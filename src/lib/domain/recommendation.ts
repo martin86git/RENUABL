@@ -50,10 +50,11 @@ export const ADD_ONS: AddOn[] = [
   { id: "smart-home", name: "Smart Home Integration", blurb: "Connect and optimise your whole home.", price: 690 },
 ];
 
+/** Display order is the key order: good, better, best. */
 export const TIER_LABELS: Record<SystemTier, string> = {
-  recommended: "Recommended",
-  independence: "Higher independence",
   essential: "Essential",
+  recommended: "Recommended",
+  independence: "Maximum",
 };
 
 export function estimateAnnualUsage(profile: EnergyProfile): number {

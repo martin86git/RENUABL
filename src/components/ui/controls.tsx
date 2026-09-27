@@ -27,7 +27,7 @@ export function YesNo({ value, onChange, label }: { value: boolean | undefined; 
   );
 }
 
-/** Segmented control, e.g. Recommended / Higher independence / Essential. */
+/** Segmented control, e.g. Essential / Recommended / Maximum. */
 export function Segmented<T extends string>({
   value,
   onChange,

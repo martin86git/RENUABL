@@ -142,8 +142,8 @@ function SystemScreen() {
           >
             <Gift className="h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
             <span>
-              <span className="font-medium">Higher independence</span> includes {CARE_FREE_MONTHS} months of RENUABL Care free (valued at $
-              {careIncludedValue()}).
+              <span className="font-medium">{TIER_LABELS.independence}</span> includes {CARE_FREE_MONTHS} months of RENUABL Care free
+              (valued at ${careIncludedValue()}).
             </span>
           </button>
         )}

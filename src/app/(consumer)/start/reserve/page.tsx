@@ -14,7 +14,7 @@ import { PRODUCT_IMAGES } from "@/components/ui/brand-art";
 import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
 import { CARE_FREE_MONTHS, CARE_PLAN, careIncludedFor, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
 import { formatCurrency, formatDate } from "@/lib/domain/format";
-import { describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
+import { TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
 import { getWindow } from "@/lib/domain/scheduling";
 import type { AddOnId, LineItemId } from "@/lib/domain/types";
 import { formatAddress } from "@/lib/mock/addresses";
@@ -135,7 +135,7 @@ function ReserveScreen() {
               <p className="truncate text-[14px] text-ink">
                 {CARE_PLAN.name} · {CARE_FREE_MONTHS} months
               </p>
-              <p className="text-[12px] text-muted">Included with Higher independence</p>
+              <p className="text-[12px] text-muted">Included with {TIER_LABELS.independence}</p>
             </div>
             <p className="text-right text-[14px]">
               <s className="mr-1.5 text-muted">{formatCurrency(careIncludedValue())}</s>

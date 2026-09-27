@@ -5,6 +5,7 @@ import { useState } from "react";
 import { MascotAvatar } from "@/components/ui/brand-art";
 import { Segmented } from "@/components/ui/controls";
 import { Button, Card, cn } from "@/components/ui/primitives";
+import { TIER_LABELS } from "@/lib/domain/recommendation";
 import { CARE_FREE_MONTHS, CARE_PLAN, careIncludedValue, carePriceLabel, careYearlySaving, type CareBilling } from "@/lib/domain/care";
 
 /**
@@ -91,7 +92,9 @@ export function CareIncludedCard({ className }: { className?: string }) {
           <p className="text-[15px] font-medium text-forest">
             {CARE_FREE_MONTHS} months free {CARE_PLAN.name}
           </p>
-          <p className="text-[12.5px] text-forest/80">Valued at ${careIncludedValue()} · included with Higher independence</p>
+          <p className="text-[12.5px] text-forest/80">
+            Valued at ${careIncludedValue()} · included with {TIER_LABELS.independence}
+          </p>
         </div>
       </div>
       <ul className="mt-3 grid gap-1.5 sm:grid-cols-2">

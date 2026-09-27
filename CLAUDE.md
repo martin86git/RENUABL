@@ -19,7 +19,7 @@
 - The reservation deposit is $499 (`ASSUMPTIONS.deposit`).
 - Checkout is an editable basket: optional items can be removed or added back; the core system is edited on the system step.
 - RENUABL Care (`src/lib/domain/care.ts`, $19/month or $199/year) is opt-in only — never pre-selected, never charged with the deposit, billed after switch-on.
-- The top package (Higher independence) includes 12 months of RENUABL Care free (valued at $199). After that it never auto-renews into a charge; continuing is the customer's choice.
+- System options, in order: Essential · Recommended (default) · Maximum. The Maximum package includes 12 months of RENUABL Care free (valued at $199). After that it never auto-renews into a charge; continuing is the customer's choice.
 - Desktop flow steps are centred columns (`FlowStep` `width`), not left-aligned.
 - Post-purchase customers book service visits with their installer at `/my/service` (`src/lib/domain/service.ts`). Never quote a call-out fee in the UI: warranty work is free, other fees are confirmed before the visit is locked in.
 - The confirmation call is booked by the customer via HubSpot Meetings (`NEXT_PUBLIC_HUBSPOT_MEETINGS_URL`, `src/lib/domain/booking.ts`).

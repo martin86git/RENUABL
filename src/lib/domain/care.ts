@@ -34,7 +34,7 @@ export function carePriceLabel(billing: CareBilling): string {
   return billing === "monthly" ? `$${CARE_PLAN.monthly}/month` : `$${CARE_PLAN.yearly}/year`;
 }
 
-/** The top package ("Higher independence") includes RENUABL Care free for the first year. */
+/** The top package ("Maximum") includes RENUABL Care free for the first year. */
 export const CARE_FREE_MONTHS = 12;
 export const CARE_INCLUDED_TIER = "independence" as const;
 

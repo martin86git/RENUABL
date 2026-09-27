@@ -13,6 +13,7 @@ import {
   priceSystem,
   recommendSystem,
   suggestedAdditions,
+  TIER_LABELS,
 } from "./recommendation";
 import { buildAvailability, fromISODate } from "./scheduling";
 import { SERVICE_WINDOWS, buildServiceAvailability, mayBeWarranty } from "./service";
@@ -203,7 +204,7 @@ describe("HubSpot booking", () => {
 });
 
 describe("RENUABL Care included with the top package", () => {
-  it("is free for 12 months only on Higher independence", () => {
+  it("is free for 12 months only on the Maximum package", () => {
     expect(careIncludedFor("independence")).toBe(true);
     expect(careIncludedFor("recommended")).toBe(false);
     expect(careIncludedFor("essential")).toBe(false);
@@ -228,5 +229,11 @@ describe("service visits", () => {
   it("treats annual checks as maintenance, faults as possible warranty", () => {
     expect(mayBeWarranty("health-check")).toBe(false);
     expect(mayBeWarranty("battery")).toBe(true);
+  });
+});
+
+describe("system options", () => {
+  it("are shown Essential, Recommended, Maximum", () => {
+    expect(Object.values(TIER_LABELS)).toEqual(["Essential", "Recommended", "Maximum"]);
   });
 });
