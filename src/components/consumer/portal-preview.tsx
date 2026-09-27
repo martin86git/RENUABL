@@ -18,7 +18,7 @@ import { getToday } from "@/lib/services/home";
 const FEATURES: { icon: LucideIcon; title: string; detail: string }[] = [
   { icon: Zap, title: "What your panels make", detail: "Every day, with what you used and saved" },
   { icon: CircleCheck, title: "System health", detail: "A heads-up if something needs a look" },
-  { icon: Wrench, title: "Book a service", detail: "With your installer, at a time that suits" },
+  { icon: Wrench, title: "Book a service", detail: "With your installation partner, at a time that suits" },
   { icon: MessageCircle, title: "Ask RENUABL", detail: "Plain-English answers about your home" },
 ];
 
@@ -89,7 +89,7 @@ export function PortalTeaser({ className, closeLabel = "Back to my system" }: { 
             <p className="text-[15px] text-ink">Your home, in one app</p>
             <p className="mt-1 text-[13px] leading-snug text-muted">
               Once you&apos;re switched on, My RENUABL shows what your panels make, your battery and what you&apos;ve saved, and books
-              service with your installer.
+              service with your installation partner.
             </p>
           </div>
         </div>

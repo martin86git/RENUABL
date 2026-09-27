@@ -100,7 +100,7 @@ function ConfirmedScreen() {
                 }
               />
             )}
-            {installer && <Item icon={UserRound} title="Matched installer" detail={installer.name} />}
+            {installer && <Item icon={UserRound} title="Installation partner" detail={installer.name} />}
             {state.reservation && (
               <Item
                 icon={Lock}

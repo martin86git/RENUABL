@@ -72,7 +72,7 @@ export function installEvent(opts: { reference: string; date: string; installer?
   return {
     id: `${opts.reference}-install`,
     title: "Solar installation (RENUABL)",
-    description: `${opts.installer ? `${opts.installer} arrives` : "Your installer arrives"} between 7am and 9am. Most installs finish the same day. Reservation ${opts.reference}.`,
+    description: `${opts.installer ? `${opts.installer} arrives` : "Your installation partner arrives"} between 7am and 9am. Most installs finish the same day. Reservation ${opts.reference}.`,
     location: opts.address,
     start: marketDateTime(opts.date, 7),
     end: marketDateTime(opts.date, 15),

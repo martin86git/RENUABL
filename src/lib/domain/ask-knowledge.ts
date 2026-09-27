@@ -31,11 +31,11 @@ export const ASK_FACTS = [
   "Victorian homes may be eligible for Solar Victoria's solar panel rebate and interest-free loan (new solar systems only, subject to Solar Victoria's eligibility criteria). The customer can switch these on at checkout.",
   `Reserving an install date is free. After the 15-minute confirmation call, a ${money(ASSUMPTIONS.deposit)} refundable deposit locks in the date; the balance is due once the system is installed and switched on.`,
   // Installation
-  `The customer picks the install day; the installer arrives between ${INSTALL_ARRIVAL.label}. Most installs take one day.`,
+  `The customer picks the install day; the installation partner arrives between ${INSTALL_ARRIVAL.label}. Most installs take one day.`,
   "The 15-minute confirmation call is a check of the details (roof, switchboard, access), not a sales call. The customer books it themselves after reserving.",
-  "In Victoria the matched installer is Primero Electric & Solar. Alternatives are available if the customer asks.",
+  "RENUABL calls the installers it works with 'installation partners'; use that term. In Victoria the matched installation partner is Primero Electric & Solar. Alternatives are available if the customer asks.",
   // After install
-  "After switch-on, the My RENUABL app shows what the panels make, the battery level and what's been saved, gives a heads-up if something needs a look, and books service visits with the installer. Warranty work is free; any other fee is confirmed before a visit is booked.",
+  "After switch-on, the My RENUABL app shows what the panels make, the battery level and what's been saved, gives a heads-up if something needs a look, and books service visits with the installation partner. Warranty work is free; any other fee is confirmed before a visit is booked.",
   "A smart EV charger can be added at checkout. Heat pump hot water, smart switchboards, home backup and smart home integration aren't priced online yet: the customer can tick them to discuss, and they're talked through and quoted on the 15-minute call. Never quote a price for them.",
 ];
 
@@ -83,7 +83,7 @@ export function describeSnapshot(s: AskSnapshot): string[] {
   if (s.priceAfterRebates) out.push(`Price after rebates: ${money(s.priceAfterRebates)}`);
   if (s.rebates?.length) out.push(`Rebates applied: ${s.rebates.join("; ")}`);
   if (s.installDate) out.push(`Install date: ${s.installDate}`);
-  if (s.installer) out.push(`Installer: ${s.installer}`);
+  if (s.installer) out.push(`Installation partner: ${s.installer}`);
   if (s.reserved) out.push("Has reserved their date");
   return out;
 }

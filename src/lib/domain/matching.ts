@@ -24,7 +24,7 @@ export function rankInstallers(installers: Installer[], postcode: string): Insta
         const score = quality * 0.3 + reliability * 0.25 + workmanship * 0.25 + experience * 0.1 + capacity * 0.1;
 
         const reasons: string[] = [];
-        if (installer.preferred) reasons.push(`RENUABL's installer of choice, based in ${installer.suburbBase}.`);
+        if (installer.preferred) reasons.push(`RENUABL's installation partner of choice, based in ${installer.suburbBase}.`);
         else reasons.push(`Works in your area, based in ${installer.suburbBase}.`);
         if (installer.reviewSource)
           reasons.push(`Rated ${installer.rating.toFixed(1)} from ${installer.reviewCount} ${installer.reviewSource} reviews.`);
@@ -35,7 +35,6 @@ export function rankInstallers(installers: Installer[], postcode: string): Insta
             reasons.push(`${Math.round(installer.firstTimePassRate * 100)}% of systems pass inspection first time.`);
           if (installer.rating >= 4.8) reasons.push(`Rated ${installer.rating.toFixed(1)} by ${installer.reviewCount} RENUABL customers.`);
         }
-        reasons.push(`Has capacity for your preferred timing.`);
 
         return { installer, score: Math.round(score * 1000) / 1000, reasons };
       })

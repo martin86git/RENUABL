@@ -131,6 +131,18 @@ body {
   }
 }
 
+/* "Finding your installation partner": rings spreading out from the centre. */
+@keyframes radar {
+  from {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
@@ -148,6 +160,9 @@ body {
 .animate-bounce-soft {
   animation: bounce-soft 3.6s infinite;
 }
+.animate-radar {
+  animation: radar 2.4s ease-out infinite;
+}
 .animate-fade-up {
   /* "backwards" (not "both"): no transform lingers after the animation, so blended artwork and fixed elements inside still work. */
   animation: fade-up 0.45s ease-out backwards;
@@ -156,6 +171,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
   .animate-bounce-soft,
+  .animate-radar,
   .animate-fade-up {
     animation: none;
   }

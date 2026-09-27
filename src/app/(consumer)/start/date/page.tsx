@@ -37,7 +37,7 @@ function DateScreen() {
         </div>
       </div>
       <p className="mt-3 text-[12.5px] leading-snug text-muted">
-        Your installer will text you when they&apos;re on the way. Most installs are finished the same day.
+        Your installation partner will text you when they&apos;re on the way. Most installs are finished the same day.
       </p>
     </div>
   );

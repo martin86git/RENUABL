@@ -13,7 +13,7 @@ const FAQ = [
   },
   {
     q: "Can I change my installation date?",
-    a: "Yes — free of charge up to 72 hours before. Message us and we'll arrange it with your installer.",
+    a: "Yes — free of charge up to 72 hours before. Message us and we'll arrange it with your installation partner.",
   },
   { q: "What does my warranty cover?", a: "25 years on panels, 10 years on inverter and battery, plus the RENUABL workmanship guarantee." },
 ];
@@ -31,7 +31,7 @@ export default function SupportPage() {
           <Card className="h-full bg-forest p-5 text-white transition hover:opacity-95">
             <Wrench className="h-5 w-5 text-white/80" aria-hidden />
             <p className="mt-3 text-[16px] font-medium">Book a service</p>
-            <p className="text-[14px] text-white/75">Your installer, at a time that suits.</p>
+            <p className="text-[14px] text-white/75">Your installation partner, at a time that suits.</p>
             <p className="mt-3 inline-flex items-center gap-1.5 text-[13px]">
               Book now <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
             </p>

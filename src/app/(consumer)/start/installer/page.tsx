@@ -1,20 +1,78 @@
 "use client";
 
-import { ArrowRight, BadgeCheck, ChartColumn, ChevronRight, CircleCheck, ShieldCheck, Star, UserRound, X } from "lucide-react";
+import { ArrowRight, BadgeCheck, ChartColumn, Check, ChevronRight, CircleCheck, ShieldCheck, Star, UserRound, X } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
-import { useFlow } from "@/components/consumer/flow-state";
+import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
-import { Button, Card } from "@/components/ui/primitives";
+import { MascotAvatar } from "@/components/ui/brand-art";
+import { Button, Card, cn } from "@/components/ui/primitives";
 import { formatDate } from "@/lib/domain/format";
 import { getAvailability, matchInstallers } from "@/lib/services/consumer";
+
+const MATCH_STEP_MS = 1500;
+
+/**
+ * "Finding your installation partner": about five seconds of matching, once per
+ * address. Each line is something the match really takes into account.
+ */
+function Matching({ steps, onDone }: { steps: string[]; onDone: () => void }) {
+  const [done, setDone] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => (done >= steps.length ? onDone() : setDone((d) => d + 1)), done >= steps.length ? 600 : MATCH_STEP_MS);
+    return () => clearTimeout(t);
+  }, [done, steps.length, onDone]);
+
+  return (
+    <div className="max-w-md" aria-live="polite">
+      <div className="relative mx-auto my-4 grid h-40 w-40 place-items-center" aria-hidden>
+        {[0, 0.8, 1.6].map((delay) => (
+          <span
+            key={delay}
+            className="animate-radar absolute inset-6 rounded-full border border-forest/40 bg-sage/30"
+            style={{ animationDelay: `${delay}s` }}
+          />
+        ))}
+        <MascotAvatar className="relative h-16 w-16 ring-4 ring-canvas" />
+      </div>
+      <ul className="mt-6 space-y-4">
+        {steps.map((label, i) => {
+          const complete = i < done;
+          return (
+            <li key={label} className={cn("flex items-center gap-4 text-[15px] transition-colors", complete ? "text-ink" : "text-muted")}>
+              <span
+                className={cn(
+                  "grid h-7 w-7 shrink-0 place-items-center rounded-full border transition-colors",
+                  complete ? "border-forest bg-forest text-white" : "border-line-strong",
+                )}
+              >
+                {complete && <Check className="h-4 w-4" strokeWidth={2.4} />}
+              </span>
+              {label}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 function InstallerScreen() {
   const router = useRouter();
   const { state, update } = useFlow();
+  const { outcome, config } = useSystem();
+  const postcode = state.address?.postcode ?? "";
+  const matching = state.matchedPostcode !== postcode;
+  const matchSteps = [
+    `Finding installation partners who cover ${state.address?.suburb ?? "your area"}`,
+    config.batteryKwh > 0
+      ? `Matching your ${outcome.solarKw} kW solar and battery to the right team`
+      : `Matching your ${outcome.solarKw} kW system to the right team`,
+    "Checking their earliest install dates",
+  ];
   const matches = useMemo(() => matchInstallers(state.address?.postcode ?? ""), [state.address?.postcode]);
   const selectedId = state.installerId ?? matches[0]?.installer.id;
   const match = matches.find((m) => m.installer.id === selectedId) ?? matches[0];
@@ -28,24 +86,31 @@ function InstallerScreen() {
   }, [state.installerId, matches, update]);
 
   if (!match) return null;
+  if (matching) {
+    return (
+      <FlowStep width="narrow" title="Finding your installation partner." subtitle="Matching you with the right team for your home.">
+        <Matching steps={matchSteps} onDone={() => update({ matchedPostcode: postcode })} />
+      </FlowStep>
+    );
+  }
   const { installer } = match;
   const choose = (id: string) => update({ installerId: id, installDate: null, windowId: null });
 
   return (
     <FlowStep
       width="narrow"
-      title="Your installer is matched."
-      subtitle="We've found the best installer for your home."
+      title="Your installation partner is matched."
+      subtitle="We've found the best team to install your system."
       cta={
         <Button size="lg" className="w-full lg:w-72" onClick={() => router.push(stepHref("date"))}>
           Continue <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
         </Button>
       }
     >
-      <div className="max-w-md space-y-4">
+      <div className="animate-fade-up max-w-md space-y-4">
         <Card className="p-5">
           <div className="flex items-start gap-4">
-            {/* Monogram until the installer's own logo is supplied. */}
+            {/* Monogram until the partner's own logo is supplied. */}
             <span
               className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-sage text-[18px] tracking-wide text-forest"
               aria-hidden
@@ -67,7 +132,7 @@ function InstallerScreen() {
                   </span>
                 </p>
               )}
-              {installer.preferred && <p className="text-[12.5px] text-positive">RENUABL installer of choice</p>}
+              {installer.preferred && <p className="text-[12.5px] text-positive">RENUABL installation partner of choice</p>}
               <ul className="mt-2 space-y-1 text-[13px] text-ink-2">
                 {[
                   "Accredited & insured",
@@ -86,9 +151,7 @@ function InstallerScreen() {
 
           <div className="mt-5 border-t border-line pt-4">
             <p className="text-[14px] text-ink">Why we matched them</p>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted">
-              Best fit for your location, system and preferred installation window.
-            </p>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted">Best fit for your location and your system.</p>
             <ul className="mt-2 space-y-1 text-[13px] text-muted">
               {match.reasons.slice(1, 4).map((r) => (
                 <li key={r}>· {r}</li>
@@ -101,7 +164,7 @@ function InstallerScreen() {
               <Dialog.Trigger className="mt-4 flex w-full items-center gap-3 rounded-2xl bg-canvas px-4 py-3 text-left">
                 <UserRound className="h-5 w-5 text-muted" strokeWidth={1.5} />
                 <span className="flex-1">
-                  <span className="block text-[13px] text-ink-2">Prefer another installer?</span>
+                  <span className="block text-[13px] text-ink-2">Prefer another partner?</span>
                   <span className="block text-[12px] text-muted">View alternatives</span>
                 </span>
                 <ChevronRight className="h-4 w-4 text-muted" />
@@ -110,7 +173,7 @@ function InstallerScreen() {
                 <Dialog.Overlay className="fixed inset-0 z-40 bg-black/25" />
                 <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[80dvh] overflow-y-auto rounded-t-[28px] bg-canvas p-6 pb-safe shadow-[var(--shadow-lift)] sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-[460px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[28px]">
                   <div className="flex items-center justify-between">
-                    <Dialog.Title className="text-[18px] font-medium">Other installers near you</Dialog.Title>
+                    <Dialog.Title className="text-[18px] font-medium">Other installation partners near you</Dialog.Title>
                     <Dialog.Close className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2" aria-label="Close">
                       <X className="h-5 w-5" />
                     </Dialog.Close>
@@ -132,7 +195,7 @@ function InstallerScreen() {
                               <span className="block text-[12px] text-muted">
                                 {m.installer.verifiedStats
                                   ? `${m.installer.rating.toFixed(1)} ★ · ${m.installer.installsCompleted.toLocaleString("en-AU")} installs`
-                                  : "RENUABL-vetted installer"}
+                                  : "RENUABL-vetted installation partner"}
                               </span>
                             </span>
                             <span className="text-[13px] text-ink-2">Select</span>
@@ -148,7 +211,7 @@ function InstallerScreen() {
                         onClick={() => choose(matches[0].installer.id)}
                         className="mt-4 text-[13px] text-ink-2 underline underline-offset-4"
                       >
-                        Go back to our recommended installer
+                        Go back to our recommended partner
                       </button>
                     </Dialog.Close>
                   )}
@@ -160,7 +223,7 @@ function InstallerScreen() {
 
         <ul className="grid grid-cols-3 gap-2 pt-2 text-center text-[11.5px] leading-tight text-muted">
           {[
-            { icon: ShieldCheck, label: "Vetted installers" },
+            { icon: ShieldCheck, label: "Vetted partners" },
             { icon: BadgeCheck, label: "Accredited & insured" },
             { icon: ChartColumn, label: "Proven track record" },
           ].map(({ icon: Icon, label }) => (

@@ -3,7 +3,7 @@ export const FLOW_STEPS = [
   { key: "home", title: "Your home", subtitle: "Your address", routes: ["analysing"] },
   { key: "about", title: "About your home", subtitle: "Your bill and a few details", routes: ["profile"] },
   { key: "system", title: "Your system", subtitle: "Sized from your bill", routes: ["system", "extras"] },
-  { key: "installer", title: "Your installer", subtitle: "We've matched the best fit", routes: ["installer"] },
+  { key: "installer", title: "Installation partner", subtitle: "Matched to your home", routes: ["installer"] },
   { key: "date", title: "Choose your date", subtitle: "Pick what works for you", routes: ["date"] },
   { key: "secure", title: "Reserve your date", subtitle: "Nothing to pay today", routes: ["reserve"] },
   { key: "confirmation", title: "Confirmation", subtitle: "Final details", routes: ["confirmed"] },

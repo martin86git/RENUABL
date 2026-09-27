@@ -41,7 +41,7 @@ export default function HealthPage() {
             <StatRow label="Solar" value={`${household.solarKw} kW`} />
             <StatRow label="Battery" value={`${household.batteryKwh} kWh`} />
             <StatRow label="Installed" value={formatDate(household.installedOn, { day: "numeric", month: "short", year: "numeric" })} />
-            <StatRow label="Installer" value={household.installer} />
+            <StatRow label="Installation partner" value={household.installer} />
           </div>
         </Card>
       </div>

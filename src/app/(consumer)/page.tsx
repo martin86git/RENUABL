@@ -17,7 +17,7 @@ export default function HomePage() {
             Solar and batteries, sized to your bill.
           </h1>
           <p className="mt-4 max-w-md text-[16px] leading-relaxed text-muted lg:mt-6 lg:text-[18px]">
-            Upload your bill, get one system made for your home, and pick your install date. One installer, one price.
+            Upload your bill, get one system made for your home, and pick your install date. One installation partner, one price.
           </p>
           <AddressEntry className="mt-7 max-w-lg lg:mt-10" />
           <div className="mt-4 hidden lg:block">

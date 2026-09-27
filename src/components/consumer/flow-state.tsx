@@ -34,6 +34,8 @@ export interface FlowState {
   /** RENUABL Care membership, opt-in only (null = not added). */
   care: CareBilling | null;
   installerId: string | null;
+  /** The postcode the partner-matching sequence last ran for (it plays once per address). */
+  matchedPostcode: string | null;
   installDate: string | null;
   windowId: string | null;
   reservation: ReservationResult | null;
@@ -63,6 +65,7 @@ const EMPTY: FlowState = {
   addOns: [],
   care: null,
   installerId: null,
+  matchedPostcode: null,
   installDate: null,
   windowId: null,
   reservation: null,

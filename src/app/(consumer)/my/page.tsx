@@ -69,7 +69,7 @@ export default async function MyHomePage() {
                 detail={allGood ? "All systems online" : health.find((h) => h.status !== "good")!.detail}
               />
               <Row href="/my/support" icon={Headphones} title="Support" detail="Get help or book a service" />
-              <Row href="/my/service" icon={Wrench} title="Book a service" detail="Your installer, at a time that suits" />
+              <Row href="/my/service" icon={Wrench} title="Book a service" detail="Your installation partner, at a time that suits" />
               <Row href="/my/upgrades" icon={Triangle} title="Upgrade" detail="Explore new products" />
             </ul>
           </Card>

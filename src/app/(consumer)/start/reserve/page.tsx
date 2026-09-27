@@ -370,7 +370,7 @@ function ReserveScreen() {
         {state.address && (
           <StatRow label="Home" value={<span className="block max-w-[220px] truncate">{formatAddress(state.address)}</span>} />
         )}
-        {installer && <StatRow label="Installer" value={installer.name} />}
+        {installer && <StatRow label="Installation partner" value={installer.name} />}
         {state.installDate && (
           <StatRow
             label="Installation"

@@ -57,7 +57,7 @@ export function orderConfirmationEmail(o: OrderEmail): { subject: string; html: 
 <p style="color:#6B6B6B;margin:0 0 24px">Your date is reserved (${esc(o.reference)}). There's nothing to pay today.</p>
 <div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:16px">
 <table style="width:100%;border-collapse:collapse;font-size:14px">
-${o.address ? row("Home", o.address) : ""}${o.installer ? row("Installer", o.installer) : ""}${o.installDate ? row("Installation", `${o.installDate}${o.arrival ? `, arrival ${o.arrival}` : ""}`) : ""}${o.call ? row("Confirmation call", o.call) : ""}
+${o.address ? row("Home", o.address) : ""}${o.installer ? row("Installation partner", o.installer) : ""}${o.installDate ? row("Installation", `${o.installDate}${o.arrival ? `, arrival ${o.arrival}` : ""}`) : ""}${o.call ? row("Confirmation call", o.call) : ""}
 </table></div>
 <div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:16px">
 <p style="margin:0 0 8px">${esc(clip(o.system, 200))}</p>
@@ -77,7 +77,7 @@ ${o.discuss?.length ? `<p style="font-size:14px;margin:12px 0 0">To discuss on y
     `Your date is reserved (${o.reference}). There's nothing to pay today.`,
     "",
     o.address && `Home: ${o.address}`,
-    o.installer && `Installer: ${o.installer}`,
+    o.installer && `Installation partner: ${o.installer}`,
     o.installDate && `Installation: ${o.installDate}${o.arrival ? `, arrival ${o.arrival}` : ""}`,
     o.call && `Confirmation call: ${o.call}`,
     "",

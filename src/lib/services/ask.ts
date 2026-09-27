@@ -41,16 +41,16 @@ const INTENTS: { match: RegExp; answer: string }[] = [
   {
     match: /refund|cancel|deposit/i,
     answer:
-      "Reserving your date is free. The $499 deposit is only asked for after your confirmation call, and it's fully refundable until your installer confirms the site visit. If anything doesn't feel right, we'll refund it, no questions asked.",
+      "Reserving your date is free. The $499 deposit is only asked for after your confirmation call, and it's fully refundable until your installation partner confirms the site visit. If anything doesn't feel right, we'll refund it, no questions asked.",
   },
   {
     match: /install|how long|day|takes/i,
-    answer: "Most homes are done in a single day. You choose the day, and your installer arrives between 7am and 9am.",
+    answer: "Most homes are done in a single day. You choose the day, and your installation partner arrives between 7am and 9am.",
   },
   {
     match: /installer|who|trust|licen[cs]ed|accredit/i,
     answer:
-      "Every RENUABL installer is licensed, accredited and reviewed on every job. We match you with the one with the best track record in your area and the right availability.",
+      "Every RENUABL installation partner is licensed and accredited. We match you with the best fit for your area and your system, and you can see the alternatives if you'd prefer someone else.",
   },
   {
     match: /call|confirm|phone|15/i,
@@ -74,7 +74,7 @@ export const SUGGESTED_QUESTIONS: Record<AskContext, string[]> = {
   profile: ["Why do you need my bill?", "Which bill should I upload?", "Do I need a battery?"],
   recommendation: ["Do I need a battery?", "How are savings calculated?", "What if my roof is shaded?"],
   extras: ["Which upgrades are right for me?", "Is a heat pump worth it?", "Can I add these later?"],
-  installer: ["How do you choose installers?", "Can I pick someone else?"],
+  installer: ["How do you choose partners?", "Can I pick someone else?"],
   schedule: ["How long does install take?", "Can I change the date later?"],
   checkout: ["Is the deposit refundable?", "When do I pay the rest?"],
   my: ["How can I improve my savings?", "Why did I use grid power last night?", "Should I add more panels?"],
@@ -85,7 +85,7 @@ function cannedAnswer(question: string): string {
   return (
     hit?.answer ??
     (/how.*work/i.test(question)
-      ? "Tell us your address and upload your latest bill. We recommend one system sized to your home, match you with a trusted local installer, and you choose the install date. A short call confirms the details."
+      ? "Tell us your address and upload your latest bill. We recommend one system sized to your home, match you with a trusted local installation partner, and you choose the install date. A short call confirms the details."
       : "Good question. Your RENUABL specialist will cover that on your 15-minute confirmation call.")
   );
 }

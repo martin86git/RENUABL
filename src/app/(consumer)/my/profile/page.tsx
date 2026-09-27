@@ -19,7 +19,7 @@ export default function ProfilePage() {
         <div className="divide-y divide-line">
           <StatRow label="System" value={`${household.solarKw} kW solar · ${household.batteryKwh} kWh battery`} />
           <StatRow label="Installed" value={formatDate(household.installedOn, { day: "numeric", month: "short", year: "numeric" })} />
-          <StatRow label="Installer" value={household.installer} />
+          <StatRow label="Installation partner" value={household.installer} />
         </div>
       </Card>
       <Card className="overflow-hidden">

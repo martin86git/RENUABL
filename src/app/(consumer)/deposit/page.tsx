@@ -32,7 +32,7 @@ export default async function DepositPage({ searchParams }: PageProps<"/deposit"
               </div>
               <ul className="mt-3 space-y-1.5 text-[13px] leading-snug text-muted">
                 <li>Comes off your final price. The balance is due once your system is switched on.</li>
-                <li>Fully refundable until your installer confirms the site visit.</li>
+                <li>Fully refundable until your installation partner confirms the site visit.</li>
               </ul>
               <div className="mt-5">
                 <DepositPay reference={reference} email={email} amount={DEPOSIT.amount} />
