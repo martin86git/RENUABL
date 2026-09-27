@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Car, House, PlugZap, type LucideIcon } from "lucide-react";
+import { ArrowRight, BatteryCharging, Car, House, PlugZap, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { FlowStep } from "@/components/consumer/flow-shell";
@@ -15,6 +15,7 @@ import type { EnergyProfile } from "@/lib/domain/types";
 const QUESTIONS: { key: keyof EnergyProfile; label: string; icon: LucideIcon }[] = [
   { key: "ev", label: "Do you charge an EV at home now?", icon: PlugZap },
   { key: "evPlanned", label: "Planning to get an EV (or another one)?", icon: Car },
+  { key: "batteryPlanned", label: "Thinking about adding a battery later?", icon: BatteryCharging },
   { key: "backup", label: "Want backup power during outages?", icon: House },
 ];
 
@@ -31,7 +32,7 @@ export default function ProfilePage() {
     <FlowStep
       width="wide"
       title="Tell us about your home."
-      subtitle="Your latest bill and three quick questions, so we size your system to what you actually use."
+      subtitle="Your latest bill and four quick questions, so we size your system to what you actually use."
       ask={<AskRenuabl context="profile" title="Not sure?" subtitle="Ask RENUABL anything about your home." arrow="light" />}
       cta={
         <Button size="lg" className="w-full lg:w-72" disabled={!complete} onClick={() => router.push(stepHref("system"))}>

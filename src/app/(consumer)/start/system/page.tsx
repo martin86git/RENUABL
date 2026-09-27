@@ -14,7 +14,7 @@ import { Segmented, Toggle } from "@/components/ui/controls";
 import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
 import { CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
-import { TIER_LABELS, isSameConfig } from "@/lib/domain/recommendation";
+import { ASSUMPTIONS, TIER_LABELS, isSameConfig } from "@/lib/domain/recommendation";
 import type { SystemConfig, SystemTier } from "@/lib/domain/types";
 
 type Part = "solar" | "battery" | "ev" | "monitoring";
@@ -205,7 +205,10 @@ function SystemScreen() {
         <p>
           That&apos;s sized to what your home uses: about {recommendation.usage.dailyKwh} kWh a day (
           {recommendation.usage.annualKwh.toLocaleString("en-AU")} kWh a year) from your bill
-          {profile.evPlanned ? ", plus your future EV" : ""}. No bigger than you need.
+          {profile.evPlanned ? ", plus your future EV" : ""}.
+          {config.batteryKwh > 0 || profile.batteryPlanned
+            ? ` It makes about ${Math.round((ASSUMPTIONS.batteryReadySolar - 1) * 100)}% more than that, so there's spare sunshine to charge ${config.batteryKwh > 0 ? "your" : "the"} battery${config.batteryKwh > 0 ? "" : " you're planning"}, even in winter.`
+            : " No bigger than you need."}
         </p>
         <p className="text-[13px] text-muted">Your roof and switchboard are confirmed on the 15-minute call.</p>
       </PartSheet>

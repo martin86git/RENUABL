@@ -43,9 +43,9 @@ function ConfirmedScreen() {
       }
     >
       <div className="mx-auto max-w-md text-center">
-        <div className="relative mx-auto w-[240px]">
-          <Mascot pose="confirm" className="h-auto w-full" float priority />
-          <span className="absolute -bottom-3 left-1/2 grid h-11 w-11 -translate-x-1/2 place-items-center rounded-full bg-forest text-white ring-4 ring-canvas">
+        <div className="relative mx-auto w-[170px]">
+          <Mascot className="h-auto w-full" float priority />
+          <span className="absolute bottom-2 right-0 grid h-11 w-11 place-items-center rounded-full bg-forest text-white ring-4 ring-canvas">
             <Check className="h-5 w-5" strokeWidth={2.4} />
           </span>
         </div>

@@ -23,7 +23,7 @@ import type { EnergyProfile, HomeAnalysis } from "./types";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
 import { INSTALLERS } from "@/lib/mock/installers";
 
-const base: EnergyProfile = { ev: false, evPlanned: false, backup: false };
+const base: EnergyProfile = { ev: false, evPlanned: false, batteryPlanned: false, backup: false };
 const analysis: HomeAnalysis = { storeys: "single", roof: "Colorbond", orientation: "North", maxPanels: 36 };
 const bill = summariseBill({ isElectricityBill: true, periodDays: 91, usageKwh: 1547, eveningShare: 0.58, usageRate: 0.31 }) as BillSummary;
 
@@ -55,23 +55,32 @@ describe("summariseBill", () => {
 });
 
 describe("recommendSystem", () => {
-  it("sizes solar to the bill and gives every option the same panels", () => {
+  it("sizes solar without a battery to what the home uses, no more", () => {
     const { tiers, usage } = recommendSystem(base, analysis, bill);
-    expect(usage.annualKwh).toBe(bill.annualUsageKwh);
-    const panels = tiers.recommended.config.panelCount;
-    expect(tiers.essential.config.panelCount).toBe(panels);
-    expect(tiers.independence.config.panelCount).toBe(panels);
-    // Covers a year's use without oversizing by more than one panel.
+    const panels = tiers.essential.config.panelCount;
     const kwhPerPanelYear = (ASSUMPTIONS.panelWatts / 1000) * ASSUMPTIONS.dailyYieldKwhPerKw * 365;
     expect(panels * kwhPerPanelYear).toBeGreaterThanOrEqual(usage.annualKwh);
     expect((panels - 1) * kwhPerPanelYear).toBeLessThan(usage.annualKwh);
   });
 
+  it("adds generation to charge a battery, now or planned", () => {
+    const { tiers, usage } = recommendSystem(base, analysis, bill);
+    const kwhPerPanelYear = (ASSUMPTIONS.panelWatts / 1000) * ASSUMPTIONS.dailyYieldKwhPerKw * 365;
+    expect(tiers.recommended.config.panelCount).toBeGreaterThan(tiers.essential.config.panelCount);
+    expect(tiers.recommended.config.panelCount * kwhPerPanelYear).toBeGreaterThanOrEqual(usage.annualKwh * ASSUMPTIONS.batteryReadySolar);
+    expect(tiers.independence.config.panelCount).toBe(tiers.recommended.config.panelCount);
+
+    // Planning a battery later: Essential gets the same battery-ready solar, without the battery.
+    const planned = recommendSystem({ ...base, batteryPlanned: true }, analysis, bill).tiers.essential.config;
+    expect(planned.panelCount).toBe(tiers.recommended.config.panelCount);
+    expect(planned.batteryKwh).toBe(0);
+  });
+
   it("grows with a bigger bill and a planned EV", () => {
-    const small = recommendSystem(base, analysis, bill).tiers.recommended.config.panelCount;
+    const small = recommendSystem(base, analysis, bill).tiers.essential.config.panelCount;
     const ev = recommendSystem({ ...base, evPlanned: true }, analysis, bill);
     expect(ev.usage.annualKwh - bill.annualUsageKwh).toBe(ASSUMPTIONS.evAnnualKwh);
-    expect(ev.tiers.recommended.config.panelCount).toBeGreaterThan(small);
+    expect(ev.tiers.essential.config.panelCount).toBeGreaterThan(small);
   });
 
   it("differs by battery only: none, sized to evening use, one size up", () => {

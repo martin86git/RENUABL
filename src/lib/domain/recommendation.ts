@@ -31,6 +31,12 @@ export const ASSUMPTIONS = {
   baseSelfConsumption: 0.4,
   batterySizes: [10, 13.5, 20, 27] as const, // 27 = two 13.5 kWh units
   batteryUsableShare: 0.9,
+  /**
+   * With a battery (now or planned), solar is sized this much above annual use
+   * so there's daytime surplus to charge it, including through winter.
+   * PLACEHOLDER: confirm with Primero.
+   */
+  batteryReadySolar: 1.25,
   prices: {
     solarPerKw: 1050,
     batteryPerKwh: 850,
@@ -80,9 +86,12 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
-/** Panels to cover a year's use, within the roof's limit. Every option gets the same panels. */
-export function panelsNeeded(annualKwh: number, analysis: Pick<HomeAnalysis, "maxPanels">) {
-  const kw = annualKwh / (ASSUMPTIONS.dailyYieldKwhPerKw * 365);
+/**
+ * Panels to cover a year's use, within the roof's limit. A home with a
+ * battery, now or planned, needs extra generation to charge it.
+ */
+export function panelsNeeded(annualKwh: number, analysis: Pick<HomeAnalysis, "maxPanels">, battery = false) {
+  const kw = (annualKwh * (battery ? ASSUMPTIONS.batteryReadySolar : 1)) / (ASSUMPTIONS.dailyYieldKwhPerKw * 365);
   return clamp(Math.ceil((kw * 1000) / ASSUMPTIONS.panelWatts), ASSUMPTIONS.minPanels, Math.min(ASSUMPTIONS.maxPanels, analysis.maxPanels));
 }
 
@@ -103,17 +112,19 @@ function nextBatterySize(kwh: number) {
 const kwh = (n: number) => n.toLocaleString("en-AU", { maximumFractionDigits: 1 });
 
 /**
- * Three options sized from the customer's bill. Solar is the same in each
- * (what the home needs); the options differ only in battery. The customer
- * doesn't pick panel counts or battery sizes.
+ * Three options sized from the customer's bill; they differ in battery. Solar
+ * covers what the home uses, plus charging headroom whenever there's a battery
+ * now or planned. The customer doesn't pick panel counts or battery sizes.
  */
 export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, bill: BillSummary): Recommendation {
   const usage = usageBasis(bill, profile);
-  const panelCount = panelsNeeded(usage.annualKwh, analysis);
+  const panelsForUse = panelsNeeded(usage.annualKwh, analysis, profile.batteryPlanned);
+  const panelsWithBattery = panelsNeeded(usage.annualKwh, analysis, true);
   const battery = batteryNeeded(usage, profile.backup);
   const bigBattery = nextBatterySize(battery);
   const evCharger = profile.ev || profile.evPlanned;
-  const sizedTo = `Solar sized to your ${kwh(usage.dailyKwh)} kWh a day${profile.evPlanned ? ", including your future EV" : ""}`;
+  const sizedTo = (charging: boolean) =>
+    `Solar sized to your ${kwh(usage.dailyKwh)} kWh a day${profile.evPlanned ? ", including your future EV" : ""}${charging ? ", plus enough to charge a battery" : ""}`;
   const covers = (b: number) =>
     `A ${kwh(b)} kWh battery covers ${b * ASSUMPTIONS.batteryUsableShare >= usage.dailyKwh * usage.eveningShare ? "your" : "most of your"} evening use`;
 
@@ -122,18 +133,22 @@ export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, 
     tiers: {
       essential: {
         tier: "essential",
-        config: { panelCount, batteryKwh: 0, evCharger: false },
-        why: [sizedTo, "Lowest upfront cost", "Add a battery any time"],
+        config: { panelCount: panelsForUse, batteryKwh: 0, evCharger: false },
+        why: [
+          sizedTo(profile.batteryPlanned),
+          "Lowest upfront cost",
+          profile.batteryPlanned ? "Ready for the battery you're planning" : "Add a battery any time",
+        ],
       },
       recommended: {
         tier: "recommended",
-        config: { panelCount, batteryKwh: battery, evCharger },
-        why: [sizedTo, covers(battery), profile.backup ? "Keeps essentials on during outages" : "Maximises your savings"],
+        config: { panelCount: panelsWithBattery, batteryKwh: battery, evCharger },
+        why: [sizedTo(true), covers(battery), profile.backup ? "Keeps essentials on during outages" : "Maximises your savings"],
       },
       independence: {
         tier: "independence",
-        config: { panelCount, batteryKwh: bigBattery, evCharger },
-        why: [sizedTo, covers(bigBattery), "Longest backup during outages"],
+        config: { panelCount: panelsWithBattery, batteryKwh: bigBattery, evCharger },
+        why: [sizedTo(true), covers(bigBattery), "Longest backup during outages"],
       },
     },
   };

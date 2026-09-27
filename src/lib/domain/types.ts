@@ -33,6 +33,8 @@ export interface EnergyProfile {
   ev: boolean;
   /** Planning an EV (or another one): usage the bill doesn't show yet. */
   evPlanned: boolean;
+  /** Might add a battery later: solar needs headroom to charge it. */
+  batteryPlanned: boolean;
   backup: boolean;
 }
 

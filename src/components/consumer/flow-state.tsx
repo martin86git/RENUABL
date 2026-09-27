@@ -56,7 +56,7 @@ const EMPTY: FlowState = {
   attribution: null,
 };
 
-const DEFAULT_PROFILE: EnergyProfile = { ev: false, evPlanned: false, backup: false };
+const DEFAULT_PROFILE: EnergyProfile = { ev: false, evPlanned: false, batteryPlanned: false, backup: false };
 
 /** Never shown: FlowGuard keeps customers on the bill step until a bill has been read. */
 const NO_BILL: BillSummary = {
@@ -71,7 +71,7 @@ const NO_BILL: BillSummary = {
   hasSolar: false,
 };
 
-const STORAGE_KEY = "renuabl.flow.v3";
+const STORAGE_KEY = "renuabl.flow.v4";
 
 function load(): FlowState {
   try {
@@ -149,7 +149,7 @@ export function useSystem() {
 }
 
 export function isProfileComplete(p: Partial<EnergyProfile>): p is EnergyProfile {
-  return p.ev !== undefined && p.evPlanned !== undefined && p.backup !== undefined;
+  return p.ev !== undefined && p.evPlanned !== undefined && p.batteryPlanned !== undefined && p.backup !== undefined;
 }
 
 /** The "About your home" step is done once the bill is read and the questions answered. */
