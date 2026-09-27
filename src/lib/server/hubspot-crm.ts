@@ -10,14 +10,24 @@ const API = "https://api.hubapi.com/crm/v3/objects";
 
 export class HubspotError extends Error {}
 
-async function call(path: string, token: string, method: "POST" | "PATCH", body: unknown) {
+async function call(path: string, token: string, method: "GET" | "POST" | "PATCH", body?: unknown) {
   const res = await fetch(`${API}${path}`, {
     method,
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(15_000),
   });
   return res;
+}
+
+/** The contact id for an email, creating a bare contact if there isn't one. Never overwrites details. */
+export async function contactIdByEmail(email: string, token: string): Promise<string> {
+  let res = await call(`/contacts/${encodeURIComponent(email)}?idProperty=email`, token, "GET");
+  if (res.status === 404) res = await call("/contacts", token, "POST", { properties: { email } });
+  if (!res.ok) throw new HubspotError(`HubSpot contact ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const json = (await res.json()) as { id?: string };
+  if (!json.id) throw new HubspotError("HubSpot returned no contact id");
+  return json.id;
 }
 
 /** Creates the contact, or updates it when that email already exists. Returns the contact id. */

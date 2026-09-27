@@ -43,6 +43,8 @@ That's it. From then on, each push updates the site on its own.
 | `ANTHROPIC_API_KEY`                | unset           | Claude API key used to read customers' electricity bills on the "About your home" step (console.anthropic.com → API keys). Server-side only: never prefix it with `NEXT_PUBLIC_`. Without it, preview deployments use a sample bill and production shows "We can't read bills right now".                                                                                                              |
 | `ANTHROPIC_MODEL`                  | `claude-opus-5` | Optional. The Claude model that reads bills.                                                                                                                                                                                                                                                                                                                                                           |
 | `HUBSPOT_PRIVATE_APP_TOKEN`        | unset           | Sends every reservation (name, mobile, email, system, install date, ad source) to HubSpot as a contact with a note. HubSpot → Settings → Integrations → Private apps → Create, scopes `crm.objects.contacts.read` and `crm.objects.contacts.write`, then copy the token. Server-side only. Until it's set, reservations are only written to the Vercel logs.                                           |
+| `STRIPE_SECRET_KEY`                | unset           | Takes the $499 refundable deposit after the confirmation call. Stripe → Developers → API keys → Secret key (`sk_test_…` while testing, `sk_live_…` at launch). Server-side only.                                                                                                                                                                                                                       |
+| `STRIPE_WEBHOOK_SECRET`            | unset           | Lets Stripe confirm paid deposits (noted on the customer's HubSpot contact). Stripe → Developers → Webhooks → Add endpoint `https://<your-site>/api/stripe/webhook`, event `checkout.session.completed`, then copy the signing secret (`whsec_…`).                                                                                                                                                     |
 
 **Protecting previews** — to keep the site private while you test, go to **Settings → Deployment Protection** and turn on **Vercel Authentication**. Only people you invite to the Vercel team can then open it.
 
@@ -55,3 +57,11 @@ Vercel serves the repository's default branch as production. The recommended set
 1. Create a `main` branch from the current work and make it the default branch on GitHub (**Settings → General → Default branch**).
 2. In Vercel, confirm **Settings → Git → Production Branch** is `main`.
 3. Do new work on feature branches; each gets a preview link, and merging to `main` updates the live site.
+
+## Taking the deposit
+
+Reserving is free. After the 15-minute confirmation call, send the customer their deposit link:
+
+`https://<your-site>/deposit?ref=RN-1234&email=customer@example.com`
+
+Use the reservation reference from the HubSpot note (the `email` part is optional and pre-fills Stripe). The customer pays on Stripe's secure page (card, Apple Pay, Google Pay) and gets a receipt from Stripe; the payment is noted on their HubSpot contact. Refunds are made from the Stripe dashboard. Test with card 4242 4242 4242 4242, any future expiry and any CVC while using a `sk_test_` key.
