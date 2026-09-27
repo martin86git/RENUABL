@@ -1,5 +1,6 @@
+import { PREVIEW_MODE } from "@/lib/config";
 import { SAMPLE_ADDRESSES, formatAddress } from "@/lib/mock/addresses";
-import { autocomplete } from "@/lib/server/google-places";
+import { PlacesError, autocomplete } from "@/lib/server/google-places";
 
 /** GET ?q=...&session=... → address suggestions (Google Places, or sample addresses without a key). */
 export async function GET(request: Request) {
@@ -20,7 +21,9 @@ export async function GET(request: Request) {
   try {
     return Response.json({ suggestions: await autocomplete(q, session, key), source: "google" });
   } catch (e) {
-    console.error("address search failed", e instanceof Error ? e.message : e);
-    return Response.json({ suggestions: [], error: true }, { status: 502 });
+    console.error("address search failed", e instanceof Error ? e.message : e, e instanceof PlacesError ? `Fix: ${e.fix}` : "");
+    // In preview, say what Google objected to and how to fix it (Google's reason never contains the key).
+    const problem = PREVIEW_MODE && e instanceof PlacesError ? { problem: e.message, fix: e.fix } : {};
+    return Response.json({ suggestions: [], error: true, ...problem }, { status: 502 });
   }
 }

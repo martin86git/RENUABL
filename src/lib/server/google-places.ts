@@ -2,12 +2,25 @@
  * Server only. Google Places API (New): address autocomplete and details,
  * limited to Australia. Needs GOOGLE_MAPS_API_KEY with "Places API (New)" enabled.
  */
-import { addressFromComponents, type AddressComponent, type AddressSuggestion } from "@/lib/domain/address";
+import { addressFromComponents, placesProblem, type AddressComponent, type AddressSuggestion } from "@/lib/domain/address";
 import type { Address } from "@/lib/domain/types";
 
 const BASE = "https://places.googleapis.com/v1";
 
-export class PlacesError extends Error {}
+export class PlacesError extends Error {
+  constructor(
+    message: string,
+    /** What to change in Google Cloud, in plain English. */
+    readonly fix?: string,
+  ) {
+    super(message);
+  }
+}
+
+async function refused(what: string, res: Response): Promise<PlacesError> {
+  const problem = placesProblem(res.status, await res.text());
+  return new PlacesError(`Places ${what} ${res.status} ${problem.reason}`, problem.fix);
+}
 
 export async function autocomplete(input: string, sessionToken: string, key: string): Promise<AddressSuggestion[]> {
   const res = await fetch(`${BASE}/places:autocomplete`, {
@@ -21,7 +34,7 @@ export async function autocomplete(input: string, sessionToken: string, key: str
     }),
     signal: AbortSignal.timeout(8_000),
   });
-  if (!res.ok) throw new PlacesError(`Places autocomplete ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) throw await refused("autocomplete", res);
   const json = (await res.json()) as {
     suggestions?: {
       placePrediction?: {
@@ -47,7 +60,7 @@ export async function placeAddress(placeId: string, sessionToken: string, key: s
     headers: { "X-Goog-Api-Key": key, "X-Goog-FieldMask": "id,addressComponents,location" },
     signal: AbortSignal.timeout(8_000),
   });
-  if (!res.ok) throw new PlacesError(`Places details ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) throw await refused("details", res);
   const json = (await res.json()) as {
     id?: string;
     addressComponents?: AddressComponent[];

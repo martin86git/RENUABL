@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { addressFromComponents, inLaunchMarket } from "@/lib/domain/address";
+import { addressFromComponents, inLaunchMarket, placesProblem } from "@/lib/domain/address";
 import { autocomplete, placeAddress } from "./google-places";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -66,5 +66,27 @@ describe("addresses", () => {
     const address = await placeAddress("abc", "s1", "key");
     expect(address).toMatchObject({ line: "2 Hanwell Court", state: "VIC", lat: -37.88, lng: 145.16 });
     expect(new Headers(fetchMock.mock.calls[0][1]!.headers).get("X-Goog-FieldMask")).toBe("id,addressComponents,location");
+  });
+});
+
+describe("placesProblem", () => {
+  const google = (reason: string, message: string, code = 403) =>
+    JSON.stringify({ error: { code, message, status: "PERMISSION_DENIED", details: [{ reason }] } });
+
+  it("explains each common Google Cloud setup problem", () => {
+    expect(placesProblem(400, google("API_KEY_INVALID", "API key not valid. Please pass a valid API key.", 400)).fix).toMatch(
+      /isn't valid/,
+    );
+    expect(placesProblem(403, google("SERVICE_DISABLED", "Places API (New) has not been used in project 123")).fix).toMatch(/Enable/);
+    expect(placesProblem(403, google("BILLING_DISABLED", "This API method requires billing to be enabled.")).fix).toMatch(/Billing/);
+    expect(placesProblem(403, google("API_KEY_HTTP_REFERRER_BLOCKED", "Requests from referer <empty> are blocked.")).fix).toMatch(
+      /Application restrictions → None/,
+    );
+    expect(placesProblem(403, google("API_KEY_SERVICE_BLOCKED", "Requests to this API are blocked.")).fix).toMatch(/API restrictions/);
+  });
+
+  it("keeps Google's reason and copes with a non-JSON body", () => {
+    expect(placesProblem(403, google("SERVICE_DISABLED", "disabled")).reason).toBe("SERVICE_DISABLED: disabled");
+    expect(placesProblem(500, "<html>oops</html>").reason).toBe("HTTP 500: <html>oops</html>");
   });
 });

@@ -1,5 +1,6 @@
+import { PREVIEW_MODE } from "@/lib/config";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
-import { placeAddress } from "@/lib/server/google-places";
+import { PlacesError, placeAddress } from "@/lib/server/google-places";
 
 /** GET ?id=...&session=... → the full address (with coordinates) for a suggestion. */
 export async function GET(request: Request) {
@@ -17,7 +18,9 @@ export async function GET(request: Request) {
     const address = await placeAddress(id, session, key);
     return Response.json({ address }, { status: address ? 200 : 422 });
   } catch (e) {
-    console.error("address details failed", e instanceof Error ? e.message : e);
-    return Response.json({ address: null }, { status: 502 });
+    console.error("address details failed", e instanceof Error ? e.message : e, e instanceof PlacesError ? `Fix: ${e.fix}` : "");
+    // In preview, say what Google objected to and how to fix it (Google's reason never contains the key).
+    const problem = PREVIEW_MODE && e instanceof PlacesError ? { problem: e.message, fix: e.fix } : {};
+    return Response.json({ address: null, error: true, ...problem }, { status: 502 });
   }
 }
