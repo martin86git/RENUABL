@@ -35,8 +35,13 @@ export const COSTING = {
   /** Rail per panel (portrait): its width plus this, for the top and the bottom of the panel. */
   railAllowanceM: 0.1,
   railsPerPanelRow: 2,
+  /** A 40 A isolator is used for inverters whose AC output is at most this (A per phase); above it, 63 A. */
+  isolator40MaxAmps: 32,
+  /** Grid voltage (per phase) for an inverter's rated AC output current. */
+  gridVolts: 230,
+  /** EV charger installation, ex GST. */
+  evChargerInstall: 1000,
   // PLACEHOLDERS (not in the supplier list): confirm with Primero before launch.
-  evChargerInstall: 450,
   heatPumpInstall: 1200,
   addOnPrices: { "smart-switchboard": 1450, "home-backup": 1850, "smart-home": 690 } as Record<string, number>,
 } as const;
@@ -106,6 +111,21 @@ export function batteryInstallCost(modules: number) {
   return COSTING.batteryInstallPerStack + extra * (COSTING.batteryInstallPerStack / BATTERY.modulesPerStack);
 }
 
+/** Rated AC output current per phase: 8 kW single phase ≈ 34.8 A; 15 kW three phase ≈ 21.7 A. */
+export function acOutputAmps(kw: number, phase: Phase) {
+  return (kw * 1000) / (COSTING.gridVolts * (phase === "three" ? 3 : 1));
+}
+
+/**
+ * The inverter's AC isolator: NHP 40 A (2-pole single phase, 3-pole three phase)
+ * while the output is at most 32 A per phase; above that (single-phase 8 kW and
+ * up) the 63 A. Three-phase residential inverters stay under 40 A a phase.
+ */
+export function acIsolatorFor(inverterKw: number, phase: Phase) {
+  if (phase === "three") return BOS.acIsolator3ph;
+  return acOutputAmps(inverterKw, phase) <= COSTING.isolator40MaxAmps ? BOS.acIsolator : BOS.acIsolator63;
+}
+
 function line(group: CostGroup, sku: string | null, description: string, qty: number, unitCost: number): BomLine {
   return { group, sku, description, qty, unitCost, total: round2(qty * unitCost) };
 }
@@ -143,19 +163,17 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
 
   // Inverter: the battery controller when there's a battery (or one is planned), else a string inverter.
   const three = input.phase === "three";
-  let inverterFitted = false;
+  let fitted: InverterItem | null = null;
   if (hybrid && (input.panelCount > 0 || modules > 0)) {
-    const inv = selectInverter(kw, inverterOptions("hybrid", input.phase));
-    lines.push(line(modules > 0 ? "battery" : "solar", inv.sku, inv.name, 1, inv.cost));
-    inverterFitted = true;
+    fitted = selectInverter(kw, inverterOptions("hybrid", input.phase));
+    lines.push(line(modules > 0 ? "battery" : "solar", fitted.sku, fitted.name, 1, fitted.cost));
   } else if (input.panelCount > 0 && !input.existingSolar) {
-    const inv = selectInverter(kw, inverterOptions("string", input.phase));
-    lines.push(line("solar", inv.sku, inv.name, 1, inv.cost));
-    inverterFitted = true;
+    fitted = selectInverter(kw, inverterOptions("string", input.phase));
+    lines.push(line("solar", fitted.sku, fitted.name, 1, fitted.cost));
   }
-  if (inverterFitted) {
+  if (fitted) {
     const group: CostGroup = modules > 0 && input.panelCount === 0 ? "battery" : "solar";
-    const iso = three ? BOS.acIsolator3ph : BOS.acIsolator;
+    const iso = acIsolatorFor(fitted.kw, input.phase);
     lines.push(line(group, iso.sku, iso.name, 1, iso.cost));
     if (three) lines.push(line(group, null, "Three-phase inverter installation", 1, COSTING.threePhaseInstall));
   }
@@ -182,7 +200,7 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
 
   if (input.evCharger) {
     lines.push(line("ev-charger", EV_CHARGER.sku, EV_CHARGER.name, 1, EV_CHARGER.cost));
-    lines.push(line("ev-charger", null, "EV charger installation (placeholder)", 1, COSTING.evChargerInstall));
+    lines.push(line("ev-charger", null, "EV charger installation", 1, COSTING.evChargerInstall));
   }
   for (const id of input.addOns) {
     if (id === "heat-pump") {

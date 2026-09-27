@@ -21,7 +21,17 @@ import {
 import { summariseBill, type BillSummary } from "./bill";
 import { normaliseMobile, validateContact } from "./contact";
 import { BOS, PANEL, RACKING } from "./catalogue";
-import { COSTING, arrayKw, batteryInstallCost, billOfMaterials, railLengths, selectInverter, sellPrice } from "./costing";
+import {
+  COSTING,
+  acIsolatorFor,
+  acOutputAmps,
+  arrayKw,
+  batteryInstallCost,
+  billOfMaterials,
+  railLengths,
+  selectInverter,
+  sellPrice,
+} from "./costing";
 import { REBATE_RATES, batteryFactor, batteryStcs, deemingYears, rebatesFor, solarStcs, taperedKwh } from "./rebates";
 import { zoneRating } from "./zone-ratings";
 import { HYBRID_INVERTERS, STRING_INVERTERS } from "./catalogue";
@@ -526,6 +536,31 @@ describe("costing from the supplier price list", () => {
     expect(labour(three, "Three-phase inverter installation")).toBe(150);
     expect(three.some((l) => l.sku === "SGWSG5.0RT")).toBe(true);
     expect(three.some((l) => l.sku === "NHPNL340L")).toBe(true);
+  });
+
+  it("sizes the AC isolator to the inverter's output", () => {
+    expect(acOutputAmps(5, "single")).toBeCloseTo(21.7, 1);
+    expect(acOutputAmps(8, "single")).toBeCloseTo(34.8, 1);
+    // Single phase: 40 A 2-pole up to 32 A output (5 and 6 kW), 63 A above (8 and 10 kW).
+    expect(acIsolatorFor(5, "single").sku).toBe("NHPNL140L");
+    expect(acIsolatorFor(6, "single").sku).toBe("NHPNL140L");
+    expect(acIsolatorFor(8, "single")).toBe(BOS.acIsolator63);
+    expect(acIsolatorFor(10, "single")).toBe(BOS.acIsolator63);
+    // Three phase: 40 A 3-pole is ample for residential sizes (15 kW ≈ 21.7 A a phase).
+    expect(acIsolatorFor(15, "three").sku).toBe("NHPNL340L");
+    // In the bill of materials: 22 panels (10.45 kW) need an 8 kW single-phase inverter, so the 63 A.
+    const big = billOfMaterials({ ...input, panelCount: 22 });
+    expect(big.some((l) => l.sku === BOS.acIsolator63.sku)).toBe(true);
+    expect(big.some((l) => l.sku === "NHPNL140L")).toBe(false);
+  });
+
+  it("charges $1,000 ex GST to install an EV charger", () => {
+    const ev = billOfMaterials({ ...input, evCharger: true }).find((l) => l.description === "EV charger installation");
+    expect(ev!.total).toBe(1000);
+  });
+
+  it("buys panel clips in packs of 100", () => {
+    expect(billOfMaterials({ ...input, panelCount: 26 }).find((l) => l.sku === "MTLCLIP-M4X2/SS")!.qty).toBe(200);
   });
 
   it("adds a 20% margin and GST to supplier cost", () => {

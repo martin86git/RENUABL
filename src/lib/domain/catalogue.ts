@@ -98,9 +98,14 @@ export const BOS = {
   batteryLabels: { sku: "AWMPVBATTERY", name: "Universal Battery Label Kit", cost: 28 },
   /** Minimum of ten male/female pairs per job. */
   mc4: { sku: "NEAMC4EVO2", name: "MC4 EVO2 Connector Pairs", cost: 3.5, minPairs: 10 },
-  /** Four per panel, bought in whole packs. PACK SIZE TO CONFIRM (the price list doesn't state it). */
+  /** Four per panel, bought in whole packs of 100. */
   panelClip: { sku: "MTLCLIP-M4X2/SS", name: "2 Wire Cable Clip", cost: 0.235, perPanel: 4, packSize: 100 },
-  /** NHP 40 A AC isolator (the 40 A single-phase NHP on the list is 2-pole). */
+  /** AC isolators: 40 A for inverters up to 32 A output; a 63 A for bigger single-phase inverters (see acIsolatorFor). */
   acIsolator: { sku: "NHPNL140L", name: "NHP 40 Amp 2 Pole 250 Volt AC IP66 Large N-Line Industrial Isolator", cost: 17 },
   acIsolator3ph: { sku: "NHPNL340L", name: "NHP 40 Amp 3 Pole 500 Volt AC IP66 Large N-Line Industrial Isolator", cost: 19.57 },
+  /**
+   * STAND-IN: the list has no NHP 63 A 2-pole, so this is its 63 A 3-pole (ZJ Beny).
+   * Swap for the 63 A 2-pole once it's on the price list.
+   */
+  acIsolator63: { sku: "ZJBBYA-63-L", name: "ZJ Beny 250 Volt 63 Amp 3 Pole AC Weatherproof Isolator Switch", cost: 23.95 },
 } as const;
