@@ -1,5 +1,8 @@
 import { validateContact } from "@/lib/domain/contact";
 import { PREVIEW_MODE } from "@/lib/config";
+import { buildIcs, installEvent } from "@/lib/domain/calendar";
+import { orderConfirmationEmail, type OrderEmail } from "@/lib/domain/emails";
+import { sendEmail } from "@/lib/server/email";
 import { addNote, reservationNote, upsertContact } from "@/lib/server/hubspot-crm";
 
 /**
@@ -8,7 +11,12 @@ import { addNote, reservationNote, upsertContact } from "@/lib/server/hubspot-cr
  * HUBSPOT_PRIVATE_APP_TOKEN is set.
  */
 export async function POST(request: Request) {
-  let body: { contact?: Record<string, unknown>; details?: Record<string, unknown> };
+  let body: {
+    contact?: Record<string, unknown>;
+    details?: Record<string, unknown>;
+    order?: Omit<OrderEmail, "reference" | "firstName">;
+    installDate?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -23,18 +31,21 @@ export async function POST(request: Request) {
     if (typeof v === "string" && v.trim()) details[k.slice(0, 60)] = v.trim().slice(0, 300);
   }
   const reservationId = `RN-${Math.floor(1000 + Math.random() * 9000)}`;
+  const email = () => confirmationEmail(reservationId, checked.contact, body.order, body.installDate);
 
   const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
   if (!token) {
     // No CRM yet: keep the lead in the logs rather than lose it.
     console.warn(`reservation ${reservationId} (HubSpot not configured)`, JSON.stringify({ contact: checked.contact, details }));
-    return Response.json({ ok: true, reservationId });
+    const emailed = await email();
+    return Response.json({ ok: true, reservationId, emailed });
   }
 
   try {
     const contactId = await upsertContact(checked.contact, token);
     await addNote(contactId, reservationNote(reservationId, details), token);
-    return Response.json({ ok: true, reservationId });
+    const emailed = await email();
+    return Response.json({ ok: true, reservationId, emailed });
   } catch (e) {
     console.error(
       `reservation ${reservationId} failed to reach HubSpot`,
@@ -46,5 +57,31 @@ export async function POST(request: Request) {
       { ok: false, message: PREVIEW_MODE && e instanceof Error ? `${message} (Preview detail: ${e.message.slice(0, 200)})` : message },
       { status: 502 },
     );
+  }
+}
+
+/** The order confirmation with the install day as a calendar attachment. Never blocks the reservation. */
+async function confirmationEmail(
+  reference: string,
+  contact: { email: string; firstName: string },
+  order: Omit<OrderEmail, "reference" | "firstName"> | undefined,
+  installDate: string | undefined,
+): Promise<boolean> {
+  if (!order || !Array.isArray(order.lines)) return false;
+  try {
+    const mail = orderConfirmationEmail({ ...order, reference, firstName: contact.firstName });
+    const ics =
+      installDate && /^\d{4}-\d{2}-\d{2}$/.test(installDate)
+        ? buildIcs([installEvent({ reference, date: installDate, installer: order.installer, address: order.address })])
+        : null;
+    const sent = await sendEmail({
+      to: contact.email,
+      ...mail,
+      attachments: ics ? [{ filename: "renuabl-installation.ics", content: ics, contentType: "text/calendar" }] : undefined,
+    });
+    return sent === "sent";
+  } catch (e) {
+    console.error(`reservation ${reference} confirmation email failed`, e instanceof Error ? e.message : e);
+    return false;
   }
 }

@@ -69,6 +69,23 @@ function ReserveScreen() {
       depositAfterCall: price.deposit,
       care: CARE_ENABLED ? state.care : null,
       careIncluded,
+      installDate: state.installDate,
+      order: {
+        address: state.address ? formatAddress(state.address) : undefined,
+        installer: installer?.name,
+        installDate: state.installDate
+          ? formatDate(state.installDate, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+          : undefined,
+        arrival: window?.label,
+        system: `${TIER_LABELS[state.tier]}: ${describeSystem(config)}`,
+        lines: price.lines.map((l) => ({ label: l.label, amount: l.amount })),
+        gross: price.gross,
+        rebates: price.rebateLines.map((r) => ({ label: r.label, amount: r.amount })),
+        total: price.total,
+        loan: price.loan || undefined,
+        outOfPocket: price.outOfPocket,
+        deposit: price.deposit,
+      },
       details: {
         Home: state.address ? formatAddress(state.address) : undefined,
         System: describeSystem(config),
@@ -214,64 +231,77 @@ function ReserveScreen() {
     </Card>
   );
 
-  // Solar Victoria's panel rebate is for new systems (including replacements), in Victoria.
+  // Solar Victoria (VIC homes only): the panel rebate and its loan are for new solar systems, including replacements.
   const sv = rates.solarVictoria;
   const loanMonthly = price.loan > 0 ? Math.round((price.loan / sv.loanMonths) * 100) / 100 : 0;
-  const solarVic = solarVictoriaApplies(state.address?.state ?? null) &&
-    config.panelCount > 0 &&
-    !config.existingSolar &&
-    sv.pvRebateMax > 0 && (
-      <Card className="p-5">
-        <p className="text-[15px] text-ink">Solar Victoria</p>
+  const svEligibleSystem = config.panelCount > 0 && !config.existingSolar && sv.pvRebateMax > 0;
+  const solarVic = solarVictoriaApplies(state.address?.state ?? null) && (
+    <Card className="p-5">
+      <p className="text-[15px] text-ink">Solar Victoria</p>
+      {!svEligibleSystem ? (
         <p className="mt-0.5 text-[12.5px] leading-snug text-muted">
-          Victorian homes may be eligible for a solar panel rebate of up to {formatCurrency(sv.pvRebateMax)} and an interest-free loan.{" "}
+          {config.existingSolar
+            ? "Solar Victoria's rebate and interest-free loan are for new solar systems, so they don't apply when adding to the panels you have."
+            : "Solar Victoria's rebate and interest-free loan are for new solar panels, so they don't apply to this system."}{" "}
           <a href={sv.eligibilityUrl} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-4">
-            Check eligibility
+            Solar Victoria&apos;s criteria
           </a>
         </p>
-        <div className="mt-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-[14px] text-ink">Apply the Solar Victoria rebate</p>
-            <p className="text-[12px] text-muted">If you&apos;re eligible. We confirm it with you on the call.</p>
-          </div>
-          <Toggle
-            label="Apply the Solar Victoria rebate"
-            checked={state.solarVic.rebate}
-            onChange={(rebate) => update({ solarVic: { rebate, loan: rebate && state.solarVic.loan } })}
-          />
-        </div>
-        {state.solarVic.rebate && sv.pvLoanMax > 0 && (
-          <div className="mt-4 border-t border-line pt-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[14px] text-ink">Take the interest-free loan</p>
-                <p className="text-[12px] text-muted">
-                  Up to {formatCurrency(sv.pvLoanMax)} off your upfront cost, repaid to Solar Victoria interest free.
-                </p>
-              </div>
-              <Toggle
-                label="Take the Solar Victoria interest-free loan"
-                checked={state.solarVic.loan}
-                onChange={(loan) => update({ solarVic: { ...state.solarVic, loan } })}
-              />
+      ) : (
+        <>
+          <p className="mt-0.5 text-[12.5px] leading-snug text-muted">
+            Victorian homes may be eligible for a solar panel rebate of up to {formatCurrency(sv.pvRebateMax)}
+            {sv.pvLoanMax > 0 ? ` and an interest-free loan of up to ${formatCurrency(sv.pvLoanMax)}` : ""}.{" "}
+            <a href={sv.eligibilityUrl} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-4">
+              Check eligibility
+            </a>
+          </p>
+          <div className="mt-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[14px] text-ink">Apply the Solar Victoria rebate</p>
+              <p className="text-[12px] text-muted">If you&apos;re eligible. We confirm it with you on the call.</p>
             </div>
-            {price.loan > 0 && (
-              <div className="mt-3 rounded-xl bg-sage/50 px-3.5 py-3 text-forest" aria-live="polite">
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-[13.5px]">Your upfront cost with the loan</p>
-                  <p className="text-[18px] font-medium tabular-nums">{formatCurrency(price.outOfPocket)}</p>
-                </div>
-                <p className="mt-1 text-[12px] leading-snug text-forest/80">
-                  {formatCurrency(price.total)} after rebates, less the {formatCurrency(price.loan)} loan. Then{" "}
-                  {formatCurrency(loanMonthly)} a month for {sv.loanMonths / 12} years, interest free. Subject to Solar Victoria&apos;s
-                  eligibility criteria.
-                </p>
-              </div>
-            )}
+            <Toggle
+              label="Apply the Solar Victoria rebate"
+              checked={state.solarVic.rebate}
+              onChange={(rebate) => update({ solarVic: { rebate, loan: rebate && state.solarVic.loan } })}
+            />
           </div>
-        )}
-      </Card>
-    );
+          {sv.pvLoanMax > 0 && (
+            <div className="mt-4 border-t border-line pt-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[14px] text-ink">Take the interest-free loan</p>
+                  <p className="text-[12px] text-muted">
+                    Up to {formatCurrency(sv.pvLoanMax)} off your upfront cost, repaid to Solar Victoria interest free. Comes with the
+                    rebate.
+                  </p>
+                </div>
+                <Toggle
+                  label="Take the Solar Victoria interest-free loan"
+                  checked={state.solarVic.rebate && state.solarVic.loan}
+                  onChange={(loan) => update({ solarVic: { rebate: loan || state.solarVic.rebate, loan } })}
+                />
+              </div>
+              {price.loan > 0 && (
+                <div className="mt-3 rounded-xl bg-sage/50 px-3.5 py-3 text-forest" aria-live="polite">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-[13.5px]">Your upfront cost with the loan</p>
+                    <p className="text-[18px] font-medium tabular-nums">{formatCurrency(price.outOfPocket)}</p>
+                  </div>
+                  <p className="mt-1 text-[12px] leading-snug text-forest/80">
+                    {formatCurrency(price.total)} after rebates, less the {formatCurrency(price.loan)} loan. Then{" "}
+                    {formatCurrency(loanMonthly)} a month for {sv.loanMonths / 12} years, interest free. Subject to Solar Victoria&apos;s
+                    eligibility criteria.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
 
   const additions = suggestions.length > 0 && (
     <Card className="p-5">

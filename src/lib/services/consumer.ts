@@ -7,6 +7,7 @@ import { buildCallAvailability, type CallDay } from "@/lib/domain/booking";
 import type { AddressSuggestion } from "@/lib/domain/address";
 import type { CareBilling } from "@/lib/domain/care";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
+import type { OrderEmail } from "@/lib/domain/emails";
 import type { InverterSummary } from "@/lib/domain/inverter";
 import type { RebateRates } from "@/lib/domain/rebates";
 import type { Sunshine } from "@/lib/domain/sunshine";
@@ -16,8 +17,6 @@ import { rankInstallers } from "@/lib/domain/matching";
 import { buildAvailability } from "@/lib/domain/scheduling";
 import type { Address, HomeAnalysis, ISODate, InstallerMatch } from "@/lib/domain/types";
 import { INSTALLERS } from "@/lib/mock/installers";
-
-const latency = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 
 /** Address suggestions as the customer types (Google Places; sample addresses in a preview without a key). */
 export async function suggestAddresses(
@@ -136,6 +135,8 @@ export interface ReservationResult {
   care: CareBilling | null;
   /** 12 months of RENUABL Care included free with the top package. */
   careIncluded: boolean;
+  /** The order confirmation email went out. */
+  emailed?: boolean;
 }
 
 export type ReserveResult = { ok: true; reservation: ReservationResult } | { ok: false; message?: string; errors?: ContactErrors };
@@ -150,14 +151,23 @@ export async function reserveInstall(input: {
   depositAfterCall: number;
   care: CareBilling | null;
   careIncluded: boolean;
+  /** The order breakdown for the confirmation email. */
+  order?: Omit<OrderEmail, "reference" | "firstName">;
+  installDate?: ISODate | null;
 }): Promise<ReserveResult> {
   try {
     const res = await fetch("/api/reserve", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ contact: input.contact, details: input.details }),
+      body: JSON.stringify({ contact: input.contact, details: input.details, order: input.order, installDate: input.installDate }),
     });
-    const json = (await res.json()) as { ok: boolean; reservationId?: string; message?: string; errors?: ContactErrors };
+    const json = (await res.json()) as {
+      ok: boolean;
+      reservationId?: string;
+      emailed?: boolean;
+      message?: string;
+      errors?: ContactErrors;
+    };
     if (!json.ok || !json.reservationId) return { ok: false, message: json.message, errors: json.errors };
     return {
       ok: true,
@@ -166,6 +176,7 @@ export async function reserveInstall(input: {
         depositAfterCall: input.depositAfterCall,
         care: input.careIncluded ? null : input.care,
         careIncluded: input.careIncluded,
+        emailed: json.emailed === true,
       },
     };
   } catch {
@@ -183,9 +194,26 @@ export interface CallSlot {
   time: string;
 }
 
-/** Mock: in production this books the slot in RENUABL's HubSpot calendar and emails an invite. */
-export async function bookConfirmationCall(slot: CallSlot): Promise<CallSlot> {
-  await latency(700);
+/**
+ * Books the call picked in the in-app calendar: noted on the customer's HubSpot
+ * record and emailed with a calendar invite. The booking stands even if that
+ * follow-up fails.
+ */
+export async function bookConfirmationCall(
+  slot: CallSlot,
+  who: { reference?: string; email?: string; firstName?: string; label: string },
+): Promise<CallSlot> {
+  if (who.reference) {
+    try {
+      await fetch("/api/call", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...who, ...slot }),
+      });
+    } catch {
+      /* the booking is kept in the flow; RENUABL follows up */
+    }
+  }
   return slot;
 }
 

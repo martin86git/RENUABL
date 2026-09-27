@@ -8,6 +8,7 @@ import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { CareIncludedCard } from "@/components/consumer/care-upsell";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
+import { PortalPreview, PortalTeaser } from "@/components/consumer/portal-preview";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
 import { Segmented, Toggle } from "@/components/ui/controls";
@@ -129,7 +130,12 @@ function SystemScreen() {
       width="regular"
       title="Your recommended system."
       subtitle={subtitle}
-      aside={<div className="sticky top-6 space-y-4">{estimate}</div>}
+      aside={
+        <div className="sticky top-6 space-y-4">
+          {estimate}
+          <PortalTeaser />
+        </div>
+      }
       ask={
         <AskRenuabl
           context="recommendation"
@@ -220,7 +226,10 @@ function SystemScreen() {
           </ul>
         </Card>
 
-        <div className="xl:hidden">{estimate}</div>
+        <div className="space-y-4 xl:hidden">
+          {estimate}
+          <PortalTeaser />
+        </div>
       </div>
 
       <PartSheet open={open === "solar"} onOpenChange={(o) => setOpen(o ? "solar" : null)} title="Solar System">
@@ -287,7 +296,11 @@ function SystemScreen() {
       </PartSheet>
 
       <PartSheet open={open === "monitoring"} onOpenChange={(o) => setOpen(o ? "monitoring" : null)} title="Energy Monitoring">
-        <p>Included with every RENUABL system. See what your home makes and uses in the My RENUABL app, with plain-English insights.</p>
+        <p>
+          Included with every RENUABL system. Once you&apos;re switched on, the My RENUABL app shows what your home makes and uses, with
+          plain-English insights.
+        </p>
+        <PortalPreview />
       </PartSheet>
     </FlowStep>
   );

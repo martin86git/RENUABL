@@ -1,16 +1,20 @@
 "use client";
 
-import { ArrowRight, CalendarDays, Check, Gift, HeartPulse, Lock, PhoneCall, UserRound, type LucideIcon } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, Gift, HeartPulse, Lock, Mail, PhoneCall, UserRound, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { AddToCalendar } from "@/components/consumer/add-to-calendar";
 import { CallBooking } from "@/components/consumer/call-booking";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { useFlow } from "@/components/consumer/flow-state";
+import { PortalTeaser } from "@/components/consumer/portal-preview";
 import { Mascot } from "@/components/ui/brand-art";
 import { ButtonLink, Card } from "@/components/ui/primitives";
+import { callEvent, installEvent } from "@/lib/domain/calendar";
 import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_PLAN, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
 import { formatCurrency, formatDate } from "@/lib/domain/format";
 import { getWindow } from "@/lib/domain/scheduling";
+import { formatAddress } from "@/lib/mock/addresses";
 import { getInstaller } from "@/lib/services/consumer";
 
 function Item({ icon: Icon, title, detail }: { icon: LucideIcon; title: string; detail: ReactNode }) {
@@ -29,6 +33,7 @@ function ConfirmedScreen() {
   const { state } = useFlow();
   const installer = state.installerId ? getInstaller(state.installerId) : undefined;
   const window = state.windowId ? getWindow(state.windowId) : undefined;
+  const reference = state.reservation?.reservationId ?? "RENUABL";
 
   return (
     <FlowStep
@@ -38,7 +43,7 @@ function ConfirmedScreen() {
       title={<span className="sr-only">Confirmation</span>}
       cta={
         <ButtonLink href="/my" size="lg" className="w-full lg:w-80">
-          View in my account <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
+          Preview your RENUABL home <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
         </ButtonLink>
       }
     >
@@ -57,12 +62,42 @@ function ConfirmedScreen() {
 
         <Card className="mt-6 text-left">
           <ul className="divide-y divide-line">
-            <Item icon={PhoneCall} title="15-minute system confirmation" detail={<CallBooking />} />
+            <Item
+              icon={PhoneCall}
+              title="15-minute system confirmation"
+              detail={
+                <>
+                  <CallBooking />
+                  {state.call && (
+                    <AddToCalendar
+                      event={callEvent({ reference, date: state.call.date, time: state.call.time })}
+                      filename="renuabl-call.ics"
+                    />
+                  )}
+                </>
+              }
+            />
             {state.installDate && (
               <Item
                 icon={CalendarDays}
                 title="Provisional installation date"
-                detail={`${formatDate(state.installDate, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}${window ? ` · arrival ${window.label}` : ""}`}
+                detail={
+                  <>
+                    <p className="text-[12.5px] leading-snug text-muted">
+                      {formatDate(state.installDate, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                      {window ? ` · arrival ${window.label}` : ""}
+                    </p>
+                    <AddToCalendar
+                      event={installEvent({
+                        reference,
+                        date: state.installDate,
+                        installer: installer?.name,
+                        address: state.address ? formatAddress(state.address) : undefined,
+                      })}
+                      filename="renuabl-installation.ics"
+                    />
+                  </>
+                }
               />
             )}
             {installer && <Item icon={UserRound} title="Matched installer" detail={installer.name} />}
@@ -71,6 +106,13 @@ function ConfirmedScreen() {
                 icon={Lock}
                 title="Lock in your date"
                 detail={`After your call we'll text and email a secure link for the ${formatCurrency(state.reservation.depositAfterCall)} refundable deposit.`}
+              />
+            )}
+            {state.reservation?.emailed && state.contact?.email && (
+              <Item
+                icon={Mail}
+                title="Order summary sent"
+                detail={`We've emailed your order and price breakdown to ${state.contact.email}.`}
               />
             )}
             {state.reservation?.careIncluded && (
@@ -89,6 +131,14 @@ function ConfirmedScreen() {
             )}
           </ul>
         </Card>
+
+        <div className="mt-8 text-left">
+          <p className="text-[15px] text-ink">After your system is switched on</p>
+          <p className="mb-3 mt-0.5 text-[13px] text-muted">
+            Here&apos;s what you can expect in My RENUABL. We&apos;ll show you around on your call.
+          </p>
+          <PortalTeaser closeLabel="Close" />
+        </div>
       </div>
     </FlowStep>
   );

@@ -111,7 +111,7 @@ export const NO_INCENTIVES: Incentives = { state: null, solarVicRebate: false, s
 const DEFAULT_ZONE = { zone: 4, rating: 1.185 };
 
 export function solarVictoriaApplies(state: string | null) {
-  return state === "VIC";
+  return state?.toUpperCase() === "VIC";
 }
 
 export function deemingYears(date: string, rates: RebateRates = VERIFIED_RATES) {

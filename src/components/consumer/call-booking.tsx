@@ -18,6 +18,7 @@ function CallPicker({ installDate, onBooked }: { installDate: string | null; onB
   const [date, setDate] = useState<string | null>(availability[0]?.date ?? null);
   const [time, setTime] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { state } = useFlow();
   const day = availability.find((d) => d.date === date);
 
   if (!availability.length) {
@@ -27,7 +28,13 @@ function CallPicker({ installDate, onBooked }: { installDate: string | null; onB
   async function confirm() {
     if (!date || !time) return;
     setBusy(true);
-    onBooked(await bookConfirmationCall({ date, time }));
+    const label = `${formatDate(date, { weekday: "long", day: "numeric", month: "long" })} at ${formatCallTime(time)} (${LAUNCH_MARKET.capital} time)`;
+    onBooked(
+      await bookConfirmationCall(
+        { date, time },
+        { reference: state.reservation?.reservationId, email: state.contact?.email, firstName: state.contact?.firstName, label },
+      ),
+    );
     setBusy(false);
   }
 
