@@ -66,14 +66,27 @@ export function Headline({ className, as: Tag = "h1", ...props }: ComponentProps
   );
 }
 
+/** Letter strokes of the RENUABL wordmark (the A is drawn as Λ, with a sage bar beneath). */
+const WORDMARK_PATH =
+  "M21 138V14h59a31 31 0 0 1 0 62H21M72 76l48 62" + // R
+  "M214 5v133M205 14h100M214 71h86M205 129h100" + // E
+  "M399 138V14l99 115V5" + // N
+  "M601 5v77a47 47 0 0 0 94 0V5" + // U
+  "M786 138l60.5-124L907 138" + // Λ
+  "M1016 138V14h39a28 28 0 0 1 0 56h-39m39 0h7a29.5 29.5 0 0 1 0 59h-46" + // B
+  "M1201 5v124h87"; // L
+
 export function Wordmark({ className, tone = "ink" }: { className?: string; tone?: "ink" | "light" }) {
   return (
-    <span
-      className={cn("select-none text-[20px] font-normal tracking-[0.28em]", tone === "light" ? "text-white" : "text-ink", className)}
+    <svg
+      viewBox="0 0 1300 190"
+      role="img"
       aria-label="RENUABL"
+      className={cn("h-[22px] w-auto select-none", tone === "light" ? "text-white" : "text-ink", className)}
     >
-      RENUABL
-    </span>
+      <path d={WORDMARK_PATH} fill="none" stroke="currentColor" strokeWidth="18" strokeLinejoin="miter" strokeMiterlimit="10" />
+      <rect x="778" y="166" width="137" height="19" fill="#A7BCA8" />
+    </svg>
   );
 }
 

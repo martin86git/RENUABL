@@ -10,7 +10,7 @@ export function ConsumerTopBar({ className, account = "Sign in" }: { className?:
   return (
     <header className={cn("mx-auto flex h-[76px] w-full max-w-[1440px] items-center gap-12 px-5 sm:px-8 lg:px-10", className)}>
       <Link href="/" aria-label="RENUABL home">
-        <Wordmark className="text-[22px]" />
+        <Wordmark className="h-[24px]" />
       </Link>
       <Link href="/my" className="ml-auto flex items-center gap-2.5 text-[13px] text-ink-2 hover:text-ink">
         <span className="grid h-9 w-9 place-items-center rounded-full bg-surface-2">
@@ -31,7 +31,7 @@ export function MobileHeader({ account = false, className }: { account?: boolean
         <Menu className="h-5 w-5" strokeWidth={1.5} />
       </button>
       <Link href="/" aria-label="RENUABL home">
-        <Wordmark className="text-[19px] tracking-[0.12em]" />
+        <Wordmark className="h-[20px]" />
       </Link>
       {account ? (
         <Link href="/my/profile" aria-label="Profile" className="-mr-1 grid h-9 w-9 place-items-center">
