@@ -2,13 +2,18 @@
 
 import { ArrowRight, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState, type FormEvent } from "react";
-import { parseAddress, searchAddresses } from "@/lib/services/consumer";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { inLaunchMarket, type AddressSuggestion } from "@/lib/domain/address";
+import { LAUNCH_MARKET } from "@/lib/domain/market";
 import type { Address } from "@/lib/domain/types";
-import { formatAddress } from "@/lib/mock/addresses";
+import { parseAddress, resolveAddress, suggestAddresses } from "@/lib/services/consumer";
 import { cn } from "@/components/ui/primitives";
 import { useFlow } from "./flow-state";
 import { stepHref } from "./steps";
+
+function newSession() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now());
+}
 
 export function AddressEntry({ className }: { className?: string }) {
   const router = useRouter();
@@ -17,24 +22,59 @@ export function AddressEntry({ className }: { className?: string }) {
   const [focused, setFocused] = useState(false);
   const [active, setActive] = useState(-1);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [source, setSource] = useState<"google" | "sample">("google");
+  const [busy, setBusy] = useState(false);
+  // One Places "session" per search, ended by picking an address (keeps Google billing per search, not per keystroke).
+  const session = useRef(newSession());
   const listId = useId();
-  const suggestions = searchAddresses(query);
   const showList = focused && suggestions.length > 0;
 
+  useEffect(() => {
+    if (query.trim().length < 3) return;
+    const controller = new AbortController();
+    const t = setTimeout(async () => {
+      const result = await suggestAddresses(query, session.current, controller.signal);
+      if (!controller.signal.aborted) {
+        setSuggestions(result.suggestions);
+        setSource(result.source);
+      }
+    }, 200);
+    return () => {
+      clearTimeout(t);
+      controller.abort();
+    };
+  }, [query]);
+
   function go(address: Address) {
+    if (!inLaunchMarket(address)) {
+      setError(`We're starting in ${LAUNCH_MARKET.name}. We'll be in your state soon.`);
+      return;
+    }
     update({ address });
     router.push(stepHref("analysing"));
   }
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (active >= 0 && suggestions[active]) return go(suggestions[active]);
-    const parsed = suggestions[0] ?? parseAddress(query);
-    if (!parsed) {
-      setError("Enter your street address to get started.");
+  async function pick(s: AddressSuggestion) {
+    setBusy(true);
+    const address = await resolveAddress(s.id, session.current);
+    session.current = newSession();
+    setBusy(false);
+    if (!address) {
+      setError("We couldn't find that exact address. Please pick your street address from the list.");
       return;
     }
-    go(parsed);
+    go(address);
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    const chosen = suggestions[active >= 0 ? active : 0];
+    if (chosen) return void pick(chosen);
+    // Previews without Google keep working with typed addresses.
+    const parsed = source === "sample" ? parseAddress(query) : null;
+    if (parsed) return go(parsed);
+    setError("Start typing your street address, then pick it from the list.");
   }
 
   return (
@@ -55,6 +95,7 @@ export function AddressEntry({ className }: { className?: string }) {
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
+            if (e.target.value.trim().length < 3) setSuggestions([]);
             setActive(-1);
             setError(null);
           }}
@@ -75,6 +116,7 @@ export function AddressEntry({ className }: { className?: string }) {
         <button
           type="submit"
           aria-label="Get started"
+          disabled={busy}
           className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-primary-ink transition hover:opacity-90 active:scale-[0.97]"
         >
           <ArrowRight className="h-5 w-5" strokeWidth={1.6} />
@@ -91,27 +133,25 @@ export function AddressEntry({ className }: { className?: string }) {
           role="listbox"
           className="absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-3xl bg-surface py-2 shadow-[var(--shadow-lift)] ring-1 ring-line"
         >
-          {suggestions.map((a, i) => (
+          {suggestions.map((sg, i) => (
             <li
-              key={formatAddress(a)}
+              key={sg.id}
               id={`${listId}-${i}`}
               role="option"
               aria-selected={i === active}
               onMouseDown={(e) => {
                 e.preventDefault();
-                go(a);
+                void pick(sg);
               }}
               className={cn(
                 "flex cursor-pointer items-center gap-3 px-5 py-3 text-[15px]",
                 i === active ? "bg-surface-2" : "hover:bg-surface-2",
               )}
             >
-              <MapPin className="h-4 w-4 text-muted" aria-hidden />
-              <span>
-                {a.line}
-                <span className="text-muted">
-                  , {a.suburb} {a.state} {a.postcode}
-                </span>
+              <MapPin className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+              <span className="min-w-0 truncate">
+                {sg.main}
+                {sg.secondary && <span className="text-muted">, {sg.secondary}</span>}
               </span>
             </li>
           ))}

@@ -11,6 +11,10 @@ export interface Address {
   suburb: string;
   state: string;
   postcode: string;
+  /** From Google Places when available: used for roof and sunshine data. */
+  lat?: number;
+  lng?: number;
+  placeId?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@
  */
 import { BILL_UPLOAD, isBillMediaType, type BillSummary } from "@/lib/domain/bill";
 import { buildCallAvailability, type CallDay } from "@/lib/domain/booking";
+import type { AddressSuggestion } from "@/lib/domain/address";
 import type { CareBilling } from "@/lib/domain/care";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
@@ -11,15 +12,35 @@ import { ASSUMPTIONS } from "@/lib/domain/recommendation";
 import { rankInstallers } from "@/lib/domain/matching";
 import { buildAvailability } from "@/lib/domain/scheduling";
 import type { Address, HomeAnalysis, ISODate, InstallerMatch } from "@/lib/domain/types";
-import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
 import { INSTALLERS } from "@/lib/mock/installers";
 
 const latency = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 
-export function searchAddresses(query: string): Address[] {
-  const q = query.trim().toLowerCase();
-  if (q.length < 2) return [];
-  return SAMPLE_ADDRESSES.filter((a) => `${a.line} ${a.suburb} ${a.postcode}`.toLowerCase().includes(q)).slice(0, 5);
+/** Address suggestions as the customer types (Google Places; sample addresses in a preview without a key). */
+export async function suggestAddresses(
+  query: string,
+  session: string,
+  signal?: AbortSignal,
+): Promise<{ suggestions: AddressSuggestion[]; source: "google" | "sample" }> {
+  if (query.trim().length < 3) return { suggestions: [], source: "google" };
+  try {
+    const res = await fetch(`/api/address/search?q=${encodeURIComponent(query)}&session=${encodeURIComponent(session)}`, { signal });
+    const json = (await res.json()) as { suggestions?: AddressSuggestion[]; source?: "google" | "sample" };
+    return { suggestions: json.suggestions ?? [], source: json.source ?? "google" };
+  } catch {
+    return { suggestions: [], source: "google" };
+  }
+}
+
+/** The full address for a picked suggestion. */
+export async function resolveAddress(id: string, session: string): Promise<Address | null> {
+  try {
+    const res = await fetch(`/api/address/place?id=${encodeURIComponent(id)}&session=${encodeURIComponent(session)}`);
+    const json = (await res.json()) as { address?: Address | null };
+    return json.address ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Best-effort parse for free-text addresses not in the autocomplete list. */
