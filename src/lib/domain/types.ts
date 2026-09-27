@@ -271,6 +271,10 @@ export interface Job {
   site: {
     storeys: Storeys;
     roof: string;
+    /** "Not sure" is fitted as single phase. */
+    phase?: "single" | "three";
+    /** Flat roof only: panels on tilt frames. */
+    tilt?: boolean;
     orientation: string;
     accessNotes: string;
     switchboardNotes: string;

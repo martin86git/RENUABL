@@ -25,6 +25,8 @@ import { getWindow } from "@/lib/domain/scheduling";
 import type { Crew, Job, JobStage } from "@/lib/domain/types";
 import { Handover } from "@/components/installer/handover";
 import { JobDocuments } from "@/components/installer/job-documents";
+import { JobMaterials } from "@/components/installer/materials";
+import { jobMaterials } from "@/lib/domain/materials";
 import { HomePhoto, homeBannerFor, homePhotoFor } from "@/components/ui/brand-art";
 import { ImageTile, StageBadge } from "./bits";
 import { useFieldStatus } from "./use-field-status";
@@ -216,6 +218,8 @@ export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: C
     </label>
   );
 
+  const materials = jobMaterials(job);
+
   const systemFacts = (
     <dl className="grid grid-cols-2 gap-4">
       <Fact label="Solar">
@@ -304,6 +308,11 @@ export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: C
               ),
             },
             {
+              id: "materials",
+              title: `Materials · ${materials.length} items`,
+              body: <JobMaterials reference={job.reference} lines={materials} />,
+            },
+            {
               id: "checklist",
               title: `Checklist · ${doneCount}/${checklist.length}`,
               body: <Checklist items={checklist} onToggle={toggle} />,
@@ -366,7 +375,7 @@ export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: C
 
         <Tabs.Root defaultValue="overview" className="mt-6">
           <Tabs.List className="flex gap-1 border-b border-line" aria-label="Job sections">
-            {["Overview", "Site", "System", "Handover", "Documents", "Messages", "Activity"].map((t) => (
+            {["Overview", "Site", "System", "Materials", "Handover", "Documents", "Messages", "Activity"].map((t) => (
               <Tabs.Trigger
                 key={t}
                 value={t.toLowerCase()}
@@ -466,6 +475,12 @@ export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: C
                   <ImageTile key={i.id} label={i.label} />
                 ))}
               </div>
+            </section>
+          </Tabs.Content>
+
+          <Tabs.Content value="materials" className="mt-6">
+            <section className="max-w-2xl rounded-2xl border border-line bg-surface p-6">
+              <JobMaterials reference={job.reference} lines={materials} />
             </section>
           </Tabs.Content>
 

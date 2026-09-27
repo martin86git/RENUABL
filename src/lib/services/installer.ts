@@ -6,6 +6,7 @@ import { CREWS, CURRENT_INSTALLER_ID, CURRENT_USER, INSTALLERS } from "@/lib/moc
 import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs, buildPayouts } from "@/lib/mock/jobs";
 import { todayInMarket } from "@/lib/domain/market";
 import { formatShortDate } from "@/lib/domain/format";
+import { jobsToOrderFor } from "@/lib/domain/materials";
 
 export function getCurrentInstaller() {
   return INSTALLERS.find((i) => i.id === CURRENT_INSTALLER_ID)!;
@@ -28,6 +29,11 @@ export function getJob(id: string): Job | undefined {
 export function listTodaysJobs(now = new Date()): Job[] {
   const today = todayInMarket(now);
   return listJobs().filter((j) => j.preferredDate === today || j.stage === "in-progress");
+}
+
+/** Accepted and scheduled jobs installing in the next `days` days, for the materials order. */
+export function listJobsToOrder(days: number, now = new Date()): Job[] {
+  return jobsToOrderFor(listJobs(), todayInMarket(now), days);
 }
 
 export function listCrews() {
