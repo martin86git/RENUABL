@@ -12,7 +12,7 @@ import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
 import { Segmented, Toggle } from "@/components/ui/controls";
 import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
-import { CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
+import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
 import { EXPAND_DISCLAIMER, solarSituation } from "@/lib/domain/existing-solar";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
 import { ASSUMPTIONS, TIER_LABELS, isSameConfig } from "@/lib/domain/recommendation";
@@ -151,7 +151,7 @@ function SystemScreen() {
           onChange={(t) => update({ tier: t, config: null })}
           options={(Object.keys(TIER_LABELS) as SystemTier[]).map((t) => ({ value: t, label: TIER_LABELS[t] }))}
         />
-        {careIncludedFor(state.tier) ? (
+        {!CARE_ENABLED ? null : careIncludedFor(state.tier) ? (
           <CareIncludedCard />
         ) : (
           <button

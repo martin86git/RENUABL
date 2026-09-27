@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { advanceStatus, nextFieldStatus } from "./job-status";
 import { buildCallAvailability, formatCallTime, hubspotEmbedSrc, isHubspotBookedMessage, parseHubspotMeetingsUrl } from "./booking";
-import { CARE_FREE_MONTHS, careIncludedFor, careIncludedValue, carePrice, carePriceLabel, careYearlySaving } from "./care";
+import { CARE_ENABLED, CARE_FREE_MONTHS, careIncludedFor, careIncludedValue, carePrice, carePriceLabel, careYearlySaving } from "./care";
 import { greeting, marketDateTime, todayInMarket } from "./market";
 import { rankInstallers } from "./matching";
 import {
@@ -285,7 +285,12 @@ describe("HubSpot booking", () => {
 });
 
 describe("RENUABL Care included with the top package", () => {
-  it("is free for 12 months only on the Maximum package", () => {
+  it("is switched off for now (phase 2), so no package includes it", () => {
+    expect(CARE_ENABLED).toBe(false);
+    for (const t of ["essential", "recommended", "independence"]) expect(careIncludedFor(t)).toBe(false);
+  });
+
+  it.skipIf(!CARE_ENABLED)("is free for 12 months only on the Maximum package", () => {
     expect(careIncludedFor("independence")).toBe(true);
     expect(careIncludedFor("recommended")).toBe(false);
     expect(careIncludedFor("essential")).toBe(false);

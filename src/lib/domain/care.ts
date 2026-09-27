@@ -38,8 +38,15 @@ export function carePriceLabel(billing: CareBilling): string {
 export const CARE_FREE_MONTHS = 12;
 export const CARE_INCLUDED_TIER = "independence" as const;
 
+/**
+ * RENUABL Care is switched off until performance summaries and alerts can be
+ * delivered (phase 2: inverter monitoring portal APIs). While off, nothing
+ * about Care is shown or sold, and Maximum doesn't include it.
+ */
+export const CARE_ENABLED = false;
+
 export function careIncludedFor(tier: string): boolean {
-  return tier === CARE_INCLUDED_TIER;
+  return CARE_ENABLED && tier === CARE_INCLUDED_TIER;
 }
 
 /** What the included year is worth, shown as "Valued at $199". */

@@ -13,7 +13,7 @@ import { stepHref } from "@/components/consumer/steps";
 import { PRODUCT_IMAGES } from "@/components/ui/brand-art";
 import { Toggle } from "@/components/ui/controls";
 import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
-import { CARE_FREE_MONTHS, CARE_PLAN, careIncludedFor, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
+import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_PLAN, careIncludedFor, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
 import { formatCurrency, formatDate } from "@/lib/domain/format";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { describeInverter } from "@/lib/domain/inverter";
@@ -67,7 +67,7 @@ function ReserveScreen() {
     const result = await reserveInstall({
       contact,
       depositAfterCall: price.deposit,
-      care: state.care,
+      care: CARE_ENABLED ? state.care : null,
       careIncluded,
       details: {
         Home: state.address ? formatAddress(state.address) : undefined,
@@ -78,7 +78,13 @@ function ReserveScreen() {
           ? `${formatDate(state.installDate, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}${window ? `, arrival ${window.label}` : ""}`
           : undefined,
         Installer: installer?.name,
-        "RENUABL Care": careIncluded ? `${CARE_FREE_MONTHS} months free` : state.care ? carePriceLabel(state.care) : "Not added",
+        "RENUABL Care": !CARE_ENABLED
+          ? undefined
+          : careIncluded
+            ? `${CARE_FREE_MONTHS} months free`
+            : state.care
+              ? carePriceLabel(state.care)
+              : "Not added",
         "Bill usage": state.bill ? `${state.bill.dailyUsageKwh} kWh/day${state.bill.sample ? " (sample bill)" : ""}` : undefined,
         "Existing solar": state.bill?.hasSolar
           ? `${profile.existingSize ?? "?"}${profile.existingPlan ? `, ${profile.existingPlan}` : ""}`
@@ -280,7 +286,11 @@ function ReserveScreen() {
     </Card>
   );
 
-  const care = careIncluded ? <CareIncludedCard /> : <CareUpsell value={state.care} onChange={(c) => update({ care: c })} />;
+  const care = !CARE_ENABLED ? null : careIncluded ? (
+    <CareIncludedCard />
+  ) : (
+    <CareUpsell value={state.care} onChange={(c) => update({ care: c })} />
+  );
 
   const summary = (
     <Card className="p-5">
@@ -300,6 +310,7 @@ function ReserveScreen() {
         {careIncluded ? (
           <StatRow label={CARE_PLAN.name} value={<span className="text-positive">{CARE_FREE_MONTHS} months free</span>} />
         ) : (
+          CARE_ENABLED &&
           state.care && (
             <StatRow label={CARE_PLAN.name} value={<span className="text-right">{carePriceLabel(state.care)} · after switch-on</span>} />
           )

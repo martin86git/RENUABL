@@ -8,7 +8,7 @@ import { FlowStep } from "@/components/consumer/flow-shell";
 import { useFlow } from "@/components/consumer/flow-state";
 import { Mascot } from "@/components/ui/brand-art";
 import { ButtonLink, Card } from "@/components/ui/primitives";
-import { CARE_FREE_MONTHS, CARE_PLAN, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
+import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_PLAN, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
 import { formatCurrency, formatDate } from "@/lib/domain/format";
 import { getWindow } from "@/lib/domain/scheduling";
 import { getInstaller } from "@/lib/services/consumer";
@@ -80,7 +80,7 @@ function ConfirmedScreen() {
                 detail={`Valued at $${careIncludedValue()} · starts when your system is switched on`}
               />
             )}
-            {state.reservation?.care && (
+            {CARE_ENABLED && state.reservation?.care && (
               <Item
                 icon={HeartPulse}
                 title={CARE_PLAN.name}
