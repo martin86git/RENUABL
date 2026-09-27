@@ -77,7 +77,7 @@ export function Wordmark({ className, tone = "ink" }: { className?: string; tone
   );
 }
 
-/** Handwritten accent, e.g. "Good energy lives here." */
+/** Handwritten accent, e.g. "The future lives here." */
 export function Script({ className, children }: { className?: string; children: ReactNode }) {
   return <p className={cn("font-script text-[22px] leading-[1.05] text-ink-2 -rotate-[14deg] select-none", className)}>{children}</p>;
 }

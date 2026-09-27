@@ -28,11 +28,9 @@ export default function HomePage() {
           <div className="relative mx-auto mt-4 w-[230px] lg:hidden">
             <Mascot className="h-auto w-full" float priority />
             <Script className="absolute -right-6 bottom-10 text-[20px]">
-              Good
+              The future
               <br />
-              &nbsp;energy
-              <br />
-              &nbsp;&nbsp;lives here.
+              &nbsp;lives here.
             </Script>
           </div>
 
@@ -42,11 +40,9 @@ export default function HomePage() {
         <div className="relative hidden justify-center lg:col-span-6 lg:flex">
           <Mascot className="h-auto w-[460px] xl:w-[520px]" float priority />
           <Script className="absolute bottom-16 right-[8%] text-[26px] xl:right-[14%]">
-            Good
+            The future
             <br />
-            &nbsp;energy
-            <br />
-            &nbsp;&nbsp;lives here.
+            &nbsp;lives here.
           </Script>
         </div>
       </main>
