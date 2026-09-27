@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BillSummary } from "@/lib/domain/bill";
+import type { ContactDetails } from "@/lib/domain/contact";
 import { isAboutComplete as aboutComplete } from "@/lib/domain/existing-solar";
 import { estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
 import type { CareBilling } from "@/lib/domain/care";
@@ -33,6 +34,8 @@ export interface FlowState {
   installDate: string | null;
   windowId: string | null;
   reservation: ReservationResult | null;
+  /** Given when reserving; also pre-fills the call booking. */
+  contact: ContactDetails | null;
   /** The customer booked their 15-minute confirmation call via HubSpot. */
   callBooked: boolean;
   /** The time picked in the in-app calendar (null when booked through HubSpot or not yet booked). */
@@ -52,6 +55,7 @@ const EMPTY: FlowState = {
   installDate: null,
   windowId: null,
   reservation: null,
+  contact: null,
   callBooked: false,
   call: null,
   attribution: null,

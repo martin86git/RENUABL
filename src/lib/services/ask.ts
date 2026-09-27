@@ -29,12 +29,12 @@ const INTENTS: { match: RegExp; answer: string }[] = [
   {
     match: /cost|price|expensive|afford|finance|pay/i,
     answer:
-      "Your price already includes government rebates we apply for you. Today you only pay a $499 refundable reservation deposit. The balance is due once your system is installed and switched on.",
+      "Your price already includes government rebates we apply for you. There's nothing to pay to reserve your date. After your 15-minute confirmation call, a $499 refundable deposit locks it in, and the balance is due once your system is installed and switched on.",
   },
   {
     match: /refund|cancel|deposit/i,
     answer:
-      "Your $499 reservation deposit is fully refundable until your installer confirms the site visit. If anything on the confirmation call doesn't feel right, we'll refund it — no questions asked.",
+      "Reserving your date is free. The $499 deposit is only asked for after your confirmation call, and it's fully refundable until your installer confirms the site visit. If anything doesn't feel right, we'll refund it, no questions asked.",
   },
   {
     match: /install|how long|day|takes/i,
@@ -54,12 +54,12 @@ const INTENTS: { match: RegExp; answer: string }[] = [
   {
     match: /roof|shade|tile|panel|space/i,
     answer:
-      "We size your system from your bill, so it matches what your home uses, and check your roof from satellite imagery and on the confirmation call. If something needs adjusting, we'll update your recommendation before anything is final.",
+      "We size your system from your bill, so it matches what your home uses, and check your roof, switchboard and access on the 15-minute confirmation call. If something needs adjusting, we'll update your recommendation before anything is final.",
   },
   {
     match: /sav(e|ing)|bill|money|payback/i,
     answer:
-      "Savings come from using your own solar instead of buying power, plus a small credit for what you export. Your estimate uses the usage and prices on your bill, your roof and local weather.",
+      "Savings come from using your own solar instead of buying power, plus a small credit for what you export. Your estimate uses the usage and prices on your bill and average Melbourne sunshine. Your roof is checked on the confirmation call.",
   },
 ];
 

@@ -5,9 +5,11 @@
 import { BILL_UPLOAD, isBillMediaType, type BillSummary } from "@/lib/domain/bill";
 import { buildCallAvailability, type CallDay } from "@/lib/domain/booking";
 import type { CareBilling } from "@/lib/domain/care";
+import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
+import { ASSUMPTIONS } from "@/lib/domain/recommendation";
 import { rankInstallers } from "@/lib/domain/matching";
-import { buildAvailability, stableHash } from "@/lib/domain/scheduling";
+import { buildAvailability } from "@/lib/domain/scheduling";
 import type { Address, HomeAnalysis, ISODate, InstallerMatch } from "@/lib/domain/types";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
 import { INSTALLERS } from "@/lib/mock/installers";
@@ -35,27 +37,21 @@ export function parseAddress(input: string): Address | null {
   return { line: line.trim(), suburb, state, postcode };
 }
 
-/** Steps shown while RENUABL analyses a home. */
-export const ANALYSIS_STEPS = [
-  "Checking roof size & orientation",
-  "Analysing solar potential",
-  "Local weather patterns",
-  "Electricity usage",
-  "Personalising your results",
-] as const;
+/**
+ * Steps shown after the address is entered. Only claim what actually happens
+ * here: no roof or usage checks (the roof is confirmed on the call, usage comes
+ * from the bill on the next step).
+ */
+export const ANALYSIS_STEPS = ["Finding your home", "Checking we install in your area", "Loading local sunshine averages"] as const;
 
 /**
- * Mock home analysis. In production this comes from roof imagery, solar
- * irradiance and network data for the address.
+ * What we know about the home from its address. Nothing is measured yet: no
+ * roof data source is connected, so the roof, storeys and space for panels
+ * are confirmed on the 15-minute call. Sizing is capped by the inverter only.
  */
 export function analyseHome(address: Address | null): HomeAnalysis {
-  const h = stableHash(address ? `${address.line}${address.postcode}` : "default");
-  return {
-    storeys: h % 3 === 0 ? "double" : "single",
-    roof: ["Colorbond, 20° pitch", "Terracotta tile, 22° pitch", "Concrete tile, 18° pitch"][h % 3],
-    orientation: ["North", "North / west split", "North-east"][(h >> 3) % 3],
-    maxPanels: 30 + (h % 7),
-  };
+  void address;
+  return { storeys: "single", roof: "To be confirmed", orientation: "To be confirmed", maxPanels: ASSUMPTIONS.maxPanels };
 }
 
 export type BillResult = { ok: true; bill: BillSummary } | { ok: false; message: string };
@@ -108,32 +104,49 @@ export function getAvailability(installerId: string, from = new Date()) {
   return buildAvailability(installerId, from);
 }
 
-export type PaymentMethod = "card" | "apple-pay" | "google-pay" | "bank-transfer";
-
 export interface ReservationResult {
   reservationId: string;
-  amount: number;
-  method: PaymentMethod;
+  /** Deposit taken after the confirmation call (nothing is charged to reserve). */
+  depositAfterCall: number;
   /** RENUABL Care chosen at checkout; billed only after switch-on. */
   care: CareBilling | null;
   /** 12 months of RENUABL Care included free with the top package. */
   careIncluded: boolean;
 }
 
-export async function reserveDeposit(
-  amount: number,
-  method: PaymentMethod,
-  care: CareBilling | null = null,
-  careIncluded = false,
-): Promise<ReservationResult> {
-  await latency(900);
-  return {
-    reservationId: `RN-${Math.floor(1000 + Math.random() * 9000)}`,
-    amount,
-    method,
-    care: careIncluded ? null : care,
-    careIncluded,
-  };
+export type ReserveResult = { ok: true; reservation: ReservationResult } | { ok: false; message?: string; errors?: ContactErrors };
+
+/**
+ * Reserves the install date with the customer's contact details. Nothing is
+ * charged; the reservation (and lead) goes to RENUABL's CRM.
+ */
+export async function reserveInstall(input: {
+  contact: ContactDetails;
+  details: Record<string, string | undefined>;
+  depositAfterCall: number;
+  care: CareBilling | null;
+  careIncluded: boolean;
+}): Promise<ReserveResult> {
+  try {
+    const res = await fetch("/api/reserve", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ contact: input.contact, details: input.details }),
+    });
+    const json = (await res.json()) as { ok: boolean; reservationId?: string; message?: string; errors?: ContactErrors };
+    if (!json.ok || !json.reservationId) return { ok: false, message: json.message, errors: json.errors };
+    return {
+      ok: true,
+      reservation: {
+        reservationId: json.reservationId,
+        depositAfterCall: input.depositAfterCall,
+        care: input.careIncluded ? null : input.care,
+        careIncluded: input.careIncluded,
+      },
+    };
+  } catch {
+    return { ok: false, message: "We couldn't reach RENUABL. Check your connection and try again." };
+  }
 }
 
 /** Open times for the 15-minute confirmation call (before the install date). */

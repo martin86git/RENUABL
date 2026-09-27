@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CalendarDays, Check, Gift, HeartPulse, PhoneCall, UserRound, type LucideIcon } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, Gift, HeartPulse, Lock, PhoneCall, UserRound, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { CallBooking } from "@/components/consumer/call-booking";
 import { FlowGuard } from "@/components/consumer/flow-guard";
@@ -9,7 +9,7 @@ import { useFlow } from "@/components/consumer/flow-state";
 import { Mascot } from "@/components/ui/brand-art";
 import { ButtonLink, Card } from "@/components/ui/primitives";
 import { CARE_FREE_MONTHS, CARE_PLAN, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
-import { formatDate } from "@/lib/domain/format";
+import { formatCurrency, formatDate } from "@/lib/domain/format";
 import { getWindow } from "@/lib/domain/scheduling";
 import { getInstaller } from "@/lib/services/consumer";
 
@@ -51,7 +51,8 @@ function ConfirmedScreen() {
         </div>
         <h2 className="mt-8 text-[34px] font-normal tracking-[-0.035em]">You&apos;re all set.</h2>
         <p className="mt-1 text-[15px] text-muted">
-          Your reservation {state.reservation?.reservationId ? `${state.reservation.reservationId} ` : ""}is confirmed.
+          {state.contact?.firstName ? `Thanks, ${state.contact.firstName}. ` : ""}Your date is reserved
+          {state.reservation?.reservationId ? ` (${state.reservation.reservationId})` : ""}.
         </p>
 
         <Card className="mt-6 text-left">
@@ -65,6 +66,13 @@ function ConfirmedScreen() {
               />
             )}
             {installer && <Item icon={UserRound} title="Matched installer" detail={installer.name} />}
+            {state.reservation && (
+              <Item
+                icon={Lock}
+                title="Lock in your date"
+                detail={`After your call we'll text and email a secure link for the ${formatCurrency(state.reservation.depositAfterCall)} refundable deposit.`}
+              />
+            )}
             {state.reservation?.careIncluded && (
               <Item
                 icon={Gift}

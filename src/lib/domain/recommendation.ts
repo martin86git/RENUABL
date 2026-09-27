@@ -50,6 +50,7 @@ export const ASSUMPTIONS = {
    * PLACEHOLDER: confirm with Primero.
    */
   batteryReadySolar: 1.25,
+  /** Taken after the confirmation call. Nothing is charged to reserve a date. */
   deposit: 499,
 } as const;
 

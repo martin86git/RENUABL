@@ -5,7 +5,7 @@ export const FLOW_STEPS = [
   { key: "system", title: "Your system", subtitle: "Sized from your bill", routes: ["system", "extras"] },
   { key: "installer", title: "Your installer", subtitle: "We've matched the best fit", routes: ["installer"] },
   { key: "date", title: "Choose your date", subtitle: "Pick what works for you", routes: ["date"] },
-  { key: "secure", title: "Secure your system", subtitle: "Small deposit (refundable)", routes: ["reserve"] },
+  { key: "secure", title: "Reserve your date", subtitle: "Nothing to pay today", routes: ["reserve"] },
   { key: "confirmation", title: "Confirmation", subtitle: "Final details", routes: ["confirmed"] },
 ] as const;
 

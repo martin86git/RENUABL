@@ -116,7 +116,13 @@ export function CallBooking() {
     );
   }
 
-  const src = HUBSPOT_MEETINGS_URL ? hubspotEmbedSrc(HUBSPOT_MEETINGS_URL) : null;
+  const src = HUBSPOT_MEETINGS_URL
+    ? hubspotEmbedSrc(HUBSPOT_MEETINGS_URL, {
+        firstname: state.contact?.firstName,
+        lastname: state.contact?.lastName,
+        email: state.contact?.email,
+      })
+    : null;
 
   return (
     <>

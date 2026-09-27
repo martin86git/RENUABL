@@ -119,7 +119,7 @@ function SystemScreen() {
       <div className="mt-3 divide-y divide-line border-t border-line">
         <StatRow label="Price after rebates" value={formatCurrency(price.total)} />
         <StatRow label="Pays for itself in" value={`~${outcome.paybackYears} years`} />
-        <StatRow label="Due today" value={`${formatCurrency(price.deposit)} refundable`} />
+        <StatRow label="Due today" value="$0 to reserve" />
       </div>
     </Card>
   );

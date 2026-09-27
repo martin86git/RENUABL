@@ -19,6 +19,7 @@ import {
   usageBasis,
 } from "./recommendation";
 import { summariseBill, type BillSummary } from "./bill";
+import { normaliseMobile, validateContact } from "./contact";
 import { PANEL, RACKING } from "./catalogue";
 import { COSTING, arrayKw, batteryInstallCost, billOfMaterials, railLengths, rebatesFor, selectInverter, sellPrice } from "./costing";
 import { HYBRID_INVERTERS, STRING_INVERTERS } from "./catalogue";
@@ -480,5 +481,22 @@ describe("costing from the supplier price list", () => {
     expect(price.lines.find((l) => l.id === "solar")!.amount).toBe(sellPrice(solarCost));
     expect(price.rebates).toBe(rebatesFor(config));
     expect(price.total).toBe(price.gross - price.rebates);
+  });
+});
+
+describe("contact details", () => {
+  it("normalises Australian mobiles", () => {
+    expect(normaliseMobile("0412 345 678")).toBe("+61412345678");
+    expect(normaliseMobile("+61 412 345 678")).toBe("+61412345678");
+    expect(normaliseMobile("(04) 1234-5678")).toBe("+61412345678");
+    expect(normaliseMobile("03 9555 1234")).toBeNull();
+    expect(normaliseMobile("041234567")).toBeNull();
+  });
+
+  it("validates and tidies the details", () => {
+    const ok = validateContact({ firstName: " Sarah ", lastName: "Chen", mobile: "0412345678", email: "Sarah@Example.com " });
+    expect(ok).toEqual({ contact: { firstName: "Sarah", lastName: "Chen", mobile: "+61412345678", email: "sarah@example.com" } });
+    const bad = validateContact({ firstName: "", lastName: "Chen", mobile: "123", email: "nope" });
+    expect("errors" in bad && Object.keys(bad.errors).sort()).toEqual(["email", "firstName", "mobile"]);
   });
 });

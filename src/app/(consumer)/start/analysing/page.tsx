@@ -35,9 +35,9 @@ export default function AnalysingPage() {
       width="narrow"
       title={
         <>
-          Analysing
+          Setting up
           <br />
-          your home.
+          your plan.
         </>
       }
       subtitle={state.address ? `${state.address.line}, ${state.address.suburb}` : undefined}

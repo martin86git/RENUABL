@@ -135,7 +135,7 @@ export default function ProfilePage() {
                 />
               </div>
               {profile.roofType === "unsure" && (
-                <p className="mt-2 text-[12px] text-muted">No problem. We&apos;ll confirm it from satellite images and on your call.</p>
+                <p className="mt-2 text-[12px] text-muted">No problem. We&apos;ll confirm it on your call.</p>
               )}
             </div>
           </div>
