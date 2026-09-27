@@ -16,13 +16,15 @@ import {
   EXISTING_SIZE_OPTIONS,
   EXPAND_DISCLAIMER,
   PHASE_OPTIONS,
+  FLAT_MOUNT_NOTE,
+  FLAT_MOUNT_OPTIONS,
   ROOF_OPTIONS,
   asksAboutBattery,
   existingSolarQuestions,
   solarSituation,
 } from "@/lib/domain/existing-solar";
 import type { InverterSummary } from "@/lib/domain/inverter";
-import type { EnergyProfile, ExistingSolarPlan, ExistingSolarSize, RoofType } from "@/lib/domain/types";
+import type { EnergyProfile, ExistingSolarPlan, ExistingSolarSize, FlatMount, RoofType } from "@/lib/domain/types";
 
 type YesNoKey = "ev" | "evPlanned" | "wantsBattery" | "backup";
 
@@ -155,6 +157,20 @@ export default function ProfilePage() {
                     onChange={(roofType) => change({ roofType })}
                   />
                 </div>
+                {profile.roofType === "flat" && (
+                  <div className="mt-4">
+                    <p className="text-[13.5px] leading-snug text-ink-2">How would you like your panels?</p>
+                    <div className="mt-2.5">
+                      <ChoiceChips<FlatMount>
+                        label="How would you like your panels?"
+                        options={FLAT_MOUNT_OPTIONS}
+                        value={profile.flatMount ?? "flat"}
+                        onChange={(flatMount) => change({ flatMount })}
+                      />
+                    </div>
+                    <p className="mt-2 text-[12px] leading-snug text-muted">{FLAT_MOUNT_NOTE[profile.flatMount ?? "flat"]}</p>
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -181,12 +197,6 @@ export default function ProfilePage() {
                   Tip: three main switches side by side in your switchboard usually means three phase.
                 </p>
               </div>
-              {profile.roofType === "flat" && (
-                <p className="text-[12px] leading-snug text-muted">
-                  On a flat roof we tilt your panels 10–15° towards the sun, so they make more power and rain washes them clean. The tilt
-                  frames are included in your price.
-                </p>
-              )}
               {(profile.roofType === "unsure" || profile.phase === "unsure") && (
                 <p className="text-[12px] text-muted">No problem. We&apos;ll confirm it on your call.</p>
               )}

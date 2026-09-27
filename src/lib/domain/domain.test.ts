@@ -13,6 +13,7 @@ import {
   topUpPanels,
   estimateOutcome,
   priceSystem,
+  panelsLaidFlat,
   recommendSystem,
   suggestedAdditions,
   TIER_LABELS,
@@ -554,13 +555,31 @@ describe("costing from the supplier price list", () => {
     expect(big.some((l) => l.sku === "NHPNL140L")).toBe(false);
   });
 
-  it("tilts panels on a flat roof: a tilt kit per 2 kW and $15 a panel to install", () => {
+  it("lays panels flat on a flat roof by default: tin feet, no tilt premium", () => {
     const flat = billOfMaterials({ ...input, roof: "flat" });
-    expect(flat.find((l) => l.sku === "ANTTILT10/15")!.qty).toBe(Math.ceil(arrayKw(input.panelCount) / 2));
-    expect(flat.some((l) => l.sku === "ANTTIN20" || l.sku === "ANTTILE20")).toBe(false);
-    const tilt = flat.find((l) => l.description.startsWith("Tilt frame installation"))!;
-    expect(tilt.total).toBe(input.panelCount * 15);
-    expect(billOfMaterials(input).some((l) => l.description.startsWith("Tilt frame"))).toBe(false);
+    expect(flat.some((l) => l.sku === "ANTTIN20")).toBe(true);
+    expect(flat.some((l) => l.sku === "ANTTILT10/15")).toBe(false);
+    expect(flat.some((l) => l.description.startsWith("Tilt frame"))).toBe(false);
+  });
+
+  it("tilts panels on a flat roof when chosen: a tilt kit per 2 kW and $15 a panel to install", () => {
+    const tilted = billOfMaterials({ ...input, roof: "flat", tilt: true });
+    expect(tilted.find((l) => l.sku === "ANTTILT10/15")!.qty).toBe(Math.ceil(arrayKw(input.panelCount) / 2));
+    expect(tilted.some((l) => l.sku === "ANTTIN20" || l.sku === "ANTTILE20")).toBe(false);
+    expect(tilted.find((l) => l.description.startsWith("Tilt frame installation"))!.total).toBe(input.panelCount * 15);
+    // "tilt" only means something on a flat roof.
+    expect(billOfMaterials({ ...input, roof: "tin", tilt: true }).some((l) => l.sku === "ANTTILT10/15")).toBe(false);
+  });
+
+  it("sizes panels laid flat a little larger, since they make less power", () => {
+    const bill = summariseBill({ isElectricityBill: true, periodDays: 91, usageKwh: 3000 }) as BillSummary;
+    const pitched = recommendSystem({ ...base, roofType: "tin" }, analysis, bill).tiers.essential.config.panelCount;
+    const laidFlat = recommendSystem({ ...base, roofType: "flat" }, analysis, bill).tiers.essential.config.panelCount;
+    const tilted = recommendSystem({ ...base, roofType: "flat", flatMount: "tilt" }, analysis, bill).tiers.essential.config.panelCount;
+    expect(laidFlat).toBeGreaterThan(pitched);
+    expect(tilted).toBe(pitched);
+    expect(panelsLaidFlat({ roofType: "flat" })).toBe(true);
+    expect(panelsLaidFlat({ roofType: "flat", flatMount: "tilt" })).toBe(false);
   });
 
   it("charges $1,000 ex GST to install an EV charger", () => {

@@ -24,6 +24,7 @@ function useAskSnapshot(context: AskContext): AskSnapshot {
     dailyUsageKwh: state.bill?.dailyUsageKwh,
     hasSolar: state.bill?.hasSolar,
     roof: state.profile.roofType,
+    flatMount: state.profile.roofType === "flat" ? (state.profile.flatMount ?? "flat") : undefined,
     storeys: state.profile.storeys,
     phase: state.profile.phase,
     wantsBattery: state.profile.wantsBattery,

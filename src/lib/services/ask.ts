@@ -16,7 +16,7 @@ const INTENTS: { match: RegExp; answer: string }[] = [
   {
     match: /flat|tilt/i,
     answer:
-      'Flat roofs are fine. We mount your panels on tilt frames at 10–15° facing the sun, so they make more power and rain washes them clean. Choose "Flat" for your roof and the tilt frames are included in your price. We confirm the details on your 15-minute call.',
+      'Flat roofs are fine. Choose "Flat" for your roof, then how you\'d like your panels: laid flat (low profile, and we size your system to make up for the slightly lower output) or tilted towards the sun (more power, at extra cost). Tilting needs room for all your panels and can be seen from the street, so we check both on your 15-minute call.',
   },
   {
     match: /battery|batteries|storage|night|evening/i,

@@ -44,6 +44,8 @@ export interface EnergyProfile {
   backup: boolean;
   /** What the roof is made of: sets the mounting kit. "unsure" is quoted as tile and checked on the call. */
   roofType?: RoofType;
+  /** Only asked for flat roofs; unanswered means laid flat. Tilting is confirmed on the call (roof space, looks). */
+  flatMount?: FlatMount;
   storeys?: "single" | "double";
   /** "unsure" is quoted as single phase and checked on the call. */
   phase?: "single" | "three" | "unsure";
@@ -53,8 +55,9 @@ export interface EnergyProfile {
   existingPlan?: ExistingSolarPlan;
 }
 
-/** "flat": panels go on tilt frames (a tilt kit and a per-panel installation premium). */
 export type RoofType = "tin" | "tile" | "flat" | "unsure";
+/** Flat roofs only: panels laid flat (the default) or on tilt frames (a tilt kit and a per-panel premium). */
+export type FlatMount = "flat" | "tilt";
 export type ExistingSolarSize = "under-5" | "5-10" | "over-10" | "unsure";
 export type ExistingSolarPlan = "replace" | "expand";
 

@@ -15,12 +15,17 @@ export interface Sunshine {
   source: "NASA POWER";
 }
 
-/** PLACEHOLDERS to confirm: a north-ish roof at ~20–25° in Victoria, and typical system losses. */
-export const YIELD_MODEL = { tiltGain: 1.08, performanceRatio: 0.8 } as const;
+/**
+ * PLACEHOLDERS to confirm: a north-ish roof (or tilt frame) at ~10–25° in
+ * Victoria gains ~8% over flat ground; panels laid flat on a flat roof get
+ * none. Plus typical system losses.
+ */
+export const YIELD_MODEL = { tiltGain: 1.08, flatGain: 1, performanceRatio: 0.8 } as const;
 
-/** Expected daily output per kW of panels at this location. */
-export function yieldPerKw(sun: Pick<Sunshine, "annual">): number {
-  return Math.round(sun.annual * YIELD_MODEL.tiltGain * YIELD_MODEL.performanceRatio * 100) / 100;
+/** Expected daily output per kW of panels at this location (laidFlat: panels flat on a flat roof). */
+export function yieldPerKw(sun: Pick<Sunshine, "annual">, laidFlat = false): number {
+  const gain = laidFlat ? YIELD_MODEL.flatGain : YIELD_MODEL.tiltGain;
+  return Math.round(sun.annual * gain * YIELD_MODEL.performanceRatio * 100) / 100;
 }
 
 /** Parses NASA POWER's climatology response; null if it isn't usable. */

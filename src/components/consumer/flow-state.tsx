@@ -198,7 +198,12 @@ export function useSystem() {
     const recommendation = recommendSystem(profile, analysis, state.bill ?? NO_BILL);
     const tier = recommendation.tiers[state.tier];
     const config = state.config ?? tier.config;
-    const site = { storeys: profile.storeys ?? "single", roof: profile.roofType ?? "unsure", phase } as const;
+    const site = {
+      storeys: profile.storeys ?? "single",
+      roof: profile.roofType ?? "unsure",
+      phase,
+      tilt: profile.roofType === "flat" && profile.flatMount === "tilt",
+    } as const;
     const incentives = {
       state: state.address?.state ?? null,
       postcode: state.address?.postcode ?? null,

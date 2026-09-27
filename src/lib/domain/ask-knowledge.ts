@@ -19,7 +19,8 @@ export const ASK_FACTS = [
   "Three options: Essential (no battery), Recommended (battery sized to evening use) and Maximum (a larger battery).",
   "The bill is read for usage and prices only; the file isn't stored and no personal details are taken from it.",
   // Roof and home
-  "Roof types: tin (Colorbond), tiles, flat, or not sure. On a flat roof the panels are mounted on tilt frames at 10–15° facing the sun, so they make more power and rain washes them clean. The tilt frames and their installation are already included in the price shown.",
+  "Roof types: tin (Colorbond), tiles, flat, or not sure.",
+  "On a flat roof the customer chooses panels laid flat (the default: low profile and hard to see, a little less power, so the system is sized larger to make up for it) or tilted 10–15° towards the sun (more power, at extra cost, shown in the price). Tilting only works if the roof has room for all the panels tilted (tilted rows need space between them so they don't shade each other), and tilted panels can be seen from the street. Both are checked on the 15-minute call; if tilting doesn't suit, the panels are laid flat and the price is updated.",
   "On tin roofs panels are fixed with tin feet; on tiles with tile hooks under the tiles. 'Not sure' is priced as tiles and confirmed on the call.",
   "Double-storey homes have a small installation surcharge, already in the price. Three-phase homes get a three-phase inverter; 'not sure' is priced as single phase and confirmed on the call.",
   "Shading, roof space, orientation, the switchboard and access are checked on the 15-minute confirmation call. If anything changes, the recommendation and price are updated before anything is final.",
@@ -45,6 +46,8 @@ export interface AskSnapshot {
   dailyUsageKwh?: number;
   hasSolar?: boolean;
   roof?: string;
+  /** Flat roofs: "flat" (laid flat) or "tilt". */
+  flatMount?: string;
   storeys?: string;
   phase?: string;
   wantsBattery?: boolean;
@@ -60,7 +63,7 @@ export interface AskSnapshot {
 const ROOF_LABELS: Record<string, string> = {
   tin: "tin (Colorbond)",
   tile: "tiles",
-  flat: "flat (panels will be on tilt frames, included in the price)",
+  flat: "flat",
   unsure: "not sure yet",
 };
 
@@ -69,7 +72,10 @@ export function describeSnapshot(s: AskSnapshot): string[] {
   if (s.suburb || s.state) out.push(`Home: ${[s.suburb, s.state].filter(Boolean).join(", ")}`);
   if (s.dailyUsageKwh) out.push(`Uses about ${s.dailyUsageKwh} kWh a day (from their bill)`);
   if (s.hasSolar) out.push("Already has solar");
-  if (s.roof) out.push(`Roof: ${ROOF_LABELS[s.roof] ?? s.roof}`);
+  if (s.roof) {
+    const mount = s.roof === "flat" ? (s.flatMount === "tilt" ? ", panels tilted (if the roof has room)" : ", panels laid flat") : "";
+    out.push(`Roof: ${ROOF_LABELS[s.roof] ?? s.roof}${mount}`);
+  }
   if (s.storeys) out.push(`Storeys: ${s.storeys}`);
   if (s.phase) out.push(`Power: ${s.phase === "unsure" ? "not sure (priced as single phase)" : `${s.phase} phase`}`);
   if (s.wantsBattery !== undefined) out.push(`Wants a battery: ${s.wantsBattery ? "yes" : "no"}`);

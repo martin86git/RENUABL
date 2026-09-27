@@ -68,6 +68,8 @@ export interface CostingInput {
   /** Solar-only now, but with an inverter ready for a battery later. */
   batteryReady?: boolean;
   roof: RoofType;
+  /** Flat roof only: panels on tilt frames rather than laid flat. */
+  tilt?: boolean;
   storeys: "single" | "double";
   /** Three-phase homes get three-phase inverters. "Not sure" is quoted as single phase. */
   phase: Phase;
@@ -140,8 +142,9 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
 
   if (input.panelCount > 0) {
     const rails = railLengths(input.panelCount);
-    // "Not sure" is quoted as tiles (the dearer kit); flat roofs get tilt kits.
-    const kit = input.roof === "tin" ? RACKING.tinKit : input.roof === "flat" ? RACKING.tiltKit : RACKING.tileKit;
+    // "Not sure" is quoted as tiles (the dearer kit). Flat roofs: tin feet when laid flat, tilt kits when tilted.
+    const tilted = input.roof === "flat" && Boolean(input.tilt);
+    const kit = tilted ? RACKING.tiltKit : input.roof === "tin" || input.roof === "flat" ? RACKING.tinKit : RACKING.tileKit;
     const clips = Math.ceil((input.panelCount * BOS.panelClip.perPanel) / BOS.panelClip.packSize) * BOS.panelClip.packSize;
     lines.push(line("solar", PANEL.sku, PANEL.name, input.panelCount, PANEL.cost));
     lines.push(line("solar", RACKING.rail.sku, `${RACKING.rail.name} (${rails.metres} m needed)`, rails.lengths, RACKING.rail.cost));
@@ -161,7 +164,7 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
         round2(kw * 1000 * COSTING.solarInstallPerWatt),
       ),
     );
-    if (input.roof === "flat") {
+    if (tilted) {
       lines.push(
         line(
           "solar",

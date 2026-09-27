@@ -45,6 +45,7 @@ function snapshotFrom(raw: unknown): AskSnapshot {
     dailyUsageKwh: num("dailyUsageKwh"),
     hasSolar: bool("hasSolar"),
     roof: str("roof"),
+    flatMount: str("flatMount"),
     storeys: str("storeys"),
     phase: str("phase"),
     wantsBattery: bool("wantsBattery"),

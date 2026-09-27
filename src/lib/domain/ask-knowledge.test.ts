@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import { ASK_FACTS, askSystemPrompt, cleanAskInput, describeSnapshot } from "./ask-knowledge";
 
 describe("Ask RENUABL grounding", () => {
-  it("knows flat roofs are tilted and the frames are in the price", () => {
-    expect(ASK_FACTS.join(" ")).toMatch(/flat roof.*tilt frames at 10–15°.*included in the price/i);
-    expect(describeSnapshot({ roof: "flat" })[0]).toMatch(/tilt frames, included in the price/);
+  it("knows flat roofs can be laid flat or tilted, and tilting is checked on the call", () => {
+    const facts = ASK_FACTS.join(" ");
+    expect(facts).toMatch(/laid flat \(the default/);
+    expect(facts).toMatch(/room for all the panels tilted/);
+    expect(facts).toMatch(/seen from the street/);
+    expect(describeSnapshot({ roof: "flat", flatMount: "tilt" })[0]).toBe("Roof: flat, panels tilted (if the roof has room)");
+    expect(describeSnapshot({ roof: "flat" })[0]).toBe("Roof: flat, panels laid flat");
   });
 
   it("puts the customer's answers and the rules in the prompt", () => {

@@ -107,7 +107,10 @@ function ReserveScreen() {
           ? `${profile.existingSize ?? "?"}${profile.existingPlan ? `, ${profile.existingPlan}` : ""}`
           : undefined,
         "Existing inverter": state.existingInverter ? describeInverter(state.existingInverter) : undefined,
-        Roof: profile.roofType,
+        Roof:
+          profile.roofType === "flat"
+            ? `flat (${profile.flatMount === "tilt" ? "tilted, if space allows" : "laid flat"})`
+            : profile.roofType,
         Storeys: profile.storeys ?? "single",
         Phase: profile.phase,
         "Ad source": [state.attribution?.source, state.attribution?.campaign].filter(Boolean).join(" / ") || undefined,

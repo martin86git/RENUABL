@@ -7,7 +7,7 @@
  */
 import type { BillSummary } from "./bill";
 import { describeInverter, type InverterSummary } from "./inverter";
-import type { EnergyProfile, ExistingSolarPlan, ExistingSolarSize, RoofType } from "./types";
+import type { EnergyProfile, ExistingSolarPlan, ExistingSolarSize, FlatMount, RoofType } from "./types";
 
 export const EXISTING_SIZE_OPTIONS: { value: ExistingSolarSize; label: string }[] = [
   { value: "under-5", label: "Under 5 kW" },
@@ -63,6 +63,17 @@ export const ROOF_OPTIONS: { value: RoofType; label: string }[] = [
   { value: "flat", label: "Flat" },
   { value: "unsure", label: "Not sure" },
 ];
+
+/** Flat roofs: laid flat is the default; tilting depends on roof space and looks, both checked on the call. */
+export const FLAT_MOUNT_OPTIONS: { value: FlatMount; label: string; hint: string }[] = [
+  { value: "flat", label: "Laid flat", hint: "Low profile, hard to see" },
+  { value: "tilt", label: "Tilted", hint: "More power, extra cost" },
+];
+
+export const FLAT_MOUNT_NOTE: Record<FlatMount, string> = {
+  flat: "Panels laid flat make a little less power, so we've sized your system for that.",
+  tilt: "Tilting needs room for all your panels, and tilted panels can be seen from the street. We'll check both on your call.",
+};
 
 export const PHASE_OPTIONS: { value: "single" | "three" | "unsure"; label: string }[] = [
   { value: "single", label: "Single phase" },

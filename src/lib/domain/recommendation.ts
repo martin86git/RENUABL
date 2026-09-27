@@ -1,6 +1,6 @@
 import type { BillSummary } from "./bill";
 import { PANEL } from "./catalogue";
-import { yieldPerKw } from "./sunshine";
+import { YIELD_MODEL, yieldPerKw } from "./sunshine";
 import { COSTING, billOfMaterials, inverterOptions, maxPanelsForInverter, sellPrice, type CostGroup } from "./costing";
 import { NO_INCENTIVES, VERIFIED_RATES, rebatesFor, type Incentives, type RebateRates } from "./rebates";
 import { realAnnualUse, solarSituation } from "./existing-solar";
@@ -182,7 +182,13 @@ const kwh = (n: number) => n.toLocaleString("en-AU", { maximumFractionDigits: 1 
  * now or planned. The customer doesn't pick panel counts or battery sizes.
  */
 export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, bill: BillSummary): Recommendation {
-  const usage = usageBasis(bill, profile, analysis.sunshine ? yieldPerKw(analysis.sunshine) : ASSUMPTIONS.dailyYieldKwhPerKw);
+  const flat = panelsLaidFlat(profile);
+  const dailyYield = analysis.sunshine
+    ? yieldPerKw(analysis.sunshine, flat)
+    : flat
+      ? Math.round(((ASSUMPTIONS.dailyYieldKwhPerKw * YIELD_MODEL.flatGain) / YIELD_MODEL.tiltGain) * 100) / 100
+      : ASSUMPTIONS.dailyYieldKwhPerKw;
+  const usage = usageBasis(bill, profile, dailyYield);
   if (usage.existingSolar) return expandSystem(profile, analysis, usage);
   const replacing = solarSituation(bill, profile) === "replace";
   const panelsForUse = panelsNeeded(usage.annualKwh, analysis, profile.wantsBattery, usage.dailyYieldKwhPerKw);
@@ -315,6 +321,13 @@ export interface Site {
   storeys: "single" | "double";
   roof: RoofType;
   phase: "single" | "three";
+  /** Flat roof with panels on tilt frames. */
+  tilt?: boolean;
+}
+
+/** Panels laid flat on a flat roof (the default there): they make a little less, so more are needed. */
+export function panelsLaidFlat(profile: Pick<EnergyProfile, "roofType" | "flatMount">) {
+  return profile.roofType === "flat" && profile.flatMount !== "tilt";
 }
 
 const LINE_LABELS: Partial<Record<CostGroup, string>> = {
@@ -332,7 +345,7 @@ export function priceSystem(
   incentives: Incentives = NO_INCENTIVES,
   rates: RebateRates = VERIFIED_RATES,
 ): PriceBreakdown {
-  const bom = billOfMaterials({ ...config, roof: site.roof, storeys: site.storeys, phase: site.phase, addOns });
+  const bom = billOfMaterials({ ...config, roof: site.roof, tilt: site.tilt, storeys: site.storeys, phase: site.phase, addOns });
   const cost = (group: CostGroup) => bom.filter((l) => l.group === group).reduce((sum, l) => sum + l.total, 0);
   const solarKw = panelsToKw(config.panelCount);
   const lines: PriceBreakdown["lines"] = [];
