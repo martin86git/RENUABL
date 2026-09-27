@@ -45,7 +45,7 @@ describe("priceSystem", () => {
     const plain = priceSystem(config, { storeys: "double" });
     const withAddOns = priceSystem(config, { storeys: "double" }, ["heat-pump", "smart-home"]);
     expect(plain.total).toBe(plain.gross - plain.rebates);
-    expect(plain.deposit).toBe(500);
+    expect(plain.deposit).toBe(499);
     expect(plain.lines.some((l) => l.label.includes("Double-storey"))).toBe(true);
     const addOnTotal = ADD_ONS.filter((a) => a.id === "heat-pump" || a.id === "smart-home").reduce((s, a) => s + a.price, 0);
     expect(withAddOns.total - plain.total).toBe(addOnTotal);

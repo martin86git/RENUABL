@@ -1,18 +1,9 @@
 "use client";
 
-import { ChevronDown, Home, LifeBuoy, UserRound, Zap } from "lucide-react";
+import { ArrowLeft, ChevronDown, Home, LifeBuoy, UserRound, Zap } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wordmark, cn } from "@/components/ui/primitives";
-
-/** Desktop navigation, matching the design's top bar. */
-export const MY_NAV = [
-  { href: "/my", label: "Home" },
-  { href: "/my/energy", label: "Energy" },
-  { href: "/my/savings", label: "Savings" },
-  { href: "/my/upgrades", label: "Upgrades" },
-  { href: "/my/support", label: "Support" },
-] as const;
 
 /** Mobile bottom navigation, matching the design: Home · Energy · Support · Profile. */
 export const MY_TABS = [
@@ -33,19 +24,12 @@ export function MyTopBar({ name }: { name: string }) {
       <Link href="/" aria-label="RENUABL home">
         <Wordmark className="text-[22px]" />
       </Link>
-      <nav aria-label="My RENUABL" className="flex items-center gap-9 text-[13px]">
-        {MY_NAV.map((n) => (
-          <Link
-            key={n.href}
-            href={n.href}
-            aria-current={isActive(pathname, n.href) ? "page" : undefined}
-            className={cn("relative py-2", isActive(pathname, n.href) ? "text-ink" : "text-ink-2 hover:text-ink")}
-          >
-            {n.label}
-            {isActive(pathname, n.href) && <span className="absolute inset-x-0 -bottom-[18px] h-0.5 rounded-full bg-ink" />}
-          </Link>
-        ))}
-      </nav>
+      {/* No menu of links: sections are reached from the My RENUABL home cards. */}
+      {pathname !== "/my" && (
+        <Link href="/my" className="flex items-center gap-2 text-[13px] text-ink-2 hover:text-ink">
+          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> My RENUABL
+        </Link>
+      )}
       <Link href="/my/profile" className="ml-auto flex items-center gap-2.5 text-[13px] text-ink-2 hover:text-ink">
         <span className="grid h-9 w-9 place-items-center rounded-full bg-surface-2">
           <UserRound className="h-[18px] w-[18px]" strokeWidth={1.5} />

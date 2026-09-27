@@ -38,7 +38,7 @@ export const ASSUMPTIONS = {
     solarPerKw: 370,
     batteryShare: 0.3,
   },
-  deposit: 500,
+  deposit: 499,
 } as const;
 
 /** Optional products offered after the system recommendation. Prices are placeholders. */

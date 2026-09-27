@@ -29,12 +29,12 @@ const INTENTS: { match: RegExp; answer: string }[] = [
   {
     match: /cost|price|expensive|afford|finance|pay/i,
     answer:
-      "Your price already includes government rebates we apply for you. Today you only pay a $500 refundable reservation deposit. The balance is due once your system is installed and switched on.",
+      "Your price already includes government rebates we apply for you. Today you only pay a $499 refundable reservation deposit. The balance is due once your system is installed and switched on.",
   },
   {
     match: /refund|cancel|deposit/i,
     answer:
-      "Your $500 reservation deposit is fully refundable until your installer confirms the site visit. If anything on the confirmation call doesn't feel right, we'll refund it — no questions asked.",
+      "Your $499 reservation deposit is fully refundable until your installer confirms the site visit. If anything on the confirmation call doesn't feel right, we'll refund it — no questions asked.",
   },
   {
     match: /install|how long|day|takes/i,

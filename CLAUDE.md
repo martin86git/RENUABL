@@ -15,6 +15,8 @@
 - One matched installer by default; alternatives only behind a secondary link.
 - The customer picks the install date; a refundable deposit comes before the 15-minute confirmation call (confirmation, not sales).
 - Intelligence is branded "Ask RENUABL", never labelled "AI".
+- No traditional website navigation (no Home / Energy / Savings / … link bar). Customer screens show only the wordmark and account; people move through guided steps, the My RENUABL home cards and the mobile bottom tabs.
+- The reservation deposit is $499 (`ASSUMPTIONS.deposit`).
 - Minimise jargon; technical detail lives behind disclosures.
 - Installer portal is deliberately dark; green (`positive`) is reserved for confirmed / on-track / available / positive states.
 

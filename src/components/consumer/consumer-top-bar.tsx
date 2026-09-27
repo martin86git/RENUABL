@@ -2,28 +2,16 @@ import { ChevronDown, Menu, UserRound } from "lucide-react";
 import Link from "next/link";
 import { Wordmark, cn } from "@/components/ui/primitives";
 
-export const CONSUMER_NAV = [
-  { href: "/", label: "Home" },
-  { href: "/my/energy", label: "Energy" },
-  { href: "/my/savings", label: "Savings" },
-  { href: "/my/upgrades", label: "Upgrades" },
-  { href: "/my/support", label: "Support" },
-];
-
-/** Desktop top bar: wordmark, simple navigation, account. */
+/**
+ * Desktop top bar: just the wordmark and account. Deliberately no menu of
+ * links — RENUABL should feel like a guided product, not a traditional website.
+ */
 export function ConsumerTopBar({ className, account = "Sign in" }: { className?: string; account?: string }) {
   return (
     <header className={cn("mx-auto flex h-[76px] w-full max-w-[1440px] items-center gap-12 px-5 sm:px-8 lg:px-10", className)}>
       <Link href="/" aria-label="RENUABL home">
         <Wordmark className="text-[22px]" />
       </Link>
-      <nav className="hidden items-center gap-9 text-[13px] text-ink-2 lg:flex" aria-label="Main">
-        {CONSUMER_NAV.map((n) => (
-          <Link key={n.href} href={n.href} className="hover:text-ink">
-            {n.label}
-          </Link>
-        ))}
-      </nav>
       <Link href="/my" className="ml-auto flex items-center gap-2.5 text-[13px] text-ink-2 hover:text-ink">
         <span className="grid h-9 w-9 place-items-center rounded-full bg-surface-2">
           <UserRound className="h-[18px] w-[18px]" strokeWidth={1.5} />
