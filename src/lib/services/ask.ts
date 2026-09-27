@@ -26,7 +26,7 @@ const INTENTS: { match: RegExp; answer: string }[] = [
   {
     match: /heat pump|hot water|upgrade|switchboard|smart home/i,
     answer:
-      "Upgrades are worth it when they move energy use into the daytime, when your solar is free. A heat pump hot water system is usually the biggest win. You can add any of them now or later from My RENUABL.",
+      "Upgrades are worth it when they move energy use into the daytime, when your solar is free, and heat pump hot water is often a big one. We don't price heat pumps and the other upgrades online yet: tick the ones you're interested in and we'll talk them through and quote them on your 15-minute call.",
   },
   {
     match: /bill|upload|usage|pool|spa|heating|cooling/i,

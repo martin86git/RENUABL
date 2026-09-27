@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildIcs, callEvent, googleCalendarUrl, installEvent } from "./calendar";
-import { callBookedEmail, orderConfirmationEmail, type OrderEmail } from "./emails";
+import { callBookedEmail, cleanOrder, orderConfirmationEmail, plainText, type OrderEmail } from "./emails";
 
 describe("calendar", () => {
   it("blocks out the install day from 7am Melbourne time (daylight saving in October)", () => {
@@ -64,6 +64,13 @@ describe("emails", () => {
     expect(mail.text).not.toContain("undefined");
   });
 
+  it("lists upgrades to discuss on the call, outside the price", () => {
+    const mail = orderConfirmationEmail({ ...order, discuss: ["Heat Pump Hot Water"] });
+    expect(mail.text).toContain("To discuss on your call: Heat Pump Hot Water (not included in your price).");
+    expect(mail.html).toContain("Heat Pump Hot Water");
+    expect(orderConfirmationEmail(order).text).not.toContain("To discuss");
+  });
+
   it("names the call time once it's booked, and escapes HTML", () => {
     const mail = orderConfirmationEmail({ ...order, call: "Tuesday 13 October at 10:30am" });
     expect(mail.text).toContain("We'll call you on Tuesday 13 October at 10:30am");
@@ -75,5 +82,34 @@ describe("emails", () => {
     const mail = callBookedEmail({ reference: "RN-1234", firstName: "Sam", call: "Tuesday 13 October at 10:30am" });
     expect(mail.subject).toContain("Tuesday 13 October");
     expect(mail.text).toContain("RN-1234");
+  });
+});
+
+describe("order cleaning", () => {
+  const good = { lines: [{ label: "8.1 kW solar", amount: 8788 }], gross: 8788, total: 7000, deposit: 499, system: "Recommended" };
+
+  it("strips links, web and email addresses", () => {
+    expect(plainText("Solar — visit https://evil.example now")).toBe("Solar — visit now");
+    expect(plainText("Call www.scam.com or pay at scam.com.au today")).toBe("Call or pay at today");
+    expect(plainText("reply to bad@actor.io")).toBe("reply to");
+    expect(plainText(42)).toBe("");
+  });
+
+  it("keeps a real order and caps what it carries", () => {
+    const o = cleanOrder({
+      ...good,
+      lines: Array(20).fill({ label: "x", amount: 1 }),
+      discuss: ["Heat Pump Hot Water", "see http://x.io"],
+    })!;
+    expect(o.lines).toHaveLength(8);
+    expect(o.discuss).toEqual(["Heat Pump Hot Water", "see"]);
+    expect(cleanOrder(good)!.lines[0]).toEqual({ label: "8.1 kW solar", amount: 8788 });
+  });
+
+  it("rejects anything that isn't an order", () => {
+    expect(cleanOrder(null)).toBeNull();
+    expect(cleanOrder({ ...good, lines: [] })).toBeNull();
+    expect(cleanOrder({ ...good, total: -5 })).toBeNull();
+    expect(cleanOrder({ ...good, gross: "lots" })).toBeNull();
   });
 });

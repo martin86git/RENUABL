@@ -45,6 +45,12 @@ export const ASSUMPTIONS = {
   solarHomeEveningShare: 0.75,
   evAnnualKwh: 2500,
   baseSelfConsumption: 0.4,
+  /**
+   * PLACEHOLDER: the most of a home's yearly use we claim solar (and a battery)
+   * covers. Winter days and cloudy weeks always need some grid power, so
+   * estimates never say 100%.
+   */
+  maxSolarShare: 0.9,
   /** SigenStor 8 kWh modules, up to one stack of six. */
   batterySizes: [8, 16, 24, 32, 40, 48] as const,
   batteryUsableShare: 0.9,
@@ -58,32 +64,22 @@ export const ASSUMPTIONS = {
   deposit: 499,
 } as const;
 
-/** Customer price of one add-on, from its costed bill of materials. */
-function addOnPrice(id: AddOnId) {
-  const cost = billOfMaterials({
-    panelCount: 0,
-    batteryKwh: 0,
-    evCharger: false,
-    roof: "tile",
-    storeys: "single",
-    phase: "single",
-    addOns: [id],
-  }).reduce((sum, l) => sum + l.total, 0);
-  return sellPrice(cost);
-}
-
-/** Optional products offered after the system recommendation. */
+/**
+ * Optional products offered after the system recommendation. Only costed ones
+ * carry a price; the rest (heat pumps and the placeholders) are "discuss on my
+ * call": no price, not in the total, passed to the call.
+ */
 export const ADD_ONS: AddOn[] = [
-  { id: "heat-pump", name: "Heat Pump Hot Water", blurb: "Efficient, all-electric hot water.", price: addOnPrice("heat-pump") },
-  {
-    id: "smart-switchboard",
-    name: "Smart Switchboard",
-    blurb: "Prepare for a smarter, safer home.",
-    price: addOnPrice("smart-switchboard"),
-  },
-  { id: "home-backup", name: "Home Backup", blurb: "Keep essentials running during outages.", price: addOnPrice("home-backup") },
-  { id: "smart-home", name: "Smart Home Integration", blurb: "Connect and optimise your whole home.", price: addOnPrice("smart-home") },
+  { id: "heat-pump", name: "Heat Pump Hot Water", blurb: "Efficient, all-electric hot water.", price: null },
+  { id: "smart-switchboard", name: "Smart Switchboard", blurb: "Prepare for a smarter, safer home.", price: null },
+  { id: "home-backup", name: "Home Backup", blurb: "Keep essentials running during outages.", price: null },
+  { id: "smart-home", name: "Smart Home Integration", blurb: "Connect and optimise your whole home.", price: null },
 ];
+
+/** A costed add-on the customer can buy now (the rest are discussed on the call). */
+export function isPricedAddOn(id: AddOnId) {
+  return ADD_ONS.find((a) => a.id === id)?.price != null;
+}
 
 /** Display order is the key order: good, better, best. */
 export const TIER_LABELS: Record<SystemTier, string> = {
@@ -295,7 +291,7 @@ export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: 
       annualGenerationKwh: generation,
       annualSavings,
       paybackYears: payback(annualSavings),
-      selfPoweredShare: usage.annualKwh > 0 ? Math.min(1, stored / usage.annualKwh) : 0,
+      selfPoweredShare: usage.annualKwh > 0 ? Math.min(ASSUMPTIONS.maxSolarShare, stored / usage.annualKwh) : 0,
     };
   }
 
@@ -304,7 +300,7 @@ export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: 
   if (config.evCharger) selfUse += 0.05;
   selfUse = Math.min(0.9, selfUse);
 
-  const consumedFromSolar = Math.min(usage.annualKwh, generation * selfUse);
+  const consumedFromSolar = Math.min(usage.annualKwh * ASSUMPTIONS.maxSolarShare, generation * selfUse);
   const exported = Math.max(0, generation - consumedFromSolar);
   const annualSavings = Math.round(consumedFromSolar * usage.usageRate + exported * usage.feedInRate);
 
@@ -313,7 +309,7 @@ export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: 
     annualGenerationKwh: generation,
     annualSavings,
     paybackYears: payback(annualSavings),
-    selfPoweredShare: usage.annualKwh > 0 ? Math.min(1, consumedFromSolar / usage.annualKwh) : 0,
+    selfPoweredShare: usage.annualKwh > 0 ? consumedFromSolar / usage.annualKwh : 0,
   };
 }
 
@@ -345,7 +341,8 @@ export function priceSystem(
   incentives: Incentives = NO_INCENTIVES,
   rates: RebateRates = VERIFIED_RATES,
 ): PriceBreakdown {
-  const bom = billOfMaterials({ ...config, roof: site.roof, tilt: site.tilt, storeys: site.storeys, phase: site.phase, addOns });
+  const priced = addOns.filter(isPricedAddOn);
+  const bom = billOfMaterials({ ...config, roof: site.roof, tilt: site.tilt, storeys: site.storeys, phase: site.phase, addOns: priced });
   const cost = (group: CostGroup) => bom.filter((l) => l.group === group).reduce((sum, l) => sum + l.total, 0);
   const solarKw = panelsToKw(config.panelCount);
   const lines: PriceBreakdown["lines"] = [];
@@ -360,10 +357,11 @@ export function priceSystem(
   }
   if (config.evCharger)
     lines.push({ id: "ev-charger", label: LINE_LABELS["ev-charger"]!, amount: sellPrice(cost("ev-charger")), removable: true });
-  for (const id of addOns) {
+  for (const id of priced) {
     const addOn = ADD_ONS.find((a) => a.id === id);
     if (addOn) lines.push({ id: addOn.id, label: addOn.name, amount: sellPrice(cost(id)), removable: true });
   }
+  const discuss = ADD_ONS.filter((a) => addOns.includes(a.id) && a.price == null).map((a) => ({ id: a.id, label: a.name }));
 
   const gross = lines.reduce((sum, l) => sum + l.amount, 0);
   const solarLine = lines.find((l) => l.id === "solar")?.amount ?? 0;
@@ -382,6 +380,7 @@ export function priceSystem(
     outOfPocket: total - loan,
     total,
     deposit: ASSUMPTIONS.deposit,
+    discuss,
   };
 }
 
@@ -448,7 +447,7 @@ export function suggestedAdditions(config: SystemConfig, recommended: SystemConf
     });
   }
   for (const a of ADD_ONS) {
-    if (!addOns.includes(a.id)) out.push({ id: a.id, label: a.name, blurb: a.blurb, amount: a.price });
+    if (a.price != null && !addOns.includes(a.id)) out.push({ id: a.id, label: a.name, blurb: a.blurb, amount: a.price });
   }
   return out;
 }

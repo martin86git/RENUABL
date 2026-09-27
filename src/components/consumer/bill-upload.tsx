@@ -80,7 +80,7 @@ export function BillUpload({ bill, onRead }: { bill: BillSummary | null; onRead:
           <button
             type="button"
             onClick={() => input.current?.click()}
-            className="shrink-0 text-[13px] text-forest underline-offset-4 hover:underline"
+            className="tap-area shrink-0 text-[13px] text-forest underline-offset-4 hover:underline"
           >
             Replace
           </button>

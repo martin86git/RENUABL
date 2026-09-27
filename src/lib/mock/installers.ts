@@ -44,6 +44,7 @@ export const INSTALLERS: Installer[] = [
     accreditations: ["SAA accredited installer", "Licensed electrical contractor"],
     weeklyCapacity: 9,
     verifiedStats: true, // fictional installer
+    fictional: true,
   },
   {
     id: "ins_westwind",
@@ -63,6 +64,7 @@ export const INSTALLERS: Installer[] = [
     accreditations: ["SAA accredited installer", "Licensed electrical contractor", "Battery endorsed"],
     weeklyCapacity: 11,
     verifiedStats: true, // fictional installer
+    fictional: true,
   },
   {
     id: "ins_greenfield",
@@ -78,6 +80,7 @@ export const INSTALLERS: Installer[] = [
     accreditations: ["SAA accredited installer", "Licensed electrical contractor", "Battery endorsed"],
     weeklyCapacity: 12,
     verifiedStats: true, // fictional installer
+    fictional: true,
   },
   {
     id: "ins_goldfields",
@@ -96,6 +99,7 @@ export const INSTALLERS: Installer[] = [
     accreditations: ["SAA accredited installer", "Licensed electrical contractor", "Battery endorsed"],
     weeklyCapacity: 7,
     verifiedStats: true, // fictional installer
+    fictional: true,
   },
 ];
 

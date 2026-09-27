@@ -106,7 +106,7 @@ export function ServiceBooking({ availability, installer }: { availability: DayA
 
   return (
     <div>
-      <Link href="/my/support" className="mb-4 inline-flex items-center gap-2 text-[13px] text-ink-2 hover:text-ink lg:hidden">
+      <Link href="/my/support" className="tap-area mb-4 inline-flex items-center gap-2 text-[13px] text-ink-2 hover:text-ink lg:hidden">
         ← Support
       </Link>
       <p className="text-[13px] text-muted">Book a service</p>

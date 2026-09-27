@@ -16,6 +16,8 @@ export interface OrderEmail {
   loan?: number;
   outOfPocket?: number;
   deposit: number;
+  /** Upgrades to talk about on the call (not priced, not in the total). */
+  discuss?: string[];
   /** "Tuesday 13 October at 10:30am", when the call is already booked. */
   call?: string;
 }
@@ -60,6 +62,7 @@ ${o.address ? row("Home", o.address) : ""}${o.installer ? row("Installer", o.ins
 <div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:16px">
 <p style="margin:0 0 8px">${esc(clip(o.system, 200))}</p>
 <table style="width:100%;border-collapse:collapse;font-size:14px">${lines}</table>
+${o.discuss?.length ? `<p style="font-size:14px;margin:12px 0 0">To discuss on your call: ${esc(o.discuss.map((d) => clip(d, 60)).join(", "))} (not included in your price).</p>` : ""}
 <p style="color:#6B6B6B;font-size:12px;margin:12px 0 0">Rebates and your final price are confirmed on your call before anything is final. Solar Victoria support is subject to its eligibility criteria.</p>
 </div>
 <div style="background:#D9E7DC;border-radius:16px;padding:20px;color:#1E3A2E;font-size:14px">
@@ -85,6 +88,7 @@ ${o.address ? row("Home", o.address) : ""}${o.installer ? row("Installer", o.ins
     `Total after rebates: ${money(o.total)}`,
     ...(o.loan ? [`Solar Victoria interest-free loan: -${money(o.loan)}`, `Your upfront cost: ${money(o.outOfPocket ?? o.total)}`] : []),
     "Due today: $0",
+    o.discuss?.length && `To discuss on your call: ${o.discuss.join(", ")} (not included in your price).`,
     "",
     next,
     `After the call we'll send a secure link for the ${money(o.deposit)} refundable deposit to lock in your date.`,
@@ -109,4 +113,63 @@ export function callBookedEmail(o: { reference: string; firstName: string; call:
 <p style="color:#6B6B6B;font-size:12px;margin-top:24px">The calendar invite is attached. Need a different time? Just reply to this email.</p>
 </div></body></html>`;
   return { subject, html, text: `Your call is booked, ${o.firstName}.\n\n${body}` };
+}
+
+/** Plain text only: no links, web or email addresses (so the emails can't carry someone else's message), clipped. */
+export function plainText(value: unknown, max = 120): string {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/[\u0000-\u001f<>]/g, " ")
+    .replace(/\b(?:https?:\/\/|www\.)\S*/gi, "")
+    .replace(/\S+@\S+/g, "")
+    .replace(/\b[\w-]+(?:\.[\w-]+)*\.(?:com|net|org|io|au|co|info|biz|xyz|ru|cn|app|link|site|online|top)\b\S*/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
+}
+
+const amount = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v < 1_000_000 ? v : null);
+
+function items(v: unknown, max: number): { label: string; amount: number }[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .slice(0, max)
+    .map((x) => ({ label: plainText((x as { label?: unknown })?.label, 80), amount: amount((x as { amount?: unknown })?.amount) }))
+    .filter((x): x is { label: string; amount: number } => Boolean(x.label) && x.amount !== null);
+}
+
+/**
+ * The order sent from the browser, checked before it goes into an email: known
+ * fields only, plain text, capped lengths and counts, sane amounts. Null if
+ * it doesn't look like an order.
+ */
+export function cleanOrder(raw: unknown): Omit<OrderEmail, "reference" | "firstName"> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const lines = items(r.lines, 8);
+  const gross = amount(r.gross);
+  const total = amount(r.total);
+  const deposit = amount(r.deposit);
+  if (!lines.length || gross === null || total === null || deposit === null) return null;
+  const text = (k: string, max = 120) => plainText(r[k], max) || undefined;
+  return {
+    address: text("address"),
+    installer: text("installer", 80),
+    installDate: text("installDate", 60),
+    arrival: text("arrival", 30),
+    system: plainText(r.system, 200) || "Your RENUABL system",
+    lines,
+    gross,
+    rebates: items(r.rebates, 6),
+    total,
+    loan: amount(r.loan) || undefined,
+    outOfPocket: amount(r.outOfPocket) ?? undefined,
+    deposit,
+    discuss: Array.isArray(r.discuss)
+      ? r.discuss
+          .slice(0, 6)
+          .map((d) => plainText(d, 60))
+          .filter(Boolean)
+      : undefined,
+  };
 }

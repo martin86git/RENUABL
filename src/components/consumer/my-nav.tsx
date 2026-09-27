@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronDown, Home, LifeBuoy, UserRound, Zap } from "lucide-r
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wordmark, cn } from "@/components/ui/primitives";
+import { ExampleOwnerName } from "./portal-preview";
 
 /** Mobile bottom navigation, matching the design: Home · Energy · Support · Profile. */
 export const MY_TABS = [
@@ -34,7 +35,7 @@ export function MyTopBar({ name }: { name: string }) {
         <span className="grid h-9 w-9 place-items-center rounded-full bg-surface-2">
           <UserRound className="h-[18px] w-[18px]" strokeWidth={1.5} />
         </span>
-        {name}
+        <ExampleOwnerName fallback={name} />
         <ChevronDown className="h-4 w-4" strokeWidth={1.5} />
       </Link>
     </header>

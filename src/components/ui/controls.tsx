@@ -121,7 +121,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       checked={checked}
       onCheckedChange={onChange}
       aria-label={label}
-      className="relative h-7 w-12 shrink-0 rounded-full bg-line-strong transition data-[state=checked]:bg-primary"
+      className="tap-area h-7 w-12 shrink-0 rounded-full bg-line-strong transition data-[state=checked]:bg-primary"
     >
       <Switch.Thumb className="block h-6 w-6 translate-x-0.5 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-[22px]" />
     </Switch.Root>

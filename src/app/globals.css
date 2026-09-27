@@ -187,3 +187,13 @@ body:has(.theme-installer) {
     linear-gradient(to bottom, #000 82%, transparent 100%), linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%);
   mask-composite: intersect;
 }
+
+/* A bigger invisible touch area (about 44px) for small text links and controls, without changing how they look. */
+@utility tap-area {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
+  }
+}

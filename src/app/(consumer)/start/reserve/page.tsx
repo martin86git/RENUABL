@@ -85,6 +85,7 @@ function ReserveScreen() {
         loan: price.loan || undefined,
         outOfPocket: price.outOfPocket,
         deposit: price.deposit,
+        discuss: price.discuss.map((d) => d.label),
       },
       details: {
         Home: state.address ? formatAddress(state.address) : undefined,
@@ -95,6 +96,7 @@ function ReserveScreen() {
           ? `${formatDate(state.installDate, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}${window ? `, arrival ${window.label}` : ""}`
           : undefined,
         Installer: installer?.name,
+        "Discuss on call": price.discuss.map((d) => d.label).join(", ") || undefined,
         "RENUABL Care": !CARE_ENABLED
           ? undefined
           : careIncluded
@@ -160,12 +162,12 @@ function ReserveScreen() {
                   <button
                     type="button"
                     onClick={() => removeItem(l.id)}
-                    className="text-muted underline-offset-4 hover:text-danger hover:underline"
+                    className="tap-area text-muted underline-offset-4 hover:text-danger hover:underline"
                   >
                     Remove
                   </button>
                 ) : l.id === "solar" ? (
-                  <Link href={stepHref("system")} className="text-muted underline-offset-4 hover:text-ink hover:underline">
+                  <Link href={stepHref("system")} className="tap-area text-muted underline-offset-4 hover:text-ink hover:underline">
                     Edit
                   </Link>
                 ) : (
@@ -228,6 +230,26 @@ function ReserveScreen() {
           </>
         )}
       </ul>
+      {price.discuss.length > 0 && (
+        <div className="mt-3 rounded-xl bg-canvas px-3.5 py-3 text-[12.5px] leading-snug text-ink-2">
+          <p className="text-ink">To discuss on your call</p>
+          <ul className="mt-1.5 space-y-1.5">
+            {price.discuss.map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-3">
+                <span>{d.label}</span>
+                <button
+                  type="button"
+                  onClick={() => removeItem(d.id)}
+                  className="tap-area text-muted underline underline-offset-4 hover:text-ink"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-muted">Not included in your price. We&apos;ll talk it through and quote it on your call.</p>
+        </div>
+      )}
       {rates.source !== "live" && (
         <p className="mt-3 text-[11.5px] leading-snug text-muted">Rebate amounts are confirmed on your call before anything is final.</p>
       )}

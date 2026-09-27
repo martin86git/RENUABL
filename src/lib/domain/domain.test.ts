@@ -3,7 +3,7 @@ import { advanceStatus, nextFieldStatus } from "./job-status";
 import { buildCallAvailability, formatCallTime, hubspotEmbedSrc, isHubspotBookedMessage, parseHubspotMeetingsUrl } from "./booking";
 import { CARE_ENABLED, CARE_FREE_MONTHS, careIncludedFor, careIncludedValue, carePrice, carePriceLabel, careYearlySaving } from "./care";
 import { greeting, marketDateTime, todayInMarket } from "./market";
-import { rankInstallers } from "./matching";
+import { customerNetwork, rankInstallers } from "./matching";
 import {
   ADD_ONS,
   ASSUMPTIONS,
@@ -149,8 +149,20 @@ describe("priceSystem", () => {
     expect(plain.total).toBe(plain.gross - plain.rebates);
     expect(plain.deposit).toBe(499);
     expect(plain.bom.find((l) => l.description === "Double-storey installation")?.total).toBe(400);
-    const addOnTotal = ADD_ONS.filter((a) => a.id === "heat-pump" || a.id === "smart-home").reduce((s, a) => s + a.price, 0);
-    expect(withAddOns.total - plain.total).toBe(addOnTotal);
+    // Unpriced add-ons (heat pumps for now) are discussed on the call: no price, not in the total.
+    expect(ADD_ONS.find((a) => a.id === "heat-pump")!.price).toBeNull();
+    expect(withAddOns.total).toBe(plain.total);
+    expect(withAddOns.lines.some((l) => l.id === "heat-pump")).toBe(false);
+    expect(withAddOns.bom.some((l) => l.group === "heat-pump")).toBe(false);
+    expect(withAddOns.discuss.map((d) => d.id)).toEqual(["heat-pump", "smart-home"]);
+    expect(plain.discuss).toEqual([]);
+  });
+
+  it("never claims solar covers all of a home's use", () => {
+    const config = { panelCount: 28, batteryKwh: 48, evCharger: true };
+    const outcome = estimateOutcome(config, usageBasis(bill, base), priceSystem(config, site));
+    expect(outcome.selfPoweredShare).toBeLessThanOrEqual(ASSUMPTIONS.maxSolarShare);
+    expect(outcome.selfPoweredShare).toBeGreaterThan(0.5);
   });
 
   it("produces a positive payback estimate", () => {
@@ -252,7 +264,7 @@ describe("checkout line items", () => {
   it("marks optional products removable and the core system fixed", () => {
     const price = priceSystem({ panelCount: 20, batteryKwh: 16, evCharger: true }, site, ["heat-pump"]);
     const removable = Object.fromEntries(price.lines.map((l) => [l.id, l.removable]));
-    expect(removable).toEqual({ solar: false, battery: true, "ev-charger": true, "heat-pump": true });
+    expect(removable).toEqual({ solar: false, battery: true, "ev-charger": true });
   });
 });
 
@@ -272,7 +284,18 @@ describe("suggestedAdditions", () => {
     expect(ids).toContain("battery");
     expect(ids).not.toContain("ev-charger");
     expect(ids).not.toContain("heat-pump");
-    expect(ids).toContain("smart-home");
+    // Unpriced add-ons are never offered with a price at checkout.
+    expect(ids).not.toContain("smart-home");
+  });
+});
+
+describe("launch", () => {
+  it("never matches customers with fictional installers on the live site", () => {
+    const live = customerNetwork(INSTALLERS, false);
+    expect(live.map((i) => i.id)).toEqual(["ins_primero"]);
+    expect(customerNetwork(INSTALLERS, true)).toHaveLength(INSTALLERS.length);
+    // A live customer outside Primero's area still gets Primero, never a dead end.
+    expect(rankInstallers(live, "").map((m) => m.installer.id)).toEqual(["ins_primero"]);
   });
 });
 

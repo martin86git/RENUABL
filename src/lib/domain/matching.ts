@@ -43,3 +43,8 @@ export function rankInstallers(installers: Installer[], postcode: string): Insta
       .sort((a, b) => Number(Boolean(b.installer.preferred)) - Number(Boolean(a.installer.preferred)) || b.score - a.score)
   );
 }
+
+/** Installers customers may be matched with: fictional demo installers only in preview. */
+export function customerNetwork<T extends { fictional?: boolean }>(installers: T[], preview: boolean): T[] {
+  return preview ? installers : installers.filter((i) => !i.fictional);
+}

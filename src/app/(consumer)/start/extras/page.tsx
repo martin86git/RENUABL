@@ -26,7 +26,7 @@ function ExtrasScreen() {
     <FlowStep
       width="narrow"
       title="Enhance your system."
-      subtitle="Add or remove products to suit your home."
+      subtitle="Add products now, or tick the ones you'd like to talk about on your call."
       ask={<AskRenuabl context="extras" title="Ask RENUABL" subtitle="Which upgrades are right for me?" />}
       cta={
         <Button size="lg" className="w-full lg:w-72" onClick={() => router.push(stepHref("installer"))}>
@@ -37,6 +37,14 @@ function ExtrasScreen() {
       <ul className="max-w-xl space-y-3">
         {ADD_ONS.map((a) => {
           const added = state.addOns.includes(a.id);
+          const onCall = a.price == null;
+          const action = onCall
+            ? added
+              ? `Don't discuss ${a.name}`
+              : `Discuss ${a.name} on my call`
+            : added
+              ? `Remove ${a.name}`
+              : `Add ${a.name}`;
           return (
             <li key={a.id}>
               <Card className={cn("flex items-center gap-4 p-3 pr-4 transition", added && "ring-1 ring-forest/40")}>
@@ -46,13 +54,15 @@ function ExtrasScreen() {
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] text-ink">{a.name}</span>
                   <span className="block text-[12.5px] leading-snug text-muted">{a.blurb}</span>
-                  <span className="mt-1 block text-[12px] text-ink-2">+ {formatCurrency(a.price)}</span>
+                  <span className="mt-1 block text-[12px] text-ink-2">
+                    {onCall ? (added ? "We'll talk about it on your call" : "Priced on your call") : `+ ${formatCurrency(a.price!)}`}
+                  </span>
                 </span>
                 <button
                   type="button"
                   onClick={() => toggle(a.id)}
                   aria-pressed={added}
-                  aria-label={added ? `Remove ${a.name}` : `Add ${a.name}`}
+                  aria-label={action}
                   className={cn(
                     "grid h-9 w-9 shrink-0 place-items-center rounded-full border transition",
                     added ? "border-forest bg-forest text-white" : "border-ink/70 text-ink hover:bg-surface-2",
@@ -66,8 +76,8 @@ function ExtrasScreen() {
         })}
       </ul>
       <p className="mt-5 text-[13px] text-muted" aria-live="polite">
-        Your system: {formatCurrency(price.total)} after rebates{state.addOns.length ? ` · ${state.addOns.length} added` : ""}. Optional —
-        you can add these any time later.
+        Your system: {formatCurrency(price.total)} after rebates
+        {price.discuss.length ? ` · ${price.discuss.length} to discuss on your call` : ""}. Optional: you can add these any time later.
       </p>
     </FlowStep>
   );

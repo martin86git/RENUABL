@@ -3,7 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { DayCurve, Sparkbars } from "@/components/consumer/energy-charts";
-import { PortalPreviewBanner } from "@/components/consumer/portal-preview";
+import { ExampleOwnerName } from "@/components/consumer/portal-preview";
 import { HomePhoto, Mascot } from "@/components/ui/brand-art";
 import { Card } from "@/components/ui/primitives";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
@@ -38,11 +38,10 @@ export default async function MyHomePage() {
 
   return (
     <>
-      <PortalPreviewBanner />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
         <section className="lg:col-span-7">
           <h1 className="text-[34px] font-normal leading-[1.05] tracking-[-0.035em] lg:text-[44px]">
-            {greeting()},<br className="lg:hidden" /> {household.owner}.
+            {greeting()},<br className="lg:hidden" /> <ExampleOwnerName fallback={household.owner} />.
           </h1>
           <p className="mt-1 text-[16px] text-muted lg:text-[17px]">
             {allGood ? "Your system is performing well." : "Your system is running — one thing needs a look."}

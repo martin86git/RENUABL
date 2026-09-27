@@ -5,6 +5,7 @@ import { Dialog } from "radix-ui";
 import { useState } from "react";
 import { DayCurve, Sparkbars } from "@/components/consumer/energy-charts";
 import { useFlow } from "@/components/consumer/flow-state";
+import { PREVIEW_MODE } from "@/lib/config";
 import { Button, Card, cn } from "@/components/ui/primitives";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
 import { getToday } from "@/lib/services/home";
@@ -130,12 +131,20 @@ export function PortalTeaser({ className, closeLabel = "Back to my system" }: { 
 }
 
 /**
- * On My RENUABL, for someone who has reserved but isn't installed yet: the
- * screens are a preview with an example home, not their own system.
+ * On My RENUABL, the screens are an example home: say so to anyone who has
+ * reserved, and to every visitor on the live site (there are no accounts yet).
  */
 export function PortalPreviewBanner() {
   const { state, hydrated } = useFlow();
-  if (!hydrated || !state.reservation) return null;
+  if (!hydrated || (PREVIEW_MODE && !state.reservation)) return null;
+  if (!state.reservation) {
+    return (
+      <div className="mb-6 rounded-2xl bg-sage/70 px-5 py-4 text-forest lg:mb-10">
+        <p className="text-[15px]">This is an example of My RENUABL.</p>
+        <p className="mt-0.5 text-[13px] text-forest/80">It&apos;s what you&apos;ll see once your system is installed and switched on.</p>
+      </div>
+    );
+  }
   return (
     <div className="mb-6 rounded-2xl bg-sage/70 px-5 py-4 text-forest lg:mb-10">
       <p className="text-[15px]">This is what you can expect after your system is installed and switched on.</p>
@@ -145,4 +154,10 @@ export function PortalPreviewBanner() {
       </p>
     </div>
   );
+}
+
+/** On the example home, greet a customer who has reserved by their own name. */
+export function ExampleOwnerName({ fallback }: { fallback: string }) {
+  const { state, hydrated } = useFlow();
+  return <>{hydrated && state.reservation && state.contact?.firstName ? state.contact.firstName : fallback}</>;
 }

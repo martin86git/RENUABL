@@ -1,6 +1,7 @@
-import { ChevronDown, Menu, UserRound } from "lucide-react";
+import { ChevronDown, UserRound } from "lucide-react";
 import Link from "next/link";
 import { Wordmark, cn } from "@/components/ui/primitives";
+import { MobileMenu } from "./mobile-menu";
 
 /**
  * Desktop top bar: just the wordmark and account. Deliberately no menu of
@@ -27,14 +28,12 @@ export function ConsumerTopBar({ className, account = "Sign in" }: { className?:
 export function MobileHeader({ account = false, className }: { account?: boolean; className?: string }) {
   return (
     <header className={cn("flex h-14 items-center justify-between px-5 lg:hidden", className)}>
-      <button type="button" aria-label="Menu" className="-ml-1 grid h-9 w-9 place-items-center">
-        <Menu className="h-5 w-5" strokeWidth={1.5} />
-      </button>
+      <MobileMenu />
       <Link href="/" aria-label="RENUABL home">
         <Wordmark className="text-[19px] tracking-[0.12em]" />
       </Link>
       {account ? (
-        <Link href="/my/profile" aria-label="Profile" className="-mr-1 grid h-9 w-9 place-items-center">
+        <Link href="/my/profile" aria-label="Profile" className="tap-area -mr-1 grid h-9 w-9 place-items-center">
           <UserRound className="h-5 w-5" strokeWidth={1.5} />
         </Link>
       ) : (

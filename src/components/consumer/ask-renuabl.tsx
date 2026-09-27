@@ -91,7 +91,7 @@ export function AskRenuabl({
     <Dialog.Root open={open} onOpenChange={setOpen}>
       {variant === "link" ? (
         <Dialog.Trigger asChild>
-          <button type="button" className={cn("inline-flex items-center gap-2 text-[14px] text-ink-2 hover:text-ink", className)}>
+          <button type="button" className={cn("tap-area inline-flex items-center gap-2 text-[14px] text-ink-2 hover:text-ink", className)}>
             <MascotAvatar className="h-7 w-7" />
             <span className="underline-offset-4 hover:underline">{title}</span>
           </button>

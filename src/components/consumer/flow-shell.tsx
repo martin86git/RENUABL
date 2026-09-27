@@ -24,7 +24,7 @@ export function ProgressDots({ current, className }: { current: number; classNam
           {i > 0 && <span className={cn("h-px w-5", i <= current ? "bg-ink/70" : "bg-line-strong")} />}
           {i < current ? (
             // Completed steps are tappable, with a generous hit area around the dot.
-            <Link href={stepEntryHref(i)} aria-label={`Back to ${s.title}`} className="-m-2 grid place-items-center p-2">
+            <Link href={stepEntryHref(i)} aria-label={`Back to ${s.title}`} className="tap-area -m-2 grid place-items-center p-2">
               <span className="block h-2 w-2 rounded-full bg-ink" />
             </Link>
           ) : (

@@ -1,7 +1,7 @@
 import { validateContact } from "@/lib/domain/contact";
 import { PREVIEW_MODE } from "@/lib/config";
 import { buildIcs, installEvent } from "@/lib/domain/calendar";
-import { orderConfirmationEmail, type OrderEmail } from "@/lib/domain/emails";
+import { cleanOrder, orderConfirmationEmail, plainText } from "@/lib/domain/emails";
 import { sendEmail } from "@/lib/server/email";
 import { addNote, reservationNote, upsertContact } from "@/lib/server/hubspot-crm";
 
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   let body: {
     contact?: Record<string, unknown>;
     details?: Record<string, unknown>;
-    order?: Omit<OrderEmail, "reference" | "firstName">;
+    order?: unknown;
     installDate?: string;
   };
   try {
@@ -64,12 +64,13 @@ export async function POST(request: Request) {
 async function confirmationEmail(
   reference: string,
   contact: { email: string; firstName: string },
-  order: Omit<OrderEmail, "reference" | "firstName"> | undefined,
+  rawOrder: unknown,
   installDate: string | undefined,
 ): Promise<boolean> {
-  if (!order || !Array.isArray(order.lines)) return false;
+  const order = cleanOrder(rawOrder);
+  if (!order) return false;
   try {
-    const mail = orderConfirmationEmail({ ...order, reference, firstName: contact.firstName });
+    const mail = orderConfirmationEmail({ ...order, reference, firstName: plainText(contact.firstName, 40) || "there" });
     const ics =
       installDate && /^\d{4}-\d{2}-\d{2}$/.test(installDate)
         ? buildIcs([installEvent({ reference, date: installDate, installer: order.installer, address: order.address })])

@@ -1,5 +1,8 @@
 import { buildIcs, callEvent } from "@/lib/domain/calendar";
-import { callBookedEmail } from "@/lib/domain/emails";
+import { formatCallTime } from "@/lib/domain/booking";
+import { callBookedEmail, plainText } from "@/lib/domain/emails";
+import { formatDate } from "@/lib/domain/format";
+import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { parseReference } from "@/lib/domain/deposit";
 import { sendEmail } from "@/lib/server/email";
 import { addNote, contactIdByEmail, reservationNote } from "@/lib/server/hubspot-crm";
@@ -16,9 +19,10 @@ export async function POST(request: Request) {
   const email = typeof b.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(b.email) ? b.email : null;
   const date = typeof b.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.date) ? b.date : null;
   const time = typeof b.time === "string" && /^\d{2}:\d{2}$/.test(b.time) ? b.time : null;
-  const label = typeof b.label === "string" ? b.label.slice(0, 80) : `${date} ${time}`;
-  const firstName = typeof b.firstName === "string" ? b.firstName.slice(0, 40) : "";
+  const firstName = plainText(b.firstName, 40);
   if (!reference || !date || !time) return Response.json({ ok: false }, { status: 400 });
+  // Built here rather than trusted from the browser: "Tuesday 13 October at 10:30am (Melbourne time)".
+  const label = `${formatDate(date, { weekday: "long", day: "numeric", month: "long" })} at ${formatCallTime(time)} (${LAUNCH_MARKET.capital} time)`;
 
   const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
   try {

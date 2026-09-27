@@ -128,6 +128,8 @@ export interface PriceBreakdown {
   outOfPocket: number;
   total: number;
   deposit: number;
+  /** Add-ons the customer wants to talk about on the call (no price yet, not in the total). */
+  discuss: { id: AddOnId; label: string }[];
 }
 
 export interface TierRecommendation {
@@ -147,7 +149,8 @@ export interface AddOn {
   id: AddOnId;
   name: string;
   blurb: string;
-  price: number;
+  /** Customer price, or null while it isn't costed: it's discussed and quoted on the call instead. */
+  price: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +180,8 @@ export interface Installer {
   verifiedStats?: boolean;
   /** Where `rating`/`reviewCount` come from when they are public third-party figures. */
   reviewSource?: "Google";
+  /** Made up for the demo: never shown to customers on the live site. */
+  fictional?: boolean;
 }
 
 export interface InstallerMatch {

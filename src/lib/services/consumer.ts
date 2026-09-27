@@ -13,9 +13,10 @@ import type { RebateRates } from "@/lib/domain/rebates";
 import type { Sunshine } from "@/lib/domain/sunshine";
 import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
 import { ASSUMPTIONS } from "@/lib/domain/recommendation";
-import { rankInstallers } from "@/lib/domain/matching";
+import { customerNetwork, rankInstallers } from "@/lib/domain/matching";
 import { buildAvailability } from "@/lib/domain/scheduling";
 import type { Address, HomeAnalysis, ISODate, InstallerMatch } from "@/lib/domain/types";
+import { PREVIEW_MODE } from "@/lib/config";
 import { INSTALLERS } from "@/lib/mock/installers";
 
 /** Address suggestions as the customer types (Google Places; sample addresses in a preview without a key). */
@@ -106,10 +107,13 @@ export async function readEnergyBill(file: File): Promise<BillResult> {
   }
 }
 
+/** The installers customers can be matched with: the demo's fictional ones only in preview. */
+const NETWORK = customerNetwork(INSTALLERS, PREVIEW_MODE);
+
 export function matchInstallers(postcode: string): InstallerMatch[] {
-  const ranked = rankInstallers(INSTALLERS, postcode);
+  const ranked = rankInstallers(NETWORK, postcode);
   // Fall back to the whole network rather than dead-ending the customer.
-  return ranked.length ? ranked : rankInstallers(INSTALLERS, "");
+  return ranked.length ? ranked : rankInstallers(NETWORK, "");
 }
 
 export function getInstaller(id: string) {
