@@ -4,7 +4,7 @@
 import type { FieldStatus, Job, JobStage } from "@/lib/domain/types";
 import { CREWS, CURRENT_INSTALLER_ID, INSTALLERS } from "@/lib/mock/installers";
 import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs, buildPayouts } from "@/lib/mock/jobs";
-import { toISODate } from "@/lib/domain/scheduling";
+import { todayInMarket } from "@/lib/domain/market";
 import { formatShortDate } from "@/lib/domain/format";
 
 export function getCurrentInstaller() {
@@ -22,7 +22,7 @@ export function getJob(id: string): Job | undefined {
 }
 
 export function listTodaysJobs(now = new Date()): Job[] {
-  const today = toISODate(now);
+  const today = todayInMarket(now);
   return listJobs().filter((j) => j.preferredDate === today || j.stage === "in-progress");
 }
 

@@ -48,6 +48,10 @@ better customer experience  ←  better pricing  ←─────────�
 | Recommendations → upgrades | `my/insights`, `my/upgrade` — insights lead into upgrade offers                                                                                               |
 | Supply-side flywheel       | Matching weights installer rating, on-time, first-time pass and capacity; the installer Performance page shows exactly these so installers optimise for them. |
 
+## Launch market
+
+Victoria first: metropolitan Melbourne plus Geelong, Ballarat and Bendigo. Expanding to another state means adding installers and market settings, not reshaping the product.
+
 ## Design principles that follow
 
 1. **The household is the primary entity**, not the lead or the job. A household can own many products and many jobs over time.

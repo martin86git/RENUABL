@@ -2,6 +2,7 @@
  * Consumer-facing service layer. Every function here is the seam where a real
  * API replaces mock data; UI code should only talk to these functions.
  */
+import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { rankInstallers } from "@/lib/domain/matching";
 import { buildAvailability, buildCallSlots } from "@/lib/domain/scheduling";
 import type { Address, InstallerMatch } from "@/lib/domain/types";
@@ -20,14 +21,14 @@ export function searchAddresses(query: string): Address[] {
 export function parseAddress(input: string): Address | null {
   const text = input.trim();
   if (text.length < 6) return null;
-  const postcode = text.match(/\b(\d{4})\b/)?.[1] ?? "2000";
-  const state = text.match(/\b(NSW|VIC|QLD|SA|WA|TAS|ACT|NT)\b/i)?.[1]?.toUpperCase() ?? "NSW";
+  const postcode = text.match(/\b(\d{4})\b/)?.[1] ?? LAUNCH_MARKET.capitalPostcode;
+  const state = text.match(/\b(NSW|VIC|QLD|SA|WA|TAS|ACT|NT)\b/i)?.[1]?.toUpperCase() ?? LAUNCH_MARKET.state;
   const [line, rest = ""] = text.split(",");
   const suburb =
     rest
       .replace(/\b(NSW|VIC|QLD|SA|WA|TAS|ACT|NT)\b/i, "")
       .replace(/\d{4}/, "")
-      .trim() || "Sydney";
+      .trim() || LAUNCH_MARKET.capital;
   return { line: line.trim(), suburb, state, postcode };
 }
 

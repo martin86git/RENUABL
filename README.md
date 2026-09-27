@@ -13,6 +13,10 @@ See [`docs/BUSINESS_MODEL.md`](docs/BUSINESS_MODEL.md) for the model and [`docs/
 | Installer portal (desktop)   | `/installer` dashboard, `/installer/jobs`, `/installer/jobs/[id]` site pack, `/installer/schedule`, `/installer/performance`, … |
 | Installer field app (mobile) | Same routes; mobile renders Today / Jobs / Messages / More with the sequential status flow on each job                          |
 
+## Launch market
+
+Victoria first. Market defaults (state, fallback postcode, Melbourne time zone and "today" for installer schedules) live in `src/lib/domain/market.ts`; sample installers, addresses and jobs are Victorian.
+
 ## Stack
 
 - Next.js (App Router) + TypeScript
@@ -39,7 +43,7 @@ npm run build
 
 ## Deploying
 
-Hosted on Vercel (Sydney region). See [`docs/DEPLOY.md`](docs/DEPLOY.md) for the one-time setup. Every deployment shows a "sample data" banner and is hidden from search engines until `NEXT_PUBLIC_PREVIEW_MODE=false`.
+Hosted on Vercel (Sydney region, the closest to the Victorian launch market). See [`docs/DEPLOY.md`](docs/DEPLOY.md) for the one-time setup. Every deployment shows a "sample data" banner and is hidden from search engines until `NEXT_PUBLIC_PREVIEW_MODE=false`.
 
 ## Project layout
 

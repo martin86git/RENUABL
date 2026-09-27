@@ -1,3 +1,4 @@
+import { LAUNCH_MARKET } from "./market";
 import { fromISODate } from "./scheduling";
 import type { ISODate } from "./types";
 
@@ -15,8 +16,8 @@ export function formatShortDate(iso: ISODate) {
   return formatDate(iso, { weekday: "short", day: "numeric", month: "short" });
 }
 
-/** Times of day are always shown in the business time zone, so server and browser agree. */
-export const BUSINESS_TIME_ZONE = "Australia/Sydney";
+/** Times of day are always shown in the launch market's time zone, so server and browser agree. */
+export const BUSINESS_TIME_ZONE = LAUNCH_MARKET.timeZone;
 
 export function formatTime(isoDateTime: string) {
   return new Date(isoDateTime).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", timeZone: BUSINESS_TIME_ZONE });

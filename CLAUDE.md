@@ -16,6 +16,10 @@
 - Minimise jargon; technical detail lives behind disclosures.
 - Installer portal is deliberately dark; green (`positive`) is reserved for confirmed / on-track / available / positive states.
 
+## Launch market
+
+- Victoria first. Use `LAUNCH_MARKET`, `todayInMarket()` and `marketDateTime()` from `src/lib/domain/market.ts` instead of hard-coding a state, postcode, time zone or the server's local date (Vercel runs in UTC).
+
 ## Architecture rules
 
 - Business logic lives in `src/lib/domain` (pure TS, unit tested). Don't put it in components.

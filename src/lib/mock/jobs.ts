@@ -1,14 +1,15 @@
-import { addDays, toISODate } from "@/lib/domain/scheduling";
+import { marketDateTime, todayInMarket } from "@/lib/domain/market";
+import { addDays, fromISODate, toISODate } from "@/lib/domain/scheduling";
 import type { Job, JobDocument, ChecklistItem } from "@/lib/domain/types";
 
-// Fictional jobs for the installer portal. Replace with the jobs API.
+// Fictional Victorian jobs for the installer portal. Replace with the jobs API.
 
-// Dates are relative to "now" so the mock portal always has a live-looking day.
+// Dates are relative to "today" in the launch market so the mock portal always has a live-looking day.
 function relative(now: Date) {
-  const d = (offset: number) => toISODate(addDays(now, offset));
-  // Timestamps are expressed in the business time zone (AEST) so they read correctly anywhere.
-  const at = (offset: number, hour: number, minute = 0) =>
-    `${d(offset)}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00+10:00`;
+  const today = fromISODate(todayInMarket(now));
+  const d = (offset: number) => toISODate(addDays(today, offset));
+  // Wall-clock times in Melbourne, so they read correctly on any server or browser.
+  const at = (offset: number, hour: number, minute = 0) => marketDateTime(d(offset), hour, minute);
   return { d, at };
 }
 
@@ -45,7 +46,7 @@ export function buildJobs(now = new Date()): Job[] {
       id: "job_1042",
       reference: "RN-1042",
       customer: { name: "Alex Chen", phone: "0412 555 018", email: "alex.chen@example.com" },
-      address: { line: "14 Wattle Street", suburb: "Marrickville", state: "NSW", postcode: "2204" },
+      address: { line: "14 Wattle Street", suburb: "Brunswick", state: "VIC", postcode: "3056" },
       packageName: "Whole Home · 8.8 kW + 13.5 kWh",
       system: { panelCount: 20, batteryKwh: 13.5, evCharger: false },
       stage: "scheduled",
@@ -85,7 +86,7 @@ export function buildJobs(now = new Date()): Job[] {
       id: "job_1043",
       reference: "RN-1043",
       customer: { name: "Maria Russo", phone: "0421 555 330", email: "maria.r@example.com" },
-      address: { line: "22 Jacaranda Avenue", suburb: "Newtown", state: "NSW", postcode: "2042" },
+      address: { line: "22 Jacaranda Avenue", suburb: "Northcote", state: "VIC", postcode: "3070" },
       packageName: "Solar Essentials · 6.6 kW",
       system: { panelCount: 15, batteryKwh: 0, evCharger: false },
       stage: "scheduled",
@@ -114,7 +115,7 @@ export function buildJobs(now = new Date()): Job[] {
       id: "job_1038",
       reference: "RN-1038",
       customer: { name: "Tom Walker", phone: "0433 555 912", email: "tom.walker@example.com" },
-      address: { line: "3 Banksia Close", suburb: "Penrith", state: "NSW", postcode: "2750" },
+      address: { line: "3 Banksia Close", suburb: "Werribee", state: "VIC", postcode: "3030" },
       packageName: "Whole Home + EV · 11 kW + 13.5 kWh",
       system: { panelCount: 25, batteryKwh: 13.5, evCharger: true },
       stage: "in-progress",
@@ -144,7 +145,7 @@ export function buildJobs(now = new Date()): Job[] {
       id: "job_1051",
       reference: "RN-1051",
       customer: { name: "Priya Shah", phone: "0400 555 761", email: "priya.shah@example.com" },
-      address: { line: "41 Grevillea Crescent", suburb: "Randwick", state: "NSW", postcode: "2031" },
+      address: { line: "41 Grevillea Crescent", suburb: "Coburg", state: "VIC", postcode: "3058" },
       packageName: "Whole Home · 7.9 kW + 10 kWh",
       system: { panelCount: 18, batteryKwh: 10, evCharger: false },
       stage: "new",
@@ -170,7 +171,7 @@ export function buildJobs(now = new Date()): Job[] {
       id: "job_1052",
       reference: "RN-1052",
       customer: { name: "Jordan Lee", phone: "0455 555 204", email: "jordan.lee@example.com" },
-      address: { line: "118 Station Street", suburb: "Parramatta", state: "NSW", postcode: "2150" },
+      address: { line: "118 Station Street", suburb: "Box Hill", state: "VIC", postcode: "3128" },
       packageName: "Solar Essentials · 7.0 kW",
       system: { panelCount: 16, batteryKwh: 0, evCharger: false },
       stage: "new",
@@ -196,7 +197,7 @@ export function buildJobs(now = new Date()): Job[] {
       id: "job_1047",
       reference: "RN-1047",
       customer: { name: "Grace O'Neill", phone: "0466 555 118", email: "grace.oneill@example.com" },
-      address: { line: "7 Harbour View Road", suburb: "Mosman", state: "NSW", postcode: "2088" },
+      address: { line: "7 Bay View Road", suburb: "Brighton", state: "VIC", postcode: "3186" },
       packageName: "Whole Home · 10.1 kW + 13.5 kWh",
       system: { panelCount: 23, batteryKwh: 13.5, evCharger: false },
       stage: "accepted",
@@ -222,7 +223,7 @@ export function buildJobs(now = new Date()): Job[] {
       id: "job_1045",
       reference: "RN-1045",
       customer: { name: "Ben Harris", phone: "0477 555 640", email: "ben.harris@example.com" },
-      address: { line: "56 Carrington Road", suburb: "Marrickville", state: "NSW", postcode: "2204" },
+      address: { line: "56 Carrington Road", suburb: "Thornbury", state: "VIC", postcode: "3071" },
       packageName: "Solar Essentials · 6.6 kW",
       system: { panelCount: 15, batteryKwh: 0, evCharger: false },
       stage: "scheduled",
@@ -248,7 +249,7 @@ export function buildJobs(now = new Date()): Job[] {
       id: "job_1046",
       reference: "RN-1046",
       customer: { name: "Nadia Ibrahim", phone: "0488 555 427", email: "nadia.i@example.com" },
-      address: { line: "12 Ocean Street", suburb: "Bondi", state: "NSW", postcode: "2026" },
+      address: { line: "12 Beach Street", suburb: "Elwood", state: "VIC", postcode: "3184" },
       packageName: "Whole Home · 8.4 kW + 10 kWh",
       system: { panelCount: 19, batteryKwh: 10, evCharger: false },
       stage: "scheduled",
@@ -274,7 +275,7 @@ export function buildJobs(now = new Date()): Job[] {
       id: "job_1031",
       reference: "RN-1031",
       customer: { name: "Chris Nguyen", phone: "0499 555 305", email: "chris.n@example.com" },
-      address: { line: "8 Myrtle Lane", suburb: "Ashfield", state: "NSW", postcode: "2131" },
+      address: { line: "8 Myrtle Lane", suburb: "Preston", state: "VIC", postcode: "3072" },
       packageName: "Whole Home · 8.8 kW + 13.5 kWh",
       system: { panelCount: 20, batteryKwh: 13.5, evCharger: false },
       stage: "completed",
@@ -306,7 +307,7 @@ export function buildJobs(now = new Date()): Job[] {
       id: "job_1029",
       reference: "RN-1029",
       customer: { name: "Emma Davies", phone: "0411 555 873", email: "emma.d@example.com" },
-      address: { line: "30 Kent Street", suburb: "Leichhardt", state: "NSW", postcode: "2040" },
+      address: { line: "30 Kent Street", suburb: "Footscray", state: "VIC", postcode: "3011" },
       packageName: "Solar Essentials · 6.6 kW",
       system: { panelCount: 15, batteryKwh: 0, evCharger: false },
       stage: "completed",

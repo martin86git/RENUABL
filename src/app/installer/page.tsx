@@ -3,7 +3,8 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Metric, PageHeader, Panel, StageBadge } from "@/components/installer/bits";
 import { buttonClass, cn } from "@/components/ui/primitives";
-import { formatCurrency, formatPercent, formatShortDate } from "@/lib/domain/format";
+import { formatCurrency, formatDate, formatPercent, formatShortDate } from "@/lib/domain/format";
+import { todayInMarket } from "@/lib/domain/market";
 import { FIELD_STATUS_FLOW, currentFieldStatus } from "@/lib/domain/job-status";
 import { getWindow } from "@/lib/domain/scheduling";
 import type { Job } from "@/lib/domain/types";
@@ -79,9 +80,7 @@ function MobileToday({ jobs }: { jobs: Job[] }) {
   return (
     <div className="space-y-5 lg:hidden">
       <div>
-        <p className="text-[14px] text-muted">
-          {new Date().toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" })}
-        </p>
+        <p className="text-[14px] text-muted">{formatDate(todayInMarket())}</p>
         <h1 className="text-[26px] font-semibold tracking-tight">Today</h1>
       </div>
       {next ? (

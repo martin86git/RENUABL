@@ -1,14 +1,14 @@
 import type { Crew, Installer } from "@/lib/domain/types";
 
-// Fictional installers for development. Replace with the installer network API.
+// Fictional Victorian installers for development. Replace with the installer network API.
 export const INSTALLERS: Installer[] = [
   {
     id: "ins_brightline",
     name: "Brightline Electrical",
-    suburbBase: "Marrickville",
+    suburbBase: "Brunswick",
     servicePostcodes: [
-      [2000, 2234],
-      [2745, 2770],
+      [3000, 3207], // metropolitan Melbourne
+      [3750, 3810], // outer north and east
     ],
     rating: 4.9,
     reviewCount: 412,
@@ -20,12 +20,12 @@ export const INSTALLERS: Installer[] = [
     weeklyCapacity: 14,
   },
   {
-    id: "ins_harbour",
-    name: "Harbour Solar Co.",
-    suburbBase: "Brookvale",
+    id: "ins_bayside",
+    name: "Bayside Solar Co.",
+    suburbBase: "Cheltenham",
     servicePostcodes: [
-      [2060, 2110],
-      [2000, 2050],
+      [3141, 3207], // south-east suburbs
+      [3910, 3944], // Mornington Peninsula
     ],
     rating: 4.8,
     reviewCount: 268,
@@ -39,10 +39,11 @@ export const INSTALLERS: Installer[] = [
   {
     id: "ins_westwind",
     name: "Westwind Energy",
-    suburbBase: "Parramatta",
+    suburbBase: "Sunshine",
     servicePostcodes: [
-      [2111, 2200],
-      [2745, 2770],
+      [3000, 3062], // inner and western suburbs
+      [3335, 3340], // Melton
+      [3427, 3431], // Sunbury
     ],
     rating: 4.7,
     reviewCount: 190,
@@ -56,8 +57,8 @@ export const INSTALLERS: Installer[] = [
   {
     id: "ins_greenfield",
     name: "Greenfield Power",
-    suburbBase: "Richmond",
-    servicePostcodes: [[3000, 3207]],
+    suburbBase: "Geelong",
+    servicePostcodes: [[3211, 3228]], // Geelong and Bellarine
     rating: 4.8,
     reviewCount: 305,
     installsCompleted: 1410,
@@ -66,6 +67,23 @@ export const INSTALLERS: Installer[] = [
     firstTimePassRate: 0.97,
     accreditations: ["SAA accredited installer", "Licensed electrical contractor", "Battery endorsed"],
     weeklyCapacity: 12,
+  },
+  {
+    id: "ins_goldfields",
+    name: "Goldfields Energy",
+    suburbBase: "Ballarat",
+    servicePostcodes: [
+      [3350, 3357], // Ballarat
+      [3550, 3556], // Bendigo
+    ],
+    rating: 4.8,
+    reviewCount: 156,
+    installsCompleted: 720,
+    yearsOperating: 9,
+    onTimeRate: 0.96,
+    firstTimePassRate: 0.97,
+    accreditations: ["SAA accredited installer", "Licensed electrical contractor", "Battery endorsed"],
+    weeklyCapacity: 7,
   },
 ];
 

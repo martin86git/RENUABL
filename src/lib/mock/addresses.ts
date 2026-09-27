@@ -1,15 +1,16 @@
 import type { Address } from "@/lib/domain/types";
 
-// Stand-in for an address autocomplete provider.
+// Stand-in for an address autocomplete provider. Launch market: Victoria.
 export const SAMPLE_ADDRESSES: Address[] = [
-  { line: "14 Wattle Street", suburb: "Marrickville", state: "NSW", postcode: "2204" },
-  { line: "7 Harbour View Road", suburb: "Mosman", state: "NSW", postcode: "2088" },
-  { line: "22 Jacaranda Avenue", suburb: "Newtown", state: "NSW", postcode: "2042" },
-  { line: "3 Banksia Close", suburb: "Penrith", state: "NSW", postcode: "2750" },
-  { line: "118 Station Street", suburb: "Parramatta", state: "NSW", postcode: "2150" },
-  { line: "41 Grevillea Crescent", suburb: "Randwick", state: "NSW", postcode: "2031" },
+  { line: "14 Wattle Street", suburb: "Brunswick", state: "VIC", postcode: "3056" },
+  { line: "22 Jacaranda Avenue", suburb: "Northcote", state: "VIC", postcode: "3070" },
   { line: "9 Elm Grove", suburb: "Richmond", state: "VIC", postcode: "3121" },
-  { line: "56 Bay Road", suburb: "Brighton", state: "VIC", postcode: "3186" },
+  { line: "118 Station Street", suburb: "Box Hill", state: "VIC", postcode: "3128" },
+  { line: "7 Bay View Road", suburb: "Brighton", state: "VIC", postcode: "3186" },
+  { line: "3 Banksia Close", suburb: "Werribee", state: "VIC", postcode: "3030" },
+  { line: "41 Grevillea Crescent", suburb: "Geelong West", state: "VIC", postcode: "3218" },
+  { line: "26 Wattlebird Way", suburb: "Ballarat Central", state: "VIC", postcode: "3350" },
+  { line: "12 Ironbark Drive", suburb: "Bendigo", state: "VIC", postcode: "3550" },
 ];
 
 export function formatAddress(a: Address) {

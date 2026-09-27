@@ -36,7 +36,7 @@ export interface Upgrade {
 
 export const HOME_SYSTEM = {
   owner: "Alex",
-  address: "14 Wattle Street, Marrickville",
+  address: "14 Wattle Street, Brunswick",
   installedOn: "2026-06-18",
   solarKw: 8.8,
   batteryKwh: 13.5,

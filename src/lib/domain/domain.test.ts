@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { advanceStatus, nextFieldStatus } from "./job-status";
+import { marketDateTime, todayInMarket } from "./market";
 import { rankInstallers } from "./matching";
 import { estimateAnnualUsage, estimateOutcome, priceSystem, recommendSystem, ASSUMPTIONS } from "./recommendation";
 import { buildAvailability, fromISODate } from "./scheduling";
 import type { EnergyProfile } from "./types";
+import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
 import { INSTALLERS } from "@/lib/mock/installers";
 
 const base: EnergyProfile = {
@@ -56,11 +58,28 @@ describe("priceSystem", () => {
 
 describe("rankInstallers", () => {
   it("only returns installers servicing the postcode, best first", () => {
-    const ranked = rankInstallers(INSTALLERS, "3121");
-    expect(ranked.map((r) => r.installer.id)).toEqual(["ins_greenfield"]);
-    const sydney = rankInstallers(INSTALLERS, "2042");
-    expect(sydney.length).toBeGreaterThan(1);
-    expect(sydney[0].score).toBeGreaterThanOrEqual(sydney[1].score);
+    expect(rankInstallers(INSTALLERS, "3350").map((r) => r.installer.id)).toEqual(["ins_goldfields"]); // Ballarat
+    expect(rankInstallers(INSTALLERS, "3218").map((r) => r.installer.id)).toEqual(["ins_greenfield"]); // Geelong
+    const brighton = rankInstallers(INSTALLERS, "3186");
+    expect(brighton.length).toBeGreaterThan(1);
+    expect(brighton[0].installer.id).toBe("ins_brightline");
+    expect(brighton[0].score).toBeGreaterThanOrEqual(brighton[1].score);
+  });
+
+  it("covers every sample address", () => {
+    for (const a of SAMPLE_ADDRESSES) expect(rankInstallers(INSTALLERS, a.postcode).length, a.suburb).toBeGreaterThan(0);
+  });
+});
+
+describe("launch market time", () => {
+  it("uses Melbourne's date, not the server's", () => {
+    // 11pm UTC on 30 Sep is already 1 Oct in Melbourne.
+    expect(todayInMarket(new Date("2026-09-30T23:00:00Z"))).toBe("2026-10-01");
+  });
+
+  it("converts Melbourne wall-clock time across daylight saving", () => {
+    expect(marketDateTime("2026-09-28", 7, 30)).toBe("2026-09-27T21:30:00.000Z"); // AEST, UTC+10
+    expect(marketDateTime("2026-10-12", 7, 30)).toBe("2026-10-11T20:30:00.000Z"); // AEDT, UTC+11
   });
 });
 
