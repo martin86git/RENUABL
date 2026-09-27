@@ -39,6 +39,8 @@ export const COSTING = {
   isolator40MaxAmps: 32,
   /** Grid voltage (per phase) for an inverter's rated AC output current. */
   gridVolts: 230,
+  /** PLACEHOLDER: split arrays aren't known until design; allow brackets for this many arrays. */
+  assumedArrays: 2,
   /** Tilt frames on a flat roof: extra installation per panel, ex GST. */
   tiltInstallPerPanel: 15,
   /** EV charger installation, ex GST. */
@@ -142,9 +144,11 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
 
   if (input.panelCount > 0) {
     const rails = railLengths(input.panelCount);
-    // "Not sure" is quoted as tiles (the dearer kit). Flat roofs: tin feet when laid flat, tilt kits when tilted.
-    const tilted = input.roof === "flat" && Boolean(input.tilt);
-    const kit = tilted ? RACKING.tiltKit : input.roof === "tin" || input.roof === "flat" ? RACKING.tinKit : RACKING.tileKit;
+    // "Not sure" is quoted as tiles (the dearer kit). Flat roofs always get the tin kit and Kliplok
+    // interfaces (most are Kliplok), plus tilt kits when tilted.
+    const flat = input.roof === "flat";
+    const tilted = flat && Boolean(input.tilt);
+    const kit = input.roof === "tin" || flat ? RACKING.tinKit : RACKING.tileKit;
     const clips = Math.ceil((input.panelCount * BOS.panelClip.perPanel) / BOS.panelClip.packSize) * BOS.panelClip.packSize;
     lines.push(line("solar", PANEL.sku, PANEL.name, input.panelCount, PANEL.cost));
     lines.push(line("solar", RACKING.rail.sku, `${RACKING.rail.name} (${rails.metres} m needed)`, rails.lengths, RACKING.rail.cost));
@@ -152,6 +156,13 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
       line("solar", RACKING.splice.sku, RACKING.splice.name, Math.max(0, rails.lengths - COSTING.railsPerPanelRow), RACKING.splice.cost),
     );
     lines.push(line("solar", kit.sku, kit.name, Math.ceil(kw / kit.kw), kit.cost));
+    if (flat) {
+      const k = RACKING.kliplok;
+      const brackets = input.panelCount * k.perPanel + COSTING.assumedArrays * k.extraPerArray;
+      lines.push(line("solar", k.sku, `${k.name} (${k.perPanel} per panel + split-array allowance)`, brackets, k.cost));
+    }
+    if (tilted)
+      lines.push(line("solar", RACKING.tiltKit.sku, RACKING.tiltKit.name, Math.ceil(kw / RACKING.tiltKit.kw), RACKING.tiltKit.cost));
     lines.push(line("solar", BOS.dcLabels.sku, BOS.dcLabels.name, 1, BOS.dcLabels.cost));
     lines.push(line("solar", BOS.mc4.sku, BOS.mc4.name, BOS.mc4.minPairs, BOS.mc4.cost));
     lines.push(line("solar", BOS.panelClip.sku, `${BOS.panelClip.name} (${BOS.panelClip.perPanel} per panel)`, clips, BOS.panelClip.cost));

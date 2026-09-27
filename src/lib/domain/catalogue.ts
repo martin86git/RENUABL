@@ -81,7 +81,13 @@ export const RACKING = {
   /** Each kit covers up to 2.0 kW of panels. */
   tinKit: { sku: "ANTTIN20", name: "Antai 2.0kW Tin Kit (Black)", cost: 49, kw: 2 },
   tileKit: { sku: "ANTTILE20", name: "Antai 2.0kW Tile Kit (Black)", cost: 99.8, kw: 2 },
-  /** Flat roofs with tilted panels: 10–15° frames (in place of the tin kit, which is used when laid flat). */
+  /**
+   * Flat roofs are usually Kliplok, so they're always priced with Clenergy's
+   * universal interface (suits 406 and 700): two per panel, plus two more per
+   * array for split arrays.
+   */
+  kliplok: { sku: "CLNER-I-34", name: "Clenergy Universal Klip-lok Interface", cost: 6, perPanel: 2, extraPerArray: 2 },
+  /** Flat roofs with tilted panels: 10–15° frames, on top of the tin kit. */
   tiltKit: { sku: "ANTTILT10/15", name: "Antai 2.0kW Black Tilt Kit 10-15 Degrees", cost: 129, kw: 2 },
   splice: { sku: "ANTSPLICE", name: "Antai Black Splice", cost: 1.88 },
 } as const;

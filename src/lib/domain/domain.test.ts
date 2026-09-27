@@ -555,20 +555,31 @@ describe("costing from the supplier price list", () => {
     expect(big.some((l) => l.sku === "NHPNL140L")).toBe(false);
   });
 
-  it("lays panels flat on a flat roof by default: tin feet, no tilt premium", () => {
+  it("prices flat roofs with the tin kit and Kliplok interfaces (2 a panel + 2 per array), no tilt when laid flat", () => {
     const flat = billOfMaterials({ ...input, roof: "flat" });
-    expect(flat.some((l) => l.sku === "ANTTIN20")).toBe(true);
+    expect(flat.find((l) => l.sku === "ANTTIN20")!.qty).toBe(Math.ceil(arrayKw(input.panelCount) / 2));
+    expect(flat.find((l) => l.sku === "CLNER-I-34")!.qty).toBe(input.panelCount * 2 + COSTING.assumedArrays * 2);
     expect(flat.some((l) => l.sku === "ANTTILT10/15")).toBe(false);
     expect(flat.some((l) => l.description.startsWith("Tilt frame"))).toBe(false);
+    // Pitched roofs don't get Kliplok interfaces.
+    expect(billOfMaterials(input).some((l) => l.sku === "CLNER-I-34")).toBe(false);
   });
 
-  it("tilts panels on a flat roof when chosen: a tilt kit per 2 kW and $15 a panel to install", () => {
+  it("adds tilt kits and $15 a panel when tilted, keeping the tin kit and Kliplok", () => {
     const tilted = billOfMaterials({ ...input, roof: "flat", tilt: true });
     expect(tilted.find((l) => l.sku === "ANTTILT10/15")!.qty).toBe(Math.ceil(arrayKw(input.panelCount) / 2));
-    expect(tilted.some((l) => l.sku === "ANTTIN20" || l.sku === "ANTTILE20")).toBe(false);
+    expect(tilted.some((l) => l.sku === "ANTTIN20")).toBe(true);
+    expect(tilted.some((l) => l.sku === "CLNER-I-34")).toBe(true);
     expect(tilted.find((l) => l.description.startsWith("Tilt frame installation"))!.total).toBe(input.panelCount * 15);
     // "tilt" only means something on a flat roof.
     expect(billOfMaterials({ ...input, roof: "tin", tilt: true }).some((l) => l.sku === "ANTTILT10/15")).toBe(false);
+  });
+
+  it("buys enough mounting kits for the whole array", () => {
+    for (const panelCount of [11, 14, 21, 30]) {
+      const kits = billOfMaterials({ ...input, panelCount }).find((l) => l.sku === "ANTTIN20" || l.sku === "ANTTILE20")!.qty;
+      expect(kits * 2).toBeGreaterThanOrEqual(arrayKw(panelCount));
+    }
   });
 
   it("sizes panels laid flat a little larger, since they make less power", () => {
