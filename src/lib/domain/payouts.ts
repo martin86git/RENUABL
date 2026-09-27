@@ -118,15 +118,15 @@ export const maskAccount = (n: string) => `•••• ${n.slice(-3)}`;
 // Recipient-created tax invoices
 // ---------------------------------------------------------------------------
 
-/** RENUABL's own details for its invoices. PLACEHOLDER: set the legal name and ABN before live payouts. */
-export const RENUABL_BUSINESS = { name: "RENUABL", abn: null as string | null };
+/** RENUABL's legal entity, for its invoices. */
+export const RENUABL_BUSINESS = { name: "Reburthed Pty Ltd", tradingAs: "RENUABL", abn: "96662374905" };
 
 export interface TaxInvoice {
   title: string;
   number: string;
   issued: ISODate;
   supplier: { name: string; abn: string };
-  recipient: { name: string; abn: string | null };
+  recipient: { name: string; tradingAs?: string; abn: string };
   lines: PayoutLine[];
   subtotal: number;
   gst: number;
@@ -153,7 +153,7 @@ export function payoutInvoice(payout: Payout, partner: { name: string; abn: stri
     number: `RCTI-${payout.reference}`,
     issued: payout.date,
     supplier: { name: partner.name, abn: partner.abn },
-    recipient: { name: RENUABL_BUSINESS.name, abn: RENUABL_BUSINESS.abn },
+    recipient: { name: RENUABL_BUSINESS.name, tradingAs: RENUABL_BUSINESS.tradingAs, abn: RENUABL_BUSINESS.abn },
     lines: payout.lines,
     subtotal: payout.subtotal,
     gst,

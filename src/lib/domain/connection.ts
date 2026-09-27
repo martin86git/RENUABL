@@ -16,7 +16,7 @@ export interface ConnectionStep {
   id: ConnectionStepId;
   label: string;
   detail: string;
-  /** Who's responsible, for each kind of partner. CONFIRM the installer column with RENUABL's operations. */
+  /** Who's responsible, for each kind of partner. For installers, RENUABL handles pre-approval, STCs and Solar Victoria (confirmed). */
   owner: Record<PartnerType, StepOwner>;
   /** Shown to the customer on their installation record, in plain words. */
   customerLabel: string;

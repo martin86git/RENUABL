@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { complianceStatus, expiryPhrase, offersPaused, remindersDue, type ComplianceRecord } from "./compliance";
 import { validateComplianceUpdate } from "./compliance-upload";
 import { cleanConnection, connectionComplete, connectionSteps, nextConnectionStep, partnerMayUpdate, updateConnection } from "./connection";
-import { formatBsb, jobPayout, maskAccount, payoutInvoice, payoutTotals, validateBankDetails } from "./payouts";
+import { isValidAbn } from "./partner";
+import { RENUABL_BUSINESS, formatBsb, jobPayout, maskAccount, payoutInvoice, payoutTotals, validateBankDetails } from "./payouts";
 import { SMS_MAX, newOfferSms, siteUrl, variationSentSms } from "./sms";
 import { stripeKeyMode } from "./status";
 import { addVariation, approvedTotals, cleanVariationInput, decideVariation, priceVariation } from "./variations";
@@ -159,6 +160,12 @@ describe("payouts", () => {
     expect(jobPayout(job("completed", "2026-09-10"), { today }).status).toBe("paid");
     const t = payoutTotals([jobPayout(job("completed", "2026-09-10"), { today }), jobPayout(job("scheduled", "2026-10-10"), { today })]);
     expect(t).toEqual({ paid: 1710, processing: 0, upcoming: 1710 });
+  });
+
+  it("is issued by RENUABL's legal entity, with a valid ABN", () => {
+    expect(isValidAbn(RENUABL_BUSINESS.abn)).toBe(true);
+    const inv = payoutInvoice(jobPayout(job("completed", "2026-09-10"), { today }), { name: "A", abn: "51824753556", gstRegistered: true });
+    expect(inv.recipient).toEqual({ name: "Reburthed Pty Ltd", tradingAs: "RENUABL", abn: "96662374905" });
   });
 
   it("adds GST only for GST-registered partners", () => {

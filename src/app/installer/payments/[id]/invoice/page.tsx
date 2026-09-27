@@ -50,7 +50,8 @@ export default async function InvoicePage({ params }: PageProps<"/installer/paym
           <div>
             <p className="text-[12px] uppercase tracking-wider text-[#6b6b6b]">Recipient</p>
             <p className="mt-1 font-medium">{inv.recipient.name}</p>
-            <p>ABN {inv.recipient.abn ? formatAbn(inv.recipient.abn) : "to be confirmed"}</p>
+            {inv.recipient.tradingAs && <p>Trading as {inv.recipient.tradingAs}</p>}
+            <p>ABN {formatAbn(inv.recipient.abn)}</p>
           </div>
         </div>
         <p className="mt-6 text-[13px] text-[#6b6b6b]">
