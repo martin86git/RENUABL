@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { BillSummary } from "@/lib/domain/bill";
 import type { ContactDetails } from "@/lib/domain/contact";
 import { isAboutComplete as aboutComplete } from "@/lib/domain/existing-solar";
-import { estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
+import { ASSUMPTIONS, estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
 import type { CareBilling } from "@/lib/domain/care";
 import type { Address, AddOnId, EnergyProfile, SystemConfig, SystemTier } from "@/lib/domain/types";
 import { analyseHome, type CallSlot, type ReservationResult } from "@/lib/services/consumer";
@@ -36,6 +36,8 @@ export interface FlowState {
   reservation: ReservationResult | null;
   /** Given when reserving; also pre-fills the call booking. */
   contact: ContactDetails | null;
+  /** Solar Victoria (VIC homes only): the customer's choices at checkout. */
+  solarVic: { rebate: boolean; loan: boolean };
   /** The customer booked their 15-minute confirmation call via HubSpot. */
   callBooked: boolean;
   /** The time picked in the in-app calendar (null when booked through HubSpot or not yet booked). */
@@ -56,6 +58,7 @@ const EMPTY: FlowState = {
   windowId: null,
   reservation: null,
   contact: null,
+  solarVic: { rebate: false, loan: false },
   callBooked: false,
   call: null,
   attribution: null,
@@ -77,7 +80,7 @@ const NO_BILL: BillSummary = {
   exportedDailyKwh: null,
 };
 
-const STORAGE_KEY = "renuabl.flow.v6";
+const STORAGE_KEY = "renuabl.flow.v7";
 
 function load(): FlowState {
   try {
@@ -144,15 +147,24 @@ export function useSystem() {
   const { state } = useFlow();
   return useMemo(() => {
     const profile: EnergyProfile = { ...DEFAULT_PROFILE, ...state.profile };
-    const analysis = analyseHome(state.address);
+    const phase = state.profile.phase === "three" ? "three" : "single";
+    const analysis = {
+      ...analyseHome(state.address),
+      maxPanels: phase === "three" ? ASSUMPTIONS.maxPanels : ASSUMPTIONS.maxPanelsSinglePhase,
+    };
     const recommendation = recommendSystem(profile, analysis, state.bill ?? NO_BILL);
     const tier = recommendation.tiers[state.tier];
     const config = state.config ?? tier.config;
-    const site = { storeys: analysis.storeys, roof: profile.roofType ?? "unsure" };
-    const price = priceSystem(config, site, state.addOns);
+    const site = { storeys: profile.storeys ?? "single", roof: profile.roofType ?? "unsure", phase } as const;
+    const incentives = {
+      state: state.address?.state ?? null,
+      solarVicRebate: state.solarVic.rebate,
+      solarVicLoan: state.solarVic.rebate && state.solarVic.loan,
+    };
+    const price = priceSystem(config, site, state.addOns, incentives);
     const outcome = estimateOutcome(config, recommendation.usage, price);
     return { profile, analysis, site, recommendation, tier, config, price, outcome };
-  }, [state.profile, state.address, state.bill, state.tier, state.config, state.addOns]);
+  }, [state.profile, state.address, state.bill, state.tier, state.config, state.addOns, state.solarVic]);
 }
 
 /** The "About your home" step is done once the bill is read and every question shown is answered. */

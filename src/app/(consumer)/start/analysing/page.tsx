@@ -9,7 +9,7 @@ import { stepHref } from "@/components/consumer/steps";
 import { cn } from "@/components/ui/primitives";
 import { ANALYSIS_STEPS } from "@/lib/services/consumer";
 
-const STEP_MS = 650;
+const STEP_MS = 1100;
 
 export default function AnalysingPage() {
   const router = useRouter();
@@ -23,7 +23,7 @@ export default function AnalysingPage() {
       return;
     }
     if (done >= ANALYSIS_STEPS.length) {
-      const t = setTimeout(() => router.push(stepHref("profile")), 450);
+      const t = setTimeout(() => router.push(stepHref("profile")), 1000);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => setDone((d) => d + 1), STEP_MS);

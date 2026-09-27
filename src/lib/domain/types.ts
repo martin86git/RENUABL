@@ -38,6 +38,9 @@ export interface EnergyProfile {
   backup: boolean;
   /** What the roof is made of: sets the mounting kit. "unsure" is quoted as tile and checked on the call. */
   roofType?: RoofType;
+  storeys?: "single" | "double";
+  /** "unsure" is quoted as single phase and checked on the call. */
+  phase?: "single" | "three" | "unsure";
   /** Only asked when the bill shows existing solar. */
   existingSize?: ExistingSolarSize;
   /** Only asked when the customer doesn't know their existing system's size. */
@@ -61,6 +64,7 @@ export interface UsageBasis {
 }
 
 import type { BomLine } from "./costing";
+import type { RebateLine } from "./rebates";
 
 // ---------------------------------------------------------------------------
 // System recommendation
@@ -101,7 +105,14 @@ export interface PriceBreakdown {
   /** Supplier-cost bill of materials behind the lines (for installers and audits, not customers). */
   bom: BomLine[];
   gross: number;
+  /** Total of the rebate lines. */
   rebates: number;
+  /** Each rebate, shown separately. */
+  rebateLines: RebateLine[];
+  /** Solar Victoria interest-free loan, if taken: lowers the upfront cost, repaid later. */
+  loan: number;
+  /** What the customer pays upfront: total less any loan. */
+  outOfPocket: number;
   total: number;
   deposit: number;
 }

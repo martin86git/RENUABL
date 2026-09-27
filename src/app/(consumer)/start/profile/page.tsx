@@ -14,7 +14,9 @@ import {
   EXISTING_PLAN_OPTIONS,
   EXISTING_SIZE_OPTIONS,
   EXPAND_DISCLAIMER,
+  PHASE_OPTIONS,
   ROOF_OPTIONS,
+  STOREY_OPTIONS,
   asksAboutBattery,
   existingSolarQuestions,
   solarSituation,
@@ -124,18 +126,45 @@ export default function ProfilePage() {
           {existing.size && <ExistingSolar profile={profile} situation={situation} onChange={change} />}
           <div className="flex gap-5 rounded-[var(--radius-card)] bg-surface px-5 py-4 shadow-[var(--shadow-soft)]">
             <HomeIcon className="mt-1 hidden h-7 w-7 shrink-0 text-ink lg:block" strokeWidth={1.3} aria-hidden />
-            <div className="min-w-0 flex-1">
-              <p className="text-[13.5px] leading-snug text-ink-2">What&apos;s your roof made of?</p>
-              <div className="mt-2.5">
-                <ChoiceChips<RoofType>
-                  label="What's your roof made of?"
-                  options={ROOF_OPTIONS}
-                  value={profile.roofType}
-                  onChange={(roofType) => change({ roofType })}
-                />
+            <div className="min-w-0 flex-1 space-y-4">
+              <div>
+                <p className="text-[13.5px] leading-snug text-ink-2">What&apos;s your roof made of?</p>
+                <div className="mt-2.5">
+                  <ChoiceChips<RoofType>
+                    label="What's your roof made of?"
+                    options={ROOF_OPTIONS}
+                    value={profile.roofType}
+                    onChange={(roofType) => change({ roofType })}
+                  />
+                </div>
               </div>
-              {profile.roofType === "unsure" && (
-                <p className="mt-2 text-[12px] text-muted">No problem. We&apos;ll confirm it on your call.</p>
+              <div>
+                <p className="text-[13.5px] leading-snug text-ink-2">Is your home single or double storey?</p>
+                <div className="mt-2.5">
+                  <ChoiceChips<"single" | "double">
+                    label="Is your home single or double storey?"
+                    options={STOREY_OPTIONS}
+                    value={profile.storeys}
+                    onChange={(storeys) => change({ storeys })}
+                  />
+                </div>
+              </div>
+              <div>
+                <p className="text-[13.5px] leading-snug text-ink-2">Is your power single or three phase?</p>
+                <div className="mt-2.5">
+                  <ChoiceChips<"single" | "three" | "unsure">
+                    label="Is your power single or three phase?"
+                    options={PHASE_OPTIONS}
+                    value={profile.phase}
+                    onChange={(phase) => change({ phase })}
+                  />
+                </div>
+                <p className="mt-2 text-[12px] leading-snug text-muted">
+                  Tip: three main switches side by side in your switchboard usually means three phase.
+                </p>
+              </div>
+              {(profile.roofType === "unsure" || profile.phase === "unsure") && (
+                <p className="text-[12px] text-muted">No problem. We&apos;ll confirm it on your call.</p>
               )}
             </div>
           </div>

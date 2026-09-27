@@ -11,11 +11,13 @@ import { FlowStep } from "@/components/consumer/flow-shell";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
 import { PRODUCT_IMAGES } from "@/components/ui/brand-art";
+import { Toggle } from "@/components/ui/controls";
 import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
 import { CARE_FREE_MONTHS, CARE_PLAN, careIncludedFor, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
 import { formatCurrency, formatDate } from "@/lib/domain/format";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
+import { REBATE_RATES, solarVictoriaApplies } from "@/lib/domain/rebates";
 import { getWindow } from "@/lib/domain/scheduling";
 import type { AddOnId, LineItemId } from "@/lib/domain/types";
 import { formatAddress } from "@/lib/mock/addresses";
@@ -161,16 +163,87 @@ function ReserveScreen() {
             </p>
           </li>
         )}
-        <li>
-          <StatRow
-            label={<span className="font-medium text-positive">Rebates we claim for you</span>}
-            value={<span className="font-semibold text-positive">−{formatCurrency(price.rebates)}</span>}
-          />
+        <li className="py-3">
+          <div className="flex items-baseline justify-between">
+            <p className="text-[14px] text-ink">Price before rebates</p>
+            <p className="text-[14px] tabular-nums text-ink">{formatCurrency(price.gross)}</p>
+          </div>
         </li>
+        {price.rebateLines.map((r) => (
+          <li key={r.id} className="flex items-baseline justify-between gap-3 py-2.5">
+            <div className="min-w-0">
+              <p className="text-[13.5px] font-medium text-positive">{r.label}</p>
+              <p className="text-[12px] text-muted">{r.detail}</p>
+            </div>
+            <p className="text-[14px] font-semibold tabular-nums text-positive">−{formatCurrency(r.amount)}</p>
+          </li>
+        ))}
         <li>
           <StatRow label={<span className="text-ink">Total after rebates</span>} value={formatCurrency(price.total)} />
         </li>
+        {price.loan > 0 && (
+          <>
+            <li>
+              <StatRow
+                label="Solar Victoria interest-free loan"
+                value={<span className="tabular-nums">−{formatCurrency(price.loan)}</span>}
+              />
+            </li>
+            <li>
+              <StatRow
+                label={<span className="font-medium text-ink">Your upfront cost</span>}
+                value={<span className="font-medium">{formatCurrency(price.outOfPocket)}</span>}
+              />
+            </li>
+          </>
+        )}
       </ul>
+      {!REBATE_RATES.verified && (
+        <p className="mt-3 text-[11.5px] leading-snug text-muted">Rebate amounts are confirmed on your call before anything is final.</p>
+      )}
+    </Card>
+  );
+
+  const solarVic = solarVictoriaApplies(state.address?.state ?? null) && (config.panelCount > 0 || config.batteryKwh > 0) && (
+    <Card className="p-5">
+      <p className="text-[15px] text-ink">Solar Victoria</p>
+      <p className="mt-0.5 text-[12.5px] leading-snug text-muted">
+        Victorian homes may be eligible for a Solar Victoria rebate and an interest-free loan.{" "}
+        <a
+          href={REBATE_RATES.solarVictoria.eligibilityUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-ink underline underline-offset-4"
+        >
+          Check eligibility
+        </a>
+      </p>
+      <div className="mt-4 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-[14px] text-ink">Apply the Solar Victoria rebate</p>
+          <p className="text-[12px] text-muted">If you&apos;re eligible. We confirm it with you on the call.</p>
+        </div>
+        <Toggle
+          label="Apply the Solar Victoria rebate"
+          checked={state.solarVic.rebate}
+          onChange={(rebate) => update({ solarVic: { rebate, loan: rebate && state.solarVic.loan } })}
+        />
+      </div>
+      {state.solarVic.rebate && REBATE_RATES.solarVictoria.pvLoan > 0 && config.panelCount > 0 && !config.existingSolar && (
+        <div className="mt-4 flex items-center justify-between gap-4 border-t border-line pt-4">
+          <div>
+            <p className="text-[14px] text-ink">Take the interest-free loan</p>
+            <p className="text-[12px] text-muted">
+              Up to {formatCurrency(REBATE_RATES.solarVictoria.pvLoan)} off your upfront cost, repaid to Solar Victoria interest free.
+            </p>
+          </div>
+          <Toggle
+            label="Take the Solar Victoria interest-free loan"
+            checked={state.solarVic.loan}
+            onChange={(loan) => update({ solarVic: { ...state.solarVic, loan } })}
+          />
+        </div>
+      )}
     </Card>
   );
 
@@ -312,6 +385,7 @@ function ReserveScreen() {
       <div className="grid max-w-5xl grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start lg:gap-6">
         <div className="space-y-5">
           {basket}
+          {solarVic}
           {additions}
           {care}
         </div>

@@ -20,8 +20,9 @@ import {
 } from "./recommendation";
 import { summariseBill, type BillSummary } from "./bill";
 import { normaliseMobile, validateContact } from "./contact";
-import { PANEL, RACKING } from "./catalogue";
-import { COSTING, arrayKw, batteryInstallCost, billOfMaterials, railLengths, rebatesFor, selectInverter, sellPrice } from "./costing";
+import { BOS, PANEL, RACKING } from "./catalogue";
+import { COSTING, arrayKw, batteryInstallCost, billOfMaterials, railLengths, selectInverter, sellPrice } from "./costing";
+import { REBATE_RATES, rebatesFor } from "./rebates";
 import { HYBRID_INVERTERS, STRING_INVERTERS } from "./catalogue";
 import { existingSolarQuestions, isAboutComplete, realAnnualUse, solarSituation } from "./existing-solar";
 import { INSTALL_ARRIVAL, buildAvailability, fromISODate } from "./scheduling";
@@ -32,7 +33,7 @@ import { INSTALLERS } from "@/lib/mock/installers";
 
 const base: EnergyProfile = { ev: false, evPlanned: false, wantsBattery: false, backup: false };
 const analysis: HomeAnalysis = { storeys: "single", roof: "Colorbond", orientation: "North", maxPanels: 36 };
-const site = { storeys: "single" as const, roof: "tin" as const };
+const site = { storeys: "single" as const, roof: "tin" as const, phase: "single" as const };
 const bill = summariseBill({ isElectricityBill: true, periodDays: 91, usageKwh: 1547, eveningShare: 0.58, usageRate: 0.31 }) as BillSummary;
 
 describe("summariseBill", () => {
@@ -130,11 +131,11 @@ describe("recommendSystem", () => {
 describe("priceSystem", () => {
   it("applies rebates, includes add-ons and keeps a fixed deposit", () => {
     const config = { panelCount: 30, batteryKwh: 13.5, evCharger: true };
-    const plain = priceSystem(config, { storeys: "double", roof: "tile" });
-    const withAddOns = priceSystem(config, { storeys: "double", roof: "tile" }, ["heat-pump", "smart-home"]);
+    const plain = priceSystem(config, { storeys: "double", roof: "tile", phase: "single" });
+    const withAddOns = priceSystem(config, { storeys: "double", roof: "tile", phase: "single" }, ["heat-pump", "smart-home"]);
     expect(plain.total).toBe(plain.gross - plain.rebates);
     expect(plain.deposit).toBe(499);
-    expect(plain.lines.some((l) => l.label.includes("Double-storey"))).toBe(true);
+    expect(plain.bom.find((l) => l.description === "Double-storey installation")?.total).toBe(400);
     const addOnTotal = ADD_ONS.filter((a) => a.id === "heat-pump" || a.id === "smart-home").reduce((s, a) => s + a.price, 0);
     expect(withAddOns.total - plain.total).toBe(addOnTotal);
   });
@@ -362,7 +363,14 @@ describe("existing solar", () => {
   });
 
   it("is only complete once the solar questions are answered", () => {
-    const answers = { ev: false, evPlanned: false, backup: false, roofType: "tin" as const };
+    const answers = {
+      ev: false,
+      evPlanned: false,
+      backup: false,
+      roofType: "tin" as const,
+      storeys: "single" as const,
+      phase: "single" as const,
+    };
     expect(isAboutComplete(bill, { ev: false, evPlanned: false, backup: false, wantsBattery: false })).toBe(false); // roof not answered
     expect(isAboutComplete(solarBill, answers)).toBe(false);
     expect(isAboutComplete(solarBill, { ...answers, existingSize: "unsure" })).toBe(false);
@@ -414,7 +422,15 @@ describe("existing solar", () => {
 });
 
 describe("costing from the supplier price list", () => {
-  const input = { panelCount: 14, batteryKwh: 0, evCharger: false, roof: "tin" as const, storeys: "single" as const, addOns: [] };
+  const input = {
+    panelCount: 14,
+    batteryKwh: 0,
+    evCharger: false,
+    roof: "tin" as const,
+    storeys: "single" as const,
+    phase: "single" as const,
+    addOns: [],
+  };
   const skus = (lines: ReturnType<typeof billOfMaterials>) => lines.map((l) => l.sku);
 
   it("picks the smallest inverter the array may connect to (array <= 133% of its rating)", () => {
@@ -429,8 +445,9 @@ describe("costing from the supplier price list", () => {
   });
 
   it("never sizes an array beyond what the largest inverter allows", () => {
-    expect(arrayKw(ASSUMPTIONS.maxPanels)).toBeLessThanOrEqual(10 * COSTING.maxArrayToInverter);
-    expect(arrayKw(ASSUMPTIONS.maxPanels + 1)).toBeGreaterThan(10 * COSTING.maxArrayToInverter);
+    expect(arrayKw(ASSUMPTIONS.maxPanelsSinglePhase)).toBeLessThanOrEqual(10 * COSTING.maxArrayToInverter);
+    expect(arrayKw(ASSUMPTIONS.maxPanelsSinglePhase + 1)).toBeGreaterThan(10 * COSTING.maxArrayToInverter);
+    expect(arrayKw(ASSUMPTIONS.maxPanels)).toBeLessThanOrEqual(15 * COSTING.maxArrayToInverter);
   });
 
   it("allows (panel width + 0.1 m) x 2 of rail per panel, bought in 4.8 m lengths", () => {
@@ -470,6 +487,34 @@ describe("costing from the supplier price list", () => {
     expect(batteryInstallCost(9)).toBe(2700);
   });
 
+  it("includes RENUABL's balance of system", () => {
+    const solar = billOfMaterials(input);
+    const bySku = (lines: ReturnType<typeof billOfMaterials>, sku: string) => lines.find((l) => l.sku === sku);
+    expect(bySku(solar, "MMELABELDC")!.qty).toBe(1);
+    expect(bySku(solar, "NEAMC4EVO2")!.qty).toBe(10);
+    expect(bySku(solar, "NHPNL140L")!.qty).toBe(1);
+    // Four clips per panel, rounded up to whole packs.
+    const clips = bySku(solar, "MTLCLIP-M4X2/SS")!.qty;
+    expect(clips % BOS.panelClip.packSize).toBe(0);
+    expect(clips).toBeGreaterThanOrEqual(14 * 4);
+    expect(bySku(solar, "AWMPVBATTERY")).toBeUndefined();
+    // Solar and battery: both the DC and the battery label kits.
+    const both = billOfMaterials({ ...input, batteryKwh: 8 });
+    expect(bySku(both, "MMELABELDC")).toBeDefined();
+    expect(bySku(both, "AWMPVBATTERY")).toBeDefined();
+  });
+
+  it("adds $400 for double storey and $150 only when a three-phase inverter is fitted", () => {
+    const labour = (lines: ReturnType<typeof billOfMaterials>, d: string) => lines.find((l) => l.description === d)?.total;
+    expect(labour(billOfMaterials(input), "Double-storey installation")).toBeUndefined();
+    expect(labour(billOfMaterials({ ...input, storeys: "double" }), "Double-storey installation")).toBe(400);
+    expect(labour(billOfMaterials(input), "Three-phase inverter installation")).toBeUndefined();
+    const three = billOfMaterials({ ...input, phase: "three" });
+    expect(labour(three, "Three-phase inverter installation")).toBe(150);
+    expect(three.some((l) => l.sku === "SGWSG5.0RT")).toBe(true);
+    expect(three.some((l) => l.sku === "NHPNL340L")).toBe(true);
+  });
+
   it("adds a 20% margin and GST to supplier cost", () => {
     expect(sellPrice(1000)).toBe(1320);
   });
@@ -479,7 +524,7 @@ describe("costing from the supplier price list", () => {
     const price = priceSystem(config, site);
     const solarCost = price.bom.filter((l) => l.group === "solar").reduce((s, l) => s + l.total, 0);
     expect(price.lines.find((l) => l.id === "solar")!.amount).toBe(sellPrice(solarCost));
-    expect(price.rebates).toBe(rebatesFor(config));
+    expect(price.rebates).toBe(rebatesFor(config).total);
     expect(price.total).toBe(price.gross - price.rebates);
   });
 });
@@ -498,5 +543,34 @@ describe("contact details", () => {
     expect(ok).toEqual({ contact: { firstName: "Sarah", lastName: "Chen", mobile: "+61412345678", email: "sarah@example.com" } });
     const bad = validateContact({ firstName: "", lastName: "Chen", mobile: "123", email: "nope" });
     expect("errors" in bad && Object.keys(bad.errors).sort()).toEqual(["email", "firstName", "mobile"]);
+  });
+});
+
+describe("rebates", () => {
+  const config = { panelCount: 14, batteryKwh: 16 };
+  const vic = { state: "VIC", solarVicRebate: true, solarVicLoan: false };
+
+  it("shows each federal rebate as its own line", () => {
+    const { lines, total } = rebatesFor(config);
+    expect(lines.map((l) => l.id)).toEqual(["stc-solar", "stc-battery"]);
+    const pvCerts = Math.floor(arrayKw(14) * REBATE_RATES.stc.zoneRating * REBATE_RATES.stc.deemingYears);
+    expect(lines[0].amount).toBe(Math.round(pvCerts * REBATE_RATES.stc.price));
+    expect(total).toBe(lines[0].amount + lines[1].amount);
+  });
+
+  it("offers Solar Victoria only for Victorian homes that opt in", () => {
+    expect(rebatesFor(config, { ...vic, state: "NSW" }).lines.some((l) => l.id === "sv-solar")).toBe(false);
+    expect(rebatesFor(config, { ...vic, solarVicRebate: false }).lines.some((l) => l.id === "sv-solar")).toBe(false);
+    expect(rebatesFor(config, vic).lines.find((l) => l.id === "sv-solar")!.amount).toBe(REBATE_RATES.solarVictoria.pvRebate);
+    // Not for extra panels on an existing system.
+    expect(rebatesFor({ ...config, existingSolar: true }, vic).lines.some((l) => l.id === "sv-solar")).toBe(false);
+  });
+
+  it("applies the interest-free loan to the upfront cost, not the price", () => {
+    const withLoan = priceSystem({ panelCount: 14, batteryKwh: 0, evCharger: false }, site, [], { ...vic, solarVicLoan: true });
+    const without = priceSystem({ panelCount: 14, batteryKwh: 0, evCharger: false }, site, [], vic);
+    expect(withLoan.total).toBe(without.total);
+    expect(withLoan.loan).toBe(REBATE_RATES.solarVictoria.pvLoan);
+    expect(withLoan.outOfPocket).toBe(without.total - REBATE_RATES.solarVictoria.pvLoan);
   });
 });

@@ -33,11 +33,27 @@ export const PANEL: PanelItem = {
   widthM: 1.134,
 };
 
-/** Solar-only systems (no battery now or planned): Sungrow single-phase string inverters. */
+export type Phase = "single" | "three";
+
+/** Solar-only systems (no battery now or planned): Sungrow string inverters. */
+export const STRING_INVERTERS_3PH: InverterItem[] = [
+  { sku: "SGWSG5.0RT", name: "Sungrow 5kW Three Phase Solar 2 MPPT Inverter", cost: 1295, kw: 5 },
+  { sku: "SGWSG8.0RT", name: "Sungrow 8kW Three Phase Solar 2MPPT Inverter", cost: 1400, kw: 8 },
+  { sku: "SGWSG10RT", name: "Sungrow 10kW Three Phase Solar 2 MPPT Inverter", cost: 1655, kw: 10 },
+  { sku: "SGWSG15RT", name: "Sungrow 15kW Three Phase Solar 2 MPPT Inverter", cost: 1949, kw: 15 },
+];
+
 export const STRING_INVERTERS: InverterItem[] = [
   { sku: "SGWSG5.0RS", name: "Sungrow 5kW Single Phase 2 MPPT Inverter", cost: 870, kw: 5 },
   { sku: "SGWSG8.0RS-G3-ADA", name: "Sungrow 8kW Single Phase 3 MPPT String Inverter", cost: 1650, kw: 8 },
   { sku: "SGWSG10RS-G3-ADA", name: "Sungrow 10kW Single Phase 3MPPT Inverter", cost: 1755.55, kw: 10 },
+];
+
+/** Battery systems on three-phase homes. */
+export const HYBRID_INVERTERS_3PH: InverterItem[] = [
+  { sku: "SIG11010047", name: "Sigenergy 5.0kW SigenStor Three Phase Controller", cost: 2300, kw: 5 },
+  { sku: "SIG11010045", name: "Sigenergy 10.0kW SigenStor Three Phase Controller", cost: 2663, kw: 10 },
+  { sku: "SIG11010046", name: "Sigenergy 15.0kW SigenStor Three Phase Controller", cost: 3511, kw: 15 },
 ];
 
 /** Battery systems: the Sigenergy SigenStor controller is the (hybrid) inverter. */
@@ -54,8 +70,10 @@ export const BATTERY = {
   mount: { sku: "SIG30020002", name: "Sigenergy SigenStor Wall Mount Installation Kit", cost: 202 },
   /** Needed for backup during outages. */
   gateway: { sku: "SIG11110049", name: "Sigen Energy Gateway Single Phase", cost: 695 },
+  gateway3ph: { sku: "SIG11110048", name: "Sigen Energy Gateway Three Phase 30kw", cost: 859 },
   /** Reads the existing system when a battery is added to it. */
   sensor: { sku: "SIG1426000005", name: "Sigenergy Single Phase Power Sensor With External CT 120", cost: 115 },
+  sensor3ph: { sku: "SIG1426000007", name: "Sigenergy Three Phase Power Sensor With External CT 120", cost: 217 },
 } as const;
 
 export const RACKING = {
@@ -73,11 +91,16 @@ export const HEAT_PUMP: CatalogueItem[] = [
   { sku: "BPSQIK15R", name: "Quick Installation Kit to suit Haier Heat Pumps", cost: 169.1 },
 ];
 
-/** Balance of system per solar job: DC isolator, MC4 connectors, conduit, cable, labels. */
-export const SOLAR_BOS: CatalogueItem[] = [
-  { sku: "NHPNL432PV", name: "4P 32A 1500V DC IP66 Isolator", cost: 31.95 },
-  { sku: "MC4GENPR20", name: "Genuine MC4 - Pack of 20 PAIRS", cost: 58.99 },
-  { sku: "HPPSOLARHDT2550", name: "25mm Solar Corrugated Conduit 50 Metres Grey HD", cost: 78 },
-  { sku: "TON4TDC", name: "Tonglin 4mm DC Twin Cable (100 Mtr Drum)", cost: 167.9 },
-  { sku: "MMELABELDC", name: "DC Solar Label Kit AS/NZS 4777.1:2024 with Site Map", cost: 16.85 },
-];
+/** Balance of system (RENUABL's list). */
+export const BOS = {
+  dcLabels: { sku: "MMELABELDC", name: "DC Solar Label Kit AS/NZS 4777.1:2024 with Site Map", cost: 16.85 },
+  /** Needed as well as the DC kit when there is solar and a battery. */
+  batteryLabels: { sku: "AWMPVBATTERY", name: "Universal Battery Label Kit", cost: 28 },
+  /** Minimum of ten male/female pairs per job. */
+  mc4: { sku: "NEAMC4EVO2", name: "MC4 EVO2 Connector Pairs", cost: 3.5, minPairs: 10 },
+  /** Four per panel, bought in whole packs. PACK SIZE TO CONFIRM (the price list doesn't state it). */
+  panelClip: { sku: "MTLCLIP-M4X2/SS", name: "2 Wire Cable Clip", cost: 0.235, perPanel: 4, packSize: 100 },
+  /** NHP 40 A AC isolator (the 40 A single-phase NHP on the list is 2-pole). */
+  acIsolator: { sku: "NHPNL140L", name: "NHP 40 Amp 2 Pole 250 Volt AC IP66 Large N-Line Industrial Isolator", cost: 17 },
+  acIsolator3ph: { sku: "NHPNL340L", name: "NHP 40 Amp 3 Pole 500 Volt AC IP66 Large N-Line Industrial Isolator", cost: 19.57 },
+} as const;

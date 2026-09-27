@@ -1,6 +1,7 @@
 import type { BillSummary } from "./bill";
 import { PANEL } from "./catalogue";
-import { COSTING, billOfMaterials, maxPanelsForInverter, rebatesFor, sellPrice, type CostGroup } from "./costing";
+import { COSTING, billOfMaterials, inverterOptions, maxPanelsForInverter, sellPrice, type CostGroup } from "./costing";
+import { NO_INCENTIVES, rebatesFor, type Incentives } from "./rebates";
 import { realAnnualUse, solarSituation } from "./existing-solar";
 import type {
   LineItemId,
@@ -30,8 +31,9 @@ export const ASSUMPTIONS = {
   panelWatts: PANEL_WATTS,
   minSystemKw: MIN_SYSTEM_KW,
   minPanels: Math.ceil((MIN_SYSTEM_KW * 1000) / PANEL_WATTS), // 11 x 475 W = 5.2 kW
-  /** The most the largest single-phase inverter allows (array <= 133% of 10 kW). */
-  maxPanels: maxPanelsForInverter(),
+  /** The most the largest inverter allows (array <= 133% of its rating): 10 kW single phase, 15 kW three phase. */
+  maxPanels: maxPanelsForInverter(inverterOptions("hybrid", "three")),
+  maxPanelsSinglePhase: maxPanelsForInverter(inverterOptions("hybrid", "single")),
   tariffPerKwh: 0.3,
   feedInPerKwh: 0.04,
   dailyYieldKwhPerKw: 3.8, // Melbourne average
@@ -56,10 +58,15 @@ export const ASSUMPTIONS = {
 
 /** Customer price of one add-on, from its costed bill of materials. */
 function addOnPrice(id: AddOnId) {
-  const cost = billOfMaterials({ panelCount: 0, batteryKwh: 0, evCharger: false, roof: "tile", storeys: "single", addOns: [id] }).reduce(
-    (sum, l) => sum + l.total,
-    0,
-  );
+  const cost = billOfMaterials({
+    panelCount: 0,
+    batteryKwh: 0,
+    evCharger: false,
+    roof: "tile",
+    storeys: "single",
+    phase: "single",
+    addOns: [id],
+  }).reduce((sum, l) => sum + l.total, 0);
   return sellPrice(cost);
 }
 
@@ -295,19 +302,24 @@ export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: 
 export interface Site {
   storeys: "single" | "double";
   roof: RoofType;
+  phase: "single" | "three";
 }
 
 const LINE_LABELS: Partial<Record<CostGroup, string>> = {
   "ev-charger": "Smart EV charger",
-  "double-storey": "Double-storey install",
 };
 
 /**
  * The customer's price: the system's bill of materials at supplier cost, plus
  * installation, margin and GST, grouped into the lines they see, less rebates.
  */
-export function priceSystem(config: SystemConfig, site: Site, addOns: AddOnId[] = []): PriceBreakdown {
-  const bom = billOfMaterials({ ...config, roof: site.roof, storeys: site.storeys, addOns });
+export function priceSystem(
+  config: SystemConfig,
+  site: Site,
+  addOns: AddOnId[] = [],
+  incentives: Incentives = NO_INCENTIVES,
+): PriceBreakdown {
+  const bom = billOfMaterials({ ...config, roof: site.roof, storeys: site.storeys, phase: site.phase, addOns });
   const cost = (group: CostGroup) => bom.filter((l) => l.group === group).reduce((sum, l) => sum + l.total, 0);
   const solarKw = panelsToKw(config.panelCount);
   const lines: PriceBreakdown["lines"] = [];
@@ -322,23 +334,26 @@ export function priceSystem(config: SystemConfig, site: Site, addOns: AddOnId[] 
   }
   if (config.evCharger)
     lines.push({ id: "ev-charger", label: LINE_LABELS["ev-charger"]!, amount: sellPrice(cost("ev-charger")), removable: true });
-  if (cost("double-storey") > 0) {
-    lines.push({ id: "double-storey", label: LINE_LABELS["double-storey"]!, amount: sellPrice(cost("double-storey")), removable: false });
-  }
   for (const id of addOns) {
     const addOn = ADD_ONS.find((a) => a.id === id);
     if (addOn) lines.push({ id: addOn.id, label: addOn.name, amount: sellPrice(cost(id)), removable: true });
   }
 
   const gross = lines.reduce((sum, l) => sum + l.amount, 0);
-  const rebateTotal = Math.min(gross, rebatesFor(config));
+  const rebates = rebatesFor(config, incentives);
+  const rebateTotal = Math.min(gross, rebates.total);
+  const total = gross - rebateTotal;
+  const loan = Math.min(rebates.loan, total);
 
   return {
     lines,
     bom,
     gross,
     rebates: rebateTotal,
-    total: gross - rebateTotal,
+    rebateLines: rebates.lines,
+    loan,
+    outOfPocket: total - loan,
+    total,
     deposit: ASSUMPTIONS.deposit,
   };
 }

@@ -1,18 +1,21 @@
 /**
  * Turns a system into a bill of materials at supplier cost, then into the
- * customer's price: (products + installation) x (1 + margin) + GST, less rebates.
+ * customer's price: (products + installation) x (1 + margin) + GST. Rebates are in rebates.ts.
  * Product choices and rules are RENUABL's; supplier prices are in catalogue.ts.
  */
 import {
   BATTERY,
+  BOS,
   EV_CHARGER,
   HEAT_PUMP,
   HYBRID_INVERTERS,
+  HYBRID_INVERTERS_3PH,
   PANEL,
   RACKING,
-  SOLAR_BOS,
   STRING_INVERTERS,
+  STRING_INVERTERS_3PH,
   type InverterItem,
+  type Phase,
 } from "./catalogue";
 import type { RoofType } from "./types";
 
@@ -23,6 +26,10 @@ export const COSTING = {
   solarInstallPerWatt: 0.3,
   /** Installing one battery stack, whatever its number of modules. */
   batteryInstallPerStack: 1800,
+  /** Added to the installation for a double-storey home. */
+  doubleStoreyInstall: 400,
+  /** Added to the installation only when a three-phase inverter is fitted. */
+  threePhaseInstall: 150,
   /** Under STC rules the panel array can be at most 133% of the inverter's nameplate rating. */
   maxArrayToInverter: 1.33,
   /** Rail per panel (portrait): its width plus this, for the top and the bottom of the panel. */
@@ -31,19 +38,10 @@ export const COSTING = {
   // PLACEHOLDERS (not in the supplier list): confirm with Primero before launch.
   evChargerInstall: 450,
   heatPumpInstall: 1200,
-  doubleStorey: 650,
   addOnPrices: { "smart-switchboard": 1450, "home-backup": 1850, "smart-home": 690 } as Record<string, number>,
-  rebates: {
-    // PLACEHOLDERS: confirm STC price, deeming years and the battery factor for the install year.
-    stcPrice: 38,
-    zoneRating: 1.185, // Melbourne, zone 4
-    deemingYears: 5,
-    batteryStcsPerKwh: 8.4,
-  },
 } as const;
 
-export type CostGroup =
-  "solar" | "battery" | "ev-charger" | "heat-pump" | "smart-switchboard" | "home-backup" | "smart-home" | "double-storey";
+export type CostGroup = "solar" | "battery" | "ev-charger" | "heat-pump" | "smart-switchboard" | "home-backup" | "smart-home";
 
 export interface BomLine {
   group: CostGroup;
@@ -64,6 +62,8 @@ export interface CostingInput {
   batteryReady?: boolean;
   roof: RoofType;
   storeys: "single" | "double";
+  /** Three-phase homes get three-phase inverters. "Not sure" is quoted as single phase. */
+  phase: Phase;
   addOns: string[];
 }
 
@@ -78,7 +78,12 @@ export function selectInverter(kw: number, options: InverterItem[]): InverterIte
   return options.find((i) => i.kw * COSTING.maxArrayToInverter >= kw) ?? options[options.length - 1];
 }
 
-/** Most panels the largest single-phase inverter allows. */
+export function inverterOptions(kind: "string" | "hybrid", phase: Phase) {
+  if (kind === "hybrid") return phase === "three" ? HYBRID_INVERTERS_3PH : HYBRID_INVERTERS;
+  return phase === "three" ? STRING_INVERTERS_3PH : STRING_INVERTERS;
+}
+
+/** Most panels the largest inverter for the phase allows. */
 export function maxPanelsForInverter(options: InverterItem[] = HYBRID_INVERTERS) {
   const largest = Math.max(...options.map((i) => i.kw));
   return Math.floor((largest * COSTING.maxArrayToInverter * 1000) / PANEL.watts);
@@ -114,13 +119,16 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
   if (input.panelCount > 0) {
     const rails = railLengths(input.panelCount);
     const kit = input.roof === "tin" ? RACKING.tinKit : RACKING.tileKit;
+    const clips = Math.ceil((input.panelCount * BOS.panelClip.perPanel) / BOS.panelClip.packSize) * BOS.panelClip.packSize;
     lines.push(line("solar", PANEL.sku, PANEL.name, input.panelCount, PANEL.cost));
     lines.push(line("solar", RACKING.rail.sku, `${RACKING.rail.name} (${rails.metres} m needed)`, rails.lengths, RACKING.rail.cost));
     lines.push(
       line("solar", RACKING.splice.sku, RACKING.splice.name, Math.max(0, rails.lengths - COSTING.railsPerPanelRow), RACKING.splice.cost),
     );
     lines.push(line("solar", kit.sku, kit.name, Math.ceil(kw / kit.kw), kit.cost));
-    for (const item of SOLAR_BOS) lines.push(line("solar", item.sku, item.name, bosQty(item.sku), item.cost));
+    lines.push(line("solar", BOS.dcLabels.sku, BOS.dcLabels.name, 1, BOS.dcLabels.cost));
+    lines.push(line("solar", BOS.mc4.sku, BOS.mc4.name, BOS.mc4.minPairs, BOS.mc4.cost));
+    lines.push(line("solar", BOS.panelClip.sku, `${BOS.panelClip.name} (${BOS.panelClip.perPanel} per panel)`, clips, BOS.panelClip.cost));
     lines.push(
       line(
         "solar",
@@ -130,23 +138,37 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
         round2(kw * 1000 * COSTING.solarInstallPerWatt),
       ),
     );
+    if (input.storeys === "double") lines.push(line("solar", null, "Double-storey installation", 1, COSTING.doubleStoreyInstall));
   }
 
   // Inverter: the battery controller when there's a battery (or one is planned), else a string inverter.
+  const three = input.phase === "three";
+  let inverterFitted = false;
   if (hybrid && (input.panelCount > 0 || modules > 0)) {
-    const inv = selectInverter(kw, HYBRID_INVERTERS);
+    const inv = selectInverter(kw, inverterOptions("hybrid", input.phase));
     lines.push(line(modules > 0 ? "battery" : "solar", inv.sku, inv.name, 1, inv.cost));
+    inverterFitted = true;
   } else if (input.panelCount > 0 && !input.existingSolar) {
-    const inv = selectInverter(kw, STRING_INVERTERS);
+    const inv = selectInverter(kw, inverterOptions("string", input.phase));
     lines.push(line("solar", inv.sku, inv.name, 1, inv.cost));
+    inverterFitted = true;
+  }
+  if (inverterFitted) {
+    const group: CostGroup = modules > 0 && input.panelCount === 0 ? "battery" : "solar";
+    const iso = three ? BOS.acIsolator3ph : BOS.acIsolator;
+    lines.push(line(group, iso.sku, iso.name, 1, iso.cost));
+    if (three) lines.push(line(group, null, "Three-phase inverter installation", 1, COSTING.threePhaseInstall));
   }
 
   if (modules > 0) {
     const stacks = Math.ceil(modules / BATTERY.modulesPerStack);
+    const gateway = three ? BATTERY.gateway3ph : BATTERY.gateway;
+    const sensor = three ? BATTERY.sensor3ph : BATTERY.sensor;
     lines.push(line("battery", BATTERY.module.sku, BATTERY.module.name, modules, BATTERY.module.cost));
     lines.push(line("battery", BATTERY.mount.sku, BATTERY.mount.name, stacks, BATTERY.mount.cost));
-    lines.push(line("battery", BATTERY.gateway.sku, BATTERY.gateway.name, 1, BATTERY.gateway.cost));
-    if (input.existingSolar) lines.push(line("battery", BATTERY.sensor.sku, BATTERY.sensor.name, 1, BATTERY.sensor.cost));
+    lines.push(line("battery", gateway.sku, gateway.name, 1, gateway.cost));
+    if (input.existingSolar) lines.push(line("battery", sensor.sku, sensor.name, 1, sensor.cost));
+    lines.push(line("battery", BOS.batteryLabels.sku, BOS.batteryLabels.name, 1, BOS.batteryLabels.cost));
     lines.push(
       line(
         "battery",
@@ -170,29 +192,10 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
       lines.push(line(id as CostGroup, null, `${id} (placeholder price)`, 1, COSTING.addOnPrices[id]));
     }
   }
-  if (input.storeys === "double" && input.panelCount > 0) {
-    lines.push(line("double-storey", null, "Double-storey installation (placeholder)", 1, COSTING.doubleStorey));
-  }
   return lines;
-}
-
-/** Share of a pack or drum one typical job uses. */
-function bosQty(sku: string) {
-  if (sku === "MC4GENPR20") return 0.25; // ~5 pairs
-  if (sku === "HPPSOLARHDT2550") return 0.5; // ~25 m
-  if (sku === "TON4TDC") return 0.3; // ~30 m
-  return 1;
 }
 
 /** Supplier cost -> customer price, including margin and GST. */
 export function sellPrice(cost: number) {
   return Math.round(cost * (1 + COSTING.margin) * (1 + COSTING.gst));
-}
-
-/** Solar and battery rebates (STCs), taken off the price at the point of sale. */
-export function rebatesFor(input: Pick<CostingInput, "panelCount" | "batteryKwh">) {
-  const r = COSTING.rebates;
-  const solarStcs = Math.floor(arrayKw(input.panelCount) * r.zoneRating * r.deemingYears);
-  const batteryStcs = Math.floor(batteryModules(input.batteryKwh) * BATTERY.module.kwh * r.batteryStcsPerKwh);
-  return Math.round((solarStcs + batteryStcs) * r.stcPrice);
 }
