@@ -47,7 +47,7 @@ npm run build
 
 ## Deploying
 
-Hosted on Vercel (Sydney region, the closest to the Victorian launch market). See [`docs/DEPLOY.md`](docs/DEPLOY.md) for the one-time setup. Every deployment shows a "sample data" banner and is hidden from search engines until `NEXT_PUBLIC_PREVIEW_MODE=false`.
+Hosted on Vercel (Sydney region, the closest to the Victorian launch market). See [`docs/DEPLOY.md`](docs/DEPLOY.md) for the one-time setup. Every deployment is hidden from search engines until `NEXT_PUBLIC_PREVIEW_MODE=false`.
 
 ## Project layout
 

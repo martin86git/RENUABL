@@ -12,7 +12,7 @@ The repo already contains what Vercel needs:
 | `vercel.json`              | Runs server code in Sydney (`syd1`) — Vercel's only Australian region and ~10 ms from Melbourne, so it serves the Victorian launch market well. |
 | `.github/workflows/ci.yml` | Runs typecheck, lint, tests, format check and build on every push, so broken changes are caught before deploy.                                  |
 | `.env.example`             | Lists the environment variables the app reads.                                                                                                  |
-| `src/lib/config.ts`        | Preview mode: shows a "sample data" banner and blocks search engines until launch.                                                              |
+| `src/lib/config.ts`        | Preview mode: blocks search engines until launch.                                                                                               |
 
 ## One-time setup (about 5 minutes)
 

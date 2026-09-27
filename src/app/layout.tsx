@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Caveat, Inter, Source_Serif_4 } from "next/font/google";
-import { PreviewBanner } from "@/components/ui/preview-banner";
 import { PREVIEW_MODE } from "@/lib/config";
 import "./globals.css";
 
@@ -25,10 +24,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en-AU" className={`${inter.variable} ${serif.variable} ${script.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">
-        <PreviewBanner />
-        {children}
-      </body>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }
