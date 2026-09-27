@@ -229,7 +229,7 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
       line(
         "solar",
         null,
-        `Solar installation (${round2(kw)} kW at $${solarRate}/W${nearHome ? ", close to home" : ""})`,
+        `Solar installation (${round2(kw)} kW at ${round2(solarRate * 100)}c/W${nearHome ? ", close to home" : ""})`,
         1,
         round2(kw * 1000 * solarRate),
       ),

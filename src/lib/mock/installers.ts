@@ -1,4 +1,26 @@
+import type { ComplianceRecord } from "@/lib/domain/compliance";
+import { todayInMarket } from "@/lib/domain/market";
 import type { Crew, Installer } from "@/lib/domain/types";
+
+function inDays(days: number) {
+  const d = new Date(`${todayInMarket()}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Demo only: insurance renewing soon, so the portal shows a reminder. */
+function demoCompliance(): ComplianceRecord[] {
+  return [
+    {
+      kind: "public-liability",
+      amount: 20_000_000,
+      expires: inDays(21),
+      document: { name: "certificate-of-currency.pdf", uploadedAt: inDays(-344) },
+    },
+    { kind: "electrical-licence", expires: inDays(900) },
+    { kind: "accreditation", expires: inDays(160) },
+  ];
+}
 
 // Installer network for development. Replace with the installer network API.
 //
@@ -26,6 +48,9 @@ export const INSTALLERS: Installer[] = [
     weeklyCapacity: 14,
     preferred: true,
     verifiedStats: false,
+    partnerType: "installer",
+    // PLACEHOLDER compliance dates for the portal demo (relative to today); real ones come from the partner.
+    compliance: demoCompliance(),
   },
   {
     id: "ins_bayside",

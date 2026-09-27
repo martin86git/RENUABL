@@ -26,3 +26,26 @@ export async function prepareCertificate(file: File): Promise<File> {
 }
 
 export { resolveAddress, suggestAddresses } from "./consumer";
+
+/** Sends a renewed licence or insurance certificate for RENUABL to review. */
+export async function submitComplianceRenewal(input: {
+  kind: string;
+  expires: string;
+  number?: string;
+  amount?: number;
+  file: File;
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const form = new FormData();
+  form.set("kind", input.kind);
+  form.set("expires", input.expires);
+  if (input.number) form.set("number", input.number);
+  if (input.amount) form.set("amount", String(input.amount));
+  form.set("file", await prepareCertificate(input.file));
+  try {
+    const res = await fetch("/api/partners/compliance", { method: "POST", body: form });
+    const json = (await res.json()) as { ok: boolean; message?: string };
+    return json.ok ? { ok: true } : { ok: false, message: json.message ?? "That didn't send. Try again." };
+  } catch {
+    return { ok: false, message: "That didn't send. Check your connection and try again." };
+  }
+}

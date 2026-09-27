@@ -5,7 +5,9 @@
  * has its history. Pure and tested.
  */
 import { BATTERY } from "./catalogue";
+import type { ConnectionRecord } from "./connection";
 import type { SystemConfig } from "./types";
+import type { Variation } from "./variations";
 
 export type EvidenceId = "roof-before" | "array" | "inverter" | "switchboard" | "commissioning" | "inverter-online";
 
@@ -46,6 +48,10 @@ export interface HandoverRecord {
   submittedAt?: string;
   /** Job documents the partner supplied (e.g. the Certificate of Electrical Safety), one entry per page or file. */
   documents?: HandoverDocument[];
+  /** Extra work sent to the customer to approve. */
+  variations?: Variation[];
+  /** Grid connection and rebate paperwork after the install. */
+  connection?: ConnectionRecord;
 }
 
 export interface HandoverDocument {

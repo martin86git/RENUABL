@@ -21,7 +21,7 @@ export function InstallerShell({ children, company, user }: { children: ReactNod
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-20 flex h-[72px] items-center gap-6 bg-canvas/90 px-5 backdrop-blur-md lg:h-[88px] lg:px-8">
+      <header className="print:hidden sticky top-0 z-20 flex h-[72px] items-center gap-6 bg-canvas/90 px-5 backdrop-blur-md lg:h-[88px] lg:px-8">
         <Link href="/installer" className="flex items-baseline gap-5" aria-label="Installer portal home">
           <Wordmark tone="light" className="text-[17px] lg:text-[19px]" />
           <span className="hidden text-[17px] text-ink lg:inline">Installer Portal</span>
@@ -50,7 +50,7 @@ export function InstallerShell({ children, company, user }: { children: ReactNod
       </header>
 
       <div className="flex flex-1">
-        <aside className="sticky top-[88px] hidden h-[calc(100dvh-88px)] w-60 shrink-0 flex-col px-4 pb-6 lg:flex">
+        <aside className="print:hidden sticky top-[88px] hidden h-[calc(100dvh-88px)] w-60 shrink-0 flex-col px-4 pb-6 lg:flex">
           <nav aria-label="Installer" className="flex-1 overflow-y-auto">
             <ul className="space-y-1">
               {INSTALLER_NAV.map(({ href, label, icon: Icon }) => {
@@ -83,7 +83,7 @@ export function InstallerShell({ children, company, user }: { children: ReactNod
       </div>
 
       {/* Field app bottom navigation */}
-      <nav aria-label="Field" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-safe lg:hidden">
+      <nav aria-label="Field" className="print:hidden fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-safe lg:hidden">
         <ul className="grid grid-cols-4">
           {INSTALLER_MOBILE_NAV.map(({ href, label, icon: Icon }) => {
             const active = isNavActive(pathname, href);

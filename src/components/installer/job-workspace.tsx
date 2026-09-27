@@ -26,6 +26,8 @@ import type { Crew, Job, JobStage } from "@/lib/domain/types";
 import { Handover } from "@/components/installer/handover";
 import { JobDocuments } from "@/components/installer/job-documents";
 import { JobMaterials } from "@/components/installer/materials";
+import { JobConnection } from "@/components/installer/job-connection";
+import { JobVariations, type PartnerTerms } from "@/components/installer/job-variations";
 import { jobMaterials } from "@/lib/domain/materials";
 import { HomePhoto, homeBannerFor, homePhotoFor } from "@/components/ui/brand-art";
 import { ImageTile, StageBadge } from "./bits";
@@ -141,7 +143,17 @@ function ContactButtons({ job, className }: { job: Job; className?: string }) {
 // Workspace
 // ---------------------------------------------------------------------------
 
-export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: Crew[]; installerName: string }) {
+export function JobWorkspace({
+  job,
+  crews,
+  installerName,
+  partner,
+}: {
+  job: Job;
+  crews: Crew[];
+  installerName: string;
+  partner: PartnerTerms;
+}) {
   const field = useFieldStatus(job.id, job.statusHistory);
   const [checklist, setChecklist] = useState(job.checklist);
   const [stage, setStage] = useState<JobStage>(job.stage);
@@ -313,6 +325,16 @@ export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: C
               body: <JobMaterials reference={job.reference} lines={materials} />,
             },
             {
+              id: "variations",
+              title: "Variations",
+              body: <JobVariations job={job} partner={partner} />,
+            },
+            {
+              id: "connection",
+              title: "Grid connection & rebates",
+              body: <JobConnection job={job} partnerType={partner.type} />,
+            },
+            {
               id: "checklist",
               title: `Checklist · ${doneCount}/${checklist.length}`,
               body: <Checklist items={checklist} onToggle={toggle} />,
@@ -374,16 +396,18 @@ export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: C
         </div>
 
         <Tabs.Root defaultValue="overview" className="mt-6">
-          <Tabs.List className="flex gap-1 border-b border-line" aria-label="Job sections">
-            {["Overview", "Site", "System", "Materials", "Handover", "Documents", "Messages", "Activity"].map((t) => (
-              <Tabs.Trigger
-                key={t}
-                value={t.toLowerCase()}
-                className="-mb-px border-b-2 border-transparent px-4 py-3 text-[14px] text-muted hover:text-ink data-[state=active]:border-ink data-[state=active]:font-medium data-[state=active]:text-ink"
-              >
-                {t}
-              </Tabs.Trigger>
-            ))}
+          <Tabs.List className="flex gap-1 overflow-x-auto border-b border-line" aria-label="Job sections">
+            {["Overview", "Site", "System", "Materials", "Variations", "Handover", "Connection", "Documents", "Messages", "Activity"].map(
+              (t) => (
+                <Tabs.Trigger
+                  key={t}
+                  value={t.toLowerCase()}
+                  className="-mb-px shrink-0 whitespace-nowrap border-b-2 border-transparent px-3.5 py-3 text-[14px] text-muted hover:text-ink data-[state=active]:border-ink data-[state=active]:font-medium data-[state=active]:text-ink"
+                >
+                  {t}
+                </Tabs.Trigger>
+              ),
+            )}
           </Tabs.List>
 
           <Tabs.Content value="overview" className="mt-6 grid grid-cols-12 gap-6">
@@ -481,6 +505,24 @@ export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: C
           <Tabs.Content value="materials" className="mt-6">
             <section className="max-w-2xl rounded-2xl border border-line bg-surface p-6">
               <JobMaterials reference={job.reference} lines={materials} />
+            </section>
+          </Tabs.Content>
+
+          <Tabs.Content value="variations" className="mt-6">
+            <section className="max-w-2xl rounded-2xl border border-line bg-surface p-6">
+              <JobVariations job={job} partner={partner} />
+            </section>
+          </Tabs.Content>
+
+          <Tabs.Content value="connection" className="mt-6">
+            <section className="max-w-2xl rounded-2xl border border-line bg-surface p-6">
+              <h2 className="text-[17px] font-medium">Grid connection & rebates</h2>
+              <p className="mt-1 text-[14px] text-ink-2">
+                Tick off your steps as they&apos;re done. RENUABL&apos;s steps are shown so you can see where it&apos;s up to.
+              </p>
+              <div className="mt-3">
+                <JobConnection job={job} partnerType={partner.type} />
+              </div>
             </section>
           </Tabs.Content>
 

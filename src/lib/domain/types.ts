@@ -2,7 +2,8 @@
  * Core domain types shared by the consumer experience and the installer portal.
  * These are framework-agnostic and must not import React or Next.js.
  */
-import type { InstallRates } from "./partner";
+import type { InstallRates, PartnerType } from "./partner";
+import type { ComplianceRecord } from "./compliance";
 
 export type ISODate = string; // YYYY-MM-DD
 export type ISODateTime = string;
@@ -185,6 +186,14 @@ export interface Installer {
   fictional?: boolean;
   /** Where the partner works from, for their close-to-home rate. */
   baseLocation?: { lat: number; lng: number };
+  /** Installation only (RENUABL sells and supplies) or a retailer. Installation only when unset. */
+  partnerType?: PartnerType;
+  /** ABN, for payout invoices. */
+  abn?: string;
+  /** For SMS alerts, +614XXXXXXXX. */
+  mobile?: string;
+  /** Licences and insurance, with expiry dates. */
+  compliance?: ComplianceRecord[];
   /** The partner's own rates from sign-up. Without them, RENUABL's rates are used. */
   pricing?: {
     rates: InstallRates;
@@ -263,6 +272,8 @@ export interface Job {
   address: Address;
   packageName: string;
   system: SystemConfig;
+  /** The customer is claiming the Solar Victoria rebate. */
+  solarVictoria?: boolean;
   stage: JobStage;
   preferredDate: ISODate;
   windowId: string;

@@ -3,10 +3,13 @@
  */
 import type { FieldStatus, Job, JobStage } from "@/lib/domain/types";
 import { CREWS, CURRENT_INSTALLER_ID, CURRENT_USER, INSTALLERS } from "@/lib/mock/installers";
-import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs, buildPayouts } from "@/lib/mock/jobs";
+import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs } from "@/lib/mock/jobs";
+import { jobPayout, type Payout } from "@/lib/domain/payouts";
+import type { Variation } from "@/lib/domain/variations";
 import { todayInMarket } from "@/lib/domain/market";
 import { formatShortDate } from "@/lib/domain/format";
 import { jobsToOrderFor } from "@/lib/domain/materials";
+import { COMPLIANCE_ITEMS, complianceStatus, expiryPhrase, offersPaused } from "@/lib/domain/compliance";
 
 export function getCurrentInstaller() {
   return INSTALLERS.find((i) => i.id === CURRENT_INSTALLER_ID)!;
@@ -54,14 +57,35 @@ export function getDashboardCounts() {
   };
 }
 
+/** The partner's licences and insurance, and whether new offers are paused. */
+export function getCompliance(now = new Date()) {
+  const today = todayInMarket(now);
+  const records = getCurrentInstaller().compliance ?? [];
+  const items = COMPLIANCE_ITEMS.map((item) => {
+    const record = records.find((r) => r.kind === item.kind);
+    const status = complianceStatus(record, today);
+    return { ...item, record, status, phrase: record ? expiryPhrase(record.expires, today) : "not on file" };
+  });
+  return { items, ...offersPaused(records, today), attention: items.filter((i) => i.status !== "current") };
+}
+
 export function getAlerts() {
   const jobs = listJobs();
-  const alerts: { id: string; jobId: string; title: string; detail: string; severity: "warning" | "info" }[] = [];
+  const alerts: { id: string; href: string; title: string; detail: string; severity: "warning" | "info" }[] = [];
+  for (const c of getCompliance().attention) {
+    alerts.push({
+      id: `compliance-${c.kind}`,
+      href: "/installer/compliance",
+      title: `${c.label} ${c.phrase}`,
+      detail: c.status === "expiring" ? "Upload the renewal so job offers keep coming" : "New job offers are paused until it's updated",
+      severity: "warning",
+    });
+  }
   for (const j of jobs) {
     if (j.stage === "new") {
       alerts.push({
         id: `${j.id}-new`,
-        jobId: j.id,
+        href: `/installer/jobs/${j.id}`,
         title: `New job to review · ${j.reference}`,
         detail: `${j.customer.name}, ${j.address.suburb}`,
         severity: "info",
@@ -71,7 +95,7 @@ export function getAlerts() {
     if (missingApproval && j.stage !== "new") {
       alerts.push({
         id: `${j.id}-appr`,
-        jobId: j.id,
+        href: `/installer/jobs/${j.id}`,
         title: `Network approval outstanding · ${j.reference}`,
         detail: "Submit before scheduling can be confirmed",
         severity: "warning",
@@ -80,7 +104,7 @@ export function getAlerts() {
     if (j.stage === "accepted") {
       alerts.push({
         id: `${j.id}-crew`,
-        jobId: j.id,
+        href: `/installer/jobs/${j.id}`,
         title: `Assign a crew · ${j.reference}`,
         detail: `${j.customer.name} is booked for ${formatShortDate(j.preferredDate)}`,
         severity: "warning",
@@ -94,8 +118,20 @@ export function getPerformance() {
   return INSTALLER_PERFORMANCE;
 }
 
-export function listPayouts() {
-  return buildPayouts();
+/** Payouts for the partner's jobs: installation at their rates plus approved variations (by record key). */
+export function listPartnerPayouts(variations: Record<string, Variation[]> = {}, now = new Date()): Payout[] {
+  const partner = getCurrentInstaller();
+  const today = todayInMarket(now);
+  return listJobs()
+    .filter((j) => j.stage !== "new")
+    .map((j) => jobPayout(j, { pricing: partner.pricing, variations: variations[j.recordKey], today }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export function getPartnerPayout(id: string, variations: Variation[] = [], now = new Date()): Payout | null {
+  const job = getJob(id);
+  if (!job || job.stage === "new") return null;
+  return jobPayout(job, { pricing: getCurrentInstaller().pricing, variations, today: todayInMarket(now) });
 }
 
 export function listResources() {

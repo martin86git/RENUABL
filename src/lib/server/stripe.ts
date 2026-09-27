@@ -19,7 +19,7 @@ export async function createDepositCheckout(stripe: Stripe, opts: { reference: s
           unit_amount: depositCents(),
           product_data: {
             name: DEPOSIT.description,
-            description: `Reservation ${opts.reference}. Fully refundable until your installer confirms the site visit.`,
+            description: `Reservation ${opts.reference}. Fully refundable until your installation partner confirms the site visit.`,
           },
         },
       },

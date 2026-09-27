@@ -307,7 +307,7 @@ export default async function InstallerDashboard() {
             <ul className="divide-y divide-line">
               {alerts.map((a) => (
                 <li key={a.id}>
-                  <Link href={`/installer/jobs/${a.jobId}`} className="flex gap-3 px-5 py-3.5 hover:bg-surface-2/50">
+                  <Link href={a.href} className="flex gap-3 px-5 py-3.5 hover:bg-surface-2/50">
                     <TriangleAlert
                       className={cn("mt-0.5 h-4 w-4 shrink-0", a.severity === "warning" ? "text-warning" : "text-ink-2")}
                       strokeWidth={1.6}

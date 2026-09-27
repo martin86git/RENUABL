@@ -3,6 +3,9 @@
  * Saved in RENUABL's storage; where that isn't set up (a preview), on this device.
  */
 import { emptyHandover, type EvidenceId, type HandoverDocument, type HandoverPhoto, type HandoverRecord } from "@/lib/domain/handover";
+import { updateConnection, type ConnectionProgress, type ConnectionStepId } from "@/lib/domain/connection";
+import type { PartnerType } from "@/lib/domain/partner";
+import { addVariation, cleanVariationInput, decideVariation, type VariationAction, type VariationItem } from "@/lib/domain/variations";
 import { prepareBillFile } from "./consumer";
 import { devicePhotoUrl, getDeviceRecord, saveDevicePhoto, saveDeviceRecord } from "./device-records";
 
@@ -154,4 +157,70 @@ export async function removeHandoverDocument(record: HandoverRecord, backend: Ba
 /** Where to open a document page or file from: RENUABL's route, or this device. */
 export async function documentSrc(recordKey: string, id: string, path: string): Promise<string | null> {
   return path.startsWith("device:") ? devicePhotoUrl(id) : `/api/jobs/${recordKey}/documents/${id}`;
+}
+
+// ---------------------------------------------------------------------------
+// Variations and grid connection (kept with the installation record)
+// ---------------------------------------------------------------------------
+
+async function postRecord(url: string, method: "POST" | "PUT", body: unknown): Promise<HandoverRecord> {
+  const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const json = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; record?: HandoverRecord; message?: string };
+  if (!json.ok || !json.record) throw new Error(json.message ?? "That didn't save. Try again.");
+  return json.record;
+}
+
+/** Sends a variation to the customer. On the server it's priced there; on this device, here. */
+export async function sendVariation(
+  record: HandoverRecord,
+  backend: Backend,
+  input: { reason: string; items: VariationItem[] },
+  pricing: { type: PartnerType; margin?: number },
+): Promise<HandoverRecord> {
+  if (backend === "device") {
+    const clean = cleanVariationInput(input);
+    if (!clean) throw new Error("Add what the work is, a price for each item, and why it's needed.");
+    const latest = await latestOnDevice(record);
+    const id = `var_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    return saveDeviceRecord({
+      ...latest,
+      variations: addVariation(latest.variations, clean, pricing, { id, now: new Date().toISOString() }),
+    });
+  }
+  return postRecord(`/api/jobs/${record.key}/variations`, "POST", { jobReference: record.jobReference, ...input });
+}
+
+/** The customer approves or declines, or the partner withdraws, a variation. */
+export async function answerVariation(
+  record: HandoverRecord,
+  backend: Backend,
+  id: string,
+  action: VariationAction,
+): Promise<HandoverRecord> {
+  if (backend === "device") {
+    const latest = await latestOnDevice(record);
+    const variations = decideVariation(latest.variations, id, action, new Date().toISOString());
+    if (!variations) throw new Error("This has already been answered.");
+    return saveDeviceRecord({ ...latest, variations });
+  }
+  return postRecord(`/api/jobs/${record.key}/variations/${id}`, "POST", { action });
+}
+
+/** Ticks off (or un-ticks) a grid connection or rebate step. */
+export async function setConnectionStep(
+  record: HandoverRecord,
+  backend: Backend,
+  step: ConnectionStepId,
+  value: ConnectionProgress | null,
+): Promise<HandoverRecord> {
+  if (backend === "device") {
+    const latest = await latestOnDevice(record);
+    return saveDeviceRecord({ ...latest, connection: updateConnection(latest.connection, step, value) });
+  }
+  return postRecord(`/api/jobs/${record.key}/connection`, "PUT", {
+    jobReference: record.jobReference,
+    step,
+    done: value?.done ?? null,
+    reference: value?.reference,
+  });
 }

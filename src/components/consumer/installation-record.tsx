@@ -7,7 +7,8 @@ import { Disclosure } from "@/components/ui/controls";
 import { Card, Eyebrow, StatRow } from "@/components/ui/primitives";
 import { formatDate } from "@/lib/domain/format";
 import { HANDOVER_PHOTOS, type HandoverDocument, type HandoverPhoto, type HandoverRecord } from "@/lib/domain/handover";
-import { documentSrc, findRecord, photoSrc } from "@/lib/services/handover";
+import { documentSrc, findRecord, photoSrc, type Backend } from "@/lib/services/handover";
+import { ConnectionProgress, VariationApprovals } from "./variation-approval";
 
 function Photo({ record, photo, label }: { record: HandoverRecord; photo: HandoverPhoto; label: string }) {
   const recordKey = record.key;
@@ -100,15 +101,15 @@ function Serials({ label, serials }: { label: string; serials: string[] }) {
  * home's record, labelled as such.
  */
 export function InstallationRecord({ recordKey, example }: { recordKey: string | null; example: HandoverRecord }) {
-  const [state, setState] = useState<{ record: HandoverRecord; isExample: boolean } | "loading" | "missing">(
-    recordKey ? "loading" : { record: example, isExample: true },
+  const [state, setState] = useState<{ record: HandoverRecord; isExample: boolean; backend: Backend } | "loading" | "missing">(
+    recordKey ? "loading" : { record: example, isExample: true, backend: "device" },
   );
 
   useEffect(() => {
     if (!recordKey) return;
     let live = true;
     void findRecord(recordKey).then((r) => {
-      if (live) setState(r ? { record: r.record, isExample: false } : "missing");
+      if (live) setState(r ? { record: r.record, isExample: false, backend: r.backend } : "missing");
     });
     return () => {
       live = false;
@@ -131,7 +132,7 @@ export function InstallationRecord({ recordKey, example }: { recordKey: string |
     );
   }
 
-  const { record, isExample } = state;
+  const { record, isExample, backend } = state;
   const s = record.summary ?? {};
   const byCategory = HANDOVER_PHOTOS.flatMap((slot) =>
     slot.id === "array"
@@ -161,6 +162,12 @@ export function InstallationRecord({ recordKey, example }: { recordKey: string |
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="space-y-4 lg:col-span-8">
+          <VariationApprovals
+            record={record}
+            backend={backend}
+            example={isExample}
+            onChange={(r) => setState({ record: r, isExample, backend })}
+          />
           <Card className="p-5 sm:p-6">
             <h2 className="text-[17px] font-medium">Installation photos</h2>
             {record.photos.length === 0 ? (
@@ -218,18 +225,21 @@ export function InstallationRecord({ recordKey, example }: { recordKey: string |
             </Card>
           )}
         </div>
-        <Card className="h-fit p-5 sm:p-6 lg:col-span-4">
-          <h2 className="text-[17px] font-medium">Your system</h2>
-          <div className="mt-2 divide-y divide-line">
-            {s.system && <StatRow label="System" value={s.system} />}
-            {s.address && <StatRow label="Home" value={s.address} />}
-            {s.installer && <StatRow label="Installation partner" value={s.installer} />}
-            {s.installedOn && /^\d{4}-\d{2}-\d{2}$/.test(s.installedOn) && (
-              <StatRow label="Installed" value={formatDate(s.installedOn, { day: "numeric", month: "long", year: "numeric" })} />
-            )}
-            <StatRow label="Arrays" value={record.arrays} />
-          </div>
-        </Card>
+        <div className="space-y-4 lg:col-span-4">
+          <Card className="h-fit p-5 sm:p-6">
+            <h2 className="text-[17px] font-medium">Your system</h2>
+            <div className="mt-2 divide-y divide-line">
+              {s.system && <StatRow label="System" value={s.system} />}
+              {s.address && <StatRow label="Home" value={s.address} />}
+              {s.installer && <StatRow label="Installation partner" value={s.installer} />}
+              {s.installedOn && /^\d{4}-\d{2}-\d{2}$/.test(s.installedOn) && (
+                <StatRow label="Installed" value={formatDate(s.installedOn, { day: "numeric", month: "long", year: "numeric" })} />
+              )}
+              <StatRow label="Arrays" value={record.arrays} />
+            </div>
+          </Card>
+          <ConnectionProgress record={record} />
+        </div>
       </div>
     </div>
   );

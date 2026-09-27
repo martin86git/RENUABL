@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PREVIEW_MODE } from "@/lib/config";
+import { ComplianceBanner } from "@/components/installer/compliance-banner";
 import { InstallerShell } from "@/components/installer/installer-shell";
 import { getCurrentInstaller, getCurrentUser } from "@/lib/services/installer";
 
@@ -15,6 +16,7 @@ export default function InstallerLayout({ children }: LayoutProps<"/installer">)
   return (
     <div className="theme-installer min-h-dvh bg-canvas text-ink">
       <InstallerShell company={installer.name} user={getCurrentUser().name}>
+        <ComplianceBanner />
         {children}
       </InstallerShell>
     </div>

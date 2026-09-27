@@ -213,3 +213,10 @@ body:has(.theme-installer) {
     inset: -10px;
   }
 }
+
+/* Printing an invoice from the dark portal: white page, no app chrome. */
+@media print {
+  .theme-installer {
+    background: #fff !important;
+  }
+}

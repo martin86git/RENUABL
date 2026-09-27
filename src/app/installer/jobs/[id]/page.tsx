@@ -8,7 +8,15 @@ export default async function JobPage({ params }: PageProps<"/installer/jobs/[id
   const { id } = await params;
   const job = getJob(id);
   if (!job) notFound();
-  return <JobWorkspace job={job} crews={listCrews()} installerName={getCurrentInstaller().name} />;
+  const partner = getCurrentInstaller();
+  return (
+    <JobWorkspace
+      job={job}
+      crews={listCrews()}
+      installerName={partner.name}
+      partner={{ type: partner.partnerType ?? "installer", margin: partner.pricing?.margin, rates: partner.pricing?.rates }}
+    />
+  );
 }
 
 export async function generateMetadata({ params }: PageProps<"/installer/jobs/[id]">) {

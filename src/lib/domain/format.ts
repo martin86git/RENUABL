@@ -8,6 +8,13 @@ export function formatCurrency(amount: number) {
   return aud.format(amount);
 }
 
+const audCents = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** With cents, for invoices. */
+export function formatCents(amount: number) {
+  return audCents.format(amount);
+}
+
 export function formatDate(iso: ISODate, opts: Intl.DateTimeFormatOptions = { weekday: "long", day: "numeric", month: "long" }) {
   return fromISODate(iso).toLocaleDateString("en-AU", opts);
 }

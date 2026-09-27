@@ -60,6 +60,7 @@ export function buildJobs(now = new Date()): Job[] {
       customer: { name: "Sarah Chen", phone: "0401 555 567", email: "sarah.chen@example.com" },
       address: { line: "2 Hanwell Court", suburb: "Glen Waverley", state: "VIC", postcode: "3150" },
       packageName: "Whole Home · 13.2 kW + 13.5 kWh",
+      solarVictoria: true,
       system: { panelCount: 30, batteryKwh: 13.5, evCharger: false },
       stage: "scheduled",
       preferredDate: d(0),
@@ -129,6 +130,7 @@ export function buildJobs(now = new Date()): Job[] {
       customer: { name: "Priya Nair", phone: "0433 555 912", email: "priya.nair@example.com" },
       address: { line: "4 Linden Way", suburb: "Doncaster", state: "VIC", postcode: "3108" },
       packageName: "Whole Home + EV · 11 kW + 13.5 kWh",
+      solarVictoria: true,
       system: { panelCount: 25, batteryKwh: 13.5, evCharger: true },
       stage: "in-progress",
       preferredDate: d(0),
@@ -370,16 +372,6 @@ export const INSTALLER_PERFORMANCE = {
     { label: "Sep", jobs: 38 },
   ],
 };
-
-export function buildPayouts(now = new Date()) {
-  const { d } = relative(now);
-  return [
-    { id: "p1", reference: "RN-1031", amount: 16_950, status: "paid" as const, date: d(-2) },
-    { id: "p2", reference: "RN-1029", amount: 5_280, status: "paid" as const, date: d(-6) },
-    { id: "p3", reference: "RN-1038", amount: 21_290, status: "pending" as const, date: d(3) },
-    { id: "p4", reference: "RN-1027", amount: 14_610, status: "paid" as const, date: d(-11) },
-  ];
-}
 
 export const RESOURCES = [
   { id: "r1", title: "RENUABL install standard", body: "Workmanship expectations, photo requirements and handover script." },
