@@ -12,11 +12,12 @@ export default function HomePage() {
 
       <main className="mx-auto grid w-full max-w-[1440px] flex-1 grid-cols-1 items-center px-5 pb-8 pt-6 sm:px-8 lg:grid-cols-12 lg:gap-8 lg:border-t lg:border-line lg:px-10 lg:pb-16 lg:pt-12">
         <section className="lg:col-span-6 xl:col-span-5 xl:col-start-2">
-          <h1 className="text-[40px] font-normal leading-[1.02] tracking-[-0.04em] sm:text-[52px] lg:text-[64px]">
-            A smarter energy future for your home.
+          <p className="text-[13px] tracking-[0.02em] text-forest lg:text-[14px]">One platform. One journey.</p>
+          <h1 className="mt-3 text-[40px] font-normal leading-[1.02] tracking-[-0.04em] sm:text-[52px] lg:text-[64px]">
+            Solar and batteries, sized to your bill.
           </h1>
           <p className="mt-4 max-w-md text-[16px] leading-relaxed text-muted lg:mt-6 lg:text-[18px]">
-            Solar, batteries, EV charging and more. Designed for your home, made simple.
+            Upload your bill, get one system made for your home, and pick your install date. One installer, one price, no sales calls.
           </p>
           <AddressEntry className="mt-7 max-w-lg lg:mt-10" />
           <div className="mt-4 hidden lg:block">
