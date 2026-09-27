@@ -22,7 +22,7 @@ export function MyTopBar({ name }: { name: string }) {
   return (
     <header className="mx-auto hidden h-[76px] w-full max-w-[1440px] items-center gap-12 border-b border-line px-10 lg:flex">
       <Link href="/" aria-label="RENUABL home">
-        <Wordmark className="h-[24px]" />
+        <Wordmark className="text-[22px]" />
       </Link>
       {/* No menu of links: sections are reached from the My RENUABL home cards. */}
       {pathname !== "/my" && (

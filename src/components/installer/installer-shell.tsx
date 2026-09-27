@@ -23,7 +23,7 @@ export function InstallerShell({ children, company, user }: { children: ReactNod
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 flex h-[72px] items-center gap-6 bg-canvas/90 px-5 backdrop-blur-md lg:h-[88px] lg:px-8">
         <Link href="/installer" className="flex items-baseline gap-5" aria-label="Installer portal home">
-          <Wordmark tone="light" className="h-[19px] lg:h-[21px]" />
+          <Wordmark tone="light" className="text-[17px] lg:text-[19px]" />
           <span className="hidden text-[17px] text-ink lg:inline">Installer Portal</span>
           <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted lg:hidden">Field</span>
         </Link>
