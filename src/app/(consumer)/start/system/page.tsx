@@ -7,7 +7,6 @@ import { useState, type ReactNode } from "react";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { CareIncludedCard } from "@/components/consumer/care-upsell";
 import { FlowGuard } from "@/components/consumer/flow-guard";
-import { DataSources } from "@/components/consumer/data-sources";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { PortalPreview, PortalTeaser } from "@/components/consumer/portal-preview";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
@@ -226,8 +225,6 @@ function SystemScreen() {
             ))}
           </ul>
         </Card>
-
-        <DataSources />
 
         <div className="space-y-4 xl:hidden">
           {estimate}

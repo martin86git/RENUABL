@@ -222,7 +222,7 @@ export default function ProfilePage() {
         {/* Mascot and script travel together and stay in view. Sticky makes its own layer, so it needs the page colour for the mascot's multiply blend. */}
         <div className="hidden lg:block">
           <div className="sticky top-8 mx-auto w-fit bg-canvas">
-            <Mascot pose="battery" className="h-auto w-[380px] xl:w-[440px]" bounce />
+            <Mascot pose="battery" className="h-auto w-[380px] xl:w-[440px]" />
             <Script className="absolute -bottom-2 right-0 text-[24px] xl:-right-6">
               Smarter
               <br />

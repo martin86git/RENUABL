@@ -61,13 +61,6 @@ export function parseAddress(input: string): Address | null {
 }
 
 /**
- * Steps shown after the address is entered. Only claim what actually happens
- * here: no roof or usage checks (the roof is confirmed on the call, usage comes
- * from the bill on the next step).
- */
-export const ANALYSIS_STEPS = ["Finding your home", "Checking we install in your area", "Loading local sunshine averages"] as const;
-
-/**
  * What we know about the home from its address. Nothing is measured yet: no
  * roof data source is connected, so the roof, storeys and space for panels
  * are confirmed on the 15-minute call. Sizing is capped by the inverter only.

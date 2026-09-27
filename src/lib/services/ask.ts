@@ -1,9 +1,11 @@
 /**
- * "Ask RENUABL" answers. Today this is a small intent matcher over canned,
- * reviewed answers; later it can call a model with the same signature.
+ * "Ask RENUABL" answers. Claude answers on the server (/api/ask), grounded in
+ * reviewed facts and the customer's answers; without it, a small intent
+ * matcher over canned, reviewed answers.
  */
+import type { AskContext, AskSnapshot } from "@/lib/domain/ask-knowledge";
 
-export type AskContext = "home" | "profile" | "recommendation" | "extras" | "installer" | "schedule" | "checkout" | "my";
+export type { AskContext, AskSnapshot } from "@/lib/domain/ask-knowledge";
 
 export interface AskAnswer {
   answer: string;
@@ -11,6 +13,11 @@ export interface AskAnswer {
 }
 
 const INTENTS: { match: RegExp; answer: string }[] = [
+  {
+    match: /flat|tilt/i,
+    answer:
+      'Flat roofs are fine. We mount your panels on tilt frames at 10–15° facing the sun, so they make more power and rain washes them clean. Choose "Flat" for your roof and the tilt frames are included in your price. We confirm the details on your 15-minute call.',
+  },
   {
     match: /battery|batteries|storage|night|evening/i,
     answer:
@@ -38,8 +45,7 @@ const INTENTS: { match: RegExp; answer: string }[] = [
   },
   {
     match: /install|how long|day|takes/i,
-    answer:
-      "Most homes are done in a single day. Your installer arrives at the time you pick, and you'll get a message when they're on the way and when they're finished.",
+    answer: "Most homes are done in a single day. You choose the day, and your installer arrives between 7am and 9am.",
   },
   {
     match: /installer|who|trust|licen[cs]ed|accredit/i,
@@ -59,7 +65,7 @@ const INTENTS: { match: RegExp; answer: string }[] = [
   {
     match: /sav(e|ing)|bill|money|payback/i,
     answer:
-      "Savings come from using your own solar instead of buying power, plus a small credit for what you export. Your estimate uses the usage and prices on your bill and average Melbourne sunshine. Your roof is checked on the confirmation call.",
+      "Savings come from using your own solar instead of buying power, plus a small credit for what you export. Your estimate uses the usage and prices on your bill and NASA sunshine records for your home. Your roof is checked on the confirmation call.",
   },
 ];
 
@@ -74,13 +80,33 @@ export const SUGGESTED_QUESTIONS: Record<AskContext, string[]> = {
   my: ["How can I improve my savings?", "Why did I use grid power last night?", "Should I add more panels?"],
 };
 
-export async function askRenuabl(question: string, context: AskContext): Promise<AskAnswer> {
-  await new Promise((r) => setTimeout(r, 600));
+function cannedAnswer(question: string): string {
   const hit = INTENTS.find((i) => i.match.test(question));
-  const answer =
+  return (
     hit?.answer ??
     (/how.*work/i.test(question)
-      ? "Tell us your address and a few things about your home. We recommend a system, match you with a trusted local installer, and you choose the install date. A short call confirms the details — that's it."
-      : "Good question. A RENUABL energy specialist will cover that on your confirmation call. In the meantime, everything on this screen can be changed later.");
-  return { answer, followUps: SUGGESTED_QUESTIONS[context].filter((q) => q !== question).slice(0, 2) };
+      ? "Tell us your address and upload your latest bill. We recommend one system sized to your home, match you with a trusted local installer, and you choose the install date. A short call confirms the details."
+      : "Good question. Your RENUABL specialist will cover that on your 15-minute confirmation call.")
+  );
+}
+
+export async function askRenuabl(
+  question: string,
+  context: AskContext,
+  snapshot: AskSnapshot = {},
+  history: { q: string; a: string }[] = [],
+): Promise<AskAnswer> {
+  const followUps = SUGGESTED_QUESTIONS[context].filter((q) => q !== question).slice(0, 2);
+  try {
+    const res = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question, context, snapshot, history }),
+    });
+    const json = (await res.json()) as { ok: boolean; answer?: string };
+    if (json.ok && json.answer) return { answer: json.answer, followUps };
+  } catch {
+    /* offline or no server: use the reviewed answers */
+  }
+  return { answer: cannedAnswer(question), followUps };
 }

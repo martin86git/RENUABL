@@ -3,9 +3,39 @@
 import { ArrowRight, ArrowUp, X } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useState, type FormEvent } from "react";
-import { askRenuabl, SUGGESTED_QUESTIONS, type AskContext } from "@/lib/services/ask";
+import { askRenuabl, SUGGESTED_QUESTIONS, type AskContext, type AskSnapshot } from "@/lib/services/ask";
+import { useFlow, useSystem } from "@/components/consumer/flow-state";
+import { TIER_LABELS, describeSystem } from "@/lib/domain/recommendation";
+import { formatDate } from "@/lib/domain/format";
+import { getInstaller } from "@/lib/services/consumer";
 import { MascotAvatar } from "@/components/ui/brand-art";
 import { cn } from "@/components/ui/primitives";
+
+/** The customer's own answers, so Ask RENUABL can talk about their home (none on My RENUABL's example home). */
+function useAskSnapshot(context: AskContext): AskSnapshot {
+  const { state } = useFlow();
+  const { config, price } = useSystem();
+  if (context === "my") return {};
+  const answered = Boolean(state.bill);
+  const installer = state.installerId ? getInstaller(state.installerId) : undefined;
+  return {
+    suburb: state.address?.suburb,
+    state: state.address?.state,
+    dailyUsageKwh: state.bill?.dailyUsageKwh,
+    hasSolar: state.bill?.hasSolar,
+    roof: state.profile.roofType,
+    storeys: state.profile.storeys,
+    phase: state.profile.phase,
+    wantsBattery: state.profile.wantsBattery,
+    option: answered ? TIER_LABELS[state.tier] : undefined,
+    system: answered ? describeSystem(config) : undefined,
+    priceAfterRebates: answered ? price.total : undefined,
+    rebates: answered ? price.rebateLines.map((r) => r.label) : undefined,
+    installDate: state.installDate ? formatDate(state.installDate, { weekday: "long", day: "numeric", month: "long" }) : undefined,
+    installer: installer?.name,
+    reserved: Boolean(state.reservation),
+  };
+}
 
 interface Turn {
   q: string;
@@ -37,6 +67,7 @@ export function AskRenuabl({
   const [draft, setDraft] = useState("");
   const [followUps, setFollowUps] = useState<string[]>(SUGGESTED_QUESTIONS[context]);
   const busy = turns.at(-1)?.a === null;
+  const snapshot = useAskSnapshot(context);
 
   async function ask(question: string) {
     const q = question.trim();
@@ -44,7 +75,8 @@ export function AskRenuabl({
     setOpen(true);
     setDraft("");
     setTurns((t) => [...t, { q, a: null }]);
-    const res = await askRenuabl(q, context);
+    const history = turns.filter((t): t is { q: string; a: string } => t.a !== null);
+    const res = await askRenuabl(q, context, snapshot, history);
     setTurns((t) => t.map((turn, i) => (i === t.length - 1 ? { ...turn, a: res.answer } : turn)));
     setFollowUps(res.followUps);
   }
