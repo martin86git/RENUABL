@@ -41,6 +41,8 @@ export const HOME_SYSTEM = {
   solarKw: 13.2,
   batteryKwh: 13.5,
   installer: "Primero Electric & Solar",
+  installerId: "ins_primero",
+  phone: "0401 555 567",
 };
 
 function bell(hour: number, peak: number, centre = 12.5, spread = 3.2) {

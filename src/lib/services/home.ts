@@ -2,6 +2,7 @@
  * Post-install household service ("My RENUABL"). This is the long-term
  * relationship surface: telemetry → insights → upgrades.
  */
+import { buildServiceAvailability, type ServiceReasonId } from "@/lib/domain/service";
 import { HEALTH, HOME_SYSTEM, INSIGHTS, MONTH_SUMMARY, TODAY, TODAY_CURVE, UPGRADES, WEEK } from "@/lib/mock/home-energy";
 
 export function getHousehold() {
@@ -30,4 +31,27 @@ export function getSystemHealth() {
 
 export function getUpgrades() {
   return UPGRADES;
+}
+
+export function getServiceAvailability(from = new Date()) {
+  return buildServiceAvailability(HOME_SYSTEM.installerId, from);
+}
+
+export interface ServiceRequest {
+  reason: ServiceReasonId;
+  details: string;
+  photos: number;
+  date: string;
+  windowId: string;
+}
+
+export interface ServiceBooking extends ServiceRequest {
+  reference: string;
+  installer: string;
+}
+
+/** Mock: in production this creates a service job in the installer portal and notifies the customer. */
+export async function requestService(req: ServiceRequest): Promise<ServiceBooking> {
+  await new Promise((r) => setTimeout(r, 800));
+  return { ...req, reference: `SV-${Math.floor(1000 + Math.random() * 9000)}`, installer: HOME_SYSTEM.installer };
 }

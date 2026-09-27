@@ -15,6 +15,7 @@ import {
   suggestedAdditions,
 } from "./recommendation";
 import { buildAvailability, fromISODate } from "./scheduling";
+import { SERVICE_WINDOWS, buildServiceAvailability, mayBeWarranty } from "./service";
 import type { EnergyProfile, HomeAnalysis } from "./types";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
 import { INSTALLERS } from "@/lib/mock/installers";
@@ -208,5 +209,24 @@ describe("RENUABL Care included with the top package", () => {
     expect(careIncludedFor("essential")).toBe(false);
     expect(careIncludedValue()).toBe(199);
     expect(CARE_FREE_MONTHS).toBe(12);
+  });
+});
+
+describe("service visits", () => {
+  it("offers weekday slots from two days out", () => {
+    const from = new Date(2026, 8, 28); // Monday
+    const days = buildServiceAvailability("ins_primero", from);
+    expect(days.length).toBeGreaterThan(5);
+    for (const d of days) {
+      const date = fromISODate(d.date);
+      expect([0, 6]).not.toContain(date.getDay());
+      expect(date.getTime()).toBeGreaterThanOrEqual(new Date(2026, 8, 30).getTime());
+      expect(d.windows.every((w) => SERVICE_WINDOWS.some((s) => s.id === w))).toBe(true);
+    }
+  });
+
+  it("treats annual checks as maintenance, faults as possible warranty", () => {
+    expect(mayBeWarranty("health-check")).toBe(false);
+    expect(mayBeWarranty("battery")).toBe(true);
   });
 });

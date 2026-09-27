@@ -27,6 +27,7 @@ export default function ProfilePage() {
           {[
             { href: "/my/health", label: "System health" },
             { href: "/my/upgrades", label: "Upgrades" },
+            { href: "/my/service", label: "Book a service" },
             { href: "/my/support", label: "Help & support" },
           ].map((l) => (
             <li key={l.href}>
