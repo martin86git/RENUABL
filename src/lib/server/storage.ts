@@ -1,6 +1,6 @@
 /**
- * Server only. Private file storage on Vercel Blob (BLOB_READ_WRITE_TOKEN,
- * from a private Blob store connected to the project). Used for partners'
+ * Server only. Private file storage on Vercel Blob (a private Blob store connected to the project:
+ * BLOB_READ_WRITE_TOKEN, or BLOB_STORE_ID with Vercel OIDC). Used for partners'
  * insurance certificates and applications, and for job handover records and
  * photos. Nothing here is public: files are read back only through our own
  * routes. Without a token, storage reports that it isn't set up.
@@ -9,20 +9,22 @@ import { BlobNotFoundError, get, put } from "@vercel/blob";
 
 export class StorageError extends Error {}
 
+/** Set up when the project has a Blob token, or a connected store (BLOB_STORE_ID, with Vercel's OIDC sign-in). */
 export function storageConfigured() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim() || process.env.BLOB_STORE_ID?.trim());
 }
 
-function token() {
+/** Credentials for each call: the token when there is one; otherwise the SDK signs in with the connected store. */
+function auth(): { token?: string } {
+  if (!storageConfigured()) throw new StorageError("Storage isn't set up (BLOB_READ_WRITE_TOKEN or BLOB_STORE_ID)");
   const t = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-  if (!t) throw new StorageError("Storage isn't set up (BLOB_READ_WRITE_TOKEN)");
-  return t;
+  return t ? { token: t } : {};
 }
 
 /** Saves a file; returns its stored pathname (with a random suffix so names never clash). */
 export async function saveFile(pathname: string, body: Blob | ArrayBuffer | Buffer, contentType: string): Promise<string> {
   const data = body instanceof ArrayBuffer ? Buffer.from(body) : body;
-  const blob = await put(pathname, data, { access: "private", contentType, addRandomSuffix: true, token: token() });
+  const blob = await put(pathname, data, { access: "private", contentType, addRandomSuffix: true, ...auth() });
   return blob.pathname;
 }
 
@@ -32,13 +34,13 @@ export async function saveJson(pathname: string, value: unknown): Promise<void> 
     contentType: "application/json",
     addRandomSuffix: false,
     allowOverwrite: true,
-    token: token(),
+    ...auth(),
   });
 }
 
 export async function readJson<T>(pathname: string): Promise<T | null> {
   try {
-    const res = await get(pathname, { access: "private", useCache: false, token: token() });
+    const res = await get(pathname, { access: "private", useCache: false, ...auth() });
     if (!res?.stream) return null;
     return (await new Response(res.stream).json()) as T;
   } catch (e) {
@@ -50,7 +52,7 @@ export async function readJson<T>(pathname: string): Promise<T | null> {
 /** A stored file as a stream, for our own routes to pass on. */
 export async function readFile(pathname: string): Promise<{ stream: ReadableStream; contentType: string } | null> {
   try {
-    const res = await get(pathname, { access: "private", token: token() });
+    const res = await get(pathname, { access: "private", ...auth() });
     if (!res?.stream) return null;
     return { stream: res.stream, contentType: res.blob.contentType ?? "application/octet-stream" };
   } catch (e) {
