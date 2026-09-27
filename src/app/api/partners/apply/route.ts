@@ -31,6 +31,10 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, errors: { certificate: "Upload a PDF, JPG or PNG under 4 MB." } }, { status: 422 });
   }
 
+  // The preview's sample certificate is for testing only.
+  if (file && !PREVIEW_MODE && file.name === "sample-certificate-of-currency.pdf") {
+    return Response.json({ ok: false, errors: { certificate: "Please upload your own certificate of currency." } }, { status: 422 });
+  }
   const checked = validatePartnerApplication(raw, { today: todayInMarket(), hasCertificate: Boolean(file) });
   if ("errors" in checked) return Response.json({ ok: false, errors: checked.errors }, { status: 422 });
   const app = checked.application;

@@ -7,13 +7,27 @@ import { MobileMenu } from "./mobile-menu";
  * Desktop top bar: just the wordmark and account. Deliberately no menu of
  * links — RENUABL should feel like a guided product, not a traditional website.
  */
-export function ConsumerTopBar({ className, account = "Sign in" }: { className?: string; account?: string }) {
+export function ConsumerTopBar({
+  className,
+  account = "Sign in",
+  partners = false,
+}: {
+  className?: string;
+  account?: string;
+  /** "Become a partner" for installers and retailers (home page only, not mid-purchase). */
+  partners?: boolean;
+}) {
   return (
     <header className={cn("mx-auto flex h-[76px] w-full max-w-[1440px] items-center gap-12 px-5 sm:px-8 lg:px-10", className)}>
       <Link href="/" aria-label="RENUABL home">
         <Wordmark className="text-[22px]" />
       </Link>
-      <Link href="/my" className="ml-auto flex items-center gap-2.5 text-[13px] text-ink-2 hover:text-ink">
+      {partners && (
+        <Link href="/partners" className="ml-auto text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline">
+          Become a partner
+        </Link>
+      )}
+      <Link href="/my" className={cn("flex items-center gap-2.5 text-[13px] text-ink-2 hover:text-ink", !partners && "ml-auto")}>
         <span className="grid h-9 w-9 place-items-center rounded-full bg-surface-2">
           <UserRound className="h-[18px] w-[18px]" strokeWidth={1.5} />
         </span>
@@ -25,7 +39,16 @@ export function ConsumerTopBar({ className, account = "Sign in" }: { className?:
 }
 
 /** Mobile header: menu, centred wordmark, optional account. */
-export function MobileHeader({ account = false, className }: { account?: boolean; className?: string }) {
+export function MobileHeader({
+  account = false,
+  partners = false,
+  className,
+}: {
+  account?: boolean;
+  /** A small "Partners" link top right (home page). */
+  partners?: boolean;
+  className?: string;
+}) {
   return (
     <header className={cn("flex h-14 items-center justify-between px-5 lg:hidden", className)}>
       <MobileMenu />
@@ -35,6 +58,10 @@ export function MobileHeader({ account = false, className }: { account?: boolean
       {account ? (
         <Link href="/my/profile" aria-label="Profile" className="tap-area -mr-1 grid h-9 w-9 place-items-center">
           <UserRound className="h-5 w-5" strokeWidth={1.5} />
+        </Link>
+      ) : partners ? (
+        <Link href="/partners" className="tap-area -mr-1 text-[13px] text-ink-2">
+          Partners
         </Link>
       ) : (
         <span className="w-9" />

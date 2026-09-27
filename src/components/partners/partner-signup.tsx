@@ -3,6 +3,7 @@
 import { ArrowLeft, ArrowRight, Check, CircleCheck, FileUp, Loader2, MapPin, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, Card, cn } from "@/components/ui/primitives";
+import { PREVIEW_MODE } from "@/lib/config";
 import type { AddressSuggestion } from "@/lib/domain/address";
 import { todayInMarket } from "@/lib/domain/market";
 import {
@@ -564,6 +565,20 @@ export function PartnerSignup() {
               <p className={cn("mt-1.5 text-[12.5px]", errors.certificate ? "text-danger" : "text-muted")}>
                 {errors.certificate ?? "It should show at least $10 million public liability. Kept private."}
               </p>
+              {PREVIEW_MODE && !certificate && (
+                <button
+                  type="button"
+                  className="tap-area mt-2 text-[12.5px] text-leaf underline underline-offset-4"
+                  onClick={async () => {
+                    const res = await fetch("/samples/sample-certificate-of-currency.pdf");
+                    const blob = await res.blob();
+                    setCertificate(new File([blob], "sample-certificate-of-currency.pdf", { type: "application/pdf" }));
+                    setErrors((x) => ({ ...x, certificate: undefined }));
+                  }}
+                >
+                  Testing? Use a sample certificate (preview only)
+                </button>
+              )}
             </div>
           </div>
           {nav()}

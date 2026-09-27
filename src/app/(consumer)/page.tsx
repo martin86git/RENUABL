@@ -7,8 +7,8 @@ import { Script } from "@/components/ui/primitives";
 export default function HomePage() {
   return (
     <div className="flex min-h-dvh flex-col">
-      <MobileHeader />
-      <ConsumerTopBar className="hidden lg:flex" />
+      <MobileHeader partners />
+      <ConsumerTopBar className="hidden lg:flex" partners />
 
       <main className="mx-auto grid w-full max-w-[1440px] flex-1 grid-cols-1 items-center px-5 pb-8 pt-6 sm:px-8 lg:grid-cols-12 lg:gap-8 lg:border-t lg:border-line lg:px-10 lg:pb-16 lg:pt-12">
         <section className="lg:col-span-6 xl:col-span-5 xl:col-start-2">
