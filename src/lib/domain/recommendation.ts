@@ -18,9 +18,14 @@ import type {
  * prices come from the customer's bill; these fill the gaps.
  * PLACEHOLDERS: validate every figure with installer partners before launch.
  */
+const PANEL_WATTS = 440;
+/** The smallest system RENUABL offers. */
+const MIN_SYSTEM_KW = 5;
+
 export const ASSUMPTIONS = {
-  panelWatts: 440,
-  minPanels: 6, // smallest practical install; confirm with installers
+  panelWatts: PANEL_WATTS,
+  minSystemKw: MIN_SYSTEM_KW,
+  minPanels: Math.ceil((MIN_SYSTEM_KW * 1000) / PANEL_WATTS), // 12 panels = 5.3 kW
   maxPanels: 36,
   tariffPerKwh: 0.3,
   feedInPerKwh: 0.04,

@@ -9,6 +9,7 @@ import {
   ASSUMPTIONS,
   describeSystem,
   batteryNeeded,
+  panelsToKw,
   estimateOutcome,
   priceSystem,
   recommendSystem,
@@ -55,8 +56,16 @@ describe("summariseBill", () => {
 });
 
 describe("recommendSystem", () => {
+  it("never goes below the 5 kW minimum system", () => {
+    const tiny = summariseBill({ isElectricityBill: true, annualUsageKwh: 2000 }) as BillSummary;
+    const { essential } = recommendSystem(base, analysis, tiny).tiers;
+    expect(panelsToKw(essential.config.panelCount)).toBeGreaterThanOrEqual(ASSUMPTIONS.minSystemKw);
+    expect(panelsToKw(essential.config.panelCount - 1)).toBeLessThan(ASSUMPTIONS.minSystemKw);
+  });
+
   it("sizes solar without a battery to what the home uses, no more", () => {
-    const { tiers, usage } = recommendSystem(base, analysis, bill);
+    const big = summariseBill({ isElectricityBill: true, annualUsageKwh: 9000 }) as BillSummary;
+    const { tiers, usage } = recommendSystem(base, analysis, big);
     const panels = tiers.essential.config.panelCount;
     const kwhPerPanelYear = (ASSUMPTIONS.panelWatts / 1000) * ASSUMPTIONS.dailyYieldKwhPerKw * 365;
     expect(panels * kwhPerPanelYear).toBeGreaterThanOrEqual(usage.annualKwh);
