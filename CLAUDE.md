@@ -38,7 +38,7 @@
 - Colours: Background `#FAF9F6`, Sand `#F0ECE7`, Sage `#D9E7DC`, Forest `#1E3A2E`, Charcoal `#1A1A1A`, White. They live as tokens in `src/app/globals.css`; use `bg-canvas`, `bg-surface`, `bg-sage`, `text-forest`, `bg-primary`, etc.
 - Type: Inter for UI (headlines large, regular weight, tight tracking), Source Serif for editorial lines ("Cleaner homes. Lower bills."), Caveat script for handwritten accents (`<Script>`).
 - Voice: clear, reassuring, human, optimistic, modern, built for everyday people.
-- Mascot and photography: `src/components/ui/brand-art.tsx`. Files in `public/brand/` are crops from the mockups (placeholders); replace them with the original renders and licensed photos under the same names, then clear `.next/cache/images` locally.
+- Mascot and photography: `src/components/ui/brand-art.tsx`. "About your home" uses the battery mascot (`pose="battery"`, image B) with a slow bounce (`bounce`, 3.6s; keep it slow so it doesn't distract from the questions). Files in `public/brand/` are crops from the mockups (placeholders); replace them with the original renders and licensed photos under the same names, then clear `.next/cache/images` locally.
 - Light artwork uses `.art-blend` (multiply + feathered edges) so it sits on the page colour without a box.
 
 ## Real businesses and claims

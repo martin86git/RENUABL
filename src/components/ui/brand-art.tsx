@@ -8,10 +8,11 @@ import { cn } from "./primitives";
  * and licensed photography, keeping the same file names.
  */
 
-type MascotPose = "hero" | "dark" | "avatar";
+type MascotPose = "hero" | "battery" | "dark" | "avatar";
 
 const MASCOT: Record<MascotPose, { src: string; w: number; h: number }> = {
   hero: { src: "/brand/mascot-hero.webp", w: 900, h: 908 },
+  battery: { src: "/brand/mascot-battery.webp", w: 900, h: 900 },
   dark: { src: "/brand/mascot-dark.webp", w: 236, h: 240 },
   avatar: { src: "/brand/mascot-avatar.webp", w: 240, h: 240 },
 };
@@ -21,11 +22,14 @@ export function Mascot({
   pose = "hero",
   className,
   float = false,
+  bounce = false,
   priority = false,
 }: {
   pose?: MascotPose;
   className?: string;
   float?: boolean;
+  /** A slow, gentle bounce (slower than it looks: customers read beside it). */
+  bounce?: boolean;
   priority?: boolean;
 }) {
   const m = MASCOT[pose];
@@ -37,7 +41,13 @@ export function Mascot({
       alt=""
       aria-hidden
       priority={priority}
-      className={cn("select-none", pose !== "avatar" && pose !== "dark" && "art-blend", float && "animate-float", className)}
+      className={cn(
+        "select-none",
+        pose !== "avatar" && pose !== "dark" && "art-blend",
+        float && "animate-float",
+        bounce && "animate-bounce-soft",
+        className,
+      )}
     />
   );
 }

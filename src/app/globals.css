@@ -116,6 +116,18 @@ body {
   }
 }
 
+@keyframes bounce-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1);
+  }
+  50% {
+    transform: translateY(-18px);
+    animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1);
+  }
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
@@ -130,6 +142,9 @@ body {
 .animate-float {
   animation: float 6s ease-in-out infinite;
 }
+.animate-bounce-soft {
+  animation: bounce-soft 3.6s infinite;
+}
 .animate-fade-up {
   /* "backwards" (not "both"): no transform lingers after the animation, so blended artwork and fixed elements inside still work. */
   animation: fade-up 0.45s ease-out backwards;
@@ -137,6 +152,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
+  .animate-bounce-soft,
   .animate-fade-up {
     animation: none;
   }

@@ -214,7 +214,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="relative hidden items-center justify-center lg:flex">
-          <Mascot className="h-auto w-[300px] xl:w-[330px]" float />
+          <Mascot pose="battery" className="h-auto w-[300px] xl:w-[330px]" bounce />
           <Script className="absolute -right-2 bottom-4 text-[22px] xl:right-4">
             Smarter
             <br />
