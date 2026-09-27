@@ -53,6 +53,21 @@ Do not include names, addresses, account numbers or NMIs.`;
 
 export class BillReaderError extends Error {}
 
+const KEY_PATTERN = /sk-ant-[A-Za-z0-9_-]+/;
+
+/**
+ * The API key from ANTHROPIC_API_KEY. Tolerates stray text around it (e.g. a
+ * pasted curl command) by taking just the key; null when there's no key in it.
+ */
+export function parseApiKey(raw: string | undefined): string | null {
+  return raw?.match(KEY_PATTERN)?.[0] ?? null;
+}
+
+/** Hides anything that looks like an API key, so errors are safe to log or show. */
+export function redactSecrets(text: string): string {
+  return text.replace(new RegExp(KEY_PATTERN, "g"), "[key hidden]");
+}
+
 export async function readBillWithClaude(data: ArrayBuffer, mediaType: BillMediaType, apiKey: string): Promise<Partial<BillReading>> {
   const client = new Anthropic({ apiKey, timeout: 45_000, maxRetries: 0 });
   const b64 = Buffer.from(data).toString("base64");

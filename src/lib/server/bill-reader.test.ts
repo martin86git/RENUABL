@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BillReaderError, readBillWithClaude } from "./bill-reader";
+import { BillReaderError, parseApiKey, readBillWithClaude, redactSecrets } from "./bill-reader";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -68,5 +68,25 @@ describe("readBillWithClaude", () => {
     await expect(readBillWithClaude(new ArrayBuffer(4), "image/png", "key")).rejects.toBeInstanceOf(BillReaderError);
     stub(() => message("", "refusal"));
     await expect(readBillWithClaude(new ArrayBuffer(4), "image/png", "key")).rejects.toBeInstanceOf(BillReaderError);
+  });
+});
+
+describe("API key handling", () => {
+  const key = "sk-ant-api03-abcDEF_123-xyz";
+
+  it("takes just the key, even from a pasted command", () => {
+    expect(parseApiKey(key)).toBe(key);
+    expect(parseApiKey(` ${key}\n`)).toBe(key);
+    expect(
+      parseApiKey(`curl https://api.anthropic.com/v1/messages --header "x-api-key: ${key}" --header "anthropic-version: 2023-06-01"`),
+    ).toBe(key);
+    expect(parseApiKey("not a key")).toBeNull();
+    expect(parseApiKey(undefined)).toBeNull();
+  });
+
+  it("hides keys in error text", () => {
+    const text = redactSecrets(`Headers.append: "x-api-key: ${key}" is invalid`);
+    expect(text).not.toContain("sk-ant");
+    expect(text).toContain("[key hidden]");
   });
 });
