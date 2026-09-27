@@ -78,10 +78,12 @@ function ExistingSolar({
           )}
           {profile.existingSize && situation === "expand" && (!showPlan || profile.existingPlan) && (
             <>
-              <p className="mt-4 flex gap-2.5 rounded-xl bg-sage/50 px-3.5 py-3 text-[12.5px] leading-snug text-forest" role="note">
-                <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
-                {EXPAND_DISCLAIMER}
-              </p>
+              {!inverter && (
+                <p className="mt-4 flex gap-2.5 rounded-xl bg-sage/50 px-3.5 py-3 text-[12.5px] leading-snug text-forest" role="note">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
+                  {EXPAND_DISCLAIMER}
+                </p>
+              )}
               <InverterPhotos inverter={inverter} onRead={onInverter} />
             </>
           )}

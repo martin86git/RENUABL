@@ -24,7 +24,7 @@ import { BOS, PANEL, RACKING } from "./catalogue";
 import { COSTING, arrayKw, batteryInstallCost, billOfMaterials, railLengths, selectInverter, sellPrice } from "./costing";
 import { REBATE_RATES, rebatesFor } from "./rebates";
 import { HYBRID_INVERTERS, STRING_INVERTERS } from "./catalogue";
-import { existingSolarQuestions, isAboutComplete, realAnnualUse, solarSituation } from "./existing-solar";
+import { EXPAND_DISCLAIMER, existingSolarQuestions, expandNote, isAboutComplete, realAnnualUse, solarSituation } from "./existing-solar";
 import { INSTALL_ARRIVAL, buildAvailability, fromISODate } from "./scheduling";
 import { SERVICE_WINDOWS, buildServiceAvailability, mayBeWarranty } from "./service";
 import type { EnergyProfile, HomeAnalysis } from "./types";
@@ -352,6 +352,13 @@ describe("existing solar", () => {
     usageRate: 0.3,
     feedInRate: 0.04,
   }) as BillSummary;
+
+  it("names the inverter once it's been read from photos", () => {
+    expect(expandNote(null)).toBe(EXPAND_DISCLAIMER);
+    const note = expandNote({ brand: "Fronius", model: "Primo 5.0-1", ratedKw: 5, phase: "single", hybrid: false });
+    expect(note).toContain("Your current inverter: Fronius Primo 5.0-1 · 5 kW");
+    expect(note).not.toContain("don't know");
+  });
 
   it("reads daily exports from the bill", () => {
     expect(solarBill.hasSolar).toBe(true);

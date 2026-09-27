@@ -13,7 +13,7 @@ import { stepHref } from "@/components/consumer/steps";
 import { Segmented, Toggle } from "@/components/ui/controls";
 import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
 import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
-import { EXPAND_DISCLAIMER, solarSituation } from "@/lib/domain/existing-solar";
+import { expandNote, solarSituation } from "@/lib/domain/existing-solar";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
 import { ASSUMPTIONS, TIER_LABELS, isSameConfig } from "@/lib/domain/recommendation";
 import type { SystemConfig, SystemTier } from "@/lib/domain/types";
@@ -170,7 +170,7 @@ function SystemScreen() {
         {existing && (
           <p className="flex gap-2.5 rounded-2xl bg-canvas px-4 py-3 text-[13px] leading-snug text-ink-2 ring-1 ring-line" role="note">
             <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
-            {EXPAND_DISCLAIMER}
+            {expandNote(state.existingInverter)}
           </p>
         )}
 
@@ -235,7 +235,7 @@ function SystemScreen() {
                 ? `That isn't quite enough to fill a ${config.batteryKwh} kWh battery on most days, so we add ${config.panelCount} panels (${outcome.solarKw} kW).`
                 : "That's enough to fill your battery on most days, so you don't need more panels."}
             </p>
-            <p className="text-[13px] text-muted">{EXPAND_DISCLAIMER}</p>
+            <p className="text-[13px] text-muted">{expandNote(state.existingInverter)}</p>
           </>
         ) : (
           <>

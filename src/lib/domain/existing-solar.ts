@@ -6,6 +6,7 @@
  * - replace: a full new system, sized to the home's real use.
  */
 import type { BillSummary } from "./bill";
+import { describeInverter, type InverterSummary } from "./inverter";
 import type { EnergyProfile, ExistingSolarPlan, ExistingSolarSize } from "./types";
 
 export const EXISTING_SIZE_OPTIONS: { value: ExistingSolarSize; label: string }[] = [
@@ -22,6 +23,12 @@ export const EXISTING_PLAN_OPTIONS: { value: ExistingSolarPlan; label: string; h
 
 export const EXPAND_DISCLAIMER =
   "We don't know which inverter your current system uses yet. We'll check it and your panels on your 15-minute confirmation call, and confirm exactly what you need before anything is final.";
+
+/** The note shown when expanding: the disclaimer, or what we read from the inverter photos. */
+export function expandNote(inverter: InverterSummary | null): string {
+  if (!inverter) return EXPAND_DISCLAIMER;
+  return `Your current inverter: ${describeInverter(inverter)}${inverter.sample ? " (sample)" : ""}. We'll confirm it works with your new battery, and check your panels, on your 15-minute confirmation call before anything is final.`;
+}
 
 /**
  * Share of an existing system's output a home typically uses itself; the rest
