@@ -39,6 +39,8 @@ export const COSTING = {
   isolator40MaxAmps: 32,
   /** Grid voltage (per phase) for an inverter's rated AC output current. */
   gridVolts: 230,
+  /** Tilt frames on a flat roof: extra installation per panel, ex GST. */
+  tiltInstallPerPanel: 15,
   /** EV charger installation, ex GST. */
   evChargerInstall: 1000,
   // PLACEHOLDERS (not in the supplier list): confirm with Primero before launch.
@@ -138,7 +140,8 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
 
   if (input.panelCount > 0) {
     const rails = railLengths(input.panelCount);
-    const kit = input.roof === "tin" ? RACKING.tinKit : RACKING.tileKit;
+    // "Not sure" is quoted as tiles (the dearer kit); flat roofs get tilt kits.
+    const kit = input.roof === "tin" ? RACKING.tinKit : input.roof === "flat" ? RACKING.tiltKit : RACKING.tileKit;
     const clips = Math.ceil((input.panelCount * BOS.panelClip.perPanel) / BOS.panelClip.packSize) * BOS.panelClip.packSize;
     lines.push(line("solar", PANEL.sku, PANEL.name, input.panelCount, PANEL.cost));
     lines.push(line("solar", RACKING.rail.sku, `${RACKING.rail.name} (${rails.metres} m needed)`, rails.lengths, RACKING.rail.cost));
@@ -158,6 +161,17 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
         round2(kw * 1000 * COSTING.solarInstallPerWatt),
       ),
     );
+    if (input.roof === "flat") {
+      lines.push(
+        line(
+          "solar",
+          null,
+          `Tilt frame installation (${input.panelCount} panels at $${COSTING.tiltInstallPerPanel})`,
+          input.panelCount,
+          COSTING.tiltInstallPerPanel,
+        ),
+      );
+    }
     if (input.storeys === "double") lines.push(line("solar", null, "Double-storey installation", 1, COSTING.doubleStoreyInstall));
   }
 

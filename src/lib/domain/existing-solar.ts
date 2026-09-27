@@ -7,7 +7,7 @@
  */
 import type { BillSummary } from "./bill";
 import { describeInverter, type InverterSummary } from "./inverter";
-import type { EnergyProfile, ExistingSolarPlan, ExistingSolarSize } from "./types";
+import type { EnergyProfile, ExistingSolarPlan, ExistingSolarSize, RoofType } from "./types";
 
 export const EXISTING_SIZE_OPTIONS: { value: ExistingSolarSize; label: string }[] = [
   { value: "under-5", label: "Under 5 kW" },
@@ -57,9 +57,10 @@ export function asksAboutBattery(bill: Pick<BillSummary, "hasSolar"> | null, pro
   return !bill || solarSituation(bill, profile) !== "expand";
 }
 
-export const ROOF_OPTIONS: { value: "tin" | "tile" | "unsure"; label: string }[] = [
+export const ROOF_OPTIONS: { value: RoofType; label: string }[] = [
   { value: "tin", label: "Tin (Colorbond)" },
   { value: "tile", label: "Tiles" },
+  { value: "flat", label: "Flat" },
   { value: "unsure", label: "Not sure" },
 ];
 

@@ -554,6 +554,15 @@ describe("costing from the supplier price list", () => {
     expect(big.some((l) => l.sku === "NHPNL140L")).toBe(false);
   });
 
+  it("tilts panels on a flat roof: a tilt kit per 2 kW and $15 a panel to install", () => {
+    const flat = billOfMaterials({ ...input, roof: "flat" });
+    expect(flat.find((l) => l.sku === "ANTTILT10/15")!.qty).toBe(Math.ceil(arrayKw(input.panelCount) / 2));
+    expect(flat.some((l) => l.sku === "ANTTIN20" || l.sku === "ANTTILE20")).toBe(false);
+    const tilt = flat.find((l) => l.description.startsWith("Tilt frame installation"))!;
+    expect(tilt.total).toBe(input.panelCount * 15);
+    expect(billOfMaterials(input).some((l) => l.description.startsWith("Tilt frame"))).toBe(false);
+  });
+
   it("charges $1,000 ex GST to install an EV charger", () => {
     const ev = billOfMaterials({ ...input, evCharger: true }).find((l) => l.description === "EV charger installation");
     expect(ev!.total).toBe(1000);

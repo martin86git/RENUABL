@@ -81,6 +81,8 @@ export const RACKING = {
   /** Each kit covers up to 2.0 kW of panels. */
   tinKit: { sku: "ANTTIN20", name: "Antai 2.0kW Tin Kit (Black)", cost: 49, kw: 2 },
   tileKit: { sku: "ANTTILE20", name: "Antai 2.0kW Tile Kit (Black)", cost: 99.8, kw: 2 },
+  /** Flat roofs: panels tilted 10–15° (in place of the tin kit). */
+  tiltKit: { sku: "ANTTILT10/15", name: "Antai 2.0kW Black Tilt Kit 10-15 Degrees", cost: 129, kw: 2 },
   splice: { sku: "ANTSPLICE", name: "Antai Black Splice", cost: 1.88 },
 } as const;
 

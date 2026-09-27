@@ -181,6 +181,12 @@ export default function ProfilePage() {
                   Tip: three main switches side by side in your switchboard usually means three phase.
                 </p>
               </div>
+              {profile.roofType === "flat" && (
+                <p className="text-[12px] leading-snug text-muted">
+                  On a flat roof we tilt your panels 10–15° towards the sun, so they make more power and rain washes them clean. The tilt
+                  frames are included in your price.
+                </p>
+              )}
               {(profile.roofType === "unsure" || profile.phase === "unsure") && (
                 <p className="text-[12px] text-muted">No problem. We&apos;ll confirm it on your call.</p>
               )}
@@ -213,17 +219,20 @@ export default function ProfilePage() {
           </ul>
         </div>
 
-        <div className="relative hidden items-center justify-center lg:flex">
-          <Mascot pose="battery" className="h-auto w-[300px] xl:w-[330px]" bounce />
-          <Script className="absolute -right-2 bottom-4 text-[22px] xl:right-4">
-            Smarter
-            <br />
-            &nbsp;energy.
-            <br />
-            &nbsp;&nbsp;Brighter
-            <br />
-            &nbsp;&nbsp;&nbsp;tomorrows.
-          </Script>
+        {/* Mascot and script travel together and stay in view. Sticky makes its own layer, so it needs the page colour for the mascot's multiply blend. */}
+        <div className="hidden lg:block">
+          <div className="sticky top-8 mx-auto w-fit bg-canvas">
+            <Mascot pose="battery" className="h-auto w-[380px] xl:w-[440px]" bounce />
+            <Script className="absolute -bottom-2 right-0 text-[24px] xl:-right-6">
+              Smarter
+              <br />
+              &nbsp;energy.
+              <br />
+              &nbsp;&nbsp;Brighter
+              <br />
+              &nbsp;&nbsp;&nbsp;tomorrows.
+            </Script>
+          </div>
         </div>
       </div>
     </FlowStep>

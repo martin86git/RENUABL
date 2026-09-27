@@ -53,7 +53,8 @@ export interface EnergyProfile {
   existingPlan?: ExistingSolarPlan;
 }
 
-export type RoofType = "tin" | "tile" | "unsure";
+/** "flat": panels go on tilt frames (a tilt kit and a per-panel installation premium). */
+export type RoofType = "tin" | "tile" | "flat" | "unsure";
 export type ExistingSolarSize = "under-5" | "5-10" | "over-10" | "unsure";
 export type ExistingSolarPlan = "replace" | "expand";
 
