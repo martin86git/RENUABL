@@ -3,6 +3,7 @@
  * relationship surface: telemetry → insights → upgrades.
  */
 import { buildServiceAvailability, type ServiceReasonId } from "@/lib/domain/service";
+import { EXAMPLE_INSTALLATION } from "@/lib/mock/installation";
 import { HEALTH, HOME_SYSTEM, INSIGHTS, MONTH_SUMMARY, TODAY, TODAY_CURVE, UPGRADES, WEEK } from "@/lib/mock/home-energy";
 
 export function getHousehold() {
@@ -54,4 +55,9 @@ export interface ServiceBooking extends ServiceRequest {
 export async function requestService(req: ServiceRequest): Promise<ServiceBooking> {
   await new Promise((r) => setTimeout(r, 800));
   return { ...req, reference: `SV-${Math.floor(1000 + Math.random() * 9000)}`, installer: HOME_SYSTEM.installer };
+}
+
+/** The example home's installation record (until customers have their own). */
+export function getExampleInstallation() {
+  return EXAMPLE_INSTALLATION;
 }

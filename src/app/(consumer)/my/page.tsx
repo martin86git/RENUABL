@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronRight, CircleCheck, Headphones, Triangle, Wrench, Zap, type LucideIcon } from "lucide-react";
+import { ArrowRight, Camera, ChevronRight, CircleCheck, Headphones, Triangle, Wrench, Zap, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
@@ -67,6 +67,12 @@ export default async function MyHomePage() {
                 icon={CircleCheck}
                 title="System health"
                 detail={allGood ? "All systems online" : health.find((h) => h.status !== "good")!.detail}
+              />
+              <Row
+                href="/my/installation"
+                icon={Camera}
+                title="Your installation"
+                detail="Photos, serial numbers and your system's history"
               />
               <Row href="/my/support" icon={Headphones} title="Support" detail="Get help or book a service" />
               <Row href="/my/service" icon={Wrench} title="Book a service" detail="Your installation partner, at a time that suits" />

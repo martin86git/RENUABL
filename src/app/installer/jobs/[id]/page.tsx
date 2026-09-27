@@ -1,14 +1,14 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { JobWorkspace } from "@/components/installer/job-workspace";
-import { getJob, listCrews } from "@/lib/services/installer";
+import { getCurrentInstaller, getJob, listCrews } from "@/lib/services/installer";
 
 export default async function JobPage({ params }: PageProps<"/installer/jobs/[id]">) {
   await connection();
   const { id } = await params;
   const job = getJob(id);
   if (!job) notFound();
-  return <JobWorkspace job={job} crews={listCrews()} />;
+  return <JobWorkspace job={job} crews={listCrews()} installerName={getCurrentInstaller().name} />;
 }
 
 export async function generateMetadata({ params }: PageProps<"/installer/jobs/[id]">) {

@@ -39,9 +39,21 @@ const imagery = [
   { id: "img3", label: "Switchboard" },
 ];
 
+/** Demo only: a stable record key per sample job. Real jobs get a random key when they're created. */
+export function demoRecordKey(jobId: string) {
+  let h = 2166136261;
+  for (const c of `renuabl-demo-${jobId}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  let out = "";
+  for (let i = 0; i < 24; i++) {
+    h = Math.imul(h ^ (h >>> 13), 1103515245) >>> 0;
+    out += (h % 36).toString(36);
+  }
+  return out;
+}
+
 export function buildJobs(now = new Date()): Job[] {
   const { d, at } = relative(now);
-  return [
+  const jobs: Omit<Job, "recordKey">[] = [
     {
       id: "job_1042",
       reference: "RN-1042",
@@ -336,6 +348,7 @@ export function buildJobs(now = new Date()): Job[] {
       ],
     },
   ];
+  return jobs.map((j) => ({ ...j, recordKey: demoRecordKey(j.id) }));
 }
 
 export const INSTALLER_PERFORMANCE = {

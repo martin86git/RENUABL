@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Camera,
   Check,
   ChevronDown,
   CircleCheck,
@@ -18,13 +17,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Accordion, Tabs } from "radix-ui";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Badge, Button, buttonClass, cn } from "@/components/ui/primitives";
 import { formatCurrency, formatDate, formatDateTime, formatTime } from "@/lib/domain/format";
 import { FIELD_STATUS_FLOW, stageForFieldStatus } from "@/lib/domain/job-status";
 import { panelsToKw } from "@/lib/domain/recommendation";
 import { getWindow } from "@/lib/domain/scheduling";
 import type { Crew, Job, JobStage } from "@/lib/domain/types";
+import { Handover } from "@/components/installer/handover";
 import { HomePhoto, homeBannerFor, homePhotoFor } from "@/components/ui/brand-art";
 import { ImageTile, StageBadge } from "./bits";
 import { useFieldStatus } from "./use-field-status";
@@ -96,44 +96,6 @@ function Checklist({ items, onToggle }: { items: Job["checklist"]; onToggle: (id
   );
 }
 
-function Photos({ photos, onAdd }: { photos: string[]; onAdd: (files: FileList) => void }) {
-  const input = useRef<HTMLInputElement>(null);
-  return (
-    <div>
-      <div className="grid grid-cols-3 gap-2">
-        {photos.map((src, i) => (
-          // eslint-disable-next-line @next/next/no-img-element -- local object URLs from the camera
-          <img
-            key={src}
-            src={src}
-            alt={`Site photo ${i + 1}`}
-            className="aspect-square w-full rounded-xl border border-line object-cover"
-          />
-        ))}
-        <button
-          type="button"
-          onClick={() => input.current?.click()}
-          className="grid aspect-square place-items-center rounded-xl border-2 border-dashed border-line-strong text-muted hover:text-ink"
-        >
-          <span className="flex flex-col items-center gap-1 text-[13px]">
-            <Camera className="h-6 w-6" /> Add photo
-          </span>
-        </button>
-      </div>
-      <input
-        ref={input}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        multiple
-        hidden
-        onChange={(e) => e.target.files && onAdd(e.target.files)}
-      />
-      <p className="mt-2 text-[12px] text-muted">Photos are saved on this device and upload when you have signal.</p>
-    </div>
-  );
-}
-
 function Documents({ docs }: { docs: Job["documents"] }) {
   const tone = { ready: "positive", submitted: "info", required: "warning" } as const;
   const label = { ready: "Ready", submitted: "Submitted", required: "Required" } as const;
@@ -193,10 +155,9 @@ function ContactButtons({ job, className }: { job: Job; className?: string }) {
 // Workspace
 // ---------------------------------------------------------------------------
 
-export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
+export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: Crew[]; installerName: string }) {
   const field = useFieldStatus(job.id, job.statusHistory);
   const [checklist, setChecklist] = useState(job.checklist);
-  const [photos, setPhotos] = useState<string[]>([]);
   const [stage, setStage] = useState<JobStage>(job.stage);
   const [crewId, setCrewId] = useState(job.crewId);
   const [confirming, setConfirming] = useState(false);
@@ -207,15 +168,7 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
   const doneCount = checklist.filter((c) => c.done).length;
   const canStartField = effectiveStage === "scheduled" || effectiveStage === "in-progress";
 
-  const photoUrls = useRef<string[]>([]);
-  useEffect(() => () => photoUrls.current.forEach((p) => URL.revokeObjectURL(p)), []);
-
   const toggle = (id: string) => setChecklist((cs) => cs.map((c) => (c.id === id ? { ...c, done: !c.done } : c)));
-  const addPhotos = (files: FileList) => {
-    const urls = Array.from(files).map((f) => URL.createObjectURL(f));
-    photoUrls.current.push(...urls);
-    setPhotos((ps) => [...ps, ...urls]);
-  };
 
   function advance() {
     setConfirming(true);
@@ -372,9 +325,9 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
               body: <Checklist items={checklist} onToggle={toggle} />,
             },
             {
-              id: "photos",
-              title: `Photos${photos.length ? ` · ${photos.length}` : ""}`,
-              body: <Photos photos={photos} onAdd={addPhotos} />,
+              id: "handover",
+              title: "Handover · photos & serials",
+              body: <Handover job={job} installer={installerName} installedOn={job.preferredDate} />,
             },
             { id: "docs", title: "Documents", body: <Documents docs={job.documents} /> },
             {
@@ -429,7 +382,7 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
 
         <Tabs.Root defaultValue="overview" className="mt-6">
           <Tabs.List className="flex gap-1 border-b border-line" aria-label="Job sections">
-            {["Overview", "Site", "System", "Documents", "Messages", "Activity"].map((t) => (
+            {["Overview", "Site", "System", "Handover", "Documents", "Messages", "Activity"].map((t) => (
               <Tabs.Trigger
                 key={t}
                 value={t.toLowerCase()}
@@ -529,10 +482,12 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
                   <ImageTile key={i.id} label={i.label} />
                 ))}
               </div>
-              <div className="mt-6">
-                <h3 className="mb-3 text-[14px] font-medium">Install photos</h3>
-                <Photos photos={photos} onAdd={addPhotos} />
-              </div>
+            </section>
+          </Tabs.Content>
+
+          <Tabs.Content value="handover" className="mt-6">
+            <section className="max-w-2xl rounded-2xl border border-line bg-surface p-6">
+              <Handover job={job} installer={installerName} installedOn={job.preferredDate} />
             </section>
           </Tabs.Content>
 

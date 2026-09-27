@@ -74,7 +74,7 @@ export function analyseHome(address: Address | null): HomeAnalysis {
 export type BillResult = { ok: true; bill: BillSummary } | { ok: false; message: string };
 
 /** Shrinks large phone photos so they upload quickly and stay under the size limit. */
-async function prepareBillFile(file: File, keepUnder = 1_500_000): Promise<File> {
+export async function prepareBillFile(file: File, keepUnder = 1_500_000): Promise<File> {
   if (file.type === "application/pdf" || (file.size < keepUnder && isBillMediaType(file.type))) return file;
   try {
     const bitmap = await createImageBitmap(file);

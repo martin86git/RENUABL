@@ -257,6 +257,8 @@ export interface JobActivity {
 export interface Job {
   id: string;
   reference: string;
+  /** Private key of the job's installation record (photos and serials); in the customer's record link. */
+  recordKey: string;
   customer: { name: string; phone: string; email: string };
   address: Address;
   packageName: string;
