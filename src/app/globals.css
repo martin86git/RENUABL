@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/*
+ * RENUABL design tokens.
+ * Semantic tokens (canvas, surface, ink, …) are shared by both products.
+ * The consumer experience is light and warm; `.theme-installer` swaps the
+ * same tokens for the deliberate dark operational palette.
+ */
+:root {
+  --canvas: #f6f4f0;
+  --surface: #ffffff;
+  --surface-2: #efece6;
+  --ink: #15161a;
+  --ink-2: #3a3d44;
+  --muted: #6d7179;
+  --line: #e5e1da;
+  --line-strong: #d4cfc6;
+  --primary: #15161a;
+  --primary-ink: #ffffff;
+  --positive: #1f8a5b;
+  --positive-soft: #e3f3ea;
+  --warning: #b86e00;
+  --warning-soft: #fbefd9;
+  --danger: #c2412d;
+  --info: #4b5bd6;
+  --info-soft: #ebedfd;
+  --sun: #ffb547;
+  --coral: #ff7a59;
+  --lilac: #b9a7ff;
+  --sky: #8fd3ff;
+  --focus: #4b5bd6;
+  color-scheme: light;
+}
+
+.theme-installer {
+  --canvas: #0d0f12;
+  --surface: #15181d;
+  --surface-2: #1c2026;
+  --ink: #eceef1;
+  --ink-2: #c5c9d0;
+  --muted: #8d949e;
+  --line: #262b33;
+  --line-strong: #353b45;
+  --primary: #f2f3f5;
+  --primary-ink: #0d0f12;
+  /* Green is reserved for confirmed / on-track / available / positive. */
+  --positive: #3ddc84;
+  --positive-soft: rgba(61, 220, 132, 0.12);
+  --warning: #f5b544;
+  --warning-soft: rgba(245, 181, 68, 0.12);
+  --danger: #f2665c;
+  --info: #8ea2ff;
+  --info-soft: rgba(142, 162, 255, 0.12);
+  --focus: #8ea2ff;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
+  --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-sun: var(--sun);
+  --color-coral: var(--coral);
+  --color-lilac: var(--lilac);
+  --color-sky: var(--sky);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius-card: 1.5rem;
+  --shadow-soft: 0 1px 2px rgb(20 20 30 / 0.04), 0 8px 24px -8px rgb(20 20 30 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(20 20 30 / 0.04), 0 24px 48px -16px rgb(20 20 30 / 0.18);
+}
+
+html,
+body {
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@keyframes orb-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.02);
+  }
+}
+
+@keyframes orb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-orb-float {
+  animation: orb-float 7s ease-in-out infinite;
+}
+.animate-orb-spin {
+  animation: orb-spin 24s linear infinite;
+}
+.animate-fade-up {
+  animation: fade-up 0.45s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-orb-float,
+  .animate-orb-spin,
+  .animate-fade-up {
+    animation: none;
+  }
+}
+
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* Keep overscroll areas dark inside the installer portal. */
+html:has(.theme-installer),
+body:has(.theme-installer) {
+  background: #0d0f12;
+  color-scheme: dark;
+}
+
+/* Keep focused/scrolled-to controls clear of the mobile sticky CTA bar. */
+@media (max-width: 1023px) {
+  html:has(.flow-sticky-cta) {
+    scroll-padding-bottom: 12rem;
+  }
+}
