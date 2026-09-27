@@ -8,7 +8,7 @@ import { BillUpload } from "@/components/consumer/bill-upload";
 import { isAboutComplete, useFlow } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
 import { Mascot } from "@/components/ui/brand-art";
-import { ChoiceChips, YesNo } from "@/components/ui/controls";
+import { ChoiceChips, Toggle, YesNo } from "@/components/ui/controls";
 import { Button, Script } from "@/components/ui/primitives";
 import {
   EXISTING_PLAN_OPTIONS,
@@ -16,7 +16,6 @@ import {
   EXPAND_DISCLAIMER,
   PHASE_OPTIONS,
   ROOF_OPTIONS,
-  STOREY_OPTIONS,
   asksAboutBattery,
   existingSolarQuestions,
   solarSituation,
@@ -138,16 +137,16 @@ export default function ProfilePage() {
                   />
                 </div>
               </div>
-              <div>
-                <p className="text-[13.5px] leading-snug text-ink-2">Is your home single or double storey?</p>
-                <div className="mt-2.5">
-                  <ChoiceChips<"single" | "double">
-                    label="Is your home single or double storey?"
-                    options={STOREY_OPTIONS}
-                    value={profile.storeys}
-                    onChange={(storeys) => change({ storeys })}
-                  />
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[13.5px] leading-snug text-ink-2">Double-storey home?</p>
+                  <p className="text-[12px] text-muted">{profile.storeys === "double" ? "Double storey" : "Single storey"}</p>
                 </div>
+                <Toggle
+                  label="Double-storey home"
+                  checked={profile.storeys === "double"}
+                  onChange={(double) => change({ storeys: double ? "double" : "single" })}
+                />
               </div>
               <div>
                 <p className="text-[13.5px] leading-snug text-ink-2">Is your power single or three phase?</p>

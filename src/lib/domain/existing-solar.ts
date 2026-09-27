@@ -56,11 +56,6 @@ export const ROOF_OPTIONS: { value: "tin" | "tile" | "unsure"; label: string }[]
   { value: "unsure", label: "Not sure" },
 ];
 
-export const STOREY_OPTIONS: { value: "single" | "double"; label: string }[] = [
-  { value: "single", label: "Single storey" },
-  { value: "double", label: "Double storey" },
-];
-
 export const PHASE_OPTIONS: { value: "single" | "three" | "unsure"; label: string }[] = [
   { value: "single", label: "Single phase" },
   { value: "three", label: "Three phase" },
@@ -69,7 +64,7 @@ export const PHASE_OPTIONS: { value: "single" | "three" | "unsure"; label: strin
 
 /** "About your home" is done once the bill is read and every question shown is answered. */
 export function isAboutComplete(bill: BillSummary | null, profile: Partial<EnergyProfile>): boolean {
-  if (!bill || !profile.roofType || !profile.storeys || !profile.phase) return false;
+  if (!bill || !profile.roofType || !profile.phase) return false; // storeys defaults to single
   const q = existingSolarQuestions(bill, profile);
   if (q.size && !profile.existingSize) return false;
   if (q.plan && !profile.existingPlan) return false;
