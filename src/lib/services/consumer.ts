@@ -8,7 +8,6 @@ import { rankInstallers } from "@/lib/domain/matching";
 import { buildAvailability, stableHash } from "@/lib/domain/scheduling";
 import type { Address, HomeAnalysis, InstallerMatch } from "@/lib/domain/types";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
-import { PROOF_POINTS, TESTIMONIALS } from "@/lib/mock/brand";
 import { INSTALLERS } from "@/lib/mock/installers";
 
 const latency = (ms = 250) => new Promise((r) => setTimeout(r, ms));
@@ -97,12 +96,4 @@ export async function reserveDeposit(
     care: careIncluded ? null : care,
     careIncluded,
   };
-}
-
-export function getProofPoints() {
-  return PROOF_POINTS;
-}
-
-export function getTestimonials() {
-  return TESTIMONIALS;
 }

@@ -73,7 +73,6 @@ Everything under `src/lib/mock` is placeholder data. Swap a service's implementa
 - Payments (Apple Pay / Google Pay / card) are mocked in `services/consumer.ts`; wire up a payment provider's hosted fields before launch.
 - Address autocomplete uses a sample list; replace it with a geocoding provider.
 - Brand artwork in `public/brand/` is cropped from the design mockups — swap in the original mascot renders and licensed photography.
-- Brand proof points ("50,000+ homes", "4.9 from 6,000+ reviews") and testimonials in `src/lib/mock/brand.ts` are design placeholders — replace with verified figures.
 - The 15-minute confirmation call is booked through HubSpot Meetings once `NEXT_PUBLIC_HUBSPOT_MEETINGS_URL` is set (see `docs/DEPLOY.md`).
 - RENUABL Care ($19/month or $199/year) is offered at checkout as an opt-in; billing isn't wired up yet.
 - "Ask RENUABL" uses reviewed canned answers (`services/ask.ts`); the function signature is ready to be backed by a model.

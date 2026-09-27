@@ -1,7 +1,6 @@
 "use client";
 
 import { Check } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FlowStep } from "@/components/consumer/flow-shell";
@@ -33,7 +32,7 @@ export default function AnalysingPage() {
 
   return (
     <FlowStep
-      width="wide"
+      width="narrow"
       title={
         <>
           Analysing
@@ -43,7 +42,7 @@ export default function AnalysingPage() {
       }
       subtitle={state.address ? `${state.address.line}, ${state.address.suburb}` : undefined}
     >
-      <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
+      <div>
         <ul className="space-y-5" aria-live="polite">
           {ANALYSIS_STEPS.map((label, i) => {
             const complete = i < done;
@@ -62,17 +61,6 @@ export default function AnalysingPage() {
             );
           })}
         </ul>
-        <figure className="flex flex-col items-center">
-          <Image
-            src="/brand/analysing.webp"
-            width={466}
-            height={380}
-            alt=""
-            aria-hidden
-            className="art-blend h-auto w-[260px] animate-float lg:w-[340px]"
-          />
-          <figcaption className="mt-2 text-[13px] text-muted">Using real data, not guesses.</figcaption>
-        </figure>
       </div>
     </FlowStep>
   );

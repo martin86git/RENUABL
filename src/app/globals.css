@@ -131,7 +131,8 @@ body {
   animation: float 6s ease-in-out infinite;
 }
 .animate-fade-up {
-  animation: fade-up 0.45s ease-out both;
+  /* "backwards" (not "both"): no transform lingers after the animation, so blended artwork and fixed elements inside still work. */
+  animation: fade-up 0.45s ease-out backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

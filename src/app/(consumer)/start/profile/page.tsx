@@ -3,7 +3,6 @@
 import { ArrowRight, Car, Fan, House, Waves, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
-import { BrandAside } from "@/components/consumer/brand-aside";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { isProfileComplete, useFlow } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
@@ -33,7 +32,6 @@ export default function ProfilePage() {
       width="wide"
       title="Tell us about your home."
       subtitle="A few quick details so we can recommend the right solution for you."
-      aside={<BrandAside />}
       ask={<AskRenuabl context="profile" title="Not sure?" subtitle="Ask RENUABL anything about your home." arrow="light" />}
       cta={
         <Button size="lg" className="w-full lg:w-72" disabled={!complete} onClick={() => router.push(stepHref("system"))}>

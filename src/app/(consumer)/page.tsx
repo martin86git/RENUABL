@@ -1,6 +1,5 @@
 import { AddressEntry } from "@/components/consumer/address-entry";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
-import { ProofStats } from "@/components/consumer/brand-aside";
 import { ConsumerTopBar, MobileHeader } from "@/components/consumer/consumer-top-bar";
 import { Mascot } from "@/components/ui/brand-art";
 import { Script } from "@/components/ui/primitives";
@@ -24,7 +23,7 @@ export default function HomePage() {
             <AskRenuabl context="home" variant="link" title="Not sure yet? Ask RENUABL" />
           </div>
 
-          {/* Mobile mascot sits between the address and the proof strip. */}
+          {/* Mobile mascot sits below the address. */}
           <div className="relative mx-auto mt-4 w-[230px] lg:hidden">
             <Mascot className="h-auto w-full" float priority />
             <Script className="absolute -right-6 bottom-10 text-[20px]">
@@ -36,7 +35,6 @@ export default function HomePage() {
             </Script>
           </div>
 
-          <ProofStats className="mt-4 max-w-md lg:mt-14" />
           <AskRenuabl context="home" variant="link" title="Not sure yet? Ask RENUABL" className="mt-6 lg:hidden" />
         </section>
 

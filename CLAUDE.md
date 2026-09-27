@@ -37,7 +37,7 @@
 ## Real businesses and claims
 
 - Primero Electric & Solar is the installer of choice in Victoria. Only show figures that are real and attributed (its Google rating: 4.7 from 141 reviews, as supplied). Never invent ratings, review counts, install numbers or testimonials for a real business: `verifiedStats`/`reviewSource` on `Installer` gate what customers see.
-- Brand proof points and testimonials in `src/lib/mock/brand.ts` are design placeholders and must be replaced with verified data before launch (Australian Consumer Law).
+- RENUABL has no customer reviews yet: don't show ratings, review counts, "homes powered" or testimonials for RENUABL until there are real, verifiable figures (Australian Consumer Law).
 
 ## Launch market
 
