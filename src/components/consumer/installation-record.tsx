@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 import { Disclosure } from "@/components/ui/controls";
 import { Card, Eyebrow, StatRow } from "@/components/ui/primitives";
 import { formatDate } from "@/lib/domain/format";
-import { HANDOVER_PHOTOS, type HandoverPhoto, type HandoverRecord } from "@/lib/domain/handover";
-import { findRecord, photoSrc } from "@/lib/services/handover";
+import { HANDOVER_PHOTOS, type HandoverDocument, type HandoverPhoto, type HandoverRecord } from "@/lib/domain/handover";
+import { documentSrc, findRecord, photoSrc } from "@/lib/services/handover";
 
 function Photo({ record, photo, label }: { record: HandoverRecord; photo: HandoverPhoto; label: string }) {
   const recordKey = record.key;
@@ -47,6 +47,34 @@ function Photo({ record, photo, label }: { record: HandoverRecord; photo: Handov
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+function DocumentLink({ record, file, label }: { record: HandoverRecord; file: HandoverDocument; label: string }) {
+  const [href, setHref] = useState<string | null>(null);
+  const recordKey = record.key;
+  const { id, path } = file;
+  useEffect(() => {
+    let url: string | null = null;
+    let live = true;
+    void documentSrc(recordKey, id, path).then((s) => {
+      url = s;
+      if (live) setHref(s);
+    });
+    return () => {
+      live = false;
+      if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+    };
+  }, [recordKey, id, path]);
+  return (
+    <a
+      href={href ?? undefined}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="tap-area text-[13.5px] text-ink-2 underline underline-offset-4"
+    >
+      {label}
+    </a>
   );
 }
 
@@ -155,14 +183,40 @@ export function InstallationRecord({ recordKey, example }: { recordKey: string |
               </ul>
             )}
           </Card>
-          <Card className="px-5 py-2 sm:px-6">
-            <h2 className="pt-3 text-[17px] font-medium">Serial numbers</h2>
-            <div className="divide-y divide-line">
-              <Serials label="Panels" serials={record.serials.panels} />
-              {record.serials.inverter && <StatRow label="Inverter" value={<span className="font-mono">{record.serials.inverter}</span>} />}
-              <Serials label="Battery modules" serials={record.serials.batteries} />
-            </div>
-          </Card>
+          {(record.documents ?? []).length > 0 && (
+            <Card className="p-5 sm:p-6">
+              <h2 className="text-[17px] font-medium">Documents</h2>
+              <ul className="mt-3 divide-y divide-line">
+                {Object.entries(
+                  (record.documents ?? []).reduce<Record<string, HandoverDocument[]>>((acc, d) => {
+                    (acc[d.docId] ??= []).push(d);
+                    return acc;
+                  }, {}),
+                ).map(([docId, files]) => (
+                  <li key={docId} className="py-3">
+                    <p className="text-[15px] text-ink">{files[0].label ?? "Document"}</p>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                      {files.map((f, i) => (
+                        <DocumentLink key={f.id} record={record} file={f} label={files.length > 1 ? `Page ${i + 1}` : "Open"} />
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          {(record.serials.panels.length > 0 || record.serials.inverter || record.serials.batteries.length > 0) && (
+            <Card className="px-5 py-2 sm:px-6">
+              <h2 className="pt-3 text-[17px] font-medium">Serial numbers</h2>
+              <div className="divide-y divide-line">
+                <Serials label="Panels" serials={record.serials.panels} />
+                {record.serials.inverter && (
+                  <StatRow label="Inverter" value={<span className="font-mono">{record.serials.inverter}</span>} />
+                )}
+                <Serials label="Battery modules" serials={record.serials.batteries} />
+              </div>
+            </Card>
+          )}
         </div>
         <Card className="h-fit p-5 sm:p-6 lg:col-span-4">
           <h2 className="text-[17px] font-medium">Your system</h2>

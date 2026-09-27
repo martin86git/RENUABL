@@ -2,11 +2,16 @@
  * Job handover for the partner portal and the customer's installation record.
  * Saved in RENUABL's storage; where that isn't set up (a preview), on this device.
  */
-import { emptyHandover, type EvidenceId, type HandoverPhoto, type HandoverRecord } from "@/lib/domain/handover";
+import { emptyHandover, type EvidenceId, type HandoverDocument, type HandoverPhoto, type HandoverRecord } from "@/lib/domain/handover";
 import { prepareBillFile } from "./consumer";
 import { devicePhotoUrl, getDeviceRecord, saveDevicePhoto, saveDeviceRecord } from "./device-records";
 
 export type Backend = "server" | "device";
+
+/** On this device, change the latest saved copy (other parts of the page may have saved since). */
+async function latestOnDevice(record: HandoverRecord): Promise<HandoverRecord> {
+  return (await getDeviceRecord(record.key)) ?? record;
+}
 
 export async function loadHandover(key: string, jobReference: string): Promise<{ record: HandoverRecord; backend: Backend }> {
   try {
@@ -39,10 +44,13 @@ export async function saveHandover(
   opts: { submit?: boolean; summary?: HandoverRecord["summary"] } = {},
 ): Promise<HandoverRecord> {
   if (backend === "device") {
+    const latest = await latestOnDevice(record);
     return saveDeviceRecord({
-      ...record,
-      summary: opts.summary ?? record.summary,
-      submittedAt: opts.submit ? new Date().toISOString() : record.submittedAt,
+      ...latest,
+      arrays: record.arrays,
+      serials: record.serials,
+      summary: opts.summary ?? latest.summary,
+      submittedAt: opts.submit ? new Date().toISOString() : latest.submittedAt,
     });
   }
   const res = await fetch(`/api/jobs/${record.key}/handover`, {
@@ -67,7 +75,8 @@ export async function addHandoverPhoto(
     const id = `ph_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     await saveDevicePhoto(id, photo);
     const entry: HandoverPhoto = { id, category, array, path: `device:${id}`, takenAt: new Date().toISOString() };
-    return saveDeviceRecord({ ...record, photos: [...record.photos, entry] });
+    const latest = await latestOnDevice(record);
+    return saveDeviceRecord({ ...latest, photos: [...latest.photos, entry] });
   }
   const body = new FormData();
   body.append("category", category);
@@ -81,7 +90,10 @@ export async function addHandoverPhoto(
 }
 
 export async function removeHandoverPhoto(record: HandoverRecord, backend: Backend, photoId: string): Promise<HandoverRecord> {
-  if (backend === "device") return saveDeviceRecord({ ...record, photos: record.photos.filter((p) => p.id !== photoId) });
+  if (backend === "device") {
+    const latest = await latestOnDevice(record);
+    return saveDeviceRecord({ ...latest, photos: latest.photos.filter((p) => p.id !== photoId) });
+  }
   const res = await fetch(`/api/jobs/${record.key}/photos?id=${encodeURIComponent(photoId)}`, { method: "DELETE" });
   const json = (await res.json()) as { ok: boolean; record?: HandoverRecord };
   if (!json.ok || !json.record) throw new Error("Couldn't remove that photo");
@@ -91,4 +103,55 @@ export async function removeHandoverPhoto(record: HandoverRecord, backend: Backe
 /** Where to show a photo from: RENUABL's route, or this device. */
 export async function photoSrc(recordKey: string, photoId: string, path: string): Promise<string | null> {
   return path.startsWith("device:") ? devicePhotoUrl(photoId) : `/api/jobs/${recordKey}/photos/${photoId}`;
+}
+
+/** Adds a page or file (PDF or photo, shrunk first) to one of the job's documents. */
+export async function addHandoverDocument(
+  record: HandoverRecord,
+  backend: Backend,
+  doc: { id: string; label: string },
+  file: File,
+): Promise<HandoverRecord> {
+  const docId = doc.id;
+  const prepared = file.type === "application/pdf" ? file : await prepareBillFile(file, 1_500_000);
+  if (backend === "device") {
+    const id = `dc_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    await saveDevicePhoto(id, prepared);
+    const entry: HandoverDocument = {
+      id,
+      docId,
+      label: doc.label,
+      name: prepared.name,
+      path: `device:${id}`,
+      contentType: prepared.type,
+      uploadedAt: new Date().toISOString(),
+    };
+    const latest = await latestOnDevice(record);
+    return saveDeviceRecord({ ...latest, documents: [...(latest.documents ?? []), entry] });
+  }
+  const body = new FormData();
+  body.append("docId", docId);
+  body.append("label", doc.label);
+  body.append("jobReference", record.jobReference);
+  body.append("file", prepared);
+  const res = await fetch(`/api/jobs/${record.key}/documents`, { method: "POST", body });
+  const json = (await res.json()) as { ok: boolean; record?: HandoverRecord; message?: string };
+  if (!json.ok || !json.record) throw new Error(json.message ?? "That didn't upload. Try again.");
+  return json.record;
+}
+
+export async function removeHandoverDocument(record: HandoverRecord, backend: Backend, id: string): Promise<HandoverRecord> {
+  if (backend === "device") {
+    const latest = await latestOnDevice(record);
+    return saveDeviceRecord({ ...latest, documents: (latest.documents ?? []).filter((d) => d.id !== id) });
+  }
+  const res = await fetch(`/api/jobs/${record.key}/documents?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  const json = (await res.json()) as { ok: boolean; record?: HandoverRecord };
+  if (!json.ok || !json.record) throw new Error("Couldn't remove that file");
+  return json.record;
+}
+
+/** Where to open a document page or file from: RENUABL's route, or this device. */
+export async function documentSrc(recordKey: string, id: string, path: string): Promise<string | null> {
+  return path.startsWith("device:") ? devicePhotoUrl(id) : `/api/jobs/${recordKey}/documents/${id}`;
 }

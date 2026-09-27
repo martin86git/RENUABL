@@ -64,6 +64,19 @@ describe("handover", () => {
     expect(p.complete).toBe(true);
   });
 
+  it("groups uploaded document pages by document", async () => {
+    const { documentFiles } = await import("./handover");
+    const r = {
+      documents: [
+        { id: "d1", docId: "d4", name: "p1.jpg", path: "x", contentType: "image/jpeg", uploadedAt: "" },
+        { id: "d2", docId: "d4", name: "p2.jpg", path: "y", contentType: "image/jpeg", uploadedAt: "" },
+        { id: "d3", docId: "d9", name: "a.pdf", path: "z", contentType: "application/pdf", uploadedAt: "" },
+      ],
+    };
+    expect(documentFiles(r, "d4").map((d) => d.id)).toEqual(["d1", "d2"]);
+    expect(documentFiles({}, "d4")).toEqual([]);
+  });
+
   it("cleans updates from the portal", () => {
     expect(cleanHandoverUpdate(null)).toBeNull();
     const c = cleanHandoverUpdate({ arrays: 40, serials: { panels: ["a1b2c3d4", "a1b2c3d4", 5], inverter: "bad", batteries: [] } })!;

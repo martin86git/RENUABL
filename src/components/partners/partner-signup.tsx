@@ -2,6 +2,7 @@
 
 import { ArrowLeft, ArrowRight, Check, CircleCheck, FileUp, Loader2, MapPin, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { CaptureButtons } from "@/components/ui/capture";
 import { Button, Card, cn } from "@/components/ui/primitives";
 import { PREVIEW_MODE } from "@/lib/config";
 import type { AddressSuggestion } from "@/lib/domain/address";
@@ -30,7 +31,7 @@ import {
   type PartnerErrors,
 } from "@/lib/domain/partner";
 import type { Address } from "@/lib/domain/types";
-import { resolveAddress, submitPartnerApplication, suggestAddresses } from "@/lib/services/partners";
+import { prepareCertificate, resolveAddress, submitPartnerApplication, suggestAddresses } from "@/lib/services/partners";
 
 type Step = "intro" | "type" | "business" | "area" | "credentials" | "rates" | "supply" | "review" | "done";
 
@@ -199,6 +200,7 @@ export function PartnerSignup() {
   const [loaded, setLoaded] = useState(false);
   const [step, setStep] = useState<Step>("intro");
   const [certificate, setCertificate] = useState<File | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [errors, setErrors] = useState<PartnerErrors>({});
   const [problem, setProblem] = useState<string | null>(null);
@@ -537,31 +539,42 @@ export function PartnerSignup() {
             </Field>
             <div>
               <p className="mb-1.5 text-[13.5px] text-ink-2">Certificate of currency</p>
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-xl bg-canvas px-4 py-4 ring-1",
-                  errors.certificate ? "ring-danger" : "ring-line",
-                )}
-              >
-                <FileUp className="h-5 w-5 shrink-0 text-muted" strokeWidth={1.6} aria-hidden />
-                <span className="min-w-0 flex-1 truncate text-[14px] text-ink-2">
-                  {certificate ? certificate.name : "Upload a PDF or photo"}
-                </span>
-                <span className="text-[13px] text-leaf">{certificate ? "Change" : "Choose"}</span>
-                <input
-                  type="file"
-                  className="sr-only"
+              {certificate && (
+                <div
+                  className={cn(
+                    "mb-2.5 flex items-center gap-3 rounded-xl bg-canvas px-4 py-3 ring-1",
+                    errors.certificate ? "ring-danger" : "ring-line",
+                  )}
+                >
+                  <FileUp className="h-5 w-5 shrink-0 text-muted" strokeWidth={1.6} aria-hidden />
+                  <span className="min-w-0 flex-1 truncate text-[14px] text-ink-2">{certificate.name}</span>
+                  <button type="button" className="tap-area text-[13px] text-leaf" onClick={() => setCertificate(null)}>
+                    Remove
+                  </button>
+                </div>
+              )}
+              {!certificate && (
+                <CaptureButtons
+                  busy={preparing}
                   accept={CERTIFICATE_UPLOAD.types.join(",")}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    if (f && f.size > CERTIFICATE_UPLOAD.maxBytes) {
-                      setErrors((x) => ({ ...x, certificate: "That file is over 4 MB. Try a PDF or a smaller photo." }));
+                  desktopLabel="Upload a PDF or photo"
+                  onFiles={async ([f]) => {
+                    setPreparing(true);
+                    const ready = await prepareCertificate(f);
+                    setPreparing(false);
+                    if (!(CERTIFICATE_UPLOAD.types as readonly string[]).includes(ready.type)) {
+                      setErrors((x) => ({ ...x, certificate: "Send a PDF, or a photo (JPG or PNG)." }));
                       return;
                     }
-                    setCertificate(f);
+                    if (ready.size > CERTIFICATE_UPLOAD.maxBytes) {
+                      setErrors((x) => ({ ...x, certificate: "That file is over 4 MB. Try a photo instead, or a smaller PDF." }));
+                      return;
+                    }
+                    setErrors((x) => ({ ...x, certificate: undefined }));
+                    setCertificate(ready);
                   }}
                 />
-              </label>
+              )}
               <p className={cn("mt-1.5 text-[12.5px]", errors.certificate ? "text-danger" : "text-muted")}>
                 {errors.certificate ?? "It should show at least $10 million public liability. Kept private."}
               </p>

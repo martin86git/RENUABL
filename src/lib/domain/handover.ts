@@ -44,6 +44,28 @@ export interface HandoverRecord {
   updatedAt: string;
   /** Set when the partner submits the finished handover. */
   submittedAt?: string;
+  /** Job documents the partner supplied (e.g. the Certificate of Electrical Safety), one entry per page or file. */
+  documents?: HandoverDocument[];
+}
+
+export interface HandoverDocument {
+  id: string;
+  /** Which of the job's documents this is (JobDocument id), and its name, e.g. "Certificate of compliance". */
+  docId: string;
+  label?: string;
+  name: string;
+  path: string;
+  contentType: string;
+  uploadedAt: string;
+}
+
+/** Documents and photos partners can send from a phone: PDFs, or photos (shrunk before upload). */
+export const DOCUMENT_UPLOAD = { maxBytes: 4 * 1024 * 1024, types: ["application/pdf", "image/jpeg", "image/png"] } as const;
+export const MAX_DOCUMENT_FILES = 10;
+
+/** The pages or files supplied for one of the job's documents. */
+export function documentFiles(record: Pick<HandoverRecord, "documents">, docId: string) {
+  return (record.documents ?? []).filter((d) => d.docId === docId);
 }
 
 export const MAX_ARRAYS = 6;

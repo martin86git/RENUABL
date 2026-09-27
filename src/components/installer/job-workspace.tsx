@@ -5,7 +5,6 @@ import {
   ChevronDown,
   CircleCheck,
   CloudOff,
-  FileText,
   KeyRound,
   Loader2,
   Mail,
@@ -18,13 +17,14 @@ import {
 import Link from "next/link";
 import { Accordion, Tabs } from "radix-ui";
 import { useState, type ReactNode } from "react";
-import { Badge, Button, buttonClass, cn } from "@/components/ui/primitives";
+import { Button, buttonClass, cn } from "@/components/ui/primitives";
 import { formatCurrency, formatDate, formatDateTime, formatTime } from "@/lib/domain/format";
 import { FIELD_STATUS_FLOW, stageForFieldStatus } from "@/lib/domain/job-status";
 import { panelsToKw } from "@/lib/domain/recommendation";
 import { getWindow } from "@/lib/domain/scheduling";
 import type { Crew, Job, JobStage } from "@/lib/domain/types";
 import { Handover } from "@/components/installer/handover";
+import { JobDocuments } from "@/components/installer/job-documents";
 import { HomePhoto, homeBannerFor, homePhotoFor } from "@/components/ui/brand-art";
 import { ImageTile, StageBadge } from "./bits";
 import { useFieldStatus } from "./use-field-status";
@@ -90,22 +90,6 @@ function Checklist({ items, onToggle }: { items: Job["checklist"]; onToggle: (id
             </span>
             <span className={cn("text-[15px]", c.done && "text-muted line-through")}>{c.label}</span>
           </label>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function Documents({ docs }: { docs: Job["documents"] }) {
-  const tone = { ready: "positive", submitted: "info", required: "warning" } as const;
-  const label = { ready: "Ready", submitted: "Submitted", required: "Required" } as const;
-  return (
-    <ul className="divide-y divide-line">
-      {docs.map((d) => (
-        <li key={d.id} className="flex min-h-14 items-center gap-3 py-2">
-          <FileText className="h-5 w-5 shrink-0 text-muted" />
-          <span className="flex-1 text-[15px]">{d.name}</span>
-          <Badge tone={tone[d.status]}>{label[d.status]}</Badge>
         </li>
       ))}
     </ul>
@@ -329,7 +313,7 @@ export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: C
               title: "Handover · photos & serials",
               body: <Handover job={job} installer={installerName} installedOn={job.preferredDate} />,
             },
-            { id: "docs", title: "Documents", body: <Documents docs={job.documents} /> },
+            { id: "docs", title: "Documents", body: <JobDocuments job={job} docs={job.documents} /> },
             {
               id: "contact",
               title: "Customer contact",
@@ -459,7 +443,7 @@ export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: C
               </section>
               <section className="rounded-2xl border border-line bg-surface p-6">
                 <h2 className="mb-2 text-[15px] font-medium">Required documents</h2>
-                <Documents docs={job.documents.filter((d) => d.status !== "ready")} />
+                <JobDocuments job={job} docs={job.documents.filter((d) => d.status !== "ready")} />
               </section>
             </div>
           </Tabs.Content>
@@ -501,7 +485,7 @@ export function JobWorkspace({ job, crews, installerName }: { job: Job; crews: C
 
           <Tabs.Content value="documents" className="mt-6">
             <section className="max-w-2xl rounded-2xl border border-line bg-surface px-6 py-2">
-              <Documents docs={job.documents} />
+              <JobDocuments job={job} docs={job.documents} />
             </section>
           </Tabs.Content>
 

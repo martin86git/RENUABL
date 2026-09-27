@@ -14,7 +14,8 @@ vi.mock("./storage", () => ({
   readFile: async (path: string) => (files.has(path) ? { stream: new ReadableStream(), contentType: files.get(path)!.contentType } : null),
 }));
 
-const { addPhoto, getRecord, photoFile, removePhoto, saveRecord, validKey } = await import("./handover-store");
+const { addDocument, addPhoto, documentFile, getRecord, photoFile, removeDocument, removePhoto, saveRecord, validKey } =
+  await import("./handover-store");
 const key = "abcdefghijklmnopqrst";
 
 describe("handover store", () => {
@@ -52,5 +53,28 @@ describe("handover store", () => {
     const reread = (await getRecord(key))!;
     expect(reread.photos).toHaveLength(1);
     expect(reread.serials.inverter).toBe("SG10RS2026A001");
+  });
+
+  it("keeps job documents page by page, readable only through their record", async () => {
+    let r = await addDocument(key, "RN-1043", {
+      docId: "d4",
+      label: "Certificate of compliance",
+      name: "p1.jpg",
+      data: new ArrayBuffer(4),
+      contentType: "image/jpeg",
+    });
+    r = await addDocument(key, "RN-1043", {
+      docId: "d4",
+      label: "Certificate of compliance",
+      name: "p2.pdf",
+      data: new ArrayBuffer(4),
+      contentType: "application/pdf",
+    });
+    expect(r.documents).toHaveLength(2);
+    expect(r.documents![1].path).toMatch(new RegExp(`^jobs/${key}/documents/d4-dc_.*\\.pdf$`));
+    expect(await documentFile(key, r.documents![0].id)).not.toBeNull();
+    expect(await documentFile("zzzzzzzzzzzzzzzzzzzz", r.documents![0].id)).toBeNull();
+    const after = await removeDocument(key, r.documents![0].id);
+    expect(after!.documents!.map((d) => d.name)).toEqual(["p2.pdf"]);
   });
 });
