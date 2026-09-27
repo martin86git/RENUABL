@@ -20,7 +20,9 @@ export default function HomePage() {
             Solar, batteries, EV charging and more. Designed for your home, made simple.
           </p>
           <AddressEntry className="mt-7 max-w-lg lg:mt-10" />
-          <AskRenuabl context="home" variant="link" title="Not sure yet? Ask RENUABL" className="mt-4 hidden lg:inline-flex" />
+          <div className="mt-4 hidden lg:block">
+            <AskRenuabl context="home" variant="link" title="Not sure yet? Ask RENUABL" />
+          </div>
 
           {/* Mobile mascot sits between the address and the proof strip. */}
           <div className="relative mx-auto mt-4 w-[230px] lg:hidden">
@@ -39,7 +41,7 @@ export default function HomePage() {
         </section>
 
         <div className="relative hidden justify-center lg:col-span-6 lg:flex">
-          <Mascot className="h-auto w-[400px] xl:w-[440px]" float priority />
+          <Mascot className="h-auto w-[460px] xl:w-[520px]" float priority />
           <Script className="absolute bottom-16 right-[8%] text-[26px] xl:right-[14%]">
             Good
             <br />

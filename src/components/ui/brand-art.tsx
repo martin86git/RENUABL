@@ -2,18 +2,19 @@ import Image from "next/image";
 import { cn } from "./primitives";
 
 /*
- * Brand artwork. The files in /public/brand are crops from the design
- * mockups and are placeholders: swap in the original high-resolution
- * renders and licensed photography, keeping the same file names.
+ * Brand artwork. mascot-hero and mascot-avatar come from the original
+ * high-resolution mascot render. The other files in /public/brand are crops
+ * from the design mockups and are placeholders: swap in the original renders
+ * and licensed photography, keeping the same file names.
  */
 
 type MascotPose = "hero" | "confirm" | "dark" | "avatar";
 
 const MASCOT: Record<MascotPose, { src: string; w: number; h: number }> = {
-  hero: { src: "/brand/mascot-hero.webp", w: 552, h: 784 },
+  hero: { src: "/brand/mascot-hero.webp", w: 900, h: 908 },
   confirm: { src: "/brand/mascot-confirm.webp", w: 450, h: 244 },
   dark: { src: "/brand/mascot-dark.webp", w: 236, h: 240 },
-  avatar: { src: "/brand/mascot-avatar.webp", w: 120, h: 120 },
+  avatar: { src: "/brand/mascot-avatar.webp", w: 240, h: 240 },
 };
 
 /** The RENUABL mascot — a soft, friendly character, never labelled "AI". */
