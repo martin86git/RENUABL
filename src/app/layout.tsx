@@ -10,7 +10,7 @@ const script = Caveat({ variable: "--font-script", subsets: ["latin"], weight: [
 
 export const metadata: Metadata = {
   title: { default: "RENUABL — Renewable energy on your terms", template: "%s · RENUABL" },
-  description: "Solar and batteries, sized to your bill. One system made for your home, one installer, one price, no sales calls.",
+  description: "Solar and batteries, sized to your bill. One system made for your home, one installer, one price.",
   // Keep preview deployments out of search results.
   robots: PREVIEW_MODE ? { index: false, follow: false } : undefined,
 };
