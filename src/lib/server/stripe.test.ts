@@ -17,21 +17,32 @@ describe("deposit", () => {
     expect(depositCents()).toBe(49900);
   });
 
-  it("opens a Stripe Checkout page for $499 AUD with the reservation attached", async () => {
+  it("creates an embedded-form Checkout Session for $499 AUD with the reservation attached", async () => {
     const create = vi.fn(async (params: Stripe.Checkout.SessionCreateParams) => {
       void params;
-      return { url: "https://checkout.stripe.com/c/pay/cs_test" };
+      return { client_secret: "cs_test_secret" };
     });
     const fake = { checkout: { sessions: { create } } } as unknown as Stripe;
-    const url = await createDepositCheckout(fake, { reference: "RN-1234", email: "sarah@example.com", origin: "https://renuabl.test" });
-    expect(url).toBe("https://checkout.stripe.com/c/pay/cs_test");
+    const secret = await createDepositCheckout(fake, { reference: "RN-1234", email: "sarah@example.com", origin: "https://renuabl.test" });
+    expect(secret).toBe("cs_test_secret");
     const params = create.mock.calls[0][0];
     expect(params.mode).toBe("payment");
     expect(params.line_items![0].price_data).toMatchObject({ currency: "aud", unit_amount: 49900 });
     expect(params.metadata).toEqual({ reference: "RN-1234", kind: "deposit" });
     expect(params.customer_email).toBe("sarah@example.com");
-    expect(params.success_url).toBe("https://renuabl.test/deposit/paid?ref=RN-1234");
-    expect(params.cancel_url).toBe("https://renuabl.test/deposit?ref=RN-1234");
+    expect(params).toMatchObject({
+      ui_mode: "form",
+      billing_address_collection: "auto",
+      phone_number_collection: { enabled: false },
+      automatic_tax: { enabled: false },
+      submit_type: "book",
+      shipping_address_collection: { allowed_countries: ["AU"] },
+      locale: "en-GB",
+      integration_identifier: "custom_embedded_web_0002",
+    });
+    expect(params.payment_method_collection).toBeUndefined();
+    expect(params.success_url).toBeUndefined();
+    expect(params.return_url).toBe("https://renuabl.test/deposit/paid?ref=RN-1234&session_id={CHECKOUT_SESSION_ID}");
   });
 });
 

@@ -214,20 +214,20 @@ export async function bookConfirmationCall(
   return slot;
 }
 
-/** Asks RENUABL for a Stripe payment page for the deposit. */
+/** Asks RENUABL for a Stripe Checkout Session for the deposit; returns its client secret for the embedded form. */
 export async function startDepositPayment(
   reference: string,
   email: string | null,
-): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
+): Promise<{ ok: true; clientSecret: string } | { ok: false; message: string }> {
   try {
     const res = await fetch("/api/deposit/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ reference, email }),
     });
-    const json = (await res.json()) as { ok: boolean; url?: string; message?: string };
-    return json.ok && json.url
-      ? { ok: true, url: json.url }
+    const json = (await res.json()) as { ok: boolean; client_secret?: string; message?: string };
+    return json.ok && json.client_secret
+      ? { ok: true, clientSecret: json.client_secret }
       : { ok: false, message: json.message ?? "Something went wrong. Please try again." };
   } catch {
     return { ok: false, message: "We couldn't reach RENUABL. Check your connection and try again." };

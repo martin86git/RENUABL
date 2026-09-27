@@ -16,3 +16,9 @@ export const PREVIEW_MODE = process.env.NEXT_PUBLIC_PREVIEW_MODE !== "false";
  * When unset or invalid, the confirmation screen says we'll be in touch instead.
  */
 export const HUBSPOT_MEETINGS_URL = parseHubspotMeetingsUrl(process.env.NEXT_PUBLIC_HUBSPOT_MEETINGS_URL);
+
+/**
+ * NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: Stripe's publishable key (pk_test_… / pk_live_…)
+ * for the embedded deposit form. Safe in the browser. Redeploy after changing.
+ */
+export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() || null;

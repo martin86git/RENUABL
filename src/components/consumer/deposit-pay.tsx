@@ -1,10 +1,10 @@
 "use client";
 
 import { Apple, CreditCard, Loader2, Lock } from "lucide-react";
-import { useState } from "react";
-import { Button } from "@/components/ui/primitives";
+import { useEffect, useRef, useState } from "react";
 import { formatCurrency } from "@/lib/domain/format";
 import { startDepositPayment } from "@/lib/services/consumer";
+import { mountDepositForm, stripeFormAvailable } from "@/lib/services/stripe-form";
 
 function GoogleG() {
   return (
@@ -29,27 +29,46 @@ function GoogleG() {
   );
 }
 
-/** Opens Stripe's secure payment page for the deposit. */
+/** Stripe's embedded payment form for the deposit, on our own page. */
 export function DepositPay({ reference, email, amount }: { reference: string; email: string | null; amount: number }) {
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
+  const [problem, setProblem] = useState<string | null>(
+    stripeFormAvailable() ? null : "Online payments aren't set up yet. We'll be in touch.",
+  );
 
-  async function pay() {
-    setBusy(true);
-    setProblem(null);
-    const result = await startDepositPayment(reference, email);
-    if (result.ok) window.location.assign(result.url);
-    else {
-      setProblem(result.message);
-      setBusy(false);
-    }
-  }
+  useEffect(() => {
+    const el = formRef.current;
+    if (!el || !stripeFormAvailable()) return;
+    let cleanup: (() => void) | undefined;
+    let live = true;
+    const clientSecret = startDepositPayment(reference, email).then((r) => {
+      if (!r.ok) throw new Error(r.message);
+      return r.clientSecret;
+    });
+    clientSecret.catch((e: unknown) => live && setProblem(e instanceof Error ? e.message : "Something went wrong. Please try again."));
+    mountDepositForm(el, clientSecret, (m) => live && setProblem(m))
+      .then((c) => {
+        cleanup = c;
+        if (live) setReady(true);
+        else c();
+      })
+      .catch(() => live && setProblem((p) => p ?? "We couldn't open the payment form just now. Please try again."));
+    return () => {
+      live = false;
+      cleanup?.();
+    };
+  }, [reference, email]);
 
   return (
     <div>
-      <Button size="lg" className="w-full" disabled={busy} onClick={() => void pay()}>
-        {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : `Pay ${formatCurrency(amount)} deposit`}
-      </Button>
+      <p className="mb-3 text-[14px] text-ink">Pay {formatCurrency(amount)} deposit</p>
+      {!ready && !problem && (
+        <p className="flex items-center justify-center gap-2 py-6 text-[14px] text-muted">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading secure payment
+        </p>
+      )}
+      <div id="checkout-form" ref={formRef} />
       <div className="mt-3 flex items-center justify-center gap-2" aria-label="Card, Apple Pay or Google Pay">
         <span className="grid h-7 w-7 place-items-center rounded-lg bg-forest text-white">
           <CreditCard className="h-4 w-4" strokeWidth={1.7} aria-hidden />

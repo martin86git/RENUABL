@@ -1,7 +1,7 @@
 import { parseReference } from "@/lib/domain/deposit";
 import { createDepositCheckout, stripeClient } from "@/lib/server/stripe";
 
-/** POST { reference, email? } → { url } of a Stripe Checkout page for the deposit. */
+/** POST { reference, email? } → { client_secret } of a Stripe Checkout Session, for the embedded payment form. */
 export async function POST(request: Request) {
   let body: { reference?: string; email?: string };
   try {
@@ -18,8 +18,8 @@ export async function POST(request: Request) {
 
   const email = typeof body.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(body.email.trim()) ? body.email.trim() : null;
   try {
-    const url = await createDepositCheckout(stripe, { reference, email, origin: new URL(request.url).origin });
-    return Response.json({ ok: true, url });
+    const clientSecret = await createDepositCheckout(stripe, { reference, email, origin: new URL(request.url).origin });
+    return Response.json({ ok: true, client_secret: clientSecret });
   } catch (e) {
     console.error("deposit checkout failed", reference, e instanceof Error ? e.message : e);
     return Response.json({ ok: false, message: "We couldn't open the payment page just now. Please try again." }, { status: 502 });
