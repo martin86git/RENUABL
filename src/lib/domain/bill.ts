@@ -35,6 +35,8 @@ export interface BillSummary {
   usageRate: number | null;
   feedInRate: number | null;
   hasSolar: boolean;
+  /** Solar exported per day by an existing system (null when unknown or no solar). */
+  exportedDailyKwh: number | null;
   /** True when this is a stand-in reading (preview without a Claude API key). */
   sample?: boolean;
 }
@@ -68,6 +70,11 @@ function dollars(v: number | null, max: number) {
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
+function exportedPerDay(exported: number | null, periodDays: number | null) {
+  if (!exported || exported <= 0 || !periodDays) return null;
+  return round1(exported / periodDays);
+}
+
 /**
  * Validates a reading and derives daily and annual usage. Returns a problem
  * instead when it isn't an electricity bill or the usage can't be trusted.
@@ -97,6 +104,7 @@ export function summariseBill(raw: Partial<Record<keyof BillReading, unknown>>):
     usageRate: dollars(num(raw.usageRate), 1.5),
     feedInRate: dollars(num(raw.feedInRate), 0.5),
     hasSolar: (num(raw.exportedKwh) ?? 0) > 0,
+    exportedDailyKwh: exportedPerDay(num(raw.exportedKwh), periodDays),
   };
 }
 

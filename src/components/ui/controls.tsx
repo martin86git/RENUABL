@@ -27,6 +27,37 @@ export function YesNo({ value, onChange, label }: { value: boolean | undefined; 
   );
 }
 
+/** A small set of labelled choices as pills, e.g. existing system size. */
+export function ChoiceChips<T extends string>({
+  value,
+  onChange,
+  options,
+  label,
+}: {
+  value: T | undefined;
+  onChange: (v: T) => void;
+  options: { value: T; label: string; hint?: string }[];
+  label: string;
+}) {
+  return (
+    <RadioGroup.Root aria-label={label} value={value ?? ""} onValueChange={(v) => onChange(v as T)} className="flex flex-wrap gap-2">
+      {options.map((o) => (
+        <RadioGroup.Item
+          key={o.value}
+          value={o.value}
+          className={cn(
+            "rounded-full bg-surface px-4 text-[13.5px] text-ink-2 shadow-[0_0_0_1px_var(--line)] transition hover:shadow-[0_0_0_1px_var(--line-strong)] data-[state=checked]:bg-primary data-[state=checked]:text-primary-ink data-[state=checked]:shadow-none",
+            o.hint ? "py-2 text-left" : "h-9",
+          )}
+        >
+          <span className="block">{o.label}</span>
+          {o.hint && <span className="block text-[11.5px] opacity-75">{o.hint}</span>}
+        </RadioGroup.Item>
+      ))}
+    </RadioGroup.Root>
+  );
+}
+
 /** Segmented control, e.g. Essential / Recommended / Maximum. */
 export function Segmented<T extends string>({
   value,

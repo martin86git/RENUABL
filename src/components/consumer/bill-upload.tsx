@@ -72,7 +72,8 @@ export function BillUpload({ bill, onRead }: { bill: BillSummary | null; onRead:
             </p>
             {bill.hasSolar && (
               <p className="mt-1 text-[12.5px] text-forest/80">
-                It looks like you already have solar. We&apos;ll size around it on your confirmation call.
+                It looks like you already have solar{bill.exportedDailyKwh ? ` (exporting about ${bill.exportedDailyKwh} kWh a day)` : ""}.
+                Tell us about it below.
               </p>
             )}
           </div>

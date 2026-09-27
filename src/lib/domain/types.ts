@@ -33,10 +33,17 @@ export interface EnergyProfile {
   ev: boolean;
   /** Planning an EV (or another one): usage the bill doesn't show yet. */
   evPlanned: boolean;
-  /** Might add a battery later: solar needs headroom to charge it. */
-  batteryPlanned: boolean;
+  /** Wants a battery: solar gets headroom to charge it, and a battery option is suggested. */
+  wantsBattery: boolean;
   backup: boolean;
+  /** Only asked when the bill shows existing solar. */
+  existingSize?: ExistingSolarSize;
+  /** Only asked when the customer doesn't know their existing system's size. */
+  existingPlan?: ExistingSolarPlan;
 }
+
+export type ExistingSolarSize = "under-5" | "5-10" | "over-10" | "unsure";
+export type ExistingSolarPlan = "replace" | "expand";
 
 /** The usage and prices a system is sized and costed against, from the customer's bill. */
 export interface UsageBasis {
@@ -46,6 +53,8 @@ export interface UsageBasis {
   eveningShare: number;
   usageRate: number;
   feedInRate: number;
+  /** Set when the home already has solar and the customer is expanding it. */
+  existingSolar: { exportedDailyKwh: number } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,6 +67,8 @@ export interface SystemConfig {
   panelCount: number;
   batteryKwh: number; // 0 = no battery
   evCharger: boolean;
+  /** Adds to a system the home already has (panelCount is then the extra panels, often 0). */
+  existingSolar?: boolean;
 }
 
 export interface SystemEstimate {

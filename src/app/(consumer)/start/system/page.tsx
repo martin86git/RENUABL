@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Battery, Check, ChevronRight, Gauge, Gift, PlugZap, RotateCcw, Sun, X, type LucideIcon } from "lucide-react";
+import { ArrowRight, Battery, Check, ChevronRight, Gauge, Gift, Info, PlugZap, RotateCcw, Sun, X, type LucideIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -13,6 +13,7 @@ import { stepHref } from "@/components/consumer/steps";
 import { Segmented, Toggle } from "@/components/ui/controls";
 import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
 import { CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
+import { EXPAND_DISCLAIMER, solarSituation } from "@/lib/domain/existing-solar";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
 import { ASSUMPTIONS, TIER_LABELS, isSameConfig } from "@/lib/domain/recommendation";
 import type { SystemConfig, SystemTier } from "@/lib/domain/types";
@@ -89,6 +90,20 @@ function SystemScreen() {
   const adjusted = !isSameConfig(config, tier.config);
   const set = (patch: Partial<SystemConfig>) => update({ config: { ...config, ...patch } });
 
+  const existing = recommendation.usage.existingSolar;
+  const replacing = state.bill ? solarSituation(state.bill, profile) === "replace" : false;
+  const daily = recommendation.usage.dailyKwh;
+  const subtitle = existing
+    ? `Built around your existing solar: you buy about ${daily} kWh a day from the grid.`
+    : replacing
+      ? `A new system to replace your current one, sized to about ${daily} kWh a day (estimated from your bill).`
+      : `Sized to your bill: about ${state.bill?.dailyUsageKwh ?? daily} kWh a day${profile.evPlanned ? ", plus your future EV" : ""}.`;
+  const solarSubtitle = existing
+    ? config.panelCount > 0
+      ? `Your existing solar + ${outcome.solarKw} kW new panels`
+      : "Keeping your existing solar"
+    : `${outcome.solarKw} kW · Premium panels`;
+
   const estimate = (
     <Card className="p-5">
       <p className="text-[13px] text-muted">Estimated savings</p>
@@ -96,7 +111,11 @@ function SystemScreen() {
         {formatCurrency(outcome.annualSavings)}
         <span className="text-[14px] text-muted"> / year</span>
       </p>
-      <p className="text-[13px] text-muted">About {formatPercent(outcome.selfPoweredShare)} of your home powered by the sun.</p>
+      <p className="text-[13px] text-muted">
+        {existing
+          ? `Cuts about ${formatPercent(outcome.selfPoweredShare)} of the power you buy from the grid.`
+          : `About ${formatPercent(outcome.selfPoweredShare)} of your home powered by the sun.`}
+      </p>
       <div className="mt-3 divide-y divide-line border-t border-line">
         <StatRow label="Price after rebates" value={formatCurrency(price.total)} />
         <StatRow label="Pays for itself in" value={`~${outcome.paybackYears} years`} />
@@ -109,7 +128,7 @@ function SystemScreen() {
     <FlowStep
       width="regular"
       title="Your recommended system."
-      subtitle={`Sized to your bill: about ${state.bill?.dailyUsageKwh ?? recommendation.usage.dailyKwh} kWh a day${profile.evPlanned ? ", plus your future EV" : ""}.`}
+      subtitle={subtitle}
       aside={<div className="sticky top-6 space-y-4">{estimate}</div>}
       ask={
         <AskRenuabl
@@ -148,9 +167,16 @@ function SystemScreen() {
           </button>
         )}
 
+        {existing && (
+          <p className="flex gap-2.5 rounded-2xl bg-canvas px-4 py-3 text-[13px] leading-snug text-ink-2 ring-1 ring-line" role="note">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
+            {EXPAND_DISCLAIMER}
+          </p>
+        )}
+
         <Card className="overflow-hidden">
           <ul className="divide-y divide-line">
-            <Row icon={Sun} title="Solar System" subtitle={`${outcome.solarKw} kW · Premium panels`} onOpen={() => setOpen("solar")} />
+            <Row icon={Sun} title="Solar System" subtitle={solarSubtitle} onOpen={() => setOpen("solar")} />
             <Row
               icon={Battery}
               title="Battery Storage"
@@ -198,21 +224,42 @@ function SystemScreen() {
       </div>
 
       <PartSheet open={open === "solar"} onOpenChange={(o) => setOpen(o ? "solar" : null)} title="Solar System">
-        <p>
-          {outcome.solarKw} kW from {config.panelCount} premium panels, generating about{" "}
-          {outcome.annualGenerationKwh.toLocaleString("en-AU")} kWh a year.
-        </p>
-        <p>
-          That&apos;s sized to what your home uses: about {recommendation.usage.dailyKwh} kWh a day (
-          {recommendation.usage.annualKwh.toLocaleString("en-AU")} kWh a year) from your bill
-          {profile.evPlanned ? ", plus your future EV" : ""}.
-          {config.panelCount === ASSUMPTIONS.minPanels
-            ? ` That's covered by our smallest system (${ASSUMPTIONS.minSystemKw} kW), so you'll have a little spare to export.`
-            : config.batteryKwh > 0 || profile.batteryPlanned
-              ? ` It makes about ${Math.round((ASSUMPTIONS.batteryReadySolar - 1) * 100)}% more than that, so there's spare sunshine to charge ${config.batteryKwh > 0 ? "your" : "the"} battery${config.batteryKwh > 0 ? "" : " you're planning"}, even in winter.`
-              : " No bigger than you need."}
-        </p>
-        <p className="text-[13px] text-muted">Your roof and switchboard are confirmed on the 15-minute call.</p>
+        {existing ? (
+          <>
+            <p>
+              We keep your existing panels. Your bill shows they export about {existing.exportedDailyKwh} kWh a day, which is what charges
+              your battery.
+            </p>
+            <p>
+              {config.panelCount > 0
+                ? `That isn't quite enough to fill a ${config.batteryKwh} kWh battery on most days, so we add ${config.panelCount} panels (${outcome.solarKw} kW).`
+                : "That's enough to fill your battery on most days, so you don't need more panels."}
+            </p>
+            <p className="text-[13px] text-muted">{EXPAND_DISCLAIMER}</p>
+          </>
+        ) : (
+          <>
+            <p>
+              {outcome.solarKw} kW from {config.panelCount} premium panels, generating about{" "}
+              {outcome.annualGenerationKwh.toLocaleString("en-AU")} kWh a year.
+            </p>
+            <p>
+              That&apos;s sized to what your home uses: about {daily} kWh a day ({recommendation.usage.annualKwh.toLocaleString("en-AU")}{" "}
+              kWh a year) {replacing ? "estimated from your bill and what your current panels export" : "from your bill"}
+              {profile.evPlanned ? ", plus your future EV" : ""}.
+              {config.panelCount === ASSUMPTIONS.minPanels
+                ? ` That's covered by our smallest system (${ASSUMPTIONS.minSystemKw} kW), so you'll have a little spare to export.`
+                : config.batteryKwh > 0 || profile.wantsBattery
+                  ? ` It makes about ${Math.round((ASSUMPTIONS.batteryReadySolar - 1) * 100)}% more than that, so there's spare sunshine to charge a battery, even in winter.`
+                  : " No bigger than you need."}
+            </p>
+            <p className="text-[13px] text-muted">
+              {replacing
+                ? "Removing your current system, your roof and your switchboard are all confirmed on the 15-minute call."
+                : "Your roof and switchboard are confirmed on the 15-minute call."}
+            </p>
+          </>
+        )}
       </PartSheet>
 
       <PartSheet open={open === "battery"} onOpenChange={(o) => setOpen(o ? "battery" : null)} title="Battery Storage">
@@ -221,8 +268,8 @@ function SystemScreen() {
         </p>
         {config.batteryKwh > 0 ? (
           <p>
-            Your bill shows you use about {Math.round(recommendation.usage.dailyKwh * recommendation.usage.eveningShare * 10) / 10} kWh a
-            day after the sun goes down, so we&apos;ve sized a {config.batteryKwh} kWh battery for your home.
+            Your bill shows you {existing ? "buy" : "use"} about {Math.round(daily * recommendation.usage.eveningShare * 10) / 10} kWh a day
+            after the sun goes down, so we&apos;ve sized a {config.batteryKwh} kWh battery for your home.
           </p>
         ) : (
           <p>

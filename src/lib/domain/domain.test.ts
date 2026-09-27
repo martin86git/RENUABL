@@ -10,6 +10,7 @@ import {
   describeSystem,
   batteryNeeded,
   panelsToKw,
+  topUpPanels,
   estimateOutcome,
   priceSystem,
   recommendSystem,
@@ -18,13 +19,14 @@ import {
   usageBasis,
 } from "./recommendation";
 import { summariseBill, type BillSummary } from "./bill";
+import { existingSolarQuestions, isAboutComplete, realAnnualUse, solarSituation } from "./existing-solar";
 import { INSTALL_ARRIVAL, buildAvailability, fromISODate } from "./scheduling";
 import { SERVICE_WINDOWS, buildServiceAvailability, mayBeWarranty } from "./service";
 import type { EnergyProfile, HomeAnalysis } from "./types";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
 import { INSTALLERS } from "@/lib/mock/installers";
 
-const base: EnergyProfile = { ev: false, evPlanned: false, batteryPlanned: false, backup: false };
+const base: EnergyProfile = { ev: false, evPlanned: false, wantsBattery: false, backup: false };
 const analysis: HomeAnalysis = { storeys: "single", roof: "Colorbond", orientation: "North", maxPanels: 36 };
 const bill = summariseBill({ isElectricityBill: true, periodDays: 91, usageKwh: 1547, eveningShare: 0.58, usageRate: 0.31 }) as BillSummary;
 
@@ -80,7 +82,7 @@ describe("recommendSystem", () => {
     expect(tiers.independence.config.panelCount).toBe(tiers.recommended.config.panelCount);
 
     // Planning a battery later: Essential gets the same battery-ready solar, without the battery.
-    const planned = recommendSystem({ ...base, batteryPlanned: true }, analysis, bill).tiers.essential.config;
+    const planned = recommendSystem({ ...base, wantsBattery: true }, analysis, bill).tiers.essential.config;
     expect(planned.panelCount).toBe(tiers.recommended.config.panelCount);
     expect(planned.batteryKwh).toBe(0);
   });
@@ -326,5 +328,81 @@ describe("confirmation call booking", () => {
     expect(formatCallTime("09:00")).toBe("9am");
     expect(formatCallTime("13:30")).toBe("1:30pm");
     expect(formatCallTime("12:00")).toBe("12pm");
+  });
+});
+
+describe("existing solar", () => {
+  // A home with solar: buys ~12 kWh a day from the grid, exports ~6 kWh a day.
+  const solarBill = summariseBill({
+    isElectricityBill: true,
+    periodDays: 90,
+    usageKwh: 1080,
+    exportedKwh: 540,
+    usageRate: 0.3,
+    feedInRate: 0.04,
+  }) as BillSummary;
+
+  it("reads daily exports from the bill", () => {
+    expect(solarBill.hasSolar).toBe(true);
+    expect(solarBill.exportedDailyKwh).toBe(6);
+  });
+
+  it("asks the size, and replace-or-expand only when unsure", () => {
+    expect(existingSolarQuestions(bill, {})).toEqual({ size: false, plan: false });
+    expect(existingSolarQuestions(solarBill, {})).toEqual({ size: true, plan: false });
+    expect(existingSolarQuestions(solarBill, { existingSize: "unsure" })).toEqual({ size: true, plan: true });
+    expect(solarSituation(solarBill, { existingSize: "5-10" })).toBe("expand");
+    expect(solarSituation(solarBill, { existingSize: "unsure", existingPlan: "replace" })).toBe("replace");
+    expect(solarSituation(bill, {})).toBe("new");
+  });
+
+  it("is only complete once the solar questions are answered", () => {
+    const answers = { ev: false, evPlanned: false, backup: false };
+    expect(isAboutComplete(solarBill, answers)).toBe(false);
+    expect(isAboutComplete(solarBill, { ...answers, existingSize: "unsure" })).toBe(false);
+    // Expanding: every option has a battery, so the battery question isn't asked.
+    expect(isAboutComplete(solarBill, { ...answers, existingSize: "unsure", existingPlan: "expand" })).toBe(true);
+    expect(isAboutComplete(solarBill, { ...answers, existingSize: "unsure", existingPlan: "replace" })).toBe(false);
+    expect(isAboutComplete(solarBill, { ...answers, existingSize: "unsure", existingPlan: "replace", wantsBattery: true })).toBe(true);
+    expect(isAboutComplete(bill, { ...answers, wantsBattery: false })).toBe(true);
+  });
+
+  it("expanding keeps the existing panels and sells a battery in every option", () => {
+    const { tiers, usage } = recommendSystem({ ...base, existingSize: "5-10" }, analysis, solarBill);
+    expect(usage.existingSolar).toEqual({ exportedDailyKwh: 6 });
+    for (const t of Object.values(tiers)) {
+      expect(t.config.existingSolar).toBe(true);
+      expect(t.config.batteryKwh).toBeGreaterThan(0);
+      expect(t.config.panelCount).toBeLessThan(ASSUMPTIONS.minPanels);
+    }
+    expect(tiers.essential.config.panelCount).toBe(0);
+    expect(tiers.essential.config.batteryKwh).toBeLessThanOrEqual(tiers.recommended.config.batteryKwh);
+    expect(tiers.independence.config.batteryKwh).toBeGreaterThan(tiers.recommended.config.batteryKwh);
+  });
+
+  it("adds panels only when exports can't fill the battery", () => {
+    const usage = usageBasis(solarBill, { ...base, existingSize: "5-10" });
+    const plenty = { ...usage, existingSolar: { exportedDailyKwh: 30 } };
+    expect(topUpPanels(plenty, 13.5, analysis)).toBe(0);
+    const little = { ...usage, existingSolar: { exportedDailyKwh: 1 } };
+    expect(topUpPanels(little, 13.5, analysis)).toBeGreaterThan(0);
+  });
+
+  it("prices an expansion without a solar line when no panels are added, and saves money", () => {
+    const { tiers, usage } = recommendSystem({ ...base, existingSize: "5-10" }, analysis, solarBill);
+    const price = priceSystem(tiers.essential.config, analysis);
+    expect(price.lines.some((l) => l.id === "solar")).toBe(false);
+    expect(describeSystem(tiers.essential.config)).toMatch(/^Your existing solar \+ \d+(\.\d)? kWh battery/);
+    expect(estimateOutcome(tiers.essential.config, usage, price).annualSavings).toBeGreaterThan(0);
+  });
+
+  it("replacing sizes to estimated real use: grid purchases plus solar used at home", () => {
+    const replace = { ...base, existingSize: "unsure" as const, existingPlan: "replace" as const };
+    const { usage, tiers } = recommendSystem(replace, analysis, solarBill);
+    expect(usage.existingSolar).toBeNull();
+    expect(usage.annualKwh).toBe(realAnnualUse(solarBill));
+    expect(usage.annualKwh).toBeGreaterThan(solarBill.annualUsageKwh);
+    expect(tiers.essential.config.existingSolar).toBeUndefined();
+    expect(tiers.essential.why[0]).toBe("Replaces your current solar system");
   });
 });

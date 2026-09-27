@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BillSummary } from "@/lib/domain/bill";
+import { isAboutComplete as aboutComplete } from "@/lib/domain/existing-solar";
 import { estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
 import type { CareBilling } from "@/lib/domain/care";
 import type { Address, AddOnId, EnergyProfile, SystemConfig, SystemTier } from "@/lib/domain/types";
@@ -56,7 +57,7 @@ const EMPTY: FlowState = {
   attribution: null,
 };
 
-const DEFAULT_PROFILE: EnergyProfile = { ev: false, evPlanned: false, batteryPlanned: false, backup: false };
+const DEFAULT_PROFILE: EnergyProfile = { ev: false, evPlanned: false, wantsBattery: false, backup: false };
 
 /** Never shown: FlowGuard keeps customers on the bill step until a bill has been read. */
 const NO_BILL: BillSummary = {
@@ -69,9 +70,10 @@ const NO_BILL: BillSummary = {
   usageRate: null,
   feedInRate: null,
   hasSolar: false,
+  exportedDailyKwh: null,
 };
 
-const STORAGE_KEY = "renuabl.flow.v4";
+const STORAGE_KEY = "renuabl.flow.v5";
 
 function load(): FlowState {
   try {
@@ -148,11 +150,7 @@ export function useSystem() {
   }, [state.profile, state.address, state.bill, state.tier, state.config, state.addOns]);
 }
 
-export function isProfileComplete(p: Partial<EnergyProfile>): p is EnergyProfile {
-  return p.ev !== undefined && p.evPlanned !== undefined && p.batteryPlanned !== undefined && p.backup !== undefined;
-}
-
-/** The "About your home" step is done once the bill is read and the questions answered. */
+/** The "About your home" step is done once the bill is read and every question shown is answered. */
 export function isAboutComplete(s: Pick<FlowState, "bill" | "profile">) {
-  return Boolean(s.bill) && isProfileComplete(s.profile);
+  return aboutComplete(s.bill, s.profile);
 }
