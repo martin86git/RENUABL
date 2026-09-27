@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { PreviewBanner } from "@/components/ui/preview-banner";
+import { PREVIEW_MODE } from "@/lib/config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,6 +17,8 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: { default: "RENUABL — Clean energy for your home", template: "%s · RENUABL" },
   description: "Tell us your address. We'll recommend the right system, match a trusted installer and you choose the day.",
+  // Keep preview deployments out of search results.
+  robots: PREVIEW_MODE ? { index: false, follow: false } : undefined,
 };
 
 export const viewport: Viewport = {
@@ -26,7 +30,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en-AU" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <PreviewBanner />
+        {children}
+      </body>
     </html>
   );
 }
