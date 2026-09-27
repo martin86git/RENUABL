@@ -53,7 +53,10 @@ function ReserveScreen() {
       {price.lines.map((l) => (
         <StatRow key={l.label} label={l.label} value={formatCurrency(l.amount)} />
       ))}
-      <StatRow label="Rebates we claim for you" value={`−${formatCurrency(price.rebates)}`} />
+      <StatRow
+        label={<span className="font-medium text-positive">Rebates we claim for you</span>}
+        value={<span className="font-semibold text-positive">−{formatCurrency(price.rebates)}</span>}
+      />
       <StatRow label={<span className="text-ink">Total after rebates</span>} value={formatCurrency(price.total)} />
     </div>
   );
