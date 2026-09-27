@@ -32,7 +32,10 @@ export async function POST(request: Request) {
     if (!isBillSummary(summary)) return fail(BILL_PROBLEM_MESSAGES[summary], 422);
     return Response.json({ ok: true, bill: summary });
   } catch (e) {
-    console.error("bill read failed", e instanceof BillReaderError ? e.message : e);
-    return fail("We couldn't read that bill just now. Please try again.", 502);
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error("bill read failed", e instanceof BillReaderError ? detail : e);
+    // While in preview, show the reason on screen so it can be fixed without digging through logs.
+    const message = "We couldn't read that bill just now. Please try again.";
+    return fail(PREVIEW_MODE ? `${message} (Preview detail: ${detail.slice(0, 300)})` : message, 502);
   }
 }

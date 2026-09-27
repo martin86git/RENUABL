@@ -54,24 +54,30 @@ Do not include names, addresses, account numbers or NMIs.`;
 export class BillReaderError extends Error {}
 
 export async function readBillWithClaude(data: ArrayBuffer, mediaType: BillMediaType, apiKey: string): Promise<Partial<BillReading>> {
-  const client = new Anthropic({ apiKey, timeout: 50_000, maxRetries: 1 });
+  const client = new Anthropic({ apiKey, timeout: 45_000, maxRetries: 0 });
   const b64 = Buffer.from(data).toString("base64");
   const file: Anthropic.Beta.BetaContentBlockParam =
     mediaType === "application/pdf"
       ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } }
       : { type: "image", source: { type: "base64", media_type: mediaType, data: b64 } };
 
+  const request = {
+    model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
+    max_tokens: 4096,
+    output_config: { format: betaJSONSchemaOutputFormat(BILL_SCHEMA) },
+    messages: [{ role: "user" as const, content: [file, { type: "text" as const, text: PROMPT }] }],
+  };
+
   let response;
   try {
-    response = await client.beta.messages.parse({
-      model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
-      max_tokens: 4096,
+    try {
       // If the model declines, the API retries on Anthropic's recommended fallback model.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { format: betaJSONSchemaOutputFormat(BILL_SCHEMA) },
-      messages: [{ role: "user", content: [file, { type: "text", text: PROMPT }] }],
-    });
+      response = await client.beta.messages.parse({ ...request, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" });
+    } catch (e) {
+      // Accounts or models without server-side fallbacks: ask again without them.
+      if (!(e instanceof Anthropic.BadRequestError && /fallback/i.test(e.message))) throw e;
+      response = await client.beta.messages.parse(request);
+    }
   } catch (e) {
     if (e instanceof Anthropic.APIError) throw new BillReaderError(`Claude API ${e.status}: ${e.message}`);
     // parse() throws when the reply isn't schema JSON (e.g. a refusal or a cut-off reply).

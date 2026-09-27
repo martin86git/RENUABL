@@ -28,6 +28,18 @@ function sent(fetchMock: ReturnType<typeof stub>) {
 }
 
 describe("readBillWithClaude", () => {
+  it("asks again without fallbacks when the account doesn't support them", async () => {
+    let calls = 0;
+    const fetchMock = stub(() =>
+      ++calls === 1
+        ? Response.json({ type: "error", error: { type: "invalid_request_error", message: "fallbacks: not enabled" } }, { status: 400 })
+        : message(JSON.stringify({ isElectricityBill: true, usageKwh: 900 })),
+    );
+    expect(await readBillWithClaude(new ArrayBuffer(4), "image/png", "key")).toMatchObject({ usageKwh: 900 });
+    const second = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
+    expect(second.fallbacks).toBeUndefined();
+  });
+
   it("sends a PDF as a document with structured output and fallbacks, and returns the parsed figures", async () => {
     const fetchMock = stub(() => message(JSON.stringify({ isElectricityBill: true, usageKwh: 1200 })));
 
