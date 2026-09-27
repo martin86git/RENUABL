@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { BillSummary } from "@/lib/domain/bill";
 import { estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
 import type { CareBilling } from "@/lib/domain/care";
 import type { Address, AddOnId, EnergyProfile, SystemConfig, SystemTier } from "@/lib/domain/types";
@@ -19,6 +20,8 @@ export interface Attribution {
 
 export interface FlowState {
   address: Address | null;
+  /** Usage read from the customer's electricity bill; the system is sized from it. */
+  bill: BillSummary | null;
   profile: Partial<EnergyProfile>;
   tier: SystemTier;
   config: SystemConfig | null; // null = use the tier's recommendation as-is
@@ -36,6 +39,7 @@ export interface FlowState {
 
 const EMPTY: FlowState = {
   address: null,
+  bill: null,
   profile: {},
   tier: "recommended",
   config: null,
@@ -49,9 +53,22 @@ const EMPTY: FlowState = {
   attribution: null,
 };
 
-const DEFAULT_PROFILE: EnergyProfile = { ev: false, pool: false, electricHeating: false, backup: false };
+const DEFAULT_PROFILE: EnergyProfile = { ev: false, evPlanned: false, backup: false };
 
-const STORAGE_KEY = "renuabl.flow.v2";
+/** Never shown: FlowGuard keeps customers on the bill step until a bill has been read. */
+const NO_BILL: BillSummary = {
+  retailer: null,
+  periodDays: 365,
+  dailyUsageKwh: 15,
+  annualUsageKwh: 5475,
+  annualSource: "period",
+  eveningShare: null,
+  usageRate: null,
+  feedInRate: null,
+  hasSolar: false,
+};
+
+const STORAGE_KEY = "renuabl.flow.v3";
 
 function load(): FlowState {
   try {
@@ -119,15 +136,20 @@ export function useSystem() {
   return useMemo(() => {
     const profile: EnergyProfile = { ...DEFAULT_PROFILE, ...state.profile };
     const analysis = analyseHome(state.address);
-    const recommendation = recommendSystem(profile, analysis);
+    const recommendation = recommendSystem(profile, analysis, state.bill ?? NO_BILL);
     const tier = recommendation.tiers[state.tier];
     const config = state.config ?? tier.config;
     const price = priceSystem(config, analysis, state.addOns);
-    const outcome = estimateOutcome(config, profile, price);
+    const outcome = estimateOutcome(config, recommendation.usage, price);
     return { profile, analysis, recommendation, tier, config, price, outcome };
-  }, [state.profile, state.address, state.tier, state.config, state.addOns]);
+  }, [state.profile, state.address, state.bill, state.tier, state.config, state.addOns]);
 }
 
 export function isProfileComplete(p: Partial<EnergyProfile>): p is EnergyProfile {
-  return p.ev !== undefined && p.pool !== undefined && p.electricHeating !== undefined && p.backup !== undefined;
+  return p.ev !== undefined && p.evPlanned !== undefined && p.backup !== undefined;
+}
+
+/** The "About your home" step is done once the bill is read and the questions answered. */
+export function isAboutComplete(s: Pick<FlowState, "bill" | "profile">) {
+  return Boolean(s.bill) && isProfileComplete(s.profile);
 }

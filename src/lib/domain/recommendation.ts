@@ -1,3 +1,4 @@
+import type { BillSummary } from "./bill";
 import type {
   LineItemId,
   AddOn,
@@ -9,25 +10,27 @@ import type {
   SystemConfig,
   SystemEstimate,
   SystemTier,
+  UsageBasis,
 } from "./types";
 
 /**
- * Assumptions used by the first-pass sizing and pricing model.
+ * Assumptions used by the first-pass sizing and pricing model. Usage and
+ * prices come from the customer's bill; these fill the gaps.
  * PLACEHOLDERS: validate every figure with installer partners before launch.
  */
 export const ASSUMPTIONS = {
   panelWatts: 440,
-  minPanels: 12,
+  minPanels: 6, // smallest practical install; confirm with installers
   maxPanels: 36,
   tariffPerKwh: 0.3,
   feedInPerKwh: 0.04,
   dailyYieldKwhPerKw: 3.8, // Melbourne average
-  baseAnnualKwh: 5200,
-  poolAnnualKwh: 2200,
-  electricHeatingAnnualKwh: 2600,
+  /** Used when the bill doesn't split usage by time of day. */
+  eveningShare: 0.6,
   evAnnualKwh: 2500,
   baseSelfConsumption: 0.4,
-  batterySizes: [10, 13.5, 20] as const,
+  batterySizes: [10, 13.5, 20, 27] as const, // 27 = two 13.5 kWh units
+  batteryUsableShare: 0.9,
   prices: {
     solarPerKw: 1050,
     batteryPerKwh: 850,
@@ -57,14 +60,16 @@ export const TIER_LABELS: Record<SystemTier, string> = {
   independence: "Maximum",
 };
 
-export function estimateAnnualUsage(profile: EnergyProfile): number {
-  const a = ASSUMPTIONS;
-  return (
-    a.baseAnnualKwh +
-    (profile.pool ? a.poolAnnualKwh : 0) +
-    (profile.electricHeating ? a.electricHeatingAnnualKwh : 0) +
-    (profile.ev ? a.evAnnualKwh : 0)
-  );
+/** What the home actually uses (from the bill), plus a planned EV the bill can't show yet. */
+export function usageBasis(bill: BillSummary, profile: EnergyProfile): UsageBasis {
+  const annualKwh = bill.annualUsageKwh + (profile.evPlanned ? ASSUMPTIONS.evAnnualKwh : 0);
+  return {
+    annualKwh,
+    dailyKwh: Math.round((annualKwh / 365) * 10) / 10,
+    eveningShare: bill.eveningShare ?? ASSUMPTIONS.eveningShare,
+    usageRate: bill.usageRate ?? ASSUMPTIONS.tariffPerKwh,
+    feedInRate: bill.feedInRate ?? ASSUMPTIONS.feedInPerKwh,
+  };
 }
 
 export function panelsToKw(panelCount: number): number {
@@ -75,52 +80,66 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
-function panelsFor(usageKwh: number, coverage: number, analysis: HomeAnalysis) {
-  const kw = (usageKwh * coverage) / (ASSUMPTIONS.dailyYieldKwhPerKw * 365);
+/** Panels to cover a year's use, within the roof's limit. Every option gets the same panels. */
+export function panelsNeeded(annualKwh: number, analysis: Pick<HomeAnalysis, "maxPanels">) {
+  const kw = annualKwh / (ASSUMPTIONS.dailyYieldKwhPerKw * 365);
   return clamp(Math.ceil((kw * 1000) / ASSUMPTIONS.panelWatts), ASSUMPTIONS.minPanels, Math.min(ASSUMPTIONS.maxPanels, analysis.maxPanels));
 }
 
-/** Three coherent options; "recommended" is the default the customer sees first. */
-export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis): Recommendation {
-  const usage = estimateAnnualUsage(profile);
-  const heavyEvening = profile.ev || profile.pool || profile.electricHeating;
+/** Smallest standard battery that covers a typical evening and night; one size up for backup. */
+export function batteryNeeded(usage: UsageBasis, backup: boolean): number {
+  const sizes = ASSUMPTIONS.batterySizes;
+  const overnight = usage.dailyKwh * usage.eveningShare;
+  let i = sizes.findIndex((s) => s * ASSUMPTIONS.batteryUsableShare >= overnight);
+  if (i === -1) i = sizes.length - 1;
+  if (backup) i = Math.min(i + 1, sizes.length - 1);
+  return sizes[i];
+}
+
+function nextBatterySize(kwh: number) {
+  return ASSUMPTIONS.batterySizes.find((s) => s > kwh) ?? kwh;
+}
+
+const kwh = (n: number) => n.toLocaleString("en-AU", { maximumFractionDigits: 1 });
+
+/**
+ * Three options sized from the customer's bill. Solar is the same in each
+ * (what the home needs); the options differ only in battery. The customer
+ * doesn't pick panel counts or battery sizes.
+ */
+export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, bill: BillSummary): Recommendation {
+  const usage = usageBasis(bill, profile);
+  const panelCount = panelsNeeded(usage.annualKwh, analysis);
+  const battery = batteryNeeded(usage, profile.backup);
+  const bigBattery = nextBatterySize(battery);
+  const evCharger = profile.ev || profile.evPlanned;
+  const sizedTo = `Solar sized to your ${kwh(usage.dailyKwh)} kWh a day${profile.evPlanned ? ", including your future EV" : ""}`;
+  const covers = (b: number) =>
+    `A ${kwh(b)} kWh battery covers ${b * ASSUMPTIONS.batteryUsableShare >= usage.dailyKwh * usage.eveningShare ? "your" : "most of your"} evening use`;
 
   return {
-    estimatedAnnualUsageKwh: usage,
+    usage,
     tiers: {
+      essential: {
+        tier: "essential",
+        config: { panelCount, batteryKwh: 0, evCharger: false },
+        why: [sizedTo, "Lowest upfront cost", "Add a battery any time"],
+      },
       recommended: {
         tier: "recommended",
-        config: {
-          panelCount: panelsFor(usage, 1.1, analysis),
-          batteryKwh: profile.backup || heavyEvening ? 13.5 : 10,
-          evCharger: profile.ev,
-        },
-        why: ["Matches your energy usage", "Maximises your savings", "Prepares you for the future"],
+        config: { panelCount, batteryKwh: battery, evCharger },
+        why: [sizedTo, covers(battery), profile.backup ? "Keeps essentials on during outages" : "Maximises your savings"],
       },
       independence: {
         tier: "independence",
-        config: {
-          panelCount: panelsFor(usage, 1.4, analysis),
-          batteryKwh: 20,
-          evCharger: profile.ev,
-        },
-        why: ["Runs your home on your own power most of the year", "Longest backup during outages", "Ready for more electric appliances"],
-      },
-      essential: {
-        tier: "essential",
-        config: {
-          panelCount: panelsFor(usage, 0.8, analysis),
-          batteryKwh: 0,
-          evCharger: false,
-        },
-        why: ["Lowest upfront cost", "Cuts daytime power bills", "Add a battery or charger any time"],
+        config: { panelCount, batteryKwh: bigBattery, evCharger },
+        why: [sizedTo, covers(bigBattery), "Longest backup during outages"],
       },
     },
   };
 }
 
-export function estimateOutcome(config: SystemConfig, profile: EnergyProfile, price: PriceBreakdown): SystemEstimate {
-  const usage = estimateAnnualUsage(profile);
+export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: PriceBreakdown): SystemEstimate {
   const solarKw = panelsToKw(config.panelCount);
   const generation = Math.round(solarKw * ASSUMPTIONS.dailyYieldKwhPerKw * 365);
 
@@ -129,16 +148,16 @@ export function estimateOutcome(config: SystemConfig, profile: EnergyProfile, pr
   if (config.evCharger) selfUse += 0.05;
   selfUse = Math.min(0.9, selfUse);
 
-  const consumedFromSolar = Math.min(usage, generation * selfUse);
+  const consumedFromSolar = Math.min(usage.annualKwh, generation * selfUse);
   const exported = Math.max(0, generation - consumedFromSolar);
-  const annualSavings = Math.round(consumedFromSolar * ASSUMPTIONS.tariffPerKwh + exported * ASSUMPTIONS.feedInPerKwh);
+  const annualSavings = Math.round(consumedFromSolar * usage.usageRate + exported * usage.feedInRate);
 
   return {
     solarKw,
     annualGenerationKwh: generation,
     annualSavings,
     paybackYears: annualSavings > 0 ? Math.round((price.total / annualSavings) * 10) / 10 : 0,
-    selfPoweredShare: usage > 0 ? Math.min(1, consumedFromSolar / usage) : 0,
+    selfPoweredShare: usage.annualKwh > 0 ? Math.min(1, consumedFromSolar / usage.annualKwh) : 0,
   };
 }
 
@@ -220,7 +239,7 @@ export interface SuggestedAddition {
 export function suggestedAdditions(config: SystemConfig, recommended: SystemConfig, addOns: AddOnId[]): SuggestedAddition[] {
   const out: SuggestedAddition[] = [];
   if (config.batteryKwh === 0) {
-    const size = recommended.batteryKwh || 10;
+    const size = recommended.batteryKwh || ASSUMPTIONS.batterySizes[0];
     out.push({
       id: "battery",
       label: `${size} kWh battery`,

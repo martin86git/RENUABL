@@ -10,11 +10,11 @@ import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
-import { Segmented, Stepper, Toggle } from "@/components/ui/controls";
+import { Segmented, Toggle } from "@/components/ui/controls";
 import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
 import { CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
-import { ASSUMPTIONS, TIER_LABELS, isSameConfig, panelsToKw } from "@/lib/domain/recommendation";
+import { TIER_LABELS, isSameConfig } from "@/lib/domain/recommendation";
 import type { SystemConfig, SystemTier } from "@/lib/domain/types";
 
 type Part = "solar" | "battery" | "ev" | "monitoring";
@@ -84,7 +84,7 @@ function PartSheet({
 function SystemScreen() {
   const router = useRouter();
   const { state, update } = useFlow();
-  const { recommendation, tier, config, price, outcome } = useSystem();
+  const { recommendation, profile, tier, config, price, outcome } = useSystem();
   const [open, setOpen] = useState<Part | null>(null);
   const adjusted = !isSameConfig(config, tier.config);
   const set = (patch: Partial<SystemConfig>) => update({ config: { ...config, ...patch } });
@@ -109,7 +109,7 @@ function SystemScreen() {
     <FlowStep
       width="regular"
       title="Your recommended system."
-      subtitle="A tailored system for your home and lifestyle."
+      subtitle={`Sized to your bill: about ${state.bill?.dailyUsageKwh ?? recommendation.usage.dailyKwh} kWh a day${profile.evPlanned ? ", plus your future EV" : ""}.`}
       aside={<div className="sticky top-6 space-y-4">{estimate}</div>}
       ask={
         <AskRenuabl
@@ -200,52 +200,29 @@ function SystemScreen() {
       <PartSheet open={open === "solar"} onOpenChange={(o) => setOpen(o ? "solar" : null)} title="Solar System">
         <p>
           {outcome.solarKw} kW from {config.panelCount} premium panels, generating about{" "}
-          {outcome.annualGenerationKwh.toLocaleString("en-AU")} kWh a year. Your home uses around{" "}
-          {recommendation.estimatedAnnualUsageKwh.toLocaleString("en-AU")} kWh.
+          {outcome.annualGenerationKwh.toLocaleString("en-AU")} kWh a year.
         </p>
-        <div className="flex items-center justify-between rounded-2xl bg-surface p-4">
-          <span>Panels</span>
-          <Stepper
-            label="panels"
-            value={config.panelCount}
-            min={ASSUMPTIONS.minPanels}
-            max={ASSUMPTIONS.maxPanels}
-            onChange={(panelCount) => set({ panelCount })}
-          />
-        </div>
-        <p className="text-[13px] text-muted">Each panel adds {panelsToKw(1)} kW. Your roof is confirmed on the 15-minute call.</p>
+        <p>
+          That&apos;s sized to what your home uses: about {recommendation.usage.dailyKwh} kWh a day (
+          {recommendation.usage.annualKwh.toLocaleString("en-AU")} kWh a year) from your bill
+          {profile.evPlanned ? ", plus your future EV" : ""}. No bigger than you need.
+        </p>
+        <p className="text-[13px] text-muted">Your roof and switchboard are confirmed on the 15-minute call.</p>
       </PartSheet>
 
       <PartSheet open={open === "battery"} onOpenChange={(o) => setOpen(o ? "battery" : null)} title="Battery Storage">
         <p>
           A battery stores the sunshine you don&apos;t use during the day, so your home can run on it in the evening and during outages.
         </p>
-        <div className="flex items-center justify-between rounded-2xl bg-surface p-4">
-          <span>Include a battery</span>
-          <Toggle
-            label="Include battery"
-            checked={config.batteryKwh > 0}
-            onChange={(on) => set({ batteryKwh: on ? tier.config.batteryKwh || 10 : 0 })}
-          />
-        </div>
-        {config.batteryKwh > 0 && (
-          <div className="flex gap-2" role="radiogroup" aria-label="Battery size">
-            {ASSUMPTIONS.batterySizes.map((s) => (
-              <button
-                key={s}
-                type="button"
-                role="radio"
-                aria-checked={config.batteryKwh === s}
-                onClick={() => set({ batteryKwh: s })}
-                className={cn(
-                  "h-11 flex-1 rounded-full text-[14px]",
-                  config.batteryKwh === s ? "bg-primary text-primary-ink" : "bg-surface text-ink-2 shadow-[0_0_0_1px_var(--line)]",
-                )}
-              >
-                {s} kWh
-              </button>
-            ))}
-          </div>
+        {config.batteryKwh > 0 ? (
+          <p>
+            Your bill shows you use about {Math.round(recommendation.usage.dailyKwh * recommendation.usage.eveningShare * 10) / 10} kWh a
+            day after the sun goes down, so we&apos;ve sized a {config.batteryKwh} kWh battery for your home.
+          </p>
+        ) : (
+          <p>
+            {TIER_LABELS.essential} doesn&apos;t include a battery. Choose {TIER_LABELS.recommended} for one sized to your evening use.
+          </p>
         )}
       </PartSheet>
 

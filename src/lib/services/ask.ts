@@ -22,9 +22,9 @@ const INTENTS: { match: RegExp; answer: string }[] = [
       "Upgrades are worth it when they move energy use into the daytime, when your solar is free. A heat pump hot water system is usually the biggest win. You can add any of them now or later from My RENUABL.",
   },
   {
-    match: /pool|spa|heating|cooling/i,
+    match: /bill|upload|usage|pool|spa|heating|cooling/i,
     answer:
-      "Pools, spas and electric heating use a lot of power, so they change how much solar and battery your home needs. We use your answers to size the system correctly.",
+      "Your bill shows how much power your home really uses, and when. We size your solar to cover that and your battery to cover your evenings, nothing bigger than you need. We only read the usage and prices; your bill isn't stored.",
   },
   {
     match: /cost|price|expensive|afford|finance|pay/i,
@@ -54,18 +54,18 @@ const INTENTS: { match: RegExp; answer: string }[] = [
   {
     match: /roof|shade|tile|panel|space/i,
     answer:
-      "We size your system from satellite imagery of your roof and check it on the confirmation call. If something needs adjusting, we'll update your recommendation before anything is final.",
+      "We size your system from your bill, so it matches what your home uses, and check your roof from satellite imagery and on the confirmation call. If something needs adjusting, we'll update your recommendation before anything is final.",
   },
   {
     match: /sav(e|ing)|bill|money|payback/i,
     answer:
-      "Savings come from using your own solar instead of buying power, plus a small credit for what you export. Your estimate is based on your roof, local weather and the answers you gave us.",
+      "Savings come from using your own solar instead of buying power, plus a small credit for what you export. Your estimate uses the usage and prices on your bill, your roof and local weather.",
   },
 ];
 
 export const SUGGESTED_QUESTIONS: Record<AskContext, string[]> = {
   home: ["How does RENUABL work?", "What will it cost?", "How long does install take?"],
-  profile: ["Why do you ask about my pool?", "What if I'm not sure?", "Do I need a battery?"],
+  profile: ["Why do you need my bill?", "Which bill should I upload?", "Do I need a battery?"],
   recommendation: ["Do I need a battery?", "How are savings calculated?", "What if my roof is shaded?"],
   extras: ["Which upgrades are right for me?", "Is a heat pump worth it?", "Can I add these later?"],
   installer: ["How do you choose installers?", "Can I pick someone else?"],

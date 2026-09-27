@@ -8,47 +8,97 @@ import {
   ADD_ONS,
   ASSUMPTIONS,
   describeSystem,
-  estimateAnnualUsage,
+  batteryNeeded,
   estimateOutcome,
   priceSystem,
   recommendSystem,
   suggestedAdditions,
   TIER_LABELS,
+  usageBasis,
 } from "./recommendation";
+import { summariseBill, type BillSummary } from "./bill";
 import { buildAvailability, fromISODate } from "./scheduling";
 import { SERVICE_WINDOWS, buildServiceAvailability, mayBeWarranty } from "./service";
 import type { EnergyProfile, HomeAnalysis } from "./types";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
 import { INSTALLERS } from "@/lib/mock/installers";
 
-const base: EnergyProfile = { ev: false, pool: false, electricHeating: false, backup: false };
+const base: EnergyProfile = { ev: false, evPlanned: false, backup: false };
 const analysis: HomeAnalysis = { storeys: "single", roof: "Colorbond", orientation: "North", maxPanels: 36 };
+const bill = summariseBill({ isElectricityBill: true, periodDays: 91, usageKwh: 1547, eveningShare: 0.58, usageRate: 0.31 }) as BillSummary;
+
+describe("summariseBill", () => {
+  it("scales a billing period to a year and converts cents to dollars", () => {
+    const b = summariseBill({ isElectricityBill: true, periodDays: 90, usageKwh: 1350, usageRate: 32, feedInRate: 3.3 }) as BillSummary;
+    expect(b.dailyUsageKwh).toBe(15);
+    expect(b.annualUsageKwh).toBe(5475);
+    expect(b.annualSource).toBe("period");
+    expect(b.usageRate).toBeCloseTo(0.32);
+    expect(b.feedInRate).toBeCloseTo(0.033);
+  });
+
+  it("prefers the bill's own 12-month history", () => {
+    const b = summariseBill({ isElectricityBill: true, periodDays: 90, usageKwh: 2000, annualUsageKwh: 6200 }) as BillSummary;
+    expect(b.annualUsageKwh).toBe(6200);
+    expect(b.annualSource).toBe("history");
+  });
+
+  it("rejects non-electricity bills and missing usage", () => {
+    expect(summariseBill({ isElectricityBill: false })).toBe("not-a-bill");
+    expect(summariseBill({ isElectricityBill: true, periodDays: 90, usageKwh: null })).toBe("unreadable");
+    expect(summariseBill({ isElectricityBill: true, periodDays: 90, usageKwh: -5 })).toBe("unreadable");
+  });
+
+  it("flags existing solar", () => {
+    expect((summariseBill({ isElectricityBill: true, annualUsageKwh: 5000, exportedKwh: 300 }) as BillSummary).hasSolar).toBe(true);
+  });
+});
 
 describe("recommendSystem", () => {
-  it("offers three tiers ordered by size", () => {
-    const { tiers } = recommendSystem({ ...base, pool: true }, analysis);
-    expect(tiers.essential.config.panelCount).toBeLessThan(tiers.recommended.config.panelCount);
-    expect(tiers.recommended.config.panelCount).toBeLessThanOrEqual(tiers.independence.config.panelCount);
+  it("sizes solar to the bill and gives every option the same panels", () => {
+    const { tiers, usage } = recommendSystem(base, analysis, bill);
+    expect(usage.annualKwh).toBe(bill.annualUsageKwh);
+    const panels = tiers.recommended.config.panelCount;
+    expect(tiers.essential.config.panelCount).toBe(panels);
+    expect(tiers.independence.config.panelCount).toBe(panels);
+    // Covers a year's use without oversizing by more than one panel.
+    const kwhPerPanelYear = (ASSUMPTIONS.panelWatts / 1000) * ASSUMPTIONS.dailyYieldKwhPerKw * 365;
+    expect(panels * kwhPerPanelYear).toBeGreaterThanOrEqual(usage.annualKwh);
+    expect((panels - 1) * kwhPerPanelYear).toBeLessThan(usage.annualKwh);
+  });
+
+  it("grows with a bigger bill and a planned EV", () => {
+    const small = recommendSystem(base, analysis, bill).tiers.recommended.config.panelCount;
+    const ev = recommendSystem({ ...base, evPlanned: true }, analysis, bill);
+    expect(ev.usage.annualKwh - bill.annualUsageKwh).toBe(ASSUMPTIONS.evAnnualKwh);
+    expect(ev.tiers.recommended.config.panelCount).toBeGreaterThan(small);
+  });
+
+  it("differs by battery only: none, sized to evening use, one size up", () => {
+    const { tiers, usage } = recommendSystem(base, analysis, bill);
     expect(tiers.essential.config.batteryKwh).toBe(0);
+    expect(tiers.recommended.config.batteryKwh * ASSUMPTIONS.batteryUsableShare).toBeGreaterThanOrEqual(
+      usage.dailyKwh * usage.eveningShare,
+    );
     expect(tiers.independence.config.batteryKwh).toBeGreaterThan(tiers.recommended.config.batteryKwh);
   });
 
-  it("sizes solar within panel and roof limits", () => {
-    const heavy = recommendSystem({ ev: true, pool: true, electricHeating: true, backup: true }, { ...analysis, maxPanels: 24 });
-    for (const t of Object.values(heavy.tiers)) {
-      expect(t.config.panelCount).toBeGreaterThanOrEqual(ASSUMPTIONS.minPanels);
+  it("goes one battery size up for backup", () => {
+    const usage = usageBasis(bill, base);
+    expect(batteryNeeded(usage, true)).toBeGreaterThan(batteryNeeded(usage, false));
+  });
+
+  it("stays within panel and roof limits", () => {
+    const huge = summariseBill({ isElectricityBill: true, annualUsageKwh: 40000 }) as BillSummary;
+    for (const t of Object.values(recommendSystem(base, { ...analysis, maxPanels: 24 }, huge).tiers)) {
       expect(t.config.panelCount).toBeLessThanOrEqual(24);
     }
   });
 
   it("adds an EV charger only for EV households", () => {
-    expect(recommendSystem({ ...base, ev: true }, analysis).tiers.recommended.config.evCharger).toBe(true);
-    expect(recommendSystem(base, analysis).tiers.recommended.config.evCharger).toBe(false);
-  });
-
-  it("counts each answer in annual usage", () => {
-    expect(estimateAnnualUsage({ ...base, ev: true }) - estimateAnnualUsage(base)).toBe(ASSUMPTIONS.evAnnualKwh);
-    expect(estimateAnnualUsage({ ...base, pool: true }) - estimateAnnualUsage(base)).toBe(ASSUMPTIONS.poolAnnualKwh);
+    expect(recommendSystem({ ...base, ev: true }, analysis, bill).tiers.recommended.config.evCharger).toBe(true);
+    expect(recommendSystem({ ...base, evPlanned: true }, analysis, bill).tiers.recommended.config.evCharger).toBe(true);
+    expect(recommendSystem(base, analysis, bill).tiers.recommended.config.evCharger).toBe(false);
   });
 });
 
@@ -66,7 +116,7 @@ describe("priceSystem", () => {
 
   it("produces a positive payback estimate", () => {
     const config = { panelCount: 20, batteryKwh: 0, evCharger: false };
-    const outcome = estimateOutcome(config, base, priceSystem(config, analysis));
+    const outcome = estimateOutcome(config, usageBasis(bill, base), priceSystem(config, analysis));
     expect(outcome.annualSavings).toBeGreaterThan(0);
     expect(outcome.paybackYears).toBeGreaterThan(0);
   });

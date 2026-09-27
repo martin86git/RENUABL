@@ -11,7 +11,9 @@
 
 ## Product rules to preserve
 
-- RENUABL recommends one system; the customer adjusts it. No catalogues.
+- RENUABL recommends one system, sized from the customer's electricity bill. No catalogues.
+- The customer uploads their latest bill on "About your home"; Claude reads it server-side (`src/app/api/bill/route.ts`, `src/lib/server/bill-reader.ts`) and `src/lib/domain/bill.ts` validates the figures. Ask only for usage and prices, never personal details, and don't store the file.
+- Solar is sized to what the home uses (same panels in every option). Customers never choose panel counts or battery sizes; the options differ only in battery (none / sized to evening use / one size up).
 - One matched installer by default; alternatives only behind a secondary link.
 - The customer picks the install date; a refundable deposit comes before the 15-minute confirmation call (confirmation, not sales).
 - Intelligence is branded "Ask RENUABL", never labelled "AI".

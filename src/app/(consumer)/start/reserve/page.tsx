@@ -63,7 +63,7 @@ const field = "h-11 w-full rounded-xl bg-canvas px-4 text-[15px] outline-none ri
 function ReserveScreen() {
   const router = useRouter();
   const { state, update } = useFlow();
-  const { config, price, tier } = useSystem();
+  const { config, price, recommendation } = useSystem();
   const [method, setMethod] = useState<PaymentMethod>("card");
   const [busy, setBusy] = useState(false);
   const installer = state.installerId ? getInstaller(state.installerId) : undefined;
@@ -83,11 +83,11 @@ function ReserveScreen() {
     else update({ addOns: state.addOns.filter((a) => a !== id) });
   };
   const addItem = (id: LineItemId) => {
-    if (id === "battery") setConfig({ batteryKwh: tier.config.batteryKwh || 10 });
+    if (id === "battery") setConfig({ batteryKwh: recommendation.tiers.recommended.config.batteryKwh });
     else if (id === "ev-charger") setConfig({ evCharger: true });
     else update({ addOns: [...state.addOns, id as AddOnId] });
   };
-  const suggestions = suggestedAdditions(config, tier.config, state.addOns);
+  const suggestions = suggestedAdditions(config, recommendation.tiers.recommended.config, state.addOns);
   const careIncluded = careIncludedFor(state.tier);
 
   const basket = (

@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
-import { useFlow, isProfileComplete, type FlowState } from "./flow-state";
+import { useFlow, isAboutComplete, type FlowState } from "./flow-state";
 import { stepHref, type FlowSlug } from "./steps";
 
-const needsProfile = (s: FlowState): FlowSlug | null => (isProfileComplete(s.profile) ? null : "profile");
+const needsProfile = (s: FlowState): FlowSlug | null => (isAboutComplete(s) ? null : "profile");
 
 const REQUIREMENTS: Record<FlowSlug, (s: FlowState) => FlowSlug | null> = {
   analysing: () => null,

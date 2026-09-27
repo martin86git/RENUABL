@@ -2,6 +2,7 @@
  * Consumer-facing service layer. Every function here is the seam where a real
  * API replaces mock data; UI code should only talk to these functions.
  */
+import { BILL_UPLOAD, isBillMediaType, type BillSummary } from "@/lib/domain/bill";
 import type { CareBilling } from "@/lib/domain/care";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { rankInstallers } from "@/lib/domain/matching";
@@ -54,6 +55,42 @@ export function analyseHome(address: Address | null): HomeAnalysis {
     orientation: ["North", "North / west split", "North-east"][(h >> 3) % 3],
     maxPanels: 30 + (h % 7),
   };
+}
+
+export type BillResult = { ok: true; bill: BillSummary } | { ok: false; message: string };
+
+/** Shrinks large phone photos so they upload quickly and stay under the size limit. */
+async function prepareBillFile(file: File): Promise<File> {
+  if (file.type === "application/pdf" || (file.size < 1_500_000 && isBillMediaType(file.type))) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 2400 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+    return blob ? new File([blob], "bill.jpg", { type: "image/jpeg" }) : file;
+  } catch {
+    return file; // e.g. a format the browser can't decode; the server will say so
+  }
+}
+
+/** Sends the customer's bill to RENUABL to read their usage. The file isn't stored. */
+export async function readEnergyBill(file: File): Promise<BillResult> {
+  const prepared = await prepareBillFile(file);
+  if (prepared.size > BILL_UPLOAD.maxBytes) {
+    return { ok: false, message: "That file is too large. Try the PDF from your retailer's email, or a photo." };
+  }
+  const body = new FormData();
+  body.append("bill", prepared);
+  try {
+    const res = await fetch("/api/bill", { method: "POST", body });
+    const json = (await res.json()) as BillResult;
+    return json.ok && json.bill ? json : { ok: false, message: json.ok ? "We couldn't read that bill." : json.message };
+  } catch {
+    return { ok: false, message: "We couldn't reach RENUABL. Check your connection and try again." };
+  }
 }
 
 export function matchInstallers(postcode: string): InstallerMatch[] {

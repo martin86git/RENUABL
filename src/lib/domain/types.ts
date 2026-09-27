@@ -29,10 +29,21 @@ export interface HomeAnalysis {
 
 /** The few yes/no questions the customer answers. */
 export interface EnergyProfile {
+  /** Already charges an EV at home (its usage is on the bill). */
   ev: boolean;
-  pool: boolean;
-  electricHeating: boolean;
+  /** Planning an EV (or another one): usage the bill doesn't show yet. */
+  evPlanned: boolean;
   backup: boolean;
+}
+
+/** The usage and prices a system is sized and costed against, from the customer's bill. */
+export interface UsageBasis {
+  annualKwh: number;
+  dailyKwh: number;
+  /** Share of daily use outside daylight hours (what a battery can cover). */
+  eveningShare: number;
+  usageRate: number;
+  feedInRate: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +92,7 @@ export interface TierRecommendation {
 
 export interface Recommendation {
   tiers: Record<SystemTier, TierRecommendation>;
-  estimatedAnnualUsageKwh: number;
+  usage: UsageBasis;
 }
 
 export type AddOnId = "heat-pump" | "smart-switchboard" | "home-backup" | "smart-home";
