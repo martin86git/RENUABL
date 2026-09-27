@@ -1,50 +1,16 @@
 "use client";
 
-import { BadgeCheck, Clock, ShieldCheck, Star, Wrench } from "lucide-react";
+import { ArrowRight, BadgeCheck, ChartColumn, ChevronRight, CircleCheck, ShieldCheck, Star, UserRound, X } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
-import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { useFlow } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
-import { Disclosure } from "@/components/ui/controls";
-import { Badge, Button, Card, cn } from "@/components/ui/primitives";
-import { matchInstallers } from "@/lib/services/consumer";
-import type { Installer } from "@/lib/domain/types";
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("");
-}
-
-function TrustRows({ installer }: { installer: Installer }) {
-  const rows = [
-    { icon: Star, label: `${installer.rating.toFixed(1)} rating`, detail: `${installer.reviewCount} reviews` },
-    {
-      icon: Wrench,
-      label: `${installer.installsCompleted.toLocaleString("en-AU")} installs`,
-      detail: `${installer.yearsOperating} years operating`,
-    },
-    { icon: Clock, label: `${Math.round(installer.onTimeRate * 100)}% on time`, detail: "Arrives in your window" },
-    { icon: ShieldCheck, label: "Licensed & accredited", detail: installer.accreditations[0] },
-  ];
-  return (
-    <ul className="divide-y divide-line">
-      {rows.map(({ icon: Icon, label, detail }) => (
-        <li key={label} className="flex items-center gap-3 py-3">
-          <Icon className="h-4 w-4 shrink-0 text-muted" aria-hidden />
-          <span className="text-[15px] font-medium">{label}</span>
-          <span className="ml-auto truncate text-right text-[13px] text-muted">{detail}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
+import { Button, Card } from "@/components/ui/primitives";
+import { formatDate } from "@/lib/domain/format";
+import { getAvailability, matchInstallers } from "@/lib/services/consumer";
 
 function InstallerScreen() {
   const router = useRouter();
@@ -54,81 +20,102 @@ function InstallerScreen() {
   const match = matches.find((m) => m.installer.id === selectedId) ?? matches[0];
   const isTopMatch = match?.installer.id === matches[0]?.installer.id;
   const alternatives = matches.filter((m) => m.installer.id !== match?.installer.id);
+  const firstAvailable = useMemo(() => (match ? getAvailability(match.installer.id)[0]?.date : undefined), [match]);
 
-  // Default to the best match without asking the customer to choose.
+  // RENUABL chooses by default; the customer never has to compare.
   useEffect(() => {
     if (!state.installerId && matches[0]) update({ installerId: matches[0].installer.id });
   }, [state.installerId, matches, update]);
 
   if (!match) return null;
   const { installer } = match;
+  const choose = (id: string) => update({ installerId: id, installDate: null, windowId: null });
 
   return (
     <FlowStep
-      title="We've matched your installer"
-      subtitle={`Chosen for their track record near ${state.address?.suburb ?? "you"} and availability for your install.`}
+      title="Your installer is matched."
+      subtitle="We've found the best installer for your home."
       cta={
-        <Button
-          size="lg"
-          className="w-full lg:w-auto"
-          onClick={() => {
-            // Selecting a different installer invalidates their calendar slot.
-            router.push(stepHref("date"));
-          }}
-        >
-          Choose my installation date
+        <Button size="lg" className="w-full lg:w-72" onClick={() => router.push(stepHref("date"))}>
+          Continue <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
         </Button>
       }
     >
-      <div className="mx-auto max-w-xl lg:mx-0">
-        <Card className="p-6 sm:p-8">
-          <div className="flex items-center gap-4">
-            <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-ink text-[20px] font-semibold text-canvas">
-              {initials(installer.name)}
+      <div className="max-w-md space-y-4">
+        <Card className="p-5">
+          <div className="flex items-start gap-4">
+            {/* Monogram until the installer's own logo is supplied. */}
+            <span
+              className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-sage text-[18px] tracking-wide text-forest"
+              aria-hidden
+            >
+              {installer.name
+                .split(" ")
+                .map((w) => w[0])
+                .join("")
+                .slice(0, 2)}
             </span>
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[20px] font-semibold">{installer.name}</p>
-                <BadgeCheck className="h-5 w-5 text-info" aria-label="Verified RENUABL installer" />
-              </div>
-              <p className="text-[14px] text-muted">Based in {installer.suburbBase}</p>
+              <p className="text-[17px] text-ink">{installer.name}</p>
+              {(installer.verifiedStats || installer.reviewSource) && (
+                <p className="flex items-center gap-1 text-[13px] text-ink-2">
+                  <Star className="h-4 w-4 fill-[#e8a93a] text-[#e8a93a]" strokeWidth={0} aria-hidden />
+                  {installer.rating.toFixed(1)}{" "}
+                  <span className="text-muted">
+                    ({installer.reviewCount} {installer.reviewSource ? `${installer.reviewSource} ` : ""}reviews)
+                  </span>
+                </p>
+              )}
+              {installer.preferred && <p className="text-[12.5px] text-positive">RENUABL installer of choice</p>}
+              <ul className="mt-2 space-y-1 text-[13px] text-ink-2">
+                {[
+                  "Accredited & insured",
+                  "Local to your area",
+                  firstAvailable ? `Available ${formatDate(firstAvailable, { day: "numeric", month: "short" })}` : null,
+                ]
+                  .filter(Boolean)
+                  .map((t) => (
+                    <li key={t} className="flex items-center gap-2">
+                      <CircleCheck className="h-4 w-4 fill-positive text-white" strokeWidth={2} aria-hidden /> {t}
+                    </li>
+                  ))}
+              </ul>
             </div>
           </div>
-          <div className="mt-4">
-            {isTopMatch ? <Badge tone="positive">Best match for your home</Badge> : <Badge tone="info">Your choice</Badge>}
-          </div>
-          <div className="mt-4">
-            <TrustRows installer={installer} />
-          </div>
-          <div className="mt-2 border-t border-line">
-            <Disclosure title="Why we matched them">
-              <ul className="space-y-2">
-                {match.reasons.map((r) => (
-                  <li key={r} className="flex gap-2">
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-positive" />
-                    {r}
-                  </li>
-                ))}
-              </ul>
-            </Disclosure>
-          </div>
-          <p className="mt-2 rounded-2xl bg-surface-2 px-4 py-3 text-[14px] text-ink-2">
-            Backed by the RENUABL workmanship guarantee. If anything isn&apos;t right, we make it right.
-          </p>
-        </Card>
 
-        <div className="mt-5 flex flex-col items-center gap-4 lg:items-start">
+          <div className="mt-5 border-t border-line pt-4">
+            <p className="text-[14px] text-ink">Why we matched them</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-muted">
+              Best fit for your location, system and preferred installation window.
+            </p>
+            <ul className="mt-2 space-y-1 text-[13px] text-muted">
+              {match.reasons.slice(1, 4).map((r) => (
+                <li key={r}>· {r}</li>
+              ))}
+            </ul>
+          </div>
+
           {alternatives.length > 0 && (
             <Dialog.Root>
-              <Dialog.Trigger className="text-[14px] text-muted underline-offset-4 hover:text-ink hover:underline">
-                View alternatives
+              <Dialog.Trigger className="mt-4 flex w-full items-center gap-3 rounded-2xl bg-canvas px-4 py-3 text-left">
+                <UserRound className="h-5 w-5 text-muted" strokeWidth={1.5} />
+                <span className="flex-1">
+                  <span className="block text-[13px] text-ink-2">Prefer another installer?</span>
+                  <span className="block text-[12px] text-muted">View alternatives</span>
+                </span>
+                <ChevronRight className="h-4 w-4 text-muted" />
               </Dialog.Trigger>
               <Dialog.Portal>
                 <Dialog.Overlay className="fixed inset-0 z-40 bg-black/25" />
-                <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[80dvh] overflow-y-auto rounded-t-[28px] bg-surface p-6 pb-safe shadow-[var(--shadow-lift)] sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-[480px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[28px]">
-                  <Dialog.Title className="text-[17px] font-semibold">Other installers near you</Dialog.Title>
-                  <Dialog.Description className="mt-1 text-[14px] text-muted">
-                    All are RENUABL-verified. We still recommend {matches[0].installer.name}.
+                <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[80dvh] overflow-y-auto rounded-t-[28px] bg-canvas p-6 pb-safe shadow-[var(--shadow-lift)] sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-[460px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[28px]">
+                  <div className="flex items-center justify-between">
+                    <Dialog.Title className="text-[18px] font-medium">Other installers near you</Dialog.Title>
+                    <Dialog.Close className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2" aria-label="Close">
+                      <X className="h-5 w-5" />
+                    </Dialog.Close>
+                  </div>
+                  <Dialog.Description className="mt-1 text-[13px] text-muted">
+                    All are RENUABL-vetted. We still recommend {matches[0].installer.name}.
                   </Dialog.Description>
                   <ul className="mt-4 space-y-2">
                     {alternatives.map((m) => (
@@ -136,38 +123,52 @@ function InstallerScreen() {
                         <Dialog.Close asChild>
                           <button
                             type="button"
-                            onClick={() => update({ installerId: m.installer.id, installDate: null, windowId: null })}
-                            className={cn(
-                              "flex w-full items-center justify-between rounded-2xl border border-line px-4 py-3 text-left hover:border-line-strong",
-                            )}
+                            onClick={() => choose(m.installer.id)}
+                            className="flex w-full items-center justify-between rounded-2xl bg-surface px-4 py-3 text-left shadow-[var(--shadow-soft)]"
                           >
                             <span>
-                              <span className="block text-[15px] font-medium">{m.installer.name}</span>
-                              <span className="block text-[13px] text-muted">
-                                {m.installer.rating.toFixed(1)} ★ · {m.installer.installsCompleted.toLocaleString("en-AU")} installs
+                              <span className="block text-[15px]">{m.installer.name}</span>
+                              <span className="block text-[12px] text-muted">
+                                {m.installer.verifiedStats
+                                  ? `${m.installer.rating.toFixed(1)} ★ · ${m.installer.installsCompleted.toLocaleString("en-AU")} installs`
+                                  : "RENUABL-vetted installer"}
                               </span>
                             </span>
-                            <span className="text-[13px] font-medium text-ink-2">Select</span>
+                            <span className="text-[13px] text-ink-2">Select</span>
                           </button>
                         </Dialog.Close>
                       </li>
                     ))}
                   </ul>
+                  {!isTopMatch && (
+                    <Dialog.Close asChild>
+                      <button
+                        type="button"
+                        onClick={() => choose(matches[0].installer.id)}
+                        className="mt-4 text-[13px] text-ink-2 underline underline-offset-4"
+                      >
+                        Go back to our recommended installer
+                      </button>
+                    </Dialog.Close>
+                  )}
                 </Dialog.Content>
               </Dialog.Portal>
             </Dialog.Root>
           )}
-          {!isTopMatch && (
-            <button
-              type="button"
-              className="text-[14px] text-ink-2 underline underline-offset-4"
-              onClick={() => update({ installerId: matches[0].installer.id, installDate: null, windowId: null })}
-            >
-              Go back to our recommended installer
-            </button>
-          )}
-          <AskRenuabl context="installer" prompt="How do you choose installers?" className="w-full" />
-        </div>
+        </Card>
+
+        <ul className="grid grid-cols-3 gap-2 pt-2 text-center text-[11.5px] leading-tight text-muted">
+          {[
+            { icon: ShieldCheck, label: "Vetted installers" },
+            { icon: BadgeCheck, label: "Accredited & insured" },
+            { icon: ChartColumn, label: "Proven track record" },
+          ].map(({ icon: Icon, label }) => (
+            <li key={label} className="flex flex-col items-center gap-2">
+              <Icon className="h-7 w-7 text-ink" strokeWidth={1.2} aria-hidden />
+              {label}
+            </li>
+          ))}
+        </ul>
       </div>
     </FlowStep>
   );

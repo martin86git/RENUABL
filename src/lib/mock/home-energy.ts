@@ -35,12 +35,12 @@ export interface Upgrade {
 }
 
 export const HOME_SYSTEM = {
-  owner: "Alex",
-  address: "14 Wattle Street, Brunswick",
+  owner: "Sarah",
+  address: "12 Harvest Court, Glen Waverley",
   installedOn: "2026-06-18",
-  solarKw: 8.8,
+  solarKw: 13.2,
   batteryKwh: 13.5,
-  installer: "Brightline Electrical",
+  installer: "Primero Electric & Solar",
 };
 
 function bell(hour: number, peak: number, centre = 12.5, spread = 3.2) {
@@ -59,7 +59,7 @@ export const TODAY_CURVE: HourPoint[] = Array.from({ length: 24 }, (_, hour) => 
 }));
 
 export const TODAY = {
-  solarKwh: 38.6,
+  solarKwh: 24.8,
   usageKwh: 24.1,
   selfPoweredShare: 0.91,
   batteryPercent: 82,
@@ -108,10 +108,10 @@ export const INSIGHTS: Insight[] = [
 ];
 
 export const HEALTH: HealthItem[] = [
-  { id: "h1", label: "Solar panels", status: "good", detail: "All 20 panels producing as expected" },
+  { id: "h1", label: "Solar panels", status: "good", detail: "All 30 panels producing as expected" },
   { id: "h2", label: "Inverter", status: "good", detail: "Online · firmware up to date" },
   { id: "h3", label: "Battery", status: "good", detail: "82% charged · health 100%" },
-  { id: "h4", label: "Connection", status: "attention", detail: "Wi-Fi signal is weak at the inverter. Data may be delayed." },
+  { id: "h4", label: "Connection", status: "good", detail: "Online · data up to date" },
 ];
 
 export const UPGRADES: Upgrade[] = [

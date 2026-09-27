@@ -1,9 +1,9 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { priceSystem, recommendSystem, estimateOutcome } from "@/lib/domain/recommendation";
-import type { Address, EnergyProfile, SystemConfig } from "@/lib/domain/types";
-import type { ReservationResult } from "@/lib/services/consumer";
+import { estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
+import type { Address, AddOnId, EnergyProfile, SystemConfig, SystemTier } from "@/lib/domain/types";
+import { analyseHome, type ReservationResult } from "@/lib/services/consumer";
 
 /**
  * Client state for the guided purchase flow. Business rules live in
@@ -19,37 +19,32 @@ export interface Attribution {
 export interface FlowState {
   address: Address | null;
   profile: Partial<EnergyProfile>;
-  config: SystemConfig | null; // null = use recommendation as-is
+  tier: SystemTier;
+  config: SystemConfig | null; // null = use the tier's recommendation as-is
+  addOns: AddOnId[];
   installerId: string | null;
   installDate: string | null;
   windowId: string | null;
   reservation: ReservationResult | null;
-  call: { date: string; time: string } | null;
   attribution: Attribution | null;
 }
 
 const EMPTY: FlowState = {
   address: null,
   profile: {},
+  tier: "recommended",
   config: null,
+  addOns: [],
   installerId: null,
   installDate: null,
   windowId: null,
   reservation: null,
-  call: null,
   attribution: null,
 };
 
-const DEFAULT_PROFILE: EnergyProfile = {
-  household: "3-4",
-  bill: "400-700",
-  daytime: "sometimes",
-  ev: "none",
-  storeys: "single",
-  backup: "nice-to-have",
-};
+const DEFAULT_PROFILE: EnergyProfile = { ev: false, pool: false, electricHeating: false, backup: false };
 
-const STORAGE_KEY = "renuabl.flow.v1";
+const STORAGE_KEY = "renuabl.flow.v2";
 
 function load(): FlowState {
   try {
@@ -116,14 +111,16 @@ export function useSystem() {
   const { state } = useFlow();
   return useMemo(() => {
     const profile: EnergyProfile = { ...DEFAULT_PROFILE, ...state.profile };
-    const recommendation = recommendSystem(profile);
-    const config = state.config ?? recommendation.recommended;
-    const price = priceSystem(config, profile);
+    const analysis = analyseHome(state.address);
+    const recommendation = recommendSystem(profile, analysis);
+    const tier = recommendation.tiers[state.tier];
+    const config = state.config ?? tier.config;
+    const price = priceSystem(config, analysis, state.addOns);
     const outcome = estimateOutcome(config, profile, price);
-    return { profile, recommendation, config, price, outcome };
-  }, [state.profile, state.config]);
+    return { profile, analysis, recommendation, tier, config, price, outcome };
+  }, [state.profile, state.address, state.tier, state.config, state.addOns]);
 }
 
 export function isProfileComplete(p: Partial<EnergyProfile>): p is EnergyProfile {
-  return Boolean(p.household && p.bill && p.daytime && p.ev && p.storeys && p.backup);
+  return p.ev !== undefined && p.pool !== undefined && p.electricHeating !== undefined && p.backup !== undefined;
 }

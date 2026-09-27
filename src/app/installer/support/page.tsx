@@ -21,7 +21,7 @@ export default function SupportPage() {
             className="min-h-28 rounded-2xl border border-line bg-surface p-5 text-left hover:border-line-strong"
           >
             <Icon className="h-5 w-5 text-muted" aria-hidden />
-            <p className="mt-3 text-[16px] font-semibold">{title}</p>
+            <p className="mt-3 text-[16px] font-medium">{title}</p>
             <p className="mt-1 text-[14px] text-muted">{body}</p>
           </button>
         ))}

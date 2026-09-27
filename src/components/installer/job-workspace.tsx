@@ -25,6 +25,7 @@ import { FIELD_STATUS_FLOW, stageForFieldStatus } from "@/lib/domain/job-status"
 import { panelsToKw } from "@/lib/domain/recommendation";
 import { getWindow } from "@/lib/domain/scheduling";
 import type { Crew, Job, JobStage } from "@/lib/domain/types";
+import { HomePhoto, homeBannerFor, homePhotoFor } from "@/components/ui/brand-art";
 import { ImageTile, StageBadge } from "./bits";
 import { useFieldStatus } from "./use-field-status";
 
@@ -236,7 +237,7 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
         {confirming ? <Loader2 className="h-5 w-5 animate-spin" /> : field.next.action}
       </Button>
     ) : (
-      <div className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-positive-soft text-[16px] font-semibold text-positive">
+      <div className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-positive-soft text-[16px] font-medium text-positive">
         <CircleCheck className="h-5 w-5" /> Installation complete
       </div>
     );
@@ -305,10 +306,11 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
         <Link href="/installer/jobs" className="text-[14px] text-muted">
           ← Jobs
         </Link>
+        <HomePhoto src={homeBannerFor(job.id)} className="mt-3 h-32 w-full rounded-2xl" sizes="100vw" />
         <div className="mt-3 flex items-start justify-between gap-3">
           <div>
             <p className="text-[12px] font-medium uppercase tracking-wider text-muted">{job.reference}</p>
-            <h1 className="text-[24px] font-semibold leading-tight">{job.customer.name}</h1>
+            <h1 className="text-[26px] font-normal leading-tight tracking-[-0.03em]">{job.customer.name}</h1>
           </div>
           <StageBadge stage={effectiveStage} />
         </div>
@@ -407,14 +409,17 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
           ← All jobs
         </Link>
         <div className="mt-3 flex items-start justify-between gap-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-[28px] font-semibold tracking-tight">{job.customer.name}</h1>
-              <StageBadge stage={effectiveStage} />
+          <div className="flex items-center gap-5">
+            <HomePhoto src={homePhotoFor(job.id)} className="h-20 w-24 shrink-0 rounded-xl" sizes="96px" />
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-[30px] font-normal tracking-[-0.03em]">{job.customer.name}</h1>
+                <StageBadge stage={effectiveStage} />
+              </div>
+              <p className="mt-1 text-[14px] text-muted">
+                {job.reference} · {job.address.line}, {job.address.suburb} {job.address.state} {job.address.postcode}
+              </p>
             </div>
-            <p className="mt-1 text-[14px] text-muted">
-              {job.reference} · {job.address.line}, {job.address.suburb} {job.address.state} {job.address.postcode}
-            </p>
           </div>
           <div className="w-72 space-y-2">
             {primaryCta}
@@ -460,20 +465,20 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
               </section>
               <div className="grid grid-cols-2 gap-6">
                 <section className="rounded-2xl border border-line bg-surface p-6">
-                  <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+                  <h2 className="flex items-center gap-2 text-[15px] font-medium">
                     <KeyRound className="h-4 w-4 text-muted" /> Access notes
                   </h2>
                   <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{job.site.accessNotes}</p>
                 </section>
                 <section className="rounded-2xl border border-line bg-surface p-6">
-                  <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+                  <h2 className="flex items-center gap-2 text-[15px] font-medium">
                     <Zap className="h-4 w-4 text-warning" /> Switchboard
                   </h2>
                   <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{job.site.switchboardNotes}</p>
                 </section>
               </div>
               <section className="rounded-2xl border border-line bg-surface p-6">
-                <h2 className="text-[15px] font-semibold">Roof & site imagery</h2>
+                <h2 className="text-[15px] font-medium">Roof & site imagery</h2>
                 <div className="mt-4 grid grid-cols-3 gap-3">
                   {job.site.imagery.map((i) => (
                     <ImageTile key={i.id} label={i.label} />
@@ -481,7 +486,7 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
                 </div>
               </section>
               <section className="rounded-2xl border border-line bg-surface p-6">
-                <h2 className="text-[15px] font-semibold">
+                <h2 className="text-[15px] font-medium">
                   Approvals & checklist · {doneCount}/{checklist.length}
                 </h2>
                 <div className="mt-2">
@@ -491,16 +496,16 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
             </div>
             <div className="col-span-4 space-y-6">
               <section className="rounded-2xl border border-line bg-surface p-6">
-                <h2 className="mb-4 text-[15px] font-semibold">Field status</h2>
+                <h2 className="mb-4 text-[15px] font-medium">Field status</h2>
                 <StatusTimeline history={field.history} />
               </section>
               <section className="rounded-2xl border border-line bg-surface p-6">
-                <h2 className="mb-3 text-[15px] font-semibold">Crew</h2>
+                <h2 className="mb-3 text-[15px] font-medium">Crew</h2>
                 {crewSelect}
                 {crew && <p className="mt-2 text-[13px] text-muted">Lead: {crew.lead}</p>}
               </section>
               <section className="rounded-2xl border border-line bg-surface p-6">
-                <h2 className="mb-2 text-[15px] font-semibold">Required documents</h2>
+                <h2 className="mb-2 text-[15px] font-medium">Required documents</h2>
                 <Documents docs={job.documents.filter((d) => d.status !== "ready")} />
               </section>
             </div>
@@ -525,7 +530,7 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
                 ))}
               </div>
               <div className="mt-6">
-                <h3 className="mb-3 text-[14px] font-semibold">Install photos</h3>
+                <h3 className="mb-3 text-[14px] font-medium">Install photos</h3>
                 <Photos photos={photos} onAdd={addPhotos} />
               </div>
             </section>
@@ -533,7 +538,7 @@ export function JobWorkspace({ job, crews }: { job: Job; crews: Crew[] }) {
 
           <Tabs.Content value="system" className="mt-6">
             <section className="max-w-2xl rounded-2xl border border-line bg-surface p-6">
-              <p className="text-[17px] font-semibold">{job.packageName}</p>
+              <p className="text-[17px] font-medium">{job.packageName}</p>
               <div className="mt-5">{systemFacts}</div>
               <p className="mt-6 text-[13px] text-muted">Design and panel layout are in Documents.</p>
             </section>

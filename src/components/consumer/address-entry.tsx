@@ -23,7 +23,7 @@ export function AddressEntry({ className }: { className?: string }) {
 
   function go(address: Address) {
     update({ address });
-    router.push(stepHref("profile"));
+    router.push(stepHref("analysing"));
   }
 
   function onSubmit(e: FormEvent) {
@@ -42,8 +42,8 @@ export function AddressEntry({ className }: { className?: string }) {
       <label htmlFor={`${listId}-input`} className="sr-only">
         Your home address
       </label>
-      <div className="flex items-center gap-2 rounded-full border border-line bg-surface p-1.5 pl-5 shadow-[var(--shadow-lift)] focus-within:border-ink">
-        <MapPin className="h-5 w-5 shrink-0 text-muted" aria-hidden />
+      <div className="flex items-center gap-2 rounded-full bg-surface p-1.5 pl-5 shadow-[var(--shadow-lift)] ring-1 ring-line focus-within:ring-ink/40">
+        <MapPin className="h-5 w-5 shrink-0 text-ink-2" strokeWidth={1.5} aria-hidden />
         <input
           id={`${listId}-input`}
           role="combobox"
@@ -70,15 +70,14 @@ export function AddressEntry({ className }: { className?: string }) {
             }
           }}
           placeholder="Enter your home address"
-          className="h-12 min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted focus-visible:outline-none"
+          className="h-12 min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted/90 focus-visible:outline-none"
         />
         <button
           type="submit"
-          className="flex h-12 shrink-0 items-center gap-2 rounded-full bg-ink px-5 text-[15px] font-medium text-canvas transition hover:opacity-90 active:scale-[0.98]"
+          aria-label="Get started"
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-primary-ink transition hover:opacity-90 active:scale-[0.97]"
         >
-          <span className="hidden sm:inline">Get started</span>
-          <ArrowRight className="h-5 w-5" />
-          <span className="sr-only sm:hidden">Get started</span>
+          <ArrowRight className="h-5 w-5" strokeWidth={1.6} />
         </button>
       </div>
       {error && (
@@ -90,7 +89,7 @@ export function AddressEntry({ className }: { className?: string }) {
         <ul
           id={listId}
           role="listbox"
-          className="absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-3xl border border-line bg-surface py-2 shadow-[var(--shadow-lift)]"
+          className="absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-3xl bg-surface py-2 shadow-[var(--shadow-lift)] ring-1 ring-line"
         >
           {suggestions.map((a, i) => (
             <li

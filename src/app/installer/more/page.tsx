@@ -9,7 +9,7 @@ export default function MorePage() {
   const rest = INSTALLER_NAV.filter((n) => !primary.has(n.href));
   return (
     <>
-      <h1 className="mb-4 text-[26px] font-semibold tracking-tight">More</h1>
+      <h1 className="mb-4 text-[28px] font-normal tracking-[-0.03em]">More</h1>
       <ul className="divide-y divide-line rounded-2xl border border-line bg-surface">
         {rest.map(({ href, label, icon: Icon }) => (
           <li key={href}>

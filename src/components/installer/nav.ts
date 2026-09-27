@@ -16,7 +16,7 @@ import {
 export const INSTALLER_NAV = [
   { href: "/installer", label: "Dashboard", icon: LayoutDashboard },
   { href: "/installer/jobs", label: "Jobs", icon: Briefcase },
-  { href: "/installer/schedule", label: "Schedule", icon: CalendarRange },
+  { href: "/installer/schedule", label: "Calendar", icon: CalendarRange },
   { href: "/installer/customers", label: "Customers", icon: Users },
   { href: "/installer/messages", label: "Messages", icon: MessageCircle },
   { href: "/installer/documents", label: "Documents", icon: FileText },

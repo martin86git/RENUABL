@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowUp, X } from "lucide-react";
+import { ArrowRight, ArrowUp, X } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useState, type FormEvent } from "react";
 import { askRenuabl, SUGGESTED_QUESTIONS, type AskContext } from "@/lib/services/ask";
+import { MascotAvatar } from "@/components/ui/brand-art";
 import { cn } from "@/components/ui/primitives";
 
 interface Turn {
@@ -11,30 +12,24 @@ interface Turn {
   a: string | null;
 }
 
-function Spark({ className }: { className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={cn("inline-block h-6 w-6 shrink-0 rounded-full", className)}
-      style={{ background: "radial-gradient(circle at 35% 30%, #FFF4DE, var(--sun) 40%, var(--coral) 70%, var(--lilac))" }}
-    />
-  );
-}
-
 /**
  * "Ask RENUABL" — present as quiet intelligence, never labelled as AI.
- * variant="bar" is the home/hero prompt; variant="card" is the compact
- * prompt used at moments of uncertainty inside the flow.
+ * variant="card" is the design's mascot card with an arrow button;
+ * variant="link" is a small text prompt (e.g. under the address field).
  */
 export function AskRenuabl({
   context,
   variant = "card",
-  prompt = "Ask RENUABL anything",
+  title = "Questions? Ask RENUABL",
+  subtitle = "Get helpful answers about your home energy needs.",
+  arrow = "dark",
   className,
 }: {
   context: AskContext;
-  variant?: "bar" | "card";
-  prompt?: string;
+  variant?: "card" | "link";
+  title?: string;
+  subtitle?: string;
+  arrow?: "dark" | "light";
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -61,45 +56,34 @@ export function AskRenuabl({
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      {variant === "bar" ? (
-        <div className={cn("w-full", className)}>
-          <Dialog.Trigger asChild>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-full border border-line bg-surface/80 px-4 py-3 text-left text-[15px] text-muted shadow-[var(--shadow-soft)] backdrop-blur transition hover:border-line-strong"
-            >
-              <Spark />
-              <span className="flex-1">{prompt}</span>
-            </button>
-          </Dialog.Trigger>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {SUGGESTED_QUESTIONS[context].slice(0, 3).map((q) => (
-              <button
-                key={q}
-                type="button"
-                onClick={() => void ask(q)}
-                className="rounded-full bg-surface-2 px-3 py-1.5 text-[13px] text-ink-2 transition hover:bg-line"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-        </div>
+      {variant === "link" ? (
+        <Dialog.Trigger asChild>
+          <button type="button" className={cn("inline-flex items-center gap-2 text-[14px] text-ink-2 hover:text-ink", className)}>
+            <MascotAvatar className="h-7 w-7" />
+            <span className="underline-offset-4 hover:underline">{title}</span>
+          </button>
+        </Dialog.Trigger>
       ) : (
         <Dialog.Trigger asChild>
           <button
             type="button"
             className={cn(
-              "flex w-full items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 text-left transition hover:border-line-strong",
+              "flex w-full items-center gap-4 rounded-[var(--radius-card)] bg-surface px-4 py-3.5 text-left shadow-[var(--shadow-soft)] transition hover:shadow-[var(--shadow-lift)]",
               className,
             )}
           >
-            <Spark />
-            <span className="flex-1">
-              <span className="block text-[15px] font-medium text-ink">{prompt}</span>
-              <span className="block text-[13px] text-muted">
-                {SUGGESTED_QUESTIONS[context].find((q) => q !== prompt) ?? "Straight answers, anytime"}
-              </span>
+            <MascotAvatar className="h-12 w-12" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] text-ink">{title}</span>
+              <span className="block text-[13px] leading-snug text-muted">{subtitle}</span>
+            </span>
+            <span
+              className={cn(
+                "grid h-10 w-10 shrink-0 place-items-center rounded-full",
+                arrow === "dark" ? "bg-primary text-primary-ink" : "border border-line-strong text-ink",
+              )}
+            >
+              <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
             </span>
           </button>
         </Dialog.Trigger>
@@ -109,14 +93,14 @@ export function AskRenuabl({
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px]" />
         <Dialog.Content
           className={cn(
-            "fixed z-50 flex max-h-[85dvh] flex-col bg-surface text-ink shadow-[var(--shadow-lift)] outline-none",
+            "fixed z-50 flex max-h-[85dvh] flex-col bg-canvas text-ink shadow-[var(--shadow-lift)] outline-none",
             "inset-x-0 bottom-0 rounded-t-[28px] pb-safe",
             "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-[560px] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-[28px] sm:pb-0",
           )}
         >
           <div className="flex items-center justify-between px-5 pt-5 sm:px-6">
-            <Dialog.Title className="flex items-center gap-2.5 text-[17px] font-semibold">
-              <Spark /> Ask RENUABL
+            <Dialog.Title className="flex items-center gap-3 text-[17px] font-medium">
+              <MascotAvatar className="h-9 w-9" /> Ask RENUABL
             </Dialog.Title>
             <Dialog.Close className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2" aria-label="Close">
               <X className="h-5 w-5" />
@@ -130,8 +114,10 @@ export function AskRenuabl({
             {turns.length === 0 && <p className="text-[15px] text-ink-2">What would you like to know?</p>}
             {turns.map((t, i) => (
               <div key={i} className="space-y-3 animate-fade-up">
-                <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-[15px] text-canvas">{t.q}</p>
-                <p className="max-w-[92%] rounded-2xl rounded-bl-md bg-surface-2 px-4 py-3 text-[15px] leading-relaxed">
+                <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[15px] text-primary-ink">
+                  {t.q}
+                </p>
+                <p className="max-w-[92%] rounded-2xl rounded-bl-md bg-surface px-4 py-3 text-[15px] leading-relaxed shadow-[var(--shadow-soft)]">
                   {t.a ?? (
                     <span className="inline-flex gap-1 text-muted">
                       Thinking<span className="animate-pulse">…</span>
@@ -150,7 +136,7 @@ export function AskRenuabl({
                   type="button"
                   disabled={busy}
                   onClick={() => void ask(q)}
-                  className="rounded-full bg-surface-2 px-3 py-1.5 text-[13px] text-ink-2 hover:bg-line disabled:opacity-50"
+                  className="rounded-full bg-sage/60 px-3 py-1.5 text-[13px] text-ink-2 hover:bg-sage disabled:opacity-50"
                 >
                   {q}
                 </button>
@@ -158,7 +144,7 @@ export function AskRenuabl({
             </div>
             <form
               onSubmit={onSubmit}
-              className="flex items-center gap-2 rounded-full border border-line bg-canvas py-1.5 pl-4 pr-1.5 focus-within:border-ink"
+              className="flex items-center gap-2 rounded-full border border-line-strong bg-surface py-1.5 pl-4 pr-1.5 focus-within:border-ink"
             >
               <input
                 value={draft}
@@ -171,7 +157,7 @@ export function AskRenuabl({
                 type="submit"
                 disabled={!draft.trim() || busy}
                 aria-label="Send"
-                className="grid h-9 w-9 place-items-center rounded-full bg-ink text-canvas disabled:opacity-30"
+                className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-ink disabled:opacity-30"
               >
                 <ArrowUp className="h-4 w-4" />
               </button>

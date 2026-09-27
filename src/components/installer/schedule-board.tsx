@@ -68,7 +68,7 @@ export function ScheduleBoard({ jobs, crews, today }: { jobs: Job[]; crews: Crew
           {days.map((d) => (
             <div key={d} className={cn("border-b border-l border-line px-3 py-3 text-[13px]", d === today && "bg-surface-2")}>
               <span className="text-muted">{fromISODate(d).toLocaleDateString("en-AU", { weekday: "short" })}</span>{" "}
-              <span className={cn("font-semibold", d === today && "text-positive")}>{fromISODate(d).getDate()}</span>
+              <span className={cn("font-medium", d === today && "text-positive")}>{fromISODate(d).getDate()}</span>
             </div>
           ))}
           {rows.map((row) => (

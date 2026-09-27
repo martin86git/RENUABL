@@ -5,52 +5,56 @@ import { Collapsible, RadioGroup, Switch } from "radix-ui";
 import { useState, type ReactNode } from "react";
 import { cn } from "./primitives";
 
-export interface ChoiceOption<T extends string> {
-  value: T;
-  label: string;
-  hint?: string;
-  icon?: ReactNode;
+/** Yes / No pill toggle from the design. `undefined` = not answered yet. */
+export function YesNo({ value, onChange, label }: { value: boolean | undefined; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <RadioGroup.Root
+      aria-label={label}
+      value={value === undefined ? "" : value ? "yes" : "no"}
+      onValueChange={(v) => onChange(v === "yes")}
+      className="inline-flex rounded-full bg-surface p-1 shadow-[0_0_0_1px_var(--line)]"
+    >
+      {(["yes", "no"] as const).map((v) => (
+        <RadioGroup.Item
+          key={v}
+          value={v}
+          className="h-9 min-w-[68px] rounded-full px-5 text-[13.5px] text-ink-2 transition data-[state=checked]:bg-primary data-[state=checked]:text-primary-ink"
+        >
+          {v === "yes" ? "Yes" : "No"}
+        </RadioGroup.Item>
+      ))}
+    </RadioGroup.Root>
+  );
 }
 
-/** Large, tappable option cards (accessible radio group). */
-export function ChoiceCards<T extends string>({
+/** Segmented control, e.g. Recommended / Higher independence / Essential. */
+export function Segmented<T extends string>({
   value,
   onChange,
   options,
   label,
-  columns = 2,
+  className,
 }: {
-  value: T | undefined;
+  value: T;
   onChange: (v: T) => void;
-  options: ChoiceOption<T>[];
+  options: { value: T; label: string }[];
   label: string;
-  columns?: 2 | 3 | 4;
+  className?: string;
 }) {
   return (
     <RadioGroup.Root
       aria-label={label}
       value={value}
       onValueChange={(v) => onChange(v as T)}
-      className={cn(
-        "grid gap-3",
-        columns === 2 && "grid-cols-2",
-        columns === 3 && "grid-cols-3",
-        columns === 4 && "grid-cols-2 lg:grid-cols-4",
-      )}
+      className={cn("flex w-full rounded-full bg-surface-2 p-1", className)}
     >
       {options.map((o) => (
         <RadioGroup.Item
           key={o.value}
           value={o.value}
-          className={cn(
-            "group relative flex min-h-[68px] flex-col items-start justify-center gap-1 rounded-2xl border bg-surface px-3 py-3 text-left transition sm:min-h-[76px] sm:px-4 sm:py-4 sm:pr-10",
-            "border-line hover:border-line-strong data-[state=checked]:border-ink data-[state=checked]:shadow-[0_0_0_1px_var(--ink)]",
-          )}
+          className="h-9 flex-1 whitespace-nowrap rounded-full px-3 text-[12.5px] text-muted transition data-[state=checked]:bg-primary data-[state=checked]:text-primary-ink sm:text-[13px]"
         >
-          {o.icon && <span className="mb-1 text-ink-2">{o.icon}</span>}
-          <span className="text-[14px] font-medium leading-snug text-ink sm:text-[15px]">{o.label}</span>
-          {o.hint && <span className="text-[13px] text-muted">{o.hint}</span>}
-          <span className="absolute right-3 top-3 hidden h-5 w-5 rounded-full sm:block border border-line-strong group-data-[state=checked]:border-[6px] group-data-[state=checked]:border-ink" />
+          {o.label}
         </RadioGroup.Item>
       ))}
     </RadioGroup.Root>
@@ -86,7 +90,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       checked={checked}
       onCheckedChange={onChange}
       aria-label={label}
-      className="relative h-7 w-12 shrink-0 rounded-full bg-line-strong transition data-[state=checked]:bg-ink"
+      className="relative h-7 w-12 shrink-0 rounded-full bg-line-strong transition data-[state=checked]:bg-primary"
     >
       <Switch.Thumb className="block h-6 w-6 translate-x-0.5 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-[22px]" />
     </Switch.Root>
@@ -111,7 +115,7 @@ export function Stepper({
   format?: (v: number) => string;
 }) {
   const btn =
-    "grid h-9 w-9 place-items-center rounded-full border border-line bg-surface text-ink transition hover:border-line-strong disabled:opacity-30";
+    "grid h-9 w-9 place-items-center rounded-full border border-line-strong bg-surface text-ink transition hover:border-ink/40 disabled:opacity-30";
   return (
     <div className="flex items-center gap-3" role="group" aria-label={label}>
       <button

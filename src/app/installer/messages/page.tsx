@@ -20,7 +20,7 @@ export default async function MessagesPage() {
             {threads.map((t) => (
               <li key={t.jobId}>
                 <Link href={`/installer/jobs/${t.jobId}`} className="flex min-h-[72px] items-start gap-4 px-5 py-4 hover:bg-surface-2/40">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-2 text-[13px] font-semibold">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-2 text-[13px] font-medium">
                     {t.customer
                       .split(" ")
                       .map((w) => w[0])

@@ -2,20 +2,24 @@
 
 The consumer distribution layer for home energy: a premium, guided way for households to get solar, batteries and EV charging, plus the installer portal that fulfils it.
 
-See [`docs/BUSINESS_MODEL.md`](docs/BUSINESS_MODEL.md) for the model and [`docs/product-contract/`](docs/product-contract) for the UX contract this build follows.
+See [`docs/BUSINESS_MODEL.md`](docs/BUSINESS_MODEL.md) for the model, [`docs/product-contract/`](docs/product-contract) for the UX contract, and [`docs/design/`](docs/design) for the approved visual design this build matches.
 
 ## Surfaces
 
-| Surface                      | Routes                                                                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Consumer (mobile + desktop)  | `/` → `/start/profile` → `/start/system` → `/start/installer` → `/start/date` → `/start/reserve` → `/start/confirm`             |
-| My RENUABL (post-install)    | `/my`, `/my/energy`, `/my/insights`, `/my/health`, `/my/upgrade`, `/my/support`                                                 |
-| Installer portal (desktop)   | `/installer` dashboard, `/installer/jobs`, `/installer/jobs/[id]` site pack, `/installer/schedule`, `/installer/performance`, … |
-| Installer field app (mobile) | Same routes; mobile renders Today / Jobs / Messages / More with the sequential status flow on each job                          |
+| Surface                      | Routes                                                                                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Consumer (mobile + desktop)  | `/` → `/start/analysing` → `/start/profile` → `/start/system` → `/start/extras` → `/start/installer` → `/start/date` → `/start/reserve` → `/start/confirmed` |
+| My RENUABL (post-install)    | `/my`, `/my/energy`, `/my/savings`, `/my/health`, `/my/upgrades`, `/my/support`, `/my/profile`                                                               |
+| Installer portal (desktop)   | `/installer` dashboard, `/installer/jobs`, `/installer/jobs/[id]` site pack, `/installer/schedule`, `/installer/performance`, …                              |
+| Installer field app (mobile) | Same routes; mobile renders Today / Jobs / Messages / More with the sequential status flow on each job                                                       |
 
 ## Launch market
 
 Victoria first. Market defaults (state, fallback postcode, Melbourne time zone and "today" for installer schedules) live in `src/lib/domain/market.ts`; sample installers, addresses and jobs are Victorian.
+
+## Installer of choice
+
+Primero Electric & Solar (Malvern East) is the default matched installer across Victoria. Its public Google rating (4.7, 141 reviews) is shown with attribution; other performance figures are placeholders and hidden from customers. The remaining installers are fictional alternatives for development.
 
 ## Stack
 
@@ -68,5 +72,7 @@ Everything under `src/lib/mock` is placeholder data. Swap a service's implementa
 
 - Payments (Apple Pay / Google Pay / card) are mocked in `services/consumer.ts`; wire up a payment provider's hosted fields before launch.
 - Address autocomplete uses a sample list; replace it with a geocoding provider.
+- Brand artwork in `public/brand/` is cropped from the design mockups — swap in the original mascot renders and licensed photography.
+- Brand proof points ("50,000+ homes", "4.9 from 6,000+ reviews") and testimonials in `src/lib/mock/brand.ts` are design placeholders — replace with verified figures.
 - "Ask RENUABL" uses reviewed canned answers (`services/ask.ts`); the function signature is ready to be backed by a model.
 - Pricing and rebate figures in `domain/recommendation.ts` are placeholder assumptions and must be validated before showing to customers.

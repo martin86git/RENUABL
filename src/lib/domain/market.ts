@@ -35,3 +35,11 @@ export function marketDateTime(date: ISODate, hour: number, minute = 0): ISODate
   const offset = offsetMinutes(new Date(wallAsUtc));
   return new Date(wallAsUtc - offset * 60_000).toISOString();
 }
+
+/** "Good morning" / "Good afternoon" / "Good evening" for the market's local time. */
+export function greeting(now: Date = new Date()): string {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-AU", { timeZone: LAUNCH_MARKET.timeZone, hour: "numeric", hourCycle: "h23" }).format(now),
+  );
+  return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+}

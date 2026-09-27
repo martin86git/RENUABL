@@ -22,9 +22,9 @@ export default function SupportPage() {
     <div className="space-y-6">
       <div>
         <Eyebrow>Support</Eyebrow>
-        <h1 className="mt-2 text-[30px] font-semibold tracking-tight sm:text-[36px]">How can we help?</h1>
+        <h1 className="mt-2 text-[32px] font-normal tracking-[-0.035em] sm:text-[40px]">How can we help?</h1>
       </div>
-      <AskRenuabl context="my" prompt="Ask RENUABL" />
+      <AskRenuabl context="my" title="Ask RENUABL" subtitle="Straight answers about your system, any time." />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
           { icon: MessageCircle, title: "Message us", body: "Replies within the hour, 7am–9pm." },
@@ -33,7 +33,7 @@ export default function SupportPage() {
         ].map(({ icon: Icon, title, body }) => (
           <Card key={title} className="p-5">
             <Icon className="h-5 w-5 text-muted" aria-hidden />
-            <p className="mt-3 text-[16px] font-semibold">{title}</p>
+            <p className="mt-3 text-[16px] font-medium">{title}</p>
             <p className="text-[14px] text-muted">{body}</p>
           </Card>
         ))}

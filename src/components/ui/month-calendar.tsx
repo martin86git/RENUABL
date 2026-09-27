@@ -6,7 +6,7 @@ import { fromISODate, toISODate } from "@/lib/domain/scheduling";
 import type { ISODate } from "@/lib/domain/types";
 import { cn } from "./primitives";
 
-const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /** Native-feeling month calendar. Only `available` dates are selectable. */
 export function MonthCalendar({
@@ -39,31 +39,29 @@ export function MonthCalendar({
   return (
     <div className="select-none">
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-[17px] font-semibold">{monthLabel}</p>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={() => shift(-1)}
-            disabled={!canPrev}
-            aria-label="Previous month"
-            className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2 disabled:opacity-25"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => shift(1)}
-            disabled={!canNext}
-            aria-label="Next month"
-            className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2 disabled:opacity-25"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => shift(-1)}
+          disabled={!canPrev}
+          aria-label="Previous month"
+          className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2 disabled:opacity-25"
+        >
+          <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+        </button>
+        <p className="text-[16px] font-medium">{monthLabel}</p>
+        <button
+          type="button"
+          onClick={() => shift(1)}
+          disabled={!canNext}
+          aria-label="Next month"
+          className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2 disabled:opacity-25"
+        >
+          <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
+        </button>
       </div>
       <div className="grid grid-cols-7 gap-y-1 text-center" role="grid" aria-label={monthLabel}>
         {WEEKDAYS.map((d, i) => (
-          <div key={i} className="pb-2 text-xs font-medium text-muted" role="columnheader">
+          <div key={i} className="pb-2 text-[11px] text-muted" role="columnheader">
             {d}
           </div>
         ))}
@@ -84,14 +82,13 @@ export function MonthCalendar({
                   (isAvailable ? "" : ", unavailable")
                 }
                 className={cn(
-                  "relative grid h-11 w-11 place-items-center rounded-full text-[15px] tabular-nums transition",
-                  selected && "bg-ink text-canvas font-semibold",
-                  !selected && isAvailable && "text-ink hover:bg-surface-2 font-medium",
-                  !isAvailable && "text-muted/40",
+                  "grid h-10 w-10 place-items-center rounded-full text-[14px] tabular-nums transition",
+                  selected && "bg-primary font-medium text-primary-ink",
+                  !selected && isAvailable && "text-ink hover:bg-surface-2",
+                  !isAvailable && "text-muted/35",
                 )}
               >
                 {date.getDate()}
-                {isAvailable && !selected && <span className="absolute bottom-1.5 h-1 w-1 rounded-full bg-positive" />}
               </button>
             </div>
           );

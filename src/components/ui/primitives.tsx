@@ -10,19 +10,19 @@ type ButtonVariant = "primary" | "secondary" | "ghost" | "quiet";
 type ButtonSize = "sm" | "md" | "lg";
 
 const buttonBase =
-  "inline-flex items-center justify-center gap-2 rounded-full font-medium transition-[background,transform,opacity,box-shadow] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 select-none";
+  "inline-flex items-center justify-center gap-2 rounded-full font-medium transition-[background,transform,opacity,box-shadow,border-color] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 select-none";
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: "bg-primary text-primary-ink hover:opacity-90 shadow-sm",
-  secondary: "bg-surface text-ink border border-line hover:border-line-strong",
+  primary: "bg-primary text-primary-ink hover:opacity-90",
+  secondary: "bg-surface text-ink border border-line-strong hover:border-ink/40",
   ghost: "text-ink hover:bg-surface-2",
   quiet: "text-muted hover:text-ink underline-offset-4 hover:underline",
 };
 
 const buttonSizes: Record<ButtonSize, string> = {
-  sm: "h-9 px-4 text-sm",
-  md: "h-11 px-5 text-[15px]",
-  lg: "h-14 px-7 text-base",
+  sm: "h-9 px-4 text-[13px]",
+  md: "h-11 px-6 text-[14px]",
+  lg: "h-[52px] px-8 text-[15px]",
 };
 
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md", className?: string) {
@@ -47,25 +47,39 @@ export function ButtonLink({
   return <Link className={buttonClass(variant, size, className)} {...props} />;
 }
 
+/** Soft white card — no hard borders, as in the brand sheet. */
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return (
-    <div className={cn("rounded-[var(--radius-card)] bg-surface border border-line shadow-[var(--shadow-soft)]", className)} {...props} />
-  );
+  return <div className={cn("rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-soft)]", className)} {...props} />;
 }
 
 export function Eyebrow({ className, ...props }: ComponentProps<"p">) {
-  return <p className={cn("text-[13px] font-medium tracking-wide text-muted", className)} {...props} />;
+  return <p className={cn("text-[13px] text-muted", className)} {...props} />;
+}
+
+/** Headline style from the design: large, light-to-regular weight, tight tracking. */
+export function Headline({ className, as: Tag = "h1", ...props }: ComponentProps<"h1"> & { as?: "h1" | "h2" }) {
+  return (
+    <Tag
+      className={cn("text-[34px] font-normal leading-[1.05] tracking-[-0.035em] text-ink sm:text-[40px] lg:text-[44px]", className)}
+      {...props}
+    />
+  );
 }
 
 export function Wordmark({ className, tone = "ink" }: { className?: string; tone?: "ink" | "light" }) {
   return (
     <span
-      className={cn("font-semibold tracking-[0.22em] text-[15px] select-none", tone === "light" ? "text-white" : "text-ink", className)}
+      className={cn("select-none text-[20px] font-normal tracking-[0.28em]", tone === "light" ? "text-white" : "text-ink", className)}
       aria-label="RENUABL"
     >
       RENUABL
     </span>
   );
+}
+
+/** Handwritten accent, e.g. "Good energy lives here." */
+export function Script({ className, children }: { className?: string; children: ReactNode }) {
+  return <p className={cn("font-script text-[22px] leading-[1.05] text-ink-2 -rotate-[14deg] select-none", className)}>{children}</p>;
 }
 
 type Tone = "positive" | "warning" | "info" | "neutral" | "danger";
@@ -82,7 +96,7 @@ export function Badge({ tone = "neutral", children, className }: { tone?: Tone; 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-[12px] font-medium",
         toneClass[tone],
         className,
       )}
@@ -94,9 +108,9 @@ export function Badge({ tone = "neutral", children, className }: { tone?: Tone; 
 
 export function StatRow({ label, value, className }: { label: ReactNode; value: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex items-center justify-between gap-4 py-3 text-[15px]", className)}>
+    <div className={cn("flex items-center justify-between gap-4 py-3 text-[14px]", className)}>
       <span className="text-muted">{label}</span>
-      <span className="text-ink font-medium text-right">{value}</span>
+      <span className="text-right font-medium text-ink">{value}</span>
     </div>
   );
 }

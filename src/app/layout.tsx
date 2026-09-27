@@ -1,22 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Caveat, Inter, Source_Serif_4 } from "next/font/google";
 import { PreviewBanner } from "@/components/ui/preview-banner";
 import { PREVIEW_MODE } from "@/lib/config";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Brand type: Inter for UI, a light serif for editorial lines, a handwritten script for accents.
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
+const serif = Source_Serif_4({ variable: "--font-serif", subsets: ["latin"], weight: ["300", "400"] });
+const script = Caveat({ variable: "--font-script", subsets: ["latin"], weight: ["400", "500"] });
 
 export const metadata: Metadata = {
-  title: { default: "RENUABL — Clean energy for your home", template: "%s · RENUABL" },
-  description: "Tell us your address. We'll recommend the right system, match a trusted installer and you choose the day.",
+  title: { default: "RENUABL — Renewable energy on your terms", template: "%s · RENUABL" },
+  description: "Solar, batteries, EV charging and more. Designed for your home, made simple.",
   // Keep preview deployments out of search results.
   robots: PREVIEW_MODE ? { index: false, follow: false } : undefined,
 };
@@ -29,8 +24,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en-AU" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+    <html lang="en-AU" className={`${inter.variable} ${serif.variable} ${script.variable} h-full antialiased`}>
+      <body className="flex min-h-full flex-col">
         <PreviewBanner />
         {children}
       </body>

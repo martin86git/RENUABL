@@ -1,57 +1,62 @@
 @import "tailwindcss";
 
 /*
- * RENUABL design tokens.
+ * RENUABL design tokens — from the brand sheet.
+ *   Background #FAF9F6 · Sand #F0ECE7 · Sage #D9E7DC · Forest #1E3A2E · Charcoal #1A1A1A · White
  * Semantic tokens (canvas, surface, ink, …) are shared by both products.
  * The consumer experience is light and warm; `.theme-installer` swaps the
- * same tokens for the deliberate dark operational palette.
+ * same tokens for the dark, professional installer palette.
  */
-:root {
-  --canvas: #f6f4f0;
+/* .theme-light re-applies the light palette inside the dark portal (e.g. the "Next job" card). */
+:root,
+.theme-light,
+.theme-installer .theme-light {
+  --canvas: #faf9f6;
   --surface: #ffffff;
-  --surface-2: #efece6;
-  --ink: #15161a;
-  --ink-2: #3a3d44;
-  --muted: #6d7179;
-  --line: #e5e1da;
-  --line-strong: #d4cfc6;
-  --primary: #15161a;
+  --surface-2: #f0ece7;
+  --ink: #1a1a1a;
+  --ink-2: #3b3d3a;
+  --muted: #72756f;
+  --line: #ebe7e0;
+  --line-strong: #dcd7cf;
+  --primary: #1f2d27;
   --primary-ink: #ffffff;
-  --positive: #1f8a5b;
-  --positive-soft: #e3f3ea;
-  --warning: #b86e00;
-  --warning-soft: #fbefd9;
-  --danger: #c2412d;
-  --info: #4b5bd6;
-  --info-soft: #ebedfd;
-  --sun: #ffb547;
-  --coral: #ff7a59;
-  --lilac: #b9a7ff;
-  --sky: #8fd3ff;
-  --focus: #4b5bd6;
+  --forest: #1e3a2e;
+  --sage: #d9e7dc;
+  --leaf: #5b9f7d;
+  --positive: #2f7d55;
+  --positive-soft: #d9e7dc;
+  --warning: #9a6300;
+  --warning-soft: #f6ead3;
+  --danger: #b4412f;
+  --info: #3b4f47;
+  --info-soft: #e7ece8;
+  --focus: #1e3a2e;
   color-scheme: light;
 }
 
 .theme-installer {
-  --canvas: #0d0f12;
-  --surface: #15181d;
-  --surface-2: #1c2026;
-  --ink: #eceef1;
-  --ink-2: #c5c9d0;
-  --muted: #8d949e;
-  --line: #262b33;
-  --line-strong: #353b45;
-  --primary: #f2f3f5;
-  --primary-ink: #0d0f12;
+  --canvas: #171c1e;
+  --surface: #1e2427;
+  --surface-2: #272e32;
+  --ink: #f2f2ef;
+  --ink-2: #c9cdcb;
+  --muted: #959c99;
+  --line: #2c3337;
+  --line-strong: #3a4246;
+  --primary: #f7f6f2;
+  --primary-ink: #171c1e;
+  --sage: #2d4a3d;
+  --leaf: #6fb690;
   /* Green is reserved for confirmed / on-track / available / positive. */
-  --positive: #3ddc84;
-  --positive-soft: rgba(61, 220, 132, 0.12);
-  --warning: #f5b544;
-  --warning-soft: rgba(245, 181, 68, 0.12);
-  --danger: #f2665c;
-  --info: #8ea2ff;
-  --info-soft: rgba(142, 162, 255, 0.12);
-  --focus: #8ea2ff;
+  --positive: #8fd0ad;
+  --positive-soft: #2c5242;
+  --warning: #e9bd6b;
+  --warning-soft: rgba(233, 189, 107, 0.14);
+  --danger: #ef8a7b;
+  --info: #c9cdcb;
+  --info-soft: #2c3337;
+  --focus: #8fd0ad;
   color-scheme: dark;
 }
 
@@ -66,6 +71,9 @@
   --color-line-strong: var(--line-strong);
   --color-primary: var(--primary);
   --color-primary-ink: var(--primary-ink);
+  --color-forest: var(--forest);
+  --color-sage: var(--sage);
+  --color-leaf: var(--leaf);
   --color-positive: var(--positive);
   --color-positive-soft: var(--positive-soft);
   --color-warning: var(--warning);
@@ -73,15 +81,12 @@
   --color-danger: var(--danger);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
-  --color-sun: var(--sun);
-  --color-coral: var(--coral);
-  --color-lilac: var(--lilac);
-  --color-sky: var(--sky);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --radius-card: 1.5rem;
-  --shadow-soft: 0 1px 2px rgb(20 20 30 / 0.04), 0 8px 24px -8px rgb(20 20 30 / 0.08);
-  --shadow-lift: 0 2px 4px rgb(20 20 30 / 0.04), 0 24px 48px -16px rgb(20 20 30 / 0.18);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-serif);
+  --font-script: var(--font-script);
+  --radius-card: 1.25rem;
+  --shadow-soft: 0 1px 2px rgb(30 30 20 / 0.03), 0 6px 20px -8px rgb(30 30 20 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(30 30 20 / 0.04), 0 20px 44px -16px rgb(30 30 20 / 0.16);
 }
 
 html,
@@ -91,7 +96,8 @@ body {
 }
 
 body {
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "cv11", "ss01";
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -100,19 +106,13 @@ body {
   outline-offset: 2px;
 }
 
-@keyframes orb-float {
+@keyframes float {
   0%,
   100% {
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
   50% {
-    transform: translateY(-8px) scale(1.02);
-  }
-}
-
-@keyframes orb-spin {
-  to {
-    transform: rotate(360deg);
+    transform: translateY(-10px);
   }
 }
 
@@ -127,19 +127,15 @@ body {
   }
 }
 
-.animate-orb-float {
-  animation: orb-float 7s ease-in-out infinite;
-}
-.animate-orb-spin {
-  animation: orb-spin 24s linear infinite;
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 .animate-fade-up {
   animation: fade-up 0.45s ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-orb-float,
-  .animate-orb-spin,
+  .animate-float,
   .animate-fade-up {
     animation: none;
   }
@@ -152,7 +148,7 @@ body {
 /* Keep overscroll areas dark inside the installer portal. */
 html:has(.theme-installer),
 body:has(.theme-installer) {
-  background: #0d0f12;
+  background: #171c1e;
   color-scheme: dark;
 }
 
@@ -161,4 +157,13 @@ body:has(.theme-installer) {
   html:has(.flow-sticky-cta) {
     scroll-padding-bottom: 12rem;
   }
+}
+
+/* Artwork rendered on white: multiply so its background takes the page colour exactly. */
+.art-blend {
+  mix-blend-mode: multiply;
+  /* Soften the cropped edges (e.g. the ground shadow) into the page. */
+  mask-image:
+    linear-gradient(to bottom, #000 82%, transparent 100%), linear-gradient(to right, transparent 0, #000 6%, #000 94%, transparent 100%);
+  mask-composite: intersect;
 }

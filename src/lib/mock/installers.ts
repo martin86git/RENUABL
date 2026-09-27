@@ -1,23 +1,31 @@
 import type { Crew, Installer } from "@/lib/domain/types";
 
-// Fictional Victorian installers for development. Replace with the installer network API.
+// Installer network for development. Replace with the installer network API.
+//
+// Primero Electric & Solar (primerosolar.com.au, Malvern East) is RENUABL's
+// installer of choice in Victoria. Its rating and review count are its public
+// Google figures as supplied (Sept 2026: 4.7 from 141 reviews) — refresh them
+// from the Google Business Profile before launch. Service area, capacity and
+// performance figures are PLACEHOLDERS used only for matching and the portal
+// demo; `verifiedStats` stays false so none of them are shown to customers.
+// The other installers are fictional.
 export const INSTALLERS: Installer[] = [
   {
-    id: "ins_brightline",
-    name: "Brightline Electrical",
-    suburbBase: "Brunswick",
-    servicePostcodes: [
-      [3000, 3207], // metropolitan Melbourne
-      [3750, 3810], // outer north and east
-    ],
-    rating: 4.9,
-    reviewCount: 412,
-    installsCompleted: 1860,
-    yearsOperating: 11,
+    id: "ins_primero",
+    name: "Primero Electric & Solar",
+    suburbBase: "Malvern East",
+    servicePostcodes: [[3000, 3999]], // all of Victoria — confirm with Primero
+    rating: 4.7,
+    reviewCount: 141,
+    reviewSource: "Google",
+    installsCompleted: 1500,
+    yearsOperating: 10,
     onTimeRate: 0.97,
     firstTimePassRate: 0.98,
-    accreditations: ["SAA accredited designer & installer", "Licensed electrical contractor", "Battery endorsed"],
+    accreditations: ["Accredited & insured"],
     weeklyCapacity: 14,
+    preferred: true,
+    verifiedStats: false,
   },
   {
     id: "ins_bayside",
@@ -35,6 +43,7 @@ export const INSTALLERS: Installer[] = [
     firstTimePassRate: 0.96,
     accreditations: ["SAA accredited installer", "Licensed electrical contractor"],
     weeklyCapacity: 9,
+    verifiedStats: true, // fictional installer
   },
   {
     id: "ins_westwind",
@@ -53,6 +62,7 @@ export const INSTALLERS: Installer[] = [
     firstTimePassRate: 0.95,
     accreditations: ["SAA accredited installer", "Licensed electrical contractor", "Battery endorsed"],
     weeklyCapacity: 11,
+    verifiedStats: true, // fictional installer
   },
   {
     id: "ins_greenfield",
@@ -67,6 +77,7 @@ export const INSTALLERS: Installer[] = [
     firstTimePassRate: 0.97,
     accreditations: ["SAA accredited installer", "Licensed electrical contractor", "Battery endorsed"],
     weeklyCapacity: 12,
+    verifiedStats: true, // fictional installer
   },
   {
     id: "ins_goldfields",
@@ -84,13 +95,16 @@ export const INSTALLERS: Installer[] = [
     firstTimePassRate: 0.97,
     accreditations: ["SAA accredited installer", "Licensed electrical contractor", "Battery endorsed"],
     weeklyCapacity: 7,
+    verifiedStats: true, // fictional installer
   },
 ];
 
-export const CURRENT_INSTALLER_ID = "ins_brightline";
+export const CURRENT_INSTALLER_ID = "ins_primero";
 
 export const CREWS: Crew[] = [
-  { id: "crew_a", name: "Crew A", lead: "Sam Okafor" },
+  { id: "crew_a", name: "Crew A", lead: "Michael Tran" },
   { id: "crew_b", name: "Crew B", lead: "Priya Nair" },
   { id: "crew_c", name: "Crew C", lead: "Luca Romano" },
 ];
+
+export const CURRENT_USER = { name: "Michael Tran", firstName: "Michael" };

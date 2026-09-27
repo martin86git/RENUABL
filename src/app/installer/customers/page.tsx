@@ -16,7 +16,7 @@ export default async function CustomersPage() {
           {customers.map((c) => (
             <li key={c.id}>
               <Link href={`/installer/jobs/${c.id}`} className="flex min-h-16 items-center gap-4 px-5 py-3 hover:bg-surface-2/40">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-2 text-[13px] font-semibold">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-2 text-[13px] font-medium">
                   {c.name
                     .split(" ")
                     .map((w) => w[0])

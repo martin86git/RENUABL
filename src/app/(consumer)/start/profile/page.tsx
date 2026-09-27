@@ -1,141 +1,84 @@
 "use client";
 
+import { ArrowRight, Car, Fan, House, Waves, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
+import { BrandAside } from "@/components/consumer/brand-aside";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { isProfileComplete, useFlow } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
-import { ChoiceCards, type ChoiceOption } from "@/components/ui/controls";
-import { EnergyOrb } from "@/components/ui/energy-orb";
-import { Button, Card } from "@/components/ui/primitives";
+import { Mascot } from "@/components/ui/brand-art";
+import { YesNo } from "@/components/ui/controls";
+import { Button, Script } from "@/components/ui/primitives";
 import type { EnergyProfile } from "@/lib/domain/types";
 
-type Question<K extends keyof EnergyProfile> = {
-  key: K;
-  title: string;
-  hint?: string;
-  columns?: 2 | 3 | 4;
-  options: ChoiceOption<EnergyProfile[K]>[];
-};
-
-const QUESTIONS = [
-  {
-    key: "household",
-    title: "Who lives here?",
-    columns: 3,
-    options: [
-      { value: "1-2", label: "1–2 people" },
-      { value: "3-4", label: "3–4 people" },
-      { value: "5+", label: "5 or more" },
-    ],
-  } satisfies Question<"household">,
-  {
-    key: "bill",
-    title: "Roughly, what's your power bill each quarter?",
-    hint: "A best guess is fine.",
-    columns: 4,
-    options: [
-      { value: "under-400", label: "Under $400" },
-      { value: "400-700", label: "$400 – $700" },
-      { value: "700-1000", label: "$700 – $1,000" },
-      { value: "over-1000", label: "Over $1,000" },
-    ],
-  } satisfies Question<"bill">,
-  {
-    key: "daytime",
-    title: "Is someone usually home during the day?",
-    columns: 3,
-    options: [
-      { value: "mostly-home", label: "Most days" },
-      { value: "sometimes", label: "Some days" },
-      { value: "mostly-away", label: "Rarely" },
-    ],
-  } satisfies Question<"daytime">,
-  {
-    key: "ev",
-    title: "Do you drive an electric car?",
-    columns: 3,
-    options: [
-      { value: "have", label: "Yes" },
-      { value: "planning", label: "Thinking about it" },
-      { value: "none", label: "No" },
-    ],
-  } satisfies Question<"ev">,
-  {
-    key: "storeys",
-    title: "How many storeys is your home?",
-    columns: 2,
-    options: [
-      { value: "single", label: "Single storey" },
-      { value: "double", label: "Two or more" },
-    ],
-  } satisfies Question<"storeys">,
-  {
-    key: "backup",
-    title: "How important is keeping the lights on in a blackout?",
-    columns: 3,
-    options: [
-      { value: "important", label: "Very important" },
-      { value: "nice-to-have", label: "Nice to have" },
-      { value: "not-needed", label: "Not needed" },
-    ],
-  } satisfies Question<"backup">,
-] as const;
+const QUESTIONS: { key: keyof EnergyProfile; label: string; icon: LucideIcon }[] = [
+  { key: "ev", label: "Do you have an EV or plan to get one?", icon: Car },
+  { key: "pool", label: "Do you have a pool or spa?", icon: Waves },
+  { key: "electricHeating", label: "Do you use electric heating or cooling?", icon: Fan },
+  { key: "backup", label: "Want backup power during outages?", icon: House },
+];
 
 export default function ProfilePage() {
   const router = useRouter();
   const { state, update } = useFlow();
   const profile = state.profile;
-  const answered = QUESTIONS.filter((q) => profile[q.key] !== undefined).length;
   const complete = isProfileComplete(profile);
 
-  const set = <K extends keyof EnergyProfile>(key: K, value: EnergyProfile[K]) =>
-    // Changing answers resets any manual system adjustments to a fresh recommendation.
-    update({ profile: { ...profile, [key]: value }, config: null });
-
-  const cta = (
-    <Button size="lg" className="w-full lg:w-auto" disabled={!complete} onClick={() => router.push(stepHref("system"))}>
-      {complete ? "See my recommendation" : `${answered} of ${QUESTIONS.length} answered`}
-    </Button>
-  );
+  // Changing answers resets manual adjustments so the recommendation stays honest.
+  const set = (key: keyof EnergyProfile, value: boolean) => update({ profile: { ...profile, [key]: value }, config: null });
 
   return (
     <FlowStep
-      title="Tell us about your home"
-      subtitle="Six quick questions. We use them to size a system that fits how you actually live."
-      cta={cta}
-      aside={
-        <>
-          <Card className="flex flex-col items-center p-8 text-center">
-            <EnergyOrb size={160} />
-            <p className="mt-4 text-[17px] font-semibold">No expertise needed</p>
-            <p className="mt-1 text-[15px] text-muted">
-              We&apos;ll handle kilowatts, inverters and approvals. You just tell us about your routine.
-            </p>
-          </Card>
-          <AskRenuabl context="profile" prompt="Not sure how to answer?" />
-        </>
+      title="Tell us about your home."
+      subtitle="A few quick details so we can recommend the right solution for you."
+      aside={<BrandAside />}
+      ask={<AskRenuabl context="profile" title="Not sure?" subtitle="Ask RENUABL anything about your home." arrow="light" />}
+      cta={
+        <Button size="lg" className="w-full lg:w-72" disabled={!complete} onClick={() => router.push(stepHref("system"))}>
+          Continue <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
+        </Button>
       }
     >
-      <div className="space-y-10">
-        {QUESTIONS.map((q) => (
-          <fieldset key={q.key}>
-            <legend className="text-[18px] font-semibold">{q.title}</legend>
-            {"hint" in q && q.hint && <p className="mt-1 text-[14px] text-muted">{q.hint}</p>}
-            <div className="mt-4">
-              <ChoiceCards
-                label={q.title}
-                columns={q.columns}
-                value={profile[q.key] as string | undefined}
-                onChange={(v) => set(q.key, v as never)}
-                options={q.options as unknown as ChoiceOption<string>[]}
-              />
-            </div>
-          </fieldset>
-        ))}
-      </div>
-      <div className="mt-10 lg:hidden">
-        <AskRenuabl context="profile" prompt="Not sure how to answer?" />
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,360px)_1fr]">
+        {/* Desktop: icon cards. Mobile: one card with rows, toggles right-aligned. */}
+        <ul className="hidden space-y-2.5 lg:block">
+          {QUESTIONS.map(({ key, label, icon: Icon }) => (
+            <li key={key} className="flex gap-5 rounded-[var(--radius-card)] bg-surface px-5 py-4 shadow-[var(--shadow-soft)]">
+              <Icon className="mt-1 h-7 w-7 shrink-0 text-ink" strokeWidth={1.3} aria-hidden />
+              <div>
+                <p className="max-w-[210px] text-[13.5px] leading-snug text-ink-2">{label}</p>
+                <div className="mt-2.5">
+                  <YesNo label={label} value={profile[key]} onChange={(v) => set(key, v)} />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <ul className="divide-y divide-line rounded-[var(--radius-card)] bg-surface px-5 shadow-[var(--shadow-soft)] lg:hidden">
+          {QUESTIONS.map(({ key, label }) => (
+            <li key={key} className="py-4">
+              <p className="text-[14px] text-ink-2">{label}</p>
+              <div className="mt-2 flex justify-end">
+                <YesNo label={label} value={profile[key]} onChange={(v) => set(key, v)} />
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <div className="relative hidden items-center justify-center lg:flex">
+          <Mascot className="h-auto w-[300px] xl:w-[330px]" float />
+          <Script className="absolute -right-2 bottom-4 text-[22px] xl:right-4">
+            Smarter
+            <br />
+            &nbsp;energy.
+            <br />
+            &nbsp;&nbsp;Brighter
+            <br />
+            &nbsp;&nbsp;&nbsp;tomorrows.
+          </Script>
+        </div>
       </div>
     </FlowStep>
   );

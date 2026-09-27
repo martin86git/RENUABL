@@ -12,7 +12,7 @@ export default function ResourcesPage() {
         {listResources().map((r) => (
           <article key={r.id} className="rounded-2xl border border-line bg-surface p-5">
             <BookOpen className="h-5 w-5 text-muted" aria-hidden />
-            <h2 className="mt-3 text-[16px] font-semibold">{r.title}</h2>
+            <h2 className="mt-3 text-[16px] font-medium">{r.title}</h2>
             <p className="mt-1 text-[14px] text-muted">{r.body}</p>
           </article>
         ))}

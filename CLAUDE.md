@@ -4,6 +4,8 @@
 
 ## Read first
 
+- `docs/design/` holds the approved visual design (brand sheet, desktop + mobile customer screens, installer portal). **Match it.** It overrides any earlier styling in this repo.
+
 - `docs/product-contract/` is the UX contract (master prompt + four surface specs). When anything is ambiguous, prefer simplicity and those principles over adding features.
 - `docs/BUSINESS_MODEL.md`: the household, not the lead or the job, is the core entity. Solar is product 1 of a catalogue.
 
@@ -15,6 +17,19 @@
 - Intelligence is branded "Ask RENUABL", never labelled "AI".
 - Minimise jargon; technical detail lives behind disclosures.
 - Installer portal is deliberately dark; green (`positive`) is reserved for confirmed / on-track / available / positive states.
+
+## Brand system (from `docs/design/brand-and-desktop.webp`)
+
+- Colours: Background `#FAF9F6`, Sand `#F0ECE7`, Sage `#D9E7DC`, Forest `#1E3A2E`, Charcoal `#1A1A1A`, White. They live as tokens in `src/app/globals.css`; use `bg-canvas`, `bg-surface`, `bg-sage`, `text-forest`, `bg-primary`, etc.
+- Type: Inter for UI (headlines large, regular weight, tight tracking), Source Serif for editorial lines ("Cleaner homes. Lower bills."), Caveat script for handwritten accents (`<Script>`).
+- Voice: clear, reassuring, human, optimistic, modern, built for everyday people.
+- Mascot and photography: `src/components/ui/brand-art.tsx`. Files in `public/brand/` are crops from the mockups (placeholders); replace them with the original renders and licensed photos under the same names, then clear `.next/cache/images` locally.
+- Light artwork uses `.art-blend` (multiply + feathered edges) so it sits on the page colour without a box.
+
+## Real businesses and claims
+
+- Primero Electric & Solar is the installer of choice in Victoria. Only show figures that are real and attributed (its Google rating: 4.7 from 141 reviews, as supplied). Never invent ratings, review counts, install numbers or testimonials for a real business: `verifiedStats`/`reviewSource` on `Installer` gate what customers see.
+- Brand proof points and testimonials in `src/lib/mock/brand.ts` are design placeholders and must be replaced with verified data before launch (Australian Consumer Law).
 
 ## Launch market
 

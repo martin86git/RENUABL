@@ -14,28 +14,32 @@ export interface Address {
 }
 
 // ---------------------------------------------------------------------------
-// Energy profile (consumer answers)
+// Home analysis + energy profile (consumer answers)
 // ---------------------------------------------------------------------------
 
-export type HouseholdSize = "1-2" | "3-4" | "5+";
-export type BillBand = "under-400" | "400-700" | "700-1000" | "over-1000";
-export type DaytimePresence = "mostly-home" | "sometimes" | "mostly-away";
-export type EvStatus = "have" | "planning" | "none";
 export type Storeys = "single" | "double";
-export type BackupPreference = "important" | "nice-to-have" | "not-needed";
 
-export interface EnergyProfile {
-  household: HouseholdSize;
-  bill: BillBand;
-  daytime: DaytimePresence;
-  ev: EvStatus;
+/** What RENUABL works out about the home from its address (roof, orientation). */
+export interface HomeAnalysis {
   storeys: Storeys;
-  backup: BackupPreference;
+  roof: string;
+  orientation: string;
+  maxPanels: number;
+}
+
+/** The few yes/no questions the customer answers. */
+export interface EnergyProfile {
+  ev: boolean;
+  pool: boolean;
+  electricHeating: boolean;
+  backup: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // System recommendation
 // ---------------------------------------------------------------------------
+
+export type SystemTier = "recommended" | "independence" | "essential";
 
 export interface SystemConfig {
   panelCount: number;
@@ -59,10 +63,24 @@ export interface PriceBreakdown {
   deposit: number;
 }
 
+export interface TierRecommendation {
+  tier: SystemTier;
+  config: SystemConfig;
+  why: string[];
+}
+
 export interface Recommendation {
-  recommended: SystemConfig;
-  reasons: string[];
+  tiers: Record<SystemTier, TierRecommendation>;
   estimatedAnnualUsageKwh: number;
+}
+
+export type AddOnId = "heat-pump" | "smart-switchboard" | "home-backup" | "smart-home";
+
+export interface AddOn {
+  id: AddOnId;
+  name: string;
+  blurb: string;
+  price: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,6 +100,16 @@ export interface Installer {
   firstTimePassRate: number; // 0..1
   accreditations: string[];
   weeklyCapacity: number;
+  /** RENUABL's installer of choice: always matched first where it operates. */
+  preferred?: boolean;
+  /**
+   * Only show ratings, review counts and install numbers to customers when
+   * they are verified figures supplied by the installer. Never invent them
+   * for a real business.
+   */
+  verifiedStats?: boolean;
+  /** Where `rating`/`reviewCount` come from when they are public third-party figures. */
+  reviewSource?: "Google";
 }
 
 export interface InstallerMatch {

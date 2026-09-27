@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarCheck } from "lucide-react";
+import { ArrowRight, CalendarDays } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef } from "react";
 import { FlowGuard } from "@/components/consumer/flow-guard";
@@ -11,7 +11,7 @@ import { MonthCalendar } from "@/components/ui/month-calendar";
 import { Button, Card, cn } from "@/components/ui/primitives";
 import { formatDate } from "@/lib/domain/format";
 import { INSTALL_WINDOWS, getWindow } from "@/lib/domain/scheduling";
-import { getAvailability } from "@/lib/services/consumer";
+import { getAvailability, getInstaller } from "@/lib/services/consumer";
 
 function DateScreen() {
   const router = useRouter();
@@ -21,88 +21,80 @@ function DateScreen() {
   const day = availability.find((a) => a.date === state.installDate);
   const window = state.windowId ? getWindow(state.windowId) : undefined;
   const ready = Boolean(day && window && day.windows.includes(window.id));
-  const windowsRef = useRef<HTMLDivElement>(null);
+  const timesRef = useRef<HTMLDivElement>(null);
+  const installer = state.installerId ? getInstaller(state.installerId) : undefined;
 
-  const summary = (
-    <div className="flex items-center gap-3">
-      <CalendarCheck className="h-5 w-5 shrink-0 text-muted" aria-hidden />
-      <p className="text-[15px]" aria-live="polite">
-        {day ? (
-          <>
-            <span className="font-semibold">{formatDate(day.date)}</span>
-            {ready && window ? (
-              <span className="text-muted"> · arrival {window.label}</span>
-            ) : (
-              <span className="text-muted"> · choose an arrival time</span>
-            )}
-          </>
-        ) : (
-          <span className="text-muted">Choose a date that suits you</span>
-        )}
-      </p>
+  const times = (
+    <div ref={timesRef}>
+      <div className="flex items-baseline justify-between">
+        <p className="text-[15px] text-ink">Available times</p>
+        <p className="text-[12.5px] text-muted">
+          {day ? formatDate(day.date, { weekday: "long", day: "numeric", month: "long" }) : "Pick a date first"}
+        </p>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Arrival time">
+        {INSTALL_WINDOWS.filter((w) => day?.windows.includes(w.id)).map((w) => {
+          const selected = state.windowId === w.id;
+          return (
+            <button
+              key={w.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => update({ windowId: w.id })}
+              className={cn(
+                "h-10 rounded-full text-[13.5px] tabular-nums transition",
+                selected
+                  ? "bg-primary text-primary-ink"
+                  : "bg-surface text-ink-2 shadow-[0_0_0_1px_var(--line)] hover:shadow-[0_0_0_1px_var(--line-strong)]",
+              )}
+            >
+              {w.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 
   return (
     <FlowStep
-      title="When would you like it installed?"
-      subtitle="Most installs take a single day. Dots show days your installer is available."
-      wide
+      title="Select your installation date."
+      subtitle={`Choose a date that works for you with ${installer ? installer.name : "your matched installer"}.`}
       cta={
-        <div className="space-y-3 lg:flex lg:items-center lg:gap-6 lg:space-y-0">
-          <div className="lg:hidden">{summary}</div>
-          <Button size="lg" className="w-full lg:w-auto" disabled={!ready} onClick={() => router.push(stepHref("reserve"))}>
-            Continue
-          </Button>
-        </div>
+        <Button size="lg" className="w-full lg:w-72" disabled={!ready} onClick={() => router.push(stepHref("reserve"))}>
+          Continue <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
+        </Button>
       }
     >
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        <Card className="p-5 sm:p-6 lg:col-span-7 xl:col-span-6">
+      <div className="grid max-w-4xl grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
+        <Card className="p-5">
           <MonthCalendar
             available={dates}
             value={state.installDate}
             onChange={(installDate) => {
               const next = availability.find((a) => a.date === installDate);
               update({ installDate, windowId: next?.windows.includes(state.windowId ?? "") ? state.windowId : null });
-              // On stacked (mobile) layouts, bring the arrival times into view next.
+              // On stacked (mobile) layouts, bring the times into view next.
               if (typeof matchMedia !== "undefined" && !matchMedia("(min-width: 1024px)").matches) {
-                windowsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                timesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
               }
             }}
           />
         </Card>
-        <div ref={windowsRef} className="space-y-4 lg:col-span-5 xl:col-span-4">
-          <Card className="p-5 sm:p-6">
-            <p className="text-[15px] font-semibold">Arrival time</p>
-            <p className="mt-0.5 text-[13px] text-muted">{day ? formatDate(day.date) : "Pick a date first"}</p>
-            <div className="mt-4 grid grid-cols-1 gap-2" role="radiogroup" aria-label="Arrival window">
-              {INSTALL_WINDOWS.map((w) => {
-                const open = Boolean(day?.windows.includes(w.id));
-                const selected = state.windowId === w.id && open;
-                return (
-                  <button
-                    key={w.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    disabled={!open}
-                    onClick={() => update({ windowId: w.id })}
-                    className={cn(
-                      "flex h-14 items-center justify-between rounded-full border px-5 text-[15px] transition",
-                      selected ? "border-ink bg-ink text-canvas" : "border-line bg-surface hover:border-line-strong",
-                      !open && "opacity-35",
-                    )}
-                  >
-                    <span className="font-medium">{w.label}</span>
-                    <span className={cn("text-[13px]", selected ? "text-canvas/70" : "text-muted")}>{open ? w.detail : "Unavailable"}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
-          <Card className="hidden p-5 lg:block">{summary}</Card>
-          <p className="px-1 text-[13px] text-muted">You can reschedule for free up to 72 hours before your install.</p>
+        <div className="space-y-5">
+          {times}
+          <div
+            className="hidden items-center gap-3 rounded-[var(--radius-card)] bg-surface p-4 shadow-[var(--shadow-soft)] lg:flex"
+            aria-live="polite"
+          >
+            <CalendarDays className="h-5 w-5 shrink-0 text-muted" strokeWidth={1.5} />
+            <p className="text-[13.5px]">
+              {day ? formatDate(day.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "No date selected"}
+              {ready && window && <span className="text-muted"> · {window.label} arrival</span>}
+            </p>
+          </div>
+          <p className="text-[12.5px] text-muted">Most installs take a single day. Reschedule free up to 72 hours before.</p>
         </div>
       </div>
     </FlowStep>

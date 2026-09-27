@@ -1,19 +1,28 @@
 import type { ReactNode } from "react";
 import { Badge, cn } from "@/components/ui/primitives";
-import { stageLabel } from "@/lib/domain/job-status";
 import type { JobStage } from "@/lib/domain/types";
 
 // Green is reserved for confirmed / on-track / positive states only.
-const STAGE_TONE: Record<JobStage, "positive" | "warning" | "info" | "neutral"> = {
-  new: "info",
-  accepted: "warning",
-  scheduled: "positive",
-  "in-progress": "info",
-  completed: "neutral",
+const STAGE_BADGE: Record<JobStage, { tone: "positive" | "warning" | "info" | "neutral"; label: string }> = {
+  new: { tone: "info", label: "New" },
+  accepted: { tone: "warning", label: "Awaiting confirmation" },
+  scheduled: { tone: "positive", label: "Confirmed" },
+  "in-progress": { tone: "positive", label: "On track" },
+  completed: { tone: "neutral", label: "Completed" },
 };
 
 export function StageBadge({ stage }: { stage: JobStage }) {
-  return <Badge tone={STAGE_TONE[stage]}>{stageLabel(stage)}</Badge>;
+  const b = STAGE_BADGE[stage];
+  return <Badge tone={b.tone}>{b.label}</Badge>;
+}
+
+/** Small grey package chip, e.g. "Solar + Battery". */
+export function Chip({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <span className={cn("inline-flex whitespace-nowrap rounded-md bg-surface-2 px-2.5 py-1 text-[12px] text-ink-2", className)}>
+      {children}
+    </span>
+  );
 }
 
 export function Panel({
@@ -31,7 +40,7 @@ export function Panel({
     <section className={cn("rounded-2xl border border-line bg-surface", className)}>
       {(title || action) && (
         <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4">
-          {title && <h2 className="text-[15px] font-semibold">{title}</h2>}
+          {title && <h2 className="text-[17px] text-ink">{title}</h2>}
           {action}
         </div>
       )}
@@ -44,8 +53,8 @@ export function PageHeader({ title, subtitle, action }: { title: string; subtitl
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-[24px] font-semibold tracking-tight lg:text-[28px]">{title}</h1>
-        {subtitle && <p className="mt-1 text-[14px] text-muted">{subtitle}</p>}
+        <h1 className="text-[26px] font-normal tracking-[-0.03em] lg:text-[30px]">{title}</h1>
+        {subtitle && <p className="mt-1 text-[15px] text-ink-2">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -66,7 +75,7 @@ export function Metric({
   return (
     <div className="rounded-2xl border border-line bg-surface p-5">
       <p className="text-[13px] text-muted">{label}</p>
-      <p className={cn("mt-2 text-[28px] font-semibold tracking-tight tabular-nums", positive && "text-positive")}>{value}</p>
+      <p className={cn("mt-2 text-[28px] font-normal tracking-tight tabular-nums", positive && "text-positive")}>{value}</p>
       {detail && <p className="mt-1 text-[12px] text-muted">{detail}</p>}
     </div>
   );

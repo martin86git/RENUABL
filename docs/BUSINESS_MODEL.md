@@ -50,7 +50,7 @@ better customer experience  ←  better pricing  ←─────────�
 
 ## Launch market
 
-Victoria first: metropolitan Melbourne plus Geelong, Ballarat and Bendigo. Expanding to another state means adding installers and market settings, not reshaping the product.
+Victoria first: metropolitan Melbourne plus Geelong, Ballarat and Bendigo. Primero Electric & Solar (Malvern East) is RENUABL's installer of choice and is matched first wherever it operates. Expanding to another state means adding installers and market settings, not reshaping the product.
 
 ## Design principles that follow
 

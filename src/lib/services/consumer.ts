@@ -4,9 +4,10 @@
  */
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { rankInstallers } from "@/lib/domain/matching";
-import { buildAvailability, buildCallSlots } from "@/lib/domain/scheduling";
-import type { Address, InstallerMatch } from "@/lib/domain/types";
+import { buildAvailability, stableHash } from "@/lib/domain/scheduling";
+import type { Address, HomeAnalysis, InstallerMatch } from "@/lib/domain/types";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
+import { PROOF_POINTS, TESTIMONIALS } from "@/lib/mock/brand";
 import { INSTALLERS } from "@/lib/mock/installers";
 
 const latency = (ms = 250) => new Promise((r) => setTimeout(r, ms));
@@ -32,6 +33,29 @@ export function parseAddress(input: string): Address | null {
   return { line: line.trim(), suburb, state, postcode };
 }
 
+/** Steps shown while RENUABL analyses a home. */
+export const ANALYSIS_STEPS = [
+  "Checking roof size & orientation",
+  "Analysing solar potential",
+  "Local weather patterns",
+  "Electricity usage",
+  "Personalising your results",
+] as const;
+
+/**
+ * Mock home analysis. In production this comes from roof imagery, solar
+ * irradiance and network data for the address.
+ */
+export function analyseHome(address: Address | null): HomeAnalysis {
+  const h = stableHash(address ? `${address.line}${address.postcode}` : "default");
+  return {
+    storeys: h % 3 === 0 ? "double" : "single",
+    roof: ["Colorbond, 20° pitch", "Terracotta tile, 22° pitch", "Concrete tile, 18° pitch"][h % 3],
+    orientation: ["North", "North / west split", "North-east"][(h >> 3) % 3],
+    maxPanels: 30 + (h % 7),
+  };
+}
+
 export function matchInstallers(postcode: string): InstallerMatch[] {
   const ranked = rankInstallers(INSTALLERS, postcode);
   // Fall back to the whole network rather than dead-ending the customer.
@@ -46,17 +70,13 @@ export function getAvailability(installerId: string, from = new Date()) {
   return buildAvailability(installerId, from);
 }
 
-export function getCallSlots(from = new Date()) {
-  return buildCallSlots(from);
-}
+export type PaymentMethod = "card" | "apple-pay" | "google-pay" | "bank-transfer";
 
 export interface ReservationResult {
   reservationId: string;
   amount: number;
   method: PaymentMethod;
 }
-
-export type PaymentMethod = "apple-pay" | "google-pay" | "card";
 
 export async function reserveDeposit(amount: number, method: PaymentMethod): Promise<ReservationResult> {
   await latency(900);
@@ -67,7 +87,10 @@ export async function reserveDeposit(amount: number, method: PaymentMethod): Pro
   };
 }
 
-export async function bookConfirmationCall(date: string, time: string) {
-  await latency(500);
-  return { date, time, confirmed: true as const };
+export function getProofPoints() {
+  return PROOF_POINTS;
+}
+
+export function getTestimonials() {
+  return TESTIMONIALS;
 }

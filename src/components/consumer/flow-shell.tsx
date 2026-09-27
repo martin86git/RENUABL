@@ -1,135 +1,169 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { ArrowLeft, CircleCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { Wordmark, cn } from "@/components/ui/primitives";
-import { FLOW_STEPS, stepHref, stepIndex } from "./steps";
+import { cn } from "@/components/ui/primitives";
+import { ConsumerTopBar } from "./consumer-top-bar";
 import { useFlow } from "./flow-state";
-import { formatAddress } from "@/lib/mock/addresses";
+import { FLOW_STEPS, previousHref, stepIndex } from "./steps";
 
-/** Frame for the guided flow: progress navigation replaces the generic nav. */
-export function FlowShell({ children }: { children: ReactNode }) {
+function useCurrentStep() {
   const pathname = usePathname();
-  const current = stepIndex(pathname.split("/")[2] ?? "");
+  const slug = pathname.split("/")[2] ?? "";
+  return { slug, index: stepIndex(slug) };
+}
+
+/** Mobile progress: small dots joined by a line, as in the design. */
+export function ProgressDots({ current, className }: { current: number; className?: string }) {
+  return (
+    <ol className={cn("flex items-center", className)} aria-label={`Step ${current + 1} of ${FLOW_STEPS.length}`}>
+      {FLOW_STEPS.map((s, i) => (
+        <li key={s.key} className="flex items-center" aria-current={i === current ? "step" : undefined}>
+          {i > 0 && <span className={cn("h-px w-5", i <= current ? "bg-ink/70" : "bg-line-strong")} />}
+          <span
+            className={cn(
+              "block rounded-full",
+              i <= current ? "h-2 w-2 bg-ink" : "h-1.5 w-1.5 border border-line-strong bg-canvas",
+              i === current && "ring-4 ring-ink/10",
+            )}
+          />
+          <span className="sr-only">{s.title}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function StepRail({ current, address }: { current: number; address: string | null }) {
+  return (
+    <nav aria-label="Progress" className="sticky top-6">
+      <ol className="relative space-y-1">
+        <span aria-hidden className="absolute bottom-6 left-[27px] top-6 w-px bg-line" />
+        {FLOW_STEPS.map((s, i) => {
+          const done = i < current;
+          const active = i === current;
+          const subtitle = i === 0 && address ? address : s.subtitle;
+          const body = (
+            <>
+              <span
+                className={cn(
+                  "relative z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full text-[12px]",
+                  done || active ? "bg-leaf text-white" : "bg-surface-2 text-muted",
+                )}
+              >
+                {i + 1}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className={cn("block text-[14px]", done || active ? "text-ink" : "text-muted")}>{s.title}</span>
+                <span className="block truncate text-[12px] text-muted">{subtitle}</span>
+              </span>
+              {done && <CircleCheck className="h-[18px] w-[18px] shrink-0 text-leaf" strokeWidth={1.6} aria-label="Done" />}
+            </>
+          );
+          return (
+            <li key={s.key} aria-current={active ? "step" : undefined}>
+              <div className={cn("flex items-center gap-3.5 rounded-2xl px-3.5 py-4", active && "bg-surface shadow-[var(--shadow-soft)]")}>
+                {body}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+/** Frame for the guided flow: progress navigation replaces generic navigation. */
+export function FlowShell({ children }: { children: ReactNode }) {
+  const { index } = useCurrentStep();
   const { state } = useFlow();
+  const address = state.address ? `${state.address.line}, ${state.address.state}` : null;
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-12">
-        <Link href="/" aria-label="RENUABL home">
-          <Wordmark />
-        </Link>
-        {state.address && <p className="hidden max-w-sm truncate text-[13px] text-muted md:block">{formatAddress(state.address)}</p>}
-        <Link href="/my/support" className="text-[14px] text-ink-2 hover:text-ink">
-          Help
-        </Link>
-      </header>
-
-      {/* Mobile progress: dots + current title */}
-      <div className="px-5 pb-2 pt-1 lg:hidden">
-        <ol className="flex gap-1.5" aria-label="Progress">
-          {FLOW_STEPS.map((s, i) => (
-            <li
-              key={s.slug}
-              aria-current={i === current ? "step" : undefined}
-              className={cn("h-1 flex-1 rounded-full transition-colors", i <= current ? "bg-ink" : "bg-line")}
-            >
-              <span className="sr-only">{s.title}</span>
-            </li>
-          ))}
-        </ol>
-        {current >= 0 && (
-          <p className="mt-3 text-[13px] font-medium text-muted">
-            Step {current + 1} of {FLOW_STEPS.length} · {FLOW_STEPS[current].title}
-          </p>
-        )}
-      </div>
-
-      <div className="mx-auto grid w-full max-w-[1440px] flex-1 grid-cols-1 gap-10 px-5 sm:px-8 lg:grid-cols-12 lg:px-12 lg:pt-8">
-        {/* Desktop progress rail */}
-        <nav className="hidden lg:col-span-3 lg:block xl:col-span-2" aria-label="Progress">
-          <ol className="sticky top-8 space-y-1">
-            {FLOW_STEPS.map((s, i) => {
-              const done = i < current;
-              const active = i === current;
-              const content = (
-                <>
-                  <span
-                    className={cn(
-                      "grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px] font-semibold",
-                      done && "border-ink bg-ink text-canvas",
-                      active && "border-ink text-ink",
-                      !done && !active && "border-line-strong text-muted",
-                    )}
-                  >
-                    {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
-                  </span>
-                  <span className={cn("text-[14px]", active ? "font-semibold text-ink" : done ? "text-ink-2" : "text-muted")}>
-                    {s.title}
-                  </span>
-                </>
-              );
-              return (
-                <li key={s.slug} aria-current={active ? "step" : undefined}>
-                  {done ? (
-                    <Link href={stepHref(s.slug)} className="flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-surface-2">
-                      {content}
-                    </Link>
-                  ) : (
-                    <div className="flex items-center gap-3 px-2 py-2.5">{content}</div>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        </nav>
-
-        <div className="lg:col-span-9 xl:col-span-10">{children}</div>
+      <ConsumerTopBar className="hidden lg:flex" />
+      <div className="mx-auto flex w-full max-w-[1440px] flex-1 lg:border-t lg:border-line">
+        <aside className="hidden w-[272px] shrink-0 border-r border-line px-5 py-8 lg:block">
+          <StepRail current={index} address={address} />
+        </aside>
+        <div className="min-w-0 flex-1">{children}</div>
       </div>
     </div>
   );
 }
 
 /**
- * A single step. Desktop: centre task + optional contextual aside.
- * Mobile: stacked, with the primary CTA in a sticky bottom bar.
+ * One step. Desktop: centre task (+ optional contextual aside), with the
+ * Ask RENUABL card and primary CTA side by side at the bottom.
+ * Mobile: back arrow + progress dots, stacked content, sticky CTA.
  */
 export function FlowStep({
   title,
   subtitle,
   children,
   aside,
+  ask,
   cta,
-  wide = false,
+  hideMobileHeader = false,
 }: {
-  title: string;
+  title: ReactNode;
   subtitle?: ReactNode;
   children: ReactNode;
   aside?: ReactNode;
+  ask?: ReactNode;
   cta?: ReactNode;
-  wide?: boolean;
+  hideMobileHeader?: boolean;
 }) {
+  const { slug, index } = useCurrentStep();
+
   return (
-    <div className="grid grid-cols-1 gap-10 pb-48 lg:grid-cols-10 lg:pb-16">
-      <section className={cn("animate-fade-up", aside ? "lg:col-span-6" : wide ? "lg:col-span-10" : "lg:col-span-7")}>
-        <h1 className="text-[28px] font-semibold leading-tight tracking-tight sm:text-[34px] lg:text-[40px]">{title}</h1>
-        {subtitle && <p className="mt-3 max-w-xl text-[16px] leading-relaxed text-muted lg:text-[17px]">{subtitle}</p>}
-        <div className="mt-8">{children}</div>
-        {cta && <div className="mt-10 hidden lg:block">{cta}</div>}
-      </section>
-      {aside && (
-        <aside className="hidden lg:col-span-4 lg:block">
-          <div className="sticky top-8 space-y-4">{aside}</div>
-        </aside>
-      )}
-      {/* Kept outside the animated section: a transformed ancestor would break `position: fixed`. */}
-      {cta && (
-        <div className="flow-sticky-cta fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/90 px-5 pt-3 backdrop-blur-md pb-safe lg:hidden">
-          {cta}
-        </div>
-      )}
+    <div className="flex min-h-full">
+      <div className="min-w-0 flex-1">
+        {!hideMobileHeader && (
+          <div className="flex items-center gap-4 px-5 pt-5 lg:hidden">
+            <Link
+              href={previousHref(slug)}
+              aria-label="Back"
+              className="-ml-1 grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2"
+            >
+              <ArrowLeft className="h-5 w-5" strokeWidth={1.6} />
+            </Link>
+            <ProgressDots current={index} className="mx-auto pr-9" />
+          </div>
+        )}
+
+        <section className={cn("animate-fade-up px-5 pb-40 pt-8 sm:px-8 lg:px-12 lg:pb-10 lg:pt-8", cta ? "" : "pb-16")}>
+          <div className="mb-3 hidden lg:block">
+            <span className="block h-0.5 w-8 rounded-full bg-leaf" />
+            <p className="mt-2 text-[13px] text-muted">
+              Step {index + 1} of {FLOW_STEPS.length}
+            </p>
+          </div>
+          <h1 className="text-[34px] font-normal leading-[1.05] tracking-[-0.035em] sm:text-[38px] lg:text-[36px] xl:text-[40px]">
+            {title}
+          </h1>
+          {subtitle && <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-muted lg:mt-2">{subtitle}</p>}
+          <div className="mt-7">{children}</div>
+
+          {(ask || cta) && (
+            <div className="mt-8 hidden items-center gap-6 lg:flex">
+              {ask && <div className="max-w-md flex-1">{ask}</div>}
+              {cta && <div className={cn("shrink-0", !ask && "min-w-72")}>{cta}</div>}
+            </div>
+          )}
+          {ask && <div className="mt-6 lg:hidden">{ask}</div>}
+        </section>
+
+        {/* Kept outside the animated section: a transformed ancestor would break `position: fixed`. */}
+        {cta && (
+          <div className="flow-sticky-cta fixed inset-x-0 bottom-0 z-30 bg-gradient-to-t from-canvas via-canvas to-canvas/0 px-5 pt-6 pb-safe lg:hidden [&_a]:rounded-xl [&_button]:rounded-xl">
+            {cta}
+          </div>
+        )}
+      </div>
+      {aside && <aside className="hidden w-[300px] shrink-0 border-l border-line px-6 py-8 xl:block">{aside}</aside>}
     </div>
   );
 }

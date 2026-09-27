@@ -2,13 +2,17 @@
  * Installer portal service layer. Replace mock reads/writes with API calls.
  */
 import type { FieldStatus, Job, JobStage } from "@/lib/domain/types";
-import { CREWS, CURRENT_INSTALLER_ID, INSTALLERS } from "@/lib/mock/installers";
+import { CREWS, CURRENT_INSTALLER_ID, CURRENT_USER, INSTALLERS } from "@/lib/mock/installers";
 import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs, buildPayouts } from "@/lib/mock/jobs";
 import { todayInMarket } from "@/lib/domain/market";
 import { formatShortDate } from "@/lib/domain/format";
 
 export function getCurrentInstaller() {
   return INSTALLERS.find((i) => i.id === CURRENT_INSTALLER_ID)!;
+}
+
+export function getCurrentUser() {
+  return CURRENT_USER;
 }
 
 export function listJobs(stage?: JobStage): Job[] {
@@ -34,6 +38,7 @@ export function getDashboardCounts() {
   const jobs = listJobs();
   return {
     newJobs: jobs.filter((j) => j.stage === "new").length,
+    awaitingConfirmation: jobs.filter((j) => j.stage === "new" || j.stage === "accepted").length,
     upcoming: jobs.filter((j) => j.stage === "scheduled").length,
     awaitingAction: jobs.filter(
       (j) => j.stage === "new" || j.stage === "accepted" || j.documents.some((d) => d.status === "required" && d.kind === "approval"),

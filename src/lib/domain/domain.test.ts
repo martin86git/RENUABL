@@ -1,69 +1,95 @@
 import { describe, expect, it } from "vitest";
 import { advanceStatus, nextFieldStatus } from "./job-status";
-import { marketDateTime, todayInMarket } from "./market";
+import { greeting, marketDateTime, todayInMarket } from "./market";
 import { rankInstallers } from "./matching";
-import { estimateAnnualUsage, estimateOutcome, priceSystem, recommendSystem, ASSUMPTIONS } from "./recommendation";
+import { ADD_ONS, ASSUMPTIONS, describeSystem, estimateAnnualUsage, estimateOutcome, priceSystem, recommendSystem } from "./recommendation";
 import { buildAvailability, fromISODate } from "./scheduling";
-import type { EnergyProfile } from "./types";
+import type { EnergyProfile, HomeAnalysis } from "./types";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
 import { INSTALLERS } from "@/lib/mock/installers";
 
-const base: EnergyProfile = {
-  household: "3-4",
-  bill: "400-700",
-  daytime: "sometimes",
-  ev: "none",
-  storeys: "single",
-  backup: "nice-to-have",
-};
+const base: EnergyProfile = { ev: false, pool: false, electricHeating: false, backup: false };
+const analysis: HomeAnalysis = { storeys: "single", roof: "Colorbond", orientation: "North", maxPanels: 36 };
 
 describe("recommendSystem", () => {
-  it("sizes solar within panel limits", () => {
-    const small = recommendSystem({ ...base, bill: "under-400" });
-    const large = recommendSystem({ ...base, bill: "over-1000", ev: "have" });
-    expect(small.recommended.panelCount).toBeGreaterThanOrEqual(ASSUMPTIONS.minPanels);
-    expect(large.recommended.panelCount).toBeLessThanOrEqual(ASSUMPTIONS.maxPanels);
-    expect(large.recommended.panelCount).toBeGreaterThan(small.recommended.panelCount);
+  it("offers three tiers ordered by size", () => {
+    const { tiers } = recommendSystem({ ...base, pool: true }, analysis);
+    expect(tiers.essential.config.panelCount).toBeLessThan(tiers.recommended.config.panelCount);
+    expect(tiers.recommended.config.panelCount).toBeLessThanOrEqual(tiers.independence.config.panelCount);
+    expect(tiers.essential.config.batteryKwh).toBe(0);
+    expect(tiers.independence.config.batteryKwh).toBeGreaterThan(tiers.recommended.config.batteryKwh);
   });
 
-  it("adds a battery when backup matters", () => {
-    expect(recommendSystem({ ...base, backup: "important" }).recommended.batteryKwh).toBeGreaterThan(0);
+  it("sizes solar within panel and roof limits", () => {
+    const heavy = recommendSystem({ ev: true, pool: true, electricHeating: true, backup: true }, { ...analysis, maxPanels: 24 });
+    for (const t of Object.values(heavy.tiers)) {
+      expect(t.config.panelCount).toBeGreaterThanOrEqual(ASSUMPTIONS.minPanels);
+      expect(t.config.panelCount).toBeLessThanOrEqual(24);
+    }
   });
 
-  it("adds an EV charger for EV owners and planners", () => {
-    expect(recommendSystem({ ...base, ev: "planning" }).recommended.evCharger).toBe(true);
-    expect(recommendSystem(base).recommended.evCharger).toBe(false);
+  it("adds an EV charger only for EV households", () => {
+    expect(recommendSystem({ ...base, ev: true }, analysis).tiers.recommended.config.evCharger).toBe(true);
+    expect(recommendSystem(base, analysis).tiers.recommended.config.evCharger).toBe(false);
   });
 
-  it("counts EV usage in annual usage", () => {
-    expect(estimateAnnualUsage({ ...base, ev: "have" }) - estimateAnnualUsage(base)).toBe(ASSUMPTIONS.evAnnualKwh);
+  it("counts each answer in annual usage", () => {
+    expect(estimateAnnualUsage({ ...base, ev: true }) - estimateAnnualUsage(base)).toBe(ASSUMPTIONS.evAnnualKwh);
+    expect(estimateAnnualUsage({ ...base, pool: true }) - estimateAnnualUsage(base)).toBe(ASSUMPTIONS.poolAnnualKwh);
   });
 });
 
 describe("priceSystem", () => {
-  it("applies rebates and keeps a fixed deposit", () => {
-    const price = priceSystem({ panelCount: 20, batteryKwh: 10, evCharger: false }, { storeys: "double" });
-    expect(price.total).toBe(price.gross - price.rebates);
-    expect(price.deposit).toBe(199);
-    expect(price.lines.some((l) => l.label.includes("Double-storey"))).toBe(true);
+  it("applies rebates, includes add-ons and keeps a fixed deposit", () => {
+    const config = { panelCount: 30, batteryKwh: 13.5, evCharger: true };
+    const plain = priceSystem(config, { storeys: "double" });
+    const withAddOns = priceSystem(config, { storeys: "double" }, ["heat-pump", "smart-home"]);
+    expect(plain.total).toBe(plain.gross - plain.rebates);
+    expect(plain.deposit).toBe(500);
+    expect(plain.lines.some((l) => l.label.includes("Double-storey"))).toBe(true);
+    const addOnTotal = ADD_ONS.filter((a) => a.id === "heat-pump" || a.id === "smart-home").reduce((s, a) => s + a.price, 0);
+    expect(withAddOns.total - plain.total).toBe(addOnTotal);
   });
 
   it("produces a positive payback estimate", () => {
     const config = { panelCount: 20, batteryKwh: 0, evCharger: false };
-    const outcome = estimateOutcome(config, base, priceSystem(config, base));
+    const outcome = estimateOutcome(config, base, priceSystem(config, analysis));
     expect(outcome.annualSavings).toBeGreaterThan(0);
     expect(outcome.paybackYears).toBeGreaterThan(0);
+  });
+
+  it("describes a system in plain language", () => {
+    expect(describeSystem({ panelCount: 30, batteryKwh: 13.5, evCharger: true })).toBe(
+      "13.2 kW solar + 13.5 kWh battery + EV charger + monitoring",
+    );
   });
 });
 
 describe("rankInstallers", () => {
   it("only returns installers servicing the postcode, best first", () => {
-    expect(rankInstallers(INSTALLERS, "3350").map((r) => r.installer.id)).toEqual(["ins_goldfields"]); // Ballarat
-    expect(rankInstallers(INSTALLERS, "3218").map((r) => r.installer.id)).toEqual(["ins_greenfield"]); // Geelong
+    // Ballarat: Primero (preferred, statewide) then the local specialist.
+    expect(rankInstallers(INSTALLERS, "3350").map((r) => r.installer.id)).toEqual(["ins_primero", "ins_goldfields"]);
     const brighton = rankInstallers(INSTALLERS, "3186");
-    expect(brighton.length).toBeGreaterThan(1);
-    expect(brighton[0].installer.id).toBe("ins_brightline");
-    expect(brighton[0].score).toBeGreaterThanOrEqual(brighton[1].score);
+    expect(brighton[0].installer.id).toBe("ins_primero");
+    expect(brighton.map((r) => r.installer.id)).toContain("ins_bayside");
+    // Non-preferred installers are ordered by score.
+    const base = INSTALLERS.find((i) => i.id === "ins_bayside")!;
+    const ranked = rankInstallers(
+      [
+        { ...base, id: "weaker", rating: 4.2 },
+        { ...base, id: "stronger", rating: 5 },
+      ],
+      "3186",
+    );
+    expect(ranked.map((r) => r.installer.id)).toEqual(["stronger", "weaker"]);
+    // Outside Victoria, only installers that serve the postcode are returned.
+    expect(rankInstallers(INSTALLERS, "2000")).toEqual([]);
+  });
+
+  it("never makes performance claims for installers without verified figures", () => {
+    const primero = rankInstallers(INSTALLERS, "3000").find((r) => r.installer.id === "ins_primero")!;
+    expect(primero.reasons.join(" ")).not.toMatch(/%|RENUABL customers/);
+    expect(primero.reasons).toContain("Rated 4.7 from 141 Google reviews.");
   });
 
   it("covers every sample address", () => {
@@ -86,7 +112,7 @@ describe("launch market time", () => {
 describe("buildAvailability", () => {
   it("respects lead time and skips Sundays", () => {
     const from = new Date(2026, 8, 1);
-    const days = buildAvailability("ins_brightline", from);
+    const days = buildAvailability("ins_primero", from);
     expect(days.length).toBeGreaterThan(10);
     for (const d of days) {
       const date = fromISODate(d.date);
@@ -104,5 +130,13 @@ describe("field status flow", () => {
     for (let i = 0; i < 10; i++) history = advanceStatus(history);
     expect(history.map((h) => h.status)).toEqual(["en-route", "on-site", "installing", "final-checks", "complete"]);
     expect(nextFieldStatus("complete")).toBeNull();
+  });
+});
+
+describe("greeting", () => {
+  it("follows Melbourne time", () => {
+    expect(greeting(new Date("2026-09-27T22:00:00Z"))).toBe("Good morning"); // 8am AEST
+    expect(greeting(new Date("2026-09-28T04:00:00Z"))).toBe("Good afternoon"); // 2pm
+    expect(greeting(new Date("2026-09-28T09:30:00Z"))).toBe("Good evening"); // 7:30pm
   });
 });
