@@ -29,3 +29,9 @@ export function previousHref(slug: string) {
   const prev = FLOW_ROUTES[i - 1];
   return prev === "analysing" ? "/" : stepHref(prev);
 }
+
+/** Where clicking a step in the progress rail goes (step 1 returns to the address). */
+export function stepEntryHref(index: number) {
+  if (index <= 0) return "/";
+  return stepHref(FLOW_STEPS[index].routes[0] as FlowSlug);
+}

@@ -1,16 +1,18 @@
 "use client";
 
-import { ArrowRight, Battery, Check, ChevronRight, Gauge, PlugZap, RotateCcw, Sun, X, type LucideIcon } from "lucide-react";
+import { ArrowRight, Battery, Check, ChevronRight, Gauge, Gift, PlugZap, RotateCcw, Sun, X, type LucideIcon } from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
+import { CareIncludedCard } from "@/components/consumer/care-upsell";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
 import { Segmented, Stepper, Toggle } from "@/components/ui/controls";
 import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
+import { CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
 import { ASSUMPTIONS, TIER_LABELS, isSameConfig, panelsToKw } from "@/lib/domain/recommendation";
 import type { SystemConfig, SystemTier } from "@/lib/domain/types";
@@ -105,6 +107,7 @@ function SystemScreen() {
 
   return (
     <FlowStep
+      width="regular"
       title="Your recommended system."
       subtitle="A tailored system for your home and lifestyle."
       aside={<div className="sticky top-6 space-y-4">{estimate}</div>}
@@ -129,6 +132,21 @@ function SystemScreen() {
           onChange={(t) => update({ tier: t, config: null })}
           options={(Object.keys(TIER_LABELS) as SystemTier[]).map((t) => ({ value: t, label: TIER_LABELS[t] }))}
         />
+        {careIncludedFor(state.tier) ? (
+          <CareIncludedCard />
+        ) : (
+          <button
+            type="button"
+            onClick={() => update({ tier: CARE_INCLUDED_TIER, config: null })}
+            className="flex w-full items-center gap-2.5 rounded-2xl bg-sage/50 px-4 py-3 text-left text-[13px] text-forest hover:bg-sage/80"
+          >
+            <Gift className="h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
+            <span>
+              <span className="font-medium">Higher independence</span> includes {CARE_FREE_MONTHS} months of RENUABL Care free (valued at $
+              {careIncludedValue()}).
+            </span>
+          </button>
+        )}
 
         <Card className="overflow-hidden">
           <ul className="divide-y divide-line">

@@ -36,9 +36,10 @@ That's it. From then on, each push updates the site on its own.
 
 **Environment variables** — Vercel → your project → **Settings → Environment Variables**.
 
-| Variable                   | Default         | When to change                                                                                                |
-| -------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_PREVIEW_MODE` | on (when unset) | Set to `false` only at launch, once real pricing, payments and legal terms are live. Redeploy after changing. |
+| Variable                           | Default         | When to change                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_PREVIEW_MODE`         | on (when unset) | Set to `false` only at launch, once real pricing, payments and legal terms are live. Redeploy after changing.                                                                                                                                                                                                                  |
+| `NEXT_PUBLIC_HUBSPOT_MEETINGS_URL` | unset           | Your HubSpot Meetings link for the 15-minute confirmation call (HubSpot → Library → Meetings → copy link, e.g. `https://meetings.hubspot.com/your-team/confirmation-call`). Customers then book the call themselves on the confirmation screen. Until it's set, that screen says "We'll be in touch". Redeploy after changing. |
 
 **Protecting previews** — to keep the site private while you test, go to **Settings → Deployment Protection** and turn on **Vercel Authentication**. Only people you invite to the Vercel team can then open it.
 

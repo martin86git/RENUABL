@@ -33,6 +33,7 @@ function InstallerScreen() {
 
   return (
     <FlowStep
+      width="narrow"
       title="Your installer is matched."
       subtitle="We've found the best installer for your home."
       cta={

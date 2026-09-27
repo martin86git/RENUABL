@@ -1,17 +1,22 @@
 "use client";
 
-import { Apple, ChevronRight, CreditCard, Landmark, Loader2, Lock, X } from "lucide-react";
-import { Dialog } from "radix-ui";
+import { Apple, Battery, CreditCard, Gauge, Gift, House, Landmark, Loader2, Lock, Plus, PlugZap, Sun } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { CareIncludedCard, CareUpsell } from "@/components/consumer/care-upsell";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
+import { PRODUCT_IMAGES } from "@/components/ui/brand-art";
 import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
+import { CARE_FREE_MONTHS, CARE_PLAN, careIncludedFor, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
 import { formatCurrency, formatDate } from "@/lib/domain/format";
-import { describeSystem } from "@/lib/domain/recommendation";
+import { describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
 import { getWindow } from "@/lib/domain/scheduling";
+import type { AddOnId, LineItemId } from "@/lib/domain/types";
 import { formatAddress } from "@/lib/mock/addresses";
 import { getInstaller, reserveDeposit, type PaymentMethod } from "@/lib/services/consumer";
 
@@ -30,12 +35,35 @@ const METHODS: { id: PaymentMethod; label: string; icon: ReactNode }[] = [
   { id: "bank-transfer", label: "Bank transfer", icon: <Landmark className="h-4 w-4" strokeWidth={1.5} /> },
 ];
 
+const ITEM_ICONS: Partial<Record<LineItemId, typeof Sun>> = {
+  solar: Sun,
+  battery: Battery,
+  "ev-charger": PlugZap,
+  monitoring: Gauge,
+  "double-storey": House,
+};
+
+/** Small tile for a basket line: product photo for add-ons, a line icon otherwise. */
+function ItemArt({ id }: { id: LineItemId }) {
+  const img = PRODUCT_IMAGES[id];
+  const Icon = ITEM_ICONS[id];
+  return (
+    <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-canvas">
+      {img ? (
+        <Image src={img} fill sizes="44px" alt="" aria-hidden className="object-contain p-0.5" />
+      ) : (
+        Icon && <Icon className="h-5 w-5 text-ink" strokeWidth={1.4} aria-hidden />
+      )}
+    </span>
+  );
+}
+
 const field = "h-11 w-full rounded-xl bg-canvas px-4 text-[15px] outline-none ring-1 ring-line placeholder:text-muted/70 focus:ring-ink/40";
 
 function ReserveScreen() {
   const router = useRouter();
   const { state, update } = useFlow();
-  const { config, price } = useSystem();
+  const { config, price, tier } = useSystem();
   const [method, setMethod] = useState<PaymentMethod>("card");
   const [busy, setBusy] = useState(false);
   const installer = state.installerId ? getInstaller(state.installerId) : undefined;
@@ -43,25 +71,26 @@ function ReserveScreen() {
 
   async function pay() {
     setBusy(true);
-    const reservation = await reserveDeposit(price.deposit, method);
+    const reservation = await reserveDeposit(price.deposit, method, state.care, careIncludedFor(state.tier));
     update({ reservation });
     router.push(stepHref("confirmed"));
   }
 
-  const breakdown = (
-    <div className="divide-y divide-line">
-      {price.lines.map((l) => (
-        <StatRow key={l.label} label={l.label} value={formatCurrency(l.amount)} />
-      ))}
-      <StatRow
-        label={<span className="font-medium text-positive">Rebates we claim for you</span>}
-        value={<span className="font-semibold text-positive">−{formatCurrency(price.rebates)}</span>}
-      />
-      <StatRow label={<span className="text-ink">Total after rebates</span>} value={formatCurrency(price.total)} />
-    </div>
-  );
+  const setConfig = (patch: Partial<typeof config>) => update({ config: { ...config, ...patch } });
+  const removeItem = (id: LineItemId) => {
+    if (id === "battery") setConfig({ batteryKwh: 0 });
+    else if (id === "ev-charger") setConfig({ evCharger: false });
+    else update({ addOns: state.addOns.filter((a) => a !== id) });
+  };
+  const addItem = (id: LineItemId) => {
+    if (id === "battery") setConfig({ batteryKwh: tier.config.batteryKwh || 10 });
+    else if (id === "ev-charger") setConfig({ evCharger: true });
+    else update({ addOns: [...state.addOns, id as AddOnId] });
+  };
+  const suggestions = suggestedAdditions(config, tier.config, state.addOns);
+  const careIncluded = careIncludedFor(state.tier);
 
-  const summary = (
+  const basket = (
     <Card className="p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -70,26 +99,98 @@ function ReserveScreen() {
         </div>
         <p className="text-[19px] tabular-nums text-ink">{formatCurrency(price.total)}</p>
       </div>
-      <Dialog.Root>
-        <Dialog.Trigger className="mt-1 flex w-full items-center justify-end gap-1 text-[12.5px] text-ink-2 hover:text-ink lg:hidden">
-          View details <ChevronRight className="h-3.5 w-3.5" />
-        </Dialog.Trigger>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/25" />
-          <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-[28px] bg-canvas p-6 pb-safe shadow-[var(--shadow-lift)]">
-            <div className="flex items-center justify-between">
-              <Dialog.Title className="text-[18px] font-medium">Your system</Dialog.Title>
-              <Dialog.Close className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2" aria-label="Close">
-                <X className="h-5 w-5" />
-              </Dialog.Close>
+      <ul className="mt-4 divide-y divide-line border-t border-line">
+        {price.lines.map((l) => (
+          <li key={l.id} className="flex items-center gap-3 py-3">
+            <ItemArt id={l.id} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[14px] text-ink">{l.label}</p>
+              <p className="text-[12px]">
+                {l.removable ? (
+                  <button
+                    type="button"
+                    onClick={() => removeItem(l.id)}
+                    className="text-muted underline-offset-4 hover:text-danger hover:underline"
+                  >
+                    Remove
+                  </button>
+                ) : l.id === "solar" ? (
+                  <Link href={stepHref("system")} className="text-muted underline-offset-4 hover:text-ink hover:underline">
+                    Edit
+                  </Link>
+                ) : (
+                  <span className="text-muted">Included</span>
+                )}
+              </p>
             </div>
-            <Dialog.Description className="sr-only">Price breakdown</Dialog.Description>
-            <div className="mt-2">{breakdown}</div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-      <div className="mt-4 hidden lg:block">{breakdown}</div>
-      <div className="mt-3 divide-y divide-line border-t border-line lg:mt-1">
+            <p className="text-[14px] tabular-nums text-ink">{formatCurrency(l.amount)}</p>
+          </li>
+        ))}
+        {careIncluded && (
+          <li className="flex items-center gap-3 py-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sage text-forest">
+              <Gift className="h-5 w-5" strokeWidth={1.6} aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[14px] text-ink">
+                {CARE_PLAN.name} · {CARE_FREE_MONTHS} months
+              </p>
+              <p className="text-[12px] text-muted">Included with Higher independence</p>
+            </div>
+            <p className="text-right text-[14px]">
+              <s className="mr-1.5 text-muted">{formatCurrency(careIncludedValue())}</s>
+              <span className="font-semibold text-positive">Free</span>
+            </p>
+          </li>
+        )}
+        <li>
+          <StatRow
+            label={<span className="font-medium text-positive">Rebates we claim for you</span>}
+            value={<span className="font-semibold text-positive">−{formatCurrency(price.rebates)}</span>}
+          />
+        </li>
+        <li>
+          <StatRow label={<span className="text-ink">Total after rebates</span>} value={formatCurrency(price.total)} />
+        </li>
+      </ul>
+    </Card>
+  );
+
+  const additions = suggestions.length > 0 && (
+    <Card className="p-5">
+      <p className="text-[15px] text-ink">Add to your system</p>
+      <p className="text-[12.5px] text-muted">Homes like yours often add these. Installed on the same day.</p>
+      <ul className="mt-3 divide-y divide-line">
+        {suggestions.map((sg) => (
+          <li key={sg.id} className="flex items-center gap-3 py-3">
+            <ItemArt id={sg.id} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] text-ink">{sg.label}</p>
+              <p className="truncate text-[12px] text-muted">{sg.blurb}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[13px] tabular-nums text-ink-2">+{formatCurrency(sg.amount)}</p>
+              <button
+                type="button"
+                onClick={() => addItem(sg.id)}
+                aria-label={`Add ${sg.label}`}
+                className="mt-1 inline-flex h-8 items-center gap-1 rounded-full border border-ink/70 px-3 text-[12.5px] text-ink hover:bg-surface-2"
+              >
+                <Plus className="h-3.5 w-3.5" strokeWidth={1.8} /> Add
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+
+  const care = careIncluded ? <CareIncludedCard /> : <CareUpsell value={state.care} onChange={(c) => update({ care: c })} />;
+
+  const summary = (
+    <Card className="p-5">
+      <p className="text-[15px] text-ink">Order summary</p>
+      <div className="mt-2 divide-y divide-line">
         {state.address && (
           <StatRow label="Home" value={<span className="block max-w-[220px] truncate">{formatAddress(state.address)}</span>} />
         )}
@@ -99,6 +200,14 @@ function ReserveScreen() {
             label="Installation"
             value={`${formatDate(state.installDate, { weekday: "short", day: "numeric", month: "short" })}${window ? ` · ${window.label}` : ""}`}
           />
+        )}
+        <StatRow label="System after rebates" value={formatCurrency(price.total)} />
+        {careIncluded ? (
+          <StatRow label={CARE_PLAN.name} value={<span className="text-positive">{CARE_FREE_MONTHS} months free</span>} />
+        ) : (
+          state.care && (
+            <StatRow label={CARE_PLAN.name} value={<span className="text-right">{carePriceLabel(state.care)} · after switch-on</span>} />
+          )
         )}
       </div>
       <div className="mt-2 flex items-center justify-between border-t border-line pt-4">
@@ -162,6 +271,7 @@ function ReserveScreen() {
 
   return (
     <FlowStep
+      width="wide"
       title="Secure your system."
       subtitle="Pay a reservation deposit to lock in your quote and installation date. Fully refundable."
       cta={
@@ -177,9 +287,16 @@ function ReserveScreen() {
         </div>
       }
     >
-      <div className="grid max-w-5xl grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
-        {summary}
-        {payment}
+      <div className="grid max-w-5xl grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start lg:gap-6">
+        <div className="space-y-5">
+          {basket}
+          {additions}
+          {care}
+        </div>
+        <div className="space-y-5 lg:sticky lg:top-6">
+          {summary}
+          {payment}
+        </div>
       </div>
     </FlowStep>
   );

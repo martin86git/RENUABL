@@ -2,6 +2,7 @@
  * Consumer-facing service layer. Every function here is the seam where a real
  * API replaces mock data; UI code should only talk to these functions.
  */
+import type { CareBilling } from "@/lib/domain/care";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { rankInstallers } from "@/lib/domain/matching";
 import { buildAvailability, stableHash } from "@/lib/domain/scheduling";
@@ -76,14 +77,25 @@ export interface ReservationResult {
   reservationId: string;
   amount: number;
   method: PaymentMethod;
+  /** RENUABL Care chosen at checkout; billed only after switch-on. */
+  care: CareBilling | null;
+  /** 12 months of RENUABL Care included free with the top package. */
+  careIncluded: boolean;
 }
 
-export async function reserveDeposit(amount: number, method: PaymentMethod): Promise<ReservationResult> {
+export async function reserveDeposit(
+  amount: number,
+  method: PaymentMethod,
+  care: CareBilling | null = null,
+  careIncluded = false,
+): Promise<ReservationResult> {
   await latency(900);
   return {
     reservationId: `RN-${Math.floor(1000 + Math.random() * 9000)}`,
     amount,
     method,
+    care: careIncluded ? null : care,
+    careIncluded,
   };
 }
 

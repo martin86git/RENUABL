@@ -59,6 +59,7 @@ function DateScreen() {
 
   return (
     <FlowStep
+      width="wide"
       title="Select your installation date."
       subtitle={`Choose a date that works for you with ${installer ? installer.name : "your matched installer"}.`}
       cta={

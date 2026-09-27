@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { advanceStatus, nextFieldStatus } from "./job-status";
+import { hubspotEmbedSrc, isHubspotBookedMessage, parseHubspotMeetingsUrl } from "./booking";
+import { CARE_FREE_MONTHS, careIncludedFor, careIncludedValue, carePrice, carePriceLabel, careYearlySaving } from "./care";
 import { greeting, marketDateTime, todayInMarket } from "./market";
 import { rankInstallers } from "./matching";
-import { ADD_ONS, ASSUMPTIONS, describeSystem, estimateAnnualUsage, estimateOutcome, priceSystem, recommendSystem } from "./recommendation";
+import {
+  ADD_ONS,
+  ASSUMPTIONS,
+  describeSystem,
+  estimateAnnualUsage,
+  estimateOutcome,
+  priceSystem,
+  recommendSystem,
+  suggestedAdditions,
+} from "./recommendation";
 import { buildAvailability, fromISODate } from "./scheduling";
 import type { EnergyProfile, HomeAnalysis } from "./types";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
@@ -138,5 +149,64 @@ describe("greeting", () => {
     expect(greeting(new Date("2026-09-27T22:00:00Z"))).toBe("Good morning"); // 8am AEST
     expect(greeting(new Date("2026-09-28T04:00:00Z"))).toBe("Good afternoon"); // 2pm
     expect(greeting(new Date("2026-09-28T09:30:00Z"))).toBe("Good evening"); // 7:30pm
+  });
+});
+
+describe("checkout line items", () => {
+  it("marks optional products removable and the core system fixed", () => {
+    const price = priceSystem({ panelCount: 29, batteryKwh: 20, evCharger: true }, { storeys: "single" }, ["heat-pump"]);
+    const removable = Object.fromEntries(price.lines.map((l) => [l.id, l.removable]));
+    expect(removable).toEqual({ solar: false, battery: true, "ev-charger": true, monitoring: false, "heat-pump": true });
+  });
+});
+
+describe("RENUABL Care", () => {
+  it("prices monthly and yearly billing, with yearly cheaper", () => {
+    expect(carePrice("monthly")).toBe(19);
+    expect(carePrice("yearly")).toBe(199);
+    expect(careYearlySaving()).toBe(29);
+    expect(carePriceLabel("yearly")).toBe("$199/year");
+  });
+});
+
+describe("suggestedAdditions", () => {
+  it("offers removed or missing optional items, never ones already chosen", () => {
+    const rec = { panelCount: 29, batteryKwh: 13.5, evCharger: true };
+    const ids = suggestedAdditions({ ...rec, batteryKwh: 0 }, rec, ["heat-pump"]).map((s) => s.id);
+    expect(ids).toContain("battery");
+    expect(ids).not.toContain("ev-charger");
+    expect(ids).not.toContain("heat-pump");
+    expect(ids).toContain("smart-home");
+  });
+});
+
+describe("HubSpot booking", () => {
+  it("accepts only https HubSpot meetings links", () => {
+    expect(parseHubspotMeetingsUrl("https://meetings.hubspot.com/renuabl/confirmation")?.hostname).toBe("meetings.hubspot.com");
+    expect(parseHubspotMeetingsUrl("https://meetings-ap1.hubspot.com/renuabl")).not.toBeNull();
+    expect(parseHubspotMeetingsUrl("http://meetings.hubspot.com/renuabl")).toBeNull();
+    expect(parseHubspotMeetingsUrl("https://evil.example.com/hubspot.com")).toBeNull();
+    expect(parseHubspotMeetingsUrl(undefined)).toBeNull();
+  });
+
+  it("builds an embed link with prefill", () => {
+    const src = hubspotEmbedSrc(new URL("https://meetings.hubspot.com/renuabl"), { email: "sarah@example.com" });
+    expect(src).toBe("https://meetings.hubspot.com/renuabl?embed=true&email=sarah%40example.com");
+  });
+
+  it("recognises HubSpot's booked message only from HubSpot", () => {
+    expect(isHubspotBookedMessage("https://meetings.hubspot.com", { meetingBookSucceeded: true })).toBe(true);
+    expect(isHubspotBookedMessage("https://attacker.example", { meetingBookSucceeded: true })).toBe(false);
+    expect(isHubspotBookedMessage("https://meetings.hubspot.com", { other: 1 })).toBe(false);
+  });
+});
+
+describe("RENUABL Care included with the top package", () => {
+  it("is free for 12 months only on Higher independence", () => {
+    expect(careIncludedFor("independence")).toBe(true);
+    expect(careIncludedFor("recommended")).toBe(false);
+    expect(careIncludedFor("essential")).toBe(false);
+    expect(careIncludedValue()).toBe(199);
+    expect(CARE_FREE_MONTHS).toBe(12);
   });
 });

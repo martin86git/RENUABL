@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
+import type { CareBilling } from "@/lib/domain/care";
 import type { Address, AddOnId, EnergyProfile, SystemConfig, SystemTier } from "@/lib/domain/types";
 import { analyseHome, type ReservationResult } from "@/lib/services/consumer";
 
@@ -22,10 +23,14 @@ export interface FlowState {
   tier: SystemTier;
   config: SystemConfig | null; // null = use the tier's recommendation as-is
   addOns: AddOnId[];
+  /** RENUABL Care membership, opt-in only (null = not added). */
+  care: CareBilling | null;
   installerId: string | null;
   installDate: string | null;
   windowId: string | null;
   reservation: ReservationResult | null;
+  /** The customer booked their 15-minute confirmation call via HubSpot. */
+  callBooked: boolean;
   attribution: Attribution | null;
 }
 
@@ -35,10 +40,12 @@ const EMPTY: FlowState = {
   tier: "recommended",
   config: null,
   addOns: [],
+  care: null,
   installerId: null,
   installDate: null,
   windowId: null,
   reservation: null,
+  callBooked: false,
   attribution: null,
 };
 

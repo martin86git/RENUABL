@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
 import { ConsumerTopBar } from "./consumer-top-bar";
 import { useFlow } from "./flow-state";
-import { FLOW_STEPS, previousHref, stepIndex } from "./steps";
+import { FLOW_STEPS, previousHref, stepEntryHref, stepIndex } from "./steps";
 
 function useCurrentStep() {
   const pathname = usePathname();
@@ -22,13 +22,19 @@ export function ProgressDots({ current, className }: { current: number; classNam
       {FLOW_STEPS.map((s, i) => (
         <li key={s.key} className="flex items-center" aria-current={i === current ? "step" : undefined}>
           {i > 0 && <span className={cn("h-px w-5", i <= current ? "bg-ink/70" : "bg-line-strong")} />}
-          <span
-            className={cn(
-              "block rounded-full",
-              i <= current ? "h-2 w-2 bg-ink" : "h-1.5 w-1.5 border border-line-strong bg-canvas",
-              i === current && "ring-4 ring-ink/10",
-            )}
-          />
+          {i < current ? (
+            // Completed steps are tappable, with a generous hit area around the dot.
+            <Link href={stepEntryHref(i)} aria-label={`Back to ${s.title}`} className="-m-2 grid place-items-center p-2">
+              <span className="block h-2 w-2 rounded-full bg-ink" />
+            </Link>
+          ) : (
+            <span
+              className={cn(
+                "block rounded-full",
+                i === current ? "h-2 w-2 bg-ink ring-4 ring-ink/10" : "h-1.5 w-1.5 border border-line-strong bg-canvas",
+              )}
+            />
+          )}
           <span className="sr-only">{s.title}</span>
         </li>
       ))}
@@ -64,9 +70,21 @@ function StepRail({ current, address }: { current: number; address: string | nul
           );
           return (
             <li key={s.key} aria-current={active ? "step" : undefined}>
-              <div className={cn("flex items-center gap-3.5 rounded-2xl px-3.5 py-4", active && "bg-surface shadow-[var(--shadow-soft)]")}>
-                {body}
-              </div>
+              {done ? (
+                <Link
+                  href={stepEntryHref(i)}
+                  title={`Go back to ${s.title}`}
+                  className="flex items-center gap-3.5 rounded-2xl px-3.5 py-4 transition hover:bg-surface/70"
+                >
+                  {body}
+                </Link>
+              ) : (
+                <div
+                  className={cn("flex items-center gap-3.5 rounded-2xl px-3.5 py-4", active && "bg-surface shadow-[var(--shadow-soft)]")}
+                >
+                  {body}
+                </div>
+              )}
             </li>
           );
         })}
@@ -107,6 +125,8 @@ export function FlowStep({
   ask,
   cta,
   hideMobileHeader = false,
+  width = "regular",
+  centered = false,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -115,6 +135,10 @@ export function FlowStep({
   ask?: ReactNode;
   cta?: ReactNode;
   hideMobileHeader?: boolean;
+  /** Width of the centred content column on desktop. */
+  width?: "narrow" | "regular" | "wide";
+  /** Centre the heading and actions too (e.g. the confirmation screen). */
+  centered?: boolean;
 }) {
   const { slug, index } = useCurrentStep();
 
@@ -134,9 +158,24 @@ export function FlowStep({
           </div>
         )}
 
-        <section className={cn("animate-fade-up px-5 pb-40 pt-8 sm:px-8 lg:px-12 lg:pb-10 lg:pt-8", cta ? "" : "pb-16")}>
+        <section
+          className={cn(
+            // Centred column on desktop so wide screens don't leave a gap on the right.
+            "animate-fade-up px-5 pb-40 pt-8 sm:px-8 lg:mx-auto lg:px-12 lg:pb-10 lg:pt-8",
+            width === "narrow" && "lg:max-w-[680px]",
+            width === "regular" && "lg:max-w-[860px]",
+            width === "wide" && "lg:max-w-[1120px]",
+            centered && "lg:text-center",
+            cta ? "" : "pb-16",
+          )}
+        >
           <div className="mb-3 hidden lg:block">
-            <span className="block h-0.5 w-8 rounded-full bg-leaf" />
+            {!hideMobileHeader && (
+              <Link href={previousHref(slug)} className="mb-4 inline-flex items-center gap-2 text-[13px] text-ink-2 hover:text-ink">
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.6} /> Back
+              </Link>
+            )}
+            <span className={cn("block h-0.5 w-8 rounded-full bg-leaf", centered && "mx-auto")} />
             <p className="mt-2 text-[13px] text-muted">
               Step {index + 1} of {FLOW_STEPS.length}
             </p>
@@ -148,7 +187,7 @@ export function FlowStep({
           <div className="mt-7">{children}</div>
 
           {(ask || cta) && (
-            <div className="mt-8 hidden items-center gap-6 lg:flex">
+            <div className={cn("mt-8 hidden items-center gap-6 lg:flex", centered && "justify-center")}>
               {ask && <div className="max-w-md flex-1">{ask}</div>}
               {cta && <div className={cn("shrink-0", !ask && "min-w-72")}>{cta}</div>}
             </div>

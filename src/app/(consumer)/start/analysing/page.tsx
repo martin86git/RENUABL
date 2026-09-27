@@ -33,6 +33,7 @@ export default function AnalysingPage() {
 
   return (
     <FlowStep
+      width="wide"
       title={
         <>
           Analysing

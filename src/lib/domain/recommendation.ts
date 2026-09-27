@@ -1,4 +1,5 @@
 import type {
+  LineItemId,
   AddOn,
   AddOnId,
   EnergyProfile,
@@ -144,17 +145,29 @@ export function priceSystem(config: SystemConfig, analysis: Pick<HomeAnalysis, "
   const { prices, rebates } = ASSUMPTIONS;
   const solarKw = panelsToKw(config.panelCount);
   const lines: PriceBreakdown["lines"] = [
-    { label: `${solarKw} kW solar (${config.panelCount} panels)`, amount: Math.round(solarKw * prices.solarPerKw) },
+    {
+      id: "solar",
+      label: `${solarKw} kW solar (${config.panelCount} panels)`,
+      amount: Math.round(solarKw * prices.solarPerKw),
+      removable: false,
+    },
   ];
   if (config.batteryKwh > 0) {
-    lines.push({ label: `${config.batteryKwh} kWh battery`, amount: Math.round(config.batteryKwh * prices.batteryPerKwh) });
+    lines.push({
+      id: "battery",
+      label: `${config.batteryKwh} kWh battery`,
+      amount: Math.round(config.batteryKwh * prices.batteryPerKwh),
+      removable: true,
+    });
   }
-  if (config.evCharger) lines.push({ label: "Smart EV charger", amount: prices.evCharger });
-  lines.push({ label: "Energy monitoring", amount: prices.monitoring });
-  if (analysis.storeys === "double") lines.push({ label: "Double-storey install", amount: prices.doubleStorey });
+  if (config.evCharger) lines.push({ id: "ev-charger", label: "Smart EV charger", amount: prices.evCharger, removable: true });
+  lines.push({ id: "monitoring", label: "Energy monitoring", amount: prices.monitoring, removable: false });
+  if (analysis.storeys === "double") {
+    lines.push({ id: "double-storey", label: "Double-storey install", amount: prices.doubleStorey, removable: false });
+  }
   for (const id of addOns) {
     const addOn = ADD_ONS.find((a) => a.id === id);
-    if (addOn) lines.push({ label: addOn.name, amount: addOn.price });
+    if (addOn) lines.push({ id: addOn.id, label: addOn.name, amount: addOn.price, removable: true });
   }
 
   const gross = lines.reduce((sum, l) => sum + l.amount, 0);
@@ -190,4 +203,40 @@ export function packageLabel(config: SystemConfig) {
 
 export function isSameConfig(a: SystemConfig, b: SystemConfig) {
   return a.panelCount === b.panelCount && a.batteryKwh === b.batteryKwh && a.evCharger === b.evCharger;
+}
+
+export interface SuggestedAddition {
+  id: LineItemId;
+  label: string;
+  blurb: string;
+  amount: number;
+}
+
+/**
+ * "Add to your system" suggestions at checkout: anything optional the
+ * customer doesn't have yet (including items they just removed).
+ */
+export function suggestedAdditions(config: SystemConfig, recommended: SystemConfig, addOns: AddOnId[]): SuggestedAddition[] {
+  const out: SuggestedAddition[] = [];
+  if (config.batteryKwh === 0) {
+    const size = recommended.batteryKwh || 10;
+    out.push({
+      id: "battery",
+      label: `${size} kWh battery`,
+      blurb: "Use your sunshine at night and keep essentials on in outages.",
+      amount: Math.round(size * ASSUMPTIONS.prices.batteryPerKwh),
+    });
+  }
+  if (!config.evCharger) {
+    out.push({
+      id: "ev-charger",
+      label: "Smart EV charger",
+      blurb: "Charge your car from surplus solar.",
+      amount: ASSUMPTIONS.prices.evCharger,
+    });
+  }
+  for (const a of ADD_ONS) {
+    if (!addOns.includes(a.id)) out.push({ id: a.id, label: a.name, blurb: a.blurb, amount: a.price });
+  }
+  return out;
 }

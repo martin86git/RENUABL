@@ -74,5 +74,7 @@ Everything under `src/lib/mock` is placeholder data. Swap a service's implementa
 - Address autocomplete uses a sample list; replace it with a geocoding provider.
 - Brand artwork in `public/brand/` is cropped from the design mockups — swap in the original mascot renders and licensed photography.
 - Brand proof points ("50,000+ homes", "4.9 from 6,000+ reviews") and testimonials in `src/lib/mock/brand.ts` are design placeholders — replace with verified figures.
+- The 15-minute confirmation call is booked through HubSpot Meetings once `NEXT_PUBLIC_HUBSPOT_MEETINGS_URL` is set (see `docs/DEPLOY.md`).
+- RENUABL Care ($19/month or $199/year) is offered at checkout as an opt-in; billing isn't wired up yet.
 - "Ask RENUABL" uses reviewed canned answers (`services/ask.ts`); the function signature is ready to be backed by a model.
 - Pricing and rebate figures in `domain/recommendation.ts` are placeholder assumptions and must be validated before showing to customers.

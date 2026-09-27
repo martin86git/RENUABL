@@ -55,8 +55,18 @@ export interface SystemEstimate {
   selfPoweredShare: number; // 0..1
 }
 
+export type LineItemId = "solar" | "battery" | "ev-charger" | "monitoring" | "double-storey" | AddOnId;
+
+export interface LineItem {
+  id: LineItemId;
+  label: string;
+  amount: number;
+  /** Whether the customer can take it out at checkout. */
+  removable: boolean;
+}
+
 export interface PriceBreakdown {
-  lines: { label: string; amount: number }[];
+  lines: LineItem[];
   gross: number;
   rebates: number;
   total: number;

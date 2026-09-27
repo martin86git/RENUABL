@@ -30,6 +30,7 @@ export default function ProfilePage() {
 
   return (
     <FlowStep
+      width="wide"
       title="Tell us about your home."
       subtitle="A few quick details so we can recommend the right solution for you."
       aside={<BrandAside />}

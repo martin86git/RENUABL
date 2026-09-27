@@ -24,6 +24,7 @@ function ExtrasScreen() {
 
   return (
     <FlowStep
+      width="narrow"
       title="Enhance your system."
       subtitle="Add or remove products to suit your home."
       ask={<AskRenuabl context="extras" title="Ask RENUABL" subtitle="Which upgrades are right for me?" />}

@@ -17,6 +17,11 @@
 - Intelligence is branded "Ask RENUABL", never labelled "AI".
 - No traditional website navigation (no Home / Energy / Savings / … link bar). Customer screens show only the wordmark and account; people move through guided steps, the My RENUABL home cards and the mobile bottom tabs.
 - The reservation deposit is $499 (`ASSUMPTIONS.deposit`).
+- Checkout is an editable basket: optional items can be removed or added back; the core system is edited on the system step.
+- RENUABL Care (`src/lib/domain/care.ts`, $19/month or $199/year) is opt-in only — never pre-selected, never charged with the deposit, billed after switch-on.
+- The top package (Higher independence) includes 12 months of RENUABL Care free (valued at $199). After that it never auto-renews into a charge; continuing is the customer's choice.
+- Desktop flow steps are centred columns (`FlowStep` `width`), not left-aligned.
+- The confirmation call is booked by the customer via HubSpot Meetings (`NEXT_PUBLIC_HUBSPOT_MEETINGS_URL`, `src/lib/domain/booking.ts`).
 - Minimise jargon; technical detail lives behind disclosures.
 - Installer portal is deliberately dark; green (`positive`) is reserved for confirmed / on-track / available / positive states.
 
