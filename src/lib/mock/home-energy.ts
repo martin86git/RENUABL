@@ -36,7 +36,7 @@ export interface Upgrade {
 
 export const HOME_SYSTEM = {
   owner: "Sarah",
-  address: "12 Harvest Court, Glen Waverley",
+  address: "2 Hanwell Court, Glen Waverley",
   installedOn: "2026-06-18",
   solarKw: 13.2,
   batteryKwh: 13.5,
