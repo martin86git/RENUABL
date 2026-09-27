@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, FileText, Loader2, Upload } from "lucide-react";
+import { Camera, Check, FileText, Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/primitives";
 import { BILL_UPLOAD, type BillSummary } from "@/lib/domain/bill";
@@ -11,6 +11,7 @@ const kwh = (n: number) => n.toLocaleString("en-AU", { maximumFractionDigits: 1 
 /** Upload the latest electricity bill; RENUABL reads the usage and sizes the system from it. */
 export function BillUpload({ bill, onRead }: { bill: BillSummary | null; onRead: (bill: BillSummary) => void }) {
   const input = useRef<HTMLInputElement>(null);
+  const camera = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,19 +24,32 @@ export function BillUpload({ bill, onRead }: { bill: BillSummary | null; onRead:
     else setError(result.message);
   }
 
+  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (f) void read(f);
+  };
   const picker = (
-    <input
-      ref={input}
-      type="file"
-      accept={BILL_UPLOAD.types.join(",")}
-      hidden
-      aria-label="Upload your electricity bill"
-      onChange={(e) => {
-        const f = e.target.files?.[0];
-        e.target.value = "";
-        if (f) void read(f);
-      }}
-    />
+    <>
+      <input
+        ref={input}
+        type="file"
+        accept={BILL_UPLOAD.types.join(",")}
+        hidden
+        aria-label="Upload your electricity bill"
+        onChange={onPick}
+      />
+      {/* Opens the camera on phones: most people have a paper bill or one on another screen. */}
+      <input
+        ref={camera}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        aria-label="Take a photo of your bill"
+        onChange={onPick}
+      />
+    </>
   );
 
   if (reading) {
@@ -96,15 +110,29 @@ export function BillUpload({ bill, onRead }: { bill: BillSummary | null; onRead:
       <div className="flex items-start gap-4">
         <FileText className="mt-0.5 h-7 w-7 shrink-0 text-ink" strokeWidth={1.3} aria-hidden />
         <div>
-          <p className="text-[15px] text-ink">Upload your latest electricity bill</p>
+          <p className="text-[15px] text-ink">Add your latest electricity bill</p>
           <p className="mt-0.5 text-[13px] leading-snug text-muted">
-            A PDF or a clear photo. We size your system to what your home actually uses, nothing more.
+            A clear photo or the PDF. We size your system to what your home actually uses, nothing more.
           </p>
         </div>
       </div>
-      <Button className="mt-4 w-full sm:w-auto" onClick={() => input.current?.click()}>
-        <Upload className="h-4 w-4" strokeWidth={1.8} /> Upload bill
-      </Button>
+      {/* Phones: take a photo first, upload a file (PDF or screenshot) as the other option. Desktop: upload. */}
+      <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:hidden">
+        <Button onClick={() => camera.current?.click()}>
+          <Camera className="h-4 w-4" strokeWidth={1.8} /> Take a photo
+        </Button>
+        <Button variant="secondary" onClick={() => input.current?.click()}>
+          <Upload className="h-4 w-4" strokeWidth={1.8} /> Upload a file
+        </Button>
+      </div>
+      <div className="mt-4 hidden lg:block">
+        <Button onClick={() => input.current?.click()}>
+          <Upload className="h-4 w-4" strokeWidth={1.8} /> Upload bill
+        </Button>
+      </div>
+      <p className="mt-3 text-[12px] leading-snug text-muted lg:hidden">
+        Photograph the page showing your usage and billing period, flat and in good light.
+      </p>
       {error && (
         <p className="mt-3 text-[13px] text-danger" role="alert">
           {error}

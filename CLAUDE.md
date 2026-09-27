@@ -12,7 +12,7 @@
 ## Product rules to preserve
 
 - RENUABL recommends one system, sized from the customer's electricity bill. No catalogues.
-- The customer uploads their latest bill on "About your home"; Claude reads it server-side (`src/app/api/bill/route.ts`, `src/lib/server/bill-reader.ts`) and `src/lib/domain/bill.ts` validates the figures. Ask only for usage and prices, never personal details, and don't store the file.
+- The customer uploads their latest bill on "About your home"; Claude reads it server-side (`src/app/api/bill/route.ts`, `src/lib/server/bill-reader.ts`) and `src/lib/domain/bill.ts` validates the figures. Ask only for usage and prices, never personal details, and don't store the file. On phones the main option is "Take a photo" (opens the camera), with "Upload a file" for PDFs and screenshots; desktop shows "Upload bill".
 - Solar is sized to what the home uses, never below the 5 kW minimum system (`ASSUMPTIONS.minSystemKw`). When there is a battery, now or planned ("Thinking about adding a battery later?"), solar gets `ASSUMPTIONS.batteryReadySolar` headroom to charge it. Customers never choose panel counts or battery sizes; the options differ in battery (none / sized to evening use / one size up).
 - The battery question is "Would you like a battery?" (a sale now, not "later"). Yes leads with Recommended, No with Essential.
 - Existing solar (the bill shows exports): ask its size, or "I'm not sure", then "Replace or expand?". Expanding (or a known size) keeps the panels and sells a battery in every option, with extra panels only if exports can't fill it, and always shows `EXPAND_DISCLAIMER` (the inverter is unknown until the call), with an optional upload of the inverter's front and its model/serial sticker, which Claude reads (`/api/inverter`) for make, model and kW; photos aren't stored. Replacing sizes a new system to estimated real use (`realAnnualUse`, placeholder self-use share) and says it's an estimate. Logic: `src/lib/domain/existing-solar.ts`.
@@ -62,6 +62,7 @@
 - Business logic lives in `src/lib/domain` (pure TS, unit tested). Don't put it in components.
 - UI reads and writes only through `src/lib/services/*`; mock data stays in `src/lib/mock`.
 - Use the semantic color tokens (`bg-canvas`, `bg-surface`, `text-ink`, `text-muted`, `border-line`, `text-positive`, …) rather than raw colors so both themes work.
+- `cn` only joins classes (no tailwind-merge): a `className` can't override a component's own display or colour classes, so wrap it (e.g. a `hidden lg:block` div) instead. Disabled buttons use solid muted colours, never transparency.
 - Small text links and controls get a ~44px touch area with the `tap-area` utility (in `globals.css`). The mobile menu (`MobileMenu`) only offers "Start with your address" and "My RENUABL".
 - Mobile-first, but build deliberate desktop layouts (see `FlowStep`, `InstallerShell`) rather than stretching mobile.
 - Don't put `position: fixed` elements inside an animated (`transform`) ancestor, because it breaks fixed positioning. `FlowStep` renders its sticky CTA outside the animated section for this reason.

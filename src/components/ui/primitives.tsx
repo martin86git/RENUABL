@@ -10,13 +10,14 @@ type ButtonVariant = "primary" | "secondary" | "ghost" | "quiet";
 type ButtonSize = "sm" | "md" | "lg";
 
 const buttonBase =
-  "inline-flex items-center justify-center gap-2 rounded-full font-medium transition-[background,transform,opacity,box-shadow,border-color] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 select-none";
+  "inline-flex items-center justify-center gap-2 rounded-full font-medium transition-[background,transform,opacity,box-shadow,border-color] duration-150 active:scale-[0.98] disabled:pointer-events-none select-none";
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: "bg-primary text-primary-ink hover:opacity-90",
-  secondary: "bg-surface text-ink border border-line-strong hover:border-ink/40",
-  ghost: "text-ink hover:bg-surface-2",
-  quiet: "text-muted hover:text-ink underline-offset-4 hover:underline",
+  // Disabled buttons use solid muted colours, not transparency, so nothing shows through a pinned button.
+  primary: "bg-primary text-primary-ink hover:opacity-90 disabled:bg-line-strong disabled:text-muted",
+  secondary: "bg-surface text-ink border border-line-strong hover:border-ink/40 disabled:border-line disabled:text-muted",
+  ghost: "text-ink hover:bg-surface-2 disabled:text-muted",
+  quiet: "text-muted hover:text-ink underline-offset-4 hover:underline disabled:text-muted/60",
 };
 
 const buttonSizes: Record<ButtonSize, string> = {
