@@ -2,6 +2,7 @@
  * Core domain types shared by the consumer experience and the installer portal.
  * These are framework-agnostic and must not import React or Next.js.
  */
+import type { InstallRates } from "./partner";
 
 export type ISODate = string; // YYYY-MM-DD
 export type ISODateTime = string;
@@ -182,6 +183,14 @@ export interface Installer {
   reviewSource?: "Google";
   /** Made up for the demo: never shown to customers on the live site. */
   fictional?: boolean;
+  /** Where the partner works from, for their close-to-home rate. */
+  baseLocation?: { lat: number; lng: number };
+  /** The partner's own rates from sign-up. Without them, RENUABL's rates are used. */
+  pricing?: {
+    rates: InstallRates;
+    supplyCosts?: Record<string, number>;
+    margin?: number;
+  };
 }
 
 export interface InstallerMatch {

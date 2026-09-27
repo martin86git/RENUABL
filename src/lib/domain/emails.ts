@@ -173,3 +173,21 @@ export function cleanOrder(raw: unknown): Omit<OrderEmail, "reference" | "firstN
       : undefined,
   };
 }
+
+/** Sent when a partner applies. */
+export function partnerReceivedEmail(o: { reference: string; firstName: string; type: "installer" | "retailer" }): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const role = o.type === "retailer" ? "retail partner" : "installation partner";
+  const subject = `We've received your RENUABL application (${o.reference})`;
+  const body = `Thanks for applying to become a RENUABL ${role}. We'll check your accreditation, licence and insurance and be in touch shortly. Your reference is ${o.reference}.`;
+  const html = `<!doctype html><html><body style="margin:0;background:#FAF9F6;font-family:Inter,Arial,sans-serif;color:#1A1A1A"><div style="max-width:560px;margin:0 auto;padding:32px 20px">
+<p style="letter-spacing:.28em;font-size:14px;margin:0 0 24px">RENUABL</p>
+<h1 style="font-weight:400;font-size:26px;margin:0 0 12px">Thanks, ${esc(plainText(o.firstName, 40) || "there")}.</h1>
+<p style="margin:0">${esc(body)}</p>
+<p style="color:#6B6B6B;font-size:12px;margin-top:24px">Questions? Just reply to this email.</p>
+</div></body></html>`;
+  return { subject, html, text: `Thanks, ${plainText(o.firstName, 40) || "there"}.\n\n${body}` };
+}

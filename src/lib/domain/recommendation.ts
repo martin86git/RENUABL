@@ -1,7 +1,7 @@
 import type { BillSummary } from "./bill";
 import { PANEL } from "./catalogue";
 import { YIELD_MODEL, yieldPerKw } from "./sunshine";
-import { COSTING, billOfMaterials, inverterOptions, maxPanelsForInverter, sellPrice, type CostGroup } from "./costing";
+import { COSTING, billOfMaterials, inverterOptions, maxPanelsForInverter, sellPrice, type CostGroup, type PartnerPricing } from "./costing";
 import { NO_INCENTIVES, VERIFIED_RATES, rebatesFor, type Incentives, type RebateRates } from "./rebates";
 import { realAnnualUse, solarSituation } from "./existing-solar";
 import type {
@@ -340,9 +340,20 @@ export function priceSystem(
   addOns: AddOnId[] = [],
   incentives: Incentives = NO_INCENTIVES,
   rates: RebateRates = VERIFIED_RATES,
+  /** The matched partner's pricing; RENUABL's own rates and margin when absent. */
+  partner?: PartnerPricing,
 ): PriceBreakdown {
   const priced = addOns.filter(isPricedAddOn);
-  const bom = billOfMaterials({ ...config, roof: site.roof, tilt: site.tilt, storeys: site.storeys, phase: site.phase, addOns: priced });
+  const bom = billOfMaterials({
+    ...config,
+    roof: site.roof,
+    tilt: site.tilt,
+    storeys: site.storeys,
+    phase: site.phase,
+    addOns: priced,
+    partner,
+  });
+  const price = (c: number) => sellPrice(c, partner?.margin);
   const cost = (group: CostGroup) => bom.filter((l) => l.group === group).reduce((sum, l) => sum + l.total, 0);
   const solarKw = panelsToKw(config.panelCount);
   const lines: PriceBreakdown["lines"] = [];
@@ -350,16 +361,16 @@ export function priceSystem(
   if (cost("solar") > 0) {
     const label =
       config.panelCount > 0 ? `${solarKw} kW ${config.existingSolar ? "extra " : ""}solar (${config.panelCount} panels)` : "Solar";
-    lines.push({ id: "solar", label, amount: sellPrice(cost("solar")), removable: false });
+    lines.push({ id: "solar", label, amount: price(cost("solar")), removable: false });
   }
   if (config.batteryKwh > 0) {
-    lines.push({ id: "battery", label: `${config.batteryKwh} kWh battery`, amount: sellPrice(cost("battery")), removable: true });
+    lines.push({ id: "battery", label: `${config.batteryKwh} kWh battery`, amount: price(cost("battery")), removable: true });
   }
   if (config.evCharger)
-    lines.push({ id: "ev-charger", label: LINE_LABELS["ev-charger"]!, amount: sellPrice(cost("ev-charger")), removable: true });
+    lines.push({ id: "ev-charger", label: LINE_LABELS["ev-charger"]!, amount: price(cost("ev-charger")), removable: true });
   for (const id of priced) {
     const addOn = ADD_ONS.find((a) => a.id === id);
-    if (addOn) lines.push({ id: addOn.id, label: addOn.name, amount: sellPrice(cost(id)), removable: true });
+    if (addOn) lines.push({ id: addOn.id, label: addOn.name, amount: price(cost(id)), removable: true });
   }
   const discuss = ADD_ONS.filter((a) => addOns.includes(a.id) && a.price == null).map((a) => ({ id: a.id, label: a.name }));
 

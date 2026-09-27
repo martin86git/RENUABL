@@ -31,14 +31,20 @@ export async function contactIdByEmail(email: string, token: string): Promise<st
 }
 
 /** Creates the contact, or updates it when that email already exists. Returns the contact id. */
-export async function upsertContact(contact: ContactDetails, token: string): Promise<string> {
+export async function upsertContact(
+  contact: ContactDetails,
+  token: string,
+  /** Partners are "other", not sales leads; extra standard properties such as company and website. */
+  opts: { lifecycle?: string; extra?: Record<string, string> } = {},
+): Promise<string> {
   const properties = {
     email: contact.email,
     firstname: contact.firstName,
     lastname: contact.lastName,
     mobilephone: contact.mobile,
     phone: contact.mobile,
-    lifecyclestage: "lead",
+    ...opts.extra,
+    lifecyclestage: opts.lifecycle ?? "lead",
   };
   let res = await call("/contacts", token, "POST", { properties });
   if (res.status === 409) {
@@ -65,8 +71,13 @@ const escape = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": 
 
 /** Note body: one line per detail, escaped. */
 export function reservationNote(reference: string, details: Record<string, string | undefined>): string {
+  return crmNote(`RENUABL reservation ${reference}`, details);
+}
+
+/** A HubSpot note: a bold title and one "Label: value" line per detail. */
+export function crmNote(title: string, details: Record<string, string | undefined>): string {
   const rows = Object.entries(details)
     .filter(([, v]) => v)
     .map(([k, v]) => `<strong>${escape(k)}:</strong> ${escape(v!)}`);
-  return [`<strong>RENUABL reservation ${escape(reference)}</strong>`, ...rows].join("<br>");
+  return [`<strong>${escape(title)}</strong>`, ...rows].join("<br>");
 }

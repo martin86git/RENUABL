@@ -17,6 +17,7 @@ import {
   type InverterItem,
   type Phase,
 } from "./catalogue";
+import type { InstallRates } from "./partner";
 import type { RoofType } from "./types";
 
 export const COSTING = {
@@ -82,6 +83,36 @@ export interface CostingInput {
   /** Three-phase homes get three-phase inverters. "Not sure" is quoted as single phase. */
   phase: Phase;
   addOns: string[];
+  /** The matched partner's own rates (and, for retailers, product costs). Without it, RENUABL's rates are used. */
+  partner?: PartnerPricing;
+}
+
+/** A partner's pricing for one job. */
+export interface PartnerPricing {
+  rates: InstallRates;
+  /** How far the home is from the partner's base, for their close-to-home rate. */
+  distanceKm?: number;
+  /** Retailers: their cost per product, by SKU (anything missing uses RENUABL's supplier cost). */
+  supplyCosts?: Record<string, number>;
+  /** Retailers: their margin, used instead of RENUABL's. */
+  margin?: number;
+}
+
+/** RENUABL's own installation rates, as the rates a partner would set. */
+export function renuablRates(): InstallRates {
+  return {
+    solarPerWatt: COSTING.solarInstallPerWatt,
+    nearHomePerWatt: COSTING.solarInstallPerWatt,
+    nearHomeKm: 0,
+    extraArray: COSTING.thirdArrayInstall,
+    doubleStorey: COSTING.doubleStoreyInstall,
+    switchboardUpgrade: 0,
+    tiltPerPanel: COSTING.tiltInstallPerPanel,
+    batteryPerStack: COSTING.batteryInstallPerStack,
+    batteryExtraModule: COSTING.batteryInstallPerStack / BATTERY.modulesPerStack,
+    threePhase: COSTING.threePhaseInstall,
+    evCharger: COSTING.evChargerInstall,
+  };
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -123,11 +154,11 @@ export function batteryModules(kwh: number) {
   return Math.ceil(kwh / BATTERY.module.kwh);
 }
 
-/** $1,800 per stack; modules in a further stack cost $1,800 / modules-per-stack each. */
-export function batteryInstallCost(modules: number) {
+/** $1,800 per stack; modules in a further stack cost $1,800 / modules-per-stack each (or the partner's rates). */
+export function batteryInstallCost(modules: number, rates: InstallRates = renuablRates()) {
   if (modules <= 0) return 0;
   const extra = Math.max(0, modules - BATTERY.modulesPerStack);
-  return COSTING.batteryInstallPerStack + extra * (COSTING.batteryInstallPerStack / BATTERY.modulesPerStack);
+  return rates.batteryPerStack + extra * rates.batteryExtraModule;
 }
 
 /** Rated AC output current per phase: 8 kW single phase ≈ 34.8 A; 15 kW three phase ≈ 21.7 A. */
@@ -154,6 +185,12 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
   const kw = arrayKw(input.panelCount);
   const modules = batteryModules(input.batteryKwh);
   const hybrid = modules > 0 || Boolean(input.batteryReady);
+  const rates = input.partner?.rates ?? renuablRates();
+  /** A product's cost: the retailer's own where they've set one. */
+  const unit = (sku: string, cost: number) => input.partner?.supplyCosts?.[sku] ?? cost;
+  // A partner's close-to-home rate applies to single-storey homes within their range.
+  const nearHome = input.storeys === "single" && input.partner?.distanceKm !== undefined && input.partner.distanceKm <= rates.nearHomeKm;
+  const solarRate = nearHome ? rates.nearHomePerWatt : rates.solarPerWatt;
 
   if (input.panelCount > 0) {
     const rails = railLengths(input.panelCount, input.roof);
@@ -164,7 +201,7 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
     const tilted = flat && Boolean(input.tilt);
     const kit = input.roof === "tin" || flat ? RACKING.tinKit : RACKING.tileKit;
     const clips = Math.ceil((input.panelCount * BOS.panelClip.perPanel) / BOS.panelClip.packSize) * BOS.panelClip.packSize;
-    lines.push(line("solar", PANEL.sku, PANEL.name, input.panelCount, PANEL.cost));
+    lines.push(line("solar", PANEL.sku, PANEL.name, input.panelCount, unit(PANEL.sku, PANEL.cost)));
     lines.push(
       line(
         "solar",
@@ -192,9 +229,9 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
       line(
         "solar",
         null,
-        `Solar installation (${round2(kw)} kW at $${COSTING.solarInstallPerWatt}/W)`,
+        `Solar installation (${round2(kw)} kW at $${solarRate}/W${nearHome ? ", close to home" : ""})`,
         1,
-        round2(kw * 1000 * COSTING.solarInstallPerWatt),
+        round2(kw * 1000 * solarRate),
       ),
     );
     if (tilted) {
@@ -202,14 +239,14 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
         line(
           "solar",
           null,
-          `Tilt frame installation (${input.panelCount} panels at $${COSTING.tiltInstallPerPanel})`,
+          `Tilt frame installation (${input.panelCount} panels at $${rates.tiltPerPanel})`,
           input.panelCount,
-          COSTING.tiltInstallPerPanel,
+          rates.tiltPerPanel,
         ),
       );
     }
-    if (arrays > COSTING.arrays) lines.push(line("solar", null, "Third array installation", 1, COSTING.thirdArrayInstall));
-    if (input.storeys === "double") lines.push(line("solar", null, "Double-storey installation", 1, COSTING.doubleStoreyInstall));
+    if (arrays > COSTING.arrays) lines.push(line("solar", null, "Third array installation", arrays - COSTING.arrays, rates.extraArray));
+    if (input.storeys === "double") lines.push(line("solar", null, "Double-storey installation", 1, rates.doubleStorey));
   }
 
   // Inverter: the battery controller when there's a battery (or one is planned), else a string inverter.
@@ -217,25 +254,25 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
   let fitted: InverterItem | null = null;
   if (hybrid && (input.panelCount > 0 || modules > 0)) {
     fitted = selectInverter(kw, inverterOptions("hybrid", input.phase));
-    lines.push(line(modules > 0 ? "battery" : "solar", fitted.sku, fitted.name, 1, fitted.cost));
+    lines.push(line(modules > 0 ? "battery" : "solar", fitted.sku, fitted.name, 1, unit(fitted.sku, fitted.cost)));
   } else if (input.panelCount > 0 && !input.existingSolar) {
     fitted = selectInverter(kw, inverterOptions("string", input.phase));
-    lines.push(line("solar", fitted.sku, fitted.name, 1, fitted.cost));
+    lines.push(line("solar", fitted.sku, fitted.name, 1, unit(fitted.sku, fitted.cost)));
   }
   if (fitted) {
     const group: CostGroup = modules > 0 && input.panelCount === 0 ? "battery" : "solar";
     const iso = acIsolatorFor(fitted.kw, input.phase);
     lines.push(line(group, iso.sku, iso.name, 1, iso.cost));
-    if (three) lines.push(line(group, null, "Three-phase inverter installation", 1, COSTING.threePhaseInstall));
+    if (three) lines.push(line(group, null, "Three-phase inverter installation", 1, rates.threePhase));
   }
 
   if (modules > 0) {
     const stacks = Math.ceil(modules / BATTERY.modulesPerStack);
     const gateway = three ? BATTERY.gateway3ph : BATTERY.gateway;
     const sensor = three ? BATTERY.sensor3ph : BATTERY.sensor;
-    lines.push(line("battery", BATTERY.module.sku, BATTERY.module.name, modules, BATTERY.module.cost));
-    lines.push(line("battery", BATTERY.mount.sku, BATTERY.mount.name, stacks, BATTERY.mount.cost));
-    lines.push(line("battery", gateway.sku, gateway.name, 1, gateway.cost));
+    lines.push(line("battery", BATTERY.module.sku, BATTERY.module.name, modules, unit(BATTERY.module.sku, BATTERY.module.cost)));
+    lines.push(line("battery", BATTERY.mount.sku, BATTERY.mount.name, stacks, unit(BATTERY.mount.sku, BATTERY.mount.cost)));
+    lines.push(line("battery", gateway.sku, gateway.name, 1, unit(gateway.sku, gateway.cost)));
     if (input.existingSolar) lines.push(line("battery", sensor.sku, sensor.name, 1, sensor.cost));
     lines.push(line("battery", BOS.batteryLabels.sku, BOS.batteryLabels.name, 1, BOS.batteryLabels.cost));
     lines.push(
@@ -244,14 +281,14 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
         null,
         `Battery installation (${stacks} stack${stacks > 1 ? "s" : ""}, ${modules} modules)`,
         1,
-        batteryInstallCost(modules),
+        batteryInstallCost(modules, rates),
       ),
     );
   }
 
   if (input.evCharger) {
-    lines.push(line("ev-charger", EV_CHARGER.sku, EV_CHARGER.name, 1, EV_CHARGER.cost));
-    lines.push(line("ev-charger", null, "EV charger installation", 1, COSTING.evChargerInstall));
+    lines.push(line("ev-charger", EV_CHARGER.sku, EV_CHARGER.name, 1, unit(EV_CHARGER.sku, EV_CHARGER.cost)));
+    lines.push(line("ev-charger", null, "EV charger installation", 1, rates.evCharger));
   }
   for (const id of input.addOns) {
     if (id === "heat-pump") {
@@ -264,7 +301,7 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
   return lines;
 }
 
-/** Supplier cost -> customer price, including margin and GST. */
-export function sellPrice(cost: number) {
-  return Math.round(cost * (1 + COSTING.margin) * (1 + COSTING.gst));
+/** Supplier cost -> customer price, including margin (RENUABL's, or a retailer's own) and GST. */
+export function sellPrice(cost: number, margin: number = COSTING.margin) {
+  return Math.round(cost * (1 + margin) * (1 + COSTING.gst));
 }

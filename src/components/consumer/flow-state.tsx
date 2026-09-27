@@ -10,7 +10,8 @@ import { isAboutComplete as aboutComplete } from "@/lib/domain/existing-solar";
 import { ASSUMPTIONS, estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
 import type { CareBilling } from "@/lib/domain/care";
 import type { Address, AddOnId, EnergyProfile, SystemConfig, SystemTier } from "@/lib/domain/types";
-import { analyseHome, fetchRebateRates, fetchSunshine, type CallSlot, type ReservationResult } from "@/lib/services/consumer";
+import { partnerPricingFor } from "@/lib/domain/partner";
+import { analyseHome, fetchRebateRates, fetchSunshine, getInstaller, type CallSlot, type ReservationResult } from "@/lib/services/consumer";
 
 /**
  * Client state for the guided purchase flow. Business rules live in
@@ -214,7 +215,8 @@ export function useSystem() {
       solarVicRebate: state.solarVic.rebate,
       solarVicLoan: state.solarVic.rebate && state.solarVic.loan,
     };
-    const price = priceSystem(config, site, state.addOns, incentives, rates);
+    const partner = partnerPricingFor(state.installerId ? getInstaller(state.installerId) : undefined, state.address);
+    const price = priceSystem(config, site, state.addOns, incentives, rates, partner);
     const outcome = estimateOutcome(config, recommendation.usage, price);
     return { profile, analysis, site, recommendation, tier, config, price, outcome, rates };
   }, [
@@ -228,6 +230,7 @@ export function useSystem() {
     state.installDate,
     state.rates,
     state.sunshine,
+    state.installerId,
   ]);
 }
 
