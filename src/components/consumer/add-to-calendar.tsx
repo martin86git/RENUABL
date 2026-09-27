@@ -33,8 +33,8 @@ export function AddToCalendar({ event, filename }: { event: CalendarEvent; filen
 
   return (
     <div className="mt-2.5 flex flex-wrap gap-2">
-      {/* Apple's black (a fixed brand colour, the same in both themes). */}
-      <button type="button" onClick={download} className={`${pill} bg-[#000] text-white hover:bg-[#1d1d1f]`}>
+      {/* White with Apple's black text and icon (fixed brand colours, the same in both themes). */}
+      <button type="button" onClick={download} className={`${pill} bg-white text-[#000] ring-1 ring-[#dadce0] hover:bg-[#f8f9fa]`}>
         <CalendarPlus className="h-4 w-4" strokeWidth={1.7} aria-hidden /> Apple / Outlook
       </button>
       <a
