@@ -8,6 +8,8 @@ import type { AddressSuggestion } from "@/lib/domain/address";
 import type { CareBilling } from "@/lib/domain/care";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import type { InverterSummary } from "@/lib/domain/inverter";
+import type { RebateRates } from "@/lib/domain/rebates";
+import type { Sunshine } from "@/lib/domain/sunshine";
 import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
 import { ASSUMPTIONS } from "@/lib/domain/recommendation";
 import { rankInstallers } from "@/lib/domain/matching";
@@ -221,5 +223,25 @@ export async function readInverterPhotos(files: File[]): Promise<InverterResult>
       : { ok: false, message: json.message ?? "We couldn't read those photos." };
   } catch {
     return { ok: false, message: "We couldn't reach RENUABL. Check your connection and try again." };
+  }
+}
+
+/** Today's rebate rules (live from the CER and Solar Victoria where possible). */
+export async function fetchRebateRates(): Promise<RebateRates | null> {
+  try {
+    const res = await fetch("/api/rebates");
+    return ((await res.json()) as { rates?: RebateRates }).rates ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** NASA POWER sunshine for the home's coordinates. */
+export async function fetchSunshine(lat: number, lng: number): Promise<Sunshine | null> {
+  try {
+    const res = await fetch(`/api/sunshine?lat=${lat}&lng=${lng}`);
+    return ((await res.json()) as { sunshine?: Sunshine | null }).sunshine ?? null;
+  } catch {
+    return null;
   }
 }

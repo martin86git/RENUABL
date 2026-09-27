@@ -1,7 +1,8 @@
 import type { BillSummary } from "./bill";
 import { PANEL } from "./catalogue";
+import { yieldPerKw } from "./sunshine";
 import { COSTING, billOfMaterials, inverterOptions, maxPanelsForInverter, sellPrice, type CostGroup } from "./costing";
-import { NO_INCENTIVES, rebatesFor, type Incentives } from "./rebates";
+import { NO_INCENTIVES, VERIFIED_RATES, rebatesFor, type Incentives, type RebateRates } from "./rebates";
 import { realAnnualUse, solarSituation } from "./existing-solar";
 import type {
   LineItemId,
@@ -36,7 +37,8 @@ export const ASSUMPTIONS = {
   maxPanelsSinglePhase: maxPanelsForInverter(inverterOptions("hybrid", "single")),
   tariffPerKwh: 0.3,
   feedInPerKwh: 0.04,
-  dailyYieldKwhPerKw: 3.8, // Melbourne average
+  /** Used when a home's NASA sunshine isn't known: Melbourne average. */
+  dailyYieldKwhPerKw: 3.8,
   /** Used when the bill doesn't split usage by time of day. */
   eveningShare: 0.6,
   /** Homes with solar buy most of their grid power after dark. */
@@ -95,7 +97,11 @@ export const TIER_LABELS: Record<SystemTier, string> = {
  * With existing solar the bill shows only grid purchases: expanding keeps that
  * (the battery covers them); replacing adds back the solar the home uses itself.
  */
-export function usageBasis(bill: BillSummary, profile: EnergyProfile): UsageBasis {
+export function usageBasis(
+  bill: BillSummary,
+  profile: EnergyProfile,
+  dailyYieldKwhPerKw: number = ASSUMPTIONS.dailyYieldKwhPerKw,
+): UsageBasis {
   const situation = solarSituation(bill, profile);
   const base = situation === "replace" ? realAnnualUse(bill) : bill.annualUsageKwh;
   const annualKwh = base + (profile.evPlanned ? ASSUMPTIONS.evAnnualKwh : 0);
@@ -106,6 +112,7 @@ export function usageBasis(bill: BillSummary, profile: EnergyProfile): UsageBasi
     usageRate: bill.usageRate ?? ASSUMPTIONS.tariffPerKwh,
     feedInRate: bill.feedInRate ?? ASSUMPTIONS.feedInPerKwh,
     existingSolar: situation === "expand" ? { exportedDailyKwh: bill.exportedDailyKwh ?? 0 } : null,
+    dailyYieldKwhPerKw,
   };
 }
 
@@ -121,8 +128,13 @@ function clamp(n: number, min: number, max: number) {
  * Panels to cover a year's use, within the roof's limit. A home with a
  * battery, now or planned, needs extra generation to charge it.
  */
-export function panelsNeeded(annualKwh: number, analysis: Pick<HomeAnalysis, "maxPanels">, battery = false) {
-  const kw = (annualKwh * (battery ? ASSUMPTIONS.batteryReadySolar : 1)) / (ASSUMPTIONS.dailyYieldKwhPerKw * 365);
+export function panelsNeeded(
+  annualKwh: number,
+  analysis: Pick<HomeAnalysis, "maxPanels">,
+  battery = false,
+  dailyYieldKwhPerKw: number = ASSUMPTIONS.dailyYieldKwhPerKw,
+) {
+  const kw = (annualKwh * (battery ? ASSUMPTIONS.batteryReadySolar : 1)) / (dailyYieldKwhPerKw * 365);
   return clamp(Math.ceil((kw * 1000) / ASSUMPTIONS.panelWatts), ASSUMPTIONS.minPanels, Math.min(ASSUMPTIONS.maxPanels, analysis.maxPanels));
 }
 
@@ -158,7 +170,7 @@ export function topUpPanels(usage: UsageBasis, batteryKwh: number, analysis: Pic
   const toStore = Math.min(batteryKwh * ASSUMPTIONS.batteryUsableShare, eveningKwh(usage));
   const shortfall = toStore * ASSUMPTIONS.batteryReadySolar - usage.existingSolar.exportedDailyKwh;
   if (shortfall <= 0) return 0;
-  const perPanelDaily = (ASSUMPTIONS.panelWatts / 1000) * ASSUMPTIONS.dailyYieldKwhPerKw;
+  const perPanelDaily = (ASSUMPTIONS.panelWatts / 1000) * usage.dailyYieldKwhPerKw;
   return Math.min(Math.ceil(shortfall / perPanelDaily), analysis.maxPanels);
 }
 
@@ -170,11 +182,11 @@ const kwh = (n: number) => n.toLocaleString("en-AU", { maximumFractionDigits: 1 
  * now or planned. The customer doesn't pick panel counts or battery sizes.
  */
 export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, bill: BillSummary): Recommendation {
-  const usage = usageBasis(bill, profile);
+  const usage = usageBasis(bill, profile, analysis.sunshine ? yieldPerKw(analysis.sunshine) : ASSUMPTIONS.dailyYieldKwhPerKw);
   if (usage.existingSolar) return expandSystem(profile, analysis, usage);
   const replacing = solarSituation(bill, profile) === "replace";
-  const panelsForUse = panelsNeeded(usage.annualKwh, analysis, profile.wantsBattery);
-  const panelsWithBattery = panelsNeeded(usage.annualKwh, analysis, true);
+  const panelsForUse = panelsNeeded(usage.annualKwh, analysis, profile.wantsBattery, usage.dailyYieldKwhPerKw);
+  const panelsWithBattery = panelsNeeded(usage.annualKwh, analysis, true, usage.dailyYieldKwhPerKw);
   const battery = batteryNeeded(usage, profile.backup);
   const bigBattery = nextBatterySize(battery);
   const evCharger = profile.ev || profile.evPlanned;
@@ -259,7 +271,7 @@ function expandSystem(profile: EnergyProfile, analysis: HomeAnalysis, usage: Usa
 
 export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: PriceBreakdown): SystemEstimate {
   const solarKw = panelsToKw(config.panelCount);
-  const generation = Math.round(solarKw * ASSUMPTIONS.dailyYieldKwhPerKw * 365);
+  const generation = Math.round(solarKw * usage.dailyYieldKwhPerKw * 365);
   const payback = (savings: number) => (savings > 0 ? Math.round((price.total / savings) * 10) / 10 : 0);
 
   if (usage.existingSolar) {
@@ -318,6 +330,7 @@ export function priceSystem(
   site: Site,
   addOns: AddOnId[] = [],
   incentives: Incentives = NO_INCENTIVES,
+  rates: RebateRates = VERIFIED_RATES,
 ): PriceBreakdown {
   const bom = billOfMaterials({ ...config, roof: site.roof, storeys: site.storeys, phase: site.phase, addOns });
   const cost = (group: CostGroup) => bom.filter((l) => l.group === group).reduce((sum, l) => sum + l.total, 0);
@@ -340,7 +353,8 @@ export function priceSystem(
   }
 
   const gross = lines.reduce((sum, l) => sum + l.amount, 0);
-  const rebates = rebatesFor(config, incentives);
+  const solarLine = lines.find((l) => l.id === "solar")?.amount ?? 0;
+  const rebates = rebatesFor(config, incentives, rates, solarLine);
   const rebateTotal = Math.min(gross, rebates.total);
   const total = gross - rebateTotal;
   const loan = Math.min(rebates.loan, total);

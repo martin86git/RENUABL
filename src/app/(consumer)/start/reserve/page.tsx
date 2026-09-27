@@ -18,7 +18,7 @@ import { formatCurrency, formatDate } from "@/lib/domain/format";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { describeInverter } from "@/lib/domain/inverter";
 import { TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
-import { REBATE_RATES, solarVictoriaApplies } from "@/lib/domain/rebates";
+import { solarVictoriaApplies } from "@/lib/domain/rebates";
 import { getWindow } from "@/lib/domain/scheduling";
 import type { AddOnId, LineItemId } from "@/lib/domain/types";
 import { formatAddress } from "@/lib/mock/addresses";
@@ -52,7 +52,7 @@ const field = "h-11 w-full rounded-xl bg-canvas px-4 text-[15px] outline-none ri
 function ReserveScreen() {
   const router = useRouter();
   const { state, update } = useFlow();
-  const { config, price, recommendation, site, profile } = useSystem();
+  const { config, price, recommendation, site, profile, rates } = useSystem();
   const [contact, setContact] = useState<ContactDetails>(state.contact ?? { firstName: "", lastName: "", mobile: "", email: "" });
   const [errors, setErrors] = useState<ContactErrors>({});
   const [problem, setProblem] = useState<string | null>(null);
@@ -208,54 +208,70 @@ function ReserveScreen() {
           </>
         )}
       </ul>
-      {!REBATE_RATES.verified && (
+      {rates.source !== "live" && (
         <p className="mt-3 text-[11.5px] leading-snug text-muted">Rebate amounts are confirmed on your call before anything is final.</p>
       )}
     </Card>
   );
 
-  const solarVic = solarVictoriaApplies(state.address?.state ?? null) && (config.panelCount > 0 || config.batteryKwh > 0) && (
-    <Card className="p-5">
-      <p className="text-[15px] text-ink">Solar Victoria</p>
-      <p className="mt-0.5 text-[12.5px] leading-snug text-muted">
-        Victorian homes may be eligible for a Solar Victoria rebate and an interest-free loan.{" "}
-        <a
-          href={REBATE_RATES.solarVictoria.eligibilityUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-ink underline underline-offset-4"
-        >
-          Check eligibility
-        </a>
-      </p>
-      <div className="mt-4 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-[14px] text-ink">Apply the Solar Victoria rebate</p>
-          <p className="text-[12px] text-muted">If you&apos;re eligible. We confirm it with you on the call.</p>
-        </div>
-        <Toggle
-          label="Apply the Solar Victoria rebate"
-          checked={state.solarVic.rebate}
-          onChange={(rebate) => update({ solarVic: { rebate, loan: rebate && state.solarVic.loan } })}
-        />
-      </div>
-      {state.solarVic.rebate && REBATE_RATES.solarVictoria.pvLoan > 0 && config.panelCount > 0 && !config.existingSolar && (
-        <div className="mt-4 flex items-center justify-between gap-4 border-t border-line pt-4">
+  // Solar Victoria's panel rebate is for new systems (including replacements), in Victoria.
+  const sv = rates.solarVictoria;
+  const loanMonthly = price.loan > 0 ? Math.round((price.loan / sv.loanMonths) * 100) / 100 : 0;
+  const solarVic = solarVictoriaApplies(state.address?.state ?? null) &&
+    config.panelCount > 0 &&
+    !config.existingSolar &&
+    sv.pvRebateMax > 0 && (
+      <Card className="p-5">
+        <p className="text-[15px] text-ink">Solar Victoria</p>
+        <p className="mt-0.5 text-[12.5px] leading-snug text-muted">
+          Victorian homes may be eligible for a solar panel rebate of up to {formatCurrency(sv.pvRebateMax)} and an interest-free loan.{" "}
+          <a href={sv.eligibilityUrl} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-4">
+            Check eligibility
+          </a>
+        </p>
+        <div className="mt-4 flex items-center justify-between gap-4">
           <div>
-            <p className="text-[14px] text-ink">Take the interest-free loan</p>
-            <p className="text-[12px] text-muted">
-              Up to {formatCurrency(REBATE_RATES.solarVictoria.pvLoan)} off your upfront cost, repaid to Solar Victoria interest free.
-            </p>
+            <p className="text-[14px] text-ink">Apply the Solar Victoria rebate</p>
+            <p className="text-[12px] text-muted">If you&apos;re eligible. We confirm it with you on the call.</p>
           </div>
           <Toggle
-            label="Take the Solar Victoria interest-free loan"
-            checked={state.solarVic.loan}
-            onChange={(loan) => update({ solarVic: { ...state.solarVic, loan } })}
+            label="Apply the Solar Victoria rebate"
+            checked={state.solarVic.rebate}
+            onChange={(rebate) => update({ solarVic: { rebate, loan: rebate && state.solarVic.loan } })}
           />
         </div>
-      )}
-    </Card>
-  );
+        {state.solarVic.rebate && sv.pvLoanMax > 0 && (
+          <div className="mt-4 border-t border-line pt-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[14px] text-ink">Take the interest-free loan</p>
+                <p className="text-[12px] text-muted">
+                  Up to {formatCurrency(sv.pvLoanMax)} off your upfront cost, repaid to Solar Victoria interest free.
+                </p>
+              </div>
+              <Toggle
+                label="Take the Solar Victoria interest-free loan"
+                checked={state.solarVic.loan}
+                onChange={(loan) => update({ solarVic: { ...state.solarVic, loan } })}
+              />
+            </div>
+            {price.loan > 0 && (
+              <div className="mt-3 rounded-xl bg-sage/50 px-3.5 py-3 text-forest" aria-live="polite">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-[13.5px]">Your upfront cost with the loan</p>
+                  <p className="text-[18px] font-medium tabular-nums">{formatCurrency(price.outOfPocket)}</p>
+                </div>
+                <p className="mt-1 text-[12px] leading-snug text-forest/80">
+                  {formatCurrency(price.total)} after rebates, less the {formatCurrency(price.loan)} loan. Then{" "}
+                  {formatCurrency(loanMonthly)} a month for {sv.loanMonths / 12} years, interest free. Subject to Solar Victoria&apos;s
+                  eligibility criteria.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+    );
 
   const additions = suggestions.length > 0 && (
     <Card className="p-5">

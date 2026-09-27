@@ -22,7 +22,8 @@ import { summariseBill, type BillSummary } from "./bill";
 import { normaliseMobile, validateContact } from "./contact";
 import { BOS, PANEL, RACKING } from "./catalogue";
 import { COSTING, arrayKw, batteryInstallCost, billOfMaterials, railLengths, selectInverter, sellPrice } from "./costing";
-import { REBATE_RATES, rebatesFor } from "./rebates";
+import { REBATE_RATES, batteryFactor, batteryStcs, deemingYears, rebatesFor, solarStcs, taperedKwh } from "./rebates";
+import { zoneRating } from "./zone-ratings";
 import { HYBRID_INVERTERS, STRING_INVERTERS } from "./catalogue";
 import { EXPAND_DISCLAIMER, existingSolarQuestions, expandNote, isAboutComplete, realAnnualUse, solarSituation } from "./existing-solar";
 import { INSTALL_ARRIVAL, buildAvailability, fromISODate } from "./scheduling";
@@ -560,29 +561,58 @@ describe("contact details", () => {
 
 describe("rebates", () => {
   const config = { panelCount: 14, batteryKwh: 16 };
-  const vic = { state: "VIC", solarVicRebate: true, solarVicLoan: false };
+  const vic = { state: "VIC", postcode: "3150", installDate: "2026-10-05", solarVicRebate: true, solarVicLoan: false };
 
-  it("shows each federal rebate as its own line", () => {
-    const { lines, total } = rebatesFor(config);
-    expect(lines.map((l) => l.id)).toEqual(["stc-solar", "stc-battery"]);
-    const pvCerts = Math.floor(arrayKw(14) * REBATE_RATES.stc.zoneRating * REBATE_RATES.stc.deemingYears);
-    expect(lines[0].amount).toBe(Math.round(pvCerts * REBATE_RATES.stc.price));
-    expect(total).toBe(lines[0].amount + lines[1].amount);
+  it("uses the CER's zone for the postcode and the deeming years for the install year", () => {
+    expect(zoneRating("3150")).toEqual({ zone: 4, rating: 1.185 }); // Glen Waverley
+    expect(zoneRating("3500")).toEqual({ zone: 3, rating: 1.382 }); // Mildura
+    expect(deemingYears("2026-10-05")).toBe(5);
+    expect(deemingYears("2027-02-01")).toBe(4);
+    expect(solarStcs(14, "3150", "2026-10-05")).toBe(Math.floor(arrayKw(14) * 1.185 * 5));
+    expect(solarStcs(14, "3500", "2026-10-05")).toBe(Math.floor(arrayKw(14) * 1.382 * 5));
   });
 
-  it("offers Solar Victoria only for Victorian homes that opt in", () => {
+  it("uses the battery factor for the install date, tapered by size and capped at 50 kWh", () => {
+    expect(batteryFactor("2026-04-30")).toBe(8.4);
+    expect(batteryFactor("2026-10-05")).toBe(6.8);
+    expect(batteryFactor("2027-07-01")).toBe(5.2);
+    expect(taperedKwh(8)).toBe(8);
+    expect(taperedKwh(24)).toBeCloseTo(14 + 10 * 0.6);
+    expect(taperedKwh(40)).toBeCloseTo(14 + 14 * 0.6 + 12 * 0.15);
+    expect(taperedKwh(60)).toBeCloseTo(14 + 14 * 0.6 + 22 * 0.15);
+    expect(batteryStcs(24, "2026-10-05")).toBe(Math.floor((14 + 10 * 0.6) * 6.8)); // 136
+  });
+
+  it("shows each federal rebate as its own line", () => {
+    const { lines, total } = rebatesFor(config, vic);
+    expect(lines.map((l) => l.id)).toEqual(["stc-solar", "stc-battery", "sv-solar"]);
+    expect(lines[0].amount).toBe(Math.round(solarStcs(14, "3150", "2026-10-05") * REBATE_RATES.stc.price));
+    expect(total).toBe(lines.reduce((s, l) => s + l.amount, 0));
+  });
+
+  it("offers Solar Victoria only for Victorian homes that opt in, capped at 50% of the solar cost after STCs", () => {
     expect(rebatesFor(config, { ...vic, state: "NSW" }).lines.some((l) => l.id === "sv-solar")).toBe(false);
     expect(rebatesFor(config, { ...vic, solarVicRebate: false }).lines.some((l) => l.id === "sv-solar")).toBe(false);
-    expect(rebatesFor(config, vic).lines.find((l) => l.id === "sv-solar")!.amount).toBe(REBATE_RATES.solarVictoria.pvRebate);
-    // Not for extra panels on an existing system.
+    expect(rebatesFor(config, vic, REBATE_RATES, 10_000).lines.find((l) => l.id === "sv-solar")!.amount).toBe(1400);
+    const stc = rebatesFor(config, vic).lines[0].amount;
+    expect(rebatesFor(config, vic, REBATE_RATES, stc + 2000).lines.find((l) => l.id === "sv-solar")!.amount).toBe(1000);
+    // Not for extra panels on an existing system, and no Solar Victoria battery rebate.
     expect(rebatesFor({ ...config, existingSolar: true }, vic).lines.some((l) => l.id === "sv-solar")).toBe(false);
+    expect(rebatesFor(config, vic).lines.some((l) => l.id === "sv-battery")).toBe(false);
   });
 
   it("applies the interest-free loan to the upfront cost, not the price", () => {
     const withLoan = priceSystem({ panelCount: 14, batteryKwh: 0, evCharger: false }, site, [], { ...vic, solarVicLoan: true });
     const without = priceSystem({ panelCount: 14, batteryKwh: 0, evCharger: false }, site, [], vic);
     expect(withLoan.total).toBe(without.total);
-    expect(withLoan.loan).toBe(REBATE_RATES.solarVictoria.pvLoan);
-    expect(withLoan.outOfPocket).toBe(without.total - REBATE_RATES.solarVictoria.pvLoan);
+    expect(withLoan.loan).toBe(1400);
+    expect(withLoan.outOfPocket).toBe(without.total - 1400);
+  });
+});
+
+describe("battery STCs for a 48 kWh battery in October 2026 (checked by hand)", () => {
+  it("gets 172 certificates, not 403", () => {
+    // 14 × 100% + 14 × 60% + 20 × 15% = 25.4 kWh × 6.8 = 172.72 → 172
+    expect(batteryStcs(48, "2026-10-05")).toBe(172);
   });
 });

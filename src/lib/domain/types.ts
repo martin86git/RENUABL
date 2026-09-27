@@ -29,6 +29,8 @@ export interface HomeAnalysis {
   roof: string;
   orientation: string;
   maxPanels: number;
+  /** NASA POWER sunshine for the home's coordinates, when known. */
+  sunshine?: Sunshine | null;
 }
 
 /** The few yes/no questions the customer answers. */
@@ -65,10 +67,13 @@ export interface UsageBasis {
   feedInRate: number;
   /** Set when the home already has solar and the customer is expanding it. */
   existingSolar: { exportedDailyKwh: number } | null;
+  /** Expected daily output per kW of panels at this home. */
+  dailyYieldKwhPerKw: number;
 }
 
 import type { BomLine } from "./costing";
 import type { RebateLine } from "./rebates";
+import type { Sunshine } from "./sunshine";
 
 // ---------------------------------------------------------------------------
 // System recommendation

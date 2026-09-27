@@ -4,11 +4,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { BillSummary } from "@/lib/domain/bill";
 import type { ContactDetails } from "@/lib/domain/contact";
 import type { InverterSummary } from "@/lib/domain/inverter";
+import { VERIFIED_RATES, type RebateRates } from "@/lib/domain/rebates";
+import type { Sunshine } from "@/lib/domain/sunshine";
 import { isAboutComplete as aboutComplete } from "@/lib/domain/existing-solar";
 import { ASSUMPTIONS, estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
 import type { CareBilling } from "@/lib/domain/care";
 import type { Address, AddOnId, EnergyProfile, SystemConfig, SystemTier } from "@/lib/domain/types";
-import { analyseHome, type CallSlot, type ReservationResult } from "@/lib/services/consumer";
+import { analyseHome, fetchRebateRates, fetchSunshine, type CallSlot, type ReservationResult } from "@/lib/services/consumer";
 
 /**
  * Client state for the guided purchase flow. Business rules live in
@@ -39,6 +41,10 @@ export interface FlowState {
   contact: ContactDetails | null;
   /** An existing inverter read from the customer's photos (expanding an existing system). */
   existingInverter: InverterSummary | null;
+  /** Today's rebate rules, loaded once per visit (null until loaded: the verified copy is used). */
+  rates: RebateRates | null;
+  /** NASA POWER sunshine for the home's coordinates. */
+  sunshine: Sunshine | null;
   /** Solar Victoria (VIC homes only): the customer's choices at checkout. */
   solarVic: { rebate: boolean; loan: boolean };
   /** The customer booked their 15-minute confirmation call via HubSpot. */
@@ -62,6 +68,8 @@ const EMPTY: FlowState = {
   reservation: null,
   contact: null,
   existingInverter: null,
+  rates: null,
+  sunshine: null,
   solarVic: { rebate: false, loan: false },
   callBooked: false,
   call: null,
@@ -133,6 +141,35 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     }
   }, [state, hydrated]);
 
+  // Rebate rules: once per visit, or when the saved copy is from another day.
+  useEffect(() => {
+    if (!hydrated) return;
+    const today = new Date().toISOString().slice(0, 10);
+    if (state.rates?.asOf === today) return;
+    let cancelled = false;
+    void fetchRebateRates().then((rates) => {
+      if (!cancelled && rates) setState((s) => ({ ...s, rates }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, state.rates?.asOf]);
+
+  // NASA sunshine for the home's coordinates.
+  const lat = state.address?.lat;
+  const lng = state.address?.lng;
+  useEffect(() => {
+    if (!hydrated || lat === undefined || lng === undefined) return;
+    if (state.sunshine && Math.abs(state.sunshine.lat - lat) < 0.01 && Math.abs(state.sunshine.lng - lng) < 0.01) return;
+    let cancelled = false;
+    void fetchSunshine(lat, lng).then((sunshine) => {
+      if (!cancelled) setState((s) => ({ ...s, sunshine }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, lat, lng, state.sunshine]);
+
   const update = useCallback((patch: Partial<FlowState>) => setState((s) => ({ ...s, ...patch })), []);
   const reset = useCallback(() => setState({ ...EMPTY, attribution: state.attribution }), [state.attribution]);
 
@@ -152,8 +189,10 @@ export function useSystem() {
   return useMemo(() => {
     const profile: EnergyProfile = { ...DEFAULT_PROFILE, ...state.profile };
     const phase = state.profile.phase === "three" ? "three" : "single";
+    const rates = state.rates ?? VERIFIED_RATES;
     const analysis = {
       ...analyseHome(state.address),
+      sunshine: state.sunshine,
       maxPanels: phase === "three" ? ASSUMPTIONS.maxPanels : ASSUMPTIONS.maxPanelsSinglePhase,
     };
     const recommendation = recommendSystem(profile, analysis, state.bill ?? NO_BILL);
@@ -162,13 +201,26 @@ export function useSystem() {
     const site = { storeys: profile.storeys ?? "single", roof: profile.roofType ?? "unsure", phase } as const;
     const incentives = {
       state: state.address?.state ?? null,
+      postcode: state.address?.postcode ?? null,
+      installDate: state.installDate,
       solarVicRebate: state.solarVic.rebate,
       solarVicLoan: state.solarVic.rebate && state.solarVic.loan,
     };
-    const price = priceSystem(config, site, state.addOns, incentives);
+    const price = priceSystem(config, site, state.addOns, incentives, rates);
     const outcome = estimateOutcome(config, recommendation.usage, price);
-    return { profile, analysis, site, recommendation, tier, config, price, outcome };
-  }, [state.profile, state.address, state.bill, state.tier, state.config, state.addOns, state.solarVic]);
+    return { profile, analysis, site, recommendation, tier, config, price, outcome, rates };
+  }, [
+    state.profile,
+    state.address,
+    state.bill,
+    state.tier,
+    state.config,
+    state.addOns,
+    state.solarVic,
+    state.installDate,
+    state.rates,
+    state.sunshine,
+  ]);
 }
 
 /** The "About your home" step is done once the bill is read and every question shown is answered. */
