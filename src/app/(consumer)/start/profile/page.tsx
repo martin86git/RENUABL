@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BatteryCharging, Car, House, Info, PlugZap, Sun, type LucideIcon } from "lucide-react";
+import { ArrowRight, BatteryCharging, Car, Home as HomeIcon, House, Info, PlugZap, Sun, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { FlowStep } from "@/components/consumer/flow-shell";
@@ -14,11 +14,12 @@ import {
   EXISTING_PLAN_OPTIONS,
   EXISTING_SIZE_OPTIONS,
   EXPAND_DISCLAIMER,
+  ROOF_OPTIONS,
   asksAboutBattery,
   existingSolarQuestions,
   solarSituation,
 } from "@/lib/domain/existing-solar";
-import type { EnergyProfile, ExistingSolarPlan, ExistingSolarSize } from "@/lib/domain/types";
+import type { EnergyProfile, ExistingSolarPlan, ExistingSolarSize, RoofType } from "@/lib/domain/types";
 
 type YesNoKey = "ev" | "evPlanned" | "wantsBattery" | "backup";
 
@@ -121,6 +122,23 @@ export default function ProfilePage() {
         <div className="space-y-4">
           <BillUpload bill={state.bill} onRead={(bill) => update({ bill, config: null })} />
           {existing.size && <ExistingSolar profile={profile} situation={situation} onChange={change} />}
+          <div className="flex gap-5 rounded-[var(--radius-card)] bg-surface px-5 py-4 shadow-[var(--shadow-soft)]">
+            <HomeIcon className="mt-1 hidden h-7 w-7 shrink-0 text-ink lg:block" strokeWidth={1.3} aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13.5px] leading-snug text-ink-2">What&apos;s your roof made of?</p>
+              <div className="mt-2.5">
+                <ChoiceChips<RoofType>
+                  label="What's your roof made of?"
+                  options={ROOF_OPTIONS}
+                  value={profile.roofType}
+                  onChange={(roofType) => change({ roofType })}
+                />
+              </div>
+              {profile.roofType === "unsure" && (
+                <p className="mt-2 text-[12px] text-muted">No problem. We&apos;ll confirm it from satellite images and on your call.</p>
+              )}
+            </div>
+          </div>
           {/* Desktop: icon cards. Mobile: one card with rows, toggles right-aligned. */}
           <ul className="hidden space-y-2.5 lg:block">
             {questions.map(({ key, label, icon: Icon }) => (

@@ -50,9 +50,15 @@ export function asksAboutBattery(bill: Pick<BillSummary, "hasSolar"> | null, pro
   return !bill || solarSituation(bill, profile) !== "expand";
 }
 
+export const ROOF_OPTIONS: { value: "tin" | "tile" | "unsure"; label: string }[] = [
+  { value: "tin", label: "Tin (Colorbond)" },
+  { value: "tile", label: "Tiles" },
+  { value: "unsure", label: "Not sure" },
+];
+
 /** "About your home" is done once the bill is read and every question shown is answered. */
 export function isAboutComplete(bill: BillSummary | null, profile: Partial<EnergyProfile>): boolean {
-  if (!bill) return false;
+  if (!bill || !profile.roofType) return false;
   const q = existingSolarQuestions(bill, profile);
   if (q.size && !profile.existingSize) return false;
   if (q.plan && !profile.existingPlan) return false;

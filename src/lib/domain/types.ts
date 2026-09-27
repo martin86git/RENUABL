@@ -36,12 +36,15 @@ export interface EnergyProfile {
   /** Wants a battery: solar gets headroom to charge it, and a battery option is suggested. */
   wantsBattery: boolean;
   backup: boolean;
+  /** What the roof is made of: sets the mounting kit. "unsure" is quoted as tile and checked on the call. */
+  roofType?: RoofType;
   /** Only asked when the bill shows existing solar. */
   existingSize?: ExistingSolarSize;
   /** Only asked when the customer doesn't know their existing system's size. */
   existingPlan?: ExistingSolarPlan;
 }
 
+export type RoofType = "tin" | "tile" | "unsure";
 export type ExistingSolarSize = "under-5" | "5-10" | "over-10" | "unsure";
 export type ExistingSolarPlan = "replace" | "expand";
 
@@ -57,6 +60,8 @@ export interface UsageBasis {
   existingSolar: { exportedDailyKwh: number } | null;
 }
 
+import type { BomLine } from "./costing";
+
 // ---------------------------------------------------------------------------
 // System recommendation
 // ---------------------------------------------------------------------------
@@ -69,6 +74,8 @@ export interface SystemConfig {
   evCharger: boolean;
   /** Adds to a system the home already has (panelCount is then the extra panels, often 0). */
   existingSolar?: boolean;
+  /** No battery yet, but a battery-ready (hybrid) inverter so one can be added later. */
+  batteryReady?: boolean;
 }
 
 export interface SystemEstimate {
@@ -91,6 +98,8 @@ export interface LineItem {
 
 export interface PriceBreakdown {
   lines: LineItem[];
+  /** Supplier-cost bill of materials behind the lines (for installers and audits, not customers). */
+  bom: BomLine[];
   gross: number;
   rebates: number;
   total: number;

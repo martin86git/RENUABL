@@ -1,4 +1,6 @@
 import type { BillSummary } from "./bill";
+import { PANEL } from "./catalogue";
+import { COSTING, billOfMaterials, maxPanelsForInverter, rebatesFor, sellPrice, type CostGroup } from "./costing";
 import { realAnnualUse, solarSituation } from "./existing-solar";
 import type {
   LineItemId,
@@ -10,24 +12,26 @@ import type {
   Recommendation,
   SystemConfig,
   SystemEstimate,
+  RoofType,
   SystemTier,
   UsageBasis,
 } from "./types";
 
 /**
- * Assumptions used by the first-pass sizing and pricing model. Usage and
- * prices come from the customer's bill; these fill the gaps.
- * PLACEHOLDERS: validate every figure with installer partners before launch.
+ * Assumptions used by the sizing model. Usage and prices come from the
+ * customer's bill; these fill the gaps. Product costs live in catalogue.ts and
+ * costing.ts. PLACEHOLDERS: validate with installer partners before launch.
  */
-const PANEL_WATTS = 440;
+const PANEL_WATTS = PANEL.watts;
 /** The smallest system RENUABL offers. */
 const MIN_SYSTEM_KW = 5;
 
 export const ASSUMPTIONS = {
   panelWatts: PANEL_WATTS,
   minSystemKw: MIN_SYSTEM_KW,
-  minPanels: Math.ceil((MIN_SYSTEM_KW * 1000) / PANEL_WATTS), // 12 panels = 5.3 kW
-  maxPanels: 36,
+  minPanels: Math.ceil((MIN_SYSTEM_KW * 1000) / PANEL_WATTS), // 11 x 475 W = 5.2 kW
+  /** The most the largest single-phase inverter allows (array <= 133% of 10 kW). */
+  maxPanels: maxPanelsForInverter(),
   tariffPerKwh: 0.3,
   feedInPerKwh: 0.04,
   dailyYieldKwhPerKw: 3.8, // Melbourne average
@@ -37,7 +41,8 @@ export const ASSUMPTIONS = {
   solarHomeEveningShare: 0.75,
   evAnnualKwh: 2500,
   baseSelfConsumption: 0.4,
-  batterySizes: [10, 13.5, 20, 27] as const, // 27 = two 13.5 kWh units
+  /** SigenStor 8 kWh modules, up to one stack of six. */
+  batterySizes: [8, 16, 24, 32, 40, 48] as const,
   batteryUsableShare: 0.9,
   /**
    * With a battery (now or planned), solar is sized this much above annual use
@@ -45,26 +50,29 @@ export const ASSUMPTIONS = {
    * PLACEHOLDER: confirm with Primero.
    */
   batteryReadySolar: 1.25,
-  prices: {
-    solarPerKw: 1050,
-    batteryPerKwh: 850,
-    evCharger: 1650,
-    monitoring: 350,
-    doubleStorey: 650,
-  },
-  rebates: {
-    solarPerKw: 370,
-    batteryShare: 0.3,
-  },
   deposit: 499,
 } as const;
 
-/** Optional products offered after the system recommendation. Prices are placeholders. */
+/** Customer price of one add-on, from its costed bill of materials. */
+function addOnPrice(id: AddOnId) {
+  const cost = billOfMaterials({ panelCount: 0, batteryKwh: 0, evCharger: false, roof: "tile", storeys: "single", addOns: [id] }).reduce(
+    (sum, l) => sum + l.total,
+    0,
+  );
+  return sellPrice(cost);
+}
+
+/** Optional products offered after the system recommendation. */
 export const ADD_ONS: AddOn[] = [
-  { id: "heat-pump", name: "Heat Pump Hot Water", blurb: "Efficient, all-electric hot water.", price: 3900 },
-  { id: "smart-switchboard", name: "Smart Switchboard", blurb: "Prepare for a smarter, safer home.", price: 1450 },
-  { id: "home-backup", name: "Home Backup", blurb: "Keep essentials running during outages.", price: 1850 },
-  { id: "smart-home", name: "Smart Home Integration", blurb: "Connect and optimise your whole home.", price: 690 },
+  { id: "heat-pump", name: "Heat Pump Hot Water", blurb: "Efficient, all-electric hot water.", price: addOnPrice("heat-pump") },
+  {
+    id: "smart-switchboard",
+    name: "Smart Switchboard",
+    blurb: "Prepare for a smarter, safer home.",
+    price: addOnPrice("smart-switchboard"),
+  },
+  { id: "home-backup", name: "Home Backup", blurb: "Keep essentials running during outages.", price: addOnPrice("home-backup") },
+  { id: "smart-home", name: "Smart Home Integration", blurb: "Connect and optimise your whole home.", price: addOnPrice("smart-home") },
 ];
 
 /** Display order is the key order: good, better, best. */
@@ -174,7 +182,7 @@ export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, 
     tiers: {
       essential: {
         tier: "essential",
-        config: { panelCount: panelsForUse, batteryKwh: 0, evCharger: false },
+        config: { panelCount: panelsForUse, batteryKwh: 0, evCharger: false, ...(profile.wantsBattery ? { batteryReady: true } : {}) },
         why: replaces([
           sizedTo(profile.wantsBattery),
           "Lowest upfront cost",
@@ -283,42 +291,50 @@ export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: 
   };
 }
 
-export function priceSystem(config: SystemConfig, analysis: Pick<HomeAnalysis, "storeys">, addOns: AddOnId[] = []): PriceBreakdown {
-  const { prices, rebates } = ASSUMPTIONS;
+export interface Site {
+  storeys: "single" | "double";
+  roof: RoofType;
+}
+
+const LINE_LABELS: Partial<Record<CostGroup, string>> = {
+  "ev-charger": "Smart EV charger",
+  "double-storey": "Double-storey install",
+};
+
+/**
+ * The customer's price: the system's bill of materials at supplier cost, plus
+ * installation, margin and GST, grouped into the lines they see, less rebates.
+ */
+export function priceSystem(config: SystemConfig, site: Site, addOns: AddOnId[] = []): PriceBreakdown {
+  const bom = billOfMaterials({ ...config, roof: site.roof, storeys: site.storeys, addOns });
+  const cost = (group: CostGroup) => bom.filter((l) => l.group === group).reduce((sum, l) => sum + l.total, 0);
   const solarKw = panelsToKw(config.panelCount);
   const lines: PriceBreakdown["lines"] = [];
-  if (config.panelCount > 0) {
-    lines.push({
-      id: "solar",
-      label: `${solarKw} kW ${config.existingSolar ? "extra " : ""}solar (${config.panelCount} panels)`,
-      amount: Math.round(solarKw * prices.solarPerKw),
-      removable: false,
-    });
+
+  if (cost("solar") > 0) {
+    const label =
+      config.panelCount > 0 ? `${solarKw} kW ${config.existingSolar ? "extra " : ""}solar (${config.panelCount} panels)` : "Solar";
+    lines.push({ id: "solar", label, amount: sellPrice(cost("solar")), removable: false });
   }
   if (config.batteryKwh > 0) {
-    lines.push({
-      id: "battery",
-      label: `${config.batteryKwh} kWh battery`,
-      amount: Math.round(config.batteryKwh * prices.batteryPerKwh),
-      removable: true,
-    });
+    lines.push({ id: "battery", label: `${config.batteryKwh} kWh battery`, amount: sellPrice(cost("battery")), removable: true });
   }
-  if (config.evCharger) lines.push({ id: "ev-charger", label: "Smart EV charger", amount: prices.evCharger, removable: true });
-  lines.push({ id: "monitoring", label: "Energy monitoring", amount: prices.monitoring, removable: false });
-  if (analysis.storeys === "double") {
-    lines.push({ id: "double-storey", label: "Double-storey install", amount: prices.doubleStorey, removable: false });
+  if (config.evCharger)
+    lines.push({ id: "ev-charger", label: LINE_LABELS["ev-charger"]!, amount: sellPrice(cost("ev-charger")), removable: true });
+  if (cost("double-storey") > 0) {
+    lines.push({ id: "double-storey", label: LINE_LABELS["double-storey"]!, amount: sellPrice(cost("double-storey")), removable: false });
   }
   for (const id of addOns) {
     const addOn = ADD_ONS.find((a) => a.id === id);
-    if (addOn) lines.push({ id: addOn.id, label: addOn.name, amount: addOn.price, removable: true });
+    if (addOn) lines.push({ id: addOn.id, label: addOn.name, amount: sellPrice(cost(id)), removable: true });
   }
 
   const gross = lines.reduce((sum, l) => sum + l.amount, 0);
-  const batteryCost = config.batteryKwh * prices.batteryPerKwh;
-  const rebateTotal = Math.round(solarKw * rebates.solarPerKw + batteryCost * rebates.batteryShare);
+  const rebateTotal = Math.min(gross, rebatesFor(config));
 
   return {
     lines,
+    bom,
     gross,
     rebates: rebateTotal,
     total: gross - rebateTotal,
@@ -348,7 +364,11 @@ export function packageLabel(config: SystemConfig) {
 
 export function isSameConfig(a: SystemConfig, b: SystemConfig) {
   return (
-    a.panelCount === b.panelCount && a.batteryKwh === b.batteryKwh && a.evCharger === b.evCharger && !a.existingSolar === !b.existingSolar
+    a.panelCount === b.panelCount &&
+    a.batteryKwh === b.batteryKwh &&
+    a.evCharger === b.evCharger &&
+    !a.existingSolar === !b.existingSolar &&
+    !a.batteryReady === !b.batteryReady
   );
 }
 
@@ -363,15 +383,17 @@ export interface SuggestedAddition {
  * "Add to your system" suggestions at checkout: anything optional the
  * customer doesn't have yet (including items they just removed).
  */
-export function suggestedAdditions(config: SystemConfig, recommended: SystemConfig, addOns: AddOnId[]): SuggestedAddition[] {
+export function suggestedAdditions(config: SystemConfig, recommended: SystemConfig, addOns: AddOnId[], site: Site): SuggestedAddition[] {
   const out: SuggestedAddition[] = [];
+  const base = priceSystem(config, site, addOns).gross;
+  const added = (patch: Partial<SystemConfig>) => priceSystem({ ...config, ...patch }, site, addOns).gross - base;
   if (config.batteryKwh === 0) {
     const size = recommended.batteryKwh || ASSUMPTIONS.batterySizes[0];
     out.push({
       id: "battery",
       label: `${size} kWh battery`,
       blurb: "Use your sunshine at night and keep essentials on in outages.",
-      amount: Math.round(size * ASSUMPTIONS.prices.batteryPerKwh),
+      amount: added({ batteryKwh: size }),
     });
   }
   if (!config.evCharger) {
@@ -379,7 +401,7 @@ export function suggestedAdditions(config: SystemConfig, recommended: SystemConf
       id: "ev-charger",
       label: "Smart EV charger",
       blurb: "Charge your car from surplus solar.",
-      amount: ASSUMPTIONS.prices.evCharger,
+      amount: added({ evCharger: true }),
     });
   }
   for (const a of ADD_ONS) {
@@ -387,3 +409,5 @@ export function suggestedAdditions(config: SystemConfig, recommended: SystemConf
   }
   return out;
 }
+
+export { COSTING };

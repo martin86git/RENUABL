@@ -73,7 +73,7 @@ const NO_BILL: BillSummary = {
   exportedDailyKwh: null,
 };
 
-const STORAGE_KEY = "renuabl.flow.v5";
+const STORAGE_KEY = "renuabl.flow.v6";
 
 function load(): FlowState {
   try {
@@ -144,9 +144,10 @@ export function useSystem() {
     const recommendation = recommendSystem(profile, analysis, state.bill ?? NO_BILL);
     const tier = recommendation.tiers[state.tier];
     const config = state.config ?? tier.config;
-    const price = priceSystem(config, analysis, state.addOns);
+    const site = { storeys: analysis.storeys, roof: profile.roofType ?? "unsure" };
+    const price = priceSystem(config, site, state.addOns);
     const outcome = estimateOutcome(config, recommendation.usage, price);
-    return { profile, analysis, recommendation, tier, config, price, outcome };
+    return { profile, analysis, site, recommendation, tier, config, price, outcome };
   }, [state.profile, state.address, state.bill, state.tier, state.config, state.addOns]);
 }
 
