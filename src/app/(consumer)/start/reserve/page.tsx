@@ -16,6 +16,7 @@ import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
 import { CARE_FREE_MONTHS, CARE_PLAN, careIncludedFor, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
 import { formatCurrency, formatDate } from "@/lib/domain/format";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
+import { describeInverter } from "@/lib/domain/inverter";
 import { TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
 import { REBATE_RATES, solarVictoriaApplies } from "@/lib/domain/rebates";
 import { getWindow } from "@/lib/domain/scheduling";
@@ -82,7 +83,10 @@ function ReserveScreen() {
         "Existing solar": state.bill?.hasSolar
           ? `${profile.existingSize ?? "?"}${profile.existingPlan ? `, ${profile.existingPlan}` : ""}`
           : undefined,
+        "Existing inverter": state.existingInverter ? describeInverter(state.existingInverter) : undefined,
         Roof: profile.roofType,
+        Storeys: profile.storeys ?? "single",
+        Phase: profile.phase,
         "Ad source": [state.attribution?.source, state.attribution?.campaign].filter(Boolean).join(" / ") || undefined,
       },
     });

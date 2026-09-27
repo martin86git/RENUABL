@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BillSummary } from "@/lib/domain/bill";
 import type { ContactDetails } from "@/lib/domain/contact";
+import type { InverterSummary } from "@/lib/domain/inverter";
 import { isAboutComplete as aboutComplete } from "@/lib/domain/existing-solar";
 import { ASSUMPTIONS, estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
 import type { CareBilling } from "@/lib/domain/care";
@@ -36,6 +37,8 @@ export interface FlowState {
   reservation: ReservationResult | null;
   /** Given when reserving; also pre-fills the call booking. */
   contact: ContactDetails | null;
+  /** An existing inverter read from the customer's photos (expanding an existing system). */
+  existingInverter: InverterSummary | null;
   /** Solar Victoria (VIC homes only): the customer's choices at checkout. */
   solarVic: { rebate: boolean; loan: boolean };
   /** The customer booked their 15-minute confirmation call via HubSpot. */
@@ -58,6 +61,7 @@ const EMPTY: FlowState = {
   windowId: null,
   reservation: null,
   contact: null,
+  existingInverter: null,
   solarVic: { rebate: false, loan: false },
   callBooked: false,
   call: null,

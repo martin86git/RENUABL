@@ -7,6 +7,7 @@ import { buildCallAvailability, type CallDay } from "@/lib/domain/booking";
 import type { AddressSuggestion } from "@/lib/domain/address";
 import type { CareBilling } from "@/lib/domain/care";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
+import type { InverterSummary } from "@/lib/domain/inverter";
 import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
 import { ASSUMPTIONS } from "@/lib/domain/recommendation";
 import { rankInstallers } from "@/lib/domain/matching";
@@ -78,8 +79,8 @@ export function analyseHome(address: Address | null): HomeAnalysis {
 export type BillResult = { ok: true; bill: BillSummary } | { ok: false; message: string };
 
 /** Shrinks large phone photos so they upload quickly and stay under the size limit. */
-async function prepareBillFile(file: File): Promise<File> {
-  if (file.type === "application/pdf" || (file.size < 1_500_000 && isBillMediaType(file.type))) return file;
+async function prepareBillFile(file: File, keepUnder = 1_500_000): Promise<File> {
+  if (file.type === "application/pdf" || (file.size < keepUnder && isBillMediaType(file.type))) return file;
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, 2400 / Math.max(bitmap.width, bitmap.height));
@@ -88,7 +89,7 @@ async function prepareBillFile(file: File): Promise<File> {
     canvas.height = Math.round(bitmap.height * scale);
     canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.85));
-    return blob ? new File([blob], "bill.jpg", { type: "image/jpeg" }) : file;
+    return blob ? new File([blob], "photo.jpg", { type: "image/jpeg" }) : file;
   } catch {
     return file; // e.g. a format the browser can't decode; the server will say so
   }
@@ -201,6 +202,23 @@ export async function startDepositPayment(
     return json.ok && json.url
       ? { ok: true, url: json.url }
       : { ok: false, message: json.message ?? "Something went wrong. Please try again." };
+  } catch {
+    return { ok: false, message: "We couldn't reach RENUABL. Check your connection and try again." };
+  }
+}
+
+export type InverterResult = { ok: true; inverter: InverterSummary } | { ok: false; message: string };
+
+/** Sends photos of the customer's existing inverter to read its make, model and size. The photos aren't stored. */
+export async function readInverterPhotos(files: File[]): Promise<InverterResult> {
+  const body = new FormData();
+  for (const f of files.slice(0, 3)) body.append("photos", await prepareBillFile(f, 1_000_000));
+  try {
+    const res = await fetch("/api/inverter", { method: "POST", body });
+    const json = (await res.json()) as { ok: boolean; inverter?: InverterSummary; message?: string };
+    return json.ok && json.inverter
+      ? { ok: true, inverter: json.inverter }
+      : { ok: false, message: json.message ?? "We couldn't read those photos." };
   } catch {
     return { ok: false, message: "We couldn't reach RENUABL. Check your connection and try again." };
   }

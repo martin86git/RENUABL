@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { BillUpload } from "@/components/consumer/bill-upload";
+import { InverterPhotos } from "@/components/consumer/inverter-photos";
 import { isAboutComplete, useFlow } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
 import { Mascot } from "@/components/ui/brand-art";
@@ -20,6 +21,7 @@ import {
   existingSolarQuestions,
   solarSituation,
 } from "@/lib/domain/existing-solar";
+import type { InverterSummary } from "@/lib/domain/inverter";
 import type { EnergyProfile, ExistingSolarPlan, ExistingSolarSize, RoofType } from "@/lib/domain/types";
 
 type YesNoKey = "ev" | "evPlanned" | "wantsBattery" | "backup";
@@ -35,10 +37,14 @@ function ExistingSolar({
   profile,
   situation,
   onChange,
+  inverter,
+  onInverter,
 }: {
   profile: Partial<EnergyProfile>;
   situation: "new" | "expand" | "replace";
   onChange: (patch: Partial<EnergyProfile>) => void;
+  inverter: InverterSummary | null;
+  onInverter: (i: InverterSummary) => void;
 }) {
   const showPlan = profile.existingSize === "unsure";
   return (
@@ -71,10 +77,13 @@ function ExistingSolar({
             </>
           )}
           {profile.existingSize && situation === "expand" && (!showPlan || profile.existingPlan) && (
-            <p className="mt-4 flex gap-2.5 rounded-xl bg-sage/50 px-3.5 py-3 text-[12.5px] leading-snug text-forest" role="note">
-              <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
-              {EXPAND_DISCLAIMER}
-            </p>
+            <>
+              <p className="mt-4 flex gap-2.5 rounded-xl bg-sage/50 px-3.5 py-3 text-[12.5px] leading-snug text-forest" role="note">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
+                {EXPAND_DISCLAIMER}
+              </p>
+              <InverterPhotos inverter={inverter} onRead={onInverter} />
+            </>
           )}
           {situation === "replace" && (
             <p className="mt-4 flex gap-2.5 rounded-xl bg-canvas px-3.5 py-3 text-[12.5px] leading-snug text-ink-2" role="note">
@@ -122,7 +131,15 @@ export default function ProfilePage() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,420px)_1fr]">
         <div className="space-y-4">
           <BillUpload bill={state.bill} onRead={(bill) => update({ bill, config: null })} />
-          {existing.size && <ExistingSolar profile={profile} situation={situation} onChange={change} />}
+          {existing.size && (
+            <ExistingSolar
+              profile={profile}
+              situation={situation}
+              onChange={change}
+              inverter={state.existingInverter}
+              onInverter={(existingInverter) => update({ existingInverter })}
+            />
+          )}
           <div className="flex gap-5 rounded-[var(--radius-card)] bg-surface px-5 py-4 shadow-[var(--shadow-soft)]">
             <HomeIcon className="mt-1 hidden h-7 w-7 shrink-0 text-ink lg:block" strokeWidth={1.3} aria-hidden />
             <div className="min-w-0 flex-1 space-y-4">

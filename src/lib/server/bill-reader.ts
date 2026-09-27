@@ -3,11 +3,9 @@
  * the usage figures RENUABL sizes a system from. Asks only for energy figures,
  * never names, account numbers or addresses, and doesn't keep the file.
  */
-import Anthropic from "@anthropic-ai/sdk";
-import { betaJSONSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/beta/json-schema";
+import type Anthropic from "@anthropic-ai/sdk";
+import { ClaudeReadError, readWithClaude } from "./claude-reader";
 import type { BillMediaType, BillReading } from "@/lib/domain/bill";
-
-const DEFAULT_MODEL = "claude-opus-5";
 
 const nullableNumber = (description: string) => ({ anyOf: [{ type: "number" }, { type: "null" }], description }) as const;
 
@@ -51,7 +49,7 @@ const PROMPT = `This is a customer's Australian household electricity bill, uplo
 Read it carefully and return the figures. Use null for anything the bill doesn't show; never guess.
 Do not include names, addresses, account numbers or NMIs.`;
 
-export class BillReaderError extends Error {}
+export { ClaudeReadError as BillReaderError };
 
 const KEY_PATTERN = /sk-ant-[A-Za-z0-9_-]+/;
 
@@ -69,40 +67,12 @@ export function redactSecrets(text: string): string {
 }
 
 export async function readBillWithClaude(data: ArrayBuffer, mediaType: BillMediaType, apiKey: string): Promise<Partial<BillReading>> {
-  const client = new Anthropic({ apiKey, timeout: 45_000, maxRetries: 0 });
   const b64 = Buffer.from(data).toString("base64");
   const file: Anthropic.Beta.BetaContentBlockParam =
     mediaType === "application/pdf"
       ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } }
       : { type: "image", source: { type: "base64", media_type: mediaType, data: b64 } };
-
-  const request = {
-    model: process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
-    max_tokens: 4096,
-    output_config: { format: betaJSONSchemaOutputFormat(BILL_SCHEMA) },
-    messages: [{ role: "user" as const, content: [file, { type: "text" as const, text: PROMPT }] }],
-  };
-
-  let response;
-  try {
-    try {
-      // If the model declines, the API retries on Anthropic's recommended fallback model.
-      response = await client.beta.messages.parse({ ...request, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" });
-    } catch (e) {
-      // Accounts or models without server-side fallbacks: ask again without them.
-      if (!(e instanceof Anthropic.BadRequestError && /fallback/i.test(e.message))) throw e;
-      response = await client.beta.messages.parse(request);
-    }
-  } catch (e) {
-    if (e instanceof Anthropic.APIError) throw new BillReaderError(`Claude API ${e.status}: ${e.message}`);
-    // parse() throws when the reply isn't schema JSON (e.g. a refusal or a cut-off reply).
-    throw new BillReaderError(`Unreadable reply: ${e instanceof Error ? e.message : String(e)}`);
-  }
-
-  if (response.stop_reason === "refusal") throw new BillReaderError("Claude declined to read the bill");
-  if (response.stop_reason === "max_tokens") throw new BillReaderError("Bill reading was cut off");
-  if (!response.parsed_output) throw new BillReaderError("Claude returned no bill figures");
-  return response.parsed_output as Partial<BillReading>;
+  return readWithClaude<Partial<BillReading>>([file], BILL_SCHEMA, PROMPT, apiKey);
 }
 
 /** Stand-in reading for previews without an API key: a typical Melbourne household. */
