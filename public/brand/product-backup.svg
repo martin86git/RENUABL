@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Home backup battery">
+  <defs>
+    <linearGradient id="unit" x1="0" x2="1">
+      <stop offset="0" stop-color="#D5DAD7"/><stop offset=".3" stop-color="#FFFFFF"/><stop offset=".75" stop-color="#F2F3F1"/><stop offset="1" stop-color="#CBD0CD"/>
+    </linearGradient>
+    <radialGradient id="bg" cx=".5" cy=".45" r=".6"><stop offset="0" stop-color="#E7EFE8"/><stop offset="1" stop-color="#D9E7DC"/></radialGradient>
+  </defs>
+  <rect width="160" height="160" rx="28" fill="url(#bg)"/>
+  <ellipse cx="80" cy="139" rx="36" ry="6" fill="#1E3A2E" opacity=".12"/>
+  <rect x="46" y="20" width="68" height="116" rx="18" fill="url(#unit)" stroke="#D0D5D2"/>
+  <path d="M56 32v92" stroke="#FFFFFF" stroke-width="3" opacity=".9" stroke-linecap="round"/>
+  <rect x="68" y="44" width="24" height="64" rx="12" fill="#EDF0EE" stroke="#D6DBD8"/>
+  <rect x="72" y="72" width="16" height="32" rx="8" fill="#4FA36B"/>
+  <rect x="72" y="60" width="16" height="9" rx="4.5" fill="#9FC2AE"/>
+  <path d="M82 76l-6 10h5l-2 8 7-11h-5z" fill="#FFFFFF"/>
+  <circle cx="80" cy="120" r="3" fill="#1E3A2E"/>
+</svg>

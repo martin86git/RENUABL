@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Smart home integration">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset=".7" stop-color="#F2F3F1"/><stop offset="1" stop-color="#D9DDDA"/>
+    </linearGradient>
+    <linearGradient id="roof" x1="0" x2="1">
+      <stop offset="0" stop-color="#2C4A3C"/><stop offset="1" stop-color="#1E3A2E"/>
+    </linearGradient>
+    <radialGradient id="bg" cx=".5" cy=".45" r=".6"><stop offset="0" stop-color="#F6F2EC"/><stop offset="1" stop-color="#F0ECE7"/></radialGradient>
+  </defs>
+  <rect width="160" height="160" rx="28" fill="url(#bg)"/>
+  <ellipse cx="80" cy="139" rx="44" ry="6" fill="#1E3A2E" opacity=".12"/>
+  <path d="M42 78l38-30 38 30v52a6 6 0 0 1-6 6H48a6 6 0 0 1-6-6z" fill="url(#wall)" stroke="#D3D8D5"/>
+  <path d="M34 82l46-37 46 37" fill="none" stroke="url(#roof)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="70" y="104" width="20" height="32" rx="4" fill="#E4E8E5"/>
+  <circle cx="85" cy="121" r="1.8" fill="#1E3A2E"/>
+  <rect x="52" y="92" width="14" height="14" rx="3" fill="#D9E7DC"/><rect x="94" y="92" width="14" height="14" rx="3" fill="#D9E7DC"/>
+  <g fill="none" stroke="#4FA36B" stroke-width="4" stroke-linecap="round">
+    <path d="M66 28a20 20 0 0 1 28 0"/><path d="M71.5 34a12 12 0 0 1 17 0"/>
+  </g>
+  <circle cx="80" cy="40" r="3" fill="#4FA36B"/>
+</svg>

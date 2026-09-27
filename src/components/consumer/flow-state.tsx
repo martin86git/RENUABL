@@ -5,7 +5,7 @@ import type { BillSummary } from "@/lib/domain/bill";
 import { estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
 import type { CareBilling } from "@/lib/domain/care";
 import type { Address, AddOnId, EnergyProfile, SystemConfig, SystemTier } from "@/lib/domain/types";
-import { analyseHome, type ReservationResult } from "@/lib/services/consumer";
+import { analyseHome, type CallSlot, type ReservationResult } from "@/lib/services/consumer";
 
 /**
  * Client state for the guided purchase flow. Business rules live in
@@ -34,6 +34,8 @@ export interface FlowState {
   reservation: ReservationResult | null;
   /** The customer booked their 15-minute confirmation call via HubSpot. */
   callBooked: boolean;
+  /** The time picked in the in-app calendar (null when booked through HubSpot or not yet booked). */
+  call: CallSlot | null;
   attribution: Attribution | null;
 }
 
@@ -50,6 +52,7 @@ const EMPTY: FlowState = {
   windowId: null,
   reservation: null,
   callBooked: false,
+  call: null,
   attribution: null,
 };
 

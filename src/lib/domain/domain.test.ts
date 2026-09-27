@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { advanceStatus, nextFieldStatus } from "./job-status";
-import { hubspotEmbedSrc, isHubspotBookedMessage, parseHubspotMeetingsUrl } from "./booking";
+import { buildCallAvailability, formatCallTime, hubspotEmbedSrc, isHubspotBookedMessage, parseHubspotMeetingsUrl } from "./booking";
 import { CARE_FREE_MONTHS, careIncludedFor, careIncludedValue, carePrice, carePriceLabel, careYearlySaving } from "./care";
 import { greeting, marketDateTime, todayInMarket } from "./market";
 import { rankInstallers } from "./matching";
@@ -17,7 +17,7 @@ import {
   usageBasis,
 } from "./recommendation";
 import { summariseBill, type BillSummary } from "./bill";
-import { buildAvailability, fromISODate } from "./scheduling";
+import { INSTALL_ARRIVAL, buildAvailability, fromISODate } from "./scheduling";
 import { SERVICE_WINDOWS, buildServiceAvailability, mayBeWarranty } from "./service";
 import type { EnergyProfile, HomeAnalysis } from "./types";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
@@ -173,6 +173,11 @@ describe("launch market time", () => {
 });
 
 describe("buildAvailability", () => {
+  it("offers days, not times: every install arrives 7am–9am", () => {
+    expect(INSTALL_ARRIVAL.label).toBe("7am–9am");
+    expect(buildAvailability("ins_primero", new Date(2026, 8, 1)).every((d) => d.windows.join() === INSTALL_ARRIVAL.id)).toBe(true);
+  });
+
   it("respects lead time and skips Sundays", () => {
     const from = new Date(2026, 8, 1);
     const days = buildAvailability("ins_primero", from);
@@ -285,5 +290,23 @@ describe("service visits", () => {
 describe("system options", () => {
   it("are shown Essential, Recommended, Maximum", () => {
     expect(Object.values(TIER_LABELS)).toEqual(["Essential", "Recommended", "Maximum"]);
+  });
+});
+
+describe("confirmation call booking", () => {
+  it("offers weekday times from tomorrow, all before the install date", () => {
+    const days = buildCallAvailability("2026-09-28", "2026-10-06");
+    expect(days.length).toBeGreaterThan(3);
+    for (const d of days) {
+      expect(d.date > "2026-09-28" && d.date < "2026-10-06").toBe(true);
+      expect([0, 6]).not.toContain(fromISODate(d.date).getDay());
+      expect(d.times.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("formats times plainly", () => {
+    expect(formatCallTime("09:00")).toBe("9am");
+    expect(formatCallTime("13:30")).toBe("1:30pm");
+    expect(formatCallTime("12:00")).toBe("12pm");
   });
 });

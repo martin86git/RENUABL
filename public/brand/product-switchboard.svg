@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Smart switchboard">
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#F3F4F2"/><stop offset="1" stop-color="#D8DCD9"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#23392F"/><stop offset="1" stop-color="#1A2C24"/>
+    </linearGradient>
+    <radialGradient id="bg" cx=".5" cy=".45" r=".6"><stop offset="0" stop-color="#F6F2EC"/><stop offset="1" stop-color="#F0ECE7"/></radialGradient>
+  </defs>
+  <rect width="160" height="160" rx="28" fill="url(#bg)"/>
+  <ellipse cx="80" cy="139" rx="38" ry="6" fill="#1E3A2E" opacity=".12"/>
+  <rect x="40" y="22" width="80" height="112" rx="12" fill="url(#panel)" stroke="#D3D8D5"/>
+  <rect x="50" y="34" width="60" height="44" rx="7" fill="url(#glass)"/>
+  <g>
+    <rect x="56" y="42" width="7" height="14" rx="2" fill="#F4F6F5"/><rect x="66" y="42" width="7" height="14" rx="2" fill="#F4F6F5"/>
+    <rect x="76" y="42" width="7" height="14" rx="2" fill="#F4F6F5"/><rect x="86" y="42" width="7" height="14" rx="2" fill="#F4F6F5"/>
+    <rect x="96" y="42" width="7" height="14" rx="2" fill="#F4F6F5"/>
+    <rect x="57.5" y="44" width="4" height="5" rx="1" fill="#4FA36B"/><rect x="67.5" y="44" width="4" height="5" rx="1" fill="#4FA36B"/>
+    <rect x="77.5" y="44" width="4" height="5" rx="1" fill="#4FA36B"/><rect x="87.5" y="44" width="4" height="5" rx="1" fill="#4FA36B"/>
+    <rect x="97.5" y="44" width="4" height="5" rx="1" fill="#4FA36B"/>
+    <rect x="56" y="62" width="47" height="8" rx="2" fill="#2F4A3E"/>
+    <rect x="59" y="64.5" width="22" height="3" rx="1.5" fill="#9FC2AE"/>
+  </g>
+  <rect x="50" y="88" width="60" height="32" rx="8" fill="#FFFFFF" stroke="#DDE1DE"/>
+  <circle cx="62" cy="104" r="5" fill="#D9E7DC"/><circle cx="62" cy="104" r="2.4" fill="#1E3A2E"/>
+  <rect x="72" y="98" width="30" height="3.5" rx="1.75" fill="#C9CFCB"/><rect x="72" y="106" width="20" height="3.5" rx="1.75" fill="#DCE0DD"/>
+  <rect x="114" y="62" width="3" height="18" rx="1.5" fill="#C5CBC7"/>
+</svg>

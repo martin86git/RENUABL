@@ -3,11 +3,12 @@
  * API replaces mock data; UI code should only talk to these functions.
  */
 import { BILL_UPLOAD, isBillMediaType, type BillSummary } from "@/lib/domain/bill";
+import { buildCallAvailability, type CallDay } from "@/lib/domain/booking";
 import type { CareBilling } from "@/lib/domain/care";
-import { LAUNCH_MARKET } from "@/lib/domain/market";
+import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
 import { rankInstallers } from "@/lib/domain/matching";
 import { buildAvailability, stableHash } from "@/lib/domain/scheduling";
-import type { Address, HomeAnalysis, InstallerMatch } from "@/lib/domain/types";
+import type { Address, HomeAnalysis, ISODate, InstallerMatch } from "@/lib/domain/types";
 import { SAMPLE_ADDRESSES } from "@/lib/mock/addresses";
 import { INSTALLERS } from "@/lib/mock/installers";
 
@@ -133,4 +134,20 @@ export async function reserveDeposit(
     care: careIncluded ? null : care,
     careIncluded,
   };
+}
+
+/** Open times for the 15-minute confirmation call (before the install date). */
+export function getCallAvailability(installDate: ISODate | null): CallDay[] {
+  return buildCallAvailability(todayInMarket(), installDate);
+}
+
+export interface CallSlot {
+  date: ISODate;
+  time: string;
+}
+
+/** Mock: in production this books the slot in RENUABL's HubSpot calendar and emails an invite. */
+export async function bookConfirmationCall(slot: CallSlot): Promise<CallSlot> {
+  await latency(700);
+  return slot;
 }

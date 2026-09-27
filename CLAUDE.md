@@ -15,7 +15,7 @@
 - The customer uploads their latest bill on "About your home"; Claude reads it server-side (`src/app/api/bill/route.ts`, `src/lib/server/bill-reader.ts`) and `src/lib/domain/bill.ts` validates the figures. Ask only for usage and prices, never personal details, and don't store the file.
 - Solar is sized to what the home uses (same panels in every option). Customers never choose panel counts or battery sizes; the options differ only in battery (none / sized to evening use / one size up).
 - One matched installer by default; alternatives only behind a secondary link.
-- The customer picks the install date; a refundable deposit comes before the 15-minute confirmation call (confirmation, not sales).
+- The customer picks the install day only; installers arrive 7am–9am (`INSTALL_ARRIVAL`), never a customer-chosen time. A refundable deposit comes before the 15-minute confirmation call (confirmation, not sales).
 - Intelligence is branded "Ask RENUABL", never labelled "AI".
 - No traditional website navigation (no Home / Energy / Savings / … link bar). Customer screens show only the wordmark and account; people move through guided steps, the My RENUABL home cards and the mobile bottom tabs.
 - The reservation deposit is $499 (`ASSUMPTIONS.deposit`).
@@ -24,7 +24,7 @@
 - System options, in order: Essential · Recommended (default) · Maximum. The Maximum package includes 12 months of RENUABL Care free (valued at $199). After that it never auto-renews into a charge; continuing is the customer's choice.
 - Desktop flow steps are centred columns (`FlowStep` `width`), not left-aligned.
 - Post-purchase customers book service visits with their installer at `/my/service` (`src/lib/domain/service.ts`). Never quote a call-out fee in the UI: warranty work is free, other fees are confirmed before the visit is locked in.
-- The confirmation call is booked by the customer via HubSpot Meetings (`NEXT_PUBLIC_HUBSPOT_MEETINGS_URL`, `src/lib/domain/booking.ts`).
+- The customer books the confirmation call themselves: HubSpot Meetings when `NEXT_PUBLIC_HUBSPOT_MEETINGS_URL` is set, otherwise the in-app calendar (weekday times before the install date, `src/lib/domain/booking.ts`).
 - Minimise jargon; technical detail lives behind disclosures.
 - Installer portal is deliberately dark; green (`positive`) is reserved for confirmed / on-track / available / positive states.
 

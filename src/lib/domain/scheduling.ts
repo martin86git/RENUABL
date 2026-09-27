@@ -1,13 +1,11 @@
 import type { DayAvailability, ISODate, TimeWindow } from "./types";
 
-/** Installer arrival times the customer can choose from. */
-export const INSTALL_WINDOWS: TimeWindow[] = [
-  { id: "0700", label: "7:00 am", detail: "Early start" },
-  { id: "0900", label: "9:00 am", detail: "Morning" },
-  { id: "1100", label: "11:00 am", detail: "Late morning" },
-  { id: "1300", label: "1:00 pm", detail: "Afternoon" },
-  { id: "1500", label: "3:00 pm", detail: "Afternoon" },
-];
+/**
+ * Installs are booked by the day. Customers don't choose a time: installers
+ * arrive within one fixed window, which we tell them.
+ */
+export const INSTALL_ARRIVAL: TimeWindow = { id: "0700", label: "7am–9am", detail: "Estimated arrival" };
+export const INSTALL_WINDOWS: TimeWindow[] = [INSTALL_ARRIVAL];
 
 export const LEAD_TIME_DAYS = 7;
 
@@ -40,8 +38,8 @@ export function stableHash(input: string): number {
 }
 
 /**
- * Generates installer availability. Sundays are closed; other days have
- * a stable, installer-specific subset of windows open.
+ * Generates installer availability: the days an installer can take a job.
+ * Sundays are closed; other days are open on a stable, installer-specific pattern.
  */
 export function buildAvailability(installerId: string, from: Date, days = 56): DayAvailability[] {
   const start = addDays(from, LEAD_TIME_DAYS);
@@ -51,9 +49,7 @@ export function buildAvailability(installerId: string, from: Date, days = 56): D
     if (date.getDay() === 0) continue;
     const iso = toISODate(date);
     const h = stableHash(`${installerId}:${iso}`);
-    const windows = INSTALL_WINDOWS.filter((_, idx) => ((h >> (idx * 2)) & 3) !== 0).map((w) => w.id);
-    if (date.getDay() === 6 && windows.length > 2) windows.splice(2);
-    if (windows.length > 0 && h % 7 !== 0) out.push({ date: iso, windows });
+    if ((h & 3) !== 0 && h % 7 !== 0) out.push({ date: iso, windows: [INSTALL_ARRIVAL.id] });
   }
   return out;
 }

@@ -40,8 +40,8 @@ function ExtrasScreen() {
           return (
             <li key={a.id}>
               <Card className={cn("flex items-center gap-4 p-3 pr-4 transition", added && "ring-1 ring-forest/40")}>
-                <span className="relative block h-[68px] w-[68px] shrink-0 overflow-hidden rounded-xl bg-white">
-                  <Image src={PRODUCT_IMAGES[a.id]} fill sizes="68px" alt="" aria-hidden className="object-contain" />
+                <span className="relative block h-[68px] w-[68px] shrink-0 overflow-hidden rounded-2xl">
+                  <Image src={PRODUCT_IMAGES[a.id]} fill sizes="68px" alt="" aria-hidden className="object-contain" unoptimized />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] text-ink">{a.name}</span>

@@ -22,17 +22,78 @@ import { getInstaller, reserveDeposit, type PaymentMethod } from "@/lib/services
 
 function GoogleG() {
   return (
-    <span aria-hidden className="text-[15px] font-semibold">
-      G
+    <svg viewBox="0 0 48 48" className="h-[18px] w-[18px]" aria-hidden>
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </svg>
+  );
+}
+
+/** Accepted card marks, drawn small beside "Card". */
+function CardMarks() {
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-1" aria-hidden>
+      <span className="text-[10.5px] font-extrabold italic tracking-tight text-[#1A1F71]">VISA</span>
+      <span className="relative flex h-3.5 w-[22px]">
+        <span className="absolute left-0 h-3.5 w-3.5 rounded-full bg-[#EB001B]" />
+        <span className="absolute right-0 h-3.5 w-3.5 rounded-full bg-[#F79E1B] mix-blend-multiply" />
+      </span>
     </span>
   );
 }
 
-const METHODS: { id: PaymentMethod; label: string; icon: ReactNode }[] = [
-  { id: "card", label: "Card", icon: <CreditCard className="h-4 w-4" strokeWidth={1.5} /> },
-  { id: "apple-pay", label: "Apple Pay", icon: <Apple className="h-4 w-4" strokeWidth={1.5} /> },
-  { id: "google-pay", label: "Google Pay", icon: <GoogleG /> },
-  { id: "bank-transfer", label: "Bank transfer", icon: <Landmark className="h-4 w-4" strokeWidth={1.5} /> },
+const METHODS: { id: PaymentMethod; label: string; icon: ReactNode; extra?: ReactNode }[] = [
+  {
+    id: "card",
+    label: "Card",
+    icon: (
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-forest text-white">
+        <CreditCard className="h-4 w-4" strokeWidth={1.7} />
+      </span>
+    ),
+    extra: <CardMarks />,
+  },
+  {
+    id: "apple-pay",
+    label: "Apple Pay",
+    icon: (
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-black text-white">
+        <Apple className="h-4 w-4" strokeWidth={1.7} />
+      </span>
+    ),
+  },
+  {
+    id: "google-pay",
+    label: "Google Pay",
+    icon: (
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-white ring-1 ring-line">
+        <GoogleG />
+      </span>
+    ),
+  },
+  {
+    id: "bank-transfer",
+    label: "Bank transfer",
+    icon: (
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-sage text-forest">
+        <Landmark className="h-4 w-4" strokeWidth={1.7} />
+      </span>
+    ),
+  },
 ];
 
 const ITEM_ICONS: Partial<Record<LineItemId, typeof Sun>> = {
@@ -50,7 +111,7 @@ function ItemArt({ id }: { id: LineItemId }) {
   return (
     <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-canvas">
       {img ? (
-        <Image src={img} fill sizes="44px" alt="" aria-hidden className="object-contain p-0.5" />
+        <Image src={img} fill sizes="44px" alt="" aria-hidden className="object-contain" unoptimized />
       ) : (
         Icon && <Icon className="h-5 w-5 text-ink" strokeWidth={1.4} aria-hidden />
       )}
@@ -198,7 +259,7 @@ function ReserveScreen() {
         {state.installDate && (
           <StatRow
             label="Installation"
-            value={`${formatDate(state.installDate, { weekday: "short", day: "numeric", month: "short" })}${window ? ` · ${window.label}` : ""}`}
+            value={`${formatDate(state.installDate, { weekday: "short", day: "numeric", month: "short" })}${window ? ` · arrival ${window.label}` : ""}`}
           />
         )}
         <StatRow label="System after rebates" value={formatCurrency(price.total)} />
@@ -228,12 +289,15 @@ function ReserveScreen() {
             aria-checked={method === m.id}
             onClick={() => setMethod(m.id)}
             className={cn(
-              "flex h-11 items-center gap-2.5 rounded-xl px-3.5 text-[13.5px] transition",
-              method === m.id ? "ring-[1.5px] ring-ink text-ink" : "ring-1 ring-line text-ink-2 hover:ring-line-strong",
+              "flex h-12 items-center gap-2.5 rounded-xl px-2.5 text-left text-[13.5px] transition",
+              method === m.id
+                ? "bg-sage/45 text-forest ring-[1.5px] ring-forest"
+                : "bg-surface text-ink-2 ring-1 ring-line hover:bg-canvas hover:ring-line-strong",
             )}
           >
             {m.icon}
-            {m.label}
+            <span className="shrink-0">{m.label}</span>
+            {m.extra}
           </button>
         ))}
       </div>

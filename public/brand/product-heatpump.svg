@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Heat pump hot water system">
+  <defs>
+    <linearGradient id="body" x1="0" x2="1">
+      <stop offset="0" stop-color="#D9DDDA"/><stop offset=".35" stop-color="#FFFFFF"/><stop offset=".7" stop-color="#F1F2F0"/><stop offset="1" stop-color="#C9CECB"/>
+    </linearGradient>
+    <linearGradient id="top" x1="0" x2="1">
+      <stop offset="0" stop-color="#2C4A3C"/><stop offset=".45" stop-color="#3F6352"/><stop offset="1" stop-color="#1E3A2E"/>
+    </linearGradient>
+    <radialGradient id="bg" cx=".5" cy=".45" r=".6"><stop offset="0" stop-color="#E7EFE8"/><stop offset="1" stop-color="#D9E7DC"/></radialGradient>
+  </defs>
+  <rect width="160" height="160" rx="28" fill="url(#bg)"/>
+  <ellipse cx="80" cy="140" rx="34" ry="6" fill="#1E3A2E" opacity=".12"/>
+  <path d="M52 58h56v76a8 8 0 0 1-8 8H60a8 8 0 0 1-8-8z" fill="url(#body)"/>
+  <ellipse cx="80" cy="58" rx="28" ry="6" fill="#E9ECEA"/>
+  <path d="M50 30a6 6 0 0 1 6-6h48a6 6 0 0 1 6 6v26a4 4 0 0 1-4 4H54a4 4 0 0 1-4-4z" fill="url(#top)"/>
+  <circle cx="80" cy="42" r="12" fill="#18302A"/>
+  <g stroke="#6F8F7F" stroke-width="1.4" fill="none">
+    <circle cx="80" cy="42" r="9"/><circle cx="80" cy="42" r="5.5"/><path d="M71 42h18M80 33v18"/>
+  </g>
+  <circle cx="80" cy="42" r="2" fill="#9FC2AE"/>
+  <rect x="62" y="74" width="36" height="12" rx="6" fill="#FFFFFF" stroke="#D5DAD7"/>
+  <circle cx="69" cy="80" r="2.6" fill="#4FA36B"/>
+  <rect x="75" y="78.5" width="17" height="3" rx="1.5" fill="#C7CDCA"/>
+  <path d="M60 64v72" stroke="#FFFFFF" stroke-width="3" opacity=".8" stroke-linecap="round"/>
+</svg>

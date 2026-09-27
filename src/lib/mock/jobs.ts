@@ -51,7 +51,7 @@ export function buildJobs(now = new Date()): Job[] {
       system: { panelCount: 30, batteryKwh: 13.5, evCharger: false },
       stage: "scheduled",
       preferredDate: d(0),
-      windowId: "0900",
+      windowId: "0700",
       crewId: "crew_a",
       value: 17_840,
       site: {
@@ -91,7 +91,7 @@ export function buildJobs(now = new Date()): Job[] {
       system: { panelCount: 15, batteryKwh: 0, evCharger: false },
       stage: "scheduled",
       preferredDate: d(0),
-      windowId: "1100",
+      windowId: "0700",
       crewId: "crew_b",
       value: 5_560,
       site: {
@@ -120,7 +120,7 @@ export function buildJobs(now = new Date()): Job[] {
       system: { panelCount: 25, batteryKwh: 13.5, evCharger: true },
       stage: "in-progress",
       preferredDate: d(0),
-      windowId: "1300",
+      windowId: "0700",
       crewId: "crew_c",
       value: 22_410,
       site: {
@@ -150,7 +150,7 @@ export function buildJobs(now = new Date()): Job[] {
       system: { panelCount: 18, batteryKwh: 10, evCharger: false },
       stage: "new",
       preferredDate: d(12),
-      windowId: "0900",
+      windowId: "0700",
       crewId: null,
       value: 14_920,
       site: {
@@ -202,7 +202,7 @@ export function buildJobs(now = new Date()): Job[] {
       system: { panelCount: 23, batteryKwh: 13.5, evCharger: false },
       stage: "accepted",
       preferredDate: d(6),
-      windowId: "0900",
+      windowId: "0700",
       crewId: null,
       value: 19_300,
       site: {
@@ -254,7 +254,7 @@ export function buildJobs(now = new Date()): Job[] {
       system: { panelCount: 19, batteryKwh: 10, evCharger: false },
       stage: "scheduled",
       preferredDate: d(3),
-      windowId: "0900",
+      windowId: "0700",
       crewId: "crew_b",
       value: 15_380,
       site: {
@@ -312,7 +312,7 @@ export function buildJobs(now = new Date()): Job[] {
       system: { panelCount: 15, batteryKwh: 0, evCharger: false },
       stage: "completed",
       preferredDate: d(-9),
-      windowId: "0900",
+      windowId: "0700",
       crewId: "crew_c",
       value: 5_560,
       site: {

@@ -91,8 +91,8 @@ export function HomePhoto({
 }
 
 export const PRODUCT_IMAGES: Record<string, string> = {
-  "heat-pump": "/brand/product-heatpump.webp",
-  "smart-switchboard": "/brand/product-switchboard.webp",
-  "home-backup": "/brand/product-backup.webp",
-  "smart-home": "/brand/product-smarthome.webp",
+  "heat-pump": "/brand/product-heatpump.svg",
+  "smart-switchboard": "/brand/product-switchboard.svg",
+  "home-backup": "/brand/product-backup.svg",
+  "smart-home": "/brand/product-smarthome.svg",
 };

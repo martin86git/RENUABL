@@ -61,7 +61,7 @@ function ConfirmedScreen() {
               <Item
                 icon={CalendarDays}
                 title="Provisional installation date"
-                detail={`${formatDate(state.installDate, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}${window ? ` · ${window.label}` : ""}`}
+                detail={`${formatDate(state.installDate, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}${window ? ` · arrival ${window.label}` : ""}`}
               />
             )}
             {installer && <Item icon={UserRound} title="Matched installer" detail={installer.name} />}
