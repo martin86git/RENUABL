@@ -30,6 +30,7 @@ import {
   batteryInstallCost,
   billOfMaterials,
   railLengths,
+  assumedArrays,
   selectInverter,
   sellPrice,
 } from "./costing";
@@ -474,10 +475,24 @@ describe("costing from the supplier price list", () => {
     expect(arrayKw(ASSUMPTIONS.maxPanels)).toBeLessThanOrEqual(15 * COSTING.maxArrayToInverter);
   });
 
-  it("allows (panel width + 0.1 m) x 2 of rail per panel, bought in 4.8 m lengths", () => {
-    const r = railLengths(14);
-    expect(r.metres).toBeCloseTo(14 * 2 * (PANEL.widthM + 0.1), 2);
+  it("allows (panel width + 0.1 m) x 2 of rail per panel plus a buffer, bought in 4.8 m lengths", () => {
+    const base = 14 * 2 * (PANEL.widthM + 0.1);
+    const r = railLengths(14, "tin");
+    expect(r.metres).toBeCloseTo(base * 1.05, 2);
     expect(r.lengths).toBe(Math.ceil(r.metres / RACKING.rail.lengthM));
+    expect(railLengths(14, "tile").metres).toBeCloseTo(base * 1.05, 2);
+    // Flat roofs (laid flat or tilted): 10% to bridge arrays.
+    expect(railLengths(14, "flat").metres).toBeCloseTo(base * 1.1, 2);
+  });
+
+  it("allows for a third array above 18 panels, with a $150 installation premium", () => {
+    expect(assumedArrays(18)).toBe(2);
+    expect(assumedArrays(19)).toBe(3);
+    const third = (n: number) => billOfMaterials({ ...input, panelCount: n }).find((l) => l.description === "Third array installation");
+    expect(third(18)).toBeUndefined();
+    expect(third(19)!.total).toBe(150);
+    // Flat roofs: two extra Kliplok interfaces for the third array.
+    expect(billOfMaterials({ ...input, roof: "flat", panelCount: 19 }).find((l) => l.sku === "CLNER-I-34")!.qty).toBe(19 * 2 + 3 * 2);
   });
 
   it("uses tin or tile kits (one per 2 kW) by roof type", () => {
@@ -558,7 +573,7 @@ describe("costing from the supplier price list", () => {
   it("prices flat roofs with the tin kit and Kliplok interfaces (2 a panel + 2 per array), no tilt when laid flat", () => {
     const flat = billOfMaterials({ ...input, roof: "flat" });
     expect(flat.find((l) => l.sku === "ANTTIN20")!.qty).toBe(Math.ceil(arrayKw(input.panelCount) / 2));
-    expect(flat.find((l) => l.sku === "CLNER-I-34")!.qty).toBe(input.panelCount * 2 + COSTING.assumedArrays * 2);
+    expect(flat.find((l) => l.sku === "CLNER-I-34")!.qty).toBe(input.panelCount * 2 + 2 * 2);
     expect(flat.some((l) => l.sku === "ANTTILT10/15")).toBe(false);
     expect(flat.some((l) => l.description.startsWith("Tilt frame"))).toBe(false);
     // Pitched roofs don't get Kliplok interfaces.

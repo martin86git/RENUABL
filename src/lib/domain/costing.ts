@@ -39,8 +39,14 @@ export const COSTING = {
   isolator40MaxAmps: 32,
   /** Grid voltage (per phase) for an inverter's rated AC output current. */
   gridVolts: 230,
-  /** PLACEHOLDER: split arrays aren't known until design; allow brackets for this many arrays. */
-  assumedArrays: 2,
+  /** Split arrays aren't known until design: allow for two, and a third above this many panels. */
+  arrays: 2,
+  thirdArrayAbovePanels: 18,
+  /** Installing a third array, ex GST. */
+  thirdArrayInstall: 150,
+  /** Extra rail: 10% on flat roofs (laid flat or tilted) to bridge arrays, 5% on every other roof. */
+  railBuffer: 0.05,
+  railBufferFlat: 0.1,
   /** Tilt frames on a flat roof: extra installation per panel, ex GST. */
   tiltInstallPerPanel: 15,
   /** EV charger installation, ex GST. */
@@ -101,9 +107,16 @@ export function maxPanelsForInverter(options: InverterItem[] = HYBRID_INVERTERS)
 }
 
 /** Rail for portrait panels: (width + 0.1 m) x 2 per panel, bought in 4.8 m lengths. */
-export function railLengths(panelCount: number) {
-  const metres = panelCount * COSTING.railsPerPanelRow * (PANEL.widthM + COSTING.railAllowanceM);
-  return { metres: round2(metres), lengths: Math.ceil(metres / RACKING.rail.lengthM) };
+/** Arrays allowed for: two, or three for more than 18 panels. */
+export function assumedArrays(panelCount: number) {
+  return panelCount > COSTING.thirdArrayAbovePanels ? COSTING.arrays + 1 : COSTING.arrays;
+}
+
+/** Rail for the panels (portrait), plus a buffer (10% on flat roofs to bridge arrays, 5% otherwise), in 4.8 m lengths. */
+export function railLengths(panelCount: number, roof: RoofType = "tin") {
+  const buffer = roof === "flat" ? COSTING.railBufferFlat : COSTING.railBuffer;
+  const metres = panelCount * COSTING.railsPerPanelRow * (PANEL.widthM + COSTING.railAllowanceM) * (1 + buffer);
+  return { metres: round2(metres), lengths: Math.ceil(metres / RACKING.rail.lengthM), buffer };
 }
 
 export function batteryModules(kwh: number) {
@@ -143,7 +156,8 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
   const hybrid = modules > 0 || Boolean(input.batteryReady);
 
   if (input.panelCount > 0) {
-    const rails = railLengths(input.panelCount);
+    const rails = railLengths(input.panelCount, input.roof);
+    const arrays = assumedArrays(input.panelCount);
     // "Not sure" is quoted as tiles (the dearer kit). Flat roofs always get the tin kit and Kliplok
     // interfaces (most are Kliplok), plus tilt kits when tilted.
     const flat = input.roof === "flat";
@@ -151,14 +165,22 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
     const kit = input.roof === "tin" || flat ? RACKING.tinKit : RACKING.tileKit;
     const clips = Math.ceil((input.panelCount * BOS.panelClip.perPanel) / BOS.panelClip.packSize) * BOS.panelClip.packSize;
     lines.push(line("solar", PANEL.sku, PANEL.name, input.panelCount, PANEL.cost));
-    lines.push(line("solar", RACKING.rail.sku, `${RACKING.rail.name} (${rails.metres} m needed)`, rails.lengths, RACKING.rail.cost));
+    lines.push(
+      line(
+        "solar",
+        RACKING.rail.sku,
+        `${RACKING.rail.name} (${rails.metres} m incl. ${Math.round(rails.buffer * 100)}% buffer)`,
+        rails.lengths,
+        RACKING.rail.cost,
+      ),
+    );
     lines.push(
       line("solar", RACKING.splice.sku, RACKING.splice.name, Math.max(0, rails.lengths - COSTING.railsPerPanelRow), RACKING.splice.cost),
     );
     lines.push(line("solar", kit.sku, kit.name, Math.ceil(kw / kit.kw), kit.cost));
     if (flat) {
       const k = RACKING.kliplok;
-      const brackets = input.panelCount * k.perPanel + COSTING.assumedArrays * k.extraPerArray;
+      const brackets = input.panelCount * k.perPanel + arrays * k.extraPerArray;
       lines.push(line("solar", k.sku, `${k.name} (${k.perPanel} per panel + split-array allowance)`, brackets, k.cost));
     }
     if (tilted)
@@ -186,6 +208,7 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
         ),
       );
     }
+    if (arrays > COSTING.arrays) lines.push(line("solar", null, "Third array installation", 1, COSTING.thirdArrayInstall));
     if (input.storeys === "double") lines.push(line("solar", null, "Double-storey installation", 1, COSTING.doubleStoreyInstall));
   }
 
