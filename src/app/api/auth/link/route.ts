@@ -3,7 +3,7 @@ import { applicationPendingEmail, loginLinkEmail } from "@/lib/domain/emails";
 import { siteUrl } from "@/lib/domain/sms";
 import { createLoginToken, isStaff } from "@/lib/server/accounts";
 import { dbConfigured, query } from "@/lib/server/db";
-import { sendEmail } from "@/lib/server/email";
+import { emailProvider, sendEmail } from "@/lib/server/email";
 import { jobsForCustomer } from "@/lib/server/jobs-repo";
 import { partnerByEmail } from "@/lib/server/partners-repo";
 
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const email = normaliseEmail(body.email);
   if (!email) return Response.json({ ok: false, message: "Enter a valid email address." }, { status: 422 });
   const site = siteUrl();
-  if (!site || !process.env.RESEND_API_KEY?.trim() || !process.env.EMAIL_FROM?.trim()) {
+  if (!site || !emailProvider()) {
     console.error("sign-in link not sent: email or SITE_URL isn't set up");
     return Response.json({ ok: false, message: "We can't send sign-in emails just now. Please try again later." }, { status: 503 });
   }

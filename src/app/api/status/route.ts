@@ -3,6 +3,7 @@ import { siteUrl } from "@/lib/domain/sms";
 import { stripeKeyMode } from "@/lib/domain/status";
 import { stripeClient } from "@/lib/server/stripe";
 import { dbConfigured } from "@/lib/server/db";
+import { emailProvider } from "@/lib/server/email";
 import { smsConfigured } from "@/lib/server/sms";
 import { storageConfigured } from "@/lib/server/storage";
 
@@ -29,9 +30,14 @@ export async function GET() {
     {
       stripe: { key: mode, accepted: stripeWorks, webhookSecret: set(process.env.STRIPE_WEBHOOK_SECRET) },
       hubspot: set(process.env.HUBSPOT_PRIVATE_APP_TOKEN),
-      email: set(process.env.RESEND_API_KEY) && set(process.env.EMAIL_FROM),
-      // Which half is missing when email is false.
-      emailSetup: { resendKey: set(process.env.RESEND_API_KEY), emailFrom: set(process.env.EMAIL_FROM) },
+      email: emailProvider() !== null,
+      // Which service sends, and which part is missing when email is false.
+      emailSetup: {
+        provider: emailProvider(),
+        sendgridKey: set(process.env.SENDGRID_API_KEY),
+        resendKey: set(process.env.RESEND_API_KEY),
+        emailFrom: set(process.env.EMAIL_FROM),
+      },
       storage: storageConfigured(),
       database: dbConfigured(),
       staff: set(process.env.ADMIN_EMAILS),
