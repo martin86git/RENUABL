@@ -5,8 +5,11 @@
  * sunniest faces; partners can add or remove spots. Pure and tested.
  *
  * The satellite image is a Web Mercator map at a known centre and zoom, so a
- * point's latitude and longitude map to an exact pixel.
+ * point's latitude and longitude map to an exact pixel. Google Solar's own aerial
+ * photo (the one its panel spots were measured on) comes on a UTM grid instead:
+ * a GeoFrame. Either way, `project` gives a point's pixel.
  */
+import { toUtm, utmZoneFromEpsg } from "./utm";
 
 export interface PanelSlot {
   lat: number;
@@ -96,55 +99,108 @@ export function toPixel(lat: number, lng: number, view: MapView) {
   return { x: half + (p.x - c.x) * view.scale, y: half + (p.y - c.y) * view.scale };
 }
 
-/** Ground metres per (scaled) pixel at the centre. */
-export function metresPerPixel(view: MapView) {
-  return (156_543.033_92 * Math.cos((view.centre.lat * Math.PI) / 180)) / 2 ** view.zoom / view.scale;
+/** A pixel on the (scaled) image back to latitude and longitude. */
+export function fromPixel(x: number, y: number, view: MapView) {
+  const size = 256 * 2 ** view.zoom;
+  const c = world(view.centre.lat, view.centre.lng, view.zoom);
+  const half = (view.size * view.scale) / 2;
+  const wx = c.x + (x - half) / view.scale;
+  const wy = c.y + (y - half) / view.scale;
+  const lng = (wx / size) * 360 - 180;
+  const lat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * wy) / size))) * 180) / Math.PI;
+  return { lat, lng };
+}
+
+/** Google Solar's aerial photo: a GeoTIFF's UTM grid (EPSG code, bounds in metres) and its size in pixels. */
+export interface GeoFrame {
+  epsg: number;
+  /** minX, minY, maxX, maxY: easting and northing, metres. */
+  bbox: [number, number, number, number];
+  width: number;
+  height: number;
+}
+
+/** The image a layout is drawn on: a Maps Static image (Web Mercator) or Google Solar's photo. */
+export type ImageFrame = MapView | GeoFrame;
+
+export const isGeoFrame = (f: ImageFrame): f is GeoFrame => "epsg" in f;
+
+/** A usable GeoFrame from untrusted JSON (a UTM zone, sane bounds and size), else null. */
+export function cleanGeoFrame(raw: unknown): GeoFrame | null {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const b = Array.isArray(r.bbox) ? r.bbox.map(Number) : [];
+  const [epsg, width, height] = [Number(r.epsg), Number(r.width), Number(r.height)];
+  if (!utmZoneFromEpsg(epsg) || b.length !== 4 || b.some((n) => !Number.isFinite(n))) return null;
+  if (!(b[2] > b[0] && b[3] > b[1]) || !(width > 0 && width <= 4000 && height > 0 && height <= 4000)) return null;
+  return { epsg, bbox: [b[0], b[1], b[2], b[3]], width, height };
+}
+
+/** The image's size in pixels. */
+export function frameSize(f: ImageFrame) {
+  return isGeoFrame(f) ? { w: f.width, h: f.height } : { w: f.size * f.scale, h: f.size * f.scale };
+}
+
+/** A point's pixel on the image. */
+export function project(lat: number, lng: number, f: ImageFrame) {
+  if (!isGeoFrame(f)) return toPixel(lat, lng, f);
+  const p = toUtm(lat, lng, utmZoneFromEpsg(f.epsg)!);
+  const [x0, y0, x1, y1] = f.bbox;
+  return { x: ((p.e - x0) / (x1 - x0)) * f.width, y: ((y1 - p.n) / (y1 - y0)) * f.height };
+}
+
+/** Ground metres per pixel (at the centre, for Web Mercator). */
+export function metresPerPixel(f: ImageFrame) {
+  if (isGeoFrame(f)) return (f.bbox[2] - f.bbox[0]) / f.width;
+  return (156_543.033_92 * Math.cos((f.centre.lat * Math.PI) / 180)) / 2 ** f.zoom / f.scale;
 }
 
 /**
  * A panel's outline on the image: its footprint seen from above (the slope
- * foreshortens the edge that runs down the roof), turned to face the roof's direction.
+ * foreshortens the edge that runs down the roof), turned to face the roof's
+ * direction. Corners are worked out on the ground, then projected.
  */
-export function panelOutline(slot: PanelSlot, model: RoofModel, view: MapView): { x: number; y: number }[] {
+export function panelOutline(slot: PanelSlot, model: RoofModel, frame: ImageFrame): { x: number; y: number }[] {
   const face = model.faces[slot.segment] ?? { azimuth: 0, pitch: 0 };
-  const m = metresPerPixel(view);
   const along = slot.orientation === "PORTRAIT" ? model.panel.heightM : model.panel.widthM; // down the slope
   const across = slot.orientation === "PORTRAIT" ? model.panel.widthM : model.panel.heightM;
-  const a = (along * Math.cos((face.pitch * Math.PI) / 180)) / m / 2;
-  const b = across / m / 2;
-  const c = toPixel(slot.lat, slot.lng, view);
-  // Azimuth is clockwise from north; on the image, north is up (-y).
+  const a = (along * Math.cos((face.pitch * Math.PI) / 180)) / 2;
+  const b = across / 2;
+  // Azimuth is clockwise from true north: "down" points east-north (sin, cos); "side" is at right angles.
   const t = (face.azimuth * Math.PI) / 180;
-  const down = { x: Math.sin(t), y: -Math.cos(t) };
-  const side = { x: Math.cos(t), y: Math.sin(t) };
-  return [
-    { x: c.x + down.x * a + side.x * b, y: c.y + down.y * a + side.y * b },
-    { x: c.x + down.x * a - side.x * b, y: c.y + down.y * a - side.y * b },
-    { x: c.x - down.x * a - side.x * b, y: c.y - down.y * a - side.y * b },
-    { x: c.x - down.x * a + side.x * b, y: c.y - down.y * a + side.y * b },
-  ].map((p) => ({ x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 }));
+  const down = { e: Math.sin(t), n: Math.cos(t) };
+  const side = { e: Math.cos(t), n: -Math.sin(t) };
+  const mLat = 111_132.954 - 559.822 * Math.cos((2 * slot.lat * Math.PI) / 180);
+  const mLng = 111_412.84 * Math.cos((slot.lat * Math.PI) / 180);
+  const corner = (da: number, db: number) => {
+    const e = down.e * da + side.e * db;
+    const n = down.n * da + side.n * db;
+    const p = project(slot.lat + n / mLat, slot.lng + e / mLng, frame);
+    return { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 };
+  };
+  return [corner(a, b), corner(a, -b), corner(-a, -b), corner(-a, b)];
 }
 
-/** The part of the image to show: the roof's panel spots, with a margin. */
-export function framing(model: RoofModel, view: MapView, marginPx = 90) {
-  const pts = model.slots.map((s) => toPixel(s.lat, s.lng, view));
+/** The part of the image to show: the roof's panel spots, with a margin of about 5 m. */
+export function framing(model: RoofModel, frame: ImageFrame, marginM = 5.4) {
+  const marginPx = marginM / metresPerPixel(frame);
+  const pts = model.slots.map((s) => project(s.lat, s.lng, frame));
   const xs = pts.map((p) => p.x);
   const ys = pts.map((p) => p.y);
-  const full = view.size * view.scale;
+  const { w: fw, h: fh } = frameSize(frame);
   const x0 = Math.max(0, Math.min(...xs) - marginPx);
   const y0 = Math.max(0, Math.min(...ys) - marginPx);
-  const x1 = Math.min(full, Math.max(...xs) + marginPx);
-  const y1 = Math.min(full, Math.max(...ys) + marginPx);
-  // Keep it no narrower than 4:3, so small roofs aren't blown up too far.
-  const w = Math.max(x1 - x0, (y1 - y0) * 1.33, 360);
-  const h = Math.max(y1 - y0, w * 0.6);
+  const x1 = Math.min(fw, Math.max(...xs) + marginPx);
+  const y1 = Math.min(fh, Math.max(...ys) + marginPx);
+  // Keep it no narrower than 4:3 (and at least ~21 m across), so small roofs aren't blown up too far.
+  const w = Math.min(fw, Math.max(x1 - x0, (y1 - y0) * 1.33, 21.6 / metresPerPixel(frame)));
+  const h = Math.min(fh, Math.max(y1 - y0, w * 0.6));
   const cx = (x0 + x1) / 2;
   const cy = (y0 + y1) / 2;
   return {
-    x: Math.round(Math.max(0, Math.min(full - w, cx - w / 2))),
-    y: Math.round(Math.max(0, Math.min(full - h, cy - h / 2))),
-    w: Math.round(Math.min(w, full)),
-    h: Math.round(Math.min(h, full)),
+    x: Math.round(Math.max(0, Math.min(fw - w, cx - w / 2))),
+    y: Math.round(Math.max(0, Math.min(fh - h, cy - h / 2))),
+    w: Math.round(w),
+    h: Math.round(h),
   };
 }
 
@@ -152,7 +208,6 @@ export function framing(model: RoofModel, view: MapView, marginPx = 90) {
 // Layouts
 // ---------------------------------------------------------------------------
 
-/** The best spots for this many panels (Google lists them best first). */
 /** The smallest group worth putting on a face of its own (no lone panels). */
 export const MIN_ARRAY_PANELS = 4;
 

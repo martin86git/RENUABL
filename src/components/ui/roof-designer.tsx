@@ -1,11 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { boxPixels, type Obstruction } from "@/lib/domain/obstructions";
-import { designView, framing, panelOutline, type RoofModel } from "@/lib/domain/roof-layout";
+import { useEffect, useMemo, useState } from "react";
+import { boxOnFrame, boxPixels, type Obstruction } from "@/lib/domain/obstructions";
+import { designView, frameSize, framing, metresPerPixel, panelOutline, type GeoFrame, type RoofModel } from "@/lib/domain/roof-layout";
+import { fetchRoofPhotoFrame, roofPhotoSrc } from "@/lib/services/consumer";
+
+/** Google Solar's own photo of the roof, when there is one (it lines up with the panel spots exactly). */
+function useRoofPhoto(centre: { lat: number; lng: number }) {
+  const key = `${centre.lat},${centre.lng}`;
+  const [got, setGot] = useState<{ key: string; frame: GeoFrame | null } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void fetchRoofPhotoFrame(centre.lat, centre.lng).then((frame) => {
+      if (!cancelled) setGot({ key, frame });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [key, centre.lat, centre.lng]);
+  const loading = !got || got.key !== key;
+  return { loading, frame: loading ? null : got.frame };
+}
 
 /**
- * Panels drawn on the satellite image of the roof. View-only for customers;
+ * Panels drawn on an aerial photo of the roof: Google Solar's own photo when
+ * there is one, else the Maps Static satellite view. View-only for customers;
  * for partners (editable), every spot Google found shows faintly and tapping
  * one adds or removes a panel.
  */
@@ -33,13 +52,25 @@ export function RoofDesigner({
   className?: string;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const view = useMemo(() => designView(centre), [centre]);
-  const frame = useMemo(() => framing(model, view), [model, view]);
-  const full = view.size * view.scale;
+  const photo = useRoofPhoto(centre);
+  const satellite = useMemo(() => designView(centre), [centre]);
+  const image = photo.frame ?? satellite;
+  const frame = useMemo(() => framing(model, image), [model, image]);
+  const size = frameSize(image);
+  // Lines and labels keep the same look whatever the photo's scale.
+  const k = 0.06 / metresPerPixel(image);
   const chosen = new Set(selected);
   const blocked = new Set(flagged);
-  const outlines = useMemo(() => model.slots.map((s) => panelOutline(s, model, view)), [model, view]);
+  const outlines = useMemo(() => model.slots.map((s) => panelOutline(s, model, image)), [model, image]);
   const points = (i: number) => outlines[i].map((p) => `${p.x},${p.y}`).join(" ");
+
+  if (photo.loading) {
+    return (
+      <div className={className}>
+        <div className="aspect-[4/3] w-full animate-pulse rounded-xl bg-surface-2" aria-busy="true" aria-label="Loading the roof photo" />
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
@@ -50,7 +81,15 @@ export function RoofDesigner({
         aria-label={`Panel layout: ${selected.length} panels on the roof`}
       >
         {!imageFailed && (
-          <image href={imageSrc} x={0} y={0} width={full} height={full} preserveAspectRatio="none" onError={() => setImageFailed(true)} />
+          <image
+            href={photo.frame ? roofPhotoSrc(centre.lat, centre.lng) : imageSrc}
+            x={0}
+            y={0}
+            width={size.w}
+            height={size.h}
+            preserveAspectRatio="none"
+            onError={() => setImageFailed(true)}
+          />
         )}
         {model.slots.map((_, i) =>
           chosen.has(i) ? (
@@ -60,7 +99,7 @@ export function RoofDesigner({
               fill="#15202b"
               fillOpacity={0.92}
               stroke={blocked.has(i) ? "#f5b54a" : "#e8edf2"}
-              strokeWidth={blocked.has(i) ? 3 : 1.4}
+              strokeWidth={(blocked.has(i) ? 3 : 1.4) * k}
               onClick={editable ? () => onToggle?.(i) : undefined}
               className={editable ? "cursor-pointer" : undefined}
             >
@@ -74,8 +113,8 @@ export function RoofDesigner({
               fillOpacity={0.06}
               stroke="#ffffff"
               strokeOpacity={0.55}
-              strokeWidth={1}
-              strokeDasharray="4 3"
+              strokeWidth={1 * k}
+              strokeDasharray={`${4 * k} ${3 * k}`}
               onClick={() => onToggle?.(i)}
               className="cursor-pointer"
             >
@@ -84,7 +123,7 @@ export function RoofDesigner({
           ) : null,
         )}
         {obstructions.map((o, i) => {
-          const b = boxPixels(o, view);
+          const b = photo.frame ? boxOnFrame(o, satellite, photo.frame) : boxPixels(o, satellite);
           return (
             <g key={`o${i}`} pointerEvents="none">
               <rect
@@ -95,16 +134,16 @@ export function RoofDesigner({
                 fill="#f5b54a"
                 fillOpacity={0.18}
                 stroke="#f5b54a"
-                strokeWidth={2}
+                strokeWidth={2 * k}
               />
               <text
                 x={b.x0}
-                y={b.y0 - 4}
+                y={b.y0 - 4 * k}
                 fill="#f5b54a"
-                fontSize={13}
+                fontSize={13 * k}
                 fontFamily="Inter, sans-serif"
                 stroke="#15202b"
-                strokeWidth={3}
+                strokeWidth={3 * k}
                 paintOrder="stroke"
               >
                 {o.type}

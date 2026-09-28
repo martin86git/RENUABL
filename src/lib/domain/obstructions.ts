@@ -4,7 +4,7 @@
  * overlap one (with a small setback) are flagged for the partner to move.
  * Pure and tested. The check is a helper: the partner confirms on site.
  */
-import { metresPerPixel, panelOutline, type MapView, type RoofModel } from "./roof-layout";
+import { fromPixel, metresPerPixel, panelOutline, project, type ImageFrame, type MapView, type RoofModel } from "./roof-layout";
 
 export const OBSTRUCTION_TYPES = [
   "vent",
@@ -66,6 +66,17 @@ export function boxPixels(o: Obstruction, view: MapView) {
   const full = view.size * view.scale;
   const [x0, y0, x1, y1] = o.box.map((n) => (n / 1000) * full);
   return { x0, y0, x1, y1 };
+}
+
+/** An obstruction's box (found on the Maps Static image) drawn on another image, e.g. Google Solar's photo. */
+export function boxOnFrame(o: Obstruction, view: MapView, frame: ImageFrame) {
+  const b = boxPixels(o, view);
+  const pts = [fromPixel(b.x0, b.y0, view), fromPixel(b.x1, b.y0, view), fromPixel(b.x1, b.y1, view), fromPixel(b.x0, b.y1, view)].map(
+    (p) => project(p.lat, p.lng, frame),
+  );
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
 }
 
 /** Panel spots (indexes) that overlap an obstruction, allowing the setback. */

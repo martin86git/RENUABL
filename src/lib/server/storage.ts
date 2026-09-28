@@ -28,6 +28,11 @@ export async function saveFile(pathname: string, body: Blob | ArrayBuffer | Buff
   return blob.pathname;
 }
 
+/** Saves a file under exactly this name, replacing any earlier one (for caches). */
+export async function saveFileAt(pathname: string, body: Buffer, contentType: string): Promise<void> {
+  await put(pathname, body, { access: "private", contentType, addRandomSuffix: false, allowOverwrite: true, ...auth() });
+}
+
 export async function saveJson(pathname: string, value: unknown): Promise<void> {
   await put(pathname, JSON.stringify(value), {
     access: "private",

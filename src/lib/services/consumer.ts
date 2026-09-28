@@ -2,7 +2,7 @@
  * Consumer-facing service layer. Every function here is the seam where a real
  * API replaces mock data; UI code should only talk to these functions.
  */
-import type { RoofModel } from "@/lib/domain/roof-layout";
+import { cleanGeoFrame, type GeoFrame, type RoofModel } from "@/lib/domain/roof-layout";
 import type { RoofInsights } from "@/lib/domain/solar-roof";
 import { BILL_UPLOAD, isBillMediaType, type BillSummary } from "@/lib/domain/bill";
 import { buildCallAvailability, type CallDay } from "@/lib/domain/booking";
@@ -314,6 +314,21 @@ export async function fetchRoofInsights(
   } catch {
     return { insights: null, model: null, reason: "offline" };
   }
+}
+
+/** Google Solar's own photo of the roof: its grid, for placing panels on it (null: use the satellite view). */
+export async function fetchRoofPhotoFrame(lat: number, lng: number): Promise<GeoFrame | null> {
+  try {
+    const res = await fetch(`/api/roof/photo?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&frame=1`);
+    if (!res.ok) return null;
+    return cleanGeoFrame(((await res.json()) as { frame?: unknown }).frame);
+  } catch {
+    return null;
+  }
+}
+
+export function roofPhotoSrc(lat: number, lng: number) {
+  return `/api/roof/photo?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`;
 }
 
 /** The satellite image under the customer's panel layout. */

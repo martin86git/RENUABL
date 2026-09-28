@@ -30,7 +30,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/jobs/[key]/
 
   const view = designView({ lat, lng });
   const full = view.size * view.scale;
-  const f = framing(model, view, 30);
+  const f = framing(model, view, 1.8);
   const roofBox = [f.x, f.y, f.x + f.w, f.y + f.h].map((n) => Math.round((n / full) * 1000)) as [number, number, number, number];
   try {
     const check = await checkObstructions(
