@@ -3,13 +3,25 @@
 import { Box, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/primitives";
-import { house3dAvailable, showHouse3d } from "@/lib/services/house-3d";
+import { showHouse3d } from "@/lib/services/house-3d";
 
 /**
  * "See it in 3D": Google's photorealistic 3D model of the home, to spin around
  * and judge the roof, shading and access. Loads only when opened.
  */
-export function House3d({ at, label = "See it in 3D" }: { at: { lat: number; lng: number }; label?: string }) {
+export function House3d({
+  at,
+  recordKey,
+  enabled,
+  label = "See it in 3D",
+}: {
+  at: { lat: number; lng: number };
+  /** The job record: the key is only handed to its partner or homeowner. */
+  recordKey: string;
+  /** The 3D view is set up (GOOGLE_MAP_TILES_KEY). */
+  enabled: boolean;
+  label?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const ref = useRef<HTMLDivElement>(null);
@@ -19,7 +31,7 @@ export function House3d({ at, label = "See it in 3D" }: { at: { lat: number; lng
     if (!open || !ref.current) return;
     let cleanup: (() => void) | undefined;
     let live = true;
-    showHouse3d(ref.current, { lat, lng })
+    showHouse3d(ref.current, { lat, lng }, recordKey)
       .then((c) => {
         cleanup = c;
         if (live) setState("ready");
@@ -30,9 +42,9 @@ export function House3d({ at, label = "See it in 3D" }: { at: { lat: number; lng
       live = false;
       cleanup?.();
     };
-  }, [open, lat, lng]);
+  }, [open, lat, lng, recordKey]);
 
-  if (!house3dAvailable()) return null;
+  if (!enabled) return null;
   if (!open) {
     return (
       <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>

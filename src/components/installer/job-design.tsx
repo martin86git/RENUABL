@@ -142,7 +142,7 @@ export function JobDesignPanel({ recordKey, design, panelCount }: { recordKey: s
         )}
       </div>
       <div className="mt-4">
-        <House3d at={design.centre} label="3D view of the house" />
+        <House3d at={design.centre} recordKey={recordKey} enabled={design.can3d} label="3D view of the house" />
       </div>
     </div>
   );

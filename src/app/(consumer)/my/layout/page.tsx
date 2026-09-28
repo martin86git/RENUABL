@@ -5,6 +5,7 @@ import { Card, Eyebrow } from "@/components/ui/primitives";
 import { House3d } from "@/components/ui/house-3d";
 import { RoofDesigner } from "@/components/ui/roof-designer";
 import { getMyLayout } from "@/lib/services/my-account";
+import { mapTilesKey } from "@/lib/server/map-tiles";
 
 export const metadata: Metadata = { title: "Your panel layout", robots: { index: false } };
 
@@ -34,7 +35,7 @@ export default async function MyLayoutPage({ searchParams }: PageProps<"/my/layo
               : "A first layout from Google's satellite roof data. Your installation partner confirms it before the install."}
           </p>
           <div className="px-3 pb-3">
-            <House3d at={layout.centre} label="See your home in 3D" />
+            <House3d at={layout.centre} recordKey={record as string} enabled={Boolean(mapTilesKey())} label="See your home in 3D" />
           </div>
         </Card>
       ) : (

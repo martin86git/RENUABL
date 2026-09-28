@@ -18,6 +18,7 @@ import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs } from "@/lib/mock/jobs";
 import { jobAddressForPartner, jobsForPartner, obstructionsFor } from "@/lib/server/jobs-repo";
 import type { ObstructionCheck } from "@/lib/domain/obstructions";
 import { roofData, roofInsights } from "@/lib/server/google-solar";
+import { mapTilesKey } from "@/lib/server/map-tiles";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { dailyForecast } from "@/lib/server/google-weather";
 import type { RoofInsights } from "@/lib/domain/solar-roof";
@@ -106,6 +107,8 @@ export interface JobDesign {
   obstructions: ObstructionCheck | null;
   /** The roof check can run (ANTHROPIC_API_KEY is set). */
   canCheck: boolean;
+  /** The 3D house view is set up (GOOGLE_MAP_TILES_KEY). */
+  can3d: boolean;
 }
 
 /**
@@ -127,6 +130,7 @@ export async function getJobDesign(job: Job): Promise<JobDesign | null> {
     saved: job.layout?.slots ?? null,
     obstructions: ((await obstructionsFor(job.recordKey).catch(() => null)) as ObstructionCheck | null) ?? null,
     canCheck: Boolean(process.env.ANTHROPIC_API_KEY?.trim()),
+    can3d: Boolean(mapTilesKey()),
   };
 }
 

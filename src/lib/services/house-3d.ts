@@ -2,8 +2,6 @@
  * The 3D house view: Google's photorealistic 3D tiles (Map Tiles API) shown
  * with CesiumJS, loaded from its CDN only when someone opens the view.
  */
-import { MAP_TILES_KEY } from "@/lib/config";
-
 const CESIUM = "https://cdn.jsdelivr.net/npm/cesium@1.145.0/Build/Cesium";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- CesiumJS is loaded at runtime from its CDN, without types */
@@ -31,14 +29,17 @@ function loadCesium(): Promise<any> {
   return loading;
 }
 
-export function house3dAvailable() {
-  return Boolean(MAP_TILES_KEY);
+/** The 3D tiles key, for someone allowed to see this home (job record). */
+async function tilesKey(recordKey: string): Promise<string> {
+  const res = await fetch(`/api/map-tiles/key?record=${encodeURIComponent(recordKey)}`, { cache: "no-store" });
+  const json = (await res.json()) as { ok: boolean; key?: string };
+  if (!json.ok || !json.key) throw new Error("No 3D access");
+  return json.key;
 }
 
-/** Shows the home in 3D in `el`, looking at it from the north-east. Returns a clean-up function. */
-export async function showHouse3d(el: HTMLElement, at: { lat: number; lng: number }): Promise<() => void> {
-  if (!MAP_TILES_KEY) throw new Error("No Map Tiles key");
-  const Cesium = await loadCesium();
+/** Shows the home in 3D in `el`, looking at it from the south-west. Returns a clean-up function. */
+export async function showHouse3d(el: HTMLElement, at: { lat: number; lng: number }, recordKey: string): Promise<() => void> {
+  const [key, Cesium] = await Promise.all([tilesKey(recordKey), loadCesium()]);
   const viewer = new Cesium.Viewer(el, {
     globe: false,
     baseLayer: false,
@@ -54,7 +55,7 @@ export async function showHouse3d(el: HTMLElement, at: { lat: number; lng: numbe
     selectionIndicator: false,
     requestRenderMode: true,
   });
-  const tileset = await Cesium.Cesium3DTileset.fromUrl(`https://tile.googleapis.com/v1/3dtiles/root.json?key=${MAP_TILES_KEY}`, {
+  const tileset = await Cesium.Cesium3DTileset.fromUrl(`https://tile.googleapis.com/v1/3dtiles/root.json?key=${encodeURIComponent(key)}`, {
     showCreditsOnScreen: true,
   });
   viewer.scene.primitives.add(tileset);

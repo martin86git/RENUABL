@@ -22,11 +22,3 @@ export const HUBSPOT_MEETINGS_URL = parseHubspotMeetingsUrl(process.env.NEXT_PUB
  * for the embedded deposit form. Safe in the browser. Redeploy after changing.
  */
 export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() || null;
-
-/**
- * NEXT_PUBLIC_GOOGLE_MAP_TILES_KEY: a separate Google key for the 3D house view
- * (Map Tiles API, photorealistic 3D tiles). It is used in the browser, so
- * restrict it to the Map Tiles API and to the site's address (HTTP referrers).
- * Never reuse GOOGLE_MAPS_API_KEY here.
- */
-export const MAP_TILES_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAP_TILES_KEY?.trim() || null;
