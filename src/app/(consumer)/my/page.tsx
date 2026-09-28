@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { DayCurve, Sparkbars } from "@/components/consumer/energy-charts";
 import { ExampleOwnerName } from "@/components/consumer/portal-preview";
+import { TomorrowSolar } from "@/components/consumer/tomorrow-solar";
 import { HomePhoto, Mascot } from "@/components/ui/brand-art";
 import { Card } from "@/components/ui/primitives";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
@@ -58,6 +59,10 @@ export default async function MyHomePage() {
               <ArrowRight className="mb-1 h-5 w-5 shrink-0 self-start text-ink" strokeWidth={1.5} />
             </Card>
           </Link>
+
+          <div className="mt-4">
+            <TomorrowSolar example={{ battery: household.batteryKwh > 0, ev: false }} />
+          </div>
 
           <Card className="mt-4 overflow-hidden">
             <ul className="divide-y divide-line">

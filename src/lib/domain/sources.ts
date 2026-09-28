@@ -7,7 +7,7 @@ import { solarVictoriaApplies } from "./rebates";
 import type { Address } from "./types";
 
 export interface PlanCheck {
-  id: "google" | "nasa" | "sunshine-typical" | "cer" | "solar-vic";
+  id: "google" | "google-solar" | "nasa" | "sunshine-typical" | "cer" | "solar-vic";
   name: string;
   detail: string;
 }
@@ -19,12 +19,15 @@ export function planChecks(input: {
   address: Pick<Address, "state" | "placeId" | "lat" | "lng"> | null;
   /** NASA's sunshine didn't arrive: say typical local sunshine rather than credit NASA. */
   sunshineUnavailable?: boolean;
+  /** Google's roof data arrived for this home (only then is it named). */
+  roofData?: boolean;
 }): PlanCheck[] {
   const { address } = input;
   const out: PlanCheck[] = [];
   if (address?.placeId && address.lat !== undefined && address.lng !== undefined) {
     out.push({ id: "google", name: "Google Maps", detail: "Locating your home" });
   }
+  if (input.roofData) out.push({ id: "google-solar", name: "Google Solar", detail: "Satellite data for your roof and its sunshine" });
   out.push(
     address?.lat !== undefined && !input.sunshineUnavailable
       ? { id: "nasa", name: "NASA POWER", detail: "Satellite sunshine records for your home" }

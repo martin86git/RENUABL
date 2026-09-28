@@ -11,7 +11,16 @@ import { ASSUMPTIONS, estimateOutcome, priceSystem, recommendSystem } from "@/li
 import type { CareBilling } from "@/lib/domain/care";
 import type { Address, AddOnId, EnergyProfile, SystemConfig, SystemTier } from "@/lib/domain/types";
 import { partnerPricingFor } from "@/lib/domain/partner";
-import { analyseHome, fetchRebateRates, fetchSunshine, getInstaller, type CallSlot, type ReservationResult } from "@/lib/services/consumer";
+import {
+  analyseHome,
+  fetchRebateRates,
+  fetchRoofInsights,
+  fetchSunshine,
+  getInstaller,
+  type CallSlot,
+  type ReservationResult,
+} from "@/lib/services/consumer";
+import { usableRoofSunHours, type RoofInsights } from "@/lib/domain/solar-roof";
 
 /**
  * Client state for the guided purchase flow. Business rules live in
@@ -48,6 +57,8 @@ export interface FlowState {
   rates: RebateRates | null;
   /** NASA POWER sunshine for the home's coordinates. */
   sunshine: Sunshine | null;
+  /** Google Solar API roof data for the home's coordinates (data null: Google has none). */
+  roof: { lat: number; lng: number; data: RoofInsights | null } | null;
   /** Solar Victoria (VIC homes only): the customer's choices at checkout. */
   solarVic: { rebate: boolean; loan: boolean };
   /** The customer booked their 15-minute confirmation call via HubSpot. */
@@ -74,6 +85,7 @@ const EMPTY: FlowState = {
   existingInverter: null,
   rates: null,
   sunshine: null,
+  roof: null,
   solarVic: { rebate: false, loan: false },
   callBooked: false,
   call: null,
@@ -174,6 +186,21 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     };
   }, [hydrated, lat, lng, state.sunshine]);
 
+  // Google's roof data for the home, once per address (every lookup is charged).
+  const roofDone = Boolean(
+    state.roof && lat !== undefined && lng !== undefined && Math.abs(state.roof.lat - lat) < 1e-5 && Math.abs(state.roof.lng - lng) < 1e-5,
+  );
+  useEffect(() => {
+    if (!hydrated || lat === undefined || lng === undefined || roofDone) return;
+    let cancelled = false;
+    void fetchRoofInsights(lat, lng).then((data) => {
+      if (!cancelled) setState((s) => ({ ...s, roof: { lat, lng, data } }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, lat, lng, roofDone]);
+
   const update = useCallback((patch: Partial<FlowState>) => setState((s) => ({ ...s, ...patch })), []);
   const reset = useCallback(() => setState({ ...EMPTY, attribution: state.attribution }), [state.attribution]);
 
@@ -197,6 +224,7 @@ export function useSystem() {
     const analysis = {
       ...analyseHome(state.address),
       sunshine: state.sunshine,
+      roofSunHours: state.roof?.data ? usableRoofSunHours(state.roof.data) : null,
       maxPanels: phase === "three" ? ASSUMPTIONS.maxPanels : ASSUMPTIONS.maxPanelsSinglePhase,
     };
     const recommendation = recommendSystem(profile, analysis, state.bill ?? NO_BILL);
@@ -222,6 +250,7 @@ export function useSystem() {
   }, [
     state.profile,
     state.address,
+    state.roof?.data,
     state.bill,
     state.tier,
     state.config,

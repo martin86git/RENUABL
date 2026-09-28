@@ -17,6 +17,8 @@ export interface DayForecast {
   minC: number | null;
   windKmh: number | null;
   gustKmh: number | null;
+  /** Daytime cloud cover, %. */
+  cloudCover: number | null;
 }
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -48,6 +50,7 @@ export function parseDailyForecast(raw: unknown): DayForecast[] {
         minC: num((day.minTemperature as { degrees?: unknown } | undefined)?.degrees),
         windKmh: num(wind.speed?.value),
         gustKmh: num(wind.gust?.value),
+        cloudCover: num(f.cloudCover),
       },
     ];
   });
@@ -81,4 +84,43 @@ export function customerOutlookLine(f: DayForecast) {
   if (outlook === "good") return `${f.summary || "Looking good"}${temp}. Looks good for your installation.`;
   if (outlook === "watch") return `${f.summary || "Mixed weather"}${temp}. Your installation partner is keeping an eye on it.`;
   return `${f.summary || "Wet or windy weather"}${temp}. If it isn't safe to work on your roof, your installation partner will call to move the day.`;
+}
+
+export type SolarDay = "strong" | "fair" | "quiet";
+
+/**
+ * For a home with solar: what tomorrow means for the panels, from daytime
+ * cloud and rain. No kWh figures (those need the inverter's monitoring), just
+ * a plain heads-up and a tip.
+ */
+export function solarDayOutlook(f: DayForecast, home: { battery: boolean; ev: boolean }): { day: SolarDay; headline: string; tip: string } {
+  const cloud = f.cloudCover ?? (f.rainChance !== null ? Math.min(100, f.rainChance + 20) : 50);
+  const wet = (f.rainChance ?? 0) >= 60;
+  const day: SolarDay = cloud <= 35 && !wet ? "strong" : cloud <= 75 && !wet ? "fair" : "quiet";
+  const sky = f.summary ? f.summary.toLowerCase() : day === "strong" ? "sunny" : day === "fair" ? "partly cloudy" : "cloudy";
+  if (day === "strong") {
+    return {
+      day,
+      headline: `Tomorrow looks ${sky}: expect a strong solar day.`,
+      tip: home.ev
+        ? "A good day to charge the car at home in the middle of the day."
+        : home.battery
+          ? "Run the washing or dishwasher around midday, and your battery should still fill up for the evening."
+          : "Run the washing, dishwasher or pool pump around midday to use your own power.",
+    };
+  }
+  if (day === "fair") {
+    return {
+      day,
+      headline: `Tomorrow looks ${sky}: expect a fair solar day.`,
+      tip: "Midday is still the best time for big appliances.",
+    };
+  }
+  return {
+    day,
+    headline: `Tomorrow looks ${sky}: expect a quieter solar day.`,
+    tip: home.battery
+      ? "Your battery will help carry the evening; save big loads for a sunnier day if you can."
+      : "Save big loads for a sunnier day if you can.",
+  };
 }

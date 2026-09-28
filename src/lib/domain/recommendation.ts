@@ -1,6 +1,6 @@
 import type { BillSummary } from "./bill";
 import { PANEL } from "./catalogue";
-import { YIELD_MODEL, yieldPerKw } from "./sunshine";
+import { YIELD_MODEL, blendedYieldPerKw } from "./sunshine";
 import { COSTING, billOfMaterials, inverterOptions, maxPanelsForInverter, sellPrice, type CostGroup, type PartnerPricing } from "./costing";
 import { NO_INCENTIVES, VERIFIED_RATES, rebatesFor, type Incentives, type RebateRates } from "./rebates";
 import { realAnnualUse, solarSituation } from "./existing-solar";
@@ -179,11 +179,11 @@ const kwh = (n: number) => n.toLocaleString("en-AU", { maximumFractionDigits: 1 
  */
 export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, bill: BillSummary): Recommendation {
   const flat = panelsLaidFlat(profile);
-  const dailyYield = analysis.sunshine
-    ? yieldPerKw(analysis.sunshine, flat)
-    : flat
+  const dailyYield =
+    blendedYieldPerKw(analysis.sunshine, analysis.roofSunHours, flat) ??
+    (flat
       ? Math.round(((ASSUMPTIONS.dailyYieldKwhPerKw * YIELD_MODEL.flatGain) / YIELD_MODEL.tiltGain) * 100) / 100
-      : ASSUMPTIONS.dailyYieldKwhPerKw;
+      : ASSUMPTIONS.dailyYieldKwhPerKw);
   const usage = usageBasis(bill, profile, dailyYield);
   if (usage.existingSolar) return expandSystem(profile, analysis, usage);
   const replacing = solarSituation(bill, profile) === "replace";

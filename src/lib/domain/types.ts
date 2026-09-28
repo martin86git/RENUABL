@@ -33,6 +33,8 @@ export interface HomeAnalysis {
   maxPanels: number;
   /** NASA POWER sunshine for the home's coordinates, when known. */
   sunshine?: Sunshine | null;
+  /** Google Solar API: yearly sunshine hours on the usable parts of this roof, when known. */
+  roofSunHours?: number | null;
 }
 
 /** The few yes/no questions the customer answers. */

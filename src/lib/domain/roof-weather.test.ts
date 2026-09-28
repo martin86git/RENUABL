@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { facing, parseBuildingInsights, roofFit, roofSummary } from "./solar-roof";
-import { customerOutlookLine, installOutlook, parseDailyForecast, type DayForecast } from "./weather";
+import { facing, parseBuildingInsights, roofFit, roofSummary, usableRoofSunHours } from "./solar-roof";
+import { blendedYieldPerKw } from "./sunshine";
+import { customerOutlookLine, installOutlook, parseDailyForecast, solarDayOutlook, type DayForecast } from "./weather";
 
 // Shaped like Google's documented buildingInsights:findClosest response (trimmed).
 const insights = {
@@ -91,6 +92,7 @@ describe("Google Weather install day", () => {
       minC: 11.1,
       windKmh: 14,
       gustKmh: 24,
+      cloudCover: null,
     });
     expect(parseDailyForecast({})).toEqual([]);
   });
@@ -108,5 +110,52 @@ describe("Google Weather install day", () => {
     expect(customerOutlookLine(sunny)).toBe("Sunny, 23°. Looks good for your installation.");
     expect(customerOutlookLine(wet)).toMatch(/installation partner will call to move the day/);
     expect(customerOutlookLine(wet)).not.toMatch(/installer\b/);
+  });
+});
+
+describe("sharper savings from Google's roof sunshine", () => {
+  it("blends roof sun-hours (60%) with NASA (40%), within a sensible range", () => {
+    const nasa = { annual: 4.2 }; // kWh/m²/day → 4.2 × 1.08 × 0.8 = 3.63 kWh/kW/day
+    expect(blendedYieldPerKw(nasa, null)).toBe(3.63);
+    // 1,600 sun hours ÷ 365 × 0.8 = 3.51 → 3.51 × 0.6 + 3.63 × 0.4 = 3.56
+    expect(blendedYieldPerKw(nasa, 1600)).toBe(3.56);
+    // A heavily shaded reading is held at 60% of NASA's: 2.18 × 0.6 + 3.63 × 0.4 = 2.76
+    expect(blendedYieldPerKw(nasa, 400)).toBe(2.76);
+    expect(blendedYieldPerKw(null, 1600)).toBe(3.51);
+    expect(blendedYieldPerKw(null, null)).toBeNull();
+  });
+
+  it("uses the sunny parts of the roof", () => {
+    const r = parseBuildingInsights(insights)!;
+    // Both faces get at least 70% of the best (1,100 ≥ 1,085): area-weighted (1,550 × 48 + 1,100 × 30) ÷ 78 = 1,377.
+    expect(usableRoofSunHours(r)).toBe(1377);
+    // A face in shade (under 70% of the best) is left out.
+    expect(usableRoofSunHours({ ...r, faces: [r.faces[0], { ...r.faces[1], sunshineHours: 900 }] })).toBe(1550);
+  });
+});
+
+describe("tomorrow's solar day", () => {
+  const base: DayForecast = {
+    date: "2026-10-01",
+    summary: "Sunny",
+    rainChance: 5,
+    rainMm: 0,
+    thunderChance: 0,
+    maxC: 24,
+    minC: 12,
+    windKmh: 10,
+    gustKmh: 20,
+    cloudCover: 10,
+  };
+  it("gives a plain heads-up and a tip", () => {
+    expect(solarDayOutlook(base, { battery: false, ev: false })).toMatchObject({
+      day: "strong",
+      headline: "Tomorrow looks sunny: expect a strong solar day.",
+    });
+    expect(solarDayOutlook(base, { battery: false, ev: true }).tip).toMatch(/charge the car/);
+    expect(solarDayOutlook({ ...base, summary: "Partly cloudy", cloudCover: 60 }, { battery: true, ev: false }).day).toBe("fair");
+    const wet = solarDayOutlook({ ...base, summary: "Rain", cloudCover: 95, rainChance: 90 }, { battery: true, ev: false });
+    expect(wet).toMatchObject({ day: "quiet" });
+    expect(wet.tip).toMatch(/battery/);
   });
 });

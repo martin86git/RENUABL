@@ -38,3 +38,27 @@ export function parseNasaClimatology(json: unknown, lat: number, lng: number): S
   if (!ok(p.ANN) || !months.every(ok)) return null;
   return { annual: p.ANN, monthly: months, lat, lng, source: "NASA POWER" };
 }
+
+/**
+ * Google's Solar API measures sunshine on the home's own roof faces (so it
+ * includes shading from trees and buildings, and which way the roof faces);
+ * NASA gives the area's long-term sunshine. When both are known the estimate
+ * leans on the roof (60%) and steadies it with NASA (40%), and the roof figure
+ * is kept within a sensible range of NASA's so one odd reading can't swing the
+ * price. Returns kWh a day per kW of panels.
+ */
+export const ROOF_BLEND = { roofWeight: 0.6, minRatio: 0.6, maxRatio: 1.25 } as const;
+
+export function blendedYieldPerKw(
+  sun: Pick<Sunshine, "annual"> | null | undefined,
+  roofSunHoursPerYear: number | null | undefined,
+  laidFlat = false,
+): number | null {
+  const nasa = sun ? yieldPerKw(sun, laidFlat) : null;
+  const roof = roofSunHoursPerYear && roofSunHoursPerYear > 0 ? (roofSunHoursPerYear / 365) * YIELD_MODEL.performanceRatio : null;
+  if (nasa === null && roof === null) return null;
+  if (roof === null) return nasa;
+  if (nasa === null) return Math.round(roof * 100) / 100;
+  const bounded = Math.min(Math.max(roof, nasa * ROOF_BLEND.minRatio), nasa * ROOF_BLEND.maxRatio);
+  return Math.round((bounded * ROOF_BLEND.roofWeight + nasa * (1 - ROOF_BLEND.roofWeight)) * 100) / 100;
+}

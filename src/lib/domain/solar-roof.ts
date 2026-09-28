@@ -101,3 +101,16 @@ export const ROOF_FIT_NOTE: Record<RoofFit, string> = {
   snug: "It's a snug fit. Your installation partner will confirm the panel layout on your call.",
   check: "Your roof looks tight for this many panels. We'll check the layout together on your call before anything is locked in.",
 };
+
+/**
+ * Typical sunshine on the parts of the roof panels would go: the faces that get
+ * at least 70% of the sunniest face's sun, weighted by their area.
+ */
+export function usableRoofSunHours(insights: RoofInsights): number | null {
+  const lit = insights.faces.filter((f) => f.sunshineHours);
+  if (!lit.length) return insights.sunshineHoursPerYear;
+  const best = Math.max(...lit.map((f) => f.sunshineHours!));
+  const good = lit.filter((f) => f.sunshineHours! >= best * 0.7);
+  const area = good.reduce((s, f) => s + f.areaM2, 0);
+  return area ? Math.round(good.reduce((s, f) => s + f.sunshineHours! * f.areaM2, 0) / area) : null;
+}

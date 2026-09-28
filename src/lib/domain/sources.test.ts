@@ -23,3 +23,11 @@ describe("plan checks", () => {
     expect(text.toLowerCase()).not.toMatch(/\bexact|guarantee|precise/);
   });
 });
+
+describe("Google Solar source", () => {
+  it("is named only when its roof data arrived", () => {
+    const address = { state: "VIC", placeId: "p", lat: -37.8, lng: 145 };
+    expect(planChecks({ address }).some((c) => c.id === "google-solar")).toBe(false);
+    expect(planChecks({ address, roofData: true }).find((c) => c.id === "google-solar")?.name).toBe("Google Solar");
+  });
+});

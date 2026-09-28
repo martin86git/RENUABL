@@ -6,7 +6,7 @@ import { jobsForCustomer } from "@/lib/server/jobs-repo";
 import { dailyForecast } from "@/lib/server/google-weather";
 import { daysUntil } from "@/lib/domain/compliance";
 import { todayInMarket } from "@/lib/domain/market";
-import { FORECAST_DAYS, customerOutlookLine, forecastFor } from "@/lib/domain/weather";
+import { FORECAST_DAYS, customerOutlookLine, forecastFor, solarDayOutlook } from "@/lib/domain/weather";
 
 /** What the customer sees for each stage (they're "installation partners", never "installers"). */
 export const CUSTOMER_STATUS: Record<JobStatus, string> = {
@@ -55,5 +55,27 @@ export async function getMyReservations() {
       partner: j.partnerId ? (names.get(j.partnerId) ?? null) : null,
       recordKey: j.recordKey,
     })),
+  };
+}
+
+/**
+ * For a signed-in customer whose system is installed: tomorrow's solar day at
+ * their home (Google Weather). Null otherwise.
+ */
+export async function getTomorrowSolar() {
+  if (!dbConfigured()) return null;
+  const session = await currentSession();
+  if (session?.role !== "customer") return null;
+  const installed = (await jobsForCustomer(session.email)).find(
+    (j) => j.status === "completed" && typeof j.address.lat === "number" && typeof j.address.lng === "number",
+  );
+  if (!installed) return null;
+  const tomorrow = new Date(`${todayInMarket()}T00:00:00Z`);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const f = forecastFor(await dailyForecast(installed.address.lat!, installed.address.lng!), tomorrow.toISOString().slice(0, 10));
+  if (!f) return null;
+  return {
+    ...solarDayOutlook(f, { battery: installed.system.batteryKwh > 0, ev: installed.system.evCharger }),
+    maxC: f.maxC,
   };
 }

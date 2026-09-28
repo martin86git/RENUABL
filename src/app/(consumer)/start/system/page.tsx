@@ -216,7 +216,7 @@ function SystemScreen() {
           )}
         </Card>
 
-        {!existing && <RoofCheck lat={state.address?.lat} lng={state.address?.lng} panelCount={config.panelCount} />}
+        {!existing && <RoofCheck roof={state.roof?.data} panelCount={config.panelCount} />}
 
         <Card className="p-5">
           <p className="text-[15px] text-ink">Why this system?</p>

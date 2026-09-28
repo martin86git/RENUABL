@@ -32,7 +32,8 @@ export default function AnalysingPage() {
     Math.abs(state.sunshine.lat - address.lat) < 0.01 &&
     Math.abs(state.sunshine.lng - address.lng) < 0.01,
   );
-  const checks = planChecks({ address, sunshineUnavailable: waited && !sunshineReady });
+  const roofReady = Boolean(state.roof?.data);
+  const checks = planChecks({ address, sunshineUnavailable: waited && !sunshineReady, roofData: roofReady });
   // A tick means that source's data has arrived (the rebate rules fall back to the hand-checked CER copy).
   const ready = (c: PlanCheck | undefined) =>
     !c ? false : c.id === "nasa" ? sunshineReady : c.id === "cer" || c.id === "solar-vic" ? Boolean(state.rates) || waited : true;
