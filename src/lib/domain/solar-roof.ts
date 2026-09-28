@@ -84,23 +84,15 @@ export function roofFit(insights: RoofInsights, panelCount: number): RoofFit {
   return "check";
 }
 
-/** The roof in one line for customers: "Room for about 26 panels · mostly north-facing · 20° pitch". */
+/**
+ * The roof in one line for customers: "Mostly north-facing · 20° pitch". No
+ * panel count: how many fit is worked out on the confirmation call.
+ */
 export function roofSummary(insights: RoofInsights) {
   const main = insights.faces[0];
-  return [
-    `Room for about ${insights.panelsThatFit} panels`,
-    main ? `mostly ${facing(main.azimuth).toLowerCase()}` : null,
-    main ? `${main.pitch}° pitch` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  if (!main) return "";
+  return `Mostly ${facing(main.azimuth).toLowerCase()} · ${main.pitch}° pitch`;
 }
-
-export const ROOF_FIT_NOTE: Record<RoofFit, string> = {
-  comfortable: "Your system fits comfortably.",
-  snug: "It's a snug fit. Your installation partner will confirm the panel layout on your call.",
-  check: "Your roof looks tight for this many panels. We'll check the layout together on your call before anything is locked in.",
-};
 
 /**
  * Typical sunshine on the parts of the roof panels would go: the faces that get

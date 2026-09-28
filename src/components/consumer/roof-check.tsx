@@ -3,14 +3,15 @@
 import { House } from "lucide-react";
 import { useState } from "react";
 import { Card } from "@/components/ui/primitives";
-import { isUnitAddress, ROOF_FIT_NOTE, roofFit, roofSummary, SHARED_ROOF_NOTE, type RoofInsights } from "@/lib/domain/solar-roof";
+import { isUnitAddress, roofSummary, SHARED_ROOF_NOTE, type RoofInsights } from "@/lib/domain/solar-roof";
 import { PREVIEW_MODE } from "@/lib/config";
 import { roofImageSrc } from "@/lib/services/consumer";
 import { SunMap } from "./sun-map";
 
 /**
  * "Your roof": a satellite photo of the home with what Google's roof data says
- * about it (room for panels, direction, pitch) and whether the system fits.
+ * about it (direction, pitch). No panel counts: how many fit, and where, is
+ * worked out on the confirmation call.
  * No panels are drawn: an automatic layout isn't reliable enough to show
  * customers, so the installation partner designs it (partner portal) and
  * confirms it on the call. Shown only when Google has data for the home.
@@ -51,7 +52,6 @@ export function RoofCheck({
       <p className="rounded-lg border border-line bg-surface p-4 text-[13px] text-muted">Preview only: no roof details because {why}</p>
     );
   }
-  const fit = roofFit(roof, panelCount);
   const hasPhoto = typeof centre?.lat === "number" && typeof centre.lng === "number" && !photoFailed;
   const photo = hasPhoto ? (
     // eslint-disable-next-line @next/next/no-img-element -- our own server route, already sized by Google
@@ -73,12 +73,9 @@ export function RoofCheck({
           <p className="text-[15px] text-ink">Your roof</p>
           <p className="mt-0.5 text-[14px] text-muted">{roofSummary(roof)}</p>
           <p className="mt-2 text-[14px] text-ink-2">
-            Your system uses {panelCount} panels. {ROOF_FIT_NOTE[fit]}
+            We&apos;ll work out how many panels fit on your roof, and where they go, on your 15-minute call.
           </p>
           {isUnitAddress(centre?.line) && <p className="mt-2 text-[14px] text-ink-2">{SHARED_ROOF_NOTE}</p>}
-          <p className="mt-2 text-[14px] text-ink-2">
-            Your installation partner designs your panel layout and confirms it with you on your call.
-          </p>
           <p className="mt-2 text-[12px] text-muted">From Google&apos;s satellite roof data, which also shapes your savings estimate.</p>
         </div>
       </div>

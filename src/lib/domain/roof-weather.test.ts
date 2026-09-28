@@ -32,7 +32,7 @@ describe("Google Solar roof", () => {
     // 72.5 m² × 90% ÷ (1.762 × 1.134 m) = 32.6
     expect(r.panelsThatFit).toBe(32);
     expect(r).toMatchObject({ usableAreaM2: 73, sunshineHoursPerYear: 1650, imageryDate: "2025-03", imageryQuality: "HIGH" });
-    expect(roofSummary(r)).toBe("Room for about 32 panels · mostly north-facing · 22° pitch");
+    expect(roofSummary(r)).toBe("Mostly north-facing · 22° pitch");
   });
 
   it("says whether the system fits", () => {
