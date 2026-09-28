@@ -2,8 +2,9 @@
 
 import { Apple, CreditCard, Loader2, Lock } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/primitives";
 import { formatCurrency } from "@/lib/domain/format";
-import { startDepositPayment } from "@/lib/services/consumer";
+import { startDepositPayment, startHostedDepositPayment } from "@/lib/services/consumer";
 import { mountDepositForm, stripeFormAvailable } from "@/lib/services/stripe-form";
 
 function GoogleG() {
@@ -29,46 +30,85 @@ function GoogleG() {
   );
 }
 
-/** Stripe's embedded payment form for the deposit, on our own page. */
+/** How long the embedded form gets to appear before we offer Stripe's own page instead. */
+const FORM_TIMEOUT_MS = 12_000;
+
+/**
+ * Stripe's embedded payment form for the deposit, on our own page. If it
+ * can't load (no publishable key, Stripe.js blocked, a Stripe error), the
+ * customer gets a button to Stripe's own secure payment page instead.
+ */
 export function DepositPay({ reference, email, amount }: { reference: string; email: string | null; amount: number }) {
   const formRef = useRef<HTMLDivElement>(null);
-  const [ready, setReady] = useState(false);
-  const [problem, setProblem] = useState<string | null>(
-    stripeFormAvailable() ? null : "Online payments aren't set up yet. We'll be in touch.",
-  );
+  const [state, setState] = useState<"loading" | "form" | "backup">(stripeFormAvailable() ? "loading" : "backup");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
     const el = formRef.current;
     if (!el || !stripeFormAvailable()) return;
     let cleanup: (() => void) | undefined;
     let live = true;
+    const fallBack = (why: unknown) => {
+      if (!live) return;
+      console.warn("deposit form unavailable, offering Stripe's page", why);
+      setState((s) => (s === "form" ? s : "backup"));
+    };
+    const timer = setTimeout(() => fallBack("timed out"), FORM_TIMEOUT_MS);
     const clientSecret = startDepositPayment(reference, email).then((r) => {
       if (!r.ok) throw new Error(r.message);
       return r.clientSecret;
     });
-    clientSecret.catch((e: unknown) => live && setProblem(e instanceof Error ? e.message : "Something went wrong. Please try again."));
+    clientSecret.catch(fallBack);
     mountDepositForm(el, clientSecret, (m) => live && setProblem(m))
       .then((c) => {
         cleanup = c;
-        if (live) setReady(true);
+        clearTimeout(timer);
+        if (live) setState("form");
         else c();
       })
-      .catch(() => live && setProblem((p) => p ?? "We couldn't open the payment form just now. Please try again."));
+      .catch(fallBack);
     return () => {
       live = false;
+      clearTimeout(timer);
       cleanup?.();
     };
   }, [reference, email]);
 
+  async function payOnStripe() {
+    setBusy(true);
+    setProblem(null);
+    const r = await startHostedDepositPayment(reference, email);
+    if (r.ok) window.location.assign(r.url);
+    else {
+      setProblem(r.message);
+      setBusy(false);
+    }
+  }
+
   return (
     <div>
-      <p className="mb-3 text-[14px] text-ink">Pay {formatCurrency(amount)} deposit</p>
-      {!ready && !problem && (
+      {state === "loading" && (
         <p className="flex items-center justify-center gap-2 py-6 text-[14px] text-muted">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading secure payment
         </p>
       )}
-      <div id="checkout-form" ref={formRef} />
+      <div id="checkout-form" ref={formRef} className={state === "backup" ? "hidden" : undefined} />
+      {state === "backup" && (
+        <Button size="lg" className="w-full" disabled={busy} onClick={() => void payOnStripe()}>
+          {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : `Pay ${formatCurrency(amount)} deposit`}
+        </Button>
+      )}
+      {state === "form" && (
+        <button
+          type="button"
+          onClick={() => void payOnStripe()}
+          disabled={busy}
+          className="tap-area relative mx-auto mt-3 block text-[13px] text-muted underline underline-offset-4"
+        >
+          Trouble with the form? Pay on Stripe&apos;s secure page
+        </button>
+      )}
       <div className="mt-3 flex items-center justify-center gap-2" aria-label="Card, Apple Pay or Google Pay">
         <span className="grid h-7 w-7 place-items-center rounded-lg bg-forest text-white">
           <CreditCard className="h-4 w-4" strokeWidth={1.7} aria-hidden />

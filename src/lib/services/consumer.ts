@@ -234,6 +234,26 @@ export async function startDepositPayment(
   }
 }
 
+/** The backup: a link to Stripe's own payment page for the deposit. */
+export async function startHostedDepositPayment(
+  reference: string,
+  email: string | null,
+): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
+  try {
+    const res = await fetch("/api/deposit/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reference, email, hosted: true }),
+    });
+    const json = (await res.json()) as { ok: boolean; url?: string; message?: string };
+    return json.ok && json.url
+      ? { ok: true, url: json.url }
+      : { ok: false, message: json.message ?? "Something went wrong. Please try again." };
+  } catch {
+    return { ok: false, message: "We couldn't reach RENUABL. Check your connection and try again." };
+  }
+}
+
 export type InverterResult = { ok: true; inverter: InverterSummary } | { ok: false; message: string };
 
 /** Sends photos of the customer's existing inverter to read its make, model and size. The photos aren't stored. */

@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as webhook } from "@/app/api/stripe/webhook/route";
 import { depositCents, parseReference } from "@/lib/domain/deposit";
-import { createDepositCheckout } from "./stripe";
+import { createDepositCheckout, createHostedDepositCheckout } from "./stripe";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -43,6 +43,29 @@ describe("deposit", () => {
     expect(params.payment_method_collection).toBeUndefined();
     expect(params.success_url).toBeUndefined();
     expect(params.return_url).toBe("https://renuabl.test/deposit/paid?ref=RN-1234&session_id={CHECKOUT_SESSION_ID}");
+  });
+});
+
+describe("hosted backup", () => {
+  it("opens Stripe's own page with the same deposit, reservation and settings", async () => {
+    const create = vi.fn(async (params: Stripe.Checkout.SessionCreateParams) => {
+      void params;
+      return { url: "https://checkout.stripe.com/c/pay/cs_test" };
+    });
+    const fake = { checkout: { sessions: { create } } } as unknown as Stripe;
+    const url = await createHostedDepositCheckout(fake, { reference: "RN-1234", email: null, origin: "https://renuabl.test" });
+    expect(url).toBe("https://checkout.stripe.com/c/pay/cs_test");
+    const params = create.mock.calls[0][0];
+    expect(params.ui_mode).toBeUndefined();
+    expect(params).toMatchObject({
+      mode: "payment",
+      submit_type: "book",
+      locale: "en-GB",
+      metadata: { reference: "RN-1234", kind: "deposit" },
+    });
+    expect(params.line_items![0].price_data).toMatchObject({ currency: "aud", unit_amount: 49900 });
+    expect(params.success_url).toBe("https://renuabl.test/deposit/paid?ref=RN-1234&session_id={CHECKOUT_SESSION_ID}");
+    expect(params.cancel_url).toBe("https://renuabl.test/deposit?ref=RN-1234");
   });
 });
 

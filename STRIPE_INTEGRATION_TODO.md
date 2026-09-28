@@ -63,6 +63,10 @@ No new dependencies: Stripe.js is loaded from js.stripe.com at runtime, as PCI r
 - [src/components/consumer/deposit-pay.tsx](src/components/consumer/deposit-pay.tsx): renders the form in `#checkout-form` on the deposit page.
 - [src/app/api/stripe/webhook/route.ts](src/app/api/stripe/webhook/route.ts): unchanged; handles `checkout.session.completed`.
 
+## Backup: Stripe's own payment page
+
+If the embedded form can't load within 12 seconds (no publishable key, Stripe.js blocked by a browser extension, or Stripe rejecting the embedded-form session), the page shows a **Pay $499 deposit** button instead. It opens Stripe's hosted payment page with the same deposit, reservation and settings (`createHostedDepositCheckout` in [src/lib/server/stripe.ts](src/lib/server/stripe.ts), `hosted: true` on `/api/deposit/checkout`). Under a working form there's also a small "Trouble with the form? Pay on Stripe's secure page" link.
+
 ## How it works
 
 1. After the confirmation call, RENUABL sends the customer `https://<your-site>/deposit?ref=RN-1234&email=…`.

@@ -10,15 +10,8 @@ export function stripeClient(): Stripe | null {
   return key ? new Stripe(key, { apiVersion: STRIPE_API_VERSION as Stripe.LatestApiVersion }) : null;
 }
 
-/**
- * A Checkout Session for the deposit, shown as Stripe's embedded payment form
- * on our deposit page (cards, Apple Pay, Google Pay). Returns its client secret.
- * The reservation reference, receipt email and metadata stay attached so the
- * webhook can note the payment on the customer's HubSpot contact.
- */
-export async function createDepositCheckout(stripe: Stripe, opts: { reference: string; email?: string | null; origin: string }) {
-  const session = await stripe.checkout.sessions.create({
-    ui_mode: "form",
+function depositParams(opts: { reference: string; email?: string | null }) {
+  return {
     mode: "payment",
     line_items: [
       {
@@ -39,7 +32,6 @@ export async function createDepositCheckout(stripe: Stripe, opts: { reference: s
     submit_type: "book",
     shipping_address_collection: { allowed_countries: ["AU"] },
     locale: "en-GB",
-    integration_identifier: "custom_embedded_web_0002",
     customer_email: opts.email || undefined,
     client_reference_id: opts.reference,
     metadata: { reference: opts.reference, kind: "deposit" },
@@ -47,8 +39,33 @@ export async function createDepositCheckout(stripe: Stripe, opts: { reference: s
       metadata: { reference: opts.reference, kind: "deposit" },
       description: `${DEPOSIT.description} ${opts.reference}`,
     },
+  } satisfies Stripe.Checkout.SessionCreateParams;
+}
+
+/**
+ * A Checkout Session for the deposit, shown as Stripe's embedded payment form
+ * on our deposit page (cards, Apple Pay, Google Pay). Returns its client secret.
+ * The reservation reference, receipt email and metadata stay attached so the
+ * webhook can note the payment on the customer's HubSpot contact.
+ */
+export async function createDepositCheckout(stripe: Stripe, opts: { reference: string; email?: string | null; origin: string }) {
+  const session = await stripe.checkout.sessions.create({
+    ...depositParams(opts),
+    ui_mode: "form",
+    integration_identifier: "custom_embedded_web_0002",
     return_url: `${opts.origin}/deposit/paid?ref=${encodeURIComponent(opts.reference)}&session_id={CHECKOUT_SESSION_ID}`,
   });
   if (!session.client_secret) throw new Error("Stripe returned no client secret");
   return session.client_secret;
+}
+
+/** The backup: the same deposit on Stripe's own hosted payment page, when the embedded form can't load. Returns its URL. */
+export async function createHostedDepositCheckout(stripe: Stripe, opts: { reference: string; email?: string | null; origin: string }) {
+  const session = await stripe.checkout.sessions.create({
+    ...depositParams(opts),
+    success_url: `${opts.origin}/deposit/paid?ref=${encodeURIComponent(opts.reference)}&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${opts.origin}/deposit?ref=${encodeURIComponent(opts.reference)}`,
+  });
+  if (!session.url) throw new Error("Stripe returned no checkout URL");
+  return session.url;
 }
