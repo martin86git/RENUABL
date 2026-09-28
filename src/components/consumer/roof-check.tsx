@@ -4,7 +4,7 @@ import { House } from "lucide-react";
 import { Card } from "@/components/ui/primitives";
 import { RoofDesigner } from "@/components/ui/roof-designer";
 import { autoLayout, type RoofModel } from "@/lib/domain/roof-layout";
-import { ROOF_FIT_NOTE, roofFit, roofSummary, type RoofInsights } from "@/lib/domain/solar-roof";
+import { isUnitAddress, ROOF_FIT_NOTE, roofFit, roofSummary, SHARED_ROOF_NOTE, type RoofInsights } from "@/lib/domain/solar-roof";
 import { PREVIEW_MODE } from "@/lib/config";
 import { roofImageSrc } from "@/lib/services/consumer";
 
@@ -23,7 +23,7 @@ export function RoofCheck({
 }: {
   roof: RoofInsights | null | undefined;
   model: RoofModel | null | undefined;
-  centre: { lat?: number; lng?: number } | null;
+  centre: { lat?: number; lng?: number; line?: string } | null;
   panelCount: number;
   /** Why there's no roof data, if known (shown in preview only). */
   reason?: string;
@@ -75,6 +75,7 @@ export function RoofCheck({
               : ""}
             . {ROOF_FIT_NOTE[fit]}
           </p>
+          {isUnitAddress(centre?.line) && <p className="mt-2 text-[14px] text-ink-2">{SHARED_ROOF_NOTE}</p>}
           <p className="mt-2 text-[12px] text-muted">
             From Google&apos;s satellite roof data, which also shapes your savings estimate. A first layout: your installation partner
             confirms it before anything is installed.

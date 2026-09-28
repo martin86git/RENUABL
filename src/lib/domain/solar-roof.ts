@@ -114,3 +114,11 @@ export function usableRoofSunHours(insights: RoofInsights): number | null {
   const area = good.reduce((s, f) => s + f.areaM2, 0);
   return area ? Math.round(good.reduce((s, f) => s + f.sunshineHours! * f.areaM2, 0) / area) : null;
 }
+
+/** "1/112 Leopold St", "Unit 3, …", "Apt 4 …": the roof is probably shared with neighbours. */
+export function isUnitAddress(line: string | undefined): boolean {
+  return /^\s*\w+\s*\/\s*\d/.test(line ?? "") || /\b(unit|apartment|apt|flat|townhouse|suite)\b/i.test(line ?? "");
+}
+
+export const SHARED_ROOF_NOTE =
+  "Live in a unit or townhouse? The roof may be shared, so we'll confirm which part is yours (and any owners corporation approval) on your call.";

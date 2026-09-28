@@ -1,8 +1,8 @@
 /**
  * Panel layouts on the roof. Google's Solar API models each roof (its faces,
  * and every spot a panel fits, best spots first); we draw that on a satellite
- * image of the home. The auto-layout takes the best spots for the system's
- * panel count; partners can add or remove spots. Pure and tested.
+ * image of the home. The auto-layout groups the system's panels on the
+ * sunniest faces; partners can add or remove spots. Pure and tested.
  *
  * The satellite image is a Web Mercator map at a known centre and zoom, so a
  * point's latitude and longitude map to an exact pixel.
@@ -153,8 +153,37 @@ export function framing(model: RoofModel, view: MapView, marginPx = 90) {
 // ---------------------------------------------------------------------------
 
 /** The best spots for this many panels (Google lists them best first). */
+/** The smallest group worth putting on a face of its own (no lone panels). */
+export const MIN_ARRAY_PANELS = 4;
+
+/**
+ * The first layout: tidy groups on as few roof faces as possible (pricing allows
+ * for two, or three above 18 panels), each face filled with its sunniest spots. A face
+ * that can take every remaining panel wins when it's within 5% of the sunniest
+ * option; faces too small for a proper group are used only when nothing else fits.
+ */
 export function autoLayout(model: RoofModel, panelCount: number): number[] {
-  return model.slots.slice(0, Math.max(0, Math.min(panelCount, model.slots.length))).map((_, i) => i);
+  const want = Math.max(0, Math.min(Math.round(panelCount), model.slots.length));
+  const faces = new Map<number, number[]>();
+  model.slots.forEach((s, i) => faces.set(s.segment, [...(faces.get(s.segment) ?? []), i]));
+  for (const spots of faces.values()) spots.sort((a, b) => model.slots[b].kwh - model.slots[a].kwh);
+
+  const chosen: number[] = [];
+  while (chosen.length < want && faces.size) {
+    const remaining = want - chosen.length;
+    const options = [...faces.entries()].map(([segment, spots]) => {
+      const take = spots.slice(0, remaining);
+      return { segment, take, score: take.reduce((t, i) => t + model.slots[i].kwh, 0) / take.length };
+    });
+    const proper = options.filter((o) => o.take.length >= Math.min(remaining, MIN_ARRAY_PANELS));
+    const pool = proper.length ? proper : options;
+    const best = Math.max(...pool.map((o) => o.score));
+    const fitsAll = pool.filter((o) => o.take.length === remaining && o.score >= best * 0.95);
+    const pick = (fitsAll.length ? fitsAll : pool).reduce((a, b) => (b.score > a.score ? b : a));
+    chosen.push(...pick.take);
+    faces.delete(pick.segment);
+  }
+  return chosen.sort((a, b) => a - b);
 }
 
 /** Arrays in a layout: one per roof face used. */

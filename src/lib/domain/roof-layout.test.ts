@@ -76,6 +76,37 @@ describe("roof model", () => {
     expect(layoutYearlyKwh(m, [0, 1], 475)).toBe(1413);
   });
 
+  it("auto-layout groups panels on as few faces as it can, with no lone panels", () => {
+    const spot = (segment: number, kwh: number) => ({ lat: -37.88, lng: 145.16, orientation: "PORTRAIT" as const, segment, kwh });
+    const m = {
+      panel: { heightM: 1.879, widthM: 1.045, watts: 400 },
+      faces: [],
+      // Google lists the best spots first, across faces: a tiny sunny face (1), a big north face (0), a west face (2).
+      slots: [
+        spot(1, 620),
+        spot(0, 600),
+        spot(0, 598),
+        spot(2, 590),
+        spot(0, 596),
+        spot(0, 595),
+        spot(0, 594),
+        spot(2, 580),
+        spot(0, 590),
+        spot(2, 570),
+        spot(2, 560),
+        spot(0, 585),
+      ],
+    };
+    const faces = (sel: number[]) => new Set(sel.map((i) => m.slots[i].segment));
+    // 6 panels: all on the big north face, not one on the tiny face and the rest scattered.
+    expect(faces(autoLayout(m, 6))).toEqual(new Set([0]));
+    // 10 panels: the north face (7 spots) plus the west face, still no lone panel.
+    const ten = autoLayout(m, 10);
+    expect(ten).toHaveLength(10);
+    expect(faces(ten)).toEqual(new Set([0, 2]));
+    expect(autoLayout(m, 99)).toHaveLength(12);
+  });
+
   it("checks saved layouts and toggles spots", () => {
     expect(cleanLayout([2, 0, 0, 9, -1, 1.5, "x"], 3)).toEqual([0, 2]);
     expect(cleanLayout("nope", 3)).toBeNull();
