@@ -3,6 +3,7 @@
  * API replaces mock data; UI code should only talk to these functions.
  */
 import { cleanGeoFrame, type GeoFrame, type RoofModel } from "@/lib/domain/roof-layout";
+import { cleanBox, cleanSunSummary, type SunSummary } from "@/lib/domain/sun-map";
 import type { RoofInsights } from "@/lib/domain/solar-roof";
 import { BILL_UPLOAD, isBillMediaType, type BillSummary } from "@/lib/domain/bill";
 import { buildCallAvailability, type CallDay } from "@/lib/domain/booking";
@@ -337,6 +338,36 @@ export async function fetchRoofPhotoFrame(
   } catch {
     return null;
   }
+}
+
+/** The home's sun map: its grid, the summary, and where to draw the sharp satellite photo (null: Google Solar's photo). */
+export async function fetchSunMap(
+  lat: number,
+  lng: number,
+): Promise<{
+  frame: GeoFrame;
+  summary: SunSummary;
+  box: [number, number, number, number];
+  shift: { x: number; y: number } | null;
+} | null> {
+  try {
+    const res = await fetch(`/api/roof/sun?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&frame=1`);
+    if (!res.ok) return null;
+    const json = (await res.json()) as { frame?: unknown; summary?: unknown; box?: unknown; shift?: { x?: unknown; y?: unknown } | null };
+    const frame = cleanGeoFrame(json.frame);
+    const summary = cleanSunSummary(json.summary);
+    const box = frame && cleanBox(json.box, frame.width, frame.height);
+    if (!frame || !summary || !box) return null;
+    const { x, y } = json.shift ?? {};
+    const ok = typeof x === "number" && typeof y === "number" && Math.abs(x) <= 200 && Math.abs(y) <= 200;
+    return { frame, summary, box, shift: ok ? { x, y } : null };
+  } catch {
+    return null;
+  }
+}
+
+export function sunMapSrc(lat: number, lng: number) {
+  return `/api/roof/sun?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`;
 }
 
 export function roofPhotoSrc(lat: number, lng: number) {

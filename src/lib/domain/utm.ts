@@ -48,3 +48,20 @@ export function toUtm(lat: number, lng: number, { zone, south }: UtmZone): { e: 
   if (south) north += 10_000_000;
   return { e, n: north };
 }
+
+/** UTM back to latitude and longitude (a few Newton steps on `toUtm`; sub-millimetre near the zone). */
+export function fromUtm(e: number, n: number, zone: UtmZone, near: { lat: number; lng: number }): { lat: number; lng: number } {
+  let { lat, lng } = near;
+  const h = 1e-6;
+  for (let k = 0; k < 5; k++) {
+    const p = toUtm(lat, lng, zone);
+    const pa = toUtm(lat + h, lng, zone);
+    const pb = toUtm(lat, lng + h, zone);
+    const [a, b, c, d] = [(pa.e - p.e) / h, (pb.e - p.e) / h, (pa.n - p.n) / h, (pb.n - p.n) / h];
+    const det = a * d - b * c;
+    const [re, rn] = [e - p.e, n - p.n];
+    lat += (d * re - b * rn) / det;
+    lng += (a * rn - c * re) / det;
+  }
+  return { lat, lng };
+}

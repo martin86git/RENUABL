@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/primitives";
 import { isUnitAddress, ROOF_FIT_NOTE, roofFit, roofSummary, SHARED_ROOF_NOTE, type RoofInsights } from "@/lib/domain/solar-roof";
 import { PREVIEW_MODE } from "@/lib/config";
 import { roofImageSrc } from "@/lib/services/consumer";
+import { SunMap } from "./sun-map";
 
 /**
  * "Your roof": a satellite photo of the home with what Google's roof data says
@@ -52,18 +53,19 @@ export function RoofCheck({
   }
   const fit = roofFit(roof, panelCount);
   const hasPhoto = typeof centre?.lat === "number" && typeof centre.lng === "number" && !photoFailed;
+  const photo = hasPhoto ? (
+    // eslint-disable-next-line @next/next/no-img-element -- our own server route, already sized by Google
+    <img
+      src={roofImageSrc(centre.lat!, centre.lng!)}
+      alt="Your home from above"
+      className="aspect-[4/3] w-full rounded-xl bg-surface-2 object-cover"
+      onError={() => setPhotoFailed(true)}
+    />
+  ) : null;
   return (
     <Card className="overflow-hidden">
       {hasPhoto && (
-        <div className="p-2 pb-0">
-          {/* eslint-disable-next-line @next/next/no-img-element -- our own server route, already sized by Google */}
-          <img
-            src={roofImageSrc(centre.lat!, centre.lng!)}
-            alt="Your home from above"
-            className="aspect-[4/3] w-full rounded-xl bg-surface-2 object-cover"
-            onError={() => setPhotoFailed(true)}
-          />
-        </div>
+        <div className="p-2 pb-0">{PREVIEW_MODE ? <SunMap centre={{ lat: centre.lat!, lng: centre.lng! }} fallback={photo} /> : photo}</div>
       )}
       <div className="flex gap-4 p-5">
         <House className="mt-0.5 h-6 w-6 shrink-0 text-ink" strokeWidth={1.3} aria-hidden />

@@ -9,7 +9,7 @@
  * photo (the one its panel spots were measured on) comes on a UTM grid instead:
  * a GeoFrame. Either way, `project` gives a point's pixel.
  */
-import { toUtm, utmZoneFromEpsg } from "./utm";
+import { fromUtm, toUtm, utmZoneFromEpsg } from "./utm";
 
 export interface PanelSlot {
   lat: number;
@@ -146,6 +146,24 @@ export function project(lat: number, lng: number, f: ImageFrame) {
   const p = toUtm(lat, lng, utmZoneFromEpsg(f.epsg)!);
   const [x0, y0, x1, y1] = f.bbox;
   return { x: ((p.e - x0) / (x1 - x0)) * f.width, y: ((y1 - p.n) / (y1 - y0)) * f.height };
+}
+
+/**
+ * Where a Google Solar layer (on its UTM grid) sits on a Web Mercator image:
+ * an SVG matrix(a b c d e f) taking the layer's pixels to the image's. Over a
+ * roof the mapping is affine to well under a centimetre.
+ */
+export function geoFrameOnView(frame: GeoFrame, view: MapView): [number, number, number, number, number, number] {
+  const zone = utmZoneFromEpsg(frame.epsg)!;
+  const [x0, y0, x1, y1] = frame.bbox;
+  const px = (e: number, n: number) => {
+    const ll = fromUtm(e, n, zone, view.centre);
+    return toPixel(ll.lat, ll.lng, view);
+  };
+  const tl = px(x0, y1);
+  const tr = px(x1, y1);
+  const bl = px(x0, y0);
+  return [(tr.x - tl.x) / frame.width, (tr.y - tl.y) / frame.width, (bl.x - tl.x) / frame.height, (bl.y - tl.y) / frame.height, tl.x, tl.y];
 }
 
 /** Ground metres per pixel (at the centre, for Web Mercator). */

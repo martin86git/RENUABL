@@ -20,7 +20,7 @@ const memory = new Map<string, RoofPhoto>();
 const cacheKey = (lat: number, lng: number) => `roof-photos/v1/${lat.toFixed(5)},${lng.toFixed(5)}`;
 
 /** Enough ground around the home to take in every panel spot, with a margin. */
-async function radiusFor(lat: number, lng: number) {
+export async function radiusFor(lat: number, lng: number) {
   const model = (await roofData(lat, lng).catch(() => null))?.model;
   if (!model) return 30;
   const mLat = 111_132;
@@ -61,7 +61,12 @@ async function fromGoogle(lat: number, lng: number, apiKey: string): Promise<Roo
     break;
   }
   if (!layers?.rgbUrl?.startsWith("https://solar.googleapis.com/")) return null;
-  const tif = await fetch(`${layers.rgbUrl}&key=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(20_000) });
+  return photoFromRgbUrl(layers.rgbUrl, apiKey);
+}
+
+/** Google Solar's RGB GeoTIFF (from a Data Layers reply) as a JPEG and its grid. */
+export async function photoFromRgbUrl(rgbUrl: string, apiKey: string): Promise<RoofPhoto | null> {
+  const tif = await fetch(`${rgbUrl}&key=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(20_000) });
   if (!tif.ok) {
     console.error(`Solar GeoTIFF ${tif.status}`);
     return null;
@@ -105,10 +110,16 @@ export async function roofPhoto(lat: number, lng: number): Promise<RoofPhoto | n
     return null;
   });
   if (!photo) return null;
+  await rememberPhoto(lat, lng, photo);
+  return photo;
+}
+
+/** Keeps a home's photo (e.g. one that came with the sun map's lookup), so it isn't fetched again. */
+export async function rememberPhoto(lat: number, lng: number, photo: RoofPhoto) {
+  const key = cacheKey(lat, lng);
   memory.set(key, photo);
   if (memory.size > 40) memory.delete(memory.keys().next().value!);
   if (storageConfigured()) {
     await Promise.all([saveFileAt(`${key}.jpg`, photo.jpeg, "image/jpeg"), saveJson(`${key}.json`, photo.frame)]).catch(() => undefined);
   }
-  return photo;
 }

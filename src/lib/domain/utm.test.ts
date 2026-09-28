@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toUtm, utmZoneFromEpsg } from "./utm";
+import { fromUtm, toUtm, utmZoneFromEpsg } from "./utm";
 
 describe("utm", () => {
   it("reads zones from EPSG codes", () => {
@@ -20,5 +20,14 @@ describe("utm", () => {
     const a = toUtm(-37.8, 145.0, z);
     const b = toUtm(-37.8 + 10 / 111_000, 145.0, z);
     expect(Math.hypot(b.e - a.e, b.n - a.n)).toBeCloseTo(10, 0);
+  });
+
+  it("goes back from UTM to latitude and longitude", () => {
+    const z = { zone: 55, south: true };
+    const p = toUtm(-37.8136, 144.9631, z);
+    const back = fromUtm(p.e + 12, p.n - 7, z, { lat: -37.8, lng: 145 });
+    const again = toUtm(back.lat, back.lng, z);
+    expect(again.e - p.e).toBeCloseTo(12, 3);
+    expect(again.n - p.n).toBeCloseTo(-7, 3);
   });
 });
