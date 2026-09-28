@@ -30,6 +30,8 @@ export async function GET() {
       stripe: { key: mode, accepted: stripeWorks, webhookSecret: set(process.env.STRIPE_WEBHOOK_SECRET) },
       hubspot: set(process.env.HUBSPOT_PRIVATE_APP_TOKEN),
       email: set(process.env.RESEND_API_KEY) && set(process.env.EMAIL_FROM),
+      // Which half is missing when email is false.
+      emailSetup: { resendKey: set(process.env.RESEND_API_KEY), emailFrom: set(process.env.EMAIL_FROM) },
       storage: storageConfigured(),
       database: dbConfigured(),
       staff: set(process.env.ADMIN_EMAILS),
