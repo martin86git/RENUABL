@@ -43,6 +43,10 @@ export function JobDesignPanel({ recordKey, design, panelCount }: { recordKey: s
   }
 
   async function save() {
+    if (design.sample) {
+      setSavedSlots(selected); // the sample portal keeps it on screen only
+      return;
+    }
     setBusy(true);
     setProblem(null);
     const r = await saveLayout(recordKey, selected);
@@ -82,6 +86,9 @@ export function JobDesignPanel({ recordKey, design, panelCount }: { recordKey: s
           )}
           <p className="mt-1.5 text-[12px] text-muted">From the satellite image: a helper, not a site inspection. Confirm on the roof.</p>
         </div>
+      )}
+      {design.sample && (
+        <p className="mt-2 text-[12.5px] text-muted">Sample portal: every sample job uses {design.sample}. Layouts aren&apos;t saved.</p>
       )}
       <p className="mt-2 text-[12.5px] text-muted">
         Tap a panel to remove it, or a dashed spot to add one. Spots come from Google&apos;s roof model; check setbacks, vents and shading

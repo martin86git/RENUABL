@@ -18,6 +18,7 @@ import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs } from "@/lib/mock/jobs";
 import { jobAddressForPartner, jobsForPartner, obstructionsFor } from "@/lib/server/jobs-repo";
 import type { ObstructionCheck } from "@/lib/domain/obstructions";
 import { roofData, roofInsights } from "@/lib/server/google-solar";
+import { SAMPLE_ROOF_ADDRESS, sampleRoofLocation } from "@/lib/server/sample-roof";
 import { mapTilesKey } from "@/lib/server/map-tiles";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { dailyForecast } from "@/lib/server/google-weather";
@@ -109,6 +110,8 @@ export interface JobDesign {
   canCheck: boolean;
   /** The 3D house view is set up (GOOGLE_MAP_TILES_KEY). */
   can3d: boolean;
+  /** The sample portal: a real sample home, and layouts aren't saved. */
+  sample?: string;
 }
 
 /**
@@ -118,7 +121,23 @@ export interface JobDesign {
  */
 export async function getJobDesign(job: Job): Promise<JobDesign | null> {
   const ctx = await requirePortal();
-  if (ctx.kind !== "partner" || job.offer || !process.env.GOOGLE_MAPS_API_KEY?.trim()) return null;
+  if (job.offer || !process.env.GOOGLE_MAPS_API_KEY?.trim()) return null;
+  if (ctx.kind === "demo") {
+    // The sample portal designs on a real home, so the tab can be tried.
+    const at = await sampleRoofLocation();
+    const model = at && (await roofData(at.lat, at.lng).catch(() => null))?.model;
+    if (!at || !model) return null;
+    return {
+      model,
+      centre: at,
+      imageSrc: `/api/roof/image?lat=${at.lat.toFixed(6)}&lng=${at.lng.toFixed(6)}`,
+      saved: null,
+      obstructions: null,
+      canCheck: false,
+      can3d: false,
+      sample: SAMPLE_ROOF_ADDRESS,
+    };
+  }
   const address = await jobAddressForPartner(ctx.partner.id, job.id).catch(() => null);
   if (typeof address?.lat !== "number" || typeof address.lng !== "number") return null;
   const data = await roofData(address.lat, address.lng).catch(() => null);
