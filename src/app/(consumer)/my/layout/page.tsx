@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Card, Eyebrow } from "@/components/ui/primitives";
 import { House3d } from "@/components/ui/house-3d";
+import { PanelPlanner } from "@/components/ui/panel-planner";
 import { RoofDesigner } from "@/components/ui/roof-designer";
 import { getMyLayout } from "@/lib/services/my-account";
 import { mapTilesKey } from "@/lib/server/map-tiles";
@@ -24,12 +25,14 @@ export default async function MyLayoutPage({ searchParams }: PageProps<"/my/layo
       </div>
       {layout ? (
         <Card className="overflow-hidden p-2">
-          {layout.confirmed ? (
+          {layout.panels ? (
+            <PanelPlanner centre={layout.centre} imageSrc={`/api/jobs/${record}/roof?size=design`} panels={layout.panels} zoomM={32} />
+          ) : layout.legacy ? (
             <RoofDesigner
-              model={layout.model}
+              model={layout.legacy.model}
               centre={layout.centre}
               imageSrc={`/api/jobs/${record}/roof?size=design`}
-              selected={layout.selected}
+              selected={layout.legacy.slots}
             />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element -- our own server route
@@ -42,7 +45,7 @@ export default async function MyLayoutPage({ searchParams }: PageProps<"/my/layo
           <p className="px-3 py-3 text-[14px] text-ink-2">
             {layout.reference} ·{" "}
             {layout.confirmed
-              ? `${layout.selected.length} panels. This is your installation partner's layout.`
+              ? `${layout.panels?.length ?? layout.legacy?.slots.length ?? 0} panels. This is your installation partner's layout.`
               : `${layout.panelCount} panels. Your installation partner designs your layout and it appears here once it's ready.`}
           </p>
           <div className="px-3 pb-3">

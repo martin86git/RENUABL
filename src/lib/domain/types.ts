@@ -1,3 +1,4 @@
+import type { PlacedPanel } from "./panel-plan";
 /**
  * Core domain types shared by the consumer experience and the installer portal.
  * These are framework-agnostic and must not import React or Next.js.
@@ -299,7 +300,14 @@ export interface Job {
   activity: JobActivity[];
   statusHistory: StatusEvent[];
   /** The partner's saved panel layout (from the Design section). */
-  layout?: { slots: number[]; arrays: number; updatedAt: string };
+  layout?: {
+    /** Panels placed by hand (the Design tab). */
+    panels?: PlacedPanel[];
+    /** Older layouts: spots from Google's roof model. */
+    slots?: number[];
+    arrays: number;
+    updatedAt: string;
+  };
   /** An open offer to this partner: accept or decline before it expires. */
   offer?: { id: string; expiresAt: string };
 }

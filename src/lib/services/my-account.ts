@@ -4,6 +4,7 @@ import { currentSession } from "@/lib/server/accounts";
 import { dbConfigured, query } from "@/lib/server/db";
 import { jobsForCustomer } from "@/lib/server/jobs-repo";
 import { roofData } from "@/lib/server/google-solar";
+import type { PlacedPanel } from "@/lib/domain/panel-plan";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { dailyForecast } from "@/lib/server/google-weather";
 import { daysUntil } from "@/lib/domain/compliance";
@@ -88,9 +89,11 @@ export async function getTomorrowSolar() {
  * no roof model.
  */
 export async function getMyLayout(recordKey: string): Promise<{
-  model: RoofModel;
   centre: { lat: number; lng: number };
-  selected: number[];
+  /** The panels the installation partner placed (null until they've saved a layout). */
+  panels: PlacedPanel[] | null;
+  /** An older saved layout: spots from Google's roof model. */
+  legacy: { model: RoofModel; slots: number[] } | null;
   confirmed: boolean;
   reference: string;
   panelCount: number;
@@ -101,14 +104,13 @@ export async function getMyLayout(recordKey: string): Promise<{
   const job = (await jobsForCustomer(session.email)).find((j) => j.recordKey === recordKey);
   const { lat, lng } = job?.address ?? {};
   if (!job || typeof lat !== "number" || typeof lng !== "number") return null;
-  const model = (await roofData(lat, lng))?.model;
-  if (!model) return null;
+  const slots = job.layout?.panels ? null : job.layout?.slots;
+  const model = slots?.length ? (await roofData(lat, lng).catch(() => null))?.model : null;
   return {
-    model,
     centre: { lat, lng },
-    // Only the installation partner's own layout: an automatic one isn't shown to customers.
-    selected: job.layout?.slots ?? [],
-    confirmed: Boolean(job.layout),
+    panels: job.layout?.panels ?? null,
+    legacy: model && slots ? { model, slots } : null,
+    confirmed: Boolean(job.layout?.panels || (model && slots)),
     reference: job.reference,
     panelCount: job.system.panelCount,
   };

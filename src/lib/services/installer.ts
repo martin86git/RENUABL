@@ -17,10 +17,10 @@ import { CREWS, CURRENT_INSTALLER_ID, CURRENT_USER, INSTALLERS } from "@/lib/moc
 import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs } from "@/lib/mock/jobs";
 import { jobAddressForPartner, jobsForPartner, obstructionsFor } from "@/lib/server/jobs-repo";
 import type { ObstructionCheck } from "@/lib/domain/obstructions";
-import { roofData, roofInsights } from "@/lib/server/google-solar";
+import { roofInsights } from "@/lib/server/google-solar";
 import { SAMPLE_ROOF_ADDRESS, sampleRoofLocation } from "@/lib/server/sample-roof";
 import { mapTilesKey } from "@/lib/server/map-tiles";
-import type { RoofModel } from "@/lib/domain/roof-layout";
+import type { PlacedPanel } from "@/lib/domain/panel-plan";
 import { dailyForecast } from "@/lib/server/google-weather";
 import type { RoofInsights } from "@/lib/domain/solar-roof";
 import { FORECAST_DAYS, forecastFor, installOutlook, type DayForecast, type Outlook } from "@/lib/domain/weather";
@@ -99,11 +99,10 @@ export async function getJobConditions(job: Job, now = new Date()): Promise<JobC
 }
 
 export interface JobDesign {
-  model: RoofModel;
   centre: { lat: number; lng: number };
   imageSrc: string;
-  /** The saved layout's panel spots, or null (not saved yet: start from the auto-layout). */
-  saved: number[] | null;
+  /** The panels the partner placed and saved, or null (not saved yet: start empty). */
+  plan: PlacedPanel[] | null;
   /** The last roof obstruction check, if one was run. */
   obstructions: ObstructionCheck | null;
   /** The roof check can run (ANTHROPIC_API_KEY is set). */
@@ -125,13 +124,11 @@ export async function getJobDesign(job: Job): Promise<JobDesign | null> {
   if (ctx.kind === "demo") {
     // The sample portal designs on a real home, so the tab can be tried.
     const at = await sampleRoofLocation();
-    const model = at && (await roofData(at.lat, at.lng).catch(() => null))?.model;
-    if (!at || !model) return null;
+    if (!at) return null;
     return {
-      model,
       centre: at,
       imageSrc: `/api/roof/image?lat=${at.lat.toFixed(6)}&lng=${at.lng.toFixed(6)}`,
-      saved: null,
+      plan: null,
       obstructions: null,
       canCheck: false,
       can3d: false,
@@ -140,13 +137,10 @@ export async function getJobDesign(job: Job): Promise<JobDesign | null> {
   }
   const address = await jobAddressForPartner(ctx.partner.id, job.id).catch(() => null);
   if (typeof address?.lat !== "number" || typeof address.lng !== "number") return null;
-  const data = await roofData(address.lat, address.lng).catch(() => null);
-  if (!data?.model) return null;
   return {
-    model: data.model,
     centre: { lat: address.lat, lng: address.lng },
     imageSrc: `/api/jobs/${job.recordKey}/roof?size=design`,
-    saved: job.layout?.slots ?? null,
+    plan: job.layout?.panels ?? null,
     obstructions: ((await obstructionsFor(job.recordKey).catch(() => null)) as ObstructionCheck | null) ?? null,
     canCheck: Boolean(process.env.ANTHROPIC_API_KEY?.trim()),
     can3d: Boolean(mapTilesKey()),

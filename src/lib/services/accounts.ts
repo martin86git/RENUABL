@@ -1,3 +1,4 @@
+import type { PlacedPanel } from "@/lib/domain/panel-plan";
 import type { ObstructionCheck } from "@/lib/domain/obstructions";
 
 /** Sign-in for customers and partners: a one-time link sent by email. */
@@ -77,12 +78,12 @@ export async function checkRoof(recordKey: string): Promise<{ ok: true; check: O
 }
 
 /** The job's partner saves its panel layout. */
-export async function saveLayout(recordKey: string, slots: number[]): Promise<{ ok: boolean; arrays?: number; message?: string }> {
+export async function saveLayout(recordKey: string, panels: PlacedPanel[]): Promise<{ ok: boolean; arrays?: number; message?: string }> {
   try {
     const res = await fetch(`/api/jobs/${recordKey}/layout`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ slots }),
+      body: JSON.stringify({ panels }),
     });
     return (await res.json()) as { ok: boolean; arrays?: number; message?: string };
   } catch {

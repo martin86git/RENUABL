@@ -1,4 +1,5 @@
 /** Server only. Jobs (made from reservations) and their offers, in the database. */
+import type { PlacedPanel } from "@/lib/domain/panel-plan";
 import type { JobRequest, JobStatus, StoredJob } from "@/lib/domain/jobs";
 import { newId, query, randomToken } from "./db";
 
@@ -228,7 +229,11 @@ export async function jobAddressForPartner(partnerId: string, jobId: string): Pr
 }
 
 /** Saves the partner's panel layout on their own job. False if it isn't theirs. */
-export async function saveJobLayout(partnerId: string, recordKey: string, layout: { slots: number[]; arrays: number }): Promise<boolean> {
+export async function saveJobLayout(
+  partnerId: string,
+  recordKey: string,
+  layout: { panels: PlacedPanel[]; arrays: number },
+): Promise<boolean> {
   const rows = await query(`update jobs set layout = $3 where record_key = $1 and partner_id = $2 returning id`, [
     recordKey,
     partnerId,
