@@ -27,6 +27,8 @@ import { Handover } from "@/components/installer/handover";
 import { JobDocuments } from "@/components/installer/job-documents";
 import { JobMaterials } from "@/components/installer/materials";
 import { OfferActions } from "@/components/installer/offer-actions";
+import { JobConditionsPanel } from "@/components/installer/job-conditions";
+import type { JobConditions } from "@/lib/services/installer";
 import { saveJobStage } from "@/lib/services/accounts";
 import { JobConnection } from "@/components/installer/job-connection";
 import { JobVariations, type PartnerTerms } from "@/components/installer/job-variations";
@@ -151,6 +153,7 @@ export function JobWorkspace({
   installerName,
   partner,
   live = false,
+  conditions = null,
 }: {
   job: Job;
   crews: Crew[];
@@ -158,6 +161,8 @@ export function JobWorkspace({
   partner: PartnerTerms;
   /** A signed-in partner's real job: stage changes are saved. */
   live?: boolean;
+  /** Roof (Google Solar) and install-day weather (Google Weather), for real jobs. */
+  conditions?: JobConditions | null;
 }) {
   const field = useFieldStatus(job.id, job.statusHistory);
   const [checklist, setChecklist] = useState(job.checklist);
@@ -338,6 +343,15 @@ export function JobWorkspace({
                 </>
               ),
             },
+            ...(conditions
+              ? [
+                  {
+                    id: "conditions",
+                    title: conditions.outlook?.outlook === "risky" ? "Roof & weather · weather risk" : "Roof & weather",
+                    body: <JobConditionsPanel conditions={conditions} panelCount={job.system.panelCount} />,
+                  },
+                ]
+              : []),
             {
               id: "materials",
               title: `Materials · ${materials.length} items`,
@@ -378,7 +392,7 @@ export function JobWorkspace({
             },
           ]
             // An offer shows what the job is; the working sections open once it's accepted.
-            .filter((s) => !job.offer || ["site", "system", "materials"].includes(s.id))
+            .filter((s) => !job.offer || ["site", "system", "conditions", "materials"].includes(s.id))
             .map((s) => (
               <Accordion.Item key={s.id} value={s.id}>
                 <Accordion.Header>
@@ -435,6 +449,11 @@ export function JobWorkspace({
 
           <Tabs.Content value="overview" className="mt-6 grid grid-cols-12 gap-6">
             <div className="col-span-8 space-y-6">
+              {conditions && (
+                <section className="rounded-2xl border border-line bg-surface p-6">
+                  <JobConditionsPanel conditions={conditions} panelCount={job.system.panelCount} />
+                </section>
+              )}
               <section className="rounded-2xl border border-line bg-surface p-6">
                 <dl className="grid grid-cols-3 gap-6">
                   <Fact label="Install date">{formatDate(job.preferredDate)}</Fact>

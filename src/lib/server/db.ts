@@ -83,6 +83,11 @@ create table if not exists login_tokens (
   expires_at timestamptz not null,
   used_at timestamptz
 );
+create table if not exists roof_cache (
+  key text primary key,
+  data jsonb,
+  fetched_at timestamptz not null default now()
+);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

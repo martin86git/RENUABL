@@ -2,6 +2,7 @@
  * Consumer-facing service layer. Every function here is the seam where a real
  * API replaces mock data; UI code should only talk to these functions.
  */
+import type { RoofInsights } from "@/lib/domain/solar-roof";
 import { BILL_UPLOAD, isBillMediaType, type BillSummary } from "@/lib/domain/bill";
 import { buildCallAvailability, type CallDay } from "@/lib/domain/booking";
 import type { AddressSuggestion } from "@/lib/domain/address";
@@ -294,6 +295,17 @@ export async function fetchSunshine(lat: number, lng: number): Promise<Sunshine 
   try {
     const res = await fetch(`/api/sunshine?lat=${lat}&lng=${lng}`);
     return ((await res.json()) as { sunshine?: Sunshine | null }).sunshine ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The home's roof from Google's Solar API, when there's data for it. */
+export async function fetchRoofInsights(lat: number, lng: number): Promise<RoofInsights | null> {
+  try {
+    const res = await fetch(`/api/roof?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
+    const json = (await res.json()) as { ok: boolean; roof?: RoofInsights };
+    return json.ok && json.roof ? json.roof : null;
   } catch {
     return null;
   }

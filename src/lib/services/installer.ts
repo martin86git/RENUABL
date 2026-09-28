@@ -15,7 +15,12 @@ import type { Crew, Installer, Job, JobStage } from "@/lib/domain/types";
 import type { Variation } from "@/lib/domain/variations";
 import { CREWS, CURRENT_INSTALLER_ID, CURRENT_USER, INSTALLERS } from "@/lib/mock/installers";
 import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs } from "@/lib/mock/jobs";
-import { jobsForPartner } from "@/lib/server/jobs-repo";
+import { jobAddressForPartner, jobsForPartner } from "@/lib/server/jobs-repo";
+import { roofInsights } from "@/lib/server/google-solar";
+import { dailyForecast } from "@/lib/server/google-weather";
+import type { RoofInsights } from "@/lib/domain/solar-roof";
+import { FORECAST_DAYS, forecastFor, installOutlook, type DayForecast, type Outlook } from "@/lib/domain/weather";
+import { daysUntil } from "@/lib/domain/compliance";
 import { processOffersSoon } from "@/lib/server/offers-engine";
 import { partnerAsInstaller } from "@/lib/server/partners-repo";
 import { portalContext, type PortalContext } from "@/lib/server/portal";
@@ -60,6 +65,33 @@ export async function listJobs(stage?: JobStage): Promise<Job[]> {
 
 export async function getJob(id: string): Promise<Job | undefined> {
   return (await allJobs()).find((j) => j.id === id);
+}
+
+export interface JobConditions {
+  roof: RoofInsights | null;
+  /** The install day's forecast, once it's within ten days. */
+  forecast: DayForecast | null;
+  outlook: { outlook: Outlook; reasons: string[] } | null;
+  daysAway: number;
+}
+
+/**
+ * The job's roof (Google Solar API) and install-day weather (Google Weather
+ * API), for a real job that's this partner's or offered to them. Null for the
+ * sample portal or a home without coordinates.
+ */
+export async function getJobConditions(job: Job, now = new Date()): Promise<JobConditions | null> {
+  const ctx = await requirePortal();
+  if (ctx.kind !== "partner" || !process.env.GOOGLE_MAPS_API_KEY?.trim()) return null;
+  const address = await jobAddressForPartner(ctx.partner.id, job.id).catch(() => null);
+  if (typeof address?.lat !== "number" || typeof address.lng !== "number") return null;
+  const daysAway = daysUntil(job.preferredDate, todayInMarket(now));
+  const [roof, days] = await Promise.all([
+    roofInsights(address.lat, address.lng).catch(() => null),
+    daysAway >= 0 && daysAway < FORECAST_DAYS ? dailyForecast(address.lat, address.lng) : Promise.resolve([]),
+  ]);
+  const forecast = forecastFor(days, job.preferredDate);
+  return { roof, forecast, outlook: forecast ? installOutlook(forecast) : null, daysAway };
 }
 
 export async function listTodaysJobs(now = new Date()): Promise<Job[]> {
@@ -118,6 +150,18 @@ export async function getAlerts() {
       detail: c.status === "expiring" ? "Upload the renewal so job offers keep coming" : "New job offers are paused until it's updated",
       severity: "warning",
     });
+  }
+  for (const j of jobs.filter((x) => (x.stage === "accepted" || x.stage === "scheduled") && !x.offer)) {
+    const c = await getJobConditions(j);
+    if (c?.outlook?.outlook === "risky") {
+      alerts.push({
+        id: `${j.id}-weather`,
+        href: `/installer/jobs/${j.id}`,
+        title: `Weather risk on install day · ${j.reference}`,
+        detail: `${c.outlook.reasons.join(", ")} forecast. Let the customer know early if it needs to move.`,
+        severity: "warning",
+      });
+    }
   }
   for (const j of jobs) {
     if (j.stage === "new") {

@@ -214,3 +214,13 @@ export async function advancePartnerJob(partnerId: string, jobId: string, status
   ]);
   return rows.length > 0;
 }
+
+/** The home's address (with coordinates) for a job that's this partner's, or offered to them. */
+export async function jobAddressForPartner(partnerId: string, jobId: string): Promise<StoredJob["address"] | null> {
+  const rows = await query<{ address: StoredJob["address"] }>(
+    `select j.address from jobs j
+     where j.id = $1 and (j.partner_id = $2 or exists (select 1 from offers o where o.job_id = j.id and o.partner_id = $2 and o.status = 'offered'))`,
+    [jobId, partnerId],
+  );
+  return rows[0]?.address ?? null;
+}

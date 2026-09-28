@@ -9,6 +9,7 @@ import { CareIncludedCard } from "@/components/consumer/care-upsell";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { PortalPreview, PortalTeaser } from "@/components/consumer/portal-preview";
+import { RoofCheck } from "@/components/consumer/roof-check";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
 import { Segmented, Toggle } from "@/components/ui/controls";
@@ -214,6 +215,8 @@ function SystemScreen() {
             </div>
           )}
         </Card>
+
+        {!existing && <RoofCheck lat={state.address?.lat} lng={state.address?.lng} panelCount={config.panelCount} />}
 
         <Card className="p-5">
           <p className="text-[15px] text-ink">Why this system?</p>

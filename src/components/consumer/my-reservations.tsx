@@ -28,6 +28,7 @@ export async function MyReservations() {
                 {r.partner ? ` · ${r.partner}` : ""}
                 {r.installDate ? ` · ${formatDate(r.installDate, { weekday: "short", day: "numeric", month: "short" })}` : ""}
               </span>
+              {r.forecast && <span className="mt-1 block text-[13px] text-ink-2">Install-day forecast: {r.forecast}</span>}
             </span>
             <Link
               href={`/my/installation?record=${r.recordKey}`}

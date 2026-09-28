@@ -3,6 +3,10 @@ import type { JobStatus } from "@/lib/domain/jobs";
 import { currentSession } from "@/lib/server/accounts";
 import { dbConfigured, query } from "@/lib/server/db";
 import { jobsForCustomer } from "@/lib/server/jobs-repo";
+import { dailyForecast } from "@/lib/server/google-weather";
+import { daysUntil } from "@/lib/domain/compliance";
+import { todayInMarket } from "@/lib/domain/market";
+import { FORECAST_DAYS, customerOutlookLine, forecastFor } from "@/lib/domain/weather";
 
 /** What the customer sees for each stage (they're "installation partners", never "installers"). */
 export const CUSTOMER_STATUS: Record<JobStatus, string> = {
@@ -28,9 +32,22 @@ export async function getMyReservations() {
         ),
       )
     : new Map<string, string>();
+  const today = todayInMarket();
+  /** Once the install is within ten days and still to come: the day's forecast, in plain words. */
+  const forecastLine = async (j: (typeof jobs)[number]) => {
+    const { lat, lng } = j.address;
+    if (!j.installDate || typeof lat !== "number" || typeof lng !== "number" || j.status === "completed" || j.status === "cancelled")
+      return null;
+    const away = daysUntil(j.installDate, today);
+    if (away < 0 || away >= FORECAST_DAYS) return null;
+    const f = forecastFor(await dailyForecast(lat, lng), j.installDate);
+    return f ? customerOutlookLine(f) : null;
+  };
+  const forecasts = await Promise.all(jobs.map(forecastLine));
   return {
     email: session.email,
-    reservations: jobs.map((j) => ({
+    reservations: jobs.map((j, i) => ({
+      forecast: forecasts[i],
       reference: j.reference,
       packageName: j.packageName,
       installDate: j.installDate,
