@@ -250,7 +250,7 @@ export function useSystem() {
   }, [
     state.profile,
     state.address,
-    state.roof?.data,
+    state.roof,
     state.bill,
     state.tier,
     state.config,
