@@ -79,8 +79,8 @@ export async function roofLookup(lat: number, lng: number): Promise<{ data: Roof
     });
     if (res.status === 404) continue;
     if (!res.ok) {
-      const text = (await res.text()).slice(0, 300);
-      console.error(`Solar API ${res.status}: ${text}`);
+      const text = await res.text();
+      console.error(`Solar API ${res.status}: ${text.slice(0, 300)}`);
       return { data: null, reason: `google-${res.status}: ${googleMessage(text)}` };
     }
     const json = await res.json();
@@ -97,8 +97,12 @@ export async function roofLookup(lat: number, lng: number): Promise<{ data: Roof
 function googleMessage(text: string) {
   try {
     const m = (JSON.parse(text) as { error?: { message?: string } }).error?.message ?? "";
-    return m.replace(/key=[^&\s]+/gi, "key=…").slice(0, 160);
+    return m.replace(/key=[^&\s]+/gi, "key=…").slice(0, 200) || "no message";
   } catch {
-    return "unexpected reply";
+    return `unexpected reply: ${text
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 120)}`;
   }
 }

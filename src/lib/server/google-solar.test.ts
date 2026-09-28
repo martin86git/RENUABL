@@ -45,7 +45,14 @@ describe("roofLookup", () => {
   });
 
   it("reports Google refusing, without echoing the key", async () => {
-    stub([() => Response.json({ error: { message: "Solar API has not been used in project 123 (key=test-key)" } }, { status: 403 })]);
+    // Google's real errors carry long "details"; the message must survive them.
+    const details = Array.from({ length: 10 }, (_, i) => ({
+      reason: `DETAIL_${i}`,
+      metadata: { consumer: "projects/123", service: "solar" },
+    }));
+    stub([
+      () => Response.json({ error: { message: "Solar API has not been used in project 123 (key=test-key)", details } }, { status: 403 }),
+    ]);
     const r = await roofLookup(-37.8, lng);
     expect(r.reason).toMatch(/^google-403: Solar API has not been used/);
     expect(r.reason).not.toContain("test-key");
