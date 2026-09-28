@@ -1,15 +1,17 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
+import { Loader2, RotateCcw, ScanSearch } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/primitives";
+import { House3d } from "@/components/ui/house-3d";
 import { RoofDesigner } from "@/components/ui/roof-designer";
 import { PANEL } from "@/lib/domain/catalogue";
 import { assumedArrays } from "@/lib/domain/costing";
-import { autoLayout, layoutArrays, layoutYearlyKwh, toggleSlot } from "@/lib/domain/roof-layout";
+import { blockedSlots, type ObstructionCheck } from "@/lib/domain/obstructions";
+import { autoLayout, designView, layoutArrays, layoutYearlyKwh, toggleSlot } from "@/lib/domain/roof-layout";
 import type { JobDesign } from "@/lib/services/installer";
-import { saveLayout } from "@/lib/services/accounts";
+import { checkRoof, saveLayout } from "@/lib/services/accounts";
 
 /**
  * The panel layout for the job: starts from Google's roof model (sunniest spots
@@ -23,9 +25,22 @@ export function JobDesignPanel({ recordKey, design, panelCount }: { recordKey: s
   const [savedSlots, setSavedSlots] = useState<number[] | null>(design.saved);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [check, setCheck] = useState<ObstructionCheck | null>(design.obstructions);
+  const [checking, setChecking] = useState(false);
+  const blocked = check ? blockedSlots(design.model, designView(design.centre), check.items) : [];
+  const inTheWay = selected.filter((i) => blocked.includes(i));
   const arrays = layoutArrays(design.model, selected);
   const kw = Math.round(selected.length * PANEL.watts) / 1000;
   const dirty = JSON.stringify(selected) !== JSON.stringify(savedSlots ?? auto);
+
+  async function runCheck() {
+    setChecking(true);
+    setProblem(null);
+    const r = await checkRoof(recordKey);
+    setChecking(false);
+    if (r.ok) setCheck(r.check);
+    else setProblem(r.message);
+  }
 
   async function save() {
     setBusy(true);
@@ -46,7 +61,28 @@ export function JobDesignPanel({ recordKey, design, panelCount }: { recordKey: s
         selected={selected}
         editable
         onToggle={(i) => setSelected((s) => toggleSlot(s, i))}
+        obstructions={check?.items}
+        flagged={blocked}
       />
+      {check && (
+        <div className="mt-3 rounded-xl border border-line p-3 text-[13.5px]">
+          <p className="text-ink-2">
+            <span className="font-medium text-ink">Roof check:</span> {check.summary || "Done."}{" "}
+            {check.items.length ? `Found ${check.items.map((o) => o.note || o.type).join("; ")}.` : "Nothing in the way was found."}
+          </p>
+          {inTheWay.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <span className="text-warning">
+                {inTheWay.length} panel{inTheWay.length > 1 ? "s" : ""} (outlined amber) sit on or next to something.
+              </span>
+              <Button size="sm" variant="secondary" onClick={() => setSelected((s) => s.filter((i) => !blocked.includes(i)))}>
+                Remove them
+              </Button>
+            </div>
+          )}
+          <p className="mt-1.5 text-[12px] text-muted">From the satellite image: a helper, not a site inspection. Confirm on the roof.</p>
+        </div>
+      )}
       <p className="mt-2 text-[12.5px] text-muted">
         Tap a panel to remove it, or a dashed spot to add one. Spots come from Google&apos;s roof model; check setbacks, vents and shading
         on site.
@@ -95,9 +131,18 @@ export function JobDesignPanel({ recordKey, design, panelCount }: { recordKey: s
         <Button size="sm" onClick={() => void save()} disabled={busy || !dirty}>
           {savedSlots && !dirty ? "Saved" : "Save layout"}
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => setSelected(auto)} disabled={busy}>
+        <Button size="sm" variant="secondary" onClick={() => setSelected(auto.filter((i) => !blocked.includes(i)))} disabled={busy}>
           <RotateCcw className="h-4 w-4" /> Auto-layout
         </Button>
+        {design.canCheck && (
+          <Button size="sm" variant="secondary" onClick={() => void runCheck()} disabled={checking}>
+            {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}{" "}
+            {check ? "Check again" : "Check for obstructions"}
+          </Button>
+        )}
+      </div>
+      <div className="mt-4">
+        <House3d at={design.centre} label="3D view of the house" />
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Card, Eyebrow } from "@/components/ui/primitives";
+import { House3d } from "@/components/ui/house-3d";
 import { RoofDesigner } from "@/components/ui/roof-designer";
 import { getMyLayout } from "@/lib/services/my-account";
 
@@ -32,6 +33,9 @@ export default async function MyLayoutPage({ searchParams }: PageProps<"/my/layo
               ? "This is your installation partner's layout."
               : "A first layout from Google's satellite roof data. Your installation partner confirms it before the install."}
           </p>
+          <div className="px-3 pb-3">
+            <House3d at={layout.centre} label="See your home in 3D" />
+          </div>
         </Card>
       ) : (
         <Card className="p-6">

@@ -1,3 +1,5 @@
+import type { ObstructionCheck } from "@/lib/domain/obstructions";
+
 /** Sign-in for customers and partners: a one-time link sent by email. */
 export async function requestLoginLink(
   email: string,
@@ -58,6 +60,19 @@ export async function saveJobStage(jobId: string, status: "scheduled" | "in-prog
     return ((await res.json()) as { ok: boolean }).ok;
   } catch {
     return false;
+  }
+}
+
+/** Runs the roof obstruction check on the job's satellite image. */
+export async function checkRoof(recordKey: string): Promise<{ ok: true; check: ObstructionCheck } | { ok: false; message: string }> {
+  try {
+    const res = await fetch(`/api/jobs/${recordKey}/obstructions`, { method: "POST" });
+    const json = (await res.json()) as { ok: boolean; check?: ObstructionCheck; message?: string };
+    return json.ok && json.check
+      ? { ok: true, check: json.check }
+      : { ok: false, message: json.message ?? "The roof check didn't work. Try again." };
+  } catch {
+    return { ok: false, message: "We couldn't reach RENUABL. Check your connection and try again." };
   }
 }
 

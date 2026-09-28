@@ -63,6 +63,7 @@ create table if not exists jobs (
   created_at timestamptz not null default now()
 );
 alter table jobs add column if not exists layout jsonb;
+alter table jobs add column if not exists obstructions jsonb;
 create index if not exists jobs_partner on jobs(partner_id);
 create index if not exists jobs_customer on jobs(customer_email);
 create table if not exists offers (

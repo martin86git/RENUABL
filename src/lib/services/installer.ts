@@ -15,7 +15,8 @@ import type { Crew, Installer, Job, JobStage } from "@/lib/domain/types";
 import type { Variation } from "@/lib/domain/variations";
 import { CREWS, CURRENT_INSTALLER_ID, CURRENT_USER, INSTALLERS } from "@/lib/mock/installers";
 import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs } from "@/lib/mock/jobs";
-import { jobAddressForPartner, jobsForPartner } from "@/lib/server/jobs-repo";
+import { jobAddressForPartner, jobsForPartner, obstructionsFor } from "@/lib/server/jobs-repo";
+import type { ObstructionCheck } from "@/lib/domain/obstructions";
 import { roofData, roofInsights } from "@/lib/server/google-solar";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { dailyForecast } from "@/lib/server/google-weather";
@@ -101,6 +102,10 @@ export interface JobDesign {
   imageSrc: string;
   /** The saved layout's panel spots, or null (not saved yet: start from the auto-layout). */
   saved: number[] | null;
+  /** The last roof obstruction check, if one was run. */
+  obstructions: ObstructionCheck | null;
+  /** The roof check can run (ANTHROPIC_API_KEY is set). */
+  canCheck: boolean;
 }
 
 /**
@@ -120,6 +125,8 @@ export async function getJobDesign(job: Job): Promise<JobDesign | null> {
     centre: { lat: address.lat, lng: address.lng },
     imageSrc: `/api/jobs/${job.recordKey}/roof?size=design`,
     saved: job.layout?.slots ?? null,
+    obstructions: ((await obstructionsFor(job.recordKey).catch(() => null)) as ObstructionCheck | null) ?? null,
+    canCheck: Boolean(process.env.ANTHROPIC_API_KEY?.trim()),
   };
 }
 

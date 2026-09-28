@@ -248,3 +248,19 @@ export async function jobLayoutByRecord(
   const r = rows[0];
   return r ? { layout: r.layout ?? null, address: r.address, panelCount: r.system.panelCount } : null;
 }
+
+/** Saves the roof obstruction check on the partner's own job. */
+export async function saveObstructions(partnerId: string, recordKey: string, check: unknown): Promise<boolean> {
+  const rows = await query(`update jobs set obstructions = $3 where record_key = $1 and partner_id = $2 returning id`, [
+    recordKey,
+    partnerId,
+    JSON.stringify(check),
+  ]);
+  return rows.length > 0;
+}
+
+export async function obstructionsFor(recordKey: string): Promise<unknown> {
+  return (
+    (await query<{ obstructions: unknown }>(`select obstructions from jobs where record_key = $1`, [recordKey]))[0]?.obstructions ?? null
+  );
+}
