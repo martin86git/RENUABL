@@ -316,12 +316,24 @@ export async function fetchRoofInsights(
   }
 }
 
-/** Google Solar's own photo of the roof: its grid, for placing panels on it (null: use the satellite view). */
-export async function fetchRoofPhotoFrame(lat: number, lng: number): Promise<GeoFrame | null> {
+/**
+ * Google Solar's own photo of the roof: its grid, for placing panels on it, and
+ * where to draw the sharper satellite photo so it lines up (null: no clear match).
+ * Null altogether when there's no Google Solar photo: use the satellite view as it is.
+ */
+export async function fetchRoofPhotoFrame(
+  lat: number,
+  lng: number,
+): Promise<{ frame: GeoFrame; shift: { x: number; y: number } | null } | null> {
   try {
     const res = await fetch(`/api/roof/photo?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&frame=1`);
     if (!res.ok) return null;
-    return cleanGeoFrame(((await res.json()) as { frame?: unknown }).frame);
+    const json = (await res.json()) as { frame?: unknown; shift?: { x?: unknown; y?: unknown } | null };
+    const frame = cleanGeoFrame(json.frame);
+    if (!frame) return null;
+    const { x, y } = json.shift ?? {};
+    const ok = typeof x === "number" && typeof y === "number" && Math.abs(x) <= 200 && Math.abs(y) <= 200;
+    return { frame, shift: ok ? { x, y } : null };
   } catch {
     return null;
   }

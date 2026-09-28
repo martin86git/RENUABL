@@ -107,6 +107,24 @@ describe("roof model", () => {
     expect(autoLayout(m, 99)).toHaveLength(12);
   });
 
+  it("auto-layout fills a face as a compact block, not the scattered sunniest spots", () => {
+    // A 3 × 6 grid on one face (0.00002° apart); sunshine varies a little and at random, all within 10%.
+    const kwh = [590, 600, 571, 598, 580, 596, 575, 593, 588, 579, 599, 585, 592, 572, 597, 583, 595, 577];
+    const slots = kwh.map((k, i) => ({
+      lat: -37.8 - Math.floor(i / 6) * 0.00002,
+      lng: 145 + (i % 6) * 0.00002,
+      orientation: "PORTRAIT" as const,
+      segment: 0,
+      kwh: k,
+    }));
+    const m = { panel: { heightM: 1.879, widthM: 1.045, watts: 400 }, faces: [{ azimuth: 0, pitch: 20 }], slots };
+    const pick = autoLayout(m, 6);
+    const rows = new Set(pick.map((i) => Math.floor(i / 6)));
+    const cols = pick.map((i) => i % 6);
+    // Six panels filling a 2 × 3 or 3 × 2 rectangle: a block, no gaps or steps.
+    expect(rows.size * (Math.max(...cols) - Math.min(...cols) + 1)).toBe(6);
+  });
+
   it("checks saved layouts and toggles spots", () => {
     expect(cleanLayout([2, 0, 0, 9, -1, 1.5, "x"], 3)).toEqual([0, 2]);
     expect(cleanLayout("nope", 3)).toBeNull();

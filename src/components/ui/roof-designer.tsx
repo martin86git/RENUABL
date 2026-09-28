@@ -2,24 +2,36 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { boxOnFrame, boxPixels, type Obstruction } from "@/lib/domain/obstructions";
-import { designView, frameSize, framing, metresPerPixel, panelOutline, type GeoFrame, type RoofModel } from "@/lib/domain/roof-layout";
+import { designView, frameSize, framing, metresPerPixel, panelOutline, type RoofModel } from "@/lib/domain/roof-layout";
 import { fetchRoofPhotoFrame, roofPhotoSrc } from "@/lib/services/consumer";
 
-/** Google Solar's own photo of the roof, when there is one (it lines up with the panel spots exactly). */
+/** An obstruction box found on the satellite photo, moved with it. */
+function shifted(b: { x0: number; y0: number; x1: number; y1: number }, by: { x: number; y: number } | null) {
+  return by ? { x0: b.x0 + by.x, y0: b.y0 + by.y, x1: b.x1 + by.x, y1: b.y1 + by.y } : b;
+}
+
+type PhotoInfo = Awaited<ReturnType<typeof fetchRoofPhotoFrame>>;
+
+/**
+ * How to show the roof: the sharp satellite photo moved into line with Google
+ * Solar's (when they match clearly), else Google Solar's own photo (it lines up
+ * with the panel spots exactly), else the satellite photo as it is.
+ */
 function useRoofPhoto(centre: { lat: number; lng: number }) {
   const key = `${centre.lat},${centre.lng}`;
-  const [got, setGot] = useState<{ key: string; frame: GeoFrame | null } | null>(null);
+  const [got, setGot] = useState<{ key: string; info: PhotoInfo } | null>(null);
   useEffect(() => {
     let cancelled = false;
-    void fetchRoofPhotoFrame(centre.lat, centre.lng).then((frame) => {
-      if (!cancelled) setGot({ key, frame });
+    void fetchRoofPhotoFrame(centre.lat, centre.lng).then((info) => {
+      if (!cancelled) setGot({ key, info });
     });
     return () => {
       cancelled = true;
     };
   }, [key, centre.lat, centre.lng]);
   const loading = !got || got.key !== key;
-  return { loading, frame: loading ? null : got.frame };
+  const info = loading ? null : got.info;
+  return { loading, shift: info?.shift ?? null, frame: info && !info.shift ? info.frame : null };
 }
 
 /**
@@ -83,8 +95,8 @@ export function RoofDesigner({
         {!imageFailed && (
           <image
             href={photo.frame ? roofPhotoSrc(centre.lat, centre.lng) : imageSrc}
-            x={0}
-            y={0}
+            x={photo.shift?.x ?? 0}
+            y={photo.shift?.y ?? 0}
             width={size.w}
             height={size.h}
             preserveAspectRatio="none"
@@ -123,7 +135,7 @@ export function RoofDesigner({
           ) : null,
         )}
         {obstructions.map((o, i) => {
-          const b = photo.frame ? boxOnFrame(o, satellite, photo.frame) : boxPixels(o, satellite);
+          const b = photo.frame ? boxOnFrame(o, satellite, photo.frame) : shifted(boxPixels(o, satellite), photo.shift);
           return (
             <g key={`o${i}`} pointerEvents="none">
               <rect

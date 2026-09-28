@@ -216,6 +216,7 @@ export const MIN_ARRAY_PANELS = 4;
  * for two, or three above 18 panels), each face filled with its sunniest spots. A face
  * that can take every remaining panel wins when it's within 5% of the sunniest
  * option; faces too small for a proper group are used only when nothing else fits.
+ * On each face the panels form a compact block (`compactBlock`).
  */
 export function autoLayout(model: RoofModel, panelCount: number): number[] {
   const want = Math.max(0, Math.min(Math.round(panelCount), model.slots.length));
@@ -227,7 +228,7 @@ export function autoLayout(model: RoofModel, panelCount: number): number[] {
   while (chosen.length < want && faces.size) {
     const remaining = want - chosen.length;
     const options = [...faces.entries()].map(([segment, spots]) => {
-      const take = spots.slice(0, remaining);
+      const take = compactBlock(model, spots, remaining);
       return { segment, take, score: take.reduce((t, i) => t + model.slots[i].kwh, 0) / take.length };
     });
     const proper = options.filter((o) => o.take.length >= Math.min(remaining, MIN_ARRAY_PANELS));
@@ -239,6 +240,81 @@ export function autoLayout(model: RoofModel, panelCount: number): number[] {
     faces.delete(pick.segment);
   }
   return chosen.sort((a, b) => a - b);
+}
+
+/** Each spot's row and column on its face's grid (Google lays spots out along the face's direction). */
+function faceGrid(model: RoofModel, spots: number[]) {
+  const first = model.slots[spots[0]];
+  const face = model.faces[first.segment] ?? { azimuth: 0, pitch: 0 };
+  const portrait = spots.filter((i) => model.slots[i].orientation === "PORTRAIT").length * 2 >= spots.length;
+  const along = portrait ? model.panel.heightM : model.panel.widthM;
+  const across = portrait ? model.panel.widthM : model.panel.heightM;
+  const downStep = along * Math.cos((face.pitch * Math.PI) / 180);
+  const t = (face.azimuth * Math.PI) / 180;
+  const mLat = 111_132.954 - 559.822 * Math.cos((2 * first.lat * Math.PI) / 180);
+  const mLng = 111_412.84 * Math.cos((first.lat * Math.PI) / 180);
+  const cells = new Map<number, { r: number; c: number }>();
+  for (const i of spots) {
+    const e = (model.slots[i].lng - first.lng) * mLng;
+    const n = (model.slots[i].lat - first.lat) * mLat;
+    const down = e * Math.sin(t) + n * Math.cos(t);
+    const side = e * Math.cos(t) - n * Math.sin(t);
+    cells.set(i, { r: Math.round(down / downStep), c: Math.round(side / across) });
+  }
+  return { cells, downStep, across };
+}
+
+/**
+ * A tidy block of `n` spots on one face: the rectangle of rows and columns
+ * that wastes the fewest spots and is closest to square on the ground, among
+ * spots within 10% of the face's best sunshine (then the sunniest). Rows are
+ * filled in turn, the last one centred, so there are no steps or stray panels.
+ * `spots` are the face's spots, best first.
+ */
+function compactBlock(model: RoofModel, spots: number[], n: number): number[] {
+  if (spots.length <= n) return spots;
+  const best = model.slots[spots[0]].kwh;
+  const good = spots.filter((i) => model.slots[i].kwh >= best * 0.9);
+  const pool = good.length >= n ? good : spots;
+  const { cells, downStep, across } = faceGrid(model, spots);
+  const at = new Map<string, number>();
+  for (const i of pool) at.set(`${cells.get(i)!.r},${cells.get(i)!.c}`, i);
+  const rs = pool.map((i) => cells.get(i)!.r);
+  const cs = pool.map((i) => cells.get(i)!.c);
+  const [r0, r1, c0, c1] = [Math.min(...rs), Math.max(...rs), Math.min(...cs), Math.max(...cs)];
+
+  let pick: { take: number[]; cost: number; kwh: number } | null = null;
+  for (let w = 1; w <= c1 - c0 + 1; w++) {
+    const h = Math.ceil(n / w);
+    if (h > r1 - r0 + 1) continue;
+    const shape = Math.abs(Math.log((w * across) / (h * downStep)));
+    for (let top = r0; top + h - 1 <= r1; top++) {
+      for (let left = c0; left + w - 1 <= c1; left++) {
+        const rows: number[][] = [];
+        for (let r = top; r < top + h; r++) {
+          const row: number[] = [];
+          for (let c = left; c < left + w; c++) {
+            const i = at.get(`${r},${c}`);
+            if (i !== undefined) row.push(i);
+          }
+          rows.push(row);
+        }
+        const found = rows.reduce((t, r) => t + r.length, 0);
+        if (found < n) continue;
+        const take: number[] = [];
+        for (const row of rows) {
+          const need = n - take.length;
+          if (need <= 0) break;
+          const mid = left + (w - 1) / 2;
+          take.push(...[...row].sort((a, b) => Math.abs(cells.get(a)!.c - mid) - Math.abs(cells.get(b)!.c - mid)).slice(0, need));
+        }
+        const cost = (h * w - n) / n + shape;
+        const kwh = take.reduce((t, i) => t + model.slots[i].kwh, 0);
+        if (!pick || cost < pick.cost - 1e-9 || (Math.abs(cost - pick.cost) < 1e-9 && kwh > pick.kwh)) pick = { take, cost, kwh };
+      }
+    }
+  }
+  return pick?.take ?? pool.slice(0, n);
 }
 
 /** Arrays in a layout: one per roof face used. */
