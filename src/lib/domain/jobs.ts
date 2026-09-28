@@ -118,6 +118,7 @@ export interface StoredJob {
   installDate: ISODate | null;
   status: JobStatus;
   createdAt: string;
+  layout?: Job["layout"] | null;
 }
 
 /**
@@ -157,5 +158,6 @@ export function portalJob(j: StoredJob, offer?: { id: string; expiresAt: string 
     activity: [{ id: "a1", at: j.createdAt, label: "Reserved by the customer" }],
     statusHistory: [],
     ...(offer ? { offer } : {}),
+    ...(j.layout && !offered ? { layout: j.layout } : {}),
   };
 }

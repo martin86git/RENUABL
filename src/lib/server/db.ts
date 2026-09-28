@@ -62,6 +62,7 @@ create table if not exists jobs (
   partner_id text references partners(id),
   created_at timestamptz not null default now()
 );
+alter table jobs add column if not exists layout jsonb;
 create index if not exists jobs_partner on jobs(partner_id);
 create index if not exists jobs_customer on jobs(customer_email);
 create table if not exists offers (

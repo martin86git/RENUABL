@@ -18,11 +18,12 @@ interface JobRow {
   status: JobStatus;
   partner_id: string | null;
   created_at: Date | string;
+  layout: StoredJob["layout"];
 }
 
 const cols = (t = "jobs") =>
   `${t}.id, ${t}.reference, ${t}.record_key, ${t}.customer, ${t}.customer_email, ${t}.address, ${t}.system, ${t}.site, ${t}.package_name,
-  ${t}.value, ${t}.solar_victoria, to_char(${t}.install_date, 'YYYY-MM-DD') as install_date, ${t}.status, ${t}.partner_id, ${t}.created_at`;
+  ${t}.value, ${t}.solar_victoria, to_char(${t}.install_date, 'YYYY-MM-DD') as install_date, ${t}.status, ${t}.partner_id, ${t}.created_at, ${t}.layout`;
 const COLUMNS = cols();
 
 export interface JobWithPartner extends StoredJob {
@@ -47,6 +48,7 @@ function toJob(r: JobRow): JobWithPartner {
     status: r.status,
     partnerId: r.partner_id,
     createdAt: new Date(r.created_at).toISOString(),
+    layout: r.layout ?? null,
   };
 }
 
@@ -223,4 +225,26 @@ export async function jobAddressForPartner(partnerId: string, jobId: string): Pr
     [jobId, partnerId],
   );
   return rows[0]?.address ?? null;
+}
+
+/** Saves the partner's panel layout on their own job. False if it isn't theirs. */
+export async function saveJobLayout(partnerId: string, recordKey: string, layout: { slots: number[]; arrays: number }): Promise<boolean> {
+  const rows = await query(`update jobs set layout = $3 where record_key = $1 and partner_id = $2 returning id`, [
+    recordKey,
+    partnerId,
+    JSON.stringify({ ...layout, updatedAt: new Date().toISOString() }),
+  ]);
+  return rows.length > 0;
+}
+
+/** A job's saved layout and home, by its private record key (callers check who may see it). */
+export async function jobLayoutByRecord(
+  recordKey: string,
+): Promise<{ layout: StoredJob["layout"]; address: StoredJob["address"]; panelCount: number } | null> {
+  const rows = await query<{ layout: StoredJob["layout"]; address: StoredJob["address"]; system: StoredJob["system"] }>(
+    `select layout, address, system from jobs where record_key = $1`,
+    [recordKey],
+  );
+  const r = rows[0];
+  return r ? { layout: r.layout ?? null, address: r.address, panelCount: r.system.panelCount } : null;
 }

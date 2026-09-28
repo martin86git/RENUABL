@@ -16,7 +16,8 @@ import type { Variation } from "@/lib/domain/variations";
 import { CREWS, CURRENT_INSTALLER_ID, CURRENT_USER, INSTALLERS } from "@/lib/mock/installers";
 import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs } from "@/lib/mock/jobs";
 import { jobAddressForPartner, jobsForPartner } from "@/lib/server/jobs-repo";
-import { roofInsights } from "@/lib/server/google-solar";
+import { roofData, roofInsights } from "@/lib/server/google-solar";
+import type { RoofModel } from "@/lib/domain/roof-layout";
 import { dailyForecast } from "@/lib/server/google-weather";
 import type { RoofInsights } from "@/lib/domain/solar-roof";
 import { FORECAST_DAYS, forecastFor, installOutlook, type DayForecast, type Outlook } from "@/lib/domain/weather";
@@ -92,6 +93,34 @@ export async function getJobConditions(job: Job, now = new Date()): Promise<JobC
   ]);
   const forecast = forecastFor(days, job.preferredDate);
   return { roof, forecast, outlook: forecast ? installOutlook(forecast) : null, daysAway };
+}
+
+export interface JobDesign {
+  model: RoofModel;
+  centre: { lat: number; lng: number };
+  imageSrc: string;
+  /** The saved layout's panel spots, or null (not saved yet: start from the auto-layout). */
+  saved: number[] | null;
+}
+
+/**
+ * The panel layout for the partner's own accepted job: Google's roof model, the
+ * satellite image and any saved layout. Null for offers, the sample portal, or
+ * homes Google has no roof model for.
+ */
+export async function getJobDesign(job: Job): Promise<JobDesign | null> {
+  const ctx = await requirePortal();
+  if (ctx.kind !== "partner" || job.offer || !process.env.GOOGLE_MAPS_API_KEY?.trim()) return null;
+  const address = await jobAddressForPartner(ctx.partner.id, job.id).catch(() => null);
+  if (typeof address?.lat !== "number" || typeof address.lng !== "number") return null;
+  const data = await roofData(address.lat, address.lng).catch(() => null);
+  if (!data?.model) return null;
+  return {
+    model: data.model,
+    centre: { lat: address.lat, lng: address.lng },
+    imageSrc: `/api/jobs/${job.recordKey}/roof?size=design`,
+    saved: job.layout?.slots ?? null,
+  };
 }
 
 export async function listTodaysJobs(now = new Date()): Promise<Job[]> {

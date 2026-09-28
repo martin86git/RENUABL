@@ -298,6 +298,8 @@ export interface Job {
   messages: JobMessage[];
   activity: JobActivity[];
   statusHistory: StatusEvent[];
+  /** The partner's saved panel layout (from the Design section). */
+  layout?: { slots: number[]; arrays: number; updatedAt: string };
   /** An open offer to this partner: accept or decline before it expires. */
   offer?: { id: string; expiresAt: string };
 }

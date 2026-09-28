@@ -21,6 +21,7 @@ import {
   type ReservationResult,
 } from "@/lib/services/consumer";
 import { usableRoofSunHours, type RoofInsights } from "@/lib/domain/solar-roof";
+import type { RoofModel } from "@/lib/domain/roof-layout";
 
 /**
  * Client state for the guided purchase flow. Business rules live in
@@ -58,7 +59,7 @@ export interface FlowState {
   /** NASA POWER sunshine for the home's coordinates. */
   sunshine: Sunshine | null;
   /** Google Solar API roof data for the home's coordinates (data null: Google has none). */
-  roof: { lat: number; lng: number; data: RoofInsights | null } | null;
+  roof: { lat: number; lng: number; data: RoofInsights | null; model?: RoofModel | null } | null;
   /** Solar Victoria (VIC homes only): the customer's choices at checkout. */
   solarVic: { rebate: boolean; loan: boolean };
   /** The customer booked their 15-minute confirmation call via HubSpot. */
@@ -188,13 +189,18 @@ export function FlowProvider({ children }: { children: ReactNode }) {
 
   // Google's roof data for the home, once per address (every lookup is charged).
   const roofDone = Boolean(
-    state.roof && lat !== undefined && lng !== undefined && Math.abs(state.roof.lat - lat) < 1e-5 && Math.abs(state.roof.lng - lng) < 1e-5,
+    state.roof &&
+    state.roof.model !== undefined &&
+    lat !== undefined &&
+    lng !== undefined &&
+    Math.abs(state.roof.lat - lat) < 1e-5 &&
+    Math.abs(state.roof.lng - lng) < 1e-5,
   );
   useEffect(() => {
     if (!hydrated || lat === undefined || lng === undefined || roofDone) return;
     let cancelled = false;
-    void fetchRoofInsights(lat, lng).then((data) => {
-      if (!cancelled) setState((s) => ({ ...s, roof: { lat, lng, data } }));
+    void fetchRoofInsights(lat, lng).then((r) => {
+      if (!cancelled) setState((s) => ({ ...s, roof: { lat, lng, data: r?.insights ?? null, model: r?.model ?? null } }));
     });
     return () => {
       cancelled = true;

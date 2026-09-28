@@ -60,3 +60,17 @@ export async function saveJobStage(jobId: string, status: "scheduled" | "in-prog
     return false;
   }
 }
+
+/** The job's partner saves its panel layout. */
+export async function saveLayout(recordKey: string, slots: number[]): Promise<{ ok: boolean; arrays?: number; message?: string }> {
+  try {
+    const res = await fetch(`/api/jobs/${recordKey}/layout`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ slots }),
+    });
+    return (await res.json()) as { ok: boolean; arrays?: number; message?: string };
+  } catch {
+    return { ok: false, message: "That didn't save. Check your connection and try again." };
+  }
+}

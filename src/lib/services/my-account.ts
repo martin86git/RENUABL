@@ -3,6 +3,8 @@ import type { JobStatus } from "@/lib/domain/jobs";
 import { currentSession } from "@/lib/server/accounts";
 import { dbConfigured, query } from "@/lib/server/db";
 import { jobsForCustomer } from "@/lib/server/jobs-repo";
+import { roofData } from "@/lib/server/google-solar";
+import { autoLayout, type RoofModel } from "@/lib/domain/roof-layout";
 import { dailyForecast } from "@/lib/server/google-weather";
 import { daysUntil } from "@/lib/domain/compliance";
 import { todayInMarket } from "@/lib/domain/market";
@@ -77,5 +79,36 @@ export async function getTomorrowSolar() {
   return {
     ...solarDayOutlook(f, { battery: installed.system.batteryKwh > 0, ev: installed.system.evCharger }),
     maxC: f.maxC,
+  };
+}
+
+/**
+ * The signed-in customer's panel layout for one of their homes: the partner's
+ * saved layout, or the first auto-layout. Null if it isn't theirs or there's
+ * no roof model.
+ */
+export async function getMyLayout(recordKey: string): Promise<{
+  model: RoofModel;
+  centre: { lat: number; lng: number };
+  selected: number[];
+  confirmed: boolean;
+  reference: string;
+  panelCount: number;
+} | null> {
+  if (!dbConfigured() || !/^[a-z0-9]{16,64}$/.test(recordKey)) return null;
+  const session = await currentSession();
+  if (session?.role !== "customer") return null;
+  const job = (await jobsForCustomer(session.email)).find((j) => j.recordKey === recordKey);
+  const { lat, lng } = job?.address ?? {};
+  if (!job || typeof lat !== "number" || typeof lng !== "number") return null;
+  const model = (await roofData(lat, lng))?.model;
+  if (!model) return null;
+  return {
+    model,
+    centre: { lat, lng },
+    selected: job.layout?.slots ?? autoLayout(model, job.system.panelCount),
+    confirmed: Boolean(job.layout),
+    reference: job.reference,
+    panelCount: job.system.panelCount,
   };
 }

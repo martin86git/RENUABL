@@ -30,12 +30,20 @@ export async function MyReservations() {
               </span>
               {r.forecast && <span className="mt-1 block text-[13px] text-ink-2">Install-day forecast: {r.forecast}</span>}
             </span>
-            <Link
-              href={`/my/installation?record=${r.recordKey}`}
-              className="flex items-center gap-1.5 text-[14px] text-ink underline underline-offset-4"
-            >
-              Installation record <ArrowRight className="h-4 w-4" />
-            </Link>
+            <span className="flex flex-wrap gap-x-4 gap-y-1">
+              <Link
+                href={`/my/layout?record=${r.recordKey}`}
+                className="flex items-center gap-1.5 text-[14px] text-ink underline underline-offset-4"
+              >
+                Panel layout <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href={`/my/installation?record=${r.recordKey}`}
+                className="flex items-center gap-1.5 text-[14px] text-ink underline underline-offset-4"
+              >
+                Installation record <ArrowRight className="h-4 w-4" />
+              </Link>
+            </span>
           </li>
         ))}
       </ul>

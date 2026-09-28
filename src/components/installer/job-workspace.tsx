@@ -28,7 +28,8 @@ import { JobDocuments } from "@/components/installer/job-documents";
 import { JobMaterials } from "@/components/installer/materials";
 import { OfferActions } from "@/components/installer/offer-actions";
 import { JobConditionsPanel } from "@/components/installer/job-conditions";
-import type { JobConditions } from "@/lib/services/installer";
+import type { JobConditions, JobDesign } from "@/lib/services/installer";
+import { JobDesignPanel } from "@/components/installer/job-design";
 import { saveJobStage } from "@/lib/services/accounts";
 import { JobConnection } from "@/components/installer/job-connection";
 import { JobVariations, type PartnerTerms } from "@/components/installer/job-variations";
@@ -154,6 +155,7 @@ export function JobWorkspace({
   partner,
   live = false,
   conditions = null,
+  design = null,
 }: {
   job: Job;
   crews: Crew[];
@@ -163,6 +165,8 @@ export function JobWorkspace({
   live?: boolean;
   /** Roof (Google Solar) and install-day weather (Google Weather), for real jobs. */
   conditions?: JobConditions | null;
+  /** Panel layout on the roof (Google's roof model), for the partner's own accepted jobs. */
+  design?: JobDesign | null;
 }) {
   const field = useFieldStatus(job.id, job.statusHistory);
   const [checklist, setChecklist] = useState(job.checklist);
@@ -352,6 +356,15 @@ export function JobWorkspace({
                   },
                 ]
               : []),
+            ...(design
+              ? [
+                  {
+                    id: "design",
+                    title: `Panel layout${job.layout ? " · saved" : ""}`,
+                    body: <JobDesignPanel recordKey={job.recordKey} design={design} panelCount={job.system.panelCount} />,
+                  },
+                ]
+              : []),
             {
               id: "materials",
               title: `Materials · ${materials.length} items`,
@@ -435,7 +448,19 @@ export function JobWorkspace({
           <Tabs.List className="flex gap-1 overflow-x-auto border-b border-line" aria-label="Job sections">
             {(job.offer
               ? ["Overview", "Site", "System", "Materials"]
-              : ["Overview", "Site", "System", "Materials", "Variations", "Handover", "Connection", "Documents", "Messages", "Activity"]
+              : [
+                  "Overview",
+                  "Site",
+                  "System",
+                  ...(design ? ["Design"] : []),
+                  "Materials",
+                  "Variations",
+                  "Handover",
+                  "Connection",
+                  "Documents",
+                  "Messages",
+                  "Activity",
+                ]
             ).map((t) => (
               <Tabs.Trigger
                 key={t}
@@ -547,6 +572,17 @@ export function JobWorkspace({
               </div>
             </section>
           </Tabs.Content>
+
+          {design && (
+            <Tabs.Content value="design" className="mt-6">
+              <section className="max-w-4xl rounded-2xl border border-line bg-surface p-6">
+                <h2 className="text-[17px] font-medium">Panel layout</h2>
+                <div className="mt-4">
+                  <JobDesignPanel recordKey={job.recordKey} design={design} panelCount={job.system.panelCount} />
+                </div>
+              </section>
+            </Tabs.Content>
+          )}
 
           <Tabs.Content value="materials" className="mt-6">
             <section className="max-w-2xl rounded-2xl border border-line bg-surface p-6">

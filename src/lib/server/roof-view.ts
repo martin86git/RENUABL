@@ -4,26 +4,43 @@
  */
 import { roofViewUrl, type RoofViewSize } from "@/lib/domain/roof-view";
 import type { Address } from "@/lib/domain/types";
+import { currentSession } from "./accounts";
 import { dbConfigured, query } from "./db";
 import { portalContext } from "./portal";
 
-/** The home's address, only for the signed-in partner whose job it is (not for offers or the sample portal). */
-async function ownedJobAddress(recordKey: string): Promise<Address | null> {
+/**
+ * The home's address, only for the signed-in partner whose accepted job it is,
+ * or the signed-in customer whose home it is (never for offers or the sample portal).
+ */
+export async function ownedJobAddress(recordKey: string): Promise<Address | null> {
   if (!dbConfigured()) return null;
   const ctx = await portalContext();
-  if (ctx?.kind !== "partner") return null;
-  const rows = await query<{ address: Address }>(`select address from jobs where record_key = $1 and partner_id = $2`, [
+  if (ctx?.kind === "partner") {
+    const rows = await query<{ address: Address }>(`select address from jobs where record_key = $1 and partner_id = $2`, [
+      recordKey,
+      ctx.partner.id,
+    ]);
+    if (rows[0]) return rows[0].address;
+  }
+  const session = await currentSession();
+  if (session?.role !== "customer") return null;
+  const rows = await query<{ address: Address }>(`select address from jobs where record_key = $1 and customer_email = $2`, [
     recordKey,
-    ctx.partner.id,
+    session.email,
   ]);
   return rows[0]?.address ?? null;
 }
 
 export async function roofViewFor(recordKey: string, size: RoofViewSize): Promise<Response | null> {
+  const address = await ownedJobAddress(recordKey);
+  return address ? satelliteImage(address, size) : null;
+}
+
+/** The satellite image for an address (the caller checks who may see it). */
+export async function satelliteImage(address: Address, size: RoofViewSize): Promise<Response | null> {
   const key = process.env.GOOGLE_MAPS_API_KEY?.trim();
   if (!key) return null;
-  const address = await ownedJobAddress(recordKey);
-  const url = address ? roofViewUrl(address, size, key) : null;
+  const url = roofViewUrl(address, size, key);
   if (!url) return null;
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   const type = res.headers.get("content-type") ?? "";

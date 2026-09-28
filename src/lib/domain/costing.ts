@@ -85,6 +85,8 @@ export interface CostingInput {
   addOns: string[];
   /** The matched partner's own rates (and, for retailers, product costs). Without it, RENUABL's rates are used. */
   partner?: PartnerPricing;
+  /** Arrays from a saved panel layout (otherwise assumed: 2, or 3 above 18 panels). */
+  arrays?: number;
 }
 
 /** A partner's pricing for one job. */
@@ -194,7 +196,7 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
 
   if (input.panelCount > 0) {
     const rails = railLengths(input.panelCount, input.roof);
-    const arrays = assumedArrays(input.panelCount);
+    const arrays = input.arrays && input.arrays > 0 ? input.arrays : assumedArrays(input.panelCount);
     // "Not sure" is quoted as tiles (the dearer kit). Flat roofs always get the tin kit and Kliplok
     // interfaces (most are Kliplok), plus tilt kits when tilted.
     const flat = input.roof === "flat";

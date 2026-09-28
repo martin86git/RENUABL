@@ -1,27 +1,20 @@
-import { inAustralia, roofInsights } from "@/lib/server/google-solar";
+import { inAustralia, roofData } from "@/lib/server/google-solar";
+import { allow } from "@/lib/server/rate-limit";
 
-// Each new home costs a Solar API lookup: a few per visitor per hour is plenty.
-const hits = new Map<string, { n: number; since: number }>();
-const LIMIT = 20;
-
-/** GET ?lat=&lng=: the home's roof (faces, pitch, panels that fit) from Google's Solar API. */
+/**
+ * GET ?lat=&lng=: the home's roof from Google's Solar API: its figures (faces,
+ * pitch, panels that fit) and the panel spots for drawing a layout.
+ */
 export async function GET(request: Request) {
   const u = new URL(request.url);
   const lat = Number(u.searchParams.get("lat"));
   const lng = Number(u.searchParams.get("lng"));
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || !inAustralia(lat, lng)) return Response.json({ ok: false }, { status: 400 });
-
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const h = hits.get(ip);
-  const now = Date.now();
-  if (h && now - h.since < 3_600_000) {
-    if (++h.n > LIMIT) return Response.json({ ok: false }, { status: 429 });
-  } else hits.set(ip, { n: 1, since: now });
-  if (hits.size > 5000) hits.clear();
-
+  // Each new home costs a Solar API lookup: a few per visitor per hour is plenty.
+  if (!allow(request, "roof", 20)) return Response.json({ ok: false }, { status: 429 });
   try {
-    const roof = await roofInsights(lat, lng);
-    return roof ? Response.json({ ok: true, roof }) : Response.json({ ok: false });
+    const data = await roofData(lat, lng);
+    return data ? Response.json({ ok: true, roof: data.insights, model: data.model }) : Response.json({ ok: false });
   } catch (e) {
     console.error("roof lookup failed", e instanceof Error ? e.message : e);
     return Response.json({ ok: false });

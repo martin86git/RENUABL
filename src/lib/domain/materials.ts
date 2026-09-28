@@ -62,6 +62,7 @@ export function jobMaterials(job: Job): MaterialLine[] {
     storeys: job.site.storeys,
     phase,
     addOns: [],
+    arrays: job.layout?.arrays,
   });
   const lines: MaterialLine[] = [];
   for (const l of bom) {

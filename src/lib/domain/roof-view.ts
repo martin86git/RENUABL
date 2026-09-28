@@ -5,16 +5,18 @@
  */
 import type { Address } from "./types";
 
-export type RoofViewSize = "wide" | "thumb";
+export type RoofViewSize = "wide" | "thumb" | "design";
 
 /** Pixel sizes before Google's 2x scale: a banner, and a square for lists. */
 export const ROOF_VIEW_SIZES: Record<RoofViewSize, { w: number; h: number; zoom: number }> = {
   wide: { w: 640, h: 360, zoom: 20 },
   thumb: { w: 200, h: 200, zoom: 20 },
+  /** For panel layouts: must match designView() in roof-layout.ts. */
+  design: { w: 640, h: 640, zoom: 20 },
 };
 
 export function isRoofViewSize(v: unknown): v is RoofViewSize {
-  return v === "wide" || v === "thumb";
+  return v === "wide" || v === "thumb" || v === "design";
 }
 
 export function roofViewUrl(address: Address, size: RoofViewSize, key: string): string | null {

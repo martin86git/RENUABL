@@ -2,6 +2,7 @@
  * Consumer-facing service layer. Every function here is the seam where a real
  * API replaces mock data; UI code should only talk to these functions.
  */
+import type { RoofModel } from "@/lib/domain/roof-layout";
 import type { RoofInsights } from "@/lib/domain/solar-roof";
 import { BILL_UPLOAD, isBillMediaType, type BillSummary } from "@/lib/domain/bill";
 import { buildCallAvailability, type CallDay } from "@/lib/domain/booking";
@@ -300,13 +301,18 @@ export async function fetchSunshine(lat: number, lng: number): Promise<Sunshine 
   }
 }
 
-/** The home's roof from Google's Solar API, when there's data for it. */
-export async function fetchRoofInsights(lat: number, lng: number): Promise<RoofInsights | null> {
+/** The home's roof from Google's Solar API (figures and panel spots), when there's data for it. */
+export async function fetchRoofInsights(lat: number, lng: number): Promise<{ insights: RoofInsights; model: RoofModel | null } | null> {
   try {
     const res = await fetch(`/api/roof?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
-    const json = (await res.json()) as { ok: boolean; roof?: RoofInsights };
-    return json.ok && json.roof ? json.roof : null;
+    const json = (await res.json()) as { ok: boolean; roof?: RoofInsights; model?: RoofModel | null };
+    return json.ok && json.roof ? { insights: json.roof, model: json.model ?? null } : null;
   } catch {
     return null;
   }
+}
+
+/** The satellite image under the customer's panel layout. */
+export function roofImageSrc(lat: number, lng: number) {
+  return `/api/roof/image?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`;
 }

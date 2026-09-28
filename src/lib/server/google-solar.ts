@@ -5,30 +5,37 @@
  * is one), because every lookup is charged; homes Google has no roof for are
  * remembered too.
  */
+import { parseRoofModel, type RoofModel } from "@/lib/domain/roof-layout";
 import { parseBuildingInsights, type RoofInsights } from "@/lib/domain/solar-roof";
 import { dbConfigured, query } from "./db";
 
 const KEEP_DAYS = 180;
-const memory = new Map<string, { data: RoofInsights | null; at: number }>();
+/** The roof's figures and its panel spots, from one lookup. */
+export interface RoofData {
+  insights: RoofInsights;
+  model: RoofModel | null;
+}
+
+const memory = new Map<string, { data: RoofData | null; at: number }>();
 
 export function inAustralia(lat: number, lng: number) {
   return lat >= -44 && lat <= -9 && lng >= 112 && lng <= 154;
 }
 
-const cacheKey = (lat: number, lng: number) => `${lat.toFixed(5)},${lng.toFixed(5)}`;
+const cacheKey = (lat: number, lng: number) => `v2:${lat.toFixed(5)},${lng.toFixed(5)}`;
 
-async function cached(key: string): Promise<{ data: RoofInsights | null } | null> {
+async function cached(key: string): Promise<{ data: RoofData | null } | null> {
   const m = memory.get(key);
   if (m && Date.now() - m.at < KEEP_DAYS * 86_400_000) return m;
   if (!dbConfigured()) return null;
-  const rows = await query<{ data: RoofInsights | null }>(
+  const rows = await query<{ data: RoofData | null }>(
     `select data from roof_cache where key = $1 and fetched_at > now() - ($2 || ' days')::interval`,
     [key, String(KEEP_DAYS)],
   );
   return rows[0] ?? null;
 }
 
-async function remember(key: string, data: RoofInsights | null) {
+async function remember(key: string, data: RoofData | null) {
   memory.set(key, { data, at: Date.now() });
   if (memory.size > 2000) memory.delete(memory.keys().next().value!);
   if (dbConfigured()) {
@@ -41,6 +48,11 @@ async function remember(key: string, data: RoofInsights | null) {
 
 /** The roof at these coordinates, or null (no key, outside Australia, or no roof data from Google). */
 export async function roofInsights(lat: number, lng: number): Promise<RoofInsights | null> {
+  return (await roofData(lat, lng))?.insights ?? null;
+}
+
+/** The roof's figures and panel spots (one charged lookup per home, then kept). */
+export async function roofData(lat: number, lng: number): Promise<RoofData | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
   if (!apiKey || !inAustralia(lat, lng)) return null;
   const key = cacheKey(lat, lng);
@@ -63,7 +75,9 @@ export async function roofInsights(lat: number, lng: number): Promise<RoofInsigh
     console.error(`Solar API ${res.status}: ${(await res.text()).slice(0, 200)}`);
     return null;
   }
-  const data = parseBuildingInsights(await res.json());
+  const json = await res.json();
+  const insights = parseBuildingInsights(json);
+  const data = insights ? { insights, model: parseRoofModel(json) } : null;
   await remember(key, data);
   return data;
 }
