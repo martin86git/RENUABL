@@ -4,7 +4,7 @@ import { currentSession } from "@/lib/server/accounts";
 import { dbConfigured, query } from "@/lib/server/db";
 import { jobsForCustomer } from "@/lib/server/jobs-repo";
 import { roofData } from "@/lib/server/google-solar";
-import { autoLayout, type RoofModel } from "@/lib/domain/roof-layout";
+import type { RoofModel } from "@/lib/domain/roof-layout";
 import { dailyForecast } from "@/lib/server/google-weather";
 import { daysUntil } from "@/lib/domain/compliance";
 import { todayInMarket } from "@/lib/domain/market";
@@ -106,7 +106,8 @@ export async function getMyLayout(recordKey: string): Promise<{
   return {
     model,
     centre: { lat, lng },
-    selected: job.layout?.slots ?? autoLayout(model, job.system.panelCount),
+    // Only the installation partner's own layout: an automatic one isn't shown to customers.
+    selected: job.layout?.slots ?? [],
     confirmed: Boolean(job.layout),
     reference: job.reference,
     panelCount: job.system.panelCount,

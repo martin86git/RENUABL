@@ -161,7 +161,6 @@ function SystemScreen() {
         {!existing && (
           <RoofCheck
             roof={state.roof?.data}
-            model={state.roof?.model}
             centre={state.address}
             panelCount={config.panelCount}
             reason={state.roof?.reason}
