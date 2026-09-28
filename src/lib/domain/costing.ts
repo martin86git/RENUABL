@@ -57,7 +57,8 @@ export const COSTING = {
   addOnPrices: { "smart-switchboard": 1450, "home-backup": 1850, "smart-home": 690 } as Record<string, number>,
 } as const;
 
-export type CostGroup = "solar" | "battery" | "ev-charger" | "heat-pump" | "smart-switchboard" | "home-backup" | "smart-home";
+export type CostGroup =
+  "solar" | "battery" | "ev-charger" | "heat-pump" | "reverse-cycle" | "smart-switchboard" | "home-backup" | "smart-home";
 
 export interface BomLine {
   group: CostGroup;

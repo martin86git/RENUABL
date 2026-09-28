@@ -135,6 +135,8 @@ export interface PriceBreakdown {
   deposit: number;
   /** Add-ons the customer wants to talk about on the call (no price yet, not in the total). */
   discuss: { id: AddOnId; label: string }[];
+  /** Coming-soon products the customer wants to hear about (not priced, not on the call). */
+  interested: { id: AddOnId; label: string }[];
 }
 
 export interface TierRecommendation {
@@ -148,7 +150,7 @@ export interface Recommendation {
   usage: UsageBasis;
 }
 
-export type AddOnId = "heat-pump" | "smart-switchboard" | "home-backup" | "smart-home";
+export type AddOnId = "heat-pump" | "reverse-cycle" | "smart-switchboard" | "home-backup" | "smart-home";
 
 export interface AddOn {
   id: AddOnId;
@@ -156,6 +158,8 @@ export interface AddOn {
   blurb: string;
   /** Customer price, or null while it isn't costed: it's discussed and quoted on the call instead. */
   price: number | null;
+  /** Not sold yet: the customer can ask to hear when it's available (no price, not discussed on the call). */
+  comingSoon?: boolean;
 }
 
 // ---------------------------------------------------------------------------

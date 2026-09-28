@@ -66,19 +66,28 @@ export const ASSUMPTIONS = {
 
 /**
  * Optional products offered after the system recommendation. Only costed ones
- * carry a price; the rest (heat pumps and the placeholders) are "discuss on my
- * call": no price, not in the total, passed to the call.
+ * carry a price; the rest (the placeholders) are "discuss on my call": no
+ * price, not in the total, passed to the call. Coming-soon products (home
+ * electrification) take interest only: "Let me know when it's available".
  */
 export const ADD_ONS: AddOn[] = [
-  { id: "heat-pump", name: "Heat Pump Hot Water", blurb: "Efficient, all-electric hot water.", price: null },
   { id: "smart-switchboard", name: "Smart Switchboard", blurb: "Prepare for a smarter, safer home.", price: null },
   { id: "home-backup", name: "Home Backup", blurb: "Keep essentials running during outages.", price: null },
   { id: "smart-home", name: "Smart Home Integration", blurb: "Connect and optimise your whole home.", price: null },
+  {
+    id: "reverse-cycle",
+    name: "Reverse-Cycle Heating & Cooling",
+    blurb: "All-electric heating and cooling, powered by your sun.",
+    price: null,
+    comingSoon: true,
+  },
+  { id: "heat-pump", name: "Heat Pump Hot Water", blurb: "Efficient, all-electric hot water.", price: null, comingSoon: true },
 ];
 
-/** A costed add-on the customer can buy now (the rest are discussed on the call). */
+/** A costed add-on the customer can buy now (the rest are discussed on the call, or coming soon). */
 export function isPricedAddOn(id: AddOnId) {
-  return ADD_ONS.find((a) => a.id === id)?.price != null;
+  const a = ADD_ONS.find((x) => x.id === id);
+  return a?.price != null && !a.comingSoon;
 }
 
 /** Display order is the key order: good, better, best. */
@@ -364,7 +373,11 @@ export function priceSystem(
     const addOn = ADD_ONS.find((a) => a.id === id);
     if (addOn) lines.push({ id: addOn.id, label: addOn.name, amount: price(cost(id)), removable: true });
   }
-  const discuss = ADD_ONS.filter((a) => addOns.includes(a.id) && a.price == null).map((a) => ({ id: a.id, label: a.name }));
+  const discuss = ADD_ONS.filter((a) => addOns.includes(a.id) && a.price == null && !a.comingSoon).map((a) => ({
+    id: a.id,
+    label: a.name,
+  }));
+  const interested = ADD_ONS.filter((a) => addOns.includes(a.id) && a.comingSoon).map((a) => ({ id: a.id, label: a.name }));
 
   const gross = lines.reduce((sum, l) => sum + l.amount, 0);
   const solarLine = lines.find((l) => l.id === "solar")?.amount ?? 0;
@@ -384,6 +397,7 @@ export function priceSystem(
     total,
     deposit: ASSUMPTIONS.deposit,
     discuss,
+    interested,
   };
 }
 

@@ -95,6 +95,7 @@ function ReserveScreen() {
         outOfPocket: price.outOfPocket,
         deposit: price.deposit,
         discuss: price.discuss.map((d) => d.label),
+        interested: price.interested.map((d) => d.label),
       },
       details: {
         Home: state.address ? formatAddress(state.address) : undefined,
@@ -106,6 +107,7 @@ function ReserveScreen() {
           : undefined,
         Installer: installer?.name,
         "Discuss on call": price.discuss.map((d) => d.label).join(", ") || undefined,
+        "Interested (coming soon)": price.interested.map((d) => d.label).join(", ") || undefined,
         "RENUABL Care": !CARE_ENABLED
           ? undefined
           : careIncluded
@@ -257,6 +259,26 @@ function ReserveScreen() {
             ))}
           </ul>
           <p className="mt-1.5 text-muted">Not included in your price. We&apos;ll talk it through and quote it on your call.</p>
+        </div>
+      )}
+      {price.interested.length > 0 && (
+        <div className="mt-3 rounded-xl bg-canvas px-3.5 py-3 text-[12.5px] leading-snug text-ink-2">
+          <p className="text-ink">Coming soon</p>
+          <ul className="mt-1.5 space-y-1.5">
+            {price.interested.map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-3">
+                <span>{d.label}</span>
+                <button
+                  type="button"
+                  onClick={() => removeItem(d.id)}
+                  className="tap-area text-muted underline underline-offset-4 hover:text-ink"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-muted">Not included in your price. We&apos;ll let you know when it&apos;s available.</p>
         </div>
       )}
       {rates.source !== "live" && (

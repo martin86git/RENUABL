@@ -18,6 +18,8 @@ export interface OrderEmail {
   deposit: number;
   /** Upgrades to talk about on the call (not priced, not in the total). */
   discuss?: string[];
+  /** Coming-soon products the customer wants to hear about. */
+  interested?: string[];
   /** "Tuesday 13 October at 10:30am", when the call is already booked. */
   call?: string;
 }
@@ -63,6 +65,7 @@ ${o.address ? row("Home", o.address) : ""}${o.installer ? row("Installation part
 <p style="margin:0 0 8px">${esc(clip(o.system, 200))}</p>
 <table style="width:100%;border-collapse:collapse;font-size:14px">${lines}</table>
 ${o.discuss?.length ? `<p style="font-size:14px;margin:12px 0 0">To discuss on your call: ${esc(o.discuss.map((d) => clip(d, 60)).join(", "))} (not included in your price).</p>` : ""}
+${o.interested?.length ? `<p style="font-size:14px;margin:12px 0 0">Coming soon: ${esc(o.interested.map((d) => clip(d, 60)).join(", "))}. We'll let you know when it's available.</p>` : ""}
 <p style="color:#6B6B6B;font-size:12px;margin:12px 0 0">Rebates and your final price are confirmed on your call before anything is final. Solar Victoria support is subject to its eligibility criteria.</p>
 </div>
 <div style="background:#D9E7DC;border-radius:16px;padding:20px;color:#1E3A2E;font-size:14px">
@@ -89,6 +92,7 @@ ${o.discuss?.length ? `<p style="font-size:14px;margin:12px 0 0">To discuss on y
     ...(o.loan ? [`Solar Victoria interest-free loan: -${money(o.loan)}`, `Your upfront cost: ${money(o.outOfPocket ?? o.total)}`] : []),
     "Due today: $0",
     o.discuss?.length && `To discuss on your call: ${o.discuss.join(", ")} (not included in your price).`,
+    o.interested?.length && `Coming soon: ${o.interested.join(", ")}. We'll let you know when it's available.`,
     "",
     next,
     `After the call we'll send a secure link for the ${money(o.deposit)} refundable deposit to lock in your date.`,
@@ -167,6 +171,12 @@ export function cleanOrder(raw: unknown): Omit<OrderEmail, "reference" | "firstN
     deposit,
     discuss: Array.isArray(r.discuss)
       ? r.discuss
+          .slice(0, 6)
+          .map((d) => plainText(d, 60))
+          .filter(Boolean)
+      : undefined,
+    interested: Array.isArray(r.interested)
+      ? r.interested
           .slice(0, 6)
           .map((d) => plainText(d, 60))
           .filter(Boolean)

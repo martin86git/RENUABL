@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Reverse-cycle heating and cooling unit">
+  <defs>
+    <linearGradient id="unit" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset=".7" stop-color="#F1F2F0"/><stop offset="1" stop-color="#D3D8D5"/>
+    </linearGradient>
+    <radialGradient id="bg" cx=".5" cy=".45" r=".6"><stop offset="0" stop-color="#E7EFE8"/><stop offset="1" stop-color="#D9E7DC"/></radialGradient>
+  </defs>
+  <rect width="160" height="160" rx="28" fill="url(#bg)"/>
+  <rect x="24" y="44" width="112" height="40" rx="12" fill="url(#unit)" stroke="#D5DAD7"/>
+  <path d="M34 72h92" stroke="#C7CDCA" stroke-width="2" stroke-linecap="round"/>
+  <path d="M38 78h84" stroke="#1E3A2E" stroke-width="3" stroke-linecap="round" opacity=".85"/>
+  <circle cx="122" cy="56" r="2.6" fill="#4FA36B"/>
+  <rect x="104" y="54.5" width="12" height="3" rx="1.5" fill="#C7CDCA"/>
+  <g fill="none" stroke-linecap="round" stroke-width="3">
+    <path d="M52 96c-4 8 4 12 0 20" stroke="#E0875A"/>
+    <path d="M80 96c-4 8 4 12 0 20" stroke="#6F8F7F"/>
+    <path d="M108 96c-4 8 4 12 0 20" stroke="#7FA7C9"/>
+  </g>
+</svg>

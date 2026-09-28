@@ -151,13 +151,25 @@ describe("priceSystem", () => {
     expect(plain.total).toBe(plain.gross - plain.rebates);
     expect(plain.deposit).toBe(499);
     expect(plain.bom.find((l) => l.description === "Double-storey installation")?.total).toBe(400);
-    // Unpriced add-ons (heat pumps for now) are discussed on the call: no price, not in the total.
-    expect(ADD_ONS.find((a) => a.id === "heat-pump")!.price).toBeNull();
+    // Unpriced add-ons are discussed on the call; coming-soon ones (heat pumps) only take interest. Neither is in the total.
+    expect(ADD_ONS.find((a) => a.id === "heat-pump")).toMatchObject({ price: null, comingSoon: true });
     expect(withAddOns.total).toBe(plain.total);
     expect(withAddOns.lines.some((l) => l.id === "heat-pump")).toBe(false);
     expect(withAddOns.bom.some((l) => l.group === "heat-pump")).toBe(false);
-    expect(withAddOns.discuss.map((d) => d.id)).toEqual(["heat-pump", "smart-home"]);
+    expect(withAddOns.discuss.map((d) => d.id)).toEqual(["smart-home"]);
+    expect(withAddOns.interested.map((d) => d.id)).toEqual(["heat-pump"]);
     expect(plain.discuss).toEqual([]);
+    expect(plain.interested).toEqual([]);
+  });
+
+  it("offers home electrification as coming soon, never priced", () => {
+    const soon = ADD_ONS.filter((a) => a.comingSoon).map((a) => a.id);
+    expect(soon).toEqual(["reverse-cycle", "heat-pump"]);
+    const p = priceSystem({ panelCount: 20, batteryKwh: 0, evCharger: false }, { storeys: "single", roof: "tile", phase: "single" }, [
+      "reverse-cycle",
+    ]);
+    expect(p.interested).toEqual([{ id: "reverse-cycle", label: "Reverse-Cycle Heating & Cooling" }]);
+    expect(p.lines.some((l) => l.id === "reverse-cycle")).toBe(false);
   });
 
   it("never claims solar covers all of a home's use", () => {

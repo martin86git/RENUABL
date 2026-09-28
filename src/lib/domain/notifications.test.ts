@@ -69,6 +69,9 @@ describe("emails", () => {
     expect(mail.text).toContain("To discuss on your call: Heat Pump Hot Water (not included in your price).");
     expect(mail.html).toContain("Heat Pump Hot Water");
     expect(orderConfirmationEmail(order).text).not.toContain("To discuss");
+    const soon = orderConfirmationEmail({ ...order, interested: ["Reverse-Cycle Heating & Cooling"] });
+    expect(soon.text).toContain("Coming soon: Reverse-Cycle Heating & Cooling. We'll let you know when it's available.");
+    expect(soon.html).toContain("Reverse-Cycle Heating &amp; Cooling");
   });
 
   it("names the call time once it's booked, and escapes HTML", () => {

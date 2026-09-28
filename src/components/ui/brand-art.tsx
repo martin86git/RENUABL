@@ -101,6 +101,7 @@ export function HomePhoto({
 
 export const PRODUCT_IMAGES: Record<string, string> = {
   "heat-pump": "/brand/product-heatpump.svg",
+  "reverse-cycle": "/brand/product-reverse-cycle.svg",
   "smart-switchboard": "/brand/product-switchboard.svg",
   "home-backup": "/brand/product-backup.svg",
   "smart-home": "/brand/product-smarthome.svg",

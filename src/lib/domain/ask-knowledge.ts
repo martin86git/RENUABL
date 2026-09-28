@@ -36,7 +36,7 @@ export const ASK_FACTS = [
   "RENUABL calls the installers it works with 'installation partners'; use that term. In Victoria the matched installation partner is Primero Electric & Solar. Alternatives are available if the customer asks.",
   // After install
   "After switch-on, the My RENUABL app shows what the panels make, the battery level and what's been saved, gives a heads-up if something needs a look, and books service visits with the installation partner. Warranty work is free; any other fee is confirmed before a visit is booked.",
-  "A smart EV charger can be added at checkout. Heat pump hot water, smart switchboards, home backup and smart home integration aren't priced online yet: the customer can tick them to discuss, and they're talked through and quoted on the 15-minute call. Never quote a price for them.",
+  "A smart EV charger can be added at checkout. Smart switchboards, home backup and smart home integration aren't priced online yet: the customer can tick them to discuss, and they're talked through and quoted on the 15-minute call. Reverse-cycle heating and cooling and heat pump hot water are coming soon: RENUABL doesn't sell them yet, and the customer can ask to be told when they're available. Never quote a price for any of them.",
 ];
 
 /** The customer's own answers and system, as plain lines for the model. */
