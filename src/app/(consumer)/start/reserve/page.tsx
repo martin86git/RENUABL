@@ -17,6 +17,7 @@ import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_PLAN, careIncludedFor, careInclude
 import { formatCurrency, formatDate } from "@/lib/domain/format";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { describeInverter } from "@/lib/domain/inverter";
+import { CONTACT_CONSENT } from "@/lib/domain/legal";
 import { TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
 import { solarVictoriaApplies } from "@/lib/domain/rebates";
 import { getWindow } from "@/lib/domain/scheduling";
@@ -472,6 +473,17 @@ function ReserveScreen() {
       </div>
       <p className="mt-4 flex items-center gap-2 text-[12px] text-muted">
         <Lock className="h-3.5 w-3.5 shrink-0" strokeWidth={1.6} /> We only use your details for your RENUABL system. No spam.
+      </p>
+      <p className="mt-2 text-[11.5px] leading-snug text-muted">
+        {CONTACT_CONSENT} See our{" "}
+        <Link href="/privacy" target="_blank" className="underline underline-offset-4 hover:text-ink">
+          Privacy Policy
+        </Link>{" "}
+        and{" "}
+        <Link href="/terms" target="_blank" className="underline underline-offset-4 hover:text-ink">
+          Terms
+        </Link>
+        .
       </p>
       {problem && (
         <p className="mt-3 text-[13px] text-danger" role="alert">

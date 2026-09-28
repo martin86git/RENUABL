@@ -1,6 +1,7 @@
 import { AddressEntry } from "@/components/consumer/address-entry";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { ConsumerTopBar, MobileHeader } from "@/components/consumer/consumer-top-bar";
+import { LegalFooter } from "@/components/consumer/legal-page";
 import { Mascot } from "@/components/ui/brand-art";
 import { Script } from "@/components/ui/primitives";
 
@@ -46,6 +47,7 @@ export default function HomePage() {
           </Script>
         </div>
       </main>
+      <LegalFooter />
     </div>
   );
 }
