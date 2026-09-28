@@ -16,7 +16,7 @@ export const ASK_FACTS = [
   // How it works
   "RENUABL recommends one solar (and battery) system for the home, sized from the customer's electricity bill. There's no catalogue to choose from; customers don't pick panel counts or battery sizes.",
   `Systems are never smaller than ${ASSUMPTIONS.minSystemKw} kW. Solar is sized to what the home uses; with a battery (now or planned) it gets extra headroom to charge it.`,
-  "Three options: Essential (no battery), Recommended (battery sized to evening use) and Maximum (a larger battery).",
+  "Three options: Essential (solar only), Recommended (solar and a battery sized to evening use) and Maximum (solar, the same battery and a smart EV charger). Any option can be adjusted on the system step.",
   "The bill is read for usage and prices only; the file isn't stored and no personal details are taken from it.",
   // Roof and home
   "Roof types: tin (Colorbond), tiles, flat, or not sure.",

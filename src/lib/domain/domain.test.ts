@@ -113,13 +113,14 @@ describe("recommendSystem", () => {
     expect(ev.tiers.essential.config.panelCount).toBeGreaterThan(small);
   });
 
-  it("differs by battery only: none, sized to evening use, one size up", () => {
+  it("offers solar only, solar + battery, then solar + battery + EV charger", () => {
     const { tiers, usage } = recommendSystem(base, analysis, bill);
-    expect(tiers.essential.config.batteryKwh).toBe(0);
+    expect(tiers.essential.config).toMatchObject({ batteryKwh: 0, evCharger: false });
+    expect(tiers.recommended.config.evCharger).toBe(false);
     expect(tiers.recommended.config.batteryKwh * ASSUMPTIONS.batteryUsableShare).toBeGreaterThanOrEqual(
       usage.dailyKwh * usage.eveningShare,
     );
-    expect(tiers.independence.config.batteryKwh).toBeGreaterThan(tiers.recommended.config.batteryKwh);
+    expect(tiers.independence.config).toEqual({ ...tiers.recommended.config, evCharger: true });
   });
 
   it("goes one battery size up for backup", () => {
@@ -134,10 +135,11 @@ describe("recommendSystem", () => {
     }
   });
 
-  it("adds an EV charger only for EV households", () => {
-    expect(recommendSystem({ ...base, ev: true }, analysis, bill).tiers.recommended.config.evCharger).toBe(true);
-    expect(recommendSystem({ ...base, evPlanned: true }, analysis, bill).tiers.recommended.config.evCharger).toBe(true);
-    expect(recommendSystem(base, analysis, bill).tiers.recommended.config.evCharger).toBe(false);
+  it("puts the EV charger in Maximum only, whether or not the home has an EV", () => {
+    for (const profile of [base, { ...base, ev: true }, { ...base, evPlanned: true }]) {
+      const { tiers } = recommendSystem(profile, analysis, bill);
+      expect([tiers.essential, tiers.recommended, tiers.independence].map((t) => t.config.evCharger)).toEqual([false, false, true]);
+    }
   });
 });
 
@@ -439,7 +441,7 @@ describe("existing solar", () => {
     }
     expect(tiers.essential.config.panelCount).toBe(0);
     expect(tiers.essential.config.batteryKwh).toBeLessThanOrEqual(tiers.recommended.config.batteryKwh);
-    expect(tiers.independence.config.batteryKwh).toBeGreaterThan(tiers.recommended.config.batteryKwh);
+    expect(tiers.independence.config).toEqual({ ...tiers.recommended.config, evCharger: true });
   });
 
   it("adds panels only when exports can't fill the battery", () => {

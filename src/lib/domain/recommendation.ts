@@ -144,10 +144,6 @@ export function batteryNeeded(usage: UsageBasis, backup: boolean): number {
   return sizes[i];
 }
 
-function nextBatterySize(kwh: number) {
-  return ASSUMPTIONS.batterySizes.find((s) => s > kwh) ?? kwh;
-}
-
 function previousBatterySize(kwh: number) {
   return [...ASSUMPTIONS.batterySizes].reverse().find((s) => s < kwh) ?? kwh;
 }
@@ -190,8 +186,6 @@ export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, 
   const panelsForUse = panelsNeeded(usage.annualKwh, analysis, profile.wantsBattery, usage.dailyYieldKwhPerKw);
   const panelsWithBattery = panelsNeeded(usage.annualKwh, analysis, true, usage.dailyYieldKwhPerKw);
   const battery = batteryNeeded(usage, profile.backup);
-  const bigBattery = nextBatterySize(battery);
-  const evCharger = profile.ev || profile.evPlanned;
   const sizedTo = (charging: boolean) =>
     `Solar sized to your ${kwh(usage.dailyKwh)} kWh a day${profile.evPlanned ? ", including your future EV" : ""}${charging ? ", plus enough to charge a battery" : ""}`;
   const covers = (b: number) =>
@@ -213,13 +207,13 @@ export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, 
       },
       recommended: {
         tier: "recommended",
-        config: { panelCount: panelsWithBattery, batteryKwh: battery, evCharger },
+        config: { panelCount: panelsWithBattery, batteryKwh: battery, evCharger: false },
         why: replaces([sizedTo(true), covers(battery), profile.backup ? "Keeps essentials on during outages" : "Maximises your savings"]),
       },
       independence: {
         tier: "independence",
-        config: { panelCount: panelsWithBattery, batteryKwh: bigBattery, evCharger },
-        why: replaces([sizedTo(true), covers(bigBattery), "Longest backup during outages"]),
+        config: { panelCount: panelsWithBattery, batteryKwh: battery, evCharger: true },
+        why: replaces([sizedTo(true), covers(battery), "A smart EV charger, powered by your own sun"]),
       },
     },
   };
@@ -232,18 +226,16 @@ export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, 
 function expandSystem(profile: EnergyProfile, analysis: HomeAnalysis, usage: UsageBasis): Recommendation {
   const battery = batteryNeeded(usage, profile.backup);
   const small = previousBatterySize(battery);
-  const big = nextBatterySize(battery);
-  const evCharger = profile.ev || profile.evPlanned;
   const exported = usage.existingSolar?.exportedDailyKwh ?? 0;
-  const option = (batteryKwh: number, withPanels: boolean): SystemConfig => ({
+  const option = (batteryKwh: number, withPanels: boolean, evCharger: boolean): SystemConfig => ({
     panelCount: withPanels ? topUpPanels(usage, batteryKwh, analysis) : 0,
     batteryKwh,
     evCharger,
     existingSolar: true,
   });
-  const essential = option(small, false);
-  const recommended = option(battery, true);
-  const independence = option(big, true);
+  const essential = option(small, false, false);
+  const recommended = option(battery, true, false);
+  const independence = option(battery, true, true);
   const stores = (b: number) =>
     `A ${kwh(b)} kWh battery covers ${b * ASSUMPTIONS.batteryUsableShare >= eveningKwh(usage) ? "the" : "most of the"} ${kwh(eveningKwh(usage))} kWh you buy each evening`;
   const panels = (c: SystemConfig) =>
@@ -265,7 +257,7 @@ function expandSystem(profile: EnergyProfile, analysis: HomeAnalysis, usage: Usa
       independence: {
         tier: "independence",
         config: independence,
-        why: ["Keeps your existing solar", stores(big), panels(independence), "Longest backup during outages"],
+        why: ["Keeps your existing solar", stores(battery), panels(independence), "A smart EV charger, powered by your own sun"],
       },
     },
   };

@@ -99,8 +99,8 @@ export function suggestedRates(): InstallRates {
     nearHomeKm: 10,
     extraArray: COSTING.thirdArrayInstall,
     doubleStorey: COSTING.doubleStoreyInstall,
-    // PLACEHOLDER: RENUABL doesn't price switchboard upgrades yet.
-    switchboardUpgrade: 1500,
+    // Confirmed by RENUABL (Sep 2026).
+    switchboardUpgrade: 1200,
     tiltPerPanel: COSTING.tiltInstallPerPanel,
     batteryPerStack: COSTING.batteryInstallPerStack,
     batteryExtraModule: COSTING.batteryInstallPerStack / BATTERY.modulesPerStack,
