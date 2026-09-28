@@ -33,6 +33,10 @@ export function variationDecidedSms(o: { reference: string; approved: boolean; l
   );
 }
 
+export function layoutReadySms(o: { customer: string; link: string }) {
+  return clip(`RENUABL: Hi ${firstName(o.customer)}, your panel layout is ready. See where your panels will go: ${o.link}`);
+}
+
 export function complianceReminderSms(o: { label: string; days: number; link: string }) {
   const when = o.days <= 0 ? "expires today" : o.days === 1 ? "expires tomorrow" : `expires in ${o.days} days`;
   return clip(`RENUABL: your ${o.label.toLowerCase()} ${when}. Upload the new one so job offers keep coming: ${o.link}`);

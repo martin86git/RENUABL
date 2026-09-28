@@ -78,6 +78,42 @@ export async function checkRoof(recordKey: string): Promise<{ ok: true; check: O
 }
 
 /** The job's partner saves its panel layout. */
+/** The sample portal keeps layouts on this device only (per sample job). */
+const sampleKey = (recordKey: string) => `renuabl.sample-layout.${recordKey}`;
+
+export function loadSampleLayout(recordKey: string): PlacedPanel[] | null {
+  try {
+    const raw = window.localStorage.getItem(sampleKey(recordKey));
+    const list = raw ? (JSON.parse(raw) as unknown) : null;
+    return Array.isArray(list) ? (list as PlacedPanel[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSampleLayout(recordKey: string, panels: PlacedPanel[]): boolean {
+  try {
+    window.localStorage.setItem(sampleKey(recordKey), JSON.stringify(panels));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Sends the customer their saved panel layout by email or text. */
+export async function sendLayout(recordKey: string, channel: "email" | "sms"): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const res = await fetch(`/api/jobs/${recordKey}/layout/send`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ channel }),
+    });
+    return (await res.json()) as { ok: boolean; message?: string };
+  } catch {
+    return { ok: false, message: "That didn't send. Check your connection and try again." };
+  }
+}
+
 export async function saveLayout(recordKey: string, panels: PlacedPanel[]): Promise<{ ok: boolean; arrays?: number; message?: string }> {
   try {
     const res = await fetch(`/api/jobs/${recordKey}/layout`, {

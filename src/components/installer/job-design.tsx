@@ -1,8 +1,8 @@
 "use client";
 
-import { Loader2, Minus, Plus, RectangleHorizontal, ScanSearch, ZoomIn, ZoomOut } from "lucide-react";
+import { Loader2, Mail, MessageSquare, Minus, Plus, RectangleHorizontal, Save, ScanSearch, ZoomIn, ZoomOut } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/primitives";
 import { House3d } from "@/components/ui/house-3d";
 import { PanelPlanner } from "@/components/ui/panel-planner";
@@ -12,7 +12,7 @@ import { boxPixels, OBSTRUCTION_SETBACK_M, type ObstructionCheck } from "@/lib/d
 import { nextPanel, normaliseRotation, panelsInBoxes, planArrays, type PlacedPanel } from "@/lib/domain/panel-plan";
 import { designView, metresPerPixel } from "@/lib/domain/roof-layout";
 import type { JobDesign } from "@/lib/services/installer";
-import { checkRoof, saveLayout } from "@/lib/services/accounts";
+import { checkRoof, loadSampleLayout, saveLayout, saveSampleLayout, sendLayout } from "@/lib/services/accounts";
 
 const ZOOMS = [16, 24, 32, 48];
 
@@ -45,6 +45,20 @@ export function JobDesignPanel({ recordKey, design, panelCount }: { recordKey: s
   const kw = Math.round(panels.length * PANEL.watts) / 1000;
   const dirty = JSON.stringify(panels) !== JSON.stringify(saved ?? []);
   const current = selected !== null ? panels[selected] : null;
+  // The sample portal: bring back the layout saved on this device.
+  useEffect(() => {
+    if (!design.sample) return;
+    const kept = loadSampleLayout(recordKey);
+    if (kept) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- read from localStorage after mount
+      setPanels(kept);
+      setSaved(kept);
+    }
+  }, [design.sample, recordKey]);
+  const [sending, setSending] = useState<"email" | "sms" | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Only a saved layout can be sent (the customer sees what's saved).
+  const canSend = Boolean(saved?.length) && !dirty;
 
   function add() {
     const base = current ? [...panels.filter((_, i) => i !== selected), current] : panels;
@@ -72,9 +86,22 @@ export function JobDesignPanel({ recordKey, design, panelCount }: { recordKey: s
     else setProblem(r.message);
   }
 
+  async function send(channel: "email" | "sms") {
+    setNotice(null);
+    if (design.sample) return setNotice("The sample portal doesn't send messages. A real job sends the customer a link to their layout.");
+    setSending(channel);
+    const r = await sendLayout(recordKey, channel);
+    setSending(null);
+    setNotice(r.ok ? `Sent to the customer by ${channel === "email" ? "email" : "text"}.` : (r.message ?? "That didn't send. Try again."));
+  }
+
   async function save() {
+    setNotice(null);
     if (design.sample) {
-      setSaved(panels); // the sample portal keeps it on screen only
+      // The sample portal keeps it on this device.
+      if (!saveSampleLayout(recordKey, panels)) return setProblem("This browser won't keep the layout. Try another browser.");
+      setSaved(panels);
+      setNotice("Saved on this device (sample portal).");
       return;
     }
     setBusy(true);
@@ -107,6 +134,20 @@ export function JobDesignPanel({ recordKey, design, panelCount }: { recordKey: s
             <span className="text-[20px] tabular-nums">{panels.length}</span>{" "}
             <span className="text-muted">of {panelCount} panels placed</span>
           </p>
+          <Button size="sm" className="col-span-2 lg:col-span-1" onClick={() => void save()} disabled={busy || !dirty}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} {saved && !dirty ? "Saved" : "Save layout"}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => void send("email")} disabled={!canSend || sending !== null}>
+            {sending === "email" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />} Email customer
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => void send("sms")} disabled={!canSend || sending !== null}>
+            {sending === "sms" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />} SMS customer
+          </Button>
+          {(notice || (!canSend && panels.length > 0)) && (
+            <p className="col-span-2 text-[12px] text-muted lg:col-span-1" role="status">
+              {notice ?? "Save the layout to send it to the customer."}
+            </p>
+          )}
           <Button size="sm" onClick={add} disabled={panels.length >= 200}>
             <Plus className="h-4 w-4" /> Add panel
           </Button>
@@ -147,7 +188,9 @@ export function JobDesignPanel({ recordKey, design, panelCount }: { recordKey: s
         </div>
       </div>
       {design.sample && (
-        <p className="mt-2 text-[12.5px] text-muted">Sample portal: every sample job uses {design.sample}. Layouts aren&apos;t saved.</p>
+        <p className="mt-2 text-[12.5px] text-muted">
+          Sample portal: every sample job uses {design.sample}. Layouts are kept on this device only.
+        </p>
       )}
       <p className="mt-2 text-[12.5px] text-muted">
         Add panels from the tray, drag them into place (they line up with a neighbour when close), and drag the round handle to turn a
@@ -211,17 +254,14 @@ export function JobDesignPanel({ recordKey, design, panelCount }: { recordKey: s
           {problem}
         </p>
       )}
-      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:flex">
-        <Button size="sm" onClick={() => void save()} disabled={busy || !dirty}>
-          {saved && !dirty ? "Saved" : "Save layout"}
-        </Button>
-        {design.canCheck && (
+      {design.canCheck && (
+        <div className="mt-4">
           <Button size="sm" variant="secondary" onClick={() => void runCheck()} disabled={checking}>
             {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanSearch className="h-4 w-4" />}{" "}
             {check ? "Check again" : "Check for obstructions"}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
       <div className="mt-4">
         <House3d at={design.centre} recordKey={recordKey} enabled={design.can3d} label="3D view of the house" />
       </div>

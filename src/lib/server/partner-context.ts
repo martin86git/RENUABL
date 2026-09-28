@@ -42,6 +42,17 @@ export async function customerMobileFor(recordKey: string): Promise<{ name: stri
   return c?.phone ? { name: c.name, mobile: c.phone } : null;
 }
 
+/** The customer's name, email and mobile for a job's record. Null for demo jobs. */
+export async function customerContactFor(recordKey: string): Promise<{ name: string; email: string; mobile: string } | null> {
+  if (!dbConfigured()) return null;
+  const rows = await query<{ customer: { name: string; phone: string; email: string } }>(
+    `select customer from jobs where record_key = $1`,
+    [recordKey],
+  );
+  const c = rows[0]?.customer;
+  return c ? { name: c.name ?? "", email: c.email ?? "", mobile: c.phone ?? "" } : null;
+}
+
 /** The mobile of the partner who owns a job record, for texts about it. */
 export async function partnerMobileFor(recordKey: string): Promise<string | null> {
   if (!dbConfigured()) return null;

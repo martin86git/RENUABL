@@ -245,6 +245,20 @@ export function partnerApprovedEmail(o: { firstName: string; link: string }) {
   });
 }
 
+/** The installation partner has designed the customer's panel layout: a look before install day. */
+export function layoutReadyEmail(o: { customer: string; panels: number; partner: string; link: string }) {
+  const first = plainText(o.customer, 40).split(" ")[0] || "there";
+  return simpleEmail({
+    subject: "Your panel layout is ready",
+    heading: `Hi ${first}, here's where your panels will go.`,
+    lines: [
+      `${plainText(o.partner, 60) || "Your installation partner"} has designed the layout for your ${o.panels} panels on your roof.`,
+      "Have a look before install day. If anything doesn't look right, just reply and we'll sort it out with them.",
+    ],
+    button: { label: "See your panel layout", href: o.link },
+  });
+}
+
 export function jobOfferEmail(o: { suburb: string; system: string; installDate: string | null; link: string; hours: number }) {
   return simpleEmail({
     subject: `New job offer in ${plainText(o.suburb, 40)}`,
