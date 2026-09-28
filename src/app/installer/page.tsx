@@ -15,7 +15,8 @@ import {
 import Link from "next/link";
 import { connection } from "next/server";
 import { Chip, Panel, StageBadge } from "@/components/installer/bits";
-import { HomePhoto, Mascot, homeBannerFor, homePhotoFor } from "@/components/ui/brand-art";
+import { JobPhoto } from "@/components/installer/job-photo";
+import { Mascot } from "@/components/ui/brand-art";
 import { buttonClass, cn } from "@/components/ui/primitives";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/domain/format";
 import { greeting, todayInMarket } from "@/lib/domain/market";
@@ -23,7 +24,7 @@ import { FIELD_STATUS_FLOW, currentFieldStatus } from "@/lib/domain/job-status";
 import { packageLabel, panelsToKw } from "@/lib/domain/recommendation";
 import { getWindow } from "@/lib/domain/scheduling";
 import type { Job } from "@/lib/domain/types";
-import { getAlerts, getCurrentUser, getDashboardCounts, getPerformance, listTodaysJobs } from "@/lib/services/installer";
+import { getAlerts, getCurrentUser, getDashboardCounts, getPerformance, isDemo, listTodaysJobs } from "@/lib/services/installer";
 
 export const metadata = { title: "Dashboard" };
 
@@ -91,12 +92,12 @@ function InstallRow({ job }: { job: Job }) {
 }
 
 /** The design's light "Next job" card, sitting on the dark dashboard. */
-function NextJob({ job }: { job: Job }) {
+function NextJob({ job, live }: { job: Job; live: boolean }) {
   return (
     <section className="theme-light rounded-2xl bg-canvas p-6 text-ink">
       <h2 className="text-[17px]">Next job</h2>
       <div className="mt-4 grid grid-cols-[auto_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-6">
-        <HomePhoto src={homePhotoFor(job.id)} className="h-32 w-32 rounded-xl" sizes="128px" />
+        <JobPhoto job={job} live={live} className="h-32 w-32 rounded-xl" sizes="128px" />
         <div className="min-w-0">
           <p className="text-[16px]">{job.customer.name}</p>
           <p className="text-[13px] text-muted">
@@ -155,7 +156,7 @@ function NextJob({ job }: { job: Job }) {
 }
 
 /** Field app "Today": next job first, big tap targets. */
-function MobileToday({ jobs, firstName }: { jobs: Job[]; firstName: string }) {
+function MobileToday({ jobs, firstName, live }: { jobs: Job[]; firstName: string; live: boolean }) {
   const [next, ...rest] = jobs;
   return (
     <div className="space-y-5 lg:hidden">
@@ -167,7 +168,7 @@ function MobileToday({ jobs, firstName }: { jobs: Job[]; firstName: string }) {
       </div>
       {next ? (
         <section className="theme-light overflow-hidden rounded-2xl bg-canvas text-ink">
-          <HomePhoto src={homeBannerFor(next.id)} className="h-36 w-full" sizes="100vw" />
+          <JobPhoto job={next} live={live} size="wide" className="h-36 w-full" sizes="100vw" />
           <div className="p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -218,7 +219,7 @@ function MobileToday({ jobs, firstName }: { jobs: Job[]; firstName: string }) {
               href={`/installer/jobs/${j.id}`}
               className="flex min-h-[72px] items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3"
             >
-              <HomePhoto src={homePhotoFor(j.id)} className="h-12 w-12 shrink-0 rounded-lg" sizes="48px" />
+              <JobPhoto job={j} live={live} className="h-12 w-12 shrink-0 rounded-lg" sizes="48px" />
               <span className="min-w-0 flex-1">
                 <span className="block text-[16px]">{j.customer.name}</span>
                 <span className="block truncate text-[13px] text-muted">
@@ -241,11 +242,12 @@ export default async function InstallerDashboard() {
   const today = await listTodaysJobs();
   const alerts = await getAlerts();
   const perf = await getPerformance();
+  const live = !(await isDemo());
   const next = today.find((j) => j.stage === "scheduled") ?? today[0];
 
   return (
     <>
-      <MobileToday jobs={today} firstName={user.firstName} />
+      <MobileToday jobs={today} firstName={user.firstName} live={live} />
 
       <div className="hidden space-y-6 rounded-3xl bg-surface/40 p-7 lg:block">
         <div className="flex items-start justify-between gap-6">
@@ -304,7 +306,7 @@ export default async function InstallerDashboard() {
           </section>
         </div>
 
-        {next && <NextJob job={next} />}
+        {next && <NextJob job={next} live={live} />}
 
         <div className="grid grid-cols-12 gap-6">
           <Panel className="col-span-7" title="Needs action">

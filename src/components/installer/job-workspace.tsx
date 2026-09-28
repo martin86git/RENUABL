@@ -31,7 +31,7 @@ import { saveJobStage } from "@/lib/services/accounts";
 import { JobConnection } from "@/components/installer/job-connection";
 import { JobVariations, type PartnerTerms } from "@/components/installer/job-variations";
 import { jobMaterials } from "@/lib/domain/materials";
-import { HomePhoto, homeBannerFor, homePhotoFor } from "@/components/ui/brand-art";
+import { JobPhoto, RoofView } from "@/components/installer/job-photo";
 import { ImageTile, StageBadge } from "./bits";
 import { useFieldStatus } from "./use-field-status";
 
@@ -275,7 +275,7 @@ export function JobWorkspace({
         <Link href="/installer/jobs" className="text-[14px] text-muted">
           ← Jobs
         </Link>
-        <HomePhoto src={homeBannerFor(job.id)} className="mt-3 h-32 w-full rounded-2xl" sizes="100vw" />
+        <JobPhoto job={job} live={live} size="wide" className="mt-3 h-40 w-full rounded-2xl" sizes="100vw" />
         <div className="mt-3 flex items-start justify-between gap-3">
           <div>
             <p className="text-[12px] font-medium uppercase tracking-wider text-muted">{job.reference}</p>
@@ -313,6 +313,9 @@ export function JobWorkspace({
               body: (
                 <>
                   {siteFacts}
+                  <div className="mt-4">
+                    <RoofView job={job} live={live} />
+                  </div>
                   <div className="mt-4 grid grid-cols-3 gap-2">
                     {job.site.imagery.map((i) => (
                       <ImageTile key={i.id} label={i.label} />
@@ -397,7 +400,7 @@ export function JobWorkspace({
         </Link>
         <div className="mt-3 flex items-start justify-between gap-6">
           <div className="flex items-center gap-5">
-            <HomePhoto src={homePhotoFor(job.id)} className="h-20 w-24 shrink-0 rounded-xl" sizes="96px" />
+            <JobPhoto job={job} live={live} className="h-20 w-24 shrink-0 rounded-xl" sizes="96px" />
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-[30px] font-normal tracking-[-0.03em]">{job.customer.name}</h1>
@@ -469,6 +472,9 @@ export function JobWorkspace({
               </div>
               <section className="rounded-2xl border border-line bg-surface p-6">
                 <h2 className="text-[15px] font-medium">Roof & site imagery</h2>
+                <div className="mt-4">
+                  <RoofView job={job} live={live} />
+                </div>
                 <div className="mt-4 grid grid-cols-3 gap-3">
                   {job.site.imagery.map((i) => (
                     <ImageTile key={i.id} label={i.label} />
@@ -514,7 +520,8 @@ export function JobWorkspace({
               </div>
             </section>
             <section className="col-span-7 rounded-2xl border border-line bg-surface p-6">
-              <div className="grid grid-cols-2 gap-3">
+              <RoofView job={job} live={live} />
+              <div className="mt-3 grid grid-cols-2 gap-3">
                 {job.site.imagery.map((i) => (
                   <ImageTile key={i.id} label={i.label} />
                 ))}

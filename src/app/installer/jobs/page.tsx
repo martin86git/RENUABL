@@ -2,14 +2,14 @@ import { ArrowRight, ChevronRight, EllipsisVertical } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Chip, PageHeader, StageBadge } from "@/components/installer/bits";
-import { HomePhoto, homePhotoFor } from "@/components/ui/brand-art";
+import { JobPhoto } from "@/components/installer/job-photo";
 import { buttonClass, cn } from "@/components/ui/primitives";
 import { formatDate } from "@/lib/domain/format";
 import { JOB_STAGES, primaryJobAction } from "@/lib/domain/job-status";
 import { packageLabel } from "@/lib/domain/recommendation";
 import { getWindow } from "@/lib/domain/scheduling";
 import type { JobStage } from "@/lib/domain/types";
-import { listJobs } from "@/lib/services/installer";
+import { isDemo, listJobs } from "@/lib/services/installer";
 
 export const metadata = { title: "Jobs" };
 
@@ -22,6 +22,7 @@ export default async function JobsPage({ searchParams }: PageProps<"/installer/j
   const { stage: raw } = await searchParams;
   const stage = isStage(raw) ? raw : undefined;
   const all = await listJobs();
+  const live = !(await isDemo());
   // Work still to do first; completed jobs sink to the bottom.
   const jobs = (stage ? all.filter((j) => j.stage === stage) : all).sort(
     (a, b) => Number(a.stage === "completed") - Number(b.stage === "completed"),
@@ -63,7 +64,7 @@ export default async function JobsPage({ searchParams }: PageProps<"/installer/j
           <li key={j.id}>
             {/* Desktop row */}
             <div className="hidden grid-cols-[64px_minmax(0,1.6fr)_190px_170px_110px_180px_36px] items-center gap-5 rounded-2xl border border-line bg-surface px-5 py-4 lg:grid">
-              <HomePhoto src={homePhotoFor(j.id)} className="h-14 w-16 rounded-lg" sizes="64px" />
+              <JobPhoto job={j} live={live} className="h-14 w-16 rounded-lg" sizes="64px" />
               <div className="min-w-0">
                 <p className="truncate text-[15px]">{j.customer.name}</p>
                 <p className="truncate text-[12.5px] text-muted">
@@ -97,7 +98,7 @@ export default async function JobsPage({ searchParams }: PageProps<"/installer/j
               href={`/installer/jobs/${j.id}`}
               className="flex min-h-[76px] items-center gap-3 rounded-2xl border border-line bg-surface p-3 lg:hidden"
             >
-              <HomePhoto src={homePhotoFor(j.id)} className="h-14 w-14 shrink-0 rounded-lg" sizes="56px" />
+              <JobPhoto job={j} live={live} className="h-14 w-14 shrink-0 rounded-lg" sizes="56px" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-[16px]">{j.customer.name}</p>
