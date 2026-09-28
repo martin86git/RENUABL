@@ -2,14 +2,17 @@ import { PREVIEW_MODE } from "@/lib/config";
 import { todayInMarket } from "@/lib/domain/market";
 import { CERTIFICATE_UPLOAD, partnerSummary, validatePartnerApplication } from "@/lib/domain/partner";
 import { partnerReceivedEmail } from "@/lib/domain/emails";
+import { dbConfigured } from "@/lib/server/db";
 import { sendEmail } from "@/lib/server/email";
 import { addNote, crmNote, upsertContact } from "@/lib/server/hubspot-crm";
+import { savePartnerApplication } from "@/lib/server/partners-repo";
 import { saveFile, saveJson, storageConfigured } from "@/lib/server/storage";
 
 /**
  * POST multipart: "application" (JSON) + "certificate" (PDF or photo of the
- * certificate of currency). Validates, stores both privately, adds the partner
- * to HubSpot with a note, and emails them a confirmation. Only reports success
+ * certificate of currency). Validates, stores both privately, saves the partner
+ * (pending approval) in the database, adds them to HubSpot with the whole
+ * application as a note, and emails them a confirmation. Only reports success
  * once the application is saved somewhere RENUABL can see it.
  */
 export async function POST(request: Request) {
@@ -57,6 +60,15 @@ export async function POST(request: Request) {
       saved = true;
     } catch (e) {
       problems.push(`storage: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  if (dbConfigured()) {
+    try {
+      await savePartnerApplication(app, reference);
+      saved = true;
+    } catch (e) {
+      problems.push(`database: ${e instanceof Error ? e.message : e}`);
     }
   }
 

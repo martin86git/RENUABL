@@ -1,7 +1,7 @@
-import { PREVIEW_MODE } from "@/lib/config";
 import { cleanHandoverUpdate, emptyHandover } from "@/lib/domain/handover";
 import { getRecord, saveRecord, validKey } from "@/lib/server/handover-store";
 import { storageConfigured } from "@/lib/server/storage";
+import { mayWriteRecord } from "@/lib/server/partner-context";
 
 /** GET the job's installation record (for the partner portal and the customer's My RENUABL). */
 export async function GET(_: Request, ctx: RouteContext<"/api/jobs/[key]/handover">) {
@@ -15,11 +15,11 @@ export async function GET(_: Request, ctx: RouteContext<"/api/jobs/[key]/handove
 
 /**
  * PUT { jobReference, arrays, serials, submit?, summary? } from the partner
- * portal. Only while the portal runs in preview (it has no partner logins yet).
+ * portal. Only the partner the job belongs to (or the sample portal, in preview).
  */
 export async function PUT(request: Request, ctx: RouteContext<"/api/jobs/[key]/handover">) {
   const { key } = await ctx.params;
-  if (!validKey(key) || !PREVIEW_MODE) return Response.json({ ok: false }, { status: 404 });
+  if (!validKey(key) || !(await mayWriteRecord(key))) return Response.json({ ok: false }, { status: 404 });
   if (!storageConfigured()) return Response.json({ ok: false, notConfigured: true }, { status: 503 });
   let body: Record<string, unknown>;
   try {

@@ -8,7 +8,7 @@ export const metadata = { title: "Messages" };
 
 export default async function MessagesPage() {
   await connection();
-  const threads = listConversations();
+  const threads = await listConversations();
   return (
     <>
       <PageHeader title="Messages" subtitle="Customer conversations, coordinated by RENUABL" />

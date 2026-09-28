@@ -4,8 +4,20 @@ import { getPerformance } from "@/lib/services/installer";
 
 export const metadata = { title: "Performance" };
 
-export default function PerformancePage() {
-  const p = getPerformance();
+export default async function PerformancePage() {
+  const p = await getPerformance();
+  if (!p) {
+    return (
+      <>
+        <PageHeader title="Performance" subtitle="The metrics that drive your matching priority on RENUABL" />
+        <Panel>
+          <p className="p-5 text-[15px] text-ink-2">
+            Your on-time, first-time pass and response figures appear here once you&apos;ve completed jobs.
+          </p>
+        </Panel>
+      </>
+    );
+  }
   const max = Math.max(...p.trend.map((t) => t.jobs));
 
   return (

@@ -76,6 +76,9 @@ export function InstallerShell({ children, company, user }: { children: ReactNod
           <div className="px-4 pt-4 text-[12px] text-muted">
             <p className="text-ink-2">{company}</p>
             <p>{user}</p>
+            <form action="/api/auth/signout" method="post" className="mt-2">
+              <button className="tap-area relative text-muted underline-offset-4 hover:text-ink hover:underline">Sign out</button>
+            </form>
           </div>
         </aside>
 

@@ -137,3 +137,6 @@ export const CREWS: Crew[] = [
 ];
 
 export const CURRENT_USER = { name: "Michael Tran", firstName: "Michael" };
+
+/** The sample portal's partner. */
+export const MOCK_INSTALLER = () => INSTALLERS.find((i) => i.id === CURRENT_INSTALLER_ID)!;

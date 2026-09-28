@@ -2,13 +2,18 @@ import { validateContact } from "@/lib/domain/contact";
 import { PREVIEW_MODE } from "@/lib/config";
 import { buildIcs, installEvent } from "@/lib/domain/calendar";
 import { cleanOrder, orderConfirmationEmail, plainText } from "@/lib/domain/emails";
+import { cleanJobRequest } from "@/lib/domain/jobs";
+import { dbConfigured } from "@/lib/server/db";
 import { sendEmail } from "@/lib/server/email";
+import { createJob, referenceTaken } from "@/lib/server/jobs-repo";
+import { offerNext } from "@/lib/server/offers-engine";
 import { addNote, reservationNote, upsertContact } from "@/lib/server/hubspot-crm";
 
 /**
- * POST a reservation: { contact, details }. Nothing is charged: the deposit is
- * taken after the confirmation call. The lead goes to HubSpot when
- * HUBSPOT_PRIVATE_APP_TOKEN is set.
+ * POST a reservation: { contact, details, order, installDate, job }. Nothing is
+ * charged: the deposit is taken after the confirmation call. The lead goes to
+ * HubSpot when HUBSPOT_PRIVATE_APP_TOKEN is set; with the database, the job is
+ * saved and offered to the best installation partner (24 hours to accept).
  */
 export async function POST(request: Request) {
   let body: {
@@ -16,6 +21,7 @@ export async function POST(request: Request) {
     details?: Record<string, unknown>;
     order?: unknown;
     installDate?: string;
+    job?: unknown;
   };
   try {
     body = await request.json();
@@ -30,7 +36,8 @@ export async function POST(request: Request) {
   for (const [k, v] of Object.entries(body.details ?? {})) {
     if (typeof v === "string" && v.trim()) details[k.slice(0, 60)] = v.trim().slice(0, 300);
   }
-  const reservationId = `RN-${Math.floor(1000 + Math.random() * 9000)}`;
+  const reservationId = await newReference();
+  await saveJob(reservationId, checked.contact, body.job);
   const email = () => confirmationEmail(reservationId, checked.contact, body.order, body.installDate);
 
   const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
@@ -84,5 +91,44 @@ async function confirmationEmail(
   } catch (e) {
     console.error(`reservation ${reference} confirmation email failed`, e instanceof Error ? e.message : e);
     return false;
+  }
+}
+
+/** RN-1234; with the database, one no other job has. */
+async function newReference(): Promise<string> {
+  const make = (digits: number) => `RN-${Math.floor(10 ** (digits - 1) + Math.random() * 9 * 10 ** (digits - 1))}`;
+  if (!dbConfigured()) return make(4);
+  try {
+    for (let i = 0; i < 6; i++) {
+      const ref = make(i < 3 ? 4 : 6);
+      if (!(await referenceTaken(ref))) return ref;
+    }
+  } catch (e) {
+    console.error("reference check failed", e instanceof Error ? e.message : e);
+  }
+  return make(6);
+}
+
+/** Saves the job and offers it to a partner. Never blocks the reservation: staff can place it by hand. */
+async function saveJob(
+  reference: string,
+  contact: { firstName: string; lastName: string; mobile: string; email: string },
+  rawJob: unknown,
+) {
+  if (!dbConfigured()) return;
+  const req = cleanJobRequest(rawJob);
+  if (!req) {
+    console.warn(`reservation ${reference}: no usable job details, not offered`);
+    return;
+  }
+  try {
+    const job = await createJob(
+      reference,
+      { name: `${contact.firstName} ${contact.lastName}`.trim(), phone: contact.mobile, email: contact.email },
+      req,
+    );
+    await offerNext(job.id);
+  } catch (e) {
+    console.error(`reservation ${reference}: job not saved`, e instanceof Error ? e.message : e);
   }
 }

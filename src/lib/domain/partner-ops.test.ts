@@ -215,3 +215,29 @@ describe("stripe key mode", () => {
     expect(stripeKeyMode(undefined)).toBe("missing");
   });
 });
+
+describe("compliance without an expiry date", () => {
+  it("counts a licence on file as current, without reminders", () => {
+    const records: ComplianceRecord[] = [
+      { kind: "public-liability", amount: 20_000_000, expires: "2027-06-01" },
+      { kind: "electrical-licence", number: "A12345" },
+      { kind: "accreditation", number: "S1234567" },
+    ];
+    expect(offersPaused(records, today).paused).toBe(false);
+    expect(remindersDue(records, today)).toEqual([]);
+    expect(complianceStatus({ kind: "public-liability", amount: 5_000_000 }, today)).toBe("expired");
+  });
+});
+
+describe("compliance without an expiry date", () => {
+  it("counts a licence on file as current, without reminders", () => {
+    const records: ComplianceRecord[] = [
+      { kind: "public-liability", amount: 20_000_000, expires: "2027-06-01" },
+      { kind: "electrical-licence", number: "A12345" },
+      { kind: "accreditation", number: "S1234567" },
+    ];
+    expect(offersPaused(records, today).paused).toBe(false);
+    expect(remindersDue(records, today)).toEqual([]);
+    expect(complianceStatus({ kind: "public-liability", amount: 5_000_000 }, today)).toBe("expired");
+  });
+});

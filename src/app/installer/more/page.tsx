@@ -21,6 +21,9 @@ export default function MorePage() {
           </li>
         ))}
       </ul>
+      <form action="/api/auth/signout" method="post" className="mt-6">
+        <button className="min-h-12 w-full rounded-2xl border border-line text-[16px] text-ink-2">Sign out</button>
+      </form>
     </>
   );
 }

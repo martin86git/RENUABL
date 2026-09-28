@@ -21,7 +21,7 @@ export default async function JobsPage({ searchParams }: PageProps<"/installer/j
   await connection();
   const { stage: raw } = await searchParams;
   const stage = isStage(raw) ? raw : undefined;
-  const all = listJobs();
+  const all = await listJobs();
   // Work still to do first; completed jobs sink to the bottom.
   const jobs = (stage ? all.filter((j) => j.stage === stage) : all).sort(
     (a, b) => Number(a.stage === "completed") - Number(b.stage === "completed"),

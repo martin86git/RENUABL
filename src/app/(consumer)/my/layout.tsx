@@ -1,5 +1,6 @@
 import { MobileHeader } from "@/components/consumer/consumer-top-bar";
 import { MyBottomNav, MyTopBar } from "@/components/consumer/my-nav";
+import { MyReservations } from "@/components/consumer/my-reservations";
 import { PortalPreviewBanner } from "@/components/consumer/portal-preview";
 import { getHousehold } from "@/lib/services/home";
 
@@ -10,6 +11,7 @@ export default function MyLayout({ children }: LayoutProps<"/my">) {
       <MobileHeader account />
       <MyTopBar name={household.owner} />
       <main className="mx-auto w-full max-w-[1200px] flex-1 px-5 pb-28 pt-4 sm:px-8 lg:px-12 lg:pb-16 lg:pt-12">
+        <MyReservations />
         <PortalPreviewBanner />
         {children}
       </main>

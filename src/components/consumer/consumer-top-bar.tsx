@@ -9,7 +9,7 @@ import { MobileMenu } from "./mobile-menu";
  */
 export function ConsumerTopBar({
   className,
-  account = "Sign in",
+  account = "Log in",
   partners = false,
 }: {
   className?: string;
@@ -27,7 +27,7 @@ export function ConsumerTopBar({
           Become a partner
         </Link>
       )}
-      <Link href="/my" className={cn("flex items-center gap-2.5 text-[13px] text-ink-2 hover:text-ink", !partners && "ml-auto")}>
+      <Link href="/login" className={cn("flex items-center gap-2.5 text-[13px] text-ink-2 hover:text-ink", !partners && "ml-auto")}>
         <span className="grid h-9 w-9 place-items-center rounded-full bg-surface-2">
           <UserRound className="h-[18px] w-[18px]" strokeWidth={1.5} />
         </span>
@@ -45,7 +45,7 @@ export function MobileHeader({
   className,
 }: {
   account?: boolean;
-  /** A small "Partners" link top right (home page). */
+  /** A small "Log in" link top right (home page), for customers and partners. */
   partners?: boolean;
   className?: string;
 }) {
@@ -60,8 +60,8 @@ export function MobileHeader({
           <UserRound className="h-5 w-5" strokeWidth={1.5} />
         </Link>
       ) : partners ? (
-        <Link href="/partners" className="tap-area -mr-1 text-[13px] text-ink-2">
-          Partners
+        <Link href="/login" className="tap-area -mr-1 text-[13px] text-ink-2">
+          Log in
         </Link>
       ) : (
         <span className="w-9" />

@@ -236,11 +236,11 @@ function MobileToday({ jobs, firstName }: { jobs: Job[]; firstName: string }) {
 
 export default async function InstallerDashboard() {
   await connection(); // mock data and greeting are relative to "today"
-  const user = getCurrentUser();
-  const counts = getDashboardCounts();
-  const today = listTodaysJobs();
-  const alerts = getAlerts();
-  const perf = getPerformance();
+  const user = await getCurrentUser();
+  const counts = await getDashboardCounts();
+  const today = await listTodaysJobs();
+  const alerts = await getAlerts();
+  const perf = await getPerformance();
   const next = today.find((j) => j.stage === "scheduled") ?? today[0];
 
   return (
@@ -265,7 +265,11 @@ export default async function InstallerDashboard() {
           <StatCard icon={CalendarCheck} value={counts.upcoming} label="Upcoming installs" />
           <StatCard icon={Hourglass} value={counts.awaitingConfirmation} label="Awaiting confirmation" />
           <StatCard icon={CircleCheck} value={counts.completedThisMonth} label="Completed this month" />
-          <StatCard icon={Star} value={counts.rating.toFixed(1)} label="Average rating" star />
+          {counts.rating !== null ? (
+            <StatCard icon={Star} value={counts.rating.toFixed(1)} label="Average rating" star />
+          ) : (
+            <StatCard icon={CircleCheck} value={counts.newJobs} label="New offers" />
+          )}
         </div>
 
         <div className="grid grid-cols-12 gap-6">
@@ -322,34 +326,40 @@ export default async function InstallerDashboard() {
               ))}
             </ul>
           </Panel>
-          <Panel
-            className="col-span-5"
-            title="Performance snapshot"
-            action={
-              <Link href="/installer/performance" className="text-[13px] text-ink-2 hover:text-ink">
-                Details →
-              </Link>
-            }
-          >
-            <dl className="grid grid-cols-2 gap-4 p-5 text-[13px]">
-              <div>
-                <dt className="text-muted">On time</dt>
-                <dd className="text-[22px] text-positive">{formatPercent(perf.onTimeRate)}</dd>
-              </div>
-              <div>
-                <dt className="text-muted">First-time pass</dt>
-                <dd className="text-[22px] text-positive">{formatPercent(perf.firstTimePassRate)}</dd>
-              </div>
-              <div>
-                <dt className="text-muted">Response time</dt>
-                <dd className="text-[22px]">{perf.medianResponseHours}h</dd>
-              </div>
-              <div>
-                <dt className="text-muted">Payouts this month</dt>
-                <dd className="text-[22px]">{formatCurrency(perf.payoutsThisMonth)}</dd>
-              </div>
-            </dl>
-          </Panel>
+          {perf ? (
+            <Panel
+              className="col-span-5"
+              title="Performance snapshot"
+              action={
+                <Link href="/installer/performance" className="text-[13px] text-ink-2 hover:text-ink">
+                  Details →
+                </Link>
+              }
+            >
+              <dl className="grid grid-cols-2 gap-4 p-5 text-[13px]">
+                <div>
+                  <dt className="text-muted">On time</dt>
+                  <dd className="text-[22px] text-positive">{formatPercent(perf.onTimeRate)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted">First-time pass</dt>
+                  <dd className="text-[22px] text-positive">{formatPercent(perf.firstTimePassRate)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted">Response time</dt>
+                  <dd className="text-[22px]">{perf.medianResponseHours}h</dd>
+                </div>
+                <div>
+                  <dt className="text-muted">Payouts this month</dt>
+                  <dd className="text-[22px]">{formatCurrency(perf.payoutsThisMonth)}</dd>
+                </div>
+              </dl>
+            </Panel>
+          ) : (
+            <Panel className="col-span-5" title="Performance">
+              <p className="p-5 text-[14px] text-ink-2">Your on-time and first-time pass rates build up here as you complete jobs.</p>
+            </Panel>
+          )}
         </div>
       </div>
     </>

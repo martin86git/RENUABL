@@ -7,7 +7,7 @@ export const metadata = { title: "Customers" };
 
 export default async function CustomersPage() {
   await connection();
-  const customers = listCustomers();
+  const customers = await listCustomers();
   return (
     <>
       <PageHeader title="Customers" subtitle={`${customers.length} customers matched to you by RENUABL`} />

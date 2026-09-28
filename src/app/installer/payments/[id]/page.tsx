@@ -12,10 +12,10 @@ export const metadata = { title: "Payout" };
 export default async function PayoutPage({ params }: PageProps<"/installer/payments/[id]">) {
   await connection();
   const { id } = await params;
-  const job = getJob(id);
+  const job = await getJob(id);
   if (!job) notFound();
   const variations = (await variationsFor([job.recordKey]))[job.recordKey];
-  const payout = getPartnerPayout(id, variations);
+  const payout = await getPartnerPayout(id, variations);
   if (!payout) notFound();
   const when = formatDate(payout.date, { day: "numeric", month: "long", year: "numeric" });
   return (

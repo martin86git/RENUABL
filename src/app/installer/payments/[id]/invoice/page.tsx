@@ -13,11 +13,11 @@ export const metadata = { title: "Invoice" };
 export default async function InvoicePage({ params }: PageProps<"/installer/payments/[id]/invoice">) {
   await connection();
   const { id } = await params;
-  const job = getJob(id);
+  const job = await getJob(id);
   if (!job) notFound();
-  const payout = getPartnerPayout(id, (await variationsFor([job.recordKey]))[job.recordKey]);
+  const payout = await getPartnerPayout(id, (await variationsFor([job.recordKey]))[job.recordKey]);
   if (!payout || payout.status === "upcoming") notFound();
-  const partner = getCurrentInstaller();
+  const partner = await getCurrentInstaller();
   // PREVIEW: GST status comes from the partner's account once logins are live.
   const inv = payoutInvoice(payout, { name: partner.name, abn: partner.abn ?? "", gstRegistered: true });
   return (

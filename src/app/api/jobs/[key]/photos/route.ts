@@ -1,14 +1,14 @@
-import { PREVIEW_MODE } from "@/lib/config";
 import { HANDOVER_PHOTOS, MAX_ARRAYS, type EvidenceId } from "@/lib/domain/handover";
 import { addPhoto, removePhoto, validKey } from "@/lib/server/handover-store";
 import { storageConfigured } from "@/lib/server/storage";
+import { mayWriteRecord } from "@/lib/server/partner-context";
 
 const MAX_BYTES = 4 * 1024 * 1024;
 
 /** POST multipart { category, array?, jobReference, photo }: adds a handover photo (preview portal only). */
 export async function POST(request: Request, ctx: RouteContext<"/api/jobs/[key]/photos">) {
   const { key } = await ctx.params;
-  if (!validKey(key) || !PREVIEW_MODE) return Response.json({ ok: false }, { status: 404 });
+  if (!validKey(key) || !(await mayWriteRecord(key))) return Response.json({ ok: false }, { status: 404 });
   if (!storageConfigured()) return Response.json({ ok: false, notConfigured: true }, { status: 503 });
   let form: FormData;
   try {
@@ -38,7 +38,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/jobs/[key]/
 export async function DELETE(request: Request, ctx: RouteContext<"/api/jobs/[key]/photos">) {
   const { key } = await ctx.params;
   const id = new URL(request.url).searchParams.get("id") ?? "";
-  if (!validKey(key) || !PREVIEW_MODE || !/^ph_[a-z0-9]{4,20}$/.test(id)) return Response.json({ ok: false }, { status: 404 });
+  if (!validKey(key) || !(await mayWriteRecord(key)) || !/^ph_[a-z0-9]{4,20}$/.test(id))
+    return Response.json({ ok: false }, { status: 404 });
   if (!storageConfigured()) return Response.json({ ok: false, notConfigured: true }, { status: 503 });
   const record = await removePhoto(key, id);
   return record ? Response.json({ ok: true, record }) : Response.json({ ok: false }, { status: 404 });

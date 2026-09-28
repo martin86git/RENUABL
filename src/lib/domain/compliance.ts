@@ -27,7 +27,8 @@ export interface ComplianceRecord {
   number?: string;
   /** Public liability only: the cover, in dollars. */
   amount?: number;
-  expires: ISODate;
+  /** Unknown until the partner adds it (sign-up takes licence and accreditation numbers only): on file, no reminders. */
+  expires?: ISODate;
   /** The certificate we hold for it, if any. */
   document?: { name: string; uploadedAt: string };
 }
@@ -45,6 +46,8 @@ export function daysUntil(expires: ISODate, today: ISODate) {
 
 export function complianceStatus(record: ComplianceRecord | undefined, today: ISODate): ComplianceStatus {
   if (!record) return "missing";
+  if (record.kind === "public-liability" && (record.amount ?? 0) < MIN_PUBLIC_LIABILITY) return "expired";
+  if (!record.expires) return "current";
   const days = daysUntil(record.expires, today);
   if (days < 0) return "expired";
   // Cover below the minimum counts as lapsed, whatever its date.
@@ -69,6 +72,7 @@ export function offersPaused(records: ComplianceRecord[], today: ISODate): { pau
 /** The reminders due today (the run is daily, so each fires once). */
 export function remindersDue(records: ComplianceRecord[], today: ISODate): { kind: ComplianceKind; label: string; days: number }[] {
   return records.flatMap((r) => {
+    if (!r.expires) return [];
     const days = daysUntil(r.expires, today);
     if (!(REMINDER_DAYS as readonly number[]).includes(days)) return [];
     return [{ kind: r.kind, label: COMPLIANCE_ITEMS.find((i) => i.kind === r.kind)!.label, days }];

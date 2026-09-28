@@ -151,12 +151,20 @@ export async function reserveInstall(input: {
   /** The order breakdown for the confirmation email. */
   order?: Omit<OrderEmail, "reference" | "firstName">;
   installDate?: ISODate | null;
+  /** The home, system and site, for the job offered to installation partners. */
+  job?: unknown;
 }): Promise<ReserveResult> {
   try {
     const res = await fetch("/api/reserve", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ contact: input.contact, details: input.details, order: input.order, installDate: input.installDate }),
+      body: JSON.stringify({
+        contact: input.contact,
+        details: input.details,
+        order: input.order,
+        installDate: input.installDate,
+        job: input.job,
+      }),
     });
     const json = (await res.json()) as {
       ok: boolean;

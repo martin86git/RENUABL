@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Accordion, Tabs } from "radix-ui";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button, buttonClass, cn } from "@/components/ui/primitives";
 import { formatCurrency, formatDate, formatDateTime, formatTime } from "@/lib/domain/format";
 import { FIELD_STATUS_FLOW, stageForFieldStatus } from "@/lib/domain/job-status";
@@ -26,6 +26,8 @@ import type { Crew, Job, JobStage } from "@/lib/domain/types";
 import { Handover } from "@/components/installer/handover";
 import { JobDocuments } from "@/components/installer/job-documents";
 import { JobMaterials } from "@/components/installer/materials";
+import { OfferActions } from "@/components/installer/offer-actions";
+import { saveJobStage } from "@/lib/services/accounts";
 import { JobConnection } from "@/components/installer/job-connection";
 import { JobVariations, type PartnerTerms } from "@/components/installer/job-variations";
 import { jobMaterials } from "@/lib/domain/materials";
@@ -148,11 +150,14 @@ export function JobWorkspace({
   crews,
   installerName,
   partner,
+  live = false,
 }: {
   job: Job;
   crews: Crew[];
   installerName: string;
   partner: PartnerTerms;
+  /** A signed-in partner's real job: stage changes are saved. */
+  live?: boolean;
 }) {
   const field = useFieldStatus(job.id, job.statusHistory);
   const [checklist, setChecklist] = useState(job.checklist);
@@ -174,24 +179,35 @@ export function JobWorkspace({
     setTimeout(() => setConfirming(false), 450);
   }
 
-  const primaryCta =
-    effectiveStage === "new" ? (
-      <Button size="lg" className="w-full rounded-2xl" onClick={() => setStage("accepted")}>
-        Accept job
-      </Button>
-    ) : effectiveStage === "accepted" ? (
-      <Button size="lg" className="w-full rounded-2xl" disabled={!crewId} onClick={() => setStage("scheduled")}>
-        {crewId ? "Confirm schedule" : "Assign a crew to confirm"}
-      </Button>
-    ) : field.next ? (
-      <Button size="lg" className="h-16 w-full rounded-2xl text-[17px]" onClick={advance} disabled={!canStartField || confirming}>
-        {confirming ? <Loader2 className="h-5 w-5 animate-spin" /> : field.next.action}
-      </Button>
-    ) : (
-      <div className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-positive-soft text-[16px] font-medium text-positive">
-        <CircleCheck className="h-5 w-5" /> Installation complete
-      </div>
-    );
+  // Real jobs: save the schedule confirmation and the finished install.
+  function moveTo(next: JobStage) {
+    setStage(next);
+    if (live && (next === "scheduled" || next === "in-progress" || next === "completed")) void saveJobStage(job.id, next);
+  }
+  const finished = field.current === "complete";
+  useEffect(() => {
+    if (live && finished && job.stage !== "completed") void saveJobStage(job.id, "completed");
+  }, [live, finished, job.id, job.stage]);
+
+  const primaryCta = job.offer ? (
+    <OfferActions offer={job.offer} />
+  ) : effectiveStage === "new" ? (
+    <Button size="lg" className="w-full rounded-2xl" onClick={() => moveTo("accepted")}>
+      Accept job
+    </Button>
+  ) : effectiveStage === "accepted" ? (
+    <Button size="lg" className="w-full rounded-2xl" disabled={!crewId && crews.length > 0} onClick={() => moveTo("scheduled")}>
+      {crewId || crews.length === 0 ? "Confirm schedule" : "Assign a crew to confirm"}
+    </Button>
+  ) : field.next ? (
+    <Button size="lg" className="h-16 w-full rounded-2xl text-[17px]" onClick={advance} disabled={!canStartField || confirming}>
+      {confirming ? <Loader2 className="h-5 w-5 animate-spin" /> : field.next.action}
+    </Button>
+  ) : (
+    <div className="flex h-16 items-center justify-center gap-2 rounded-2xl bg-positive-soft text-[16px] font-medium text-positive">
+      <CircleCheck className="h-5 w-5" /> Installation complete
+    </div>
+  );
 
   const syncNote = (
     <div aria-live="polite" className="min-h-5 text-[13px]">
@@ -357,17 +373,20 @@ export function JobWorkspace({
                 </>
               ),
             },
-          ].map((s) => (
-            <Accordion.Item key={s.id} value={s.id}>
-              <Accordion.Header>
-                <Accordion.Trigger className="group flex min-h-14 w-full items-center justify-between px-4 text-left text-[16px] font-medium">
-                  {s.title}
-                  <ChevronDown className="h-5 w-5 text-muted transition-transform group-data-[state=open]:rotate-180" />
-                </Accordion.Trigger>
-              </Accordion.Header>
-              <Accordion.Content className="px-4 pb-4">{s.body}</Accordion.Content>
-            </Accordion.Item>
-          ))}
+          ]
+            // An offer shows what the job is; the working sections open once it's accepted.
+            .filter((s) => !job.offer || ["site", "system", "materials"].includes(s.id))
+            .map((s) => (
+              <Accordion.Item key={s.id} value={s.id}>
+                <Accordion.Header>
+                  <Accordion.Trigger className="group flex min-h-14 w-full items-center justify-between px-4 text-left text-[16px] font-medium">
+                    {s.title}
+                    <ChevronDown className="h-5 w-5 text-muted transition-transform group-data-[state=open]:rotate-180" />
+                  </Accordion.Trigger>
+                </Accordion.Header>
+                <Accordion.Content className="px-4 pb-4">{s.body}</Accordion.Content>
+              </Accordion.Item>
+            ))}
         </Accordion.Root>
       </div>
 
@@ -397,17 +416,18 @@ export function JobWorkspace({
 
         <Tabs.Root defaultValue="overview" className="mt-6">
           <Tabs.List className="flex gap-1 overflow-x-auto border-b border-line" aria-label="Job sections">
-            {["Overview", "Site", "System", "Materials", "Variations", "Handover", "Connection", "Documents", "Messages", "Activity"].map(
-              (t) => (
-                <Tabs.Trigger
-                  key={t}
-                  value={t.toLowerCase()}
-                  className="-mb-px shrink-0 whitespace-nowrap border-b-2 border-transparent px-3.5 py-3 text-[14px] text-muted hover:text-ink data-[state=active]:border-ink data-[state=active]:font-medium data-[state=active]:text-ink"
-                >
-                  {t}
-                </Tabs.Trigger>
-              ),
-            )}
+            {(job.offer
+              ? ["Overview", "Site", "System", "Materials"]
+              : ["Overview", "Site", "System", "Materials", "Variations", "Handover", "Connection", "Documents", "Messages", "Activity"]
+            ).map((t) => (
+              <Tabs.Trigger
+                key={t}
+                value={t.toLowerCase()}
+                className="-mb-px shrink-0 whitespace-nowrap border-b-2 border-transparent px-3.5 py-3 text-[14px] text-muted hover:text-ink data-[state=active]:border-ink data-[state=active]:font-medium data-[state=active]:text-ink"
+              >
+                {t}
+              </Tabs.Trigger>
+            ))}
           </Tabs.List>
 
           <Tabs.Content value="overview" className="mt-6 grid grid-cols-12 gap-6">

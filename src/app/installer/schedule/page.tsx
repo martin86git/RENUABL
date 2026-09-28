@@ -8,11 +8,11 @@ export const metadata = { title: "Schedule" };
 
 export default async function SchedulePage() {
   await connection();
-  const jobs = listJobs().filter((j) => j.stage !== "new");
+  const jobs = (await listJobs()).filter((j) => j.stage !== "new");
   return (
     <>
       <PageHeader title="Schedule" subtitle="Week view · assign crews and check status" />
-      <ScheduleBoard jobs={jobs} crews={listCrews()} today={todayInMarket()} />
+      <ScheduleBoard jobs={jobs} crews={await listCrews()} today={todayInMarket()} />
     </>
   );
 }

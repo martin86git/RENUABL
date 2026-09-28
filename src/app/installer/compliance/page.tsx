@@ -12,7 +12,7 @@ const LABEL = { current: "Current", expiring: "Expiring soon", expired: "Expired
 
 export default async function CompliancePage() {
   await connection();
-  const { items, paused, reasons } = getCompliance();
+  const { items, paused, reasons } = await getCompliance();
   return (
     <>
       <PageHeader title="Compliance" subtitle="Your licences and insurance. Keep them current to keep receiving job offers." />
@@ -34,8 +34,8 @@ export default async function CompliancePage() {
                 <p className="mt-2 text-[14px] text-ink-2">
                   {i.record.amount ? `$${(i.record.amount / 1_000_000).toLocaleString("en-AU")} million cover · ` : ""}
                   {i.record.number ? `${i.record.number} · ` : ""}
-                  {i.phrase === "not on file"
-                    ? ""
+                  {!i.record.expires
+                    ? "On file. Add its expiry date so we can remind you before it runs out."
                     : `${i.phrase[0].toUpperCase()}${i.phrase.slice(1)} (${formatDate(i.record.expires, { day: "numeric", month: "long", year: "numeric" })})`}
                 </p>
               )}

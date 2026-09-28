@@ -1,13 +1,13 @@
-import { PREVIEW_MODE } from "@/lib/config";
 import { plainText } from "@/lib/domain/emails";
 import { DOCUMENT_UPLOAD, MAX_DOCUMENT_FILES } from "@/lib/domain/handover";
 import { addDocument, getRecord, removeDocument, validKey } from "@/lib/server/handover-store";
 import { storageConfigured } from "@/lib/server/storage";
+import { mayWriteRecord } from "@/lib/server/partner-context";
 
 /** POST multipart { docId, jobReference, file }: adds a page or file to one of the job's documents (preview portal only). */
 export async function POST(request: Request, ctx: RouteContext<"/api/jobs/[key]/documents">) {
   const { key } = await ctx.params;
-  if (!validKey(key) || !PREVIEW_MODE) return Response.json({ ok: false }, { status: 404 });
+  if (!validKey(key) || !(await mayWriteRecord(key))) return Response.json({ ok: false }, { status: 404 });
   if (!storageConfigured()) return Response.json({ ok: false, notConfigured: true }, { status: 503 });
   let form: FormData;
   try {
@@ -52,7 +52,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/jobs/[key]/
 export async function DELETE(request: Request, ctx: RouteContext<"/api/jobs/[key]/documents">) {
   const { key } = await ctx.params;
   const id = new URL(request.url).searchParams.get("id") ?? "";
-  if (!validKey(key) || !PREVIEW_MODE || !/^dc_[a-z0-9]{4,20}$/.test(id)) return Response.json({ ok: false }, { status: 404 });
+  if (!validKey(key) || !(await mayWriteRecord(key)) || !/^dc_[a-z0-9]{4,20}$/.test(id))
+    return Response.json({ ok: false }, { status: 404 });
   if (!storageConfigured()) return Response.json({ ok: false, notConfigured: true }, { status: 503 });
   const record = await removeDocument(key, id);
   return record ? Response.json({ ok: true, record }) : Response.json({ ok: false }, { status: 404 });

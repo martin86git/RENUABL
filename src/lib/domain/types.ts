@@ -296,6 +296,8 @@ export interface Job {
   messages: JobMessage[];
   activity: JobActivity[];
   statusHistory: StatusEvent[];
+  /** An open offer to this partner: accept or decline before it expires. */
+  offer?: { id: string; expiresAt: string };
 }
 
 export interface Crew {

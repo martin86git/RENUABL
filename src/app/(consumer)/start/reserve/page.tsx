@@ -70,6 +70,15 @@ function ReserveScreen() {
       care: CARE_ENABLED ? state.care : null,
       careIncluded,
       installDate: state.installDate,
+      job: {
+        address: state.address,
+        system: config,
+        site,
+        packageName: `${TIER_LABELS[state.tier]} · ${describeSystem(config)}`,
+        value: price.total,
+        solarVictoria: price.rebateLines.some((r) => r.id.startsWith("sv-")),
+        installDate: state.installDate,
+      },
       order: {
         address: state.address ? formatAddress(state.address) : undefined,
         installer: installer?.name,

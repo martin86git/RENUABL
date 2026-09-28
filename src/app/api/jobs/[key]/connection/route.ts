@@ -1,18 +1,19 @@
-import { PREVIEW_MODE } from "@/lib/config";
 import { isConnectionStep, partnerMayUpdate, updateConnection } from "@/lib/domain/connection";
 import { emptyHandover } from "@/lib/domain/handover";
 import { getRecord, saveRecord, validKey } from "@/lib/server/handover-store";
-import { currentPartner } from "@/lib/server/partner-context";
+import { currentPartner, mayWriteRecord } from "@/lib/server/partner-context";
 import { storageConfigured } from "@/lib/server/storage";
 
 /**
  * PUT { jobReference, step, done: "YYYY-MM-DD" | null, reference? } from the
- * partner portal (preview only): ticks off a grid connection or rebate step
+ * partner portal (the job's own partner): ticks off a grid connection or rebate step
  * the partner is responsible for.
  */
 export async function PUT(request: Request, ctx: RouteContext<"/api/jobs/[key]/connection">) {
   const { key } = await ctx.params;
-  if (!validKey(key) || !PREVIEW_MODE) return Response.json({ ok: false }, { status: 404 });
+  if (!validKey(key) || !(await mayWriteRecord(key))) return Response.json({ ok: false }, { status: 404 });
+  const partner = await currentPartner();
+  if (!partner) return Response.json({ ok: false }, { status: 404 });
   if (!storageConfigured()) return Response.json({ ok: false, notConfigured: true }, { status: 503 });
   let body: Record<string, unknown>;
   try {
@@ -22,7 +23,7 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/jobs/[key]/c
   }
   const step = body.step;
   if (!isConnectionStep(step)) return Response.json({ ok: false }, { status: 400 });
-  if (!partnerMayUpdate(step, currentPartner().type))
+  if (!partnerMayUpdate(step, partner.type))
     return Response.json({ ok: false, message: "RENUABL looks after this step." }, { status: 403 });
   const reference = typeof body.jobReference === "string" ? body.jobReference.slice(0, 20) : "";
   const existing = (await getRecord(key)) ?? emptyHandover(key, reference);

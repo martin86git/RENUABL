@@ -3,8 +3,8 @@ import Link from "next/link";
 import { getCompliance } from "@/lib/services/installer";
 
 /** Across the portal: new offers are paused, or something's about to expire. */
-export function ComplianceBanner() {
-  const { paused, attention } = getCompliance();
+export async function ComplianceBanner() {
+  const { paused, attention } = await getCompliance();
   if (!attention.length) return null;
   const first = attention[0];
   return (

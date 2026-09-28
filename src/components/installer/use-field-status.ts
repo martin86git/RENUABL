@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { advanceStatus, currentFieldStatus, nextFieldStatus, FIELD_STATUS_FLOW } from "@/lib/domain/job-status";
 import type { StatusEvent } from "@/lib/domain/types";
-import { updateJobStatus } from "@/lib/services/installer";
+import { updateJobStatus } from "@/lib/services/field";
 
 interface Queued extends StatusEvent {
   jobId: string;

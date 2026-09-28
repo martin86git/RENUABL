@@ -1,4 +1,3 @@
-import { PREVIEW_MODE } from "@/lib/config";
 import { COMPLIANCE_UPLOAD, validateComplianceUpdate } from "@/lib/domain/compliance-upload";
 import { todayInMarket } from "@/lib/domain/market";
 import { saveFile, saveJson, storageConfigured } from "@/lib/server/storage";
@@ -7,10 +6,11 @@ import { currentPartner } from "@/lib/server/partner-context";
 /**
  * POST multipart { kind, expires, number?, amount?, file }: a renewed licence
  * or insurance certificate from the portal, kept privately for RENUABL to
- * review. Preview only until partner logins.
+ * review. For the signed-in partner (or the sample portal, in preview).
  */
 export async function POST(request: Request) {
-  if (!PREVIEW_MODE) return Response.json({ ok: false }, { status: 404 });
+  const acting = await currentPartner();
+  if (!acting) return Response.json({ ok: false }, { status: 404 });
   if (!storageConfigured()) return Response.json({ ok: false, notConfigured: true, message: "Storage isn't set up yet." }, { status: 503 });
   let form: FormData;
   try {
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   ) {
     return Response.json({ ok: false, message: "Send a PDF or a photo (JPG or PNG) under 4 MB." }, { status: 422 });
   }
-  const partner = currentPartner().id;
+  const partner = acting.id;
   const stamp = new Date().toISOString();
   const ext = file.type === "application/pdf" ? "pdf" : file.type === "image/png" ? "png" : "jpg";
   const path = await saveFile(`partners/${partner}/compliance/${checked.update.kind}.${ext}`, await file.arrayBuffer(), file.type);

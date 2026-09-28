@@ -15,7 +15,7 @@ export default async function MaterialsPage({ searchParams }: PageProps<"/instal
   await connection();
   const { days: raw } = await searchParams;
   const days = RANGES.find((r) => String(r) === raw) ?? 14;
-  const jobs = listJobsToOrder(days);
+  const jobs = await listJobsToOrder(days);
   const lines = combineMaterials(jobs);
   return (
     <>

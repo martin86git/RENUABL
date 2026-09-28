@@ -9,7 +9,7 @@ export const metadata = { title: "Documents" };
 
 export default async function DocumentsPage() {
   await connection();
-  const outstanding = listJobs().flatMap((j) => j.documents.filter((d) => d.status === "required").map((d) => ({ ...d, job: j })));
+  const outstanding = (await listJobs()).flatMap((j) => j.documents.filter((d) => d.status === "required").map((d) => ({ ...d, job: j })));
   return (
     <>
       <PageHeader title="Documents" subtitle={`${outstanding.length} documents outstanding across your jobs`} />

@@ -191,3 +191,68 @@ export function partnerReceivedEmail(o: { reference: string; firstName: string; 
 </div></body></html>`;
   return { subject, html, text: `Thanks, ${plainText(o.firstName, 40) || "there"}.\n\n${body}` };
 }
+
+/**
+ * A short email with one button. The link is always built on the server from
+ * the site's own address (never taken from the browser).
+ */
+function simpleEmail(o: { subject: string; heading: string; lines: string[]; button?: { label: string; href: string }; footer?: string }) {
+  const btn = o.button
+    ? `<p style="margin:24px 0"><a href="${esc(o.button.href)}" style="display:inline-block;background:#1E3A2E;color:#fff;text-decoration:none;padding:14px 22px;border-radius:999px;font-size:15px">${esc(o.button.label)}</a></p>`
+    : "";
+  const html = `<!doctype html><html><body style="margin:0;background:#FAF9F6;font-family:Inter,Arial,sans-serif;color:#1A1A1A"><div style="max-width:560px;margin:0 auto;padding:32px 20px">
+<p style="letter-spacing:.28em;font-size:14px;margin:0 0 24px">RENUABL</p>
+<h1 style="font-weight:400;font-size:26px;margin:0 0 12px">${esc(o.heading)}</h1>
+${o.lines.map((l) => `<p style="margin:0 0 10px">${esc(l)}</p>`).join("\n")}
+${btn}
+<p style="color:#6B6B6B;font-size:12px;margin-top:24px">${esc(o.footer ?? "Questions? Just reply to this email.")}</p>
+</div></body></html>`;
+  const text = [o.heading, "", ...o.lines, ...(o.button ? ["", `${o.button.label}: ${o.button.href}`] : []), "", o.footer ?? ""]
+    .join("\n")
+    .trim();
+  return { subject: o.subject, html, text };
+}
+
+export function loginLinkEmail(o: { link: string; minutes: number; forPartner: boolean }) {
+  return simpleEmail({
+    subject: "Your RENUABL sign-in link",
+    heading: "Sign in to RENUABL",
+    lines: [
+      `Tap the button to sign in${o.forPartner ? " to your partner portal" : ""}. The link works once and expires in ${o.minutes} minutes.`,
+    ],
+    button: { label: "Sign in", href: o.link },
+    footer: "Didn't ask for this? You can ignore this email: nobody can sign in without the link.",
+  });
+}
+
+export function applicationPendingEmail() {
+  return simpleEmail({
+    subject: "Your RENUABL application is being reviewed",
+    heading: "We're still reviewing your application",
+    lines: ["You'll be able to sign in to the partner portal as soon as your application is approved. We'll email you then."],
+  });
+}
+
+export function partnerApprovedEmail(o: { firstName: string; link: string }) {
+  return simpleEmail({
+    subject: "You're approved: welcome to RENUABL",
+    heading: `Welcome aboard, ${plainText(o.firstName, 40) || "there"}.`,
+    lines: [
+      "Your application has been approved. New jobs within your area will be offered to you by email and in the partner portal.",
+      "You'll have 24 hours to accept each offer before it goes to another partner.",
+    ],
+    button: { label: "Open the partner portal", href: o.link },
+  });
+}
+
+export function jobOfferEmail(o: { suburb: string; system: string; installDate: string | null; link: string; hours: number }) {
+  return simpleEmail({
+    subject: `New job offer in ${plainText(o.suburb, 40)}`,
+    heading: `New job in ${plainText(o.suburb, 40)}`,
+    lines: [
+      `${plainText(o.system, 80)}${o.installDate ? `, installing ${plainText(o.installDate, 40)}` : ""}.`,
+      `Accept within ${o.hours} hours, or it will be offered to another partner.`,
+    ],
+    button: { label: "View the offer", href: o.link },
+  });
+}

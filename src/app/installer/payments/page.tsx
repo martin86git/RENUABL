@@ -48,8 +48,8 @@ function PayoutRows({ payouts }: { payouts: Payout[] }) {
 
 export default async function PaymentsPage() {
   await connection();
-  const variations = await variationsFor(listJobs().map((j) => j.recordKey));
-  const payouts = listPartnerPayouts(variations);
+  const variations = await variationsFor((await listJobs()).map((j) => j.recordKey));
+  const payouts = await listPartnerPayouts(variations);
   const totals = payoutTotals(payouts);
   const upcoming = payouts.filter((p) => p.status === "upcoming").reverse();
   const past = payouts.filter((p) => p.status !== "upcoming");

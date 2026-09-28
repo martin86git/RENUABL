@@ -1,50 +1,85 @@
 /**
- * Installer portal service layer. Replace mock reads/writes with API calls.
+ * Installer portal service layer (server only). A signed-in partner sees only
+ * their own jobs and offers, from the database; in preview, the sample portal
+ * uses mock data. Every read goes through the portal context.
  */
-import type { FieldStatus, Job, JobStage } from "@/lib/domain/types";
+import { redirect } from "next/navigation";
+import { COMPLIANCE_ITEMS, complianceStatus, expiryPhrase, offersPaused } from "@/lib/domain/compliance";
+import { formatShortDate } from "@/lib/domain/format";
+import { portalJob } from "@/lib/domain/jobs";
+import { todayInMarket } from "@/lib/domain/market";
+import { jobsToOrderFor } from "@/lib/domain/materials";
+import { timeLeft } from "@/lib/domain/offers";
+import { jobPayout, type Payout } from "@/lib/domain/payouts";
+import type { Crew, Installer, Job, JobStage } from "@/lib/domain/types";
+import type { Variation } from "@/lib/domain/variations";
 import { CREWS, CURRENT_INSTALLER_ID, CURRENT_USER, INSTALLERS } from "@/lib/mock/installers";
 import { INSTALLER_PERFORMANCE, RESOURCES, buildJobs } from "@/lib/mock/jobs";
-import { jobPayout, type Payout } from "@/lib/domain/payouts";
-import type { Variation } from "@/lib/domain/variations";
-import { todayInMarket } from "@/lib/domain/market";
-import { formatShortDate } from "@/lib/domain/format";
-import { jobsToOrderFor } from "@/lib/domain/materials";
-import { COMPLIANCE_ITEMS, complianceStatus, expiryPhrase, offersPaused } from "@/lib/domain/compliance";
+import { jobsForPartner } from "@/lib/server/jobs-repo";
+import { processOffersSoon } from "@/lib/server/offers-engine";
+import { partnerAsInstaller } from "@/lib/server/partners-repo";
+import { portalContext, type PortalContext } from "@/lib/server/portal";
 
-export function getCurrentInstaller() {
-  return INSTALLERS.find((i) => i.id === CURRENT_INSTALLER_ID)!;
+/** The portal's context, or off to sign in. */
+export async function requirePortal(): Promise<PortalContext> {
+  const ctx = await portalContext();
+  if (!ctx) redirect("/login?as=partner");
+  return ctx;
 }
 
-export function getCurrentUser() {
-  return CURRENT_USER;
+export async function isDemo() {
+  return (await requirePortal()).kind === "demo";
 }
 
-export function listJobs(stage?: JobStage): Job[] {
-  const all = buildJobs();
+export async function getCurrentInstaller(): Promise<Installer> {
+  const ctx = await requirePortal();
+  return ctx.kind === "partner" ? partnerAsInstaller(ctx.partner) : INSTALLERS.find((i) => i.id === CURRENT_INSTALLER_ID)!;
+}
+
+export async function getCurrentUser(): Promise<{ name: string; firstName: string }> {
+  const ctx = await requirePortal();
+  if (ctx.kind === "demo") return CURRENT_USER;
+  return { name: ctx.partner.full_name, firstName: ctx.partner.full_name.split(" ")[0] };
+}
+
+async function allJobs(): Promise<Job[]> {
+  const ctx = await requirePortal();
+  if (ctx.kind === "demo") return buildJobs();
+  await processOffersSoon();
+  const rows = await jobsForPartner(ctx.partner.id);
+  return rows.map(({ job, offer }) =>
+    portalJob(job, offer?.expires_at ? { id: offer.id, expiresAt: new Date(offer.expires_at).toISOString() } : undefined),
+  );
+}
+
+export async function listJobs(stage?: JobStage): Promise<Job[]> {
+  const all = await allJobs();
   const jobs = stage ? all.filter((j) => j.stage === stage) : all;
   return [...jobs].sort((a, b) => a.preferredDate.localeCompare(b.preferredDate));
 }
 
-export function getJob(id: string): Job | undefined {
-  return buildJobs().find((j) => j.id === id);
+export async function getJob(id: string): Promise<Job | undefined> {
+  return (await allJobs()).find((j) => j.id === id);
 }
 
-export function listTodaysJobs(now = new Date()): Job[] {
+export async function listTodaysJobs(now = new Date()): Promise<Job[]> {
   const today = todayInMarket(now);
-  return listJobs().filter((j) => j.preferredDate === today || j.stage === "in-progress");
+  return (await listJobs()).filter((j) => j.preferredDate === today || j.stage === "in-progress");
 }
 
 /** Accepted and scheduled jobs installing in the next `days` days, for the materials order. */
-export function listJobsToOrder(days: number, now = new Date()): Job[] {
-  return jobsToOrderFor(listJobs(), todayInMarket(now), days);
+export async function listJobsToOrder(days: number, now = new Date()): Promise<Job[]> {
+  return jobsToOrderFor(await listJobs(), todayInMarket(now), days);
 }
 
-export function listCrews() {
-  return CREWS;
+export async function listCrews(): Promise<Crew[]> {
+  return (await isDemo()) ? CREWS : [];
 }
 
-export function getDashboardCounts() {
-  const jobs = listJobs();
+export async function getDashboardCounts() {
+  const jobs = await listJobs();
+  const demo = await isDemo();
+  const month = todayInMarket().slice(0, 7);
   return {
     newJobs: jobs.filter((j) => j.stage === "new").length,
     awaitingConfirmation: jobs.filter((j) => j.stage === "new" || j.stage === "accepted").length,
@@ -52,27 +87,30 @@ export function getDashboardCounts() {
     awaitingAction: jobs.filter(
       (j) => j.stage === "new" || j.stage === "accepted" || j.documents.some((d) => d.status === "required" && d.kind === "approval"),
     ).length,
-    completedThisMonth: INSTALLER_PERFORMANCE.jobsCompletedThisMonth,
-    rating: INSTALLER_PERFORMANCE.customerRating,
+    completedThisMonth: demo
+      ? INSTALLER_PERFORMANCE.jobsCompletedThisMonth
+      : jobs.filter((j) => j.stage === "completed" && j.preferredDate.startsWith(month)).length,
+    /** Only the sample portal has a rating; real ones come once customers review their installs. */
+    rating: demo ? INSTALLER_PERFORMANCE.customerRating : null,
   };
 }
 
 /** The partner's licences and insurance, and whether new offers are paused. */
-export function getCompliance(now = new Date()) {
+export async function getCompliance(now = new Date()) {
   const today = todayInMarket(now);
-  const records = getCurrentInstaller().compliance ?? [];
+  const records = (await getCurrentInstaller()).compliance ?? [];
   const items = COMPLIANCE_ITEMS.map((item) => {
     const record = records.find((r) => r.kind === item.kind);
     const status = complianceStatus(record, today);
-    return { ...item, record, status, phrase: record ? expiryPhrase(record.expires, today) : "not on file" };
+    return { ...item, record, status, phrase: !record ? "not on file" : record.expires ? expiryPhrase(record.expires, today) : "on file" };
   });
   return { items, ...offersPaused(records, today), attention: items.filter((i) => i.status !== "current") };
 }
 
-export function getAlerts() {
-  const jobs = listJobs();
+export async function getAlerts() {
+  const jobs = await listJobs();
   const alerts: { id: string; href: string; title: string; detail: string; severity: "warning" | "info" }[] = [];
-  for (const c of getCompliance().attention) {
+  for (const c of (await getCompliance()).attention) {
     alerts.push({
       id: `compliance-${c.kind}`,
       href: "/installer/compliance",
@@ -86,8 +124,8 @@ export function getAlerts() {
       alerts.push({
         id: `${j.id}-new`,
         href: `/installer/jobs/${j.id}`,
-        title: `New job to review · ${j.reference}`,
-        detail: `${j.customer.name}, ${j.address.suburb}`,
+        title: j.offer ? `New job offer · ${j.address.suburb}` : `New job to review · ${j.reference}`,
+        detail: j.offer ? `${j.packageName} · ${timeLeft(j.offer.expiresAt).label} to accept` : `${j.customer.name}, ${j.address.suburb}`,
         severity: "info",
       });
     }
@@ -114,48 +152,46 @@ export function getAlerts() {
   return alerts;
 }
 
-export function getPerformance() {
-  return INSTALLER_PERFORMANCE;
+/** Sample figures in the demo; real partners' figures build up from their completed jobs. */
+export async function getPerformance() {
+  return (await isDemo()) ? INSTALLER_PERFORMANCE : null;
 }
 
 /** Payouts for the partner's jobs: installation at their rates plus approved variations (by record key). */
-export function listPartnerPayouts(variations: Record<string, Variation[]> = {}, now = new Date()): Payout[] {
-  const partner = getCurrentInstaller();
+export async function listPartnerPayouts(variations: Record<string, Variation[]> = {}, now = new Date()): Promise<Payout[]> {
+  const partner = await getCurrentInstaller();
   const today = todayInMarket(now);
-  return listJobs()
+  return (await listJobs())
     .filter((j) => j.stage !== "new")
     .map((j) => jobPayout(j, { pricing: partner.pricing, variations: variations[j.recordKey], today }))
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
-export function getPartnerPayout(id: string, variations: Variation[] = [], now = new Date()): Payout | null {
-  const job = getJob(id);
+export async function getPartnerPayout(id: string, variations: Variation[] = [], now = new Date()): Promise<Payout | null> {
+  const job = await getJob(id);
   if (!job || job.stage === "new") return null;
-  return jobPayout(job, { pricing: getCurrentInstaller().pricing, variations, today: todayInMarket(now) });
+  return jobPayout(job, { pricing: (await getCurrentInstaller()).pricing, variations, today: todayInMarket(now) });
 }
 
-export function listResources() {
+export async function listResources() {
   return RESOURCES;
 }
 
-export function listCustomers() {
-  return listJobs().map((j) => ({
-    id: j.id,
-    name: j.customer.name,
-    suburb: j.address.suburb,
-    phone: j.customer.phone,
-    stage: j.stage,
-    reference: j.reference,
-  }));
+export async function listCustomers() {
+  return (await listJobs())
+    .filter((j) => j.stage !== "new")
+    .map((j) => ({
+      id: j.id,
+      name: j.customer.name,
+      suburb: j.address.suburb,
+      phone: j.customer.phone,
+      stage: j.stage,
+      reference: j.reference,
+    }));
 }
 
-export function listConversations() {
-  return listJobs()
+export async function listConversations() {
+  return (await listJobs())
     .filter((j) => j.messages.length > 0)
     .map((j) => ({ jobId: j.id, reference: j.reference, customer: j.customer.name, last: j.messages[j.messages.length - 1] }));
-}
-
-export async function updateJobStatus(jobId: string, status: FieldStatus, at: string) {
-  await new Promise((r) => setTimeout(r, 400));
-  return { jobId, status, at, customerNotified: status === "en-route" || status === "on-site" || status === "complete" };
 }

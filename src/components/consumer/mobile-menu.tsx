@@ -33,6 +33,9 @@ export function MobileMenu() {
             <Link href="/my" className={item} onClick={() => setOpen(false)}>
               My RENUABL <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
             </Link>
+            <Link href="/login" className={item} onClick={() => setOpen(false)}>
+              Log in <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
+            </Link>
           </nav>
           <Link
             href="/partners"

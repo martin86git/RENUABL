@@ -1,20 +1,21 @@
-import { PREVIEW_MODE } from "@/lib/config";
 import { emptyHandover } from "@/lib/domain/handover";
 import { siteUrl, variationSentSms } from "@/lib/domain/sms";
 import { addVariation, cleanVariationInput } from "@/lib/domain/variations";
 import { getRecord, saveRecord, validKey } from "@/lib/server/handover-store";
-import { currentPartner, customerMobileFor } from "@/lib/server/partner-context";
+import { currentPartner, customerMobileFor, mayWriteRecord } from "@/lib/server/partner-context";
 import { sendSms } from "@/lib/server/sms";
 import { storageConfigured } from "@/lib/server/storage";
 
 /**
  * POST { jobReference, reason, items: [{ label, amount }] } from the partner
- * portal (preview only): prices the variation on the server and sends it to
+ * portal (the job's own partner): prices the variation on the server and sends it to
  * the customer to approve. Texts the customer a link when they can be reached.
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/jobs/[key]/variations">) {
   const { key } = await ctx.params;
-  if (!validKey(key) || !PREVIEW_MODE) return Response.json({ ok: false }, { status: 404 });
+  if (!validKey(key) || !(await mayWriteRecord(key))) return Response.json({ ok: false }, { status: 404 });
+  const partner = await currentPartner();
+  if (!partner) return Response.json({ ok: false }, { status: 404 });
   if (!storageConfigured()) return Response.json({ ok: false, notConfigured: true }, { status: 503 });
   let body: Record<string, unknown>;
   try {
@@ -29,7 +30,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/jobs/[key]/
   const existing = (await getRecord(key)) ?? emptyHandover(key, reference);
   const now = new Date().toISOString();
   const id = `var_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const record = await saveRecord({ ...existing, variations: addVariation(existing.variations, input, currentPartner(), { id, now }) });
+  const record = await saveRecord({ ...existing, variations: addVariation(existing.variations, input, partner, { id, now }) });
 
   const customer = await customerMobileFor(key);
   const site = siteUrl();
