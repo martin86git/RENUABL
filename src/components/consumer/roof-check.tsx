@@ -19,6 +19,7 @@ export function RoofCheck({
   centre,
   panelCount,
   reason,
+  loading = false,
 }: {
   roof: RoofInsights | null | undefined;
   model: RoofModel | null | undefined;
@@ -26,7 +27,17 @@ export function RoofCheck({
   panelCount: number;
   /** Why there's no roof data, if known (shown in preview only). */
   reason?: string;
+  /** Google's roof is still loading. */
+  loading?: boolean;
 }) {
+  if (loading && panelCount > 0) {
+    return (
+      <Card className="overflow-hidden" aria-busy="true">
+        <div className="aspect-[4/3] w-full animate-pulse bg-surface-2" />
+        <p className="p-5 text-[15px] text-ink">Looking at your roof from above…</p>
+      </Card>
+    );
+  }
   if (!roof || panelCount <= 0) {
     if (!PREVIEW_MODE || panelCount <= 0) return null;
     const why =
@@ -58,7 +69,11 @@ export function RoofCheck({
           <p className="text-[15px] text-ink">{canDraw ? "Your panels on your roof" : "Your roof"}</p>
           <p className="mt-0.5 text-[14px] text-muted">{roofSummary(roof)}</p>
           <p className="mt-2 text-[14px] text-ink-2">
-            Your system uses {panelCount} panels{canDraw ? ", placed on the sunniest parts of your roof" : ""}. {ROOF_FIT_NOTE[fit]}
+            Your system uses {panelCount} panels
+            {canDraw
+              ? ", placed on the sunniest parts of your roof, allowing for its tilt, direction and shade from trees and buildings"
+              : ""}
+            . {ROOF_FIT_NOTE[fit]}
           </p>
           <p className="mt-2 text-[12px] text-muted">
             From Google&apos;s satellite roof data, which also shapes your savings estimate. A first layout: your installation partner

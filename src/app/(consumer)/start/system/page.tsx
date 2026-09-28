@@ -93,6 +93,12 @@ function SystemScreen() {
   const set = (patch: Partial<SystemConfig>) => update({ config: { ...config, ...patch } });
 
   const existing = recommendation.usage.existingSolar;
+  const home = state.address;
+  // Google's roof is still on its way for this address.
+  const roofLoading =
+    typeof home?.lat === "number" &&
+    typeof home.lng === "number" &&
+    !(state.roof && Math.abs(state.roof.lat - home.lat) < 1e-5 && Math.abs(state.roof.lng - home.lng) < 1e-5);
   const replacing = state.bill ? solarSituation(state.bill, profile) === "replace" : false;
   const daily = recommendation.usage.dailyKwh;
   const subtitle = existing
@@ -152,6 +158,17 @@ function SystemScreen() {
       }
     >
       <div className="max-w-xl space-y-4">
+        {!existing && (
+          <RoofCheck
+            roof={state.roof?.data}
+            model={state.roof?.model}
+            centre={state.address}
+            panelCount={config.panelCount}
+            reason={state.roof?.reason}
+            loading={roofLoading}
+          />
+        )}
+
         <Segmented<SystemTier>
           label="System option"
           value={state.tier}
@@ -215,16 +232,6 @@ function SystemScreen() {
             </div>
           )}
         </Card>
-
-        {!existing && (
-          <RoofCheck
-            roof={state.roof?.data}
-            model={state.roof?.model}
-            centre={state.address}
-            panelCount={config.panelCount}
-            reason={state.roof?.reason}
-          />
-        )}
 
         <Card className="p-5">
           <p className="text-[15px] text-ink">Why this system?</p>
