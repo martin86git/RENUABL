@@ -301,14 +301,18 @@ export async function fetchSunshine(lat: number, lng: number): Promise<Sunshine 
   }
 }
 
-/** The home's roof from Google's Solar API (figures and panel spots), when there's data for it. */
-export async function fetchRoofInsights(lat: number, lng: number): Promise<{ insights: RoofInsights; model: RoofModel | null } | null> {
+/** The home's roof from Google's Solar API (figures and panel spots), or why there isn't one. */
+export async function fetchRoofInsights(
+  lat: number,
+  lng: number,
+): Promise<{ insights: RoofInsights | null; model: RoofModel | null; reason?: string }> {
   try {
     const res = await fetch(`/api/roof?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`);
-    const json = (await res.json()) as { ok: boolean; roof?: RoofInsights; model?: RoofModel | null };
-    return json.ok && json.roof ? { insights: json.roof, model: json.model ?? null } : null;
+    const json = (await res.json()) as { ok: boolean; roof?: RoofInsights; model?: RoofModel | null; reason?: string };
+    if (json.ok && json.roof) return { insights: json.roof, model: json.model ?? null };
+    return { insights: null, model: null, reason: json.reason ?? (res.status === 429 ? "too many lookups" : "unavailable") };
   } catch {
-    return null;
+    return { insights: null, model: null, reason: "offline" };
   }
 }
 

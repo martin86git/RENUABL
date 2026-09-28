@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/primitives";
 import { RoofDesigner } from "@/components/ui/roof-designer";
 import { autoLayout, type RoofModel } from "@/lib/domain/roof-layout";
 import { ROOF_FIT_NOTE, roofFit, roofSummary, type RoofInsights } from "@/lib/domain/solar-roof";
+import { PREVIEW_MODE } from "@/lib/config";
 import { roofImageSrc } from "@/lib/services/consumer";
 
 /**
@@ -17,13 +18,27 @@ export function RoofCheck({
   model,
   centre,
   panelCount,
+  reason,
 }: {
   roof: RoofInsights | null | undefined;
   model: RoofModel | null | undefined;
   centre: { lat?: number; lng?: number } | null;
   panelCount: number;
+  /** Why there's no roof data, if known (shown in preview only). */
+  reason?: string;
 }) {
-  if (!roof || panelCount <= 0) return null;
+  if (!roof || panelCount <= 0) {
+    if (!PREVIEW_MODE || panelCount <= 0) return null;
+    const why =
+      typeof centre?.lat !== "number"
+        ? "this address has no map location. Choose it from the address suggestions."
+        : reason === "no-coverage"
+          ? "Google has no roof data for this home."
+          : `Google's roof data didn't load (${reason ?? "still loading"}).`;
+    return (
+      <p className="rounded-lg border border-line bg-surface p-4 text-[13px] text-muted">Preview only: no panel layout because {why}</p>
+    );
+  }
   const fit = roofFit(roof, panelCount);
   const canDraw = model && typeof centre?.lat === "number" && typeof centre.lng === "number";
   return (

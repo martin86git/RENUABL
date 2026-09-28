@@ -22,7 +22,7 @@ export function inAustralia(lat: number, lng: number) {
   return lat >= -44 && lat <= -9 && lng >= 112 && lng <= 154;
 }
 
-const cacheKey = (lat: number, lng: number) => `v2:${lat.toFixed(5)},${lng.toFixed(5)}`;
+const cacheKey = (lat: number, lng: number) => `v3:${lat.toFixed(5)},${lng.toFixed(5)}`;
 
 async function cached(key: string): Promise<{ data: RoofData | null } | null> {
   const m = memory.get(key);
@@ -53,31 +53,52 @@ export async function roofInsights(lat: number, lng: number): Promise<RoofInsigh
 
 /** The roof's figures and panel spots (one charged lookup per home, then kept). */
 export async function roofData(lat: number, lng: number): Promise<RoofData | null> {
+  return (await roofLookup(lat, lng)).data;
+}
+
+/** Why there's no roof: no key, no Google coverage for the home, or Google refused (e.g. the Solar API isn't enabled for the key). */
+export type RoofMissing = "no-key" | "outside-australia" | "no-coverage" | `google-${number}: ${string}`;
+
+/** The roof, or why there isn't one (for preview diagnostics). Tries medium-quality imagery, then base. */
+export async function roofLookup(lat: number, lng: number): Promise<{ data: RoofData | null; reason?: RoofMissing }> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
-  if (!apiKey || !inAustralia(lat, lng)) return null;
+  if (!apiKey) return { data: null, reason: "no-key" };
+  if (!inAustralia(lat, lng)) return { data: null, reason: "outside-australia" };
   const key = cacheKey(lat, lng);
   const hit = await cached(key).catch(() => null);
-  if (hit) return hit.data;
-  const params = new URLSearchParams({
-    "location.latitude": lat.toFixed(6),
-    "location.longitude": lng.toFixed(6),
-    requiredQuality: "MEDIUM",
-    key: apiKey,
-  });
-  const res = await fetch(`https://solar.googleapis.com/v1/buildingInsights:findClosest?${params}`, {
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (res.status === 404) {
-    await remember(key, null);
-    return null;
+  if (hit) return hit.data ? { data: hit.data } : { data: null, reason: "no-coverage" };
+  for (const quality of ["MEDIUM", "BASE"]) {
+    const params = new URLSearchParams({
+      "location.latitude": lat.toFixed(6),
+      "location.longitude": lng.toFixed(6),
+      requiredQuality: quality,
+      key: apiKey,
+    });
+    const res = await fetch(`https://solar.googleapis.com/v1/buildingInsights:findClosest?${params}`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (res.status === 404) continue;
+    if (!res.ok) {
+      const text = (await res.text()).slice(0, 300);
+      console.error(`Solar API ${res.status}: ${text}`);
+      return { data: null, reason: `google-${res.status}: ${googleMessage(text)}` };
+    }
+    const json = await res.json();
+    const insights = parseBuildingInsights(json);
+    const data = insights ? { insights, model: parseRoofModel(json) } : null;
+    await remember(key, data);
+    return data ? { data } : { data: null, reason: "no-coverage" };
   }
-  if (!res.ok) {
-    console.error(`Solar API ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    return null;
+  await remember(key, null);
+  return { data: null, reason: "no-coverage" };
+}
+
+/** Google's error message, without anything that could echo the key. */
+function googleMessage(text: string) {
+  try {
+    const m = (JSON.parse(text) as { error?: { message?: string } }).error?.message ?? "";
+    return m.replace(/key=[^&\s]+/gi, "key=…").slice(0, 160);
+  } catch {
+    return "unexpected reply";
   }
-  const json = await res.json();
-  const insights = parseBuildingInsights(json);
-  const data = insights ? { insights, model: parseRoofModel(json) } : null;
-  await remember(key, data);
-  return data;
 }

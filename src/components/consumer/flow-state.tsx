@@ -59,7 +59,7 @@ export interface FlowState {
   /** NASA POWER sunshine for the home's coordinates. */
   sunshine: Sunshine | null;
   /** Google Solar API roof data for the home's coordinates (data null: Google has none). */
-  roof: { lat: number; lng: number; data: RoofInsights | null; model?: RoofModel | null } | null;
+  roof: { lat: number; lng: number; data: RoofInsights | null; model?: RoofModel | null; reason?: string } | null;
   /** Solar Victoria (VIC homes only): the customer's choices at checkout. */
   solarVic: { rebate: boolean; loan: boolean };
   /** The customer booked their 15-minute confirmation call via HubSpot. */
@@ -191,6 +191,8 @@ export function FlowProvider({ children }: { children: ReactNode }) {
   const roofDone = Boolean(
     state.roof &&
     state.roof.model !== undefined &&
+    // Only Google's own "no roof here" is final; a setup or network failure is asked again next visit.
+    (state.roof.data !== null || state.roof.reason === "no-coverage") &&
     lat !== undefined &&
     lng !== undefined &&
     Math.abs(state.roof.lat - lat) < 1e-5 &&
@@ -200,7 +202,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     if (!hydrated || lat === undefined || lng === undefined || roofDone) return;
     let cancelled = false;
     void fetchRoofInsights(lat, lng).then((r) => {
-      if (!cancelled) setState((s) => ({ ...s, roof: { lat, lng, data: r?.insights ?? null, model: r?.model ?? null } }));
+      if (!cancelled) setState((s) => ({ ...s, roof: { lat, lng, data: r.insights, model: r.model, reason: r.reason } }));
     });
     return () => {
       cancelled = true;

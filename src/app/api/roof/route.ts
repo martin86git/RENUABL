@@ -1,4 +1,5 @@
-import { inAustralia, roofData } from "@/lib/server/google-solar";
+import { PREVIEW_MODE } from "@/lib/config";
+import { inAustralia, roofLookup } from "@/lib/server/google-solar";
 import { allow } from "@/lib/server/rate-limit";
 
 /**
@@ -13,10 +14,12 @@ export async function GET(request: Request) {
   // Each new home costs a Solar API lookup: a few per visitor per hour is plenty.
   if (!allow(request, "roof", 20)) return Response.json({ ok: false }, { status: 429 });
   try {
-    const data = await roofData(lat, lng);
-    return data ? Response.json({ ok: true, roof: data.insights, model: data.model }) : Response.json({ ok: false });
+    const { data, reason } = await roofLookup(lat, lng);
+    if (data) return Response.json({ ok: true, roof: data.insights, model: data.model });
+    // "no-coverage" is a real answer; anything else is a setup problem worth showing in preview.
+    return Response.json({ ok: false, reason: reason === "no-coverage" || PREVIEW_MODE ? reason : undefined });
   } catch (e) {
     console.error("roof lookup failed", e instanceof Error ? e.message : e);
-    return Response.json({ ok: false });
+    return Response.json({ ok: false, reason: PREVIEW_MODE ? "lookup failed" : undefined });
   }
 }
