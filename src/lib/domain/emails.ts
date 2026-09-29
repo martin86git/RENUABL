@@ -283,6 +283,54 @@ export function layoutReadyEmail(o: { customer: string; panels: number; partner:
   });
 }
 
+/** Who hears about every new lead: LEAD_ALERT_EMAILS (comma-separated), else Martin. */
+export const DEFAULT_LEAD_ALERT_EMAIL = "martin@renuabl.com.au";
+
+export function leadAlertRecipients(raw: string | undefined): string[] {
+  const list = (raw ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s));
+  return list.length ? [...new Set(list)] : [DEFAULT_LEAD_ALERT_EMAIL];
+}
+
+/** Internal: a new lead, to RENUABL staff (not the customer). Plain text only; nothing from the browser is linked. */
+export function newLeadEmail(o: {
+  kind: "reservation" | "no-bill";
+  reference?: string;
+  name?: string;
+  email: string;
+  mobile?: string;
+  details: Record<string, string | undefined>;
+}) {
+  const name = plainText(o.name, 80);
+  // Checked on the server already; plainText would strip it (it removes addresses from customer text).
+  const email = o.email.replace(/[^\w.+@-]/g, "").slice(0, 120);
+  const who = name || email;
+  const lines = [
+    ...(name ? [`Name: ${name}`] : []),
+    `Email: ${email}`,
+    ...(o.mobile ? [`Mobile: ${plainText(o.mobile, 30)}`] : []),
+    ...Object.entries(o.details)
+      .filter((e): e is [string, string] => typeof e[1] === "string" && e[1].trim() !== "")
+      .slice(0, 30)
+      .map(([k, v]) => `${plainText(k, 60)}: ${plainText(v, 300)}`),
+  ];
+  return o.kind === "reservation"
+    ? simpleEmail({
+        subject: `New reservation${o.reference ? ` ${plainText(o.reference, 20)}` : ""}: ${who}`,
+        heading: "New reservation",
+        lines: [...(o.reference ? [`Reference: ${plainText(o.reference, 20)}`] : []), ...lines],
+        footer: "Also in HubSpot. The job has been offered to the installation partner.",
+      })
+    : simpleEmail({
+        subject: `New lead (no bill yet): ${who}`,
+        heading: "New lead: didn't have their bill handy",
+        lines: [...lines, "They've been emailed a link to come back and finish. Worth a follow-up call or email."],
+        footer: "Also in HubSpot.",
+      });
+}
+
 export function jobOfferEmail(o: { suburb: string; system: string; installDate: string | null; link: string; hours: number }) {
   return simpleEmail({
     subject: `New job offer in ${plainText(o.suburb, 40)}`,

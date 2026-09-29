@@ -6,6 +6,7 @@ import { cleanJobRequest } from "@/lib/domain/jobs";
 import { dbConfigured } from "@/lib/server/db";
 import { sendEmail } from "@/lib/server/email";
 import { createJob, referenceTaken } from "@/lib/server/jobs-repo";
+import { alertNewLead } from "@/lib/server/lead-alert";
 import { offerNext } from "@/lib/server/offers-engine";
 import { addNote, reservationNote, upsertContact } from "@/lib/server/hubspot-crm";
 
@@ -38,6 +39,15 @@ export async function POST(request: Request) {
   }
   const reservationId = await newReference();
   await saveJob(reservationId, checked.contact, body.job);
+  // Straight to RENUABL's inbox too, whatever happens with HubSpot.
+  await alertNewLead({
+    kind: "reservation",
+    reference: reservationId,
+    name: `${checked.contact.firstName} ${checked.contact.lastName}`,
+    email: checked.contact.email,
+    mobile: checked.contact.mobile,
+    details,
+  });
   const email = () => confirmationEmail(reservationId, checked.contact, body.order, body.installDate);
 
   const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();

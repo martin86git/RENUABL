@@ -3,6 +3,7 @@ import { finishLaterEmail, plainText } from "@/lib/domain/emails";
 import { siteUrl } from "@/lib/domain/sms";
 import { sendEmail } from "@/lib/server/email";
 import { addNote, contactIdByEmail, crmNote } from "@/lib/server/hubspot-crm";
+import { alertNewLead } from "@/lib/server/lead-alert";
 import { allow } from "@/lib/server/rate-limit";
 
 /**
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
       console.error("follow-up email failed", e instanceof Error ? e.message : e);
     }
   }
+  await alertNewLead({ kind: "no-bill", email, details });
   if (!saved && !emailed)
     return Response.json({ ok: false, message: "We couldn't save that just now. Please try again." }, { status: 502 });
   return Response.json({ ok: true, emailed });
