@@ -12,12 +12,12 @@ import { PortalPreview, PortalTeaser } from "@/components/consumer/portal-previe
 import { RoofCheck } from "@/components/consumer/roof-check";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
-import { Segmented, Toggle } from "@/components/ui/controls";
+import { Disclosure, Segmented, Toggle } from "@/components/ui/controls";
 import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
 import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
 import { expandNote, solarSituation } from "@/lib/domain/existing-solar";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
-import { ASSUMPTIONS, TIER_LABELS, isSameConfig } from "@/lib/domain/recommendation";
+import { ASSUMPTIONS, TIER_LABELS, isSameConfig, sizingExplanation, solarDay } from "@/lib/domain/recommendation";
 import type { SystemConfig, SystemTier } from "@/lib/domain/types";
 
 type Part = "solar" | "battery" | "ev" | "monitoring";
@@ -241,6 +241,15 @@ function SystemScreen() {
               </li>
             ))}
           </ul>
+          {!existing && (
+            <Disclosure title="How we worked this out" className="mt-3 border-t border-line">
+              <ul className="space-y-2 text-[14px] text-muted">
+                {sizingExplanation(recommendation.usage, config, { nasa: Boolean(state.sunshine), replacing }).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </Disclosure>
+          )}
         </Card>
 
         <div className="space-y-4 xl:hidden">
@@ -273,10 +282,10 @@ function SystemScreen() {
               That&apos;s sized to what your home uses: about {daily} kWh a day ({recommendation.usage.annualKwh.toLocaleString("en-AU")}{" "}
               kWh a year) {replacing ? "estimated from your bill and what your current panels export" : "from your bill"}
               {profile.evPlanned ? ", plus your future EV" : ""}.
-              {config.panelCount === ASSUMPTIONS.minPanels
-                ? ` That's covered by our smallest system (${ASSUMPTIONS.minSystemKw} kW), so you'll have a little spare to export.`
-                : config.batteryKwh > 0 || profile.wantsBattery
-                  ? ` It makes about ${Math.round((ASSUMPTIONS.batteryReadySolar - 1) * 100)}% more than that, so there's spare sunshine to charge a battery, even in winter.`
+              {config.batteryKwh > 0
+                ? " With your battery it's sized for winter, so the spare solar can fill the battery for the evening."
+                : config.panelCount === ASSUMPTIONS.minPanels
+                  ? ` That's covered by our smallest system (${ASSUMPTIONS.minSystemKw} kW), so you'll have a little spare to export.`
                   : " No bigger than you need."}
             </p>
             <p className="text-[13px] text-muted">
@@ -294,8 +303,10 @@ function SystemScreen() {
         </p>
         {config.batteryKwh > 0 ? (
           <p>
-            Your bill shows you {existing ? "buy" : "use"} about {Math.round(daily * recommendation.usage.eveningShare * 10) / 10} kWh a day
-            after the sun goes down, so we&apos;ve sized a {config.batteryKwh} kWh battery for your home.
+            {existing
+              ? `Your bill shows you buy about ${Math.round(daily * recommendation.usage.eveningShare * 10) / 10} kWh a day after the sun goes down`
+              : `On a winter day your home uses about ${Math.round(solarDay(outcome.solarKw, recommendation.usage.winterYieldKwhPerKw, daily).afterDark * 10) / 10} kWh after the sun goes down`}
+            , so we&apos;ve sized a {config.batteryKwh} kWh battery for your home.
           </p>
         ) : (
           <p>

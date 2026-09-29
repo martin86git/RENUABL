@@ -76,8 +76,10 @@ export interface UsageBasis {
   feedInRate: number;
   /** Set when the home already has solar and the customer is expanding it. */
   existingSolar: { exportedDailyKwh: number } | null;
-  /** Expected daily output per kW of panels at this home. */
+  /** Expected daily output per kW of panels at this home, averaged over the year. */
   dailyYieldKwhPerKw: number;
+  /** The same in winter (June to August), when sunshine is weakest: battery systems are sized to it. */
+  winterYieldKwhPerKw: number;
 }
 
 import type { BomLine } from "./costing";

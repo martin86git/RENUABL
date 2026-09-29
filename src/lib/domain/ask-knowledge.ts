@@ -4,6 +4,7 @@
  * figures, rebates or promises. Keep the facts in step with the product rules
  * in CLAUDE.md.
  */
+import { COSTING } from "./costing";
 import { ASSUMPTIONS } from "./recommendation";
 import { INSTALL_ARRIVAL } from "./scheduling";
 import type { AskContext } from "./ask-types";
@@ -15,7 +16,7 @@ const money = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
 export const ASK_FACTS = [
   // How it works
   "RENUABL recommends one solar (and battery) system for the home, sized from the customer's electricity bill. There's no catalogue to choose from; customers don't pick panel counts or battery sizes.",
-  `Systems are never smaller than ${ASSUMPTIONS.minSystemKw} kW. Solar is sized to what the home uses; with a battery (now or planned) it gets extra headroom to charge it.`,
+  `Systems are never smaller than ${ASSUMPTIONS.minSystemKw} kW. Essential (solar only) is the least solar that covers what the home uses in a year. How sizing works (shown under "How we worked this out" on the system step): the home's daily use comes from the bill; sunshine comes from NASA's records for the home (about ${ASSUMPTIONS.dailyYieldKwhPerKw} kWh a day per kW of panels in Melbourne over a year, about half that in winter); as a rule of thumb a home uses about ${Math.round(ASSUMPTIONS.baseSelfConsumption * 100)}% of its solar as it's made and the rest is spare, which charges a battery and then goes to the grid. With a battery, the system is sized for winter: enough solar that a winter day's spare can fill the battery for what the home uses after dark, and the battery is the smallest size (${ASSUMPTIONS.batterySizes[0]} kWh modules, ${Math.round(ASSUMPTIONS.batteryUsableShare * 100)}% usable) that holds that. A battery inverter can take panels up to ${Math.round(COSTING.maxArrayToHybridWithBattery * 100)}% of its rating (133% without a battery), so the inverter is filled. These are estimates, confirmed on the 15-minute call.`,
   "Three options: Essential (solar only), Recommended (solar and a battery sized to evening use) and Maximum (solar, the same battery and a smart EV charger). Any option can be adjusted on the system step.",
   "The bill is read for usage and prices only; the file isn't stored and no personal details are taken from it.",
   "A bill is required: the customer can't continue past \"About your home\" without uploading their latest electricity bill, because the system is sized from it. Never say they can skip it, proceed without one, or enter their usage by hand. If they don't have it handy: download the latest bill (PDF) from their energy retailer's app, website or email, take a photo of the paper bill, or use a screenshot. Any recent electricity bill works; a full quarter or month is best. Their answers are kept while they fetch it. If they can't get it now, they can leave their email in the \"Don't have your bill handy right now?\" box under the upload, and RENUABL will get in touch.",

@@ -1,7 +1,16 @@
 import type { BillSummary } from "./bill";
 import { PANEL } from "./catalogue";
-import { YIELD_MODEL, blendedYieldPerKw } from "./sunshine";
-import { COSTING, billOfMaterials, inverterOptions, maxPanelsForInverter, sellPrice, type CostGroup, type PartnerPricing } from "./costing";
+import { YIELD_MODEL, blendedYieldPerKw, type Sunshine } from "./sunshine";
+import {
+  COSTING,
+  arrayRatio,
+  billOfMaterials,
+  inverterOptions,
+  maxPanelsForInverter,
+  sellPrice,
+  type CostGroup,
+  type PartnerPricing,
+} from "./costing";
 import { NO_INCENTIVES, VERIFIED_RATES, rebatesFor, type Incentives, type RebateRates } from "./rebates";
 import { realAnnualUse, solarSituation } from "./existing-solar";
 import type {
@@ -39,11 +48,22 @@ export const ASSUMPTIONS = {
   feedInPerKwh: 0.04,
   /** Used when a home's NASA sunshine isn't known: Melbourne average. */
   dailyYieldKwhPerKw: 3.8,
+  /**
+   * Winter (June to August) sunshine as a share of the year's average, used
+   * when NASA's monthly figures aren't known. Melbourne is about half
+   * (BoM/NASA: roughly 2 kWh/m² a day in winter against 4 over the year).
+   */
+  winterSunShare: 0.5,
   /** Used when the bill doesn't split usage by time of day. */
   eveningShare: 0.6,
   /** Homes with solar buy most of their grid power after dark. */
   solarHomeEveningShare: 0.75,
   evAnnualKwh: 2500,
+  /**
+   * PLACEHOLDER rule of thumb: the share of what the panels make that the home
+   * uses as it's made (30–40% is typical in Australia without a battery). The
+   * rest is surplus: it charges the battery, then goes to the grid.
+   */
   baseSelfConsumption: 0.4,
   /**
    * PLACEHOLDER: the most of a home's yearly use we claim solar (and a battery)
@@ -55,9 +75,8 @@ export const ASSUMPTIONS = {
   batterySizes: [8, 16, 24, 32, 40, 48] as const,
   batteryUsableShare: 0.9,
   /**
-   * With a battery (now or planned), solar is sized this much above annual use
-   * so there's daytime surplus to charge it, including through winter.
-   * PLACEHOLDER: confirm with Primero.
+   * Existing solar being expanded: today's exports need this much headroom to
+   * fill the battery, or extra panels are added. PLACEHOLDER: confirm with Primero.
    */
   batteryReadySolar: 1.25,
   /** Taken after the confirmation call. Nothing is charged to reserve a date. */
@@ -106,6 +125,7 @@ export function usageBasis(
   bill: BillSummary,
   profile: EnergyProfile,
   dailyYieldKwhPerKw: number = ASSUMPTIONS.dailyYieldKwhPerKw,
+  winterYieldKwhPerKw: number = winterYield(dailyYieldKwhPerKw),
 ): UsageBasis {
   const situation = solarSituation(bill, profile);
   const base = situation === "replace" ? realAnnualUse(bill) : bill.annualUsageKwh;
@@ -118,7 +138,37 @@ export function usageBasis(
     feedInRate: bill.feedInRate ?? ASSUMPTIONS.feedInPerKwh,
     existingSolar: situation === "expand" ? { exportedDailyKwh: bill.exportedDailyKwh ?? 0 } : null,
     dailyYieldKwhPerKw,
+    winterYieldKwhPerKw,
   };
+}
+
+/**
+ * Winter output per kW: the year's figure scaled by NASA's June–August
+ * sunshine at the home against its yearly average (or Melbourne's share).
+ */
+export function winterYield(yearlyYieldKwhPerKw: number, sun?: Pick<Sunshine, "annual" | "monthly"> | null) {
+  const share =
+    sun && sun.annual > 0 && sun.monthly.length === 12
+      ? (sun.monthly[5] + sun.monthly[6] + sun.monthly[7]) / 3 / sun.annual
+      : ASSUMPTIONS.winterSunShare;
+  return Math.round(yearlyYieldKwhPerKw * share * 100) / 100;
+}
+
+/**
+ * One day of solar, by the rule of thumb: the home uses
+ * `baseSelfConsumption` (40%) of what the panels make as it's made (never more
+ * than it uses in a day); everything else it uses is after dark. The surplus
+ * (60%) charges the battery up to what the home needs after dark, and the rest
+ * goes to the grid.
+ */
+export function solarDay(solarKw: number, yieldKwhPerKw: number, dailyKwh: number, batteryUsableKwh = 0, evCharger = false) {
+  const made = solarKw * yieldKwhPerKw;
+  const selfUse = ASSUMPTIONS.baseSelfConsumption + (evCharger ? 0.05 : 0);
+  const usedAsMade = Math.min(made * selfUse, dailyKwh);
+  const afterDark = dailyKwh - usedAsMade;
+  const surplus = made - usedAsMade;
+  const stored = Math.min(batteryUsableKwh, surplus, afterDark);
+  return { made, usedAsMade, afterDark, surplus, stored, exported: surplus - stored, fromGrid: afterDark - stored };
 }
 
 export function panelsToKw(panelCount: number): number {
@@ -143,14 +193,57 @@ export function panelsNeeded(
   return clamp(Math.ceil((kw * 1000) / ASSUMPTIONS.panelWatts), ASSUMPTIONS.minPanels, Math.min(ASSUMPTIONS.maxPanels, analysis.maxPanels));
 }
 
-/** Smallest standard battery that covers a typical evening and night; one size up for backup. */
-export function batteryNeeded(usage: UsageBasis, backup: boolean): number {
+/** Panels that fill an inverter to the array limit: 133% of its rating, or more with a DC-coupled battery (`arrayRatio`). */
+export function panelsToFillInverter(inverterKw: number, withBattery = true) {
+  return Math.floor((inverterKw * arrayRatio(withBattery) * 1000) / ASSUMPTIONS.panelWatts);
+}
+
+/**
+ * Solar for a home with a battery, sized for winter: the smallest hybrid
+ * inverter, filled to its with-battery array limit
+ * (`COSTING.maxArrayToHybridWithBattery`), whose winter surplus (60% of what it
+ * makes) can fill the battery for everything the home uses after dark. That
+ * means a winter day's solar at least matches the day's use. Never less than
+ * `minPanels` (Essential's solar) and within the roof and the largest inverter.
+ */
+export function panelsForBattery(
+  usage: Pick<UsageBasis, "dailyKwh" | "winterYieldKwhPerKw">,
+  analysis: Pick<HomeAnalysis, "maxPanels">,
+  phase: "single" | "three" = "single",
+  minPanels: number = ASSUMPTIONS.minPanels,
+) {
+  const options = inverterOptions("hybrid", phase);
+  const limit = Math.min(maxPanelsForInverter(options, arrayRatio(true)), analysis.maxPanels);
+  for (const inverter of options) {
+    const panels = clamp(panelsToFillInverter(inverter.kw), Math.min(minPanels, limit), limit);
+    const winter = solarDay(panelsKw(panels), usage.winterYieldKwhPerKw, usage.dailyKwh);
+    if (winter.surplus >= winter.afterDark || panels >= limit) return panels;
+  }
+  return limit;
+}
+
+/** Smallest standard battery that holds a given night's use; one size up for backup. */
+export function batteryFor(afterDarkKwh: number, backup: boolean): number {
   const sizes = ASSUMPTIONS.batterySizes;
-  const overnight = usage.dailyKwh * usage.eveningShare;
-  let i = sizes.findIndex((s) => s * ASSUMPTIONS.batteryUsableShare >= overnight);
+  let i = sizes.findIndex((s) => s * ASSUMPTIONS.batteryUsableShare >= afterDarkKwh);
   if (i === -1) i = sizes.length - 1;
   if (backup) i = Math.min(i + 1, sizes.length - 1);
   return sizes[i];
+}
+
+/** Existing solar: the battery covers what the home buys after dark (from the bill). */
+export function batteryNeeded(usage: UsageBasis, backup: boolean): number {
+  return batteryFor(usage.dailyKwh * usage.eveningShare, backup);
+}
+
+/** A new system's battery: what the home uses after dark on a winter day, with this much solar. */
+export function batteryForSolar(usage: UsageBasis, panelCount: number, backup: boolean): number {
+  return batteryFor(solarDay(panelsKw(panelCount), usage.winterYieldKwhPerKw, usage.dailyKwh).afterDark, backup);
+}
+
+/** Exact kW of a panel count (panelsToKw rounds for display). */
+function panelsKw(panelCount: number) {
+  return (panelCount * ASSUMPTIONS.panelWatts) / 1000;
 }
 
 function previousBatterySize(kwh: number) {
@@ -189,16 +282,21 @@ export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, 
     (flat
       ? Math.round(((ASSUMPTIONS.dailyYieldKwhPerKw * YIELD_MODEL.flatGain) / YIELD_MODEL.tiltGain) * 100) / 100
       : ASSUMPTIONS.dailyYieldKwhPerKw);
-  const usage = usageBasis(bill, profile, dailyYield);
+  const usage = usageBasis(bill, profile, dailyYield, winterYield(dailyYield, analysis.sunshine));
   if (usage.existingSolar) return expandSystem(profile, analysis, usage);
   const replacing = solarSituation(bill, profile) === "replace";
-  const panelsForUse = panelsNeeded(usage.annualKwh, analysis, profile.wantsBattery, usage.dailyYieldKwhPerKw);
-  const panelsWithBattery = panelsNeeded(usage.annualKwh, analysis, true, usage.dailyYieldKwhPerKw);
-  const battery = batteryNeeded(usage, profile.backup);
+  // Essential: the least solar that covers what the home uses (never below the minimum system).
+  const panelsForUse = panelsNeeded(usage.annualKwh, analysis, false, usage.dailyYieldKwhPerKw);
+  // With a battery: sized for winter, so the surplus fills the battery for the night.
+  const panelsWithBattery = panelsForBattery(usage, analysis, profile.phase === "three" ? "three" : "single", panelsForUse);
+  const battery = batteryForSolar(usage, panelsWithBattery, profile.backup);
+  const winterNight = solarDay(panelsKw(panelsWithBattery), usage.winterYieldKwhPerKw, usage.dailyKwh).afterDark;
   const sizedTo = (charging: boolean) =>
-    `Solar sized to your ${kwh(usage.dailyKwh)} kWh a day${profile.evPlanned ? ", including your future EV" : ""}${charging ? ", plus enough to charge a battery" : ""}`;
+    charging
+      ? `Solar sized to your ${kwh(usage.dailyKwh)} kWh a day${profile.evPlanned ? " (including your future EV)" : ""}, with extra to fill your battery, even in winter`
+      : `Solar sized to your ${kwh(usage.dailyKwh)} kWh a day${profile.evPlanned ? ", including your future EV" : ""}`;
   const covers = (b: number) =>
-    `A ${kwh(b)} kWh battery covers ${b * ASSUMPTIONS.batteryUsableShare >= usage.dailyKwh * usage.eveningShare ? "your" : "most of your"} evening use`;
+    `A ${kwh(b)} kWh battery covers ${b * ASSUMPTIONS.batteryUsableShare >= winterNight ? "your" : "most of your"} evening use`;
 
   const replaces = (why: string[]) => (replacing ? ["Replaces your current solar system", ...why] : why);
 
@@ -207,12 +305,8 @@ export function recommendSystem(profile: EnergyProfile, analysis: HomeAnalysis, 
     tiers: {
       essential: {
         tier: "essential",
-        config: { panelCount: panelsForUse, batteryKwh: 0, evCharger: false, ...(profile.wantsBattery ? { batteryReady: true } : {}) },
-        why: replaces([
-          sizedTo(profile.wantsBattery),
-          "Lowest upfront cost",
-          profile.wantsBattery ? "Solar ready for a battery whenever you add one" : "Add a battery any time",
-        ]),
+        config: { panelCount: panelsForUse, batteryKwh: 0, evCharger: false },
+        why: replaces([sizedTo(false), "Lowest upfront cost", "Add a battery any time"]),
       },
       recommended: {
         tier: "recommended",
@@ -272,6 +366,42 @@ function expandSystem(profile: EnergyProfile, analysis: HomeAnalysis, usage: Usa
   };
 }
 
+/**
+ * "How we worked this out" on the system step: the sizing in plain words, with
+ * the customer's own figures. New systems only (expansions explain themselves).
+ */
+export function sizingExplanation(
+  usage: UsageBasis,
+  config: Pick<SystemConfig, "panelCount" | "batteryKwh">,
+  opts: { nasa: boolean; replacing?: boolean },
+): string[] {
+  const one = (n: number) => kwh(Math.round(n * 10) / 10);
+  const selfUse = Math.round(ASSUMPTIONS.baseSelfConsumption * 100);
+  const lines = [
+    `Your home uses about ${one(usage.dailyKwh)} kWh a day, ${opts.replacing ? "estimated from your bill and what your current panels export" : "from your bill"}.`,
+    `${opts.nasa ? "NASA's sunshine records for your home" : "Melbourne's sunshine averages"} say each kW of panels makes about ${one(usage.dailyYieldKwhPerKw)} kWh a day over a year, and about ${one(usage.winterYieldKwhPerKw)} in winter (June to August), when the sun is weakest.`,
+    `As a rule of thumb, a home uses about ${selfUse}% of its solar as it's made. The other ${100 - selfUse}% is spare: it charges a battery, then goes to the grid.`,
+  ];
+  const solarKw = panelsKw(config.panelCount);
+  if (config.batteryKwh > 0) {
+    const winter = solarDay(solarKw, usage.winterYieldKwhPerKw, usage.dailyKwh);
+    const usable = config.batteryKwh * ASSUMPTIONS.batteryUsableShare;
+    lines.push(
+      `With a battery we size for winter. On a winter day ${one(solarKw)} kW makes about ${one(winter.made)} kWh: about ${one(winter.usedAsMade)} is used as it's made, leaving about ${one(winter.afterDark)} kWh for after dark.`,
+      `A ${kwh(config.batteryKwh)} kWh battery holds about ${one(usable)} kWh${usable >= winter.afterDark ? ", enough for that" : ", most of that"}, and the ${one(winter.surplus)} kWh of spare solar ${winter.surplus >= Math.min(usable, winter.afterDark) ? "can fill it" : "fills part of it"}. In summer there's plenty to spare.`,
+      `A battery inverter can take panels up to ${Math.round(arrayRatio(true) * 100)}% of its rating, so we fill it: the inverter costs the same, and the extra panels help most in winter.`,
+    );
+  } else {
+    lines.push(
+      config.panelCount <= ASSUMPTIONS.minPanels
+        ? `Essential is the least solar that covers your yearly use. For your home that's under our smallest system, so it's ${ASSUMPTIONS.minSystemKw} kW.`
+        : "Essential is the least solar that covers your yearly use: no bigger than you need.",
+    );
+  }
+  lines.push("These are estimates, not guarantees. Your roof, shading and switchboard are checked on your 15-minute call.");
+  return lines;
+}
+
 export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: PriceBreakdown): SystemEstimate {
   const solarKw = panelsToKw(config.panelCount);
   const generation = Math.round(solarKw * usage.dailyYieldKwhPerKw * 365);
@@ -296,12 +426,15 @@ export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: 
     };
   }
 
-  let selfUse: number = ASSUMPTIONS.baseSelfConsumption;
-  if (config.batteryKwh > 0) selfUse += Math.min(0.4, config.batteryKwh / 40);
-  if (config.evCharger) selfUse += 0.05;
-  selfUse = Math.min(0.9, selfUse);
-
-  const consumedFromSolar = Math.min(usage.annualKwh * ASSUMPTIONS.maxSolarShare, generation * selfUse);
+  // An average day by the same rule of thumb as the sizing: 40% used as it's made, the surplus fills the battery.
+  const day = solarDay(
+    solarKw,
+    usage.dailyYieldKwhPerKw,
+    usage.dailyKwh,
+    config.batteryKwh * ASSUMPTIONS.batteryUsableShare,
+    config.evCharger,
+  );
+  const consumedFromSolar = Math.min(usage.annualKwh * ASSUMPTIONS.maxSolarShare, (day.usedAsMade + day.stored) * 365);
   const exported = Math.max(0, generation - consumedFromSolar);
   const annualSavings = Math.round(consumedFromSolar * usage.usageRate + exported * usage.feedInRate);
 

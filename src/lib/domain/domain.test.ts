@@ -10,6 +10,13 @@ import {
   describeSystem,
   batteryNeeded,
   panelsToKw,
+  panelsForBattery,
+  batteryForSolar,
+  solarDay,
+  sizingExplanation,
+  winterYield,
+  panelsNeeded,
+  panelsToFillInverter,
   topUpPanels,
   estimateOutcome,
   priceSystem,
@@ -93,17 +100,73 @@ describe("recommendSystem", () => {
     expect((panels - 1) * kwhPerPanelYear).toBeLessThan(usage.annualKwh);
   });
 
-  it("adds generation to charge a battery, now or planned", () => {
+  it("sizes battery systems for winter, filling the hybrid inverter to its with-battery limit", () => {
     const { tiers, usage } = recommendSystem(base, analysis, bill);
-    const kwhPerPanelYear = (ASSUMPTIONS.panelWatts / 1000) * ASSUMPTIONS.dailyYieldKwhPerKw * 365;
-    expect(tiers.recommended.config.panelCount).toBeGreaterThan(tiers.essential.config.panelCount);
-    expect(tiers.recommended.config.panelCount * kwhPerPanelYear).toBeGreaterThanOrEqual(usage.annualKwh * ASSUMPTIONS.batteryReadySolar);
-    expect(tiers.independence.config.panelCount).toBe(tiers.recommended.config.panelCount);
+    const rec = tiers.recommended.config;
+    expect(rec.panelCount).toBeGreaterThan(tiers.essential.config.panelCount);
+    // A winter day's surplus (60% of what the panels make) fills the battery for the night.
+    const winter = solarDay(panelsToKw(rec.panelCount), usage.winterYieldKwhPerKw, usage.dailyKwh);
+    expect(winter.surplus).toBeGreaterThanOrEqual(winter.afterDark);
+    expect(rec.batteryKwh * ASSUMPTIONS.batteryUsableShare).toBeGreaterThanOrEqual(winter.afterDark);
+    // Exactly as many panels as its hybrid inverter takes with a battery (array = 150% of the inverter).
+    const inverter = billOfMaterials({ ...rec, roof: "tile", storeys: "single", phase: "single", addOns: [] }).find((l) =>
+      l.sku?.startsWith("SIG1104"),
+    )!;
+    const invKw = Number(inverter.description.match(/(\d+(?:\.\d)?)kW/)![1]);
+    expect(rec.panelCount).toBe(panelsToFillInverter(invKw));
+    expect(tiers.independence.config.panelCount).toBe(rec.panelCount);
 
-    // Planning a battery later: Essential gets the same battery-ready solar, without the battery.
+    // Wanting a battery doesn't change Essential: it's the least solar that covers the home's use.
     const planned = recommendSystem({ ...base, wantsBattery: true }, analysis, bill).tiers.essential.config;
-    expect(planned.panelCount).toBe(tiers.recommended.config.panelCount);
+    expect(planned.panelCount).toBe(tiers.essential.config.panelCount);
     expect(planned.batteryKwh).toBe(0);
+  });
+
+  it("uses the 40% rule of thumb: used as it's made, the rest fills the battery, then exports", () => {
+    const day = solarDay(10, 2, 14.7, 7.2);
+    expect(day.made).toBe(20);
+    expect(day.usedAsMade).toBeCloseTo(8);
+    expect(day.afterDark).toBeCloseTo(6.7);
+    expect(day.stored).toBeCloseTo(6.7);
+    expect(day.exported).toBeCloseTo(5.3);
+    // Never uses more as it's made than the home uses in a day.
+    expect(solarDay(20, 5, 10).usedAsMade).toBe(10);
+  });
+
+  it("explains the sizing with the customer's own figures, never as exact", () => {
+    const usage = { ...usageBasis(bill, base), dailyKwh: 14.7, dailyYieldKwhPerKw: 3.8, winterYieldKwhPerKw: 1.9 };
+    const withBattery = sizingExplanation(usage, { panelCount: 18, batteryKwh: 16 }, { nasa: true }).join(" ");
+    expect(withBattery).toContain("14.7 kWh a day");
+    expect(withBattery).toContain("40%");
+    expect(withBattery).toContain("16.2 kWh");
+    expect(withBattery).toContain("150%");
+    const solarOnly = sizingExplanation(usage, { panelCount: ASSUMPTIONS.minPanels, batteryKwh: 0 }, { nasa: false }).join(" ");
+    expect(solarOnly).toContain("Melbourne");
+    expect(solarOnly).toContain("5 kW");
+    for (const text of [withBattery, solarOnly]) expect(text).not.toMatch(/exact|precise|guaranteed\b/i);
+  });
+
+  it("takes winter sunshine from NASA's June to August, else Melbourne's share", () => {
+    const monthly = [6.5, 5.8, 4.6, 3.2, 2.2, 1.8, 2, 2.7, 3.8, 5, 5.9, 6.4];
+    expect(winterYield(3.6, { annual: 4.2, monthly })).toBeCloseTo((3.6 * (1.8 + 2 + 2.7)) / 3 / 4.2, 2);
+    expect(winterYield(3.8)).toBe(1.9);
+  });
+
+  it("sizes the sample bill (14.7 kWh a day): a minimum Essential, a filled 6 kW inverter with the battery", () => {
+    expect(panelsToFillInverter(5, false)).toBe(14); // 6.65 kW on a 5 kW inverter, no battery (133%)
+    expect(panelsToFillInverter(5)).toBe(15); // 7.1 kW on a 5 kW inverter with a battery (150%)
+    expect(panelsToFillInverter(6)).toBe(18); // 8.55 kW on a 6 kW inverter with a battery
+    expect(panelsToFillInverter(8)).toBe(25);
+    const u = { annualKwh: 5366, dailyKwh: 14.7, winterYieldKwhPerKw: 1.9 };
+    const essential = panelsNeeded(u.annualKwh, analysis, false, 3.8);
+    expect(panelsToKw(essential)).toBe(5.2); // ~4.3 kW covers the year: below the minimum, so 5.2 kW
+    // Winter: 7.1 kW makes 13.5 kWh, less than the day's use, so the 6 kW inverter, filled.
+    expect(panelsForBattery(u, analysis)).toBe(18);
+    // 8.55 kW makes 16.2 kWh in winter; 6.5 is used as it's made, leaving 8.2 kWh after dark: an 8 kWh module (7.2 usable) is short.
+    const usage = { ...usageBasis(bill, base), ...u };
+    expect(batteryForSolar(usage, 18, false)).toBe(16);
+    // A bigger home needs the 8 kW inverter.
+    expect(panelsForBattery({ dailyKwh: 21.6, winterYieldKwhPerKw: 1.9 }, analysis)).toBe(25);
   });
 
   it("grows with a bigger bill and a planned EV", () => {
@@ -117,9 +180,8 @@ describe("recommendSystem", () => {
     const { tiers, usage } = recommendSystem(base, analysis, bill);
     expect(tiers.essential.config).toMatchObject({ batteryKwh: 0, evCharger: false });
     expect(tiers.recommended.config.evCharger).toBe(false);
-    expect(tiers.recommended.config.batteryKwh * ASSUMPTIONS.batteryUsableShare).toBeGreaterThanOrEqual(
-      usage.dailyKwh * usage.eveningShare,
-    );
+    const winter = solarDay(panelsToKw(tiers.recommended.config.panelCount), usage.winterYieldKwhPerKw, usage.dailyKwh);
+    expect(tiers.recommended.config.batteryKwh * ASSUMPTIONS.batteryUsableShare).toBeGreaterThanOrEqual(winter.afterDark);
     expect(tiers.independence.config).toEqual({ ...tiers.recommended.config, evCharger: true });
   });
 

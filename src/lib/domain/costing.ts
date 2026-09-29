@@ -33,6 +33,12 @@ export const COSTING = {
   threePhaseInstall: 150,
   /** Under STC rules the panel array can be at most 133% of the inverter's nameplate rating. */
   maxArrayToInverter: 1.33,
+  /**
+   * With a DC-coupled battery the 133% limit no longer applies: the array may go
+   * up to the inverter maker's limit (Sigenergy allows 2:1). PLACEHOLDER: 150% until
+   * the CER wording and the network's rules are confirmed with Primero.
+   */
+  maxArrayToHybridWithBattery: 1.5,
   /** Rail per panel (portrait): its width plus this, for the top and the bottom of the panel. */
   railAllowanceM: 0.1,
   railsPerPanelRow: 2,
@@ -124,9 +130,14 @@ export function arrayKw(panelCount: number) {
   return (panelCount * PANEL.watts) / 1000;
 }
 
-/** Smallest inverter the array may connect to (array <= 133% of its rating); the largest if none. */
-export function selectInverter(kw: number, options: InverterItem[]): InverterItem {
-  return options.find((i) => i.kw * COSTING.maxArrayToInverter >= kw) ?? options[options.length - 1];
+/** How far the array may exceed the inverter: 133%, or more with a DC-coupled battery. */
+export function arrayRatio(withBattery: boolean) {
+  return withBattery ? COSTING.maxArrayToHybridWithBattery : COSTING.maxArrayToInverter;
+}
+
+/** Smallest inverter the array may connect to (array <= 133% of its rating, more with a battery); the largest if none. */
+export function selectInverter(kw: number, options: InverterItem[], withBattery = false): InverterItem {
+  return options.find((i) => i.kw * arrayRatio(withBattery) >= kw) ?? options[options.length - 1];
 }
 
 export function inverterOptions(kind: "string" | "hybrid", phase: Phase) {
@@ -135,9 +146,9 @@ export function inverterOptions(kind: "string" | "hybrid", phase: Phase) {
 }
 
 /** Most panels the largest inverter for the phase allows. */
-export function maxPanelsForInverter(options: InverterItem[] = HYBRID_INVERTERS) {
+export function maxPanelsForInverter(options: InverterItem[] = HYBRID_INVERTERS, ratio: number = COSTING.maxArrayToInverter) {
   const largest = Math.max(...options.map((i) => i.kw));
-  return Math.floor((largest * COSTING.maxArrayToInverter * 1000) / PANEL.watts);
+  return Math.floor((largest * ratio * 1000) / PANEL.watts);
 }
 
 /** Rail for portrait panels: (width + 0.1 m) x 2 per panel, bought in 4.8 m lengths. */
@@ -256,7 +267,7 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
   const three = input.phase === "three";
   let fitted: InverterItem | null = null;
   if (hybrid && (input.panelCount > 0 || modules > 0)) {
-    fitted = selectInverter(kw, inverterOptions("hybrid", input.phase));
+    fitted = selectInverter(kw, inverterOptions("hybrid", input.phase), modules > 0);
     lines.push(line(modules > 0 ? "battery" : "solar", fitted.sku, fitted.name, 1, unit(fitted.sku, fitted.cost)));
   } else if (input.panelCount > 0 && !input.existingSolar) {
     fitted = selectInverter(kw, inverterOptions("string", input.phase));
