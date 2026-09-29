@@ -18,7 +18,7 @@ import { formatCurrency, formatDate } from "@/lib/domain/format";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { describeInverter } from "@/lib/domain/inverter";
 import { CONTACT_CONSENT } from "@/lib/domain/legal";
-import { PRICE_INCLUDES, TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
+import { PRICE_INCLUDES, RESERVE_NO_COMMITMENT, TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
 import { solarVictoriaApplies } from "@/lib/domain/rebates";
 import { getWindow } from "@/lib/domain/scheduling";
 import type { AddOnId, LineItemId } from "@/lib/domain/types";
@@ -498,17 +498,13 @@ function ReserveScreen() {
     <FlowStep
       width="wide"
       title="Reserve your date."
-      subtitle="Nothing to pay today. Reserve your installation date, then confirm everything on a quick call."
+      subtitle="Nothing to pay today. Reserve your installation date; on a quick call we'll show you your design and products."
       cta={
         <div>
           <Button size="lg" className="w-full lg:w-80" disabled={busy} onClick={() => void reserve()}>
             {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Reserve my date"}
           </Button>
-          <p className="mt-2 text-center text-[11.5px] leading-snug text-muted lg:text-left">
-            Nothing to pay today.
-            <br />
-            Next: 15-minute system confirmation.
-          </p>
+          <p className="mt-2 max-w-md text-center text-[11.5px] leading-snug text-muted lg:text-left">{RESERVE_NO_COMMITMENT}</p>
         </div>
       }
     >

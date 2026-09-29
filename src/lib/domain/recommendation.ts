@@ -383,9 +383,19 @@ export function backupNote(hasBackup: boolean) {
     : `Your battery can keep chosen circuits on in a blackout. Wiring them in is an optional extra (Blackout Backup, $${extra.toLocaleString("en-AU")} installed), which you can add on the next step.`;
 }
 
-/** Under the system on the system step: the size is a recommendation until the roof is checked. */
-export const ROOF_SIZE_NOTE =
-  "Your final system size is confirmed on your 15-minute call, once we've checked how many panels fit on your roof. If fewer fit, we'll adjust the system and the price before anything is final.";
+/**
+ * Products aren't listed online (so customers aren't left comparing brands),
+ * but that must never read as hiding them: the design, with every product,
+ * is prepared for and shown on the 15-minute call, before anything is final.
+ */
+export const DESIGN_ON_CALL = {
+  title: "Your design and products, shown on your call",
+  body: "Between now and your 15-minute call, we design your system for your home: the exact panels, inverter and battery, and how many panels fit on your roof. On the call we walk you through the design and every product, and answer your questions. Nothing is final, and nothing is charged, until you're happy.",
+} as const;
+
+/** By the reserve button: reserving doesn't commit the customer to anything. */
+export const RESERVE_NO_COMMITMENT =
+  "Free, and no commitment. On your 15-minute call we show you your design and the exact products; you only pay a deposit if you're happy to go ahead.";
 
 /**
  * "How we worked this out" on the system step: the sizing in plain words, with

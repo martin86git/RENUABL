@@ -1,6 +1,20 @@
 "use client";
 
-import { ArrowRight, Battery, Check, ChevronRight, Gauge, Gift, Info, PlugZap, RotateCcw, Sun, X, type LucideIcon } from "lucide-react";
+import {
+  ArrowRight,
+  Battery,
+  Check,
+  ChevronRight,
+  ClipboardCheck,
+  Gauge,
+  Gift,
+  Info,
+  PlugZap,
+  RotateCcw,
+  Sun,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { Dialog } from "radix-ui";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -21,7 +35,7 @@ import {
   ASSUMPTIONS,
   PRICE_INCLUDES,
   backupNote,
-  ROOF_SIZE_NOTE,
+  DESIGN_ON_CALL,
   TIER_LABELS,
   isSameConfig,
   sizingExplanation,
@@ -243,12 +257,13 @@ function SystemScreen() {
             </div>
           )}
         </Card>
-        {!existing && (
-          <p className="flex gap-2.5 px-1 text-[13px] leading-snug text-muted" role="note">
-            <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
-            {ROOF_SIZE_NOTE}
-          </p>
-        )}
+        <div className="flex gap-3 rounded-2xl bg-sage/60 px-5 py-4 text-forest" role="note">
+          <ClipboardCheck className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={1.6} aria-hidden />
+          <div>
+            <p className="text-[15px]">{DESIGN_ON_CALL.title}</p>
+            <p className="mt-1 text-[13px] leading-snug text-forest/85">{DESIGN_ON_CALL.body}</p>
+          </div>
+        </div>
 
         <Card className="p-5">
           <p className="text-[15px] text-ink">Why this system?</p>
