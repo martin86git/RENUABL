@@ -335,6 +335,19 @@ export async function fetchRebateRates(): Promise<RebateRates | null> {
   }
 }
 
+/** Supplier prices imported by staff (by SKU, cost ex GST); null if they can't be loaded (catalogue prices are used). */
+export async function fetchSupplierPrices(): Promise<Record<string, number> | null> {
+  try {
+    const res = await fetch("/api/prices");
+    const json = (await res.json()) as { costs?: Record<string, unknown> };
+    const out: Record<string, number> = {};
+    for (const [sku, v] of Object.entries(json.costs ?? {})) if (typeof v === "number" && v > 0 && v < 1_000_000) out[sku] = v;
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 /** NASA POWER sunshine for the home's coordinates. */
 export async function fetchSunshine(lat: number, lng: number): Promise<Sunshine | null> {
   try {

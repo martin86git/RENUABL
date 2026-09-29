@@ -507,6 +507,8 @@ export function priceSystem(
   rates: RebateRates = VERIFIED_RATES,
   /** The matched partner's pricing; RENUABL's own rates and margin when absent. */
   partner?: PartnerPricing,
+  /** Supplier prices imported on /admin, by SKU. */
+  costs?: Record<string, number> | null,
 ): PriceBreakdown {
   const priced = addOns.filter((id) => isPricedAddOn(id) && (config.batteryKwh > 0 || !ADD_ONS.find((a) => a.id === id)?.needsBattery));
   const bom = billOfMaterials({
@@ -517,6 +519,7 @@ export function priceSystem(
     phase: site.phase,
     addOns: priced,
     partner,
+    costs,
   });
   const price = (c: number) => sellPrice(c, partner?.margin);
   const cost = (group: CostGroup) => bom.filter((l) => l.group === group).reduce((sum, l) => sum + l.total, 0);

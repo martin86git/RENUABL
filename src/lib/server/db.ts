@@ -90,6 +90,25 @@ create table if not exists roof_cache (
   data jsonb,
   fetched_at timestamptz not null default now()
 );
+create table if not exists price_uploads (
+  id text primary key,
+  supplier text not null,
+  filename text not null,
+  uploaded_by text not null,
+  uploaded_at timestamptz not null default now(),
+  status text not null default 'pending',
+  changes jsonb not null,
+  unchanged int not null default 0,
+  not_in_file int not null default 0,
+  decided_by text,
+  decided_at timestamptz
+);
+create table if not exists price_overrides (
+  sku text primary key,
+  cost numeric not null,
+  upload_id text references price_uploads(id),
+  updated_at timestamptz not null default now()
+);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

@@ -96,6 +96,8 @@ export interface CostingInput {
   partner?: PartnerPricing;
   /** Arrays from a saved panel layout (otherwise assumed: 2, or 3 above 18 panels). */
   arrays?: number;
+  /** Supplier prices imported on /admin, by SKU (ex GST), in place of the catalogue's. */
+  costs?: Record<string, number> | null;
 }
 
 /** A partner's pricing for one job. */
@@ -317,7 +319,13 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
       lines.push(line(id as CostGroup, null, `${id} (placeholder price)`, 1, COSTING.addOnPrices[id]));
     }
   }
-  return lines;
+  // Supplier prices imported by staff replace the catalogue's (a retailer's own cost still comes first).
+  if (!input.costs) return lines;
+  return lines.map((l) => {
+    const imported = l.sku ? input.costs?.[l.sku] : undefined;
+    if (imported === undefined || (l.sku && input.partner?.supplyCosts?.[l.sku] !== undefined)) return l;
+    return line(l.group, l.sku, l.description, l.qty, imported);
+  });
 }
 
 /** Supplier cost -> customer price, including margin (RENUABL's, or a retailer's own) and GST. */

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { PartnerDecision } from "@/components/admin/partner-decision";
+import { PriceUpload } from "@/components/admin/price-upload";
 import { PageHeader, Panel } from "@/components/installer/bits";
 import { Badge } from "@/components/ui/primitives";
 import { formatAbn } from "@/lib/domain/partner";
@@ -11,6 +12,7 @@ import { dbConfigured } from "@/lib/server/db";
 import { listAllJobs } from "@/lib/server/jobs-repo";
 import { processOffersSoon } from "@/lib/server/offers-engine";
 import { listPartners } from "@/lib/server/partners-repo";
+import { listPriceUploads } from "@/lib/server/prices-repo";
 
 export const metadata = { title: "Partners and jobs" };
 
@@ -33,7 +35,7 @@ export default async function AdminPage() {
   const session = await currentSession();
   if (session?.role !== "staff") redirect("/login?as=partner&next=/admin");
   await processOffersSoon();
-  const [partners, jobs] = await Promise.all([listPartners(), listAllJobs()]);
+  const [partners, jobs, uploads] = await Promise.all([listPartners(), listAllJobs(), listPriceUploads()]);
   const names = new Map(partners.map((p) => [p.id, p.business_name]));
   const pending = partners.filter((p) => p.status === "pending").length;
 
@@ -101,6 +103,55 @@ export default async function AdminPage() {
             ))}
           </ul>
         )}
+      </Panel>
+
+      <Panel className="mt-6" title="Supplier prices">
+        <PriceUpload />
+        <div className="border-t border-line px-5 py-4">
+          <p className="text-[14px] text-ink">Upload history</p>
+          {uploads.length === 0 ? (
+            <p className="mt-1 text-[13px] text-muted">No price lists uploaded yet. Prices come from the AWM Clayton August 2026 list.</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-line">
+              {uploads.map((u) => (
+                <li key={u.id} className="flex flex-wrap items-start justify-between gap-3 py-2.5 text-[13px]">
+                  <span className="min-w-0">
+                    <span className="block text-ink">
+                      {u.supplier} · {u.filename}
+                    </span>
+                    <span className="block text-muted">
+                      Uploaded{" "}
+                      {new Date(u.uploadedAt).toLocaleString("en-AU", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        timeZone: "Australia/Melbourne",
+                      })}{" "}
+                      by {u.uploadedBy} · {u.changes.length} changed, {u.unchanged} unchanged
+                      {u.decidedAt && u.decidedBy
+                        ? ` · ${u.status === "applied" ? "applied" : "discarded"} ${new Date(u.decidedAt).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short", timeZone: "Australia/Melbourne" })} by ${u.decidedBy}`
+                        : ""}
+                    </span>
+                    {u.status === "applied" && u.changes.length > 0 && (
+                      <details className="mt-1 text-muted">
+                        <summary className="cursor-pointer">What changed</summary>
+                        <ul className="mt-1 space-y-0.5">
+                          {u.changes.map((c) => (
+                            <li key={c.sku}>
+                              {c.name}: ${c.oldCost} → ${c.newCost}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </span>
+                  <Badge tone={u.status === "applied" ? "positive" : u.status === "pending" ? "warning" : "neutral"}>
+                    {u.status === "pending" ? "not applied" : u.status}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </Panel>
     </>
   );

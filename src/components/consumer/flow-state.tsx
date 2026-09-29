@@ -15,6 +15,7 @@ import { partnerPricingFor } from "@/lib/domain/partner";
 import {
   analyseHome,
   fetchRebateRates,
+  fetchSupplierPrices,
   fetchRoofInsights,
   fetchSunshine,
   getInstaller,
@@ -57,6 +58,8 @@ export interface FlowState {
   existingInverter: InverterSummary | null;
   /** Today's rebate rules, loaded once per visit (null until loaded: the verified copy is used). */
   rates: RebateRates | null;
+  /** Supplier prices imported on /admin (by SKU), fetched each visit. */
+  prices: { costs: Record<string, number>; fetchedAt: number } | null;
   /** NASA POWER sunshine for the home's coordinates. */
   sunshine: Sunshine | null;
   /** Google Solar API roof data for the home's coordinates (data null: Google has none). */
@@ -86,6 +89,7 @@ const EMPTY: FlowState = {
   contact: null,
   existingInverter: null,
   rates: null,
+  prices: null,
   sunshine: null,
   roof: null,
   solarVic: { rebate: false, loan: false },
@@ -172,6 +176,19 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [hydrated, state.rates?.asOf]);
+
+  // Supplier prices from the latest import: once per visit, refreshed after 10 minutes.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (state.prices && Date.now() - state.prices.fetchedAt < 10 * 60_000) return;
+    let cancelled = false;
+    void fetchSupplierPrices().then((costs) => {
+      if (!cancelled && costs) setState((s) => ({ ...s, prices: { costs, fetchedAt: Date.now() } }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, state.prices]);
 
   // NASA sunshine for the home's coordinates.
   const lat = state.address?.lat;
@@ -266,7 +283,7 @@ export function useSystem() {
       solarVicLoan: state.solarVic.rebate && state.solarVic.loan,
     };
     const partner = partnerPricingFor(state.installerId ? getInstaller(state.installerId) : undefined, state.address);
-    const price = priceSystem(config, site, state.addOns, incentives, rates, partner);
+    const price = priceSystem(config, site, state.addOns, incentives, rates, partner, state.prices?.costs);
     const outcome = estimateOutcome(config, recommendation.usage, price);
     return { profile, analysis, site, recommendation, tier, config, price, outcome, rates };
   }, [
@@ -280,6 +297,7 @@ export function useSystem() {
     state.solarVic,
     state.installDate,
     state.rates,
+    state.prices,
     state.sunshine,
     state.installerId,
   ]);
