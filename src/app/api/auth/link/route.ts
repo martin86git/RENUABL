@@ -1,6 +1,7 @@
 import { LOGIN_LINK_MINUTES, normaliseEmail, safeNext, type AccountRole } from "@/lib/domain/accounts";
 import { applicationPendingEmail, loginLinkEmail } from "@/lib/domain/emails";
 import { siteUrl } from "@/lib/domain/sms";
+import { PREVIEW_MODE } from "@/lib/config";
 import { createLoginToken, isStaff } from "@/lib/server/accounts";
 import { dbConfigured, query } from "@/lib/server/db";
 import { emailProvider, sendEmail } from "@/lib/server/email";
@@ -59,8 +60,14 @@ export async function POST(request: Request) {
         }),
       });
     } catch (e) {
-      console.error("sign-in email failed", e instanceof Error ? e.message : e);
-      return Response.json({ ok: false, message: "We couldn't send the email just now. Please try again." }, { status: 502 });
+      const detail = e instanceof Error ? e.message : String(e);
+      console.error("sign-in email failed", detail);
+      // In preview, say why (the email service's own reply; no keys in it), so it can be fixed without digging through logs.
+      const message = "We couldn't send the email just now. Please try again.";
+      return Response.json(
+        { ok: false, message: PREVIEW_MODE ? `${message} (Preview detail: ${detail.slice(0, 200)})` : message },
+        { status: 502 },
+      );
     }
   }
   return Response.json({ ok: true, message: SENT });

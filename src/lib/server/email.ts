@@ -85,7 +85,16 @@ export async function sendEmail(email: Email): Promise<"sent" | "skipped"> {
     console.warn(`email skipped (email not configured): "${email.subject}"`);
     return "skipped";
   }
-  if (provider === "sendgrid") await viaSendGrid(email, process.env.SENDGRID_API_KEY!.trim(), from);
-  else await viaResend(email, process.env.RESEND_API_KEY!.trim(), from);
+  const resendKey = process.env.RESEND_API_KEY?.trim();
+  if (provider === "sendgrid") {
+    try {
+      await viaSendGrid(email, process.env.SENDGRID_API_KEY!.trim(), from);
+    } catch (e) {
+      // SendGrid refused (e.g. its sender isn't verified yet): Resend, when it's set up, sends instead.
+      if (!resendKey) throw e;
+      console.error("SendGrid failed, sending with Resend:", e instanceof Error ? e.message : e);
+      await viaResend(email, resendKey, from);
+    }
+  } else await viaResend(email, resendKey!, from);
   return "sent";
 }

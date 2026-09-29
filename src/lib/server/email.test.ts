@@ -46,6 +46,21 @@ describe("sendEmail", () => {
     await expect(sendEmail(email)).rejects.toThrow(/SendGrid 403/);
   });
 
+  it("falls back to Resend when SendGrid refuses and Resend is set up", async () => {
+    vi.stubEnv("SENDGRID_API_KEY", "SG.test");
+    vi.stubEnv("RESEND_API_KEY", "re_test");
+    vi.stubEnv("EMAIL_FROM", "hello@renuabl.com.au");
+    const fetchMock = vi.fn(async (url: unknown) =>
+      String(url).includes("sendgrid") ? new Response("not verified", { status: 403 }) : Response.json({ id: "1" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(sendEmail(email)).resolves.toBe("sent");
+    expect(fetchMock.mock.calls.map((c) => String(c[0]))).toEqual([
+      "https://api.sendgrid.com/v3/mail/send",
+      "https://api.resend.com/emails",
+    ]);
+  });
+
   it("skips without a sender or a service", async () => {
     vi.stubEnv("SENDGRID_API_KEY", "SG.test");
     expect(emailProvider()).toBeNull();
