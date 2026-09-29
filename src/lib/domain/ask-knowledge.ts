@@ -4,7 +4,7 @@
  * figures, rebates or promises. Keep the facts in step with the product rules
  * in CLAUDE.md.
  */
-import { COSTING } from "./costing";
+import { COSTING, sellPrice } from "./costing";
 import { ASSUMPTIONS } from "./recommendation";
 import { INSTALL_ARRIVAL } from "./scheduling";
 import type { AskContext } from "./ask-types";
@@ -38,7 +38,10 @@ export const ASK_FACTS = [
   "RENUABL calls the installers it works with 'installation partners'; use that term. In Victoria the matched installation partner is Primero Electric & Solar. Alternatives are available if the customer asks.",
   // After install
   "After switch-on, the My RENUABL app shows what the panels make, the battery level and what's been saved, gives a heads-up if something needs a look, and books service visits with the installation partner. Warranty work is free; any other fee is confirmed before a visit is booked.",
-  "A smart EV charger can be added at checkout. Smart switchboards, home backup and smart home integration aren't priced online yet: the customer can tick them to discuss, and they're talked through and quoted on the 15-minute call. Reverse-cycle heating and cooling and heat pump hot water are coming soon: RENUABL doesn't sell them yet, and the customer can ask to be told when they're available. Never quote a price for any of them.",
+  "The price includes installation, the inverter (a new one comes with every system), electrical work, commissioning and GST, with rebates already taken off. The only possible extras are things found when the home is checked (for example a switchboard upgrade), always priced and agreed before anything is charged.",
+  `Blackout backup: a battery can keep chosen circuits on in a blackout, but wiring those backup circuits in is an optional extra ("Blackout Backup", ${money(sellPrice(COSTING.backupCircuitsInstall))} installed, including GST), added on the Extras step. Which circuits is agreed on the 15-minute call. It needs a battery: Essential (solar only) has no backup. Without Blackout Backup, the battery doesn't power the home during a blackout.`,
+  "Battery sizes are shown as the battery's full (nominal) size; RENUABL sizes batteries assuming about 90% of that is usable. Equipment brands and models are talked through on the 15-minute call, not listed online: if asked, say the specialist will go through the exact equipment on the call.",
+  "A smart EV charger can be added at checkout. Smart switchboards and smart home integration aren't priced online yet: the customer can tick them to discuss, and they're talked through and quoted on the 15-minute call. Reverse-cycle heating and cooling and heat pump hot water are coming soon: RENUABL doesn't sell them yet, and the customer can ask to be told when they're available. Never quote a price for any of them.",
 ];
 
 /** The customer's own answers and system, as plain lines for the model. */

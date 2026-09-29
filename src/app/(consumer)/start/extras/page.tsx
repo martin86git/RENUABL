@@ -17,7 +17,9 @@ import type { AddOnId } from "@/lib/domain/types";
 function ExtrasScreen() {
   const router = useRouter();
   const { state, update } = useFlow();
-  const { price } = useSystem();
+  const { price, config } = useSystem();
+  // Blackout Backup wires circuits to the battery: only offered when there is one.
+  const offered = ADD_ONS.filter((a) => !a.needsBattery || config.batteryKwh > 0);
 
   const toggle = (id: AddOnId) =>
     update({ addOns: state.addOns.includes(id) ? state.addOns.filter((a) => a !== id) : [...state.addOns, id] });
@@ -35,7 +37,7 @@ function ExtrasScreen() {
       }
     >
       <ul className="max-w-xl space-y-3">
-        {ADD_ONS.map((a) => {
+        {offered.map((a) => {
           const added = state.addOns.includes(a.id);
           const onCall = a.price == null && !a.comingSoon;
           const action = a.comingSoon

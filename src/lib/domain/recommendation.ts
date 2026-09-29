@@ -90,8 +90,14 @@ export const ASSUMPTIONS = {
  * electrification) take interest only: "Let me know when it's available".
  */
 export const ADD_ONS: AddOn[] = [
+  {
+    id: "home-backup",
+    name: "Blackout Backup",
+    blurb: "Wire in backup circuits so your battery keeps them on in a blackout.",
+    price: sellPrice(COSTING.backupCircuitsInstall),
+    needsBattery: true,
+  },
   { id: "smart-switchboard", name: "Smart Switchboard", blurb: "Prepare for a smarter, safer home.", price: null },
-  { id: "home-backup", name: "Home Backup", blurb: "Keep essentials running during outages.", price: null },
   { id: "smart-home", name: "Smart Home Integration", blurb: "Connect and optimise your whole home.", price: null },
   {
     id: "reverse-cycle",
@@ -366,6 +372,17 @@ function expandSystem(profile: EnergyProfile, analysis: HomeAnalysis, usage: Usa
   };
 }
 
+/** Under every price: what it covers (brands are talked through on the call, not listed). */
+export const PRICE_INCLUDES = "Includes installation, the inverter, electrical work, commissioning and GST.";
+
+/** Blackout backup: the battery can run backup circuits; wiring them in is a priced extra ("Blackout Backup"). */
+export function backupNote(hasBackup: boolean) {
+  const extra = ADD_ONS.find((a) => a.id === "home-backup")?.price ?? 0;
+  return hasBackup
+    ? "Blackout backup is added: in a blackout, your backup circuits switch to the battery. We'll agree which circuits on your 15-minute call."
+    : `Your battery can keep chosen circuits on in a blackout. Wiring them in is an optional extra (Blackout Backup, $${extra.toLocaleString("en-AU")} installed), which you can add on the next step.`;
+}
+
 /** Under the system on the system step: the size is a recommendation until the roof is checked. */
 export const ROOF_SIZE_NOTE =
   "Your final system size is confirmed on your 15-minute call, once we've checked how many panels fit on your roof. If fewer fit, we'll adjust the system and the price before anything is final.";
@@ -483,7 +500,7 @@ export function priceSystem(
   /** The matched partner's pricing; RENUABL's own rates and margin when absent. */
   partner?: PartnerPricing,
 ): PriceBreakdown {
-  const priced = addOns.filter(isPricedAddOn);
+  const priced = addOns.filter((id) => isPricedAddOn(id) && (config.batteryKwh > 0 || !ADD_ONS.find((a) => a.id === id)?.needsBattery));
   const bom = billOfMaterials({
     ...config,
     roof: site.roof,
@@ -590,7 +607,7 @@ export function suggestedAdditions(config: SystemConfig, recommended: SystemConf
     out.push({
       id: "battery",
       label: `${size} kWh battery`,
-      blurb: "Use your sunshine at night and keep essentials on in outages.",
+      blurb: "Use your sunshine at night.",
       amount: added({ batteryKwh: size }),
     });
   }
@@ -603,6 +620,7 @@ export function suggestedAdditions(config: SystemConfig, recommended: SystemConf
     });
   }
   for (const a of ADD_ONS) {
+    if (a.needsBattery && config.batteryKwh === 0) continue;
     if (a.price != null && !addOns.includes(a.id)) out.push({ id: a.id, label: a.name, blurb: a.blurb, amount: a.price });
   }
   return out;

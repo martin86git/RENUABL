@@ -18,7 +18,7 @@ import { formatCurrency, formatDate } from "@/lib/domain/format";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { describeInverter } from "@/lib/domain/inverter";
 import { CONTACT_CONSENT } from "@/lib/domain/legal";
-import { TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
+import { PRICE_INCLUDES, TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
 import { solarVictoriaApplies } from "@/lib/domain/rebates";
 import { getWindow } from "@/lib/domain/scheduling";
 import type { AddOnId, LineItemId } from "@/lib/domain/types";
@@ -224,6 +224,7 @@ function ReserveScreen() {
         ))}
         <li>
           <StatRow label={<span className="text-ink">Total after rebates</span>} value={formatCurrency(price.total)} />
+          <p className="pb-2 text-[12px] text-muted">{PRICE_INCLUDES}</p>
         </li>
         {price.loan > 0 && (
           <>

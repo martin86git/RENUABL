@@ -200,6 +200,17 @@ describe("recommendSystem", () => {
     expect(batteryNeeded(usage, true)).toBeGreaterThan(batteryNeeded(usage, false));
   });
 
+  it("prices Blackout Backup at $1,000 installation (+ margin and GST), only with a battery", () => {
+    const withBattery = { panelCount: 14, batteryKwh: 16, evCharger: false };
+    const plain = priceSystem(withBattery, site).gross;
+    const backedUp = priceSystem(withBattery, site, ["home-backup"]);
+    expect(backedUp.gross - plain).toBe(sellPrice(1000));
+    expect(backedUp.lines.find((l) => l.id === "home-backup")?.amount).toBe(sellPrice(1000));
+    expect(ADD_ONS.find((a) => a.id === "home-backup")?.price).toBe(sellPrice(1000));
+    const solarOnly = { panelCount: 14, batteryKwh: 0, evCharger: false };
+    expect(priceSystem(solarOnly, site, ["home-backup"]).gross).toBe(priceSystem(solarOnly, site).gross);
+  });
+
   it("stays within panel and roof limits", () => {
     const huge = summariseBill({ isElectricityBill: true, annualUsageKwh: 40000 }) as BillSummary;
     for (const t of Object.values(recommendSystem(base, { ...analysis, maxPanels: 24 }, huge).tiers)) {

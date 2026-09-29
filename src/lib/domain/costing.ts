@@ -58,9 +58,11 @@ export const COSTING = {
   tiltInstallPerPanel: 15,
   /** EV charger installation, ex GST. */
   evChargerInstall: 1000,
+  /** Wiring backup circuits to the battery (the gateway is already in every battery), ex GST. */
+  backupCircuitsInstall: 1000,
   // PLACEHOLDERS (not in the supplier list): confirm with Primero before launch.
   heatPumpInstall: 1200,
-  addOnPrices: { "smart-switchboard": 1450, "home-backup": 1850, "smart-home": 690 } as Record<string, number>,
+  addOnPrices: { "smart-switchboard": 1450, "smart-home": 690 } as Record<string, number>,
 } as const;
 
 export type CostGroup =
@@ -308,6 +310,9 @@ export function billOfMaterials(input: CostingInput): BomLine[] {
     if (id === "heat-pump") {
       for (const item of HEAT_PUMP) lines.push(line("heat-pump", item.sku, item.name, 1, item.cost));
       lines.push(line("heat-pump", null, "Heat pump installation (placeholder)", 1, COSTING.heatPumpInstall));
+    } else if (id === "home-backup") {
+      // Backup circuits only make sense with a battery.
+      if (modules > 0) lines.push(line("home-backup", null, "Backup circuits installation", 1, COSTING.backupCircuitsInstall));
     } else if (id in COSTING.addOnPrices) {
       lines.push(line(id as CostGroup, null, `${id} (placeholder price)`, 1, COSTING.addOnPrices[id]));
     }

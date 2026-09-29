@@ -17,7 +17,16 @@ import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
 import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
 import { expandNote, solarSituation } from "@/lib/domain/existing-solar";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
-import { ASSUMPTIONS, ROOF_SIZE_NOTE, TIER_LABELS, isSameConfig, sizingExplanation, solarDay } from "@/lib/domain/recommendation";
+import {
+  ASSUMPTIONS,
+  PRICE_INCLUDES,
+  backupNote,
+  ROOF_SIZE_NOTE,
+  TIER_LABELS,
+  isSameConfig,
+  sizingExplanation,
+  solarDay,
+} from "@/lib/domain/recommendation";
 import type { SystemConfig, SystemTier } from "@/lib/domain/types";
 
 type Part = "solar" | "battery" | "ev" | "monitoring";
@@ -129,6 +138,7 @@ function SystemScreen() {
         <StatRow label="Pays for itself in" value={`~${outcome.paybackYears} years`} />
         <StatRow label="Due today" value="$0 to reserve" />
       </div>
+      <p className="mt-2 text-[12px] text-muted">{PRICE_INCLUDES}</p>
     </Card>
   );
 
@@ -204,7 +214,9 @@ function SystemScreen() {
               icon={Battery}
               title="Battery Storage"
               subtitle={
-                config.batteryKwh > 0 ? `${config.batteryKwh} kWh · Store and use more of your energy` : "Not included · Add any time"
+                config.batteryKwh > 0
+                  ? `${config.batteryKwh} kWh · ${state.addOns.includes("home-backup") ? "With blackout backup" : "Blackout backup available"}`
+                  : "Not included · Add any time"
               }
               muted={config.batteryKwh === 0}
               onOpen={() => setOpen("battery")}
@@ -316,9 +328,11 @@ function SystemScreen() {
           </p>
         ) : (
           <p>
-            {TIER_LABELS.essential} doesn&apos;t include a battery. Choose {TIER_LABELS.recommended} for one sized to your evening use.
+            {TIER_LABELS.essential} doesn&apos;t include a battery, so there&apos;s no backup in a blackout. Choose{" "}
+            {TIER_LABELS.recommended} for a battery sized to your evening use; blackout backup can be added to it.
           </p>
         )}
+        {config.batteryKwh > 0 && <p>{backupNote(state.addOns.includes("home-backup"))}</p>}
       </PartSheet>
 
       <PartSheet open={open === "ev"} onOpenChange={(o) => setOpen(o ? "ev" : null)} title="EV Charger">

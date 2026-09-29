@@ -162,6 +162,8 @@ export interface AddOn {
   price: number | null;
   /** Not sold yet: the customer can ask to hear when it's available (no price, not discussed on the call). */
   comingSoon?: boolean;
+  /** Only offered, and only priced, with a battery. */
+  needsBattery?: boolean;
 }
 
 // ---------------------------------------------------------------------------
