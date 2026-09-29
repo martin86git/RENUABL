@@ -387,7 +387,7 @@ export async function fetchSunMap(
 }
 
 export function sunMapSrc(lat: number, lng: number) {
-  return `/api/roof/sun?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`;
+  return `/api/roof/sun?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&v=3`;
 }
 
 export function roofPhotoSrc(lat: number, lng: number) {
@@ -396,5 +396,6 @@ export function roofPhotoSrc(lat: number, lng: number) {
 
 /** The satellite image under the customer's panel layout. */
 export function roofImageSrc(lat: number, lng: number) {
-  return `/api/roof/image?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`;
+  // v: bump to skip photos browsers kept from before a fix.
+  return `/api/roof/image?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&v=2`;
 }

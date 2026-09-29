@@ -14,7 +14,6 @@ import {
 } from "@/lib/domain/solar-roof";
 import { PREVIEW_MODE } from "@/lib/config";
 import { roofImageSrc } from "@/lib/services/consumer";
-import { SunMap } from "./sun-map";
 
 /**
  * "Your roof": a satellite photo of the home with what Google's roof data says
@@ -75,14 +74,20 @@ export function RoofCheck({
         onLoad={() => setPhotoLoaded(true)}
         onError={() => setPhotoFailed(true)}
       />
-      {!photoLoaded && <MascotLoading label="Looking at your roof from above…" cover />}
+      {photoLoaded ? (
+        // The photo is centred on the address: mark it, so a wrong spot is easy to see.
+        <span
+          className="pointer-events-none absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-primary shadow-[var(--shadow-soft)]"
+          aria-hidden
+        />
+      ) : (
+        <MascotLoading label="Looking at your roof from above…" cover />
+      )}
     </div>
   ) : null;
   return (
     <Card className="overflow-hidden">
-      {hasPhoto && (
-        <div className="p-2 pb-0">{PREVIEW_MODE ? <SunMap centre={{ lat: centre.lat!, lng: centre.lng! }} fallback={photo} /> : photo}</div>
-      )}
+      {hasPhoto && <div className="p-2 pb-0">{photo}</div>}
       <div className="flex gap-4 p-5">
         <House className="mt-0.5 h-6 w-6 shrink-0 text-ink" strokeWidth={1.3} aria-hidden />
         <div>
