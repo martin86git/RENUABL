@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { HomePhoto, homeBannerFor, homePhotoFor } from "@/components/ui/brand-art";
 import { cn } from "@/components/ui/primitives";
 import type { Job } from "@/lib/domain/types";
 
@@ -17,9 +16,20 @@ function useLoadFailure() {
   return { ref, failed, fail: () => setFailed(true) };
 }
 
+/** Installers fitting panels on a tin roof: the picture for jobs without a roof view. */
+const INSTALL_PHOTO = "/brand/install-crew.webp";
+
+function InstallPhoto({ className, sizes }: { className?: string; sizes?: string }) {
+  return (
+    <span className={cn("relative block overflow-hidden bg-surface-2", className)}>
+      <Image src={INSTALL_PHOTO} alt="" fill sizes={sizes} className="object-cover object-[68%_50%]" />
+    </span>
+  );
+}
+
 /**
  * A job's picture: the satellite view of the roof (Google) for a partner's own
- * accepted job; a stock home photo for offers (the aerial would give away the
+ * accepted job; the install photo for offers (the aerial would give away the
  * address), the sample portal, or when the view can't be loaded.
  */
 export function JobPhoto({
@@ -36,8 +46,7 @@ export function JobPhoto({
   sizes?: string;
 }) {
   const { ref, failed, fail } = useLoadFailure();
-  const fallback = size === "wide" ? homeBannerFor(job.id) : homePhotoFor(job.id);
-  if (!live || job.offer || failed) return <HomePhoto src={fallback} className={className} sizes={sizes} />;
+  if (!live || job.offer || failed) return <InstallPhoto className={className} sizes={sizes} />;
   return (
     <span className={cn("relative block overflow-hidden bg-surface-2", className)}>
       <Image

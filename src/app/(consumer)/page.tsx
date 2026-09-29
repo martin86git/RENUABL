@@ -17,9 +17,19 @@ export default function HomePage() {
           <h1 className="mt-3 text-[40px] font-normal leading-[1.02] tracking-[-0.04em] sm:text-[52px] lg:text-[64px]">
             Solar and batteries, sized to your bill.
           </h1>
-          <p className="mt-4 max-w-md text-[16px] leading-relaxed text-muted lg:mt-6 lg:text-[18px]">
-            Upload your bill, get one system made for your home, and pick your install date. One installation partner, one price.
-          </p>
+          <ol className="mt-5 space-y-2 text-[16px] text-muted lg:mt-7 lg:text-[18px]">
+            {["Upload your bill", "Pick your install date", "Start saving"].map((step, i) => (
+              <li key={step} className="flex items-center gap-3">
+                <span
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sage text-[12px] text-forest"
+                  aria-hidden
+                >
+                  {i + 1}
+                </span>
+                {step}
+              </li>
+            ))}
+          </ol>
           <AddressEntry className="mt-7 max-w-lg lg:mt-10" />
           <div className="mt-4 hidden lg:block">
             <AskRenuabl context="home" variant="link" title="Not sure yet? Ask RENUABL" />
