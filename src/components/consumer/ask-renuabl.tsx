@@ -11,7 +11,7 @@ import { getInstaller } from "@/lib/services/consumer";
 import { MascotAvatar } from "@/components/ui/brand-art";
 import { cn } from "@/components/ui/primitives";
 
-/** The customer's own answers, so Ask RENUABL can talk about their home (none on My RENUABL's example home). */
+/** The customer's own answers, so Ask Revo can talk about their home (none on My RENUABL's example home). */
 function useAskSnapshot(context: AskContext): AskSnapshot {
   const { state } = useFlow();
   const { config, price } = useSystem();
@@ -44,14 +44,14 @@ interface Turn {
 }
 
 /**
- * "Ask RENUABL" — present as quiet intelligence, never labelled as AI.
+ * "Ask Revo" — present as quiet intelligence, never labelled as AI.
  * variant="card" is the design's mascot card with an arrow button;
  * variant="link" is a small text prompt (e.g. under the address field).
  */
 export function AskRenuabl({
   context,
   variant = "card",
-  title = "Questions? Ask RENUABL",
+  title = "Questions? Ask Revo",
   subtitle = "Get helpful answers about your home energy needs.",
   arrow = "dark",
   className,
@@ -133,7 +133,7 @@ export function AskRenuabl({
         >
           <div className="flex items-center justify-between px-5 pt-5 sm:px-6">
             <Dialog.Title className="flex items-center gap-3 text-[17px] font-medium">
-              <MascotAvatar className="h-9 w-9" /> Ask RENUABL
+              <MascotAvatar className="h-9 w-9" /> Ask Revo
             </Dialog.Title>
             <Dialog.Close className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2" aria-label="Close">
               <X className="h-5 w-5" />

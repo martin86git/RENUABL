@@ -171,7 +171,7 @@ function SystemScreen() {
         <AskRenuabl
           context="recommendation"
           title="Questions about your system?"
-          subtitle="Ask RENUABL — do I need a battery?"
+          subtitle="Ask Revo — do I need a battery?"
           arrow="light"
         />
       }

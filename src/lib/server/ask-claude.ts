@@ -1,5 +1,5 @@
 /**
- * Server only. Ask RENUABL answers from Claude, grounded in reviewed facts and
+ * Server only. Ask Revo answers from Claude, grounded in reviewed facts and
  * the customer's own answers (src/lib/domain/ask-knowledge.ts).
  */
 import Anthropic from "@anthropic-ai/sdk";

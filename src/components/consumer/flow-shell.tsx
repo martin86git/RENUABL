@@ -114,7 +114,7 @@ export function FlowShell({ children }: { children: ReactNode }) {
 
 /**
  * One step. Desktop: centre task (+ optional contextual aside), with the
- * Ask RENUABL card and primary CTA side by side at the bottom.
+ * Ask Revo card and primary CTA side by side at the bottom.
  * Mobile: back arrow + progress dots, stacked content, sticky CTA.
  */
 export function FlowStep({

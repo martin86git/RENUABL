@@ -27,7 +27,7 @@ export default function UpgradePage() {
           </Card>
         ))}
       </div>
-      <AskRenuabl context="extras" title="Ask RENUABL" subtitle="Which upgrades are right for me?" />
+      <AskRenuabl context="extras" title="Ask Revo" subtitle="Which upgrades are right for me?" />
     </div>
   );
 }

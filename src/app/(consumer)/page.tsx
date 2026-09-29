@@ -33,7 +33,7 @@ export default function HomePage() {
           <p className="mt-5 text-[15px] text-forest lg:mt-7 lg:text-[16px]">Your system, priced in about two minutes.</p>
           <AddressEntry className="mt-4 max-w-lg lg:mt-5" />
           <div className="mt-4 hidden lg:block">
-            <AskRenuabl context="home" variant="link" title="Not sure yet? Ask RENUABL" />
+            <AskRenuabl context="home" variant="link" title="Not sure yet? Ask Revo" />
           </div>
 
           {/* Mobile mascot sits below the address. */}
@@ -46,7 +46,7 @@ export default function HomePage() {
             </Script>
           </div>
 
-          <AskRenuabl context="home" variant="link" title="Not sure yet? Ask RENUABL" className="mt-6 lg:hidden" />
+          <AskRenuabl context="home" variant="link" title="Not sure yet? Ask Revo" className="mt-6 lg:hidden" />
         </section>
 
         <div className="relative hidden justify-center lg:col-span-6 lg:flex">

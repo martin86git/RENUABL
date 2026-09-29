@@ -139,7 +139,7 @@ export default function ProfilePage() {
       width="wide"
       title="Tell us about your home."
       subtitle="Your latest bill and a few quick questions, so we size your system to what you actually use."
-      ask={<AskRenuabl context="profile" title="Not sure?" subtitle="Ask RENUABL anything about your home." arrow="light" />}
+      ask={<AskRenuabl context="profile" title="Not sure?" subtitle="Ask Revo anything about your home." arrow="light" />}
       cta={
         <Button size="lg" className="w-full lg:w-72" disabled={Boolean(state.bill) && !complete} onClick={next}>
           Continue <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />

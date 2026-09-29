@@ -13,7 +13,7 @@ const offline = () =>
     }),
   );
 
-describe("Ask RENUABL and the bill", () => {
+describe("Ask Revo and the bill", () => {
   it("tells Claude the bill can't be skipped", () => {
     const fact = ASK_FACTS.find((f) => f.startsWith("A bill is required"));
     expect(fact).toContain("Never say they can skip it");

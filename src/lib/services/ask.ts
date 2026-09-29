@@ -1,5 +1,5 @@
 /**
- * "Ask RENUABL" answers. Claude answers on the server (/api/ask), grounded in
+ * "Ask Revo" answers. Claude answers on the server (/api/ask), grounded in
  * reviewed facts and the customer's answers; without it, a small intent
  * matcher over canned, reviewed answers.
  */

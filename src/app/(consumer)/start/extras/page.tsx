@@ -29,7 +29,7 @@ function ExtrasScreen() {
       width="narrow"
       title="Enhance your system."
       subtitle="Add products now, tick the ones you'd like to talk about on your call, or hear first about what's coming."
-      ask={<AskRenuabl context="extras" title="Ask RENUABL" subtitle="Which upgrades are right for me?" />}
+      ask={<AskRenuabl context="extras" title="Ask Revo" subtitle="Which upgrades are right for me?" />}
       cta={
         <Button size="lg" className="w-full lg:w-72" onClick={() => router.push(stepHref("installer"))}>
           Continue <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />

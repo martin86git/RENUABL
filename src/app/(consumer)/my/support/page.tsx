@@ -25,7 +25,7 @@ export default function SupportPage() {
         <Eyebrow>Support</Eyebrow>
         <h1 className="mt-2 text-[32px] font-normal tracking-[-0.035em] sm:text-[40px]">How can we help?</h1>
       </div>
-      <AskRenuabl context="my" title="Ask RENUABL" subtitle="Straight answers about your system, any time." />
+      <AskRenuabl context="my" title="Ask Revo" subtitle="Straight answers about your system, any time." />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Link href="/my/service" className="block sm:order-first">
           <Card className="h-full bg-forest p-5 text-white transition hover:opacity-95">

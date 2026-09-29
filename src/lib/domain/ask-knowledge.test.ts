@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ASK_FACTS, askSystemPrompt, cleanAskInput, describeSnapshot } from "./ask-knowledge";
 
-describe("Ask RENUABL grounding", () => {
+describe("Ask Revo grounding", () => {
   it("knows flat roofs can be laid flat or tilted, and tilting is checked on the call", () => {
     const facts = ASK_FACTS.join(" ");
     expect(facts).toMatch(/laid flat \(the default/);

@@ -86,7 +86,7 @@ export default async function MyHomePage() {
           </Card>
 
           <div className="mt-4">
-            <AskRenuabl context="my" title="Ask RENUABL" subtitle="How can I improve my savings?" />
+            <AskRenuabl context="my" title="Ask Revo" subtitle="How can I improve my savings?" />
           </div>
         </section>
 
