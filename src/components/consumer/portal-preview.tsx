@@ -1,11 +1,11 @@
 "use client";
 
 import { ArrowRight, CircleCheck, MessageCircle, Smartphone, Wrench, X, Zap, type LucideIcon } from "lucide-react";
+import Link from "next/link";
 import { Dialog } from "radix-ui";
 import { useState } from "react";
 import { DayCurve, Sparkbars } from "@/components/consumer/energy-charts";
 import { useFlow } from "@/components/consumer/flow-state";
-import { PREVIEW_MODE } from "@/lib/config";
 import { Button, Card, cn } from "@/components/ui/primitives";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
 import { getToday } from "@/lib/services/home";
@@ -131,17 +131,25 @@ export function PortalTeaser({ className, closeLabel = "Back to my system" }: { 
 }
 
 /**
- * On My RENUABL, the screens are an example home: say so to anyone who has
- * reserved, and to every visitor on the live site (there are no accounts yet).
+ * On My RENUABL, the screens are an example home: say so to everyone (no
+ * customer has a switched-on system yet), in preview and live alike.
  */
 export function PortalPreviewBanner() {
   const { state, hydrated } = useFlow();
-  if (!hydrated || (PREVIEW_MODE && !state.reservation)) return null;
+  if (!hydrated) return null;
   if (!state.reservation) {
     return (
       <div className="mb-6 rounded-2xl bg-sage/70 px-5 py-4 text-forest lg:mb-10">
-        <p className="text-[15px]">This is an example of My RENUABL.</p>
-        <p className="mt-0.5 text-[13px] text-forest/80">It&apos;s what you&apos;ll see once your system is installed and switched on.</p>
+        <p className="text-[15px]">
+          <span className="mr-2 rounded-full bg-surface px-2.5 py-0.5 text-[11px] align-middle">Example</span>
+          This is what you can expect with RENUABL.
+        </p>
+        <p className="mt-1 text-[13px] text-forest/80">
+          An example home: once your system is installed and switched on, you&apos;ll see your own solar, battery and savings here.{" "}
+          <Link href="/" className="underline underline-offset-2">
+            Start with your address
+          </Link>
+        </p>
       </div>
     );
   }
