@@ -24,9 +24,14 @@ const INTENTS: { match: RegExp; answer: string }[] = [
       "A battery stores the solar you don't use during the day so your home can run on it at night. We only recommend one when it pays for itself for your household. You can remove it on your recommendation screen at any time.",
   },
   {
-    match: /heat pump|hot water|upgrade|switchboard|smart home/i,
+    match: /(no|don'?t have|haven'?t got|without|lost|can'?t find|skip).{0,20}bill|bill.{0,20}(skip|without)/i,
     answer:
-      "Upgrades are worth it when they move energy use into the daytime, when your solar is free, and heat pump hot water is often a big one. We don't price heat pumps and the other upgrades online yet: tick the ones you're interested in and we'll talk them through and quote them on your 15-minute call.",
+      "We need your latest electricity bill to size your system, so it can't be skipped. The quickest way is to download it (PDF) from your energy retailer's app, website or email, or take a photo of the paper bill. A screenshot works too. Your answers are kept while you get it.",
+  },
+  {
+    match: /heat pump|hot water|reverse.?cycle|air ?con|upgrade|switchboard|smart home/i,
+    answer:
+      "Upgrades are worth it when they move energy use into the daytime, when your solar is free. Smart switchboards, home backup and smart home integration aren't priced online yet: tick them and we'll quote them on your 15-minute call. Heat pump hot water and reverse-cycle heating and cooling are coming soon: tick them and we'll let you know when they're available.",
   },
   {
     match: /bill|upload|usage|pool|spa|heating|cooling/i,
@@ -71,7 +76,7 @@ const INTENTS: { match: RegExp; answer: string }[] = [
 
 export const SUGGESTED_QUESTIONS: Record<AskContext, string[]> = {
   home: ["How does RENUABL work?", "What will it cost?", "How long does install take?"],
-  profile: ["Why do you need my bill?", "Which bill should I upload?", "Do I need a battery?"],
+  profile: ["Why do you need my bill?", "I don't have my bill handy", "Do I need a battery?"],
   recommendation: ["Do I need a battery?", "How are savings calculated?", "What if my roof is shaded?"],
   extras: ["Which upgrades are right for me?", "Is a heat pump worth it?", "Can I add these later?"],
   installer: ["How do you choose partners?", "Can I pick someone else?"],
