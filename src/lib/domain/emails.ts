@@ -71,6 +71,7 @@ ${o.interested?.length ? `<p style="font-size:14px;margin:12px 0 0">Coming soon:
 <div style="background:#D9E7DC;border-radius:16px;padding:20px;color:#1E3A2E;font-size:14px">
 <p style="margin:0 0 6px"><strong>What happens next</strong></p>
 <p style="margin:0">${esc(next)} After the call we'll send a secure link for the ${money(o.deposit)} refundable deposit to lock in your date.</p>
+<p style="margin:10px 0 0">${esc(CHANGE_BOOKING_NOTE)}</p>
 </div>
 <p style="color:#6B6B6B;font-size:12px;margin-top:24px">Questions? Just reply to this email.</p>
 </div></body></html>`;
@@ -96,6 +97,7 @@ ${o.interested?.length ? `<p style="font-size:14px;margin:12px 0 0">Coming soon:
     "",
     next,
     `After the call we'll send a secure link for the ${money(o.deposit)} refundable deposit to lock in your date.`,
+    CHANGE_BOOKING_NOTE,
   ]
     .filter((l): l is string => typeof l === "string")
     .join("\n");
@@ -103,20 +105,40 @@ ${o.interested?.length ? `<p style="font-size:14px;margin:12px 0 0">Coming soon:
   return { subject, html, text };
 }
 
-export function callBookedEmail(o: { reference: string; firstName: string; call: string }): {
+/** How to change a booking, in every booking email. */
+export const CHANGE_BOOKING_NOTE =
+  'Need a different time or day? Use "Change" on your confirmation page, or just reply to this email and we\'ll move it for you.';
+
+export function callBookedEmail(o: { reference: string; firstName: string; call: string; changed?: boolean }): {
   subject: string;
   html: string;
   text: string;
 } {
-  const subject = `Your RENUABL call: ${o.call}`;
-  const body = `We'll call you on ${o.call} for your 15-minute system confirmation. We'll confirm your roof, switchboard and access. It isn't a sales call. Reservation ${o.reference}.`;
+  const subject = o.changed ? `Your RENUABL call has moved: ${o.call}` : `Your RENUABL call: ${o.call}`;
+  const heading = o.changed ? `Your call has moved, ${clip(o.firstName, 40)}.` : `Your call is booked, ${clip(o.firstName, 40)}.`;
+  const body = `We'll call you on ${o.call} for your 15-minute system confirmation. We'll confirm your roof, switchboard and access, and show you your design and products. It isn't a sales call. Reservation ${o.reference}.`;
   const html = `<!doctype html><html><body style="margin:0;background:#FAF9F6;font-family:Inter,Arial,sans-serif;color:#1A1A1A"><div style="max-width:560px;margin:0 auto;padding:32px 20px">
 <p style="letter-spacing:.28em;font-size:14px;margin:0 0 24px">RENUABL</p>
-<h1 style="font-weight:400;font-size:26px;margin:0 0 12px">Your call is booked, ${esc(clip(o.firstName, 40))}.</h1>
+<h1 style="font-weight:400;font-size:26px;margin:0 0 12px">${esc(heading)}</h1>
 <p style="margin:0">${esc(body)}</p>
-<p style="color:#6B6B6B;font-size:12px;margin-top:24px">The calendar invite is attached. Need a different time? Just reply to this email.</p>
+<p style="margin:16px 0 0">${esc(CHANGE_BOOKING_NOTE)}</p>
+<p style="color:#6B6B6B;font-size:12px;margin-top:24px">The calendar invite is attached.</p>
 </div></body></html>`;
-  return { subject, html, text: `Your call is booked, ${o.firstName}.\n\n${body}` };
+  return { subject, html, text: `${heading}\n\n${body}\n\n${CHANGE_BOOKING_NOTE}` };
+}
+
+/** The customer moved their installation date after reserving. */
+export function installMovedEmail(o: { reference: string; firstName: string; installDate: string; arrival: string }) {
+  return simpleEmail({
+    subject: `Your RENUABL installation has moved: ${plainText(o.installDate, 60)}`,
+    heading: `Your installation has moved, ${plainText(o.firstName, 40) || "there"}.`,
+    lines: [
+      `Your new provisional installation date is ${plainText(o.installDate, 60)}, arriving ${plainText(o.arrival, 30)}. Reservation ${plainText(o.reference, 20)}.`,
+      "We'll confirm everything on your 15-minute call.",
+      CHANGE_BOOKING_NOTE,
+    ],
+    footer: "The calendar invite is attached.",
+  });
 }
 
 /** Plain text only: no links, web or email addresses (so the emails can't carry someone else's message), clipped. */

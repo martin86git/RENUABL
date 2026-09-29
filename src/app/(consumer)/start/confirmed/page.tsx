@@ -4,6 +4,7 @@ import { ArrowRight, CalendarDays, Check, Gift, HeartPulse, Lock, Mail, PhoneCal
 import type { ReactNode } from "react";
 import { AddToCalendar } from "@/components/consumer/add-to-calendar";
 import { CallBooking } from "@/components/consumer/call-booking";
+import { ChangeInstallDate } from "@/components/consumer/change-install-date";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { useFlow } from "@/components/consumer/flow-state";
@@ -96,6 +97,7 @@ function ConfirmedScreen() {
                       })}
                       filename="renuabl-installation.ics"
                     />
+                    <ChangeInstallDate />
                   </>
                 }
               />
@@ -131,6 +133,10 @@ function ConfirmedScreen() {
             )}
           </ul>
         </Card>
+        <p className="mt-3 text-[12.5px] leading-snug text-muted">
+          Need to change something? Use &ldquo;Change call time&rdquo; or &ldquo;Change install date&rdquo; above, or just reply to your
+          confirmation email and we&apos;ll sort it out.
+        </p>
 
         <div className="mt-8 text-left">
           <p className="text-[15px] text-ink">After your system is switched on</p>

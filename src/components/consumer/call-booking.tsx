@@ -32,7 +32,13 @@ function CallPicker({ installDate, onBooked }: { installDate: string | null; onB
     onBooked(
       await bookConfirmationCall(
         { date, time },
-        { reference: state.reservation?.reservationId, email: state.contact?.email, firstName: state.contact?.firstName, label },
+        {
+          reference: state.reservation?.reservationId,
+          email: state.contact?.email,
+          firstName: state.contact?.firstName,
+          label,
+          changed: Boolean(state.call),
+        },
       ),
     );
     setBusy(false);
@@ -95,7 +101,7 @@ function CallPicker({ installDate, onBooked }: { installDate: string | null; onB
  * Meetings page embedded in a sheet when configured, otherwise an in-app
  * calendar.
  */
-export function CallBooking() {
+export function CallBooking({ prompt = "Choose a time that suits you. It takes a minute." }: { prompt?: string } = {}) {
   const { state, update } = useFlow();
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -112,17 +118,6 @@ export function CallBooking() {
     return () => window.removeEventListener("message", onMessage);
   }, [update]);
 
-  if (state.callBooked) {
-    return (
-      <span className="flex items-center gap-1.5 text-[12.5px] leading-snug text-positive">
-        <CalendarCheck className="h-4 w-4 shrink-0" strokeWidth={1.8} />
-        {state.call
-          ? `Booked for ${formatDate(state.call.date, { weekday: "short", day: "numeric", month: "short" })} at ${formatCallTime(state.call.time)}. We'll call you then.`
-          : "Booked — check your email for the details."}
-      </span>
-    );
-  }
-
   const src = HUBSPOT_MEETINGS_URL
     ? hubspotEmbedSrc(HUBSPOT_MEETINGS_URL, {
         firstname: state.contact?.firstName,
@@ -133,7 +128,16 @@ export function CallBooking() {
 
   return (
     <>
-      <span className="block text-[12.5px] leading-snug text-muted">Choose a time that suits you. It takes a minute.</span>
+      {state.callBooked ? (
+        <span className="flex items-center gap-1.5 text-[12.5px] leading-snug text-positive">
+          <CalendarCheck className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+          {state.call
+            ? `Booked for ${formatDate(state.call.date, { weekday: "short", day: "numeric", month: "short" })} at ${formatCallTime(state.call.time)}. We'll call you then.`
+            : "Booked — check your email for the details."}
+        </span>
+      ) : (
+        <span className="block text-[12.5px] leading-snug text-muted">{prompt}</span>
+      )}
       <Dialog.Root
         open={open}
         onOpenChange={(o) => {
@@ -142,9 +146,15 @@ export function CallBooking() {
         }}
       >
         <Dialog.Trigger asChild>
-          <Button size="sm" className="mt-2.5">
-            {src ? "Book my call" : "Choose a date and time"}
-          </Button>
+          {state.callBooked ? (
+            <button type="button" className="tap-area mt-1.5 text-[12.5px] font-medium text-forest underline underline-offset-4">
+              Change call time
+            </button>
+          ) : (
+            <Button size="sm" className="mt-2.5">
+              {src ? "Book my call" : "Choose a date and time"}
+            </Button>
+          )}
         </Dialog.Trigger>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/25" />

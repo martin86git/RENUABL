@@ -59,7 +59,7 @@ export function revoLine(f: RevoFacts): string {
     case "reserve":
       return "Nothing to pay today, and no commitment. Next is your 15-minute call, where you'll see your design and products.";
     case "confirmed":
-      return `You're all set${f.firstName ? `, ${f.firstName}` : ""}! Keep an eye on your inbox, and book your 15-minute call if you haven't yet.`;
+      return `You're all set${f.firstName ? `, ${f.firstName}` : ""}! Your details are on their way to your inbox. Need a different time? Tap "Change".`;
     default:
       return "Hi, I'm Revo. Ask me anything about solar, batteries or your home.";
   }

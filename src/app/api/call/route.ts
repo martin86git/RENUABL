@@ -28,7 +28,11 @@ export async function POST(request: Request) {
   try {
     if (token && email) {
       const id = await contactIdByEmail(email, token);
-      await addNote(id, reservationNote(reference, { "Confirmation call booked": label }), token);
+      await addNote(
+        id,
+        reservationNote(reference, { [b.changed === true ? "Confirmation call moved to" : "Confirmation call booked"]: label }),
+        token,
+      );
     } else {
       console.warn(`call booked ${reference} ${label} (HubSpot not configured)`);
     }
@@ -36,7 +40,7 @@ export async function POST(request: Request) {
       const ics = buildIcs([callEvent({ reference, date, time })]);
       await sendEmail({
         to: email,
-        ...callBookedEmail({ reference, firstName, call: label }),
+        ...callBookedEmail({ reference, firstName, call: label, changed: b.changed === true }),
         attachments: [{ filename: "renuabl-call.ics", content: ics, contentType: "text/calendar" }],
       });
     }

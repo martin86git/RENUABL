@@ -1,6 +1,9 @@
 import { validateContact } from "@/lib/domain/contact";
 import { PREVIEW_MODE } from "@/lib/config";
-import { buildIcs, installEvent } from "@/lib/domain/calendar";
+import { formatCallTime } from "@/lib/domain/booking";
+import { buildIcs, callEvent, installEvent } from "@/lib/domain/calendar";
+import { formatDate } from "@/lib/domain/format";
+import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { cleanOrder, orderConfirmationEmail, plainText } from "@/lib/domain/emails";
 import { cleanJobRequest } from "@/lib/domain/jobs";
 import { dbConfigured } from "@/lib/server/db";
@@ -23,6 +26,7 @@ export async function POST(request: Request) {
     order?: unknown;
     installDate?: string;
     job?: unknown;
+    call?: unknown;
   };
   try {
     body = await request.json();
@@ -37,6 +41,9 @@ export async function POST(request: Request) {
   for (const [k, v] of Object.entries(body.details ?? {})) {
     if (typeof v === "string" && v.trim()) details[k.slice(0, 60)] = v.trim().slice(0, 300);
   }
+  // The 15-minute call is booked before reserving (in-app calendar): its label is built here, not taken from the browser.
+  const call = cleanCall(body.call);
+  if (call) details["Confirmation call booked"] = call.label;
   const reservationId = await newReference();
   await saveJob(reservationId, checked.contact, body.job);
   // Straight to RENUABL's inbox too, whatever happens with HubSpot.
@@ -48,7 +55,7 @@ export async function POST(request: Request) {
     mobile: checked.contact.mobile,
     details,
   });
-  const email = () => confirmationEmail(reservationId, checked.contact, body.order, body.installDate);
+  const email = () => confirmationEmail(reservationId, checked.contact, body.order, body.installDate, call);
 
   const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
   if (!token) {
@@ -83,15 +90,24 @@ async function confirmationEmail(
   contact: { email: string; firstName: string },
   rawOrder: unknown,
   installDate: string | undefined,
+  call: { date: string; time: string; label: string } | null,
 ): Promise<boolean> {
   const order = cleanOrder(rawOrder);
   if (!order) return false;
   try {
-    const mail = orderConfirmationEmail({ ...order, reference, firstName: plainText(contact.firstName, 40) || "there" });
-    const ics =
-      installDate && /^\d{4}-\d{2}-\d{2}$/.test(installDate)
-        ? buildIcs([installEvent({ reference, date: installDate, installer: order.installer, address: order.address })])
-        : null;
+    const mail = orderConfirmationEmail({
+      ...order,
+      call: call?.label,
+      reference,
+      firstName: plainText(contact.firstName, 40) || "there",
+    });
+    const events = [
+      ...(installDate && /^\d{4}-\d{2}-\d{2}$/.test(installDate)
+        ? [installEvent({ reference, date: installDate, installer: order.installer, address: order.address })]
+        : []),
+      ...(call ? [callEvent({ reference, date: call.date, time: call.time })] : []),
+    ];
+    const ics = events.length ? buildIcs(events) : null;
     const sent = await sendEmail({
       to: contact.email,
       ...mail,
@@ -102,6 +118,19 @@ async function confirmationEmail(
     console.error(`reservation ${reference} confirmation email failed`, e instanceof Error ? e.message : e);
     return false;
   }
+}
+
+/** { date, time } of the booked call → with the label built on the server ("Tuesday 13 October at 10:30am (Melbourne time)"). */
+function cleanCall(raw: unknown): { date: string; time: string; label: string } | null {
+  const c = (raw ?? {}) as { date?: unknown; time?: unknown };
+  const date = typeof c.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(c.date) ? c.date : null;
+  const time = typeof c.time === "string" && /^\d{2}:\d{2}$/.test(c.time) ? c.time : null;
+  if (!date || !time) return null;
+  return {
+    date,
+    time,
+    label: `${formatDate(date, { weekday: "long", day: "numeric", month: "long" })} at ${formatCallTime(time)} (${LAUNCH_MARKET.capital} time)`,
+  };
 }
 
 /** RN-1234; with the database, one no other job has. */

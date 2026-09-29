@@ -1,10 +1,11 @@
 "use client";
 
-import { Battery, Gauge, Gift, House, Loader2, Lock, Plus, PlugZap, Sun } from "lucide-react";
+import { Battery, Gauge, Gift, House, Loader2, Lock, PhoneCall, Plus, PlugZap, Sun } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { CallBooking } from "@/components/consumer/call-booking";
 import { CareIncludedCard, CareUpsell } from "@/components/consumer/care-upsell";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
@@ -20,7 +21,7 @@ import { describeInverter } from "@/lib/domain/inverter";
 import { CONTACT_CONSENT } from "@/lib/domain/legal";
 import { PRICE_INCLUDES, RESERVE_NO_COMMITMENT, TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
 import { solarVictoriaApplies } from "@/lib/domain/rebates";
-import { getWindow } from "@/lib/domain/scheduling";
+import { SOLAR_VIC_DATE_NOTE, getWindow } from "@/lib/domain/scheduling";
 import type { AddOnId, LineItemId } from "@/lib/domain/types";
 import { formatAddress } from "@/lib/mock/addresses";
 import { getInstaller, reserveInstall } from "@/lib/services/consumer";
@@ -57,11 +58,19 @@ function ReserveScreen() {
   const [contact, setContact] = useState<ContactDetails>(state.contact ?? { firstName: "", lastName: "", mobile: "", email: "" });
   const [errors, setErrors] = useState<ContactErrors>({});
   const [problem, setProblem] = useState<string | null>(null);
+  const [callMissing, setCallMissing] = useState(false);
+  const callRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const installer = state.installerId ? getInstaller(state.installerId) : undefined;
   const window = state.windowId ? getWindow(state.windowId) : undefined;
 
   async function reserve() {
+    // The call is part of reserving: nobody leaves this step without a time booked.
+    if (!state.callBooked) {
+      setCallMissing(true);
+      callRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     setBusy(true);
     setProblem(null);
     const careIncluded = careIncludedFor(state.tier);
@@ -71,6 +80,7 @@ function ReserveScreen() {
       care: CARE_ENABLED ? state.care : null,
       careIncluded,
       installDate: state.installDate,
+      call: state.call,
       job: {
         address: state.address,
         system: config,
@@ -410,6 +420,9 @@ function ReserveScreen() {
             value={`${formatDate(state.installDate, { weekday: "short", day: "numeric", month: "short" })}${window ? ` · arrival ${window.label}` : ""}`}
           />
         )}
+        {state.installDate && price.rebateLines.some((r) => r.id.startsWith("sv-")) && (
+          <p className="py-2 text-[12px] leading-snug text-muted">{SOLAR_VIC_DATE_NOTE}</p>
+        )}
         <StatRow label="System after rebates" value={formatCurrency(price.total)} />
         {careIncluded ? (
           <StatRow label={CARE_PLAN.name} value={<span className="text-positive">{CARE_FREE_MONTHS} months free</span>} />
@@ -494,6 +507,30 @@ function ReserveScreen() {
     </Card>
   );
 
+  const callCard = (
+    <div ref={callRef} className="scroll-mt-6">
+      <Card className={cn("p-5", callMissing && !state.callBooked && "ring-2 ring-danger/60")}>
+        <div className="flex items-start gap-4">
+          <PhoneCall className="mt-0.5 h-6 w-6 shrink-0 text-ink" strokeWidth={1.3} aria-hidden />
+          <div className="min-w-0">
+            <p className="text-[15px] text-ink">Book your 15-minute call</p>
+            <p className="text-[12.5px] leading-snug text-muted">
+              Needed to reserve. We check your roof, switchboard and access, and show you your design and products. Not a sales call.
+            </p>
+            <div className="mt-2">
+              <CallBooking prompt="Pick a day and time that suits you." />
+            </div>
+            {callMissing && !state.callBooked && (
+              <p className="mt-2 text-[13px] text-danger" role="alert">
+                Please choose a time for your 15-minute call to reserve your date.
+              </p>
+            )}
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+
   return (
     <FlowStep
       width="wide"
@@ -517,6 +554,7 @@ function ReserveScreen() {
         </div>
         <div className="space-y-5 lg:sticky lg:top-6">
           {details}
+          {callCard}
           {summary}
         </div>
       </div>

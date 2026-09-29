@@ -55,6 +55,10 @@ export interface ShownBattery {
 export const PANEL_RANGE: ShownPanel[] = [
   // VERIFY the product warranty on Jinko's datasheet for JKM475N-48QL6-DB.
   { manufacturer: "Jinko", watts: PANEL.watts, warrantyYears: 25 },
+  // From the AWM price list: Trina 475W Vertex S+ (TNATSM-475NEG9RH.28). VERIFY the product warranty on the datasheet.
+  { manufacturer: "Trina", watts: 475, warrantyYears: 25 },
+  // From the AWM price list: Tindo Walara 440W, made in Australia (TINWALARA-440G4P). VERIFY the product warranty on the datasheet.
+  { manufacturer: "Tindo (Australian made)", watts: 440, warrantyYears: 25 },
 ];
 
 export const BATTERY_RANGE: ShownBattery[] = [

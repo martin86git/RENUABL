@@ -118,6 +118,16 @@ export async function jobsForCustomer(email: string): Promise<JobWithPartner[]> 
   return rows.map(toJob);
 }
 
+/** The customer moves their install day: only for their own reservation (reference and email must match). Returns whether it changed. */
+export async function moveInstallDate(reference: string, email: string, date: string): Promise<boolean> {
+  const rows = await query(`update jobs set install_date = $3 where reference = $1 and customer_email = $2 returning id`, [
+    reference,
+    email.toLowerCase(),
+    date,
+  ]);
+  return rows.length > 0;
+}
+
 /** Whether this partner may write to the job record with this key (it's their job). */
 export async function partnerOwnsRecord(partnerId: string, recordKey: string) {
   return (await query(`select 1 from jobs where record_key = $1 and partner_id = $2`, [recordKey, partnerId])).length > 0;

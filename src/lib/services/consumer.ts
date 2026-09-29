@@ -176,6 +176,8 @@ export async function reserveInstall(input: {
   installDate?: ISODate | null;
   /** The home, system and site, for the job offered to installation partners. */
   job?: unknown;
+  /** The 15-minute call picked before reserving (in-app calendar). */
+  call?: CallSlot | null;
 }): Promise<ReserveResult> {
   try {
     const res = await fetch("/api/reserve", {
@@ -187,6 +189,7 @@ export async function reserveInstall(input: {
         order: input.order,
         installDate: input.installDate,
         job: input.job,
+        call: input.call ?? undefined,
       }),
     });
     const json = (await res.json()) as {
@@ -229,7 +232,7 @@ export interface CallSlot {
  */
 export async function bookConfirmationCall(
   slot: CallSlot,
-  who: { reference?: string; email?: string; firstName?: string; label: string },
+  who: { reference?: string; email?: string; firstName?: string; label: string; changed?: boolean },
 ): Promise<CallSlot> {
   if (who.reference) {
     try {
@@ -243,6 +246,26 @@ export async function bookConfirmationCall(
     }
   }
   return slot;
+}
+
+/** Moves the provisional install day after reserving (the customer's own reservation only). */
+export async function moveInstallDay(input: {
+  reference: string;
+  email: string;
+  firstName?: string;
+  installDate: ISODate;
+}): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const res = await fetch("/api/reschedule", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const json = (await res.json()) as { ok: boolean; message?: string };
+    return json.ok ? { ok: true } : { ok: false, message: json.message ?? "We couldn't change it just now. Please try again." };
+  } catch {
+    return { ok: false, message: "We couldn't reach RENUABL. Check your connection and try again." };
+  }
 }
 
 /** Asks RENUABL for a Stripe Checkout Session for the deposit; returns its client secret for the embedded form. */
