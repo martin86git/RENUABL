@@ -2,7 +2,7 @@
 
 import { ArrowRight, ArrowUp, X } from "lucide-react";
 import { Dialog } from "radix-ui";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { askRenuabl, SUGGESTED_QUESTIONS, type AskContext, type AskSnapshot } from "@/lib/services/ask";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { TIER_LABELS, describeSystem } from "@/lib/domain/recommendation";
@@ -38,6 +38,62 @@ function useAskSnapshot(context: AskContext): AskSnapshot {
   };
 }
 
+/**
+ * Revo in the corner of every step: a speech bubble with a line about where
+ * the customer is and what they've chosen, and Revo's avatar. Tapping either
+ * opens Ask Revo. A new line brings the bubble back after it's closed.
+ * Mobile: above the sticky Continue button; desktop: bottom right.
+ */
+function RevoCompanion({ line, className }: { line: string; className?: string }) {
+  const [closed, setClosed] = useState<string | null>(null);
+  const showBubble = Boolean(line) && closed !== line;
+  // On phones the bubble tucks away after a few seconds so it doesn't cover the step; each new line brings it back.
+  useEffect(() => {
+    if (!line || typeof window === "undefined" || window.matchMedia("(min-width: 1024px)").matches) return;
+    const t = window.setTimeout(() => setClosed(line), 7000);
+    return () => window.clearTimeout(t);
+  }, [line]);
+  return (
+    <div
+      className={cn(
+        "pointer-events-none fixed bottom-[108px] right-4 z-30 flex max-w-[calc(100vw-2rem)] items-end gap-2 lg:bottom-6 lg:right-6",
+        className,
+      )}
+    >
+      {showBubble && (
+        <div
+          key={line}
+          className="pointer-events-auto relative mb-2 max-w-[220px] animate-fade-up rounded-2xl rounded-br-md bg-surface py-2.5 pl-3.5 pr-8 text-[12.5px] leading-snug text-ink-2 shadow-[var(--shadow-lift)] lg:max-w-[290px] lg:py-3 lg:pl-4 lg:text-[13.5px]"
+        >
+          <Dialog.Trigger asChild>
+            <button type="button" className="text-left" aria-label={`Revo says: ${line} Ask Revo a question`}>
+              {line}
+              <span className="mt-1.5 block text-[12px] font-medium text-forest">Ask me anything</span>
+            </button>
+          </Dialog.Trigger>
+          <button
+            type="button"
+            onClick={() => setClosed(line)}
+            aria-label="Hide Revo's message"
+            className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+      <Dialog.Trigger asChild>
+        <button
+          type="button"
+          aria-label="Ask Revo"
+          className="pointer-events-auto shrink-0 rounded-full bg-surface p-1 shadow-[var(--shadow-lift)] transition hover:scale-105"
+        >
+          <MascotAvatar className="h-11 w-11 lg:h-12 lg:w-12" />
+        </button>
+      </Dialog.Trigger>
+    </div>
+  );
+}
+
 interface Turn {
   q: string;
   a: string | null;
@@ -55,13 +111,16 @@ export function AskRenuabl({
   subtitle = "Get helpful answers about your home energy needs.",
   arrow = "dark",
   className,
+  line,
 }: {
   context: AskContext;
-  variant?: "card" | "link";
+  /** "revo": the persistent companion (a speech bubble with Revo's `line`, and Revo's avatar). */
+  variant?: "card" | "link" | "revo";
   title?: string;
   subtitle?: string;
   arrow?: "dark" | "light";
   className?: string;
+  line?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -89,7 +148,9 @@ export function AskRenuabl({
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      {variant === "link" ? (
+      {variant === "revo" ? (
+        <RevoCompanion line={line ?? ""} className={className} />
+      ) : variant === "link" ? (
         <Dialog.Trigger asChild>
           <button type="button" className={cn("tap-area inline-flex items-center gap-2 text-[14px] text-ink-2 hover:text-ink", className)}>
             <MascotAvatar className="h-7 w-7" />

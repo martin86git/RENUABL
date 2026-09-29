@@ -5,8 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
+import { formatDate } from "@/lib/domain/format";
+import { revoContext, revoLine } from "@/lib/domain/revo";
+import { getInstaller } from "@/lib/services/consumer";
+import { AskRenuabl } from "./ask-renuabl";
 import { ConsumerTopBar } from "./consumer-top-bar";
-import { useFlow } from "./flow-state";
+import { useFlow, useSystem } from "./flow-state";
 import { FLOW_STEPS, previousHref, stepEntryHref, stepIndex } from "./steps";
 
 function useCurrentStep() {
@@ -93,10 +97,32 @@ function StepRail({ current, address }: { current: number; address: string | nul
   );
 }
 
+/** Revo, on every step: narrates the journey and backs up each choice; tap to ask a question. */
+function RevoGuide({ slug }: { slug: string }) {
+  const { state } = useFlow();
+  const { config } = useSystem();
+  const line = revoLine({
+    step: slug,
+    suburb: state.address?.suburb,
+    dailyKwh: state.bill?.dailyUsageKwh,
+    hasSolar: state.bill?.hasSolar,
+    wantsBattery: state.profile.wantsBattery,
+    tier: state.tier,
+    batteryKwh: config.batteryKwh,
+    evCharger: config.evCharger,
+    backupAdded: state.addOns.includes("home-backup"),
+    addOns: state.addOns.length,
+    partner: state.installerId ? getInstaller(state.installerId)?.name : undefined,
+    installDate: state.installDate ? formatDate(state.installDate, { weekday: "long", day: "numeric", month: "long" }) : undefined,
+    firstName: state.contact?.firstName,
+  });
+  return <AskRenuabl context={revoContext(slug)} variant="revo" line={line} />;
+}
+
 /** Frame for the guided flow: progress navigation replaces generic navigation. */
 export function FlowShell({ children }: { children: ReactNode }) {
-  const { index } = useCurrentStep();
-  const { state } = useFlow();
+  const { index, slug } = useCurrentStep();
+  const { state, hydrated } = useFlow();
   const address = state.address ? `${state.address.line}, ${state.address.state}` : null;
 
   return (
@@ -108,6 +134,7 @@ export function FlowShell({ children }: { children: ReactNode }) {
         </aside>
         <div className="min-w-0 flex-1">{children}</div>
       </div>
+      {hydrated && <RevoGuide slug={slug} />}
     </div>
   );
 }

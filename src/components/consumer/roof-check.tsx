@@ -4,14 +4,7 @@ import { House } from "lucide-react";
 import { useState } from "react";
 import { MascotLoading } from "@/components/ui/brand-art";
 import { Card } from "@/components/ui/primitives";
-import {
-  isUnitAddress,
-  metresBetween,
-  metresFromBuilding,
-  roofSummary,
-  SHARED_ROOF_NOTE,
-  type RoofInsights,
-} from "@/lib/domain/solar-roof";
+import { isUnitAddress, roofSummary, SHARED_ROOF_NOTE, type RoofInsights } from "@/lib/domain/solar-roof";
 import { PREVIEW_MODE } from "@/lib/config";
 import { roofImageSrc } from "@/lib/services/consumer";
 
@@ -97,17 +90,6 @@ export function RoofCheck({
             We&apos;ll work out how many panels fit on your roof, and where they go, on your 15-minute call.
           </p>
           {isUnitAddress(centre?.line) && <p className="mt-2 text-[14px] text-ink-2">{SHARED_ROOF_NOTE}</p>}
-          {PREVIEW_MODE && typeof centre?.lat === "number" && typeof centre.lng === "number" && (roof.box || roof.center) && (
-            <p className="mt-2 text-[12px] text-muted">
-              Preview check: the address point is{" "}
-              {Math.round(
-                roof.box
-                  ? metresFromBuilding(roof.box, { lat: centre.lat, lng: centre.lng })
-                  : metresBetween(roof.center!, { lat: centre.lat, lng: centre.lng }),
-              )}{" "}
-              m from {roof.box ? "the edge of" : "the middle of"} the building Google matched (0 = on it).
-            </p>
-          )}
           <p className="mt-2 text-[12px] text-muted">From Google&apos;s satellite roof data, which also shapes your savings estimate.</p>
         </div>
       </div>
