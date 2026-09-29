@@ -78,6 +78,33 @@ async function viaResend(email: Email, key: string, from: string) {
   if (!res.ok) throw new Error(`Resend ${res.status}: ${(await res.text()).slice(0, 200)}`);
 }
 
+/**
+ * For setup checks: tries each configured service on its own and reports what
+ * it said (the services' own replies never contain our keys).
+ */
+export async function emailDiagnostics(email: Email) {
+  const from = process.env.EMAIL_FROM?.trim() ?? "";
+  const result: { emailFrom: boolean; sendgrid: string; resend: string } = {
+    emailFrom: Boolean(from),
+    sendgrid: "not set up",
+    resend: "not set up",
+  };
+  if (!from) return result;
+  const run = async (fn: () => Promise<void>) => {
+    try {
+      await fn();
+      return "sent";
+    } catch (e) {
+      return e instanceof Error ? e.message.slice(0, 300) : "failed";
+    }
+  };
+  const sg = process.env.SENDGRID_API_KEY?.trim();
+  const rs = process.env.RESEND_API_KEY?.trim();
+  if (sg) result.sendgrid = await run(() => viaSendGrid(email, sg, from));
+  if (rs) result.resend = await run(() => viaResend(email, rs, from));
+  return result;
+}
+
 export async function sendEmail(email: Email): Promise<"sent" | "skipped"> {
   const provider = emailProvider();
   const from = process.env.EMAIL_FROM?.trim() ?? "";
