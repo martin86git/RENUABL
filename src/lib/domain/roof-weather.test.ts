@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { facing, parseBuildingInsights, roofFit, roofSummary, usableRoofSunHours } from "./solar-roof";
+import {
+  facing,
+  isThisHome,
+  metresBetween,
+  parseBuildingInsights,
+  roofFit,
+  roofPanelLimit,
+  roofSummary,
+  usableRoofSunHours,
+} from "./solar-roof";
 import { blendedYieldPerKw } from "./sunshine";
 import { customerOutlookLine, installOutlook, parseDailyForecast, solarDayOutlook, type DayForecast } from "./weather";
 
@@ -157,5 +166,30 @@ describe("tomorrow's solar day", () => {
     const wet = solarDayOutlook({ ...base, summary: "Rain", cloudCover: 95, rainChance: 90 }, { battery: true, ev: false });
     expect(wet).toMatchObject({ day: "quiet" });
     expect(wet.tip).toMatch(/battery/);
+  });
+});
+
+describe("the home's own roof", () => {
+  const home = { lat: -37.8791, lng: 145.1647 };
+  it("keeps Google's matched building centre", () => {
+    const r = parseBuildingInsights({
+      center: { latitude: -37.8792, longitude: 145.1648 },
+      solarPotential: { maxArrayAreaMeters2: 40, roofSegmentStats: [] },
+    });
+    expect(r?.center).toEqual({ lat: -37.8792, lng: 145.1648 });
+  });
+
+  it("trusts a building near the address and turns away one next door or further", () => {
+    expect(isThisHome({ center: { lat: home.lat + 0.0001, lng: home.lng } }, home.lat, home.lng)).toBe(true); // ~11 m
+    expect(isThisHome({ center: { lat: home.lat + 0.0004, lng: home.lng } }, home.lat, home.lng)).toBe(false); // ~45 m
+    expect(isThisHome({}, home.lat, home.lng)).toBe(true);
+    expect(metresBetween(home, { lat: home.lat, lng: home.lng + 0.001 })).toBeCloseTo(87.9, 0);
+  });
+
+  it("never recommends more panels than the roof data says fit, nor fewer than the minimum system", () => {
+    expect(roofPanelLimit(31, 20, 11)).toBe(20);
+    expect(roofPanelLimit(31, 8, 11)).toBe(11);
+    expect(roofPanelLimit(31, null, 11)).toBe(31);
+    expect(roofPanelLimit(31, 60, 11)).toBe(31);
   });
 });

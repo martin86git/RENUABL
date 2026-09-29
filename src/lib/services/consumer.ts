@@ -94,13 +94,15 @@ export async function prepareBillFile(file: File, keepUnder = 1_500_000): Promis
 }
 
 /** Sends the customer's bill to RENUABL to read their usage. The file isn't stored. */
-export async function readEnergyBill(file: File): Promise<BillResult> {
+export async function readEnergyBill(file: File, address?: string): Promise<BillResult> {
   const prepared = await prepareBillFile(file);
   if (prepared.size > BILL_UPLOAD.maxBytes) {
     return { ok: false, message: "That file is too large. Try the PDF from your retailer's email, or a photo." };
   }
   const body = new FormData();
   body.append("bill", prepared);
+  // Only to check the bill is for this home; the server doesn't keep it.
+  if (address) body.append("address", address);
   try {
     const res = await fetch("/api/bill", { method: "POST", body });
     const json = (await res.json()) as BillResult;

@@ -21,7 +21,8 @@ export interface SunMap {
 }
 
 const memory = new Map<string, SunMap>();
-const cacheKey = (lat: number, lng: number) => `roof-photos/v1/${lat.toFixed(5)},${lng.toFixed(5)}.sun`;
+// v2: the roof is picked from the building Google matched, not the nearest roof to the address point.
+const cacheKey = (lat: number, lng: number) => `roof-photos/v2/${lat.toFixed(5)},${lng.toFixed(5)}.sun`;
 
 async function geoTiff(url: string, apiKey: string) {
   const res = await fetch(`${url}&key=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(20_000) });
@@ -83,14 +84,23 @@ async function fromGoogle(lat: number, lng: number, apiKey: string): Promise<Sun
       m[y * width + x] = mask.band[my * mask.frame.width + mx] ? 1 : 0;
     }
   }
-  const roof = homeRoof(m, width, height, project(lat, lng, frame), Math.round(8 / ((frame.bbox[2] - frame.bbox[0]) / width)));
+  // Start from the building Google matched for the home (the same one as "Your roof"), not the address point, which can sit nearer a neighbour.
+  const insights = (await roofData(lat, lng).catch(() => null))?.insights;
+  if (!insights) return null;
+  const seedAt = insights.center ?? { lat, lng };
+  const roof = homeRoof(
+    m,
+    width,
+    height,
+    project(seedAt.lat, seedAt.lng, frame),
+    Math.round(8 / ((frame.bbox[2] - frame.bbox[0]) / width)),
+  );
   const overlay = sunOverlay(Float32Array.from(flux.band), roof, width, height);
   if (!overlay.roofPixels || !overlay.box) return null;
   const png = await sharp(Buffer.from(overlay.rgba), { raw: { width, height, channels: 4 } })
     .png()
     .toBuffer();
-  const insights = (await roofData(lat, lng).catch(() => null))?.insights;
-  const summary = sunSummary(insights ?? { faces: [] }, overlay.shadedShare);
+  const summary = sunSummary(insights, overlay.shadedShare);
   return { png, frame, summary, box: overlay.box };
 }
 

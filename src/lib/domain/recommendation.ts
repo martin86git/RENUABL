@@ -366,6 +366,10 @@ function expandSystem(profile: EnergyProfile, analysis: HomeAnalysis, usage: Usa
   };
 }
 
+/** Under the system on the system step: the size is a recommendation until the roof is checked. */
+export const ROOF_SIZE_NOTE =
+  "Your final system size is confirmed on your 15-minute call, once we've checked how many panels fit on your roof. If fewer fit, we'll adjust the system and the price before anything is final.";
+
 /**
  * "How we worked this out" on the system step: the sizing in plain words, with
  * the customer's own figures. New systems only (expansions explain themselves).
@@ -398,7 +402,9 @@ export function sizingExplanation(
         : "Essential is the least solar that covers your yearly use: no bigger than you need.",
     );
   }
-  lines.push("These are estimates, not guarantees. Your roof, shading and switchboard are checked on your 15-minute call.");
+  lines.push(
+    "It's never more solar than Google's roof data says could fit. These are estimates, not guarantees: your roof, shading and switchboard are checked on your 15-minute call.",
+  );
   return lines;
 }
 

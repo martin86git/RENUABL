@@ -2,6 +2,7 @@
 
 import { House } from "lucide-react";
 import { useState } from "react";
+import { MascotLoading } from "@/components/ui/brand-art";
 import { Card } from "@/components/ui/primitives";
 import { isUnitAddress, roofSummary, SHARED_ROOF_NOTE, type RoofInsights } from "@/lib/domain/solar-roof";
 import { PREVIEW_MODE } from "@/lib/config";
@@ -32,11 +33,13 @@ export function RoofCheck({
   loading?: boolean;
 }) {
   const [photoFailed, setPhotoFailed] = useState(false);
+  const [photoLoaded, setPhotoLoaded] = useState(false);
   if (loading && panelCount > 0) {
     return (
       <Card className="overflow-hidden" aria-busy="true">
-        <div className="aspect-[4/3] w-full animate-pulse bg-surface-2" />
-        <p className="p-5 text-[15px] text-ink">Looking at your roof from above…</p>
+        <div className="p-2">
+          <MascotLoading label="Looking at your roof from above…" />
+        </div>
       </Card>
     );
   }
@@ -54,13 +57,17 @@ export function RoofCheck({
   }
   const hasPhoto = typeof centre?.lat === "number" && typeof centre.lng === "number" && !photoFailed;
   const photo = hasPhoto ? (
-    // eslint-disable-next-line @next/next/no-img-element -- our own server route, already sized by Google
-    <img
-      src={roofImageSrc(centre.lat!, centre.lng!)}
-      alt="Your home from above"
-      className="aspect-[4/3] w-full rounded-xl bg-surface-2 object-cover"
-      onError={() => setPhotoFailed(true)}
-    />
+    <div className="relative">
+      {/* eslint-disable-next-line @next/next/no-img-element -- our own server route, already sized by Google */}
+      <img
+        src={roofImageSrc(centre.lat!, centre.lng!)}
+        alt="Your home from above"
+        className="aspect-[4/3] w-full rounded-xl bg-surface-2 object-cover"
+        onLoad={() => setPhotoLoaded(true)}
+        onError={() => setPhotoFailed(true)}
+      />
+      {!photoLoaded && <MascotLoading label="Looking at your roof from above…" cover />}
+    </div>
   ) : null;
   return (
     <Card className="overflow-hidden">

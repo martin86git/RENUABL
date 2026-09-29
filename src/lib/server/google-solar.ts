@@ -6,7 +6,7 @@
  * remembered too.
  */
 import { parseRoofModel, type RoofModel } from "@/lib/domain/roof-layout";
-import { parseBuildingInsights, type RoofInsights } from "@/lib/domain/solar-roof";
+import { isThisHome, parseBuildingInsights, type RoofInsights } from "@/lib/domain/solar-roof";
 import { dbConfigured, query } from "./db";
 
 const KEEP_DAYS = 180;
@@ -22,7 +22,8 @@ export function inAustralia(lat: number, lng: number) {
   return lat >= -44 && lat <= -9 && lng >= 112 && lng <= 154;
 }
 
-const cacheKey = (lat: number, lng: number) => `v3:${lat.toFixed(5)},${lng.toFixed(5)}`;
+// v4: lookups keep the matched building's centre (to catch a neighbour's roof).
+const cacheKey = (lat: number, lng: number) => `v4:${lat.toFixed(5)},${lng.toFixed(5)}`;
 
 async function cached(key: string): Promise<{ data: RoofData | null } | null> {
   const m = memory.get(key);
@@ -66,7 +67,7 @@ export async function roofLookup(lat: number, lng: number): Promise<{ data: Roof
   if (!inAustralia(lat, lng)) return { data: null, reason: "outside-australia" };
   const key = cacheKey(lat, lng);
   const hit = await cached(key).catch(() => null);
-  if (hit) return hit.data ? { data: hit.data } : { data: null, reason: "no-coverage" };
+  if (hit) return hit.data && isThisHome(hit.data.insights, lat, lng) ? { data: hit.data } : { data: null, reason: "no-coverage" };
   for (const quality of ["MEDIUM", "BASE"]) {
     const params = new URLSearchParams({
       "location.latitude": lat.toFixed(6),
@@ -87,6 +88,7 @@ export async function roofLookup(lat: number, lng: number): Promise<{ data: Roof
     const insights = parseBuildingInsights(json);
     const data = insights ? { insights, model: parseRoofModel(json) } : null;
     await remember(key, data);
+    if (data && !isThisHome(data.insights, lat, lng)) return { data: null, reason: "no-coverage" };
     return data ? { data } : { data: null, reason: "no-coverage" };
   }
   await remember(key, null);

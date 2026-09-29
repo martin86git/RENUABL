@@ -51,7 +51,8 @@ describe("sunMap", () => {
       "fetch",
       vi.fn(async (url: unknown) => {
         const u = String(url);
-        if (u.includes("buildingInsights")) return new Response("{}", { status: 404 });
+        if (u.includes("buildingInsights"))
+          return Response.json({ center: { latitude: LAT, longitude: lng }, solarPotential: { maxArrayAreaMeters2: 30 } });
         if (u.includes("dataLayers:get")) return Response.json(layers);
         if (u.includes("id=flux")) return new Response(tiff(flux, 1, 32, true));
         if (u.includes("id=mask")) return new Response(tiff(mask, 1, 8));
@@ -66,5 +67,24 @@ describe("sunMap", () => {
     expect(alpha(5, 10)).toBeGreaterThan(0); // the home's roof
     expect(alpha(45, 10)).toBe(0); // the gap
     expect(alpha(55, 10)).toBe(0); // the neighbour's roof
+  });
+
+  it("shows nothing when Google's matched building isn't the home (a neighbour's, 45 m away)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: unknown) => {
+        const u = String(url);
+        if (u.includes("buildingInsights"))
+          return Response.json({ center: { latitude: LAT + 0.0004, longitude: lng }, solarPotential: { maxArrayAreaMeters2: 30 } });
+        if (u.includes("dataLayers:get"))
+          return Response.json({
+            annualFluxUrl: "https://solar.googleapis.com/v1/geoTiff:get?id=flux",
+            maskUrl: "https://solar.googleapis.com/v1/geoTiff:get?id=mask",
+          });
+        if (u.includes("id=flux")) return new Response(tiff(new Float32Array(W * H).fill(1000), 1, 32, true));
+        return new Response(tiff(new Uint8Array(W * H).fill(1), 1, 8));
+      }),
+    );
+    expect(await sunMap(LAT, lng)).toBeNull();
   });
 });

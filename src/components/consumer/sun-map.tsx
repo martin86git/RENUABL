@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { MascotLoading } from "@/components/ui/brand-art";
 import { designView, geoFrameOnView, metresPerPixel, type GeoFrame } from "@/lib/domain/roof-layout";
 import { sunColour, sunSummaryText, type SunSummary } from "@/lib/domain/sun-map";
 import { fetchSunMap, roofImageSrc, roofPhotoSrc, sunMapSrc } from "@/lib/services/consumer";
@@ -39,16 +40,14 @@ export function SunMap({ centre, fallback }: { centre: { lat: number; lng: numbe
     };
   }, [key, centre.lat, centre.lng]);
   const info = got?.key === key ? got.info : undefined;
+  // Both images (the photo and the sun layer) have to arrive before the map means anything.
+  const [loaded, setLoaded] = useState<{ key: string; n: number }>({ key, n: 0 });
+  const done = () => setLoaded((l) => (l.key === key ? { key, n: l.n + 1 } : { key, n: 1 }));
+  const ready = loaded.key === key && loaded.n >= 2;
   const view = useMemo(() => designView(centre), [centre]);
 
   if (info === undefined) {
-    return (
-      <div
-        className="aspect-[4/3] w-full animate-pulse rounded-xl bg-surface-2"
-        aria-busy="true"
-        aria-label="Loading your roof's sunlight"
-      />
-    );
+    return <MascotLoading label="Looking at your roof from above…" />;
   }
   if (info === null) return <>{fallback}</>;
 
@@ -73,8 +72,25 @@ export function SunMap({ centre, fallback }: { centre: { lat: number; lng: numbe
         role="img"
         aria-label="Sunlight on your roof"
       >
-        <image href={roofImageSrc(centre.lat, centre.lng)} x={shift.x} y={shift.y} width={full} height={full} preserveAspectRatio="none" />
-        <image href={overlay} width={frame.width} height={frame.height} transform={`matrix(${m.join(" ")})`} preserveAspectRatio="none" />
+        <image
+          href={roofImageSrc(centre.lat, centre.lng)}
+          x={shift.x}
+          y={shift.y}
+          width={full}
+          height={full}
+          preserveAspectRatio="none"
+          onLoad={done}
+          onError={done}
+        />
+        <image
+          href={overlay}
+          width={frame.width}
+          height={frame.height}
+          transform={`matrix(${m.join(" ")})`}
+          preserveAspectRatio="none"
+          onLoad={done}
+          onError={done}
+        />
       </svg>
     );
   } else {
@@ -94,8 +110,15 @@ export function SunMap({ centre, fallback }: { centre: { lat: number; lng: numbe
         role="img"
         aria-label="Sunlight on your roof"
       >
-        <image href={roofPhotoSrc(centre.lat, centre.lng)} width={frame.width} height={frame.height} preserveAspectRatio="none" />
-        <image href={overlay} width={frame.width} height={frame.height} preserveAspectRatio="none" />
+        <image
+          href={roofPhotoSrc(centre.lat, centre.lng)}
+          width={frame.width}
+          height={frame.height}
+          preserveAspectRatio="none"
+          onLoad={done}
+          onError={done}
+        />
+        <image href={overlay} width={frame.width} height={frame.height} preserveAspectRatio="none" onLoad={done} onError={done} />
       </svg>
     );
   }
@@ -103,7 +126,10 @@ export function SunMap({ centre, fallback }: { centre: { lat: number; lng: numbe
   const gradient = [0, 0.25, 0.5, 0.75, 1].map((t) => `rgb(${sunColour(t).join(",")}) ${t * 100}%`).join(", ");
   return (
     <div>
-      {svg}
+      <div className="relative">
+        {svg}
+        {!ready && <MascotLoading label="Looking at your roof from above…" cover />}
+      </div>
       <div className="mt-3 flex items-center gap-2 px-1 text-[12px] text-muted">
         <span>Less sun</span>
         <span className="h-2 flex-1 rounded-full" style={{ background: `linear-gradient(to right, ${gradient})` }} aria-hidden />

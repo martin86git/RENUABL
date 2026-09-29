@@ -24,6 +24,34 @@ export interface RoofInsights {
   sunshineHoursPerYear: number | null;
   imageryDate: string | null;
   imageryQuality: "HIGH" | "MEDIUM" | "LOW" | "BASE" | null;
+  /** The middle of the building Google matched (older cached lookups don't have it). */
+  center?: { lat: number; lng: number } | null;
+}
+
+/**
+ * Google returns the building closest to the address point, which can be a
+ * neighbour's when the point sits off the home (e.g. on the street). Farther
+ * than this from the address, the building isn't trusted to be the home.
+ */
+export const HOME_MATCH_METRES = 30;
+
+/** Metres between two nearby points (flat-earth approximation, fine at house scale). */
+export function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const dy = (a.lat - b.lat) * 111_320;
+  const dx = (a.lng - b.lng) * 111_320 * Math.cos((((a.lat + b.lat) / 2) * Math.PI) / 180);
+  return Math.hypot(dx, dy);
+}
+
+/** The most panels to recommend: the inverter limit, or fewer when the roof data says fewer fit (never below the minimum system). */
+export function roofPanelLimit(inverterLimit: number, panelsThatFit: number | null | undefined, minPanels = 0) {
+  return typeof panelsThatFit === "number" && panelsThatFit > 0
+    ? Math.max(minPanels, Math.min(inverterLimit, panelsThatFit))
+    : inverterLimit;
+}
+
+/** Whether the building Google matched is plausibly the home at this address. */
+export function isThisHome(insights: Pick<RoofInsights, "center">, lat: number, lng: number) {
+  return !insights.center || metresBetween(insights.center, { lat, lng }) <= HOME_MATCH_METRES;
 }
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -57,7 +85,10 @@ export function parseBuildingInsights(raw: unknown): RoofInsights | null {
   const y = num(d.year);
   const m = num(d.month);
   const quality = r.imageryQuality;
+  const c = (r.center ?? {}) as Record<string, unknown>;
+  const [clat, clng] = [num(c.latitude), num(c.longitude)];
   return {
+    center: clat !== null && clng !== null ? { lat: clat, lng: clng } : null,
     faces,
     usableAreaM2: Math.round(usable),
     panelsThatFit: Math.floor((usable * PANEL_PACKING) / (PANEL.heightM * PANEL.widthM)),

@@ -1,4 +1,13 @@
-import { BILL_PROBLEM_MESSAGES, BILL_UPLOAD, isBillMediaType, isBillSummary, summariseBill } from "@/lib/domain/bill";
+import {
+  BILL_PROBLEM_MESSAGES,
+  BILL_UPLOAD,
+  addressForBillCheck,
+  addressMismatchMessage,
+  billAddressMismatch,
+  isBillMediaType,
+  isBillSummary,
+  summariseBill,
+} from "@/lib/domain/bill";
 import { PREVIEW_MODE } from "@/lib/config";
 import { SAMPLE_READING, parseApiKey, readBillWithClaude, redactSecrets } from "@/lib/server/bill-reader";
 
@@ -8,11 +17,18 @@ function fail(message: string, status: number) {
   return Response.json({ ok: false, message }, { status });
 }
 
-/** POST a bill (multipart field "bill"); returns the usage summary the recommendation is sized from. */
+/**
+ * POST a bill (multipart field "bill", plus the home "address" the customer
+ * entered); returns the usage summary the recommendation is sized from. A bill
+ * clearly for a different address is turned away.
+ */
 export async function POST(request: Request) {
   let file: FormDataEntryValue | null;
+  let address: string | null;
   try {
-    file = (await request.formData()).get("bill");
+    const form = await request.formData();
+    file = form.get("bill");
+    address = addressForBillCheck(form.get("address"));
   } catch {
     return fail("Please upload your bill as a PDF or photo.", 400);
   }
@@ -33,7 +49,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const summary = summariseBill(await readBillWithClaude(await file.arrayBuffer(), file.type, apiKey));
+    const reading = await readBillWithClaude(await file.arrayBuffer(), file.type, apiKey, address);
+    if (address && billAddressMismatch(reading.supplyAddressMatches)) return fail(addressMismatchMessage(address), 422);
+    const { supplyAddressMatches: _match, ...figures } = reading;
+    void _match;
+    const summary = summariseBill(figures);
     if (!isBillSummary(summary)) return fail(BILL_PROBLEM_MESSAGES[summary], 422);
     return Response.json({ ok: true, bill: summary });
   } catch (e) {

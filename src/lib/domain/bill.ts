@@ -112,6 +112,32 @@ export function isBillSummary(v: BillSummary | BillProblem): v is BillSummary {
   return typeof v === "object";
 }
 
+/**
+ * The home address the customer entered, tidied for the bill check: one line,
+ * no control characters, a sensible length. Null when there's nothing usable.
+ */
+export function addressForBillCheck(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const clean = raw
+    .replace(/[\u0000-\u001f\u007f<>{}]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+  return clean.length >= 5 ? clean : null;
+}
+
+/** Whether the bill's supply address is the customer's home ("unclear" when it can't be read, e.g. cut off in a photo). */
+export type AddressMatch = "yes" | "no" | "unclear";
+
+/** Only a clear mismatch stops the customer: an unreadable address never does. */
+export function billAddressMismatch(match: unknown): boolean {
+  return match === "no";
+}
+
+export function addressMismatchMessage(address: string) {
+  return `This bill looks like it's for a different address. Please upload the latest bill for ${address}, or go back and change your address.`;
+}
+
 export const BILL_PROBLEM_MESSAGES: Record<BillProblem, string> = {
   "not-a-bill": "That doesn't look like an electricity bill. Try your latest bill from your energy retailer.",
   unreadable: "We couldn't read the usage on that bill. Try a clearer photo, or the PDF from your retailer's email.",

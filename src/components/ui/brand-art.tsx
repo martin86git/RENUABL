@@ -1,3 +1,4 @@
+import { Sun } from "lucide-react";
 import Image from "next/image";
 import { cn } from "./primitives";
 
@@ -49,6 +50,39 @@ export function Mascot({
         className,
       )}
     />
+  );
+}
+
+/**
+ * Loading: the mascot spinning a sun in its hand, with a short line. Fills a
+ * 4:3 box on the page colour (the mascot's multiply blend needs a backdrop).
+ */
+export function MascotLoading({
+  label,
+  cover = false,
+}: {
+  label: string;
+  /** Cover the image it's waiting for, instead of a 4:3 box. */ cover?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex w-full flex-col items-center justify-center gap-3 rounded-xl bg-canvas",
+        cover ? "absolute inset-0" : "aspect-[4/3]",
+      )}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="relative block w-28 sm:w-32">
+        <Mascot pose="hero" className="h-auto w-full" />
+        <Sun
+          className="absolute left-[56%] top-[20%] h-[34%] w-[34%] animate-[spin_2.4s_linear_infinite] text-warning motion-reduce:animate-none"
+          strokeWidth={1.8}
+          aria-hidden
+        />
+      </span>
+      <span className="px-4 text-center text-[14px] text-muted">{label}</span>
+    </div>
   );
 }
 

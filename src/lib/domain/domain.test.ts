@@ -26,7 +26,7 @@ import {
   TIER_LABELS,
   usageBasis,
 } from "./recommendation";
-import { summariseBill, type BillSummary } from "./bill";
+import { addressForBillCheck, addressMismatchMessage, billAddressMismatch, summariseBill, type BillSummary } from "./bill";
 import { normaliseMobile, validateContact } from "./contact";
 import { BOS, PANEL, RACKING } from "./catalogue";
 import {
@@ -76,6 +76,16 @@ describe("summariseBill", () => {
     expect(summariseBill({ isElectricityBill: false })).toBe("not-a-bill");
     expect(summariseBill({ isElectricityBill: true, periodDays: 90, usageKwh: null })).toBe("unreadable");
     expect(summariseBill({ isElectricityBill: true, periodDays: 90, usageKwh: -5 })).toBe("unreadable");
+  });
+
+  it("checks the bill is for the home entered, stopping only a clear mismatch", () => {
+    expect(addressForBillCheck("  2 Hanwell Court,\nGlen Waverley VIC 3150 ")).toBe("2 Hanwell Court, Glen Waverley VIC 3150");
+    expect(addressForBillCheck("<x>{y}")).toBeNull();
+    expect(addressForBillCheck(42)).toBeNull();
+    expect(billAddressMismatch("no")).toBe(true);
+    expect(billAddressMismatch("unclear")).toBe(false);
+    expect(billAddressMismatch("yes")).toBe(false);
+    expect(addressMismatchMessage("2 Hanwell Court")).toContain("2 Hanwell Court");
   });
 
   it("flags existing solar", () => {

@@ -9,7 +9,16 @@ import { readEnergyBill } from "@/lib/services/consumer";
 const kwh = (n: number) => n.toLocaleString("en-AU", { maximumFractionDigits: 1 });
 
 /** Upload the latest electricity bill; RENUABL reads the usage and sizes the system from it. */
-export function BillUpload({ bill, onRead }: { bill: BillSummary | null; onRead: (bill: BillSummary) => void }) {
+export function BillUpload({
+  bill,
+  address,
+  onRead,
+}: {
+  bill: BillSummary | null;
+  /** The home address entered, so the bill can be checked against it. */
+  address?: string;
+  onRead: (bill: BillSummary) => void;
+}) {
   const input = useRef<HTMLInputElement>(null);
   const camera = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState(false);
@@ -18,7 +27,7 @@ export function BillUpload({ bill, onRead }: { bill: BillSummary | null; onRead:
   async function read(file: File) {
     setReading(true);
     setError(null);
-    const result = await readEnergyBill(file);
+    const result = await readEnergyBill(file, address);
     setReading(false);
     if (result.ok) onRead(result.bill);
     else setError(result.message);

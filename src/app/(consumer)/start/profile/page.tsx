@@ -2,6 +2,7 @@
 
 import { ArrowRight, BatteryCharging, Car, Home as HomeIcon, House, Info, PlugZap, Sun, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { BillLater } from "@/components/consumer/bill-later";
@@ -25,6 +26,7 @@ import {
   solarSituation,
 } from "@/lib/domain/existing-solar";
 import type { InverterSummary } from "@/lib/domain/inverter";
+import { formatAddress } from "@/lib/mock/addresses";
 import type { EnergyProfile, ExistingSolarPlan, ExistingSolarSize, FlatMount, RoofType } from "@/lib/domain/types";
 
 type YesNoKey = "ev" | "evPlanned" | "wantsBattery" | "backup";
@@ -108,6 +110,17 @@ export default function ProfilePage() {
   const { state, update } = useFlow();
   const profile = state.profile;
   const complete = isAboutComplete(state);
+  // "Don't have your bill handy?" appears only when someone tries to continue without one.
+  const [missingBill, setMissingBill] = useState(false);
+  const billRef = useRef<HTMLDivElement>(null);
+  const next = () => {
+    if (!state.bill) {
+      setMissingBill(true);
+      billRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    router.push(stepHref("system"));
+  };
 
   const situation = state.bill ? solarSituation(state.bill, profile) : "new";
   const existing = existingSolarQuestions(state.bill, profile);
@@ -128,15 +141,28 @@ export default function ProfilePage() {
       subtitle="Your latest bill and a few quick questions, so we size your system to what you actually use."
       ask={<AskRenuabl context="profile" title="Not sure?" subtitle="Ask RENUABL anything about your home." arrow="light" />}
       cta={
-        <Button size="lg" className="w-full lg:w-72" disabled={!complete} onClick={() => router.push(stepHref("system"))}>
+        <Button size="lg" className="w-full lg:w-72" disabled={Boolean(state.bill) && !complete} onClick={next}>
           Continue <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
         </Button>
       }
     >
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,420px)_1fr]">
         <div className="space-y-4">
-          <BillUpload bill={state.bill} onRead={(bill) => update({ bill, config: null })} />
-          <BillLater />
+          <div ref={billRef} className="scroll-mt-6 space-y-4">
+            <BillUpload
+              bill={state.bill}
+              address={state.address ? formatAddress(state.address) : undefined}
+              onRead={(bill) => update({ bill, config: null })}
+            />
+            {missingBill && !state.bill && (
+              <>
+                <p className="text-[13.5px] text-ink-2" role="alert">
+                  Please upload your latest bill to continue: we size your system from it.
+                </p>
+                <BillLater />
+              </>
+            )}
+          </div>
           {existing.size && (
             <ExistingSolar
               profile={profile}

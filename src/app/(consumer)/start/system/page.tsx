@@ -17,7 +17,7 @@ import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
 import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
 import { expandNote, solarSituation } from "@/lib/domain/existing-solar";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
-import { ASSUMPTIONS, TIER_LABELS, isSameConfig, sizingExplanation, solarDay } from "@/lib/domain/recommendation";
+import { ASSUMPTIONS, ROOF_SIZE_NOTE, TIER_LABELS, isSameConfig, sizingExplanation, solarDay } from "@/lib/domain/recommendation";
 import type { SystemConfig, SystemTier } from "@/lib/domain/types";
 
 type Part = "solar" | "battery" | "ev" | "monitoring";
@@ -231,6 +231,12 @@ function SystemScreen() {
             </div>
           )}
         </Card>
+        {!existing && (
+          <p className="flex gap-2.5 px-1 text-[13px] leading-snug text-muted" role="note">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
+            {ROOF_SIZE_NOTE}
+          </p>
+        )}
 
         <Card className="p-5">
           <p className="text-[15px] text-ink">Why this system?</p>

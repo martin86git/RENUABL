@@ -20,7 +20,7 @@ import {
   type CallSlot,
   type ReservationResult,
 } from "@/lib/services/consumer";
-import { usableRoofSunHours, type RoofInsights } from "@/lib/domain/solar-roof";
+import { roofPanelLimit, usableRoofSunHours, type RoofInsights } from "@/lib/domain/solar-roof";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 
 /**
@@ -233,7 +233,12 @@ export function useSystem() {
       ...analyseHome(state.address),
       sunshine: state.sunshine,
       roofSunHours: state.roof?.data ? usableRoofSunHours(state.roof.data) : null,
-      maxPanels: phase === "three" ? ASSUMPTIONS.maxPanels : ASSUMPTIONS.maxPanelsSinglePhase,
+      // Never more panels than Google's roof data says could fit (confirmed on the call).
+      maxPanels: roofPanelLimit(
+        phase === "three" ? ASSUMPTIONS.maxPanels : ASSUMPTIONS.maxPanelsSinglePhase,
+        state.roof?.data?.panelsThatFit,
+        ASSUMPTIONS.minPanels,
+      ),
     };
     const recommendation = recommendSystem(profile, analysis, state.bill ?? NO_BILL);
     const tier = recommendation.tiers[state.tier];
