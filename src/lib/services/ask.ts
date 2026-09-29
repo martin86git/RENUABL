@@ -31,7 +31,7 @@ const INTENTS: { match: RegExp; answer: string }[] = [
   {
     match: /heat pump|hot water|reverse.?cycle|air ?con|upgrade|switchboard|smart home/i,
     answer:
-      "Upgrades are worth it when they move energy use into the daytime, when your solar is free. Smart switchboards and smart home integration aren't priced online yet: tick them and we'll quote them on your 15-minute call. Blackout Backup (backup circuits for your battery) can be added with a battery. Heat pump hot water and reverse-cycle heating and cooling are coming soon: tick them and we'll let you know when they're available.",
+      "Upgrades are worth it when they move energy use into the daytime, when your solar is free. Smart switchboards aren't priced online yet: tick them and we'll quote them on your 15-minute call. Blackout Backup (backup circuits for your battery) can be added with a battery. Heat pump hot water and reverse-cycle heating and cooling are coming soon: tick them and we'll let you know when they're available.",
   },
   {
     match: /bill|upload|usage|pool|spa|heating|cooling/i,

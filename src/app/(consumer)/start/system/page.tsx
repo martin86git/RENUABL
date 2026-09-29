@@ -42,6 +42,7 @@ import {
   solarDay,
 } from "@/lib/domain/recommendation";
 import { BATTERY_RANGE, PANEL, PANEL_RANGE, batteryLabel, panelLabel } from "@/lib/domain/catalogue";
+import { solarVictoriaApplies } from "@/lib/domain/rebates";
 import type { SystemConfig, SystemTier } from "@/lib/domain/types";
 
 type Part = "solar" | "battery" | "ev" | "monitoring";
@@ -166,6 +167,18 @@ function SystemScreen() {
           : `About ${formatPercent(outcome.selfPoweredShare)} of your home powered by the sun.`}
       </p>
       <div className="mt-3 divide-y divide-line border-t border-line">
+        {price.rebateLines.length > 0 && <StatRow label="Price before rebates" value={formatCurrency(price.gross)} />}
+        {price.rebateLines.map((r) => (
+          <div key={r.id} className="flex items-baseline justify-between gap-3 py-2.5">
+            <span className="text-[13.5px] font-medium text-positive">{r.label}</span>
+            <span className="text-[14px] font-semibold tabular-nums text-positive">−{formatCurrency(r.amount)}</span>
+          </div>
+        ))}
+        {!existing && solarVictoriaApplies(state.address?.state ?? null) && !price.rebateLines.some((r) => r.id.startsWith("sv-")) && (
+          <p className="py-2.5 text-[13px] text-positive">
+            <span className="font-medium">Solar Victoria Rebate:</span> you may also be eligible. Switch it on when you reserve.
+          </p>
+        )}
         <StatRow label="Price after rebates" value={formatCurrency(price.total)} />
         <StatRow label="Pays for itself in" value={`~${outcome.paybackYears} years`} />
         <StatRow label="Due today" value="$0 to reserve" />

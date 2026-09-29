@@ -98,7 +98,6 @@ export const ADD_ONS: AddOn[] = [
     needsBattery: true,
   },
   { id: "smart-switchboard", name: "Smart Switchboard", blurb: "Prepare for a smarter, safer home.", price: null },
-  { id: "smart-home", name: "Smart Home Integration", blurb: "Connect and optimise your whole home.", price: null },
   {
     id: "reverse-cycle",
     name: "Reverse-Cycle Heating & Cooling",

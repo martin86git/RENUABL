@@ -166,7 +166,7 @@ export function rebatesFor(
   if (pv > 0) {
     lines.push({
       id: "stc-solar",
-      label: "Federal solar rebate (STCs)",
+      label: "STC Solar Incentive",
       detail: `${pv} certificates × ${money(rates.stc.price)}`,
       amount: pvAmount,
     });
@@ -175,7 +175,7 @@ export function rebatesFor(
   if (bat > 0) {
     lines.push({
       id: "stc-battery",
-      label: "Federal battery rebate (Cheaper Home Batteries)",
+      label: "BSTC Battery Incentive",
       detail: `${bat} certificates × ${money(rates.stc.price)}`,
       amount: Math.round(bat * rates.stc.price),
     });
@@ -188,12 +188,12 @@ export function rebatesFor(
     if (config.panelCount > 0 && !config.existingSolar && sv.pvRebateMax > 0) {
       const amount = Math.round(Math.min(sv.pvRebateMax, Math.max(0, (solarPrice - pvAmount) * sv.pvRebateShare)));
       if (amount > 0) {
-        lines.push({ id: "sv-solar", label: "Solar Victoria solar panel rebate", detail: "If eligible", amount });
+        lines.push({ id: "sv-solar", label: "Solar Victoria Rebate", detail: "If eligible", amount });
         if (incentives.solarVicLoan) loan += Math.min(sv.pvLoanMax, amount);
       }
     }
     if (config.batteryKwh > 0 && sv.batteryRebate > 0) {
-      lines.push({ id: "sv-battery", label: "Solar Victoria battery rebate", detail: "If eligible", amount: sv.batteryRebate });
+      lines.push({ id: "sv-battery", label: "Solar Victoria Battery Rebate", detail: "If eligible", amount: sv.batteryRebate });
     }
   }
   return { lines, total: lines.reduce((s, l) => s + l.amount, 0), loan };

@@ -62,7 +62,7 @@ export const COSTING = {
   backupCircuitsInstall: 1000,
   // PLACEHOLDERS (not in the supplier list): confirm with Primero before launch.
   heatPumpInstall: 1200,
-  addOnPrices: { "smart-switchboard": 1450, "smart-home": 690 } as Record<string, number>,
+  addOnPrices: { "smart-switchboard": 1450 } as Record<string, number>,
 } as const;
 
 export type CostGroup =
