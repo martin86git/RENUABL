@@ -353,6 +353,19 @@ export function newLeadEmail(o: {
       });
 }
 
+/** To the job's installation partner: the customer moved their install day. Suburb only, like an offer; the job page has the rest. */
+export function jobMovedEmail(o: { suburb: string; reference: string; from: string | null; to: string; link: string }) {
+  return simpleEmail({
+    subject: `Install date moved: ${plainText(o.suburb, 40)} (${plainText(o.reference, 20)})`,
+    heading: "A customer has moved their install date",
+    lines: [
+      `Job ${plainText(o.reference, 20)} in ${plainText(o.suburb, 40)} is now on ${plainText(o.to, 60)}${o.from ? ` (was ${plainText(o.from, 60)})` : ""}.`,
+      "Your calendar in the partner portal is updated. If the new day doesn't work for you, reply to this email and we'll sort it out with the customer.",
+    ],
+    button: { label: "Open the job", href: o.link },
+  });
+}
+
 export function jobOfferEmail(o: { suburb: string; system: string; installDate: string | null; link: string; hours: number }) {
   return simpleEmail({
     subject: `New job offer in ${plainText(o.suburb, 40)}`,

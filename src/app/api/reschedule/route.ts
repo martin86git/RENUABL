@@ -1,13 +1,15 @@
 import { buildIcs, installEvent } from "@/lib/domain/calendar";
 import { parseReference } from "@/lib/domain/deposit";
-import { installMovedEmail, plainText } from "@/lib/domain/emails";
+import { installMovedEmail, jobMovedEmail, plainText } from "@/lib/domain/emails";
+import { siteUrl } from "@/lib/domain/sms";
 import { formatDate } from "@/lib/domain/format";
 import { todayInMarket } from "@/lib/domain/market";
 import { INSTALL_ARRIVAL, LEAD_TIME_DAYS, addDays, fromISODate, toISODate } from "@/lib/domain/scheduling";
 import { dbConfigured } from "@/lib/server/db";
 import { sendEmail } from "@/lib/server/email";
 import { addNote, contactIdByEmail, reservationNote } from "@/lib/server/hubspot-crm";
-import { moveInstallDate } from "@/lib/server/jobs-repo";
+import { getJobRow, moveInstallDate } from "@/lib/server/jobs-repo";
+import { getPartner } from "@/lib/server/partners-repo";
 import { allow } from "@/lib/server/rate-limit";
 
 /**
@@ -32,9 +34,11 @@ export async function POST(request: Request) {
   const earliest = toISODate(addDays(fromISODate(todayInMarket()), LEAD_TIME_DAYS));
   if (date < earliest) return Response.json({ ok: false, message: "Please choose a later day." }, { status: 422 });
 
+  let moved: { id: string; was: string | null } | null = null;
   if (dbConfigured()) {
     try {
-      if (!(await moveInstallDate(reference, email, date))) {
+      moved = await moveInstallDate(reference, email, date);
+      if (!moved) {
         return Response.json(
           { ok: false, message: "We couldn't find that reservation. Just reply to your confirmation email." },
           { status: 404 },
@@ -63,5 +67,29 @@ export async function POST(request: Request) {
   } catch (e) {
     console.error(`reschedule ${reference} follow-up failed`, e instanceof Error ? e.message : e);
   }
+  if (moved) await tellPartner(moved.id, moved.was, date);
   return Response.json({ ok: true });
+}
+
+/** Emails the job's installation partner (once one has accepted it) about the new day. Never blocks the change. */
+async function tellPartner(jobId: string, was: string | null, date: string) {
+  try {
+    const job = await getJobRow(jobId);
+    const partner = job?.partnerId ? await getPartner(job.partnerId) : null;
+    const site = siteUrl();
+    if (!job || !partner || !site || was === date) return;
+    const day = (d: string) => formatDate(d, { weekday: "short", day: "numeric", month: "short" });
+    await sendEmail({
+      to: partner.email,
+      ...jobMovedEmail({
+        suburb: job.address.suburb,
+        reference: job.reference,
+        from: was ? day(was) : null,
+        to: day(date),
+        link: `${site}/installer/jobs/${job.id}`,
+      }),
+    });
+  } catch (e) {
+    console.error(`reschedule ${jobId}: partner email failed`, e instanceof Error ? e.message : e);
+  }
 }
