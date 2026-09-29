@@ -192,7 +192,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     state.roof &&
     state.roof.model !== undefined &&
     // Only Google's own "no roof here" is final; a setup or network failure is asked again next visit.
-    (state.roof.data !== null || state.roof.reason === "no-coverage") &&
+    (state.roof.data !== null || state.roof.reason === "no-coverage" || state.roof.reason === "not-this-home") &&
     lat !== undefined &&
     lng !== undefined &&
     Math.abs(state.roof.lat - lat) < 1e-5 &&

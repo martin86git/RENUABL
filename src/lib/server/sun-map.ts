@@ -21,8 +21,8 @@ export interface SunMap {
 }
 
 const memory = new Map<string, SunMap>();
-// v2: the roof is picked from the building Google matched, not the nearest roof to the address point.
-const cacheKey = (lat: number, lng: number) => `roof-photos/v2/${lat.toFixed(5)},${lng.toFixed(5)}.sun`;
+// v3: the roof is picked from the building Google matched, not the nearest roof to the address point.
+const cacheKey = (lat: number, lng: number) => `roof-photos/v3/${lat.toFixed(5)},${lng.toFixed(5)}.sun`;
 
 async function geoTiff(url: string, apiKey: string) {
   const res = await fetch(`${url}&key=${encodeURIComponent(apiKey)}`, { signal: AbortSignal.timeout(20_000) });

@@ -26,14 +26,26 @@ export interface RoofInsights {
   imageryQuality: "HIGH" | "MEDIUM" | "LOW" | "BASE" | null;
   /** The middle of the building Google matched (older cached lookups don't have it). */
   center?: { lat: number; lng: number } | null;
+  /** The matched building's outline box, south-west and north-east corners. */
+  box?: { sw: { lat: number; lng: number }; ne: { lat: number; lng: number } } | null;
 }
 
 /**
  * Google returns the building closest to the address point, which can be a
- * neighbour's when the point sits off the home (e.g. on the street). Farther
- * than this from the address, the building isn't trusted to be the home.
+ * neighbour's when the point sits off the home (e.g. on the street, or on a
+ * court's shared driveway). The address point must be on the matched building,
+ * or within a front yard's depth of its edge (`HOME_EDGE_METRES`); without an
+ * outline box, its centre must be within `HOME_MATCH_METRES`.
  */
 export const HOME_MATCH_METRES = 30;
+export const HOME_EDGE_METRES = 10;
+
+/** Metres from a point to the matched building's box (0 when it's on the building). */
+export function metresFromBuilding(box: NonNullable<RoofInsights["box"]>, p: { lat: number; lng: number }) {
+  const lat = Math.min(Math.max(p.lat, box.sw.lat), box.ne.lat);
+  const lng = Math.min(Math.max(p.lng, box.sw.lng), box.ne.lng);
+  return metresBetween({ lat, lng }, p);
+}
 
 /** Metres between two nearby points (flat-earth approximation, fine at house scale). */
 export function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
@@ -50,7 +62,8 @@ export function roofPanelLimit(inverterLimit: number, panelsThatFit: number | nu
 }
 
 /** Whether the building Google matched is plausibly the home at this address. */
-export function isThisHome(insights: Pick<RoofInsights, "center">, lat: number, lng: number) {
+export function isThisHome(insights: Pick<RoofInsights, "center" | "box">, lat: number, lng: number) {
+  if (insights.box) return metresFromBuilding(insights.box, { lat, lng }) <= HOME_EDGE_METRES;
   return !insights.center || metresBetween(insights.center, { lat, lng }) <= HOME_MATCH_METRES;
 }
 
@@ -87,8 +100,15 @@ export function parseBuildingInsights(raw: unknown): RoofInsights | null {
   const quality = r.imageryQuality;
   const c = (r.center ?? {}) as Record<string, unknown>;
   const [clat, clng] = [num(c.latitude), num(c.longitude)];
+  const bb = (r.boundingBox ?? {}) as Record<string, Record<string, unknown> | undefined>;
+  const corner = (v?: Record<string, unknown>) => {
+    const [la, ln] = [num(v?.latitude), num(v?.longitude)];
+    return la !== null && ln !== null ? { lat: la, lng: ln } : null;
+  };
+  const [sw, ne] = [corner(bb.sw), corner(bb.ne)];
   return {
     center: clat !== null && clng !== null ? { lat: clat, lng: clng } : null,
+    box: sw && ne && sw.lat <= ne.lat && sw.lng <= ne.lng ? { sw, ne } : null,
     faces,
     usableAreaM2: Math.round(usable),
     panelsThatFit: Math.floor((usable * PANEL_PACKING) / (PANEL.heightM * PANEL.widthM)),

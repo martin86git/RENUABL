@@ -3,6 +3,7 @@ import {
   facing,
   isThisHome,
   metresBetween,
+  metresFromBuilding,
   parseBuildingInsights,
   roofFit,
   roofPanelLimit,
@@ -184,6 +185,18 @@ describe("the home's own roof", () => {
     expect(isThisHome({ center: { lat: home.lat + 0.0004, lng: home.lng } }, home.lat, home.lng)).toBe(false); // ~45 m
     expect(isThisHome({}, home.lat, home.lng)).toBe(true);
     expect(metresBetween(home, { lat: home.lat, lng: home.lng + 0.001 })).toBeCloseTo(87.9, 0);
+  });
+
+  it("with an outline box, the address must be on the building or within a front yard of it", () => {
+    const box = { sw: { lat: home.lat - 0.0001, lng: home.lng - 0.0001 }, ne: { lat: home.lat + 0.0001, lng: home.lng + 0.0001 } };
+    expect(metresFromBuilding(box, home)).toBe(0);
+    expect(isThisHome({ box }, home.lat - 0.00017, home.lng)).toBe(true); // ~8 m in front
+    expect(isThisHome({ box }, home.lat - 0.00025, home.lng)).toBe(false); // ~17 m: the next building over
+    const r = parseBuildingInsights({
+      boundingBox: { sw: { latitude: -37.88, longitude: 145.16 }, ne: { latitude: -37.879, longitude: 145.161 } },
+      solarPotential: { maxArrayAreaMeters2: 40 },
+    });
+    expect(r?.box).toEqual({ sw: { lat: -37.88, lng: 145.16 }, ne: { lat: -37.879, lng: 145.161 } });
   });
 
   it("never recommends more panels than the roof data says fit, nor fewer than the minimum system", () => {

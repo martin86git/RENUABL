@@ -17,7 +17,10 @@ export async function GET(request: Request) {
     const { data, reason } = await roofLookup(lat, lng);
     if (data) return Response.json({ ok: true, roof: data.insights, model: data.model });
     // "no-coverage" is a real answer; anything else is a setup problem worth showing in preview.
-    return Response.json({ ok: false, reason: reason === "no-coverage" || PREVIEW_MODE ? reason : undefined });
+    return Response.json({
+      ok: false,
+      reason: reason === "no-coverage" || reason === "not-this-home" || PREVIEW_MODE ? reason : undefined,
+    });
   } catch (e) {
     console.error("roof lookup failed", e instanceof Error ? e.message : e);
     return Response.json({ ok: false, reason: PREVIEW_MODE ? "lookup failed" : undefined });

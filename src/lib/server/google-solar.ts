@@ -22,8 +22,8 @@ export function inAustralia(lat: number, lng: number) {
   return lat >= -44 && lat <= -9 && lng >= 112 && lng <= 154;
 }
 
-// v4: lookups keep the matched building's centre (to catch a neighbour's roof).
-const cacheKey = (lat: number, lng: number) => `v4:${lat.toFixed(5)},${lng.toFixed(5)}`;
+// v5: lookups keep the matched building's centre and box (to catch a neighbour's roof).
+const cacheKey = (lat: number, lng: number) => `v5:${lat.toFixed(5)},${lng.toFixed(5)}`;
 
 async function cached(key: string): Promise<{ data: RoofData | null } | null> {
   const m = memory.get(key);
@@ -58,7 +58,7 @@ export async function roofData(lat: number, lng: number): Promise<RoofData | nul
 }
 
 /** Why there's no roof: no key, no Google coverage for the home, or Google refused (e.g. the Solar API isn't enabled for the key). */
-export type RoofMissing = "no-key" | "outside-australia" | "no-coverage" | `google-${number}: ${string}`;
+export type RoofMissing = "no-key" | "outside-australia" | "no-coverage" | "not-this-home" | `google-${number}: ${string}`;
 
 /** The roof, or why there isn't one (for preview diagnostics). Tries medium-quality imagery, then base. */
 export async function roofLookup(lat: number, lng: number): Promise<{ data: RoofData | null; reason?: RoofMissing }> {
@@ -67,7 +67,10 @@ export async function roofLookup(lat: number, lng: number): Promise<{ data: Roof
   if (!inAustralia(lat, lng)) return { data: null, reason: "outside-australia" };
   const key = cacheKey(lat, lng);
   const hit = await cached(key).catch(() => null);
-  if (hit) return hit.data && isThisHome(hit.data.insights, lat, lng) ? { data: hit.data } : { data: null, reason: "no-coverage" };
+  if (hit) {
+    if (!hit.data) return { data: null, reason: "no-coverage" };
+    return isThisHome(hit.data.insights, lat, lng) ? { data: hit.data } : { data: null, reason: "not-this-home" };
+  }
   for (const quality of ["MEDIUM", "BASE"]) {
     const params = new URLSearchParams({
       "location.latitude": lat.toFixed(6),
@@ -88,7 +91,7 @@ export async function roofLookup(lat: number, lng: number): Promise<{ data: Roof
     const insights = parseBuildingInsights(json);
     const data = insights ? { insights, model: parseRoofModel(json) } : null;
     await remember(key, data);
-    if (data && !isThisHome(data.insights, lat, lng)) return { data: null, reason: "no-coverage" };
+    if (data && !isThisHome(data.insights, lat, lng)) return { data: null, reason: "not-this-home" };
     return data ? { data } : { data: null, reason: "no-coverage" };
   }
   await remember(key, null);

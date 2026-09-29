@@ -4,7 +4,14 @@ import { House } from "lucide-react";
 import { useState } from "react";
 import { MascotLoading } from "@/components/ui/brand-art";
 import { Card } from "@/components/ui/primitives";
-import { isUnitAddress, roofSummary, SHARED_ROOF_NOTE, type RoofInsights } from "@/lib/domain/solar-roof";
+import {
+  isUnitAddress,
+  metresBetween,
+  metresFromBuilding,
+  roofSummary,
+  SHARED_ROOF_NOTE,
+  type RoofInsights,
+} from "@/lib/domain/solar-roof";
 import { PREVIEW_MODE } from "@/lib/config";
 import { roofImageSrc } from "@/lib/services/consumer";
 import { SunMap } from "./sun-map";
@@ -48,9 +55,11 @@ export function RoofCheck({
     const why =
       typeof centre?.lat !== "number"
         ? "this address has no map location. Choose it from the address suggestions."
-        : reason === "no-coverage"
-          ? "Google has no roof data for this home."
-          : `Google's roof data didn't load (${reason ?? "still loading"}).`;
+        : reason === "not-this-home"
+          ? "the building Google matched isn't at this address (likely a neighbour's), so it isn't shown."
+          : reason === "no-coverage"
+            ? "Google has no roof data for this home."
+            : `Google's roof data didn't load (${reason ?? "still loading"}).`;
     return (
       <p className="rounded-lg border border-line bg-surface p-4 text-[13px] text-muted">Preview only: no roof details because {why}</p>
     );
@@ -83,6 +92,17 @@ export function RoofCheck({
             We&apos;ll work out how many panels fit on your roof, and where they go, on your 15-minute call.
           </p>
           {isUnitAddress(centre?.line) && <p className="mt-2 text-[14px] text-ink-2">{SHARED_ROOF_NOTE}</p>}
+          {PREVIEW_MODE && typeof centre?.lat === "number" && typeof centre.lng === "number" && (roof.box || roof.center) && (
+            <p className="mt-2 text-[12px] text-muted">
+              Preview check: the address point is{" "}
+              {Math.round(
+                roof.box
+                  ? metresFromBuilding(roof.box, { lat: centre.lat, lng: centre.lng })
+                  : metresBetween(roof.center!, { lat: centre.lat, lng: centre.lng }),
+              )}{" "}
+              m from {roof.box ? "the edge of" : "the middle of"} the building Google matched (0 = on it).
+            </p>
+          )}
           <p className="mt-2 text-[12px] text-muted">From Google&apos;s satellite roof data, which also shapes your savings estimate.</p>
         </div>
       </div>
