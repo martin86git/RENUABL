@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { revoContext, revoLine } from "./revo";
+import { LEAD_TIME_DAYS, SOLAR_VIC_LEAD_DAYS, buildAvailability, installLeadDays, toISODate, addDays } from "./scheduling";
+
+describe("install dates and Solar Victoria", () => {
+  it("start about three weeks out for new Victorian systems, so there's time for approval", () => {
+    expect(installLeadDays({ state: "VIC", expandingExistingSolar: false })).toBe(SOLAR_VIC_LEAD_DAYS);
+    expect(installLeadDays({ state: "vic", expandingExistingSolar: true })).toBe(LEAD_TIME_DAYS);
+    expect(installLeadDays({ state: "NSW", expandingExistingSolar: false })).toBe(LEAD_TIME_DAYS);
+    const from = new Date(2026, 9, 1);
+    const days = buildAvailability("ins_primero", from, 56, SOLAR_VIC_LEAD_DAYS);
+    expect(days[0].date >= toISODate(addDays(from, SOLAR_VIC_LEAD_DAYS))).toBe(true);
+  });
+});
 
 describe("Revo", () => {
   it("narrates each step and backs up the customer's choices", () => {

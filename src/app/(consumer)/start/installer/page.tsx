@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
-import { useFlow, useSystem } from "@/components/consumer/flow-state";
+import { useFlow, useInstallLead, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
 import { MascotAvatar } from "@/components/ui/brand-art";
 import { Button, Card, cn } from "@/components/ui/primitives";
@@ -78,7 +78,8 @@ function InstallerScreen() {
   const match = matches.find((m) => m.installer.id === selectedId) ?? matches[0];
   const isTopMatch = match?.installer.id === matches[0]?.installer.id;
   const alternatives = matches.filter((m) => m.installer.id !== match?.installer.id);
-  const firstAvailable = useMemo(() => (match ? getAvailability(match.installer.id)[0]?.date : undefined), [match]);
+  const lead = useInstallLead();
+  const firstAvailable = useMemo(() => (match ? getAvailability(match.installer.id, lead.days)[0]?.date : undefined), [match, lead.days]);
 
   // RENUABL chooses by default; the customer never has to compare.
   useEffect(() => {

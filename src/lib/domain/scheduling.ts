@@ -9,6 +9,21 @@ export const INSTALL_WINDOWS: TimeWindow[] = [INSTALL_ARRIVAL];
 
 export const LEAD_TIME_DAYS = 7;
 
+/**
+ * New systems in Victoria may use the Solar Victoria rebate: the customer
+ * applies, then approval takes about 7–10 business days, so the first install
+ * day is this far out. PLACEHOLDER: confirm with Primero.
+ */
+export const SOLAR_VIC_LEAD_DAYS = 21;
+
+/** Shown with a chosen date when Solar Victoria may apply. */
+export const SOLAR_VIC_DATE_NOTE = "This date will be subject to your Solar Victoria application being approved.";
+
+/** Days before the first install day: longer where Solar Victoria approval may be needed (new systems in Victoria). */
+export function installLeadDays(o: { state: string | null | undefined; expandingExistingSolar: boolean }) {
+  return o.state?.toUpperCase() === "VIC" && !o.expandingExistingSolar ? SOLAR_VIC_LEAD_DAYS : LEAD_TIME_DAYS;
+}
+
 export function toISODate(d: Date): ISODate {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -41,8 +56,8 @@ export function stableHash(input: string): number {
  * Generates installer availability: the days an installer can take a job.
  * Sundays are closed; other days are open on a stable, installer-specific pattern.
  */
-export function buildAvailability(installerId: string, from: Date, days = 56): DayAvailability[] {
-  const start = addDays(from, LEAD_TIME_DAYS);
+export function buildAvailability(installerId: string, from: Date, days = 56, leadDays = LEAD_TIME_DAYS): DayAvailability[] {
+  const start = addDays(from, leadDays);
   const out: DayAvailability[] = [];
   for (let i = 0; i < days; i++) {
     const date = addDays(start, i);

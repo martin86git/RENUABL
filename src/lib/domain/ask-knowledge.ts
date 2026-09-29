@@ -34,7 +34,7 @@ export const ASK_FACTS = [
   "Victorian homes may be eligible for Solar Victoria's solar panel rebate and interest-free loan (new solar systems only, subject to Solar Victoria's eligibility criteria). The customer can switch these on at checkout.",
   `Reserving an install date is free. After the 15-minute confirmation call, a ${money(ASSUMPTIONS.deposit)} refundable deposit locks in the date; the balance is due once the system is installed and switched on.`,
   // Installation
-  `The customer picks the install day; the installation partner arrives between ${INSTALL_ARRIVAL.label}. Most installs take one day.`,
+  `The customer picks the install day; the installation partner arrives between ${INSTALL_ARRIVAL.label}. Most installs take one day. For new systems in Victoria, install dates start about three weeks away, because the customer may apply for Solar Victoria's rebate and approval usually takes 7 to 10 business days; the chosen date is subject to that application being approved.`,
   "The 15-minute confirmation call is a check of the details (roof, switchboard, access), not a sales call. The customer books it themselves after reserving.",
   "RENUABL calls the installers it works with 'installation partners'; use that term. In Victoria the matched installation partner is Primero Electric & Solar. Alternatives are available if the customer asks.",
   // After install

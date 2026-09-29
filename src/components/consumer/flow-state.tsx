@@ -6,7 +6,8 @@ import type { ContactDetails } from "@/lib/domain/contact";
 import type { InverterSummary } from "@/lib/domain/inverter";
 import { VERIFIED_RATES, type RebateRates } from "@/lib/domain/rebates";
 import type { Sunshine } from "@/lib/domain/sunshine";
-import { isAboutComplete as aboutComplete } from "@/lib/domain/existing-solar";
+import { isAboutComplete as aboutComplete, solarSituation } from "@/lib/domain/existing-solar";
+import { SOLAR_VIC_LEAD_DAYS, installLeadDays } from "@/lib/domain/scheduling";
 import { ASSUMPTIONS, estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
 import type { CareBilling } from "@/lib/domain/care";
 import type { Address, AddOnId, EnergyProfile, SystemConfig, SystemTier } from "@/lib/domain/types";
@@ -220,6 +221,14 @@ export function useFlow() {
   const ctx = useContext(FlowContext);
   if (!ctx) throw new Error("useFlow must be used inside <FlowProvider>");
   return ctx;
+}
+
+/** Days to the first install day, and whether Solar Victoria approval may be needed (new systems in Victoria). */
+export function useInstallLead() {
+  const { state } = useFlow();
+  const expanding = Boolean(state.bill && solarSituation(state.bill, { ...DEFAULT_PROFILE, ...state.profile }) === "expand");
+  const days = installLeadDays({ state: state.address?.state, expandingExistingSolar: expanding });
+  return { days, solarVic: days === SOLAR_VIC_LEAD_DAYS };
 }
 
 /** Derived system view: recommendation, the customer's adjusted config, price and outcome. */
