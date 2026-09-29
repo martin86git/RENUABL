@@ -4,6 +4,7 @@ import { ArrowRight, BatteryCharging, Car, Home as HomeIcon, House, Info, PlugZa
 import { useRouter } from "next/navigation";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { FlowStep } from "@/components/consumer/flow-shell";
+import { BillLater } from "@/components/consumer/bill-later";
 import { BillUpload } from "@/components/consumer/bill-upload";
 import { InverterPhotos } from "@/components/consumer/inverter-photos";
 import { isAboutComplete, useFlow } from "@/components/consumer/flow-state";
@@ -135,6 +136,7 @@ export default function ProfilePage() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,420px)_1fr]">
         <div className="space-y-4">
           <BillUpload bill={state.bill} onRead={(bill) => update({ bill, config: null })} />
+          <BillLater />
           {existing.size && (
             <ExistingSolar
               profile={profile}

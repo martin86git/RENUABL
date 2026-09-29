@@ -255,6 +255,20 @@ export function partnerApprovedEmail(o: { firstName: string; link: string }) {
   });
 }
 
+/** Sent when a visitor doesn't have their bill handy and leaves their email to finish later. */
+export function finishLaterEmail(o: { link: string }) {
+  return simpleEmail({
+    subject: "Pick up where you left off",
+    heading: "Your solar plan is one bill away.",
+    lines: [
+      "When you have your latest electricity bill, come back and upload it. We'll size one system to what your home actually uses and show you the price, rebates included.",
+      "Most people find their bill in their energy retailer's app or email as a PDF. A photo of the paper bill works too. We'll also be in touch to help.",
+    ],
+    button: { label: "Continue my plan", href: o.link },
+    footer: "You're getting this because you asked us to get in touch. Just reply if you have any questions.",
+  });
+}
+
 /** The installation partner has designed the customer's panel layout: a look before install day. */
 export function layoutReadyEmail(o: { customer: string; panels: number; partner: string; link: string }) {
   const first = plainText(o.customer, 40).split(" ")[0] || "there";

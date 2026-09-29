@@ -145,6 +145,24 @@ export type ReserveResult = { ok: true; reservation: ReservationResult } | { ok:
  * Reserves the install date with the customer's contact details. Nothing is
  * charged; the reservation (and lead) goes to RENUABL's CRM.
  */
+/** A visitor without their bill handy leaves their email so we can follow up. */
+export async function requestFollowUp(input: {
+  email: string;
+  home?: string;
+  source?: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const res = await fetch("/api/follow-up", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    return (await res.json()) as { ok: boolean; message?: string };
+  } catch {
+    return { ok: false, message: "That didn't send. Check your connection and try again." };
+  }
+}
+
 export async function reserveInstall(input: {
   contact: ContactDetails;
   details: Record<string, string | undefined>;

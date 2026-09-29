@@ -26,7 +26,7 @@ const INTENTS: { match: RegExp; answer: string }[] = [
   {
     match: /(no|don'?t have|haven'?t got|without|lost|can'?t find|skip).{0,20}bill|bill.{0,20}(skip|without)/i,
     answer:
-      "We need your latest electricity bill to size your system, so it can't be skipped. The quickest way is to download it (PDF) from your energy retailer's app, website or email, or take a photo of the paper bill. A screenshot works too. Your answers are kept while you get it.",
+      "We need your latest electricity bill to size your system, so it can't be skipped. The quickest way is to download it (PDF) from your energy retailer's app, website or email, or take a photo of the paper bill. A screenshot works too. Your answers are kept while you get it. Can't get it now? Leave your email in the box under the upload and we'll get in touch.",
   },
   {
     match: /heat pump|hot water|reverse.?cycle|air ?con|upgrade|switchboard|smart home/i,
