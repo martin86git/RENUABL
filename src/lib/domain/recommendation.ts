@@ -420,7 +420,6 @@ export function sizingExplanation(
     lines.push(
       `With a battery we size for winter. On a winter day ${one(solarKw)} kW makes about ${one(winter.made)} kWh: about ${one(winter.usedAsMade)} is used as it's made, leaving about ${one(winter.afterDark)} kWh for after dark.`,
       `A ${kwh(config.batteryKwh)} kWh battery holds about ${one(usable)} kWh${usable >= winter.afterDark ? ", enough for that" : ", most of that"}, and the ${one(winter.surplus)} kWh of spare solar ${winter.surplus >= Math.min(usable, winter.afterDark) ? "can fill it" : "fills part of it"}. In summer there's plenty to spare.`,
-      `A battery inverter can take panels up to ${Math.round(arrayRatio(true) * 100)}% of its rating, so we fill it: the inverter costs the same, and the extra panels help most in winter.`,
     );
   } else {
     lines.push(

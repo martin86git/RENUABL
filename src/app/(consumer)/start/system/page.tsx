@@ -41,9 +41,27 @@ import {
   sizingExplanation,
   solarDay,
 } from "@/lib/domain/recommendation";
+import { BATTERY_RANGE, PANEL, PANEL_RANGE, batteryLabel, panelLabel } from "@/lib/domain/catalogue";
 import type { SystemConfig, SystemTier } from "@/lib/domain/types";
 
 type Part = "solar" | "battery" | "ev" | "monitoring";
+
+/** "Panels we use" / "Batteries we use", from the product library. */
+function ProductList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="rounded-2xl bg-surface p-4">
+      <p className="text-[14px] text-ink">{title}</p>
+      <ul className="mt-2 space-y-1.5">
+        {items.map((i) => (
+          <li key={i} className="flex items-center gap-2.5 text-[14px] text-ink-2">
+            <Check className="h-4 w-4 shrink-0 text-positive" strokeWidth={2} aria-hidden /> {i}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[12px] text-muted">Your exact equipment is chosen in your design and shown on your 15-minute call.</p>
+    </div>
+  );
+}
 
 function Row({
   icon: Icon,
@@ -133,7 +151,7 @@ function SystemScreen() {
     ? config.panelCount > 0
       ? `Your existing solar + ${outcome.solarKw} kW new panels`
       : "Keeping your existing solar"
-    : `${outcome.solarKw} kW · Premium panels`;
+    : `${outcome.solarKw} kW · ${PANEL.watts} W panels`;
 
   const estimate = (
     <Card className="p-5">
@@ -229,7 +247,7 @@ function SystemScreen() {
               title="Battery Storage"
               subtitle={
                 config.batteryKwh > 0
-                  ? `${config.batteryKwh} kWh · ${state.addOns.includes("home-backup") ? "With blackout backup" : "Blackout backup available"}`
+                  ? `${config.batteryKwh} kWh · ${BATTERY_RANGE[0].manufacturer} · ${state.addOns.includes("home-backup") ? "With blackout backup" : "Blackout backup available"}`
                   : "Not included · Add any time"
               }
               muted={config.batteryKwh === 0}
@@ -308,7 +326,7 @@ function SystemScreen() {
         ) : (
           <>
             <p>
-              {outcome.solarKw} kW from {config.panelCount} premium panels, generating about{" "}
+              {outcome.solarKw} kW from {config.panelCount} {PANEL.watts} W panels, generating about{" "}
               {outcome.annualGenerationKwh.toLocaleString("en-AU")} kWh a year.
             </p>
             <p>
@@ -321,6 +339,7 @@ function SystemScreen() {
                   ? ` That's covered by our smallest system (${ASSUMPTIONS.minSystemKw} kW), so you'll have a little spare to export.`
                   : " No bigger than you need."}
             </p>
+            <ProductList title="Panels we use" items={PANEL_RANGE.map(panelLabel)} />
             <p className="text-[13px] text-muted">
               {replacing
                 ? "Removing your current system, your roof and your switchboard are all confirmed on the 15-minute call."
@@ -347,6 +366,7 @@ function SystemScreen() {
             {TIER_LABELS.recommended} for a battery sized to your evening use; blackout backup can be added to it.
           </p>
         )}
+        <ProductList title="Batteries we use" items={BATTERY_RANGE.map(batteryLabel)} />
         {config.batteryKwh > 0 && <p>{backupNote(state.addOns.includes("home-backup"))}</p>}
       </PartSheet>
 

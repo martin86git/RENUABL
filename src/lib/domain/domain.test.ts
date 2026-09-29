@@ -149,7 +149,7 @@ describe("recommendSystem", () => {
     expect(withBattery).toContain("14.7 kWh a day");
     expect(withBattery).toContain("40%");
     expect(withBattery).toContain("16.2 kWh");
-    expect(withBattery).toContain("150%");
+    expect(withBattery).not.toContain("150%"); // inverter detail isn't for customers
     const solarOnly = sizingExplanation(usage, { panelCount: ASSUMPTIONS.minPanels, batteryKwh: 0 }, { nasa: false }).join(" ");
     expect(solarOnly).toContain("Melbourne");
     expect(solarOnly).toContain("5 kW");

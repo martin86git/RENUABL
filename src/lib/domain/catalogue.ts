@@ -33,6 +33,45 @@ export const PANEL: PanelItem = {
   widthM: 1.134,
 };
 
+/**
+ * What customers see as "Panels we use" and "Batteries we use" on the system
+ * step: maker, size and warranty, from this product library. The first panel
+ * is the one systems are priced and sized with (PANEL). Add more (up to three)
+ * as they go on the price list, with their datasheet warranty.
+ */
+export interface ShownPanel {
+  manufacturer: string;
+  watts: number;
+  /** Product warranty in years (datasheet). */
+  warrantyYears: number;
+}
+export interface ShownBattery {
+  manufacturer: string;
+  model: string;
+  moduleKwh: number;
+  warrantyYears: number;
+}
+
+export const PANEL_RANGE: ShownPanel[] = [
+  // VERIFY the product warranty on Jinko's datasheet for JKM475N-48QL6-DB.
+  { manufacturer: "Jinko", watts: PANEL.watts, warrantyYears: 25 },
+];
+
+export const BATTERY_RANGE: ShownBattery[] = [
+  // VERIFY the warranty on Sigenergy's SigenStor datasheet.
+  { manufacturer: "Sigenergy", model: "SigenStor", moduleKwh: 8, warrantyYears: 10 },
+];
+
+/** "Jinko · 475 W · 25-year warranty" */
+export function panelLabel(p: ShownPanel) {
+  return `${p.manufacturer} · ${p.watts} W · ${p.warrantyYears}-year warranty`;
+}
+
+/** "Sigenergy SigenStor · 8 kWh modules · 10-year warranty" */
+export function batteryLabel(b: ShownBattery) {
+  return `${b.manufacturer} ${b.model} · ${b.moduleKwh} kWh modules · ${b.warrantyYears}-year warranty`;
+}
+
 export type Phase = "single" | "three";
 
 /** Solar-only systems (no battery now or planned): Sungrow string inverters. */

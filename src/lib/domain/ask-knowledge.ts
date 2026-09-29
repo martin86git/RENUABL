@@ -4,6 +4,7 @@
  * figures, rebates or promises. Keep the facts in step with the product rules
  * in CLAUDE.md.
  */
+import { BATTERY_RANGE, PANEL_RANGE, batteryLabel, panelLabel } from "./catalogue";
 import { COSTING, sellPrice } from "./costing";
 import { ASSUMPTIONS } from "./recommendation";
 import { INSTALL_ARRIVAL } from "./scheduling";
@@ -40,7 +41,7 @@ export const ASK_FACTS = [
   "After switch-on, the My RENUABL app shows what the panels make, the battery level and what's been saved, gives a heads-up if something needs a look, and books service visits with the installation partner. Warranty work is free; any other fee is confirmed before a visit is booked.",
   "The price includes installation, the inverter (a new one comes with every system), electrical work, commissioning and GST, with rebates already taken off. The only possible extras are things found when the home is checked (for example a switchboard upgrade), always priced and agreed before anything is charged.",
   `Blackout backup: a battery can keep chosen circuits on in a blackout, but wiring those backup circuits in is an optional extra ("Blackout Backup", ${money(sellPrice(COSTING.backupCircuitsInstall))} installed, including GST), added on the Extras step. Which circuits is agreed on the 15-minute call. It needs a battery: Essential (solar only) has no backup. Without Blackout Backup, the battery doesn't power the home during a blackout.`,
-  "Battery sizes are shown as the battery's full (nominal) size; RENUABL sizes batteries assuming about 90% of that is usable. Equipment: between reserving and the 15-minute call, RENUABL designs the customer's system for their home, including the exact panels, inverter and battery and how many panels fit on the roof. On the call the specialist walks them through the design and every product and answers questions. Nothing is final or charged until they're happy, and reserving is free with no commitment. If asked which brands, say this warmly (never as if it's being kept from them): the design, with the exact products, is shown on the call.",
+  `Battery sizes are shown as the battery's full (nominal) size; RENUABL sizes batteries assuming about 90% of that is usable. Equipment: between reserving and the 15-minute call, RENUABL designs the customer's system for their home, including the exact panels, inverter and battery and how many panels fit on the roof. On the call the specialist walks them through the design and every product and answers questions. Nothing is final or charged until they're happy, and reserving is free with no commitment. The panels and batteries RENUABL uses are listed on the system step (tap Solar System or Battery Storage): ${PANEL_RANGE.map(panelLabel).join("; ")} panels, and ${BATTERY_RANGE.map(batteryLabel).join("; ")} batteries. Share these if asked; the exact equipment for their home is chosen in their design and shown on the call.`,
   "A smart EV charger can be added at checkout. Smart switchboards and smart home integration aren't priced online yet: the customer can tick them to discuss, and they're talked through and quoted on the 15-minute call. Reverse-cycle heating and cooling and heat pump hot water are coming soon: RENUABL doesn't sell them yet, and the customer can ask to be told when they're available. Never quote a price for any of them.",
 ];
 
