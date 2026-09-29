@@ -30,7 +30,8 @@ export default function HomePage() {
               </li>
             ))}
           </ol>
-          <AddressEntry className="mt-7 max-w-lg lg:mt-10" />
+          <p className="mt-5 text-[15px] text-forest lg:mt-7 lg:text-[16px]">Your system, priced in about two minutes.</p>
+          <AddressEntry className="mt-4 max-w-lg lg:mt-5" />
           <div className="mt-4 hidden lg:block">
             <AskRenuabl context="home" variant="link" title="Not sure yet? Ask RENUABL" />
           </div>
