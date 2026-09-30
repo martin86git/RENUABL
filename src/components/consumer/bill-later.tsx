@@ -1,11 +1,11 @@
 "use client";
 
 import { Check, Loader2 } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/primitives";
 import { formatAddress } from "@/lib/mock/addresses";
 import { requestFollowUp } from "@/lib/services/consumer";
+import { ConsentBoxes, NO_CONSENT, type ConsentState } from "./consent-boxes";
 import { useFlow } from "./flow-state";
 
 /**
@@ -18,17 +18,24 @@ export function BillLater() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [consent, setConsent] = useState<ConsentState>(NO_CONSENT);
+  const [consentMissing, setConsentMissing] = useState(false);
 
   if (state.bill) return null;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!consent.terms) {
+      setConsentMissing(true);
+      return;
+    }
     setBusy(true);
     setProblem(null);
     const r = await requestFollowUp({
       email,
       home: state.address ? formatAddress(state.address) : undefined,
       source: [state.attribution?.source, state.attribution?.campaign].filter(Boolean).join(" / ") || undefined,
+      consent,
     });
     setBusy(false);
     if (r.ok) setDone(true);
@@ -70,12 +77,7 @@ export function BillLater() {
           {problem}
         </p>
       )}
-      <p className="mt-2 text-[11.5px] leading-snug text-muted">
-        We&apos;ll only email you about your RENUABL plan.{" "}
-        <Link href="/privacy" target="_blank" className="underline underline-offset-4 hover:text-ink">
-          Privacy
-        </Link>
-      </p>
+      <ConsentBoxes kind="follow-up" value={consent} onChange={setConsent} missing={consentMissing} className="mt-3" />
     </form>
   );
 }

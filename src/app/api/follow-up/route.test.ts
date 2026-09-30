@@ -17,8 +17,14 @@ afterEach(() => {
 
 describe("POST /api/follow-up", () => {
   it("needs a real email", async () => {
-    const res = await post({ email: "nope" }, nextIp());
+    const res = await post({ email: "nope", consent: { terms: true } }, nextIp());
     expect(res.status).toBe(422);
+  });
+
+  it("needs the Terms and Privacy box ticked", async () => {
+    const res = await post({ email: "sam@example.com" }, nextIp());
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ ok: false, consent: true });
   });
 
   it("adds a HubSpot contact with a note, and emails a link back", async () => {
@@ -36,19 +42,29 @@ describe("POST /api/follow-up", () => {
         return Response.json({ id: "c1" });
       }),
     );
-    const res = await post({ email: "Sam@Example.com", home: "12 Example St, Kew VIC 3101", source: "facebook / launch" }, nextIp());
+    const res = await post(
+      {
+        email: "Sam@Example.com",
+        home: "12 Example St, Kew VIC 3101",
+        source: "facebook / launch",
+        consent: { terms: true, marketing: true },
+      },
+      nextIp(),
+    );
     expect(await res.json()).toEqual({ ok: true, emailed: true });
     const note = calls.find((c) => c.url.endsWith("/notes"))!;
     expect(note.body).toContain("Finish later: no bill yet");
     expect(note.body).toContain("12 Example St, Kew VIC 3101");
     expect(note.body).toContain("facebook / launch");
+    expect(note.body).toContain("Terms of Use and Privacy Policy");
+    expect(note.body).toContain("Marketing tips and offers: yes");
     const mail = calls.find((c) => c.url.includes("sendgrid"))!;
     expect(mail.body).toContain("sam@example.com");
     expect(mail.body).toContain("https://renuabl.com.au/");
   });
 
   it("says so when it can't be saved anywhere", async () => {
-    const res = await post({ email: "sam@example.com" }, nextIp());
+    const res = await post({ email: "sam@example.com", consent: { terms: true } }, nextIp());
     expect(res.status).toBe(502);
   });
 });

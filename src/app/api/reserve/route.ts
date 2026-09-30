@@ -3,6 +3,7 @@ import { PREVIEW_MODE } from "@/lib/config";
 import { formatCallTime } from "@/lib/domain/booking";
 import { buildIcs, callEvent, installEvent } from "@/lib/domain/calendar";
 import { formatDate } from "@/lib/domain/format";
+import { CONSENT_MISSING, consentRecord, readConsent } from "@/lib/domain/legal";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { cleanOrder, orderConfirmationEmail, plainText } from "@/lib/domain/emails";
 import { cleanJobRequest } from "@/lib/domain/jobs";
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
   let body: {
     contact?: Record<string, unknown>;
     details?: Record<string, unknown>;
+    consent?: unknown;
     order?: unknown;
     installDate?: string;
     job?: unknown;
@@ -36,6 +38,9 @@ export async function POST(request: Request) {
 
   const checked = validateContact(body.contact ?? {});
   if ("errors" in checked) return Response.json({ ok: false, errors: checked.errors }, { status: 422 });
+  // The required box: Terms, Privacy and contact about their plan. Marketing is separate and optional.
+  const consent = readConsent(body.consent);
+  if (!consent.accepted) return Response.json({ ok: false, consent: true, message: CONSENT_MISSING }, { status: 422 });
 
   const details: Record<string, string> = {};
   for (const [k, v] of Object.entries(body.details ?? {})) {
@@ -44,6 +49,7 @@ export async function POST(request: Request) {
   // The 15-minute call is booked before reserving (in-app calendar): its label is built here, not taken from the browser.
   const call = cleanCall(body.call);
   if (call) details["Confirmation call booked"] = call.label;
+  details.Consent = consentRecord({ kind: "reserve", marketing: consent.marketing, at: new Date(), timeZone: LAUNCH_MARKET.timeZone });
   const reservationId = await newReference();
   await saveJob(reservationId, checked.contact, body.job);
   // Straight to RENUABL's inbox too, whatever happens with HubSpot.

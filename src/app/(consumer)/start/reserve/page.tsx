@@ -18,7 +18,7 @@ import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_PLAN, careIncludedFor, careInclude
 import { formatCurrency, formatDate } from "@/lib/domain/format";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { describeInverter } from "@/lib/domain/inverter";
-import { CONTACT_CONSENT } from "@/lib/domain/legal";
+import { ConsentBoxes, NO_CONSENT, type ConsentState } from "@/components/consumer/consent-boxes";
 import { PRICE_INCLUDES, RESERVE_NO_COMMITMENT, TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
 import { solarVictoriaApplies } from "@/lib/domain/rebates";
 import { SOLAR_VIC_DATE_NOTE, getWindow } from "@/lib/domain/scheduling";
@@ -59,6 +59,9 @@ function ReserveScreen() {
   const [errors, setErrors] = useState<ContactErrors>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [callMissing, setCallMissing] = useState(false);
+  const [consent, setConsent] = useState<ConsentState>(NO_CONSENT);
+  const [consentMissing, setConsentMissing] = useState(false);
+  const consentRef = useRef<HTMLDivElement>(null);
   const callRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const installer = state.installerId ? getInstaller(state.installerId) : undefined;
@@ -71,6 +74,12 @@ function ReserveScreen() {
       callRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
+    // Terms, Privacy and contact about their plan must be ticked; tips and offers stay optional.
+    if (!consent.terms) {
+      setConsentMissing(true);
+      consentRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     setBusy(true);
     setProblem(null);
     const careIncluded = careIncludedFor(state.tier);
@@ -81,6 +90,7 @@ function ReserveScreen() {
       careIncluded,
       installDate: state.installDate,
       call: state.call,
+      consent,
       job: {
         address: state.address,
         system: config,
@@ -488,17 +498,9 @@ function ReserveScreen() {
       <p className="mt-4 flex items-center gap-2 text-[12px] text-muted">
         <Lock className="h-3.5 w-3.5 shrink-0" strokeWidth={1.6} /> We only use your details for your RENUABL system. No spam.
       </p>
-      <p className="mt-2 text-[11.5px] leading-snug text-muted">
-        {CONTACT_CONSENT} See our{" "}
-        <Link href="/privacy" target="_blank" className="underline underline-offset-4 hover:text-ink">
-          Privacy Policy
-        </Link>{" "}
-        and{" "}
-        <Link href="/terms" target="_blank" className="underline underline-offset-4 hover:text-ink">
-          Terms
-        </Link>
-        .
-      </p>
+      <div ref={consentRef} className="scroll-mt-6">
+        <ConsentBoxes kind="reserve" value={consent} onChange={setConsent} missing={consentMissing} className="mt-4" />
+      </div>
       {problem && (
         <p className="mt-3 text-[13px] text-danger" role="alert">
           {problem}

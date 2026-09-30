@@ -1,5 +1,7 @@
 import { normaliseEmail } from "@/lib/domain/accounts";
 import { finishLaterEmail, plainText } from "@/lib/domain/emails";
+import { CONSENT_MISSING, consentRecord, readConsent } from "@/lib/domain/legal";
+import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { siteUrl } from "@/lib/domain/sms";
 import { sendEmail } from "@/lib/server/email";
 import { addNote, contactIdByEmail, crmNote } from "@/lib/server/hubspot-crm";
@@ -7,14 +9,14 @@ import { alertNewLead } from "@/lib/server/lead-alert";
 import { allow } from "@/lib/server/rate-limit";
 
 /**
- * POST { email, home?, source? }: a visitor without their bill handy leaves
+ * POST { email, home?, source?, consent: { terms: true, marketing? } }: a visitor without their bill handy leaves
  * their email so we can follow up. It becomes a HubSpot contact with a note
  * (home and ad source, plain text), and they're emailed a link back. They
  * still can't continue without a bill.
  */
 export async function POST(request: Request) {
   if (!allow(request, "follow-up", 10)) return Response.json({ ok: false, message: "Please try again later." }, { status: 429 });
-  let body: { email?: unknown; home?: unknown; source?: unknown };
+  let body: { email?: unknown; home?: unknown; source?: unknown; consent?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -22,10 +24,13 @@ export async function POST(request: Request) {
   }
   const email = normaliseEmail(body.email);
   if (!email) return Response.json({ ok: false, message: "Enter a valid email address." }, { status: 422 });
+  const consent = readConsent(body.consent);
+  if (!consent.accepted) return Response.json({ ok: false, consent: true, message: CONSENT_MISSING }, { status: 422 });
   const details = {
     Stage: "Didn't have their bill handy: follow up",
     Home: plainText(body.home, 160) || undefined,
     "Ad source": plainText(body.source, 120) || undefined,
+    Consent: consentRecord({ kind: "follow-up", marketing: consent.marketing, at: new Date(), timeZone: LAUNCH_MARKET.timeZone }),
   };
 
   let saved = false;

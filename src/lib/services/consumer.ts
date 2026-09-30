@@ -152,6 +152,8 @@ export async function requestFollowUp(input: {
   email: string;
   home?: string;
   source?: string;
+  /** The tickboxes: Terms and Privacy (required) and tips and offers (optional). */
+  consent: { terms: boolean; marketing: boolean };
 }): Promise<{ ok: boolean; message?: string }> {
   try {
     const res = await fetch("/api/follow-up", {
@@ -178,6 +180,8 @@ export async function reserveInstall(input: {
   job?: unknown;
   /** The 15-minute call picked before reserving (in-app calendar). */
   call?: CallSlot | null;
+  /** The tickboxes: Terms and Privacy (required) and tips and offers (optional). */
+  consent: { terms: boolean; marketing: boolean };
 }): Promise<ReserveResult> {
   try {
     const res = await fetch("/api/reserve", {
@@ -190,6 +194,7 @@ export async function reserveInstall(input: {
         installDate: input.installDate,
         job: input.job,
         call: input.call ?? undefined,
+        consent: input.consent,
       }),
     });
     const json = (await res.json()) as {
