@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Caveat, Inter, Source_Serif_4 } from "next/font/google";
 import { PREVIEW_MODE } from "@/lib/config";
+import { publicSiteUrl } from "@/lib/domain/site";
 import "./globals.css";
 
 // Brand type: Inter for UI, a light serif for editorial lines, a handwritten script for accents.
@@ -9,6 +10,7 @@ const serif = Source_Serif_4({ variable: "--font-serif", subsets: ["latin"], wei
 const script = Caveat({ variable: "--font-script", subsets: ["latin"], weight: ["400", "500"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(publicSiteUrl()),
   title: { default: "RENUABL — Renewable energy on your terms", template: "%s · RENUABL" },
   description: "Solar and batteries, sized to your bill. One system made for your home, one installer, one price.",
   // Keep preview deployments out of search results.

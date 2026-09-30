@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Dialog } from "radix-ui";
 import { useState } from "react";
 
-/** The mobile menu: just the two places a customer goes (no website-style link bar). */
+/** The mobile menu: the few places a customer goes (no website-style link bar). */
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
   const item = "flex items-center justify-between rounded-2xl bg-surface px-5 py-4 text-[16px] text-ink shadow-[var(--shadow-soft)]";
@@ -32,6 +32,9 @@ export function MobileMenu() {
             </Link>
             <Link href="/my" className={item} onClick={() => setOpen(false)}>
               My RENUABL <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
+            </Link>
+            <Link href="/learn" className={item} onClick={() => setOpen(false)}>
+              Energy guides <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
             </Link>
             <Link href="/login" className={item} onClick={() => setOpen(false)}>
               Log in <ArrowRight className="h-4 w-4" strokeWidth={1.6} />

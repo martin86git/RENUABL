@@ -27,6 +27,9 @@ export function LegalFooter() {
     <footer className="border-t border-line px-5 py-5 text-[12px] text-muted sm:px-8 lg:px-10">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-4 gap-y-2">
         <span>{legalLine(new Date().getFullYear())}</span>
+        <Link href="/learn" className="tap-area underline-offset-4 hover:text-ink hover:underline">
+          Energy guides
+        </Link>
         <Link href="/privacy" className="tap-area underline-offset-4 hover:text-ink hover:underline">
           Privacy
         </Link>

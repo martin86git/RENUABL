@@ -1,0 +1,87 @@
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import { ConsumerTopBar, MobileHeader } from "@/components/consumer/consumer-top-bar";
+import { LegalFooter } from "@/components/consumer/legal-page";
+import { ButtonLink } from "@/components/ui/primitives";
+import type { Guide, GuideBlock } from "@/lib/domain/guides";
+
+/** The reading frame for Revo's guides: the wordmark header, a centred column and the legal footer. */
+export function GuideFrame({ children, wide }: { children: ReactNode; wide?: boolean }) {
+  return (
+    <div className="flex min-h-dvh flex-col">
+      <MobileHeader />
+      <ConsumerTopBar className="hidden lg:flex" />
+      <main className={`mx-auto w-full flex-1 px-5 pb-16 pt-6 sm:px-8 lg:pt-12 ${wide ? "max-w-5xl" : "max-w-2xl"}`}>{children}</main>
+      <LegalFooter />
+    </div>
+  );
+}
+
+export function GuideBody({ blocks }: { blocks: GuideBlock[] }) {
+  return (
+    <div className="mt-8 space-y-4 text-[16px] leading-relaxed text-ink-2">
+      {blocks.map((b, i) => {
+        if (b.type === "h2")
+          return (
+            <h2 key={i} className="pt-4 text-[21px] font-normal tracking-[-0.02em] text-ink">
+              {b.text}
+            </h2>
+          );
+        if (b.type === "list")
+          return (
+            <ul key={i} className="space-y-1.5">
+              {b.items.map((item) => (
+                <li key={item} className="ml-5 list-disc">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          );
+        if (b.type === "note")
+          return (
+            <p key={i} className="rounded-2xl bg-sage px-5 py-4 text-[14.5px] text-forest">
+              {b.text}
+            </p>
+          );
+        if (b.type === "link")
+          return (
+            <p key={i}>
+              <a href={b.href} target="_blank" rel="noopener noreferrer" className="tap-area text-forest underline underline-offset-4">
+                {b.text}
+              </a>
+            </p>
+          );
+        return <p key={i}>{b.text}</p>;
+      })}
+    </div>
+  );
+}
+
+/** Every guide ends by inviting the reader to see their own home's numbers. */
+export function GuideCta() {
+  return (
+    <section className="mt-12 rounded-[var(--radius-card)] bg-surface p-6 shadow-[var(--shadow-soft)] sm:p-8">
+      <h2 className="text-[24px] font-normal tracking-[-0.03em]">See what this means for your home.</h2>
+      <p className="mt-2 text-[15px] text-muted">Enter your address and upload your bill. Your system, priced in about two minutes.</p>
+      <ButtonLink href="/" className="mt-5">
+        Start with your address <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
+      </ButtonLink>
+    </section>
+  );
+}
+
+export function GuideCard({ guide }: { guide: Guide }) {
+  return (
+    <Link
+      href={`/learn/${guide.slug}`}
+      className="flex flex-col rounded-[var(--radius-card)] bg-surface p-6 shadow-[var(--shadow-soft)] transition-shadow hover:shadow-[var(--shadow-lift)]"
+    >
+      <span className="text-[12.5px] text-forest">
+        {guide.topic} · {guide.minutes} min read
+      </span>
+      <span className="mt-2 text-[19px] leading-snug tracking-[-0.02em] text-ink">{guide.title}</span>
+      <span className="mt-2 text-[14.5px] text-muted">{guide.summary}</span>
+    </Link>
+  );
+}
