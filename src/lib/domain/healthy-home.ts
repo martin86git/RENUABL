@@ -48,7 +48,10 @@ export const PACKAGES = {
     {
       name: "Healthy home package",
       line: "Cleaner air, better water, better sleep.",
-      image: null,
+      image: {
+        src: "/brand/package-healthy.webp",
+        alt: "A family relaxing on the couch with the dog in a bright living room, with a split-system air conditioner on the wall",
+      },
       chips: [
         "Air purification",
         "Air-quality monitoring",
