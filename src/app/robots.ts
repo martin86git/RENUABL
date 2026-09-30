@@ -5,7 +5,7 @@ import { publicSiteUrl, searchIndexing } from "@/lib/domain/site";
 export default function robots(): MetadataRoute.Robots {
   if (!searchIndexing()) return { rules: { userAgent: "*", disallow: "/" } };
   return {
-    rules: { userAgent: "*", allow: "/", disallow: ["/installer", "/admin", "/api/", "/my", "/start", "/login", "/deposit"] },
+    rules: { userAgent: "*", allow: "/", disallow: ["/installer", "/admin", "/api/", "/my", "/start", "/login", "/deposit", "/demo"] },
     sitemap: `${publicSiteUrl()}/sitemap.xml`,
   };
 }

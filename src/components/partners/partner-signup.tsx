@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, CircleCheck, FileUp, Loader2, MapPin, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, FileUp, Loader2, MapPin, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CaptureButtons } from "@/components/ui/capture";
+import { PartnerPitch } from "./partner-pitch";
 import { Button, Card, cn } from "@/components/ui/primitives";
 import { PREVIEW_MODE } from "@/lib/config";
 import type { AddressSuggestion } from "@/lib/domain/address";
@@ -11,7 +12,6 @@ import {
   CERTIFICATE_UPLOAD,
   EMPTY_PARTNER_DRAFT,
   MIN_PUBLIC_LIABILITY,
-  PARTNER_BENEFITS,
   PARTNER_FIELD_STEP,
   PARTNER_TYPES,
   RADIUS_LIMITS,
@@ -306,38 +306,11 @@ export function PartnerSignup() {
 
   const rates: InstallRates = draftRates(draft);
 
+  // The pitch comes first, full width; the form steps sit in a narrow column.
+  if (step === "intro") return <PartnerPitch onStart={() => go("type")} />;
+
   return (
     <div className="mx-auto w-full max-w-xl px-5 pb-16 pt-6 sm:px-8 lg:pt-12">
-      {step === "intro" && (
-        <div>
-          <p className="text-[13px] tracking-wide text-leaf">RENUABL partners</p>
-          <h1 className="mt-2 text-[34px] font-normal leading-[1.08] tracking-[-0.035em] lg:text-[46px]">
-            Install more systems. Chase fewer leads.
-          </h1>
-          <p className="mt-4 text-[16px] leading-relaxed text-muted">
-            RENUABL helps Victorian households go solar the simple way. They upload their electricity bill, we recommend one system sized to
-            their home, and they book an install date. Then we match each job with a trusted local partner. That could be you.
-          </p>
-          <ul className="mt-7 grid gap-3 sm:grid-cols-2">
-            {PARTNER_BENEFITS.map((b) => (
-              <li key={b.title}>
-                <Card className="h-full p-5">
-                  <CircleCheck className="h-5 w-5 text-positive" strokeWidth={1.8} aria-hidden />
-                  <p className="mt-3 text-[15px] text-ink">{b.title}</p>
-                  <p className="mt-1 text-[13px] leading-relaxed text-muted">{b.detail}</p>
-                </Card>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-6 text-[13px] leading-relaxed text-muted">
-            It takes about 10 minutes. Have your ABN, accreditation number, electrical licence and certificate of currency handy.
-          </p>
-          <Button size="lg" className="mt-6 w-full sm:w-auto sm:px-10" onClick={() => go("type")}>
-            Become a partner <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
-          </Button>
-        </div>
-      )}
-
       {step === "type" && (
         <div>
           {heading("How will you work with RENUABL?", "Choose one. It decides what we ask next.")}

@@ -4,8 +4,18 @@ import { PartnerSignup } from "@/components/partners/partner-signup";
 import { Wordmark } from "@/components/ui/primitives";
 
 export const metadata: Metadata = {
-  title: "Become a partner",
-  description: "Install more solar and battery systems with RENUABL. No lead fees, and payment collected for you.",
+  title: "Solar installers: jobs already sold, no lead fees",
+  description:
+    "Join RENUABL as an installation partner in Victoria. Booked solar and battery jobs at your own rates, no lead fees, and everything for each job on your phone.",
+  alternates: { canonical: "/partners" },
+  openGraph: {
+    type: "website",
+    siteName: "RENUABL",
+    locale: "en_AU",
+    title: "Stop buying leads. Install jobs that are already sold.",
+    url: "/partners",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
+  },
 };
 
 /** Partner sign-up: public, in the partner portal's dark theme. */
