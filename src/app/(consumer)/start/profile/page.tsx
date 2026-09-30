@@ -13,6 +13,7 @@ import { stepHref } from "@/components/consumer/steps";
 import { Mascot } from "@/components/ui/brand-art";
 import { ChoiceChips, Toggle, YesNo } from "@/components/ui/controls";
 import { Button, Script } from "@/components/ui/primitives";
+import { trackLead } from "@/lib/services/meta-pixel";
 import {
   EXISTING_PLAN_OPTIONS,
   EXISTING_SIZE_OPTIONS,
@@ -152,7 +153,11 @@ export default function ProfilePage() {
             <BillUpload
               bill={state.bill}
               address={state.address ? formatAddress(state.address) : undefined}
-              onRead={(bill) => update({ bill, config: null })}
+              onRead={(bill) => {
+                // The bill was read by the server: count it once as a Meta lead (no details sent).
+                if (!state.leadTracked) trackLead();
+                update({ bill, config: null, leadTracked: true });
+              }}
             />
             {missingBill && !state.bill && (
               <>

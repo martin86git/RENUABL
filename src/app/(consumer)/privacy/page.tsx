@@ -47,14 +47,22 @@ export default function PrivacyPage() {
         <li>Your matched installation partner, once they accept your job.</li>
         <li>
           Service providers who help us run RENUABL: website hosting and storage, our customer records system, payments, email and SMS
-          delivery, mapping and roof data, and the service that reads your bill. They may only use your information to provide their service
-          to us.
+          delivery, mapping and roof data, advertising measurement (Meta), and the service that reads your bill. They may only use your
+          information to provide their service to us.
         </li>
         <li>Government bodies and distributors where needed for rebates, grid connection or the law.</li>
       </ul>
       <p>
         Some of these providers store or process information outside Australia, including in the United States. We take reasonable steps to
         make sure they protect it.
+      </p>
+
+      <h2>Advertising</h2>
+      <p>
+        We advertise on Facebook and Instagram and use the Meta Pixel to see whether our ads work. It runs only on our public pages and the
+        steps to price a system, and tells Meta when a page is visited and when a bill has been read. We never send Meta your bill, its
+        contents, your address, name, email, phone number or prices. Meta may use cookies to link these visits to your Facebook or Instagram
+        account; you can manage this in your Meta ad settings or by blocking cookies in your browser.
       </p>
 
       <h2>Keeping it safe</h2>

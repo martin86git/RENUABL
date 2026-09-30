@@ -71,6 +71,8 @@ export interface FlowState {
   /** The time picked in the in-app calendar (null when booked through HubSpot or not yet booked). */
   call: CallSlot | null;
   attribution: Attribution | null;
+  /** The Meta Pixel Lead event has been sent this visit (once, on the first bill read). */
+  leadTracked: boolean;
 }
 
 const EMPTY: FlowState = {
@@ -96,6 +98,7 @@ const EMPTY: FlowState = {
   callBooked: false,
   call: null,
   attribution: null,
+  leadTracked: false,
 };
 
 const DEFAULT_PROFILE: EnergyProfile = { ev: false, evPlanned: false, wantsBattery: false, backup: false };

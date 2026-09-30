@@ -12,7 +12,7 @@ export const LEGAL = {
   /** Must be a mailbox someone reads: privacy requests and complaints come here. */
   email: "hello@renuabl.com.au",
   state: "Victoria",
-  updated: "28 September 2026",
+  updated: "30 September 2026",
 } as const;
 
 /** Shown where customers give their mobile and email (the reserve step). */
