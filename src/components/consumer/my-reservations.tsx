@@ -61,13 +61,13 @@ export async function MyReservations() {
 }
 
 /** "Complete your Home Health check" until it's done, then the saved plan. */
-function HealthCard({ health }: { health: { plan: HealthPlan; quoted: string[] } | null }) {
+function HealthCard({ health }: { health: { plan: HealthPlan } | null }) {
   if (!health) {
     return (
       <Link href="/home-health" className="mt-4 flex items-center justify-between gap-4 rounded-2xl bg-sage px-5 py-4 text-forest">
         <span>
           <span className="block text-[15px]">Complete your Home Health check</span>
-          <span className="block text-[13px]">About two minutes. Upgrades can often go in on your install day.</span>
+          <span className="block text-[13px]">A few quick questions about your air, water, comfort and sleep, with free tips.</span>
         </span>
         <ArrowRight className="h-5 w-5 shrink-0" strokeWidth={1.6} />
       </Link>
@@ -75,16 +75,16 @@ function HealthCard({ health }: { health: { plan: HealthPlan; quoted: string[] }
   }
   return (
     <div className="mt-4 rounded-2xl bg-sage px-5 py-4 text-forest">
-      <p className="text-[15px]">Your Home Health plan</p>
+      <p className="text-[15px]">Your Home Health check</p>
       {health.plan.recommendations.length ? (
-        <ul className="mt-2 space-y-1 text-[13.5px]">
-          {health.plan.recommendations.map((r) => (
-            <li key={r.item}>
-              {r.title}
-              {health.quoted.includes(r.item) ? " · we'll quote it" : ""}
-            </li>
-          ))}
-        </ul>
+        <>
+          <p className="mt-1 text-[13px]">Ideas worth looking into:</p>
+          <ul className="mt-2 space-y-1 text-[13.5px]">
+            {health.plan.recommendations.map((r) => (
+              <li key={r.item}>{r.title}</li>
+            ))}
+          </ul>
+        </>
       ) : (
         <p className="mt-1 text-[13.5px]">Nothing stood out from your answers.</p>
       )}

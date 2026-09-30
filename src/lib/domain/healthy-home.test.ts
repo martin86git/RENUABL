@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { HOME_HERO, healthyHomeText } from "./healthy-home";
-import { HEALTH_ITEMS, HEALTH_QUESTIONS, HEALTH_RANGE, cleanAnswers, healthPlan, rangeToOffer, shareableAnswers } from "./home-health";
+import {
+  HEALTH_ITEMS,
+  HEALTH_QUESTIONS,
+  RESEARCH_QUESTIONS,
+  cleanAnswers,
+  healthPlan,
+  interestSummary,
+  shareableAnswers,
+} from "./home-health";
 import { WHOOP_COPY, WHOOP_OFFER, nextWhoopStatus, whoopEligible, whoopOfferOpen } from "./whoop-offer";
 
 const BANNED = /\b(cure|treat|prevent|guaranteed?|best|first ever|leading|AI|installer)\b|\$\d/i;
@@ -42,8 +50,9 @@ describe("WHOOP offer", () => {
 });
 
 describe("Home Health check", () => {
-  it("has the brief's 23 questions, all optional choices", () => {
-    expect(HEALTH_QUESTIONS).toHaveLength(23);
+  it("has the brief's 23 questions plus the interest questions, all optional choices", () => {
+    expect(HEALTH_QUESTIONS).toHaveLength(27);
+    for (const id of ["air-interest", "water-interest", "priority", "budget"]) expect(HEALTH_QUESTIONS.map((q) => q.id)).toContain(id);
     for (const q of HEALTH_QUESTIONS) expect(q.options.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -105,12 +114,25 @@ describe("Home Health check", () => {
     expect(text).not.toMatch(BANNED);
   });
 
-  it("offers the three-product range, without repeating a top recommendation", () => {
-    expect(HEALTH_RANGE.map((p) => p.item)).toEqual(["purifiers", "whole-house-filter", "circadian"]);
-    expect(rangeToOffer(healthPlan({}))).toHaveLength(3);
-    const plan = healthPlan({ "shower-filter": "no" });
-    expect(rangeToOffer(plan).map((p) => p.item)).toEqual(["purifiers", "circadian"]);
-    expect(JSON.stringify(HEALTH_RANGE)).not.toMatch(BANNED);
-    expect(JSON.stringify(HEALTH_RANGE)).not.toMatch(/\$\d/);
+  it("recommends what the customer said they're interested in", () => {
+    expect(healthPlan({ "air-interest": "yes-for-the-bedrooms" }).recommendations[0].item).toBe("purifiers");
+    expect(healthPlan({ "water-interest": "yes-at-the-kitchen-tap" }).recommendations[0].item).toBe("drinking-filter");
+    expect(healthPlan({ "water-interest": "yes-for-the-whole-house" }).recommendations[0].item).toBe("whole-house-filter");
+    expect(healthPlan({ "water-interest": "maybe", "air-interest": "no" }).recommendations).toHaveLength(0);
+  });
+
+  it("adds up the research answers for staff, never the allergies answer", () => {
+    const tally = interestSummary([
+      { "air-interest": "yes-for-the-bedrooms", priority: ["air", "sleep"], allergies: "yes" },
+      { "air-interest": "maybe", priority: ["air"] },
+      {},
+    ]);
+    expect(tally.map((t) => t.id)).toEqual([...RESEARCH_QUESTIONS]);
+    const air = tally.find((t) => t.id === "air-interest")!;
+    expect(air.answered).toBe(2);
+    expect(air.counts.find((c) => c.label === "Yes, for the bedrooms")?.count).toBe(1);
+    const priority = tally.find((t) => t.id === "priority")!;
+    expect(priority.counts.find((c) => c.label === "Air")?.count).toBe(2);
+    expect(JSON.stringify(tally)).not.toMatch(/allerg/i);
   });
 });

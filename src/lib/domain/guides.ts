@@ -758,7 +758,7 @@ export const GUIDES: Guide[] = [
         items: [
           "Switching usually means a new cooktop, a quick electrical check and sometimes new pans (a magnet should stick to the base).",
           "If you're planning to leave gas altogether, induction is a common place to start, alongside heat-pump hot water.",
-          "Doing it at the same time as solar means one visit and one plan.",
+          "If you're already having electrical work done, such as solar, doing it at the same time can save a visit.",
         ],
       },
       {
@@ -903,7 +903,7 @@ export const GUIDES: Guide[] = [
       { type: "h2", text: "Pairs well with" },
       {
         type: "p",
-        text: "Blackout or smart blinds keep streetlights and early sunrise out, so the lighting you choose is the light you get. Both can be planned and installed alongside your solar.",
+        text: "Blackout or smart blinds keep streetlights and early sunrise out, so the lighting you choose is the light you get.",
       },
       {
         type: "tip",

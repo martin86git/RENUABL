@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     Home: address ?? undefined,
     Recommendations: plan.recommendations.map((r) => HEALTH_ITEMS[r.item]).join(", ") || "None",
     "Free fixes": plan.freeFixes.map((f) => f.title).join(", "),
-    "Longer-term plan": plan.longTerm ? "Staying 10+ years: show the whole healthy home package" : undefined,
+    "Longer-term": plan.longTerm ? "Staying 10+ years" : undefined,
     Answers: Object.entries(shareable)
       .map(([k, v]) => {
         const q = labels.get(k);

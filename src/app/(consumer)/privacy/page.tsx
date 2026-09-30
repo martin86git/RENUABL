@@ -61,8 +61,8 @@ export default function PrivacyPage() {
       <h2>Home Health check</h2>
       <p>
         The Home Health check asks optional questions about your home&apos;s air, water, comfort, sleep and lighting. Every question is
-        optional. We use your answers only to recommend healthy home upgrades and to quote the ones you ask about, and we keep them with
-        your order so you can see them in My RENUABL.
+        optional. We use your answers only to suggest ideas for your home and, added up across all customers, to decide which healthy home
+        products to offer, and we keep them with your order so you can see them in My RENUABL.
       </p>
       <p>
         One question asks whether anyone in the home has allergies or sensitive breathing. That&apos;s health information, so we only record

@@ -7,16 +7,9 @@ import { ConsentBoxes, NO_CONSENT, type ConsentState } from "@/components/consum
 import { useFlow } from "@/components/consumer/flow-state";
 import { Button, Card, cn } from "@/components/ui/primitives";
 import { PACKAGES } from "@/lib/domain/healthy-home";
-import {
-  HEALTH_QUESTIONS,
-  SENSITIVE_CONSENT,
-  healthPlan,
-  rangeToOffer,
-  type HealthAnswers,
-  type HealthItemId,
-} from "@/lib/domain/home-health";
+import { HEALTH_QUESTIONS, SENSITIVE_CONSENT, healthPlan, HEALTH_RESULTS_COPY as COPY, type HealthAnswers } from "@/lib/domain/home-health";
 import { formatAddress } from "@/lib/mock/addresses";
-import { requestHealthQuote, saveHomeHealth } from "@/lib/services/home-health";
+import { saveHomeHealth } from "@/lib/services/home-health";
 
 const TOTAL = HEALTH_QUESTIONS.length;
 
@@ -44,12 +37,12 @@ export function HomeHealthCheck() {
   function pick(optionId: string) {
     if (q.multi) {
       const current = Array.isArray(answers[q.id]) ? (answers[q.id] as string[]) : [];
-      const exclusive = optionId === "none";
+      const only = ["none", "nothing-right-now"];
       const updated = current.includes(optionId)
         ? current.filter((x) => x !== optionId)
-        : exclusive
+        : only.includes(optionId)
           ? [optionId]
-          : [...current.filter((x) => x !== "none"), optionId];
+          : [...current.filter((x) => !only.includes(x)), optionId];
       setAnswers((a) => ({ ...a, [q.id]: updated }));
       return;
     }
@@ -168,10 +161,7 @@ function HealthResults({
 }) {
   const { state } = useFlow();
   const plan = useMemo(() => healthPlan(answers), [answers]);
-  const range = rangeToOffer(plan);
   const [id, setId] = useState<string | null>(null);
-  const [wanted, setWanted] = useState<Set<HealthItemId>>(new Set());
-  const [sent, setSent] = useState<Set<HealthItemId>>(new Set());
   const [email, setEmail] = useState(state.contact?.email ?? "");
   const [address, setAddress] = useState(state.address ? formatAddress(state.address) : "");
   const [consent, setConsent] = useState<ConsentState>(NO_CONSENT);
@@ -193,15 +183,11 @@ function HealthResults({
     });
     setBusy(false);
     if (!r.ok || !r.id) {
-      setProblem(r.message ?? "We couldn't save your plan just now. Please try again.");
+      setProblem(r.message ?? "We couldn't save your answers just now. Please try again.");
       if (r.consent) setConsentMissing(true);
       return;
     }
     setId(r.id);
-    // Anything added before saving is requested now.
-    for (const item of wanted) {
-      if (await requestHealthQuote(r.id, item)) setSent((s) => new Set(s).add(item));
-    }
   }
 
   // After a reservation the plan is saved on the order straight away.
@@ -211,22 +197,6 @@ function HealthResults({
     void save({ address: state.address ? formatAddress(state.address) : undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
   }, [linked]);
-
-  async function add(item: HealthItemId) {
-    setWanted((w) => new Set(w).add(item));
-    if (id && (await requestHealthQuote(id, item))) setSent((s) => new Set(s).add(item));
-  }
-
-  const addButton = (item: HealthItemId) =>
-    sent.has(item) || (wanted.has(item) && !id) ? (
-      <span className="inline-flex items-center gap-1.5 text-[14px] text-positive">
-        <Check className="h-4 w-4" strokeWidth={2} /> {sent.has(item) ? "Added. We'll quote it." : "Added. Save your plan below."}
-      </span>
-    ) : (
-      <Button size="sm" variant="secondary" onClick={() => void add(item)}>
-        Add to my plan — we&apos;ll quote it
-      </Button>
-    );
 
   const saveForm = (e: React.FormEvent) => {
     e.preventDefault();
@@ -242,15 +212,11 @@ function HealthResults({
       <button type="button" onClick={onBack} className="tap-area inline-flex items-center gap-1.5 text-[13px] text-muted hover:text-ink">
         <ArrowLeft className="h-4 w-4" strokeWidth={1.6} /> Back to the questions
       </button>
-      <p className="mt-6 text-[13px] tracking-[0.02em] text-forest">Your Home Health plan</p>
+      <p className="mt-6 text-[13px] tracking-[0.02em] text-forest">Your Home Health check</p>
       <h1 className="mt-2 text-[32px] font-normal leading-tight tracking-[-0.035em] lg:text-[40px]">
-        {plan.recommendations.length ? "Here's what would help most." : "Your home is in good shape."}
+        {plan.recommendations.length ? COPY.heading : COPY.headingNone}
       </h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-muted">
-        {plan.recommendations.length
-          ? "Based on your answers. Add anything you'd like to your plan and we'll quote it, often in time to install it on the same visit as your solar."
-          : "Nothing stood out from your answers. Here's a free tip, and three upgrades you can add to your plan."}
-      </p>
+      <p className="mt-3 text-[15px] leading-relaxed text-muted">{plan.recommendations.length ? COPY.intro : COPY.introNone}</p>
 
       {plan.recommendations.length > 0 && (
         <ol className="mt-8 space-y-3">
@@ -263,7 +229,6 @@ function HealthResults({
                     <div className="min-w-0 flex-1">
                       <p className="text-[17px] text-ink">{r.title}</p>
                       <p className="mt-1 text-[14px] leading-relaxed text-muted">{r.why}</p>
-                      <div className="mt-3">{addButton(r.item)}</div>
                     </div>
                   </div>
                 </Card>
@@ -271,29 +236,6 @@ function HealthResults({
             );
           })}
         </ol>
-      )}
-
-      {range.length > 0 && (
-        <section className="mt-8" aria-labelledby="health-range">
-          <h2 id="health-range" className="text-[19px] text-ink">
-            {plan.recommendations.length ? "Also in our healthy home range" : "Our healthy home range"}
-          </h2>
-          <p className="mt-1 text-[14px] text-muted">Quoted for your home, and can often go in on the same visit as your solar.</p>
-          <ul className="mt-4 space-y-3">
-            {range.map((p) => (
-              <li key={p.item}>
-                <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
-                  <div className="min-w-0 flex-1">
-                    <span className="rounded-full bg-sage px-3 py-1 text-[12px] text-forest">Healthy home</span>
-                    <p className="mt-3 text-[17px] text-ink">{p.title}</p>
-                    <p className="mt-1 text-[14px] leading-relaxed text-muted">{p.line}</p>
-                  </div>
-                  <div className="shrink-0">{addButton(p.item)}</div>
-                </Card>
-              </li>
-            ))}
-          </ul>
-        </section>
       )}
 
       <Card className="mt-6 bg-sage p-5 text-forest">
@@ -309,11 +251,13 @@ function HealthResults({
         </ul>
       </Card>
 
+      <p className="mt-6 rounded-2xl border border-line px-5 py-4 text-[13.5px] leading-relaxed text-muted">{COPY.notYet}</p>
+
       {plan.longTerm && (
         <Card className="mt-6 p-5">
           <p className="text-[16px] text-ink">Staying for the long run?</p>
           <p className="mt-1 text-[14px] leading-relaxed text-muted">
-            Since you plan to stay 10 years or more, here&apos;s the whole healthy home package to plan for over time.
+            Since you plan to stay 10 years or more, these are the kinds of upgrades worth keeping in mind over time.
           </p>
           <ul className="mt-3 flex flex-wrap gap-2">
             {PACKAGES.cards[1].chips.map((c) => (
@@ -333,8 +277,8 @@ function HealthResults({
 
       {!linked && !id && (
         <form onSubmit={saveForm} className="mt-8 rounded-[var(--radius-card)] border border-line p-5">
-          <p className="text-[17px] text-ink">Save your plan</p>
-          <p className="mt-1 text-[13.5px] text-muted">So you can come back to it, and so we can quote anything you&apos;ve added.</p>
+          <p className="text-[17px] text-ink">{COPY.save}</p>
+          <p className="mt-1 text-[13.5px] text-muted">{COPY.saveWhy}</p>
           <label className="mt-4 block">
             <span className="text-[12.5px] text-muted">Your home address</span>
             <input
@@ -358,15 +302,14 @@ function HealthResults({
           </label>
           <ConsentBoxes kind="follow-up" value={consent} onChange={setConsent} missing={consentMissing} className="mt-4" />
           <Button type="submit" size="lg" className="mt-5 w-full sm:w-auto sm:px-10" disabled={busy || !email.trim()}>
-            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Save my plan"}
+            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Save my answers"}
           </Button>
         </form>
       )}
 
       {id && (
         <p className="mt-8 flex items-center gap-2 text-[14px] text-positive" role="status">
-          <Check className="h-4 w-4" strokeWidth={2} />{" "}
-          {linked ? "Saved to your order." : "Saved. We'll be in touch about anything you've added."}
+          <Check className="h-4 w-4" strokeWidth={2} /> {linked ? COPY.savedLinked : COPY.saved}
         </p>
       )}
       {linked && busy && !id && <p className="mt-8 text-[14px] text-muted">Saving to your order…</p>}

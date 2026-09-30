@@ -306,7 +306,7 @@ export function healthReminderEmail(o: { firstName: string; link: string }) {
     heading: `Hi ${first}, two minutes for a healthier home?`,
     lines: [
       "Answer a few quick questions about your air, water, comfort and sleep, and we'll show you what would make the biggest difference, including free fixes.",
-      "If anything's worth doing, it can often be installed on the same visit as your solar. Every question is optional.",
+      "Every question is optional, and your answers help us decide which healthy home products to offer first.",
     ],
     button: { label: "Take the Home Health check", href: o.link },
     footer: "You're getting this because you reserved an installation with RENUABL. Just reply if you have any questions.",
@@ -371,7 +371,7 @@ export function newLeadEmail(o: {
       ? simpleEmail({
           subject: `Home Health check: ${who}`,
           heading: "Someone completed the Home Health check",
-          lines: [...lines, "Follow up on any quote requests before their install date, so upgrades can go in on the same visit."],
+          lines: [...lines, "Research only: healthy home products aren't offered yet, so don't promise or quote anything."],
           footer: "Also in HubSpot and on /admin.",
         })
       : simpleEmail({

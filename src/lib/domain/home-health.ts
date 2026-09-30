@@ -1,7 +1,10 @@
 /**
  * The Home Health check: optional questions about a home's air, water,
  * comfort, sleep and light, and simple rules that turn the answers into a
- * short plan (top recommendations plus at least one free fix). No score, no
+ * short plan (top recommendations plus at least one free fix). For now it's
+ * research: we don't sell healthy home products yet, so nothing can be added
+ * or quoted, and the interest questions tell us what to offer first
+ * (`interestSummary`, on /admin). No score, no
  * medical claims: recommendations describe what a product does, not a health
  * outcome. The allergies answer is sensitive information: it's only kept with
  * the customer's consent and never goes into HubSpot or staff emails. Pure, tested.
@@ -32,6 +35,12 @@ export const HEALTH_QUESTIONS: HealthQuestion[] = [
   { id: "stuffy", section: "Air", prompt: "Does any room feel stuffy when you wake up?", options: o("Often", "Sometimes", "Rarely") },
   { id: "purifier", section: "Air", prompt: "Do you have an air purifier?", options: o("Yes", "No") },
   {
+    id: "air-interest",
+    section: "Air",
+    prompt: "Would you be interested in air purification for your home?",
+    options: o("Yes, for the bedrooms", "Yes, for the whole home", "Maybe", "No"),
+  },
+  {
     id: "ac-filter",
     section: "Air",
     prompt: "Does your air conditioning have a filter, and when was it last cleaned?",
@@ -40,6 +49,12 @@ export const HEALTH_QUESTIONS: HealthQuestion[] = [
   { id: "mould", section: "Air", prompt: "Any condensation or mould on windows or walls?", options: o("Yes", "No") },
   { id: "drinking-filter", section: "Water", prompt: "Do you filter your drinking water?", options: o("Yes", "No") },
   { id: "shower-filter", section: "Water", prompt: "Do you filter your shower water?", options: o("Yes", "No") },
+  {
+    id: "water-interest",
+    section: "Water",
+    prompt: "Would you be interested in water filtration for your home?",
+    options: o("Yes, at the kitchen tap", "Yes, for the whole house", "Maybe", "No"),
+  },
   { id: "leak", section: "Water", prompt: "Have you ever had a leak or burst pipe?", options: o("Yes", "No") },
   {
     id: "rooms",
@@ -94,6 +109,19 @@ export const HEALTH_QUESTIONS: HealthQuestion[] = [
     sensitive: true,
   },
   {
+    id: "priority",
+    section: "Household",
+    prompt: "What would you most like help with at home?",
+    options: o("Air", "Water", "Temperature", "Sleep", "Lighting", "Nothing right now"),
+    multi: true,
+  },
+  {
+    id: "budget",
+    section: "Household",
+    prompt: "If it made a real difference, what would you consider spending on healthy home upgrades?",
+    options: o("Under $500", "$500 to $2,000", "$2,000 to $5,000", "Over $5,000", "Not sure"),
+  },
+  {
     id: "stay",
     section: "Household",
     prompt: "How long do you plan to stay in this home?",
@@ -105,7 +133,21 @@ export const SENSITIVE_CONSENT = "I agree RENUABL can use this answer only to ta
 
 export type HealthAnswers = Record<string, string | string[]>;
 
-/** Healthy home products (no prices: each is "Add to my plan — we'll quote it"). */
+/** Results page copy. We don't offer these products yet, so nothing here offers, adds or quotes them. */
+export const HEALTH_RESULTS_COPY = {
+  heading: "Here's what could help.",
+  headingNone: "Your home is in good shape.",
+  intro: "Ideas based on your answers, so you know what's worth looking into.",
+  introNone: "Nothing stood out from your answers. Here's a free tip anyway.",
+  notYet:
+    "We don't offer healthy home products yet. Your answers help us decide which ones to offer first, and we'll only be in touch about them if you've said we can.",
+  save: "Save your answers",
+  saveWhy: "So you can come back to them, and so they count towards what we offer next.",
+  saved: "Saved. Thanks, your answers help us decide what to offer next.",
+  savedLinked: "Saved with your order. Thanks, your answers help us decide what to offer next.",
+} as const;
+
+/** Healthy home product types we recommend (not sold yet: information only). */
 export const HEALTH_ITEMS = {
   induction: "Induction cooktop",
   "aq-monitor": "Air-quality monitor",
@@ -125,25 +167,6 @@ export type HealthItemId = keyof typeof HEALTH_ITEMS;
 
 export function isHealthItem(id: unknown): id is HealthItemId {
   return typeof id === "string" && id in HEALTH_ITEMS;
-}
-
-/**
- * The three healthy home products we sell first, offered on every results
- * page (quoted, never priced). What each one does, not a health outcome.
- */
-export const HEALTH_RANGE: { item: HealthItemId; title: string; line: string }[] = [
-  { item: "purifiers", title: "Air purification", line: "A quiet purifier in each bedroom filters dust and pollen from the air." },
-  { item: "whole-house-filter", title: "Water filtration", line: "Filters the water at every tap and shower in the house." },
-  {
-    item: "circadian",
-    title: "Circadian lighting",
-    line: "Lights that brighten gently in the morning and turn warm and soft in the evening.",
-  },
-];
-
-/** The range products not already in the customer's top recommendations. */
-export function rangeToOffer(plan: Pick<HealthPlan, "recommendations">) {
-  return HEALTH_RANGE.filter((p) => !plan.recommendations.some((r) => r.item === p.item));
 }
 
 export interface Recommendation {
@@ -199,6 +222,9 @@ export function healthPlan(a: HealthAnswers): HealthPlan {
   if (is(a, "purifier", "no") && is(a, "allergies", "yes")) {
     add("purifiers", "A purifier in each bedroom filters dust and pollen from the air while you sleep.");
   }
+  if (is(a, "air-interest", "yes-for-the-bedrooms", "yes-for-the-whole-home")) {
+    add("purifiers", "You said you'd be interested. A purifier filters dust and pollen from the air in the rooms you choose.");
+  }
   if (is(a, "ac-filter", "longer-ago", "don-t-know")) {
     add("ac-filter", "A cleaner or better filter means the air your AC blows around the house is filtered too.");
     fixes.push({
@@ -207,6 +233,10 @@ export function healthPlan(a: HealthAnswers): HealthPlan {
     });
   }
   if (is(a, "drinking-filter", "no")) add("drinking-filter", "Filters the water you drink and cook with at the kitchen tap.");
+  if (is(a, "water-interest", "yes-at-the-kitchen-tap"))
+    add("drinking-filter", "Filters the water you drink and cook with at the kitchen tap.");
+  if (is(a, "water-interest", "yes-for-the-whole-house"))
+    add("whole-house-filter", "Filters the water at every tap and shower in the house, not just the kitchen.");
   if (is(a, "shower-filter", "no"))
     add("whole-house-filter", "Filters the water at every tap and shower in the house, not just the kitchen.");
   if (is(a, "leak", "yes")) add("leak-detection", "Sensors alert your phone the moment water appears where it shouldn't.");
@@ -251,4 +281,44 @@ export function cleanAnswers(raw: unknown, consentSensitive: boolean): HealthAns
 export function shareableAnswers(a: HealthAnswers): HealthAnswers {
   const sensitive = new Set(HEALTH_QUESTIONS.filter((q) => q.sensitive).map((q) => q.id));
   return Object.fromEntries(Object.entries(a).filter(([k]) => !sensitive.has(k)));
+}
+
+/** The questions that tell us which healthy home products to offer first. */
+export const RESEARCH_QUESTIONS = [
+  "air-interest",
+  "purifier",
+  "water-interest",
+  "drinking-filter",
+  "shower-filter",
+  "gentle-light",
+  "priority",
+  "budget",
+] as const;
+
+export interface AnswerTally {
+  id: string;
+  prompt: string;
+  /** How many checks answered it (skips don't count). */
+  answered: number;
+  counts: { label: string; count: number }[];
+}
+
+/** Adds up the research answers across saved checks, for staff. Never includes the sensitive answer. */
+export function interestSummary(all: HealthAnswers[]): AnswerTally[] {
+  return RESEARCH_QUESTIONS.map((id) => {
+    const q = HEALTH_QUESTIONS.find((x) => x.id === id)!;
+    const counts = q.options.map((opt) => ({ label: opt.label, count: 0 }));
+    let answered = 0;
+    for (const a of all) {
+      const v = a[id];
+      const picked = Array.isArray(v) ? v : typeof v === "string" ? [v] : [];
+      if (!picked.length) continue;
+      answered++;
+      for (const p of picked) {
+        const i = q.options.findIndex((x) => x.id === p);
+        if (i >= 0) counts[i].count++;
+      }
+    }
+    return { id, prompt: q.prompt, answered, counts };
+  });
 }

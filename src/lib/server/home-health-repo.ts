@@ -1,9 +1,8 @@
 /**
  * Server only. Home Health checks (answers and the plan, linked to an order
- * when there is one) and the healthy home quote requests staff follow up
- * before the install date. The allergies answer is stored only with consent.
+ * when there is one), and their answers for the research tallies staff see. The allergies answer is stored only with consent.
  */
-import type { HealthAnswers, HealthItemId, HealthPlan } from "@/lib/domain/home-health";
+import type { HealthAnswers, HealthPlan } from "@/lib/domain/home-health";
 import { newId, query } from "./db";
 
 export interface HealthRecord {
@@ -58,47 +57,10 @@ export async function latestHealthFor(email: string): Promise<HealthRecord | nul
   return rows[0] ?? null;
 }
 
-/** "Add to my plan — we'll quote it": one request per item per check. */
-export async function addHealthQuote(record: HealthRecord, item: HealthItemId): Promise<boolean> {
-  const rows = await query(
-    `insert into health_quotes (id, job_reference, email, item) values ($1, $2, $3, $4)
-     on conflict (job_reference, item) do nothing returning id`,
-    [newId("hq"), record.job_reference ?? record.id, record.email, item],
-  );
-  return rows.length > 0;
-}
-
-export async function quotedItems(record: HealthRecord): Promise<string[]> {
-  const rows = await query<{ item: string }>(`select item from health_quotes where job_reference = $1`, [
-    record.job_reference ?? record.id,
-  ]);
-  return rows.map((r) => r.item);
-}
-
-export interface QuoteRow {
-  id: string;
-  item: string;
-  status: string;
-  email: string | null;
-  job_reference: string | null;
-  install_date: string | null;
-  interest: boolean | null;
-  name: string | null;
-  created_at: string;
-}
-
-/** Staff list: orders that ticked "interested" first, then the soonest install date. */
-export async function listHealthQuotes(): Promise<QuoteRow[]> {
-  return query<QuoteRow>(
-    `select q.id, q.item, q.status, q.email, j.reference as job_reference, to_char(j.install_date, 'YYYY-MM-DD') as install_date,
-            j.healthy_home_interest as interest, j.customer->>'name' as name, q.created_at
-     from health_quotes q left join jobs j on j.reference = q.job_reference
-     order by coalesce(j.healthy_home_interest, false) desc, j.install_date asc nulls last, q.created_at asc`,
-  );
-}
-
-export async function setQuoteStatus(id: string, status: "requested" | "contacted" | "quoted"): Promise<boolean> {
-  return (await query(`update health_quotes set status = $2 where id = $1 returning id`, [id, status])).length > 0;
+/** Every saved check's answers (for the research tallies on /admin; the sensitive answer is dropped there). */
+export async function allHealthAnswers(): Promise<HealthAnswers[]> {
+  const rows = await query<{ answers: HealthAnswers }>(`select answers from home_health`);
+  return rows.map((r) => r.answers);
 }
 
 /** Orders reserved 2+ days ago without a check or a reminder yet. */

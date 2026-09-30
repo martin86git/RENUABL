@@ -1,6 +1,6 @@
 /**
  * Runs against a real Postgres when TEST_DATABASE_URL is set (skipped otherwise):
- * the WHOOP cap under concurrent reservations, and Home Health checks and quotes.
+ * the WHOOP cap under concurrent reservations, and Home Health checks.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WHOOP_OFFER } from "@/lib/domain/whoop-offer";
@@ -53,7 +53,7 @@ describe.skipIf(!url)("WHOOP claims and Home Health (database)", () => {
     expect(await whoop.setWhoopStatus("RN-99999", "delivered")).toBe(true);
   });
 
-  it("saves a check, one quote per item, and lists quotes", async () => {
+  it("saves a check and lists its answers for the tallies", async () => {
     const answers = { "gas-cooking": "yes" };
     const saved = await health.saveHealthCheck({
       reference: null,
@@ -65,9 +65,7 @@ describe.skipIf(!url)("WHOOP claims and Home Health (database)", () => {
     });
     const record = (await health.healthRecord(saved.id))!;
     expect(record.plan.recommendations[0].item).toBe("induction");
-    expect(await health.addHealthQuote(record, "induction")).toBe(true);
-    expect(await health.addHealthQuote(record, "induction")).toBe(false);
-    expect((await health.listHealthQuotes()).map((q) => q.item)).toContain("induction");
+    expect(await health.allHealthAnswers()).toContainEqual(answers);
     expect((await health.latestHealthFor("SAM@example.com"))?.id).toBe(saved.id);
   });
 });

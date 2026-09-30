@@ -130,6 +130,7 @@ create table if not exists home_health (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- health_quotes: no longer written (healthy home products aren't offered yet); kept for past rows.
 create table if not exists health_quotes (
   id text primary key,
   job_reference text,

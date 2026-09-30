@@ -1,6 +1,6 @@
 /**
  * The Healthy Home message: home page copy, the two packages and the example
- * plan. Healthy home products have no prices yet (they're quoted), and the
+ * plan. Healthy home products aren't offered yet (the Home Health check is research), and the
  * wording describes what products do, never a health outcome. Tested.
  */
 
@@ -68,7 +68,7 @@ export const HOW_IT_WORKS = [
   { title: "Pick your install date", detail: "Accredited local partners install everything. We handle rebates and paperwork." },
   {
     title: "Make your home healthier",
-    detail: "After you reserve, a quick Home Health check shows what would help most. Upgrades can go in on the same visit.",
+    detail: "After you reserve, a quick Home Health check gives you ideas and free tips for your air, water, comfort and sleep.",
   },
 ] as const;
 

@@ -13,10 +13,10 @@ import { listAllJobs } from "@/lib/server/jobs-repo";
 import { processOffersSoon } from "@/lib/server/offers-engine";
 import { listPartners } from "@/lib/server/partners-repo";
 import { listPriceUploads } from "@/lib/server/prices-repo";
-import { listHealthQuotes } from "@/lib/server/home-health-repo";
+import { allHealthAnswers } from "@/lib/server/home-health-repo";
 import { listWhoopClaims } from "@/lib/server/whoop-repo";
-import { QuoteActions, WhoopActions } from "@/components/admin/healthy-actions";
-import { HEALTH_ITEMS, isHealthItem } from "@/lib/domain/home-health";
+import { WhoopActions } from "@/components/admin/healthy-actions";
+import { interestSummary } from "@/lib/domain/home-health";
 import { WHOOP_OFFER } from "@/lib/domain/whoop-offer";
 
 export const metadata = { title: "Partners and jobs" };
@@ -40,13 +40,14 @@ export default async function AdminPage() {
   const session = await currentSession();
   if (session?.role !== "staff") redirect("/login?as=partner&next=/admin");
   await processOffersSoon();
-  const [partners, jobs, uploads, claims, quotes] = await Promise.all([
+  const [partners, jobs, uploads, claims, checks] = await Promise.all([
     listPartners(),
     listAllJobs(),
     listPriceUploads(),
     listWhoopClaims(),
-    listHealthQuotes(),
+    allHealthAnswers(),
   ]);
+  const tallies = interestSummary(checks);
   const held = claims.filter((c) => c.status !== "released").length;
   const names = new Map(partners.map((p) => [p.id, p.business_name]));
   const pending = partners.filter((p) => p.status === "pending").length;
@@ -166,32 +167,27 @@ export default async function AdminPage() {
         </div>
       </Panel>
 
-      <Panel title={`Healthy home quote requests${quotes.length ? ` · ${quotes.length}` : ""}`}>
+      <Panel title={`Home Health answers · ${checks.length} ${checks.length === 1 ? "check" : "checks"}`}>
         <p className="px-5 pt-4 text-[13px] text-muted">
-          Follow up before the install date so upgrades can go in on the same visit. Orders that ticked &ldquo;interested&rdquo; come first,
-          then the soonest install.
+          Research only: we don&apos;t offer healthy home products yet. These tallies show which ones customers want most. Skipped questions
+          aren&apos;t counted, and the allergies answer is never shown here.
         </p>
-        {quotes.length === 0 ? (
-          <p className="px-5 py-4 text-[14px] text-muted">No quote requests yet. They come from the Home Health check.</p>
+        {checks.length === 0 ? (
+          <p className="px-5 py-4 text-[14px] text-muted">No checks yet. They come from the Home Health check.</p>
         ) : (
           <ul className="divide-y divide-line">
-            {quotes.map((q) => (
-              <li key={q.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 text-[14px]">
-                <span className="min-w-0">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{isHealthItem(q.item) ? HEALTH_ITEMS[q.item] : q.item}</span>
-                    {q.interest && <Badge tone="info">Interested</Badge>}
-                    <Badge tone={q.status === "quoted" ? "positive" : q.status === "contacted" ? "neutral" : "warning"}>{q.status}</Badge>
-                  </span>
-                  <span className="block text-[13px] text-muted">
-                    {q.name ?? q.email ?? "Unknown"}
-                    {q.job_reference ? ` · ${q.job_reference}` : " · no reservation yet"}
-                    {q.install_date
-                      ? ` · installs ${formatDate(q.install_date, { weekday: "short", day: "numeric", month: "short" })}`
-                      : ""}
-                  </span>
-                </span>
-                <QuoteActions id={q.id} status={q.status} />
+            {tallies.map((t) => (
+              <li key={t.id} className="px-5 py-3.5 text-[14px]">
+                <p className="font-medium">{t.prompt}</p>
+                <p className="text-[12.5px] text-muted">{t.answered} answered</p>
+                <ul className="mt-2 flex flex-wrap gap-2">
+                  {t.counts.map((c) => (
+                    <li key={c.label} className="rounded-full bg-surface-2 px-3 py-1 text-[13px] text-ink-2">
+                      {c.label} · {c.count}
+                      {t.answered ? ` (${Math.round((c.count / t.answered) * 100)}%)` : ""}
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ul>
