@@ -29,13 +29,13 @@ export function ConsentBoxes({
   missing?: boolean;
   className?: string;
 }) {
-  const box = "mt-0.5 h-5 w-5 shrink-0 accent-[var(--primary)]";
+  const box = "mt-px h-4 w-4 shrink-0 accent-[var(--primary)]";
   const link = "underline underline-offset-4 hover:text-ink";
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("space-y-2.5", className)}>
       <label
         className={cn(
-          "flex cursor-pointer items-start gap-3 rounded-2xl px-4 py-3.5 text-[13px] leading-snug text-ink-2",
+          "flex cursor-pointer items-start gap-2.5 rounded-xl px-3.5 py-3 text-[11.5px] leading-snug text-ink-2",
           missing && !value.terms ? "bg-surface-2 ring-2 ring-danger/60" : "bg-surface-2",
         )}
       >
@@ -59,11 +59,11 @@ export function ConsentBoxes({
         </span>
       </label>
       {missing && !value.terms && (
-        <p className="text-[13px] text-danger" role="alert">
+        <p className="text-[12px] text-danger" role="alert">
           {CONSENT_MISSING}
         </p>
       )}
-      <label className="flex cursor-pointer items-start gap-3 px-4 text-[13px] leading-snug text-muted">
+      <label className="flex cursor-pointer items-start gap-2.5 px-3.5 text-[11.5px] leading-snug text-muted">
         <input
           type="checkbox"
           checked={value.marketing}
