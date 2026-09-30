@@ -67,30 +67,13 @@ export function Headline({ className, as: Tag = "h1", ...props }: ComponentProps
   );
 }
 
-/** The logo: RENUABL with "HOME & ENERGY" underneath (`tagline={false}` for the bare wordmark). */
-export function Wordmark({ className, tone = "ink", tagline = true }: { className?: string; tone?: "ink" | "light"; tagline?: boolean }) {
-  const word = (
+export function Wordmark({ className, tone = "ink" }: { className?: string; tone?: "ink" | "light" }) {
+  return (
     <span
       className={cn("select-none text-[20px] font-normal tracking-[0.28em]", tone === "light" ? "text-white" : "text-ink", className)}
-      aria-hidden={tagline || undefined}
-      aria-label={tagline ? undefined : "RENUABL"}
+      aria-label="RENUABL"
     >
       RENUABL
-    </span>
-  );
-  if (!tagline) return word;
-  return (
-    <span className="inline-flex flex-col items-start gap-[3px] leading-none" role="img" aria-label="RENUABL Home and Energy">
-      {word}
-      <span
-        className={cn(
-          "select-none pl-[0.1em] text-[8.5px] font-medium tracking-[0.42em] lg:text-[9.5px]",
-          tone === "light" ? "text-white/70" : "text-forest [.theme-installer_&]:text-ink-2",
-        )}
-        aria-hidden
-      >
-        HOME &amp; ENERGY
-      </span>
     </span>
   );
 }

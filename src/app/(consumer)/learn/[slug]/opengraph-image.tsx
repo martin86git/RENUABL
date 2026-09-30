@@ -26,10 +26,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 30, color: "#1E3A2E" }}>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ letterSpacing: 10 }}>RENUABL</div>
-          <div style={{ fontSize: 13, letterSpacing: 6, marginTop: 6 }}>HOME &amp; ENERGY</div>
-        </div>
+        <div style={{ letterSpacing: 10 }}>RENUABL</div>
         <div>{LEARN_NAME}</div>
       </div>
       <div style={{ fontSize: guide && guide.title.length > 60 ? 58 : 68, lineHeight: 1.1, letterSpacing: -1.5 }}>
