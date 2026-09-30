@@ -127,6 +127,25 @@ export function isHealthItem(id: unknown): id is HealthItemId {
   return typeof id === "string" && id in HEALTH_ITEMS;
 }
 
+/**
+ * The three healthy home products we sell first, offered on every results
+ * page (quoted, never priced). What each one does, not a health outcome.
+ */
+export const HEALTH_RANGE: { item: HealthItemId; title: string; line: string }[] = [
+  { item: "purifiers", title: "Air purification", line: "A quiet purifier in each bedroom filters dust and pollen from the air." },
+  { item: "whole-house-filter", title: "Water filtration", line: "Filters the water at every tap and shower in the house." },
+  {
+    item: "circadian",
+    title: "Circadian lighting",
+    line: "Lights that brighten gently in the morning and turn warm and soft in the evening.",
+  },
+];
+
+/** The range products not already in the customer's top recommendations. */
+export function rangeToOffer(plan: Pick<HealthPlan, "recommendations">) {
+  return HEALTH_RANGE.filter((p) => !plan.recommendations.some((r) => r.item === p.item));
+}
+
 export interface Recommendation {
   item: HealthItemId;
   title: string;

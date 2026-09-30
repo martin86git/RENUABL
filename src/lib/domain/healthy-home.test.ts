@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HOME_HERO, healthyHomeText } from "./healthy-home";
-import { HEALTH_ITEMS, HEALTH_QUESTIONS, cleanAnswers, healthPlan, shareableAnswers } from "./home-health";
+import { HEALTH_ITEMS, HEALTH_QUESTIONS, HEALTH_RANGE, cleanAnswers, healthPlan, rangeToOffer, shareableAnswers } from "./home-health";
 import { WHOOP_COPY, WHOOP_OFFER, nextWhoopStatus, whoopEligible, whoopOfferOpen } from "./whoop-offer";
 
 const BANNED = /\b(cure|treat|prevent|guaranteed?|best|first ever|leading|AI|installer)\b|\$\d/i;
@@ -103,5 +103,14 @@ describe("Home Health check", () => {
     });
     const text = JSON.stringify(all) + Object.values(HEALTH_ITEMS).join(" ");
     expect(text).not.toMatch(BANNED);
+  });
+
+  it("offers the three-product range, without repeating a top recommendation", () => {
+    expect(HEALTH_RANGE.map((p) => p.item)).toEqual(["purifiers", "whole-house-filter", "circadian"]);
+    expect(rangeToOffer(healthPlan({}))).toHaveLength(3);
+    const plan = healthPlan({ "shower-filter": "no" });
+    expect(rangeToOffer(plan).map((p) => p.item)).toEqual(["purifiers", "circadian"]);
+    expect(JSON.stringify(HEALTH_RANGE)).not.toMatch(BANNED);
+    expect(JSON.stringify(HEALTH_RANGE)).not.toMatch(/\$\d/);
   });
 });

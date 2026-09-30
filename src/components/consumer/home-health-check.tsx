@@ -7,7 +7,14 @@ import { ConsentBoxes, NO_CONSENT, type ConsentState } from "@/components/consum
 import { useFlow } from "@/components/consumer/flow-state";
 import { Button, Card, cn } from "@/components/ui/primitives";
 import { PACKAGES } from "@/lib/domain/healthy-home";
-import { HEALTH_QUESTIONS, SENSITIVE_CONSENT, healthPlan, type HealthAnswers, type HealthItemId } from "@/lib/domain/home-health";
+import {
+  HEALTH_QUESTIONS,
+  SENSITIVE_CONSENT,
+  healthPlan,
+  rangeToOffer,
+  type HealthAnswers,
+  type HealthItemId,
+} from "@/lib/domain/home-health";
 import { formatAddress } from "@/lib/mock/addresses";
 import { requestHealthQuote, saveHomeHealth } from "@/lib/services/home-health";
 
@@ -161,6 +168,7 @@ function HealthResults({
 }) {
   const { state } = useFlow();
   const plan = useMemo(() => healthPlan(answers), [answers]);
+  const range = rangeToOffer(plan);
   const [id, setId] = useState<string | null>(null);
   const [wanted, setWanted] = useState<Set<HealthItemId>>(new Set());
   const [sent, setSent] = useState<Set<HealthItemId>>(new Set());
@@ -209,6 +217,17 @@ function HealthResults({
     if (id && (await requestHealthQuote(id, item))) setSent((s) => new Set(s).add(item));
   }
 
+  const addButton = (item: HealthItemId) =>
+    sent.has(item) || (wanted.has(item) && !id) ? (
+      <span className="inline-flex items-center gap-1.5 text-[14px] text-positive">
+        <Check className="h-4 w-4" strokeWidth={2} /> {sent.has(item) ? "Added. We'll quote it." : "Added. Save your plan below."}
+      </span>
+    ) : (
+      <Button size="sm" variant="secondary" onClick={() => void add(item)}>
+        Add to my plan — we&apos;ll quote it
+      </Button>
+    );
+
   const saveForm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!consent.terms) {
@@ -230,14 +249,12 @@ function HealthResults({
       <p className="mt-3 text-[15px] leading-relaxed text-muted">
         {plan.recommendations.length
           ? "Based on your answers. Add anything you'd like to your plan and we'll quote it, often in time to install it on the same visit as your solar."
-          : "Nothing stood out from your answers. Here's a free tip anyway."}
+          : "Nothing stood out from your answers. Here's a free tip, and three upgrades you can add to your plan."}
       </p>
 
       {plan.recommendations.length > 0 && (
         <ol className="mt-8 space-y-3">
           {plan.recommendations.map((r, i) => {
-            const isSent = sent.has(r.item);
-            const isWanted = wanted.has(r.item);
             return (
               <li key={r.item}>
                 <Card className="p-5">
@@ -246,18 +263,7 @@ function HealthResults({
                     <div className="min-w-0 flex-1">
                       <p className="text-[17px] text-ink">{r.title}</p>
                       <p className="mt-1 text-[14px] leading-relaxed text-muted">{r.why}</p>
-                      <div className="mt-3">
-                        {isSent || (isWanted && !id) ? (
-                          <span className="inline-flex items-center gap-1.5 text-[14px] text-positive">
-                            <Check className="h-4 w-4" strokeWidth={2} />{" "}
-                            {isSent ? "Added. We'll quote it." : "Added. Save your plan below."}
-                          </span>
-                        ) : (
-                          <Button size="sm" variant="secondary" onClick={() => void add(r.item)}>
-                            Add to my plan — we&apos;ll quote it
-                          </Button>
-                        )}
-                      </div>
+                      <div className="mt-3">{addButton(r.item)}</div>
                     </div>
                   </div>
                 </Card>
@@ -265,6 +271,29 @@ function HealthResults({
             );
           })}
         </ol>
+      )}
+
+      {range.length > 0 && (
+        <section className="mt-8" aria-labelledby="health-range">
+          <h2 id="health-range" className="text-[19px] text-ink">
+            {plan.recommendations.length ? "Also in our healthy home range" : "Our healthy home range"}
+          </h2>
+          <p className="mt-1 text-[14px] text-muted">Quoted for your home, and can often go in on the same visit as your solar.</p>
+          <ul className="mt-4 space-y-3">
+            {range.map((p) => (
+              <li key={p.item}>
+                <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+                  <div className="min-w-0 flex-1">
+                    <span className="rounded-full bg-sage px-3 py-1 text-[12px] text-forest">Healthy home</span>
+                    <p className="mt-3 text-[17px] text-ink">{p.title}</p>
+                    <p className="mt-1 text-[14px] leading-relaxed text-muted">{p.line}</p>
+                  </div>
+                  <div className="shrink-0">{addButton(p.item)}</div>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <Card className="mt-6 bg-sage p-5 text-forest">
@@ -352,12 +381,14 @@ function HealthResults({
             Get my solar and battery plan <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
           </Link>
         )}
-        <Link
-          href={exit}
-          className="tap-area inline-flex items-center text-[14px] text-muted underline-offset-4 hover:text-ink hover:underline"
-        >
-          {linked ? "Back to My RENUABL" : "Back to home"}
-        </Link>
+        {!linked && (
+          <Link
+            href={exit}
+            className="tap-area inline-flex items-center text-[14px] text-muted underline-offset-4 hover:text-ink hover:underline"
+          >
+            Back to home
+          </Link>
+        )}
       </div>
     </div>
   );
