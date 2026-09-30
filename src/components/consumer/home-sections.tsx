@@ -56,7 +56,14 @@ export function PackagesSection() {
             {/* Photo slot: a neutral placeholder until each package's photo arrives. */}
             {card.image ? (
               <div className="relative aspect-[1200/628] bg-surface-2">
-                <Image src={card.image.src} alt={card.image.alt} fill sizes="(min-width: 768px) 50vw, 100vw" className="object-cover" />
+                <Image
+                  src={card.image.src}
+                  alt={card.image.alt}
+                  fill
+                  quality={90}
+                  sizes="(min-width: 1440px) 680px, (min-width: 768px) 50vw, 100vw"
+                  className="object-cover"
+                />
               </div>
             ) : (
               <div className={ci === 0 ? "aspect-[1200/628] bg-surface-2" : "aspect-[1200/628] bg-sage/70"} aria-hidden />
