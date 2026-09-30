@@ -320,6 +320,54 @@ export const GUIDES: Guide[] = [
       },
     ],
   },
+  {
+    slug: "what-size-battery-do-i-need",
+    title: "What size battery do I need? Start with how much solar you export",
+    short: "What size battery?",
+    summary:
+      "Before choosing a battery, find out how much solar you send to the grid each day. It's on your bill, and it's what fills your battery.",
+    topic: "Batteries",
+    updated: "2026-09-30",
+    minutes: 3,
+    body: [
+      {
+        type: "p",
+        text: "\"What size battery should I get?\" is one of the most common questions we hear. The answer starts with another question: how much spare solar are you making? Most people don't know, and that's fine, because it's on your electricity bill.",
+      },
+      { type: "h2", text: "Your exports are what fill a battery" },
+      {
+        type: "p",
+        text: "During the day your home uses some of its solar as it's made. What's left over goes out to the grid, and that's the energy a battery would store for the evening instead. A battery bigger than your spare solar can fill doesn't earn its keep.",
+      },
+      { type: "h2", text: "Work out your daily exports in one minute" },
+      {
+        type: "list",
+        items: [
+          "Find the energy you exported to the grid on your bill, in kilowatt-hours (kWh). It's often labelled 'solar exports', 'feed-in' or 'generation'.",
+          "Find the number of days in the billing period (it's on the bill).",
+          "Divide the exports by the days. That's your daily export.",
+        ],
+      },
+      {
+        type: "p",
+        text: "For example, 540 kWh exported over a 90-day bill is 6 kWh a day. That's roughly how much a battery could fill on an average day from the panels you already have.",
+      },
+      { type: "h2", text: "Then compare it with your evening use" },
+      {
+        type: "p",
+        text: "A battery only saves you money on electricity you'd otherwise buy after dark. If your exports are much bigger than your evening use, size for the evening use. If they're smaller, the battery can only fill with what you export, so a smaller battery (or a few extra panels) may make more sense. And sometimes the numbers show you don't need a battery at all.",
+      },
+      {
+        type: "note",
+        text: "Winter days are shorter, so exports drop. If you have a winter bill, use it too: it shows what your panels can fill on the hardest days.",
+      },
+      { type: "h2", text: "Let us do the maths" },
+      {
+        type: "p",
+        text: `When you upload your bill to RENUABL, we read your exports and your use for you and recommend a battery sized to both. Our batteries come in ${ASSUMPTIONS.batterySizes[0]} kWh modules with about ${Math.round(ASSUMPTIONS.batteryUsableShare * 100)}% usable, and we only suggest extra panels if your exports can't fill it.`,
+      },
+    ],
+  },
 ];
 
 export function guideBySlug(slug: string): Guide | undefined {
