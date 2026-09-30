@@ -230,3 +230,12 @@ body:has(.theme-installer) {
     background: #fff !important;
   }
 }
+
+/* The warm "sun" touches on the home page: a soft glow behind the hero and a marker under "sun". */
+.sun-glow {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--sun) 85%, transparent), transparent);
+}
+.sun-mark {
+  background: linear-gradient(transparent 64%, var(--sun) 64%, var(--sun) 92%, transparent 92%);
+  padding: 0 0.06em;
+}

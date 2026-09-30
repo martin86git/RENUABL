@@ -84,7 +84,7 @@ export function GuidesStrip({ guides }: { guides: Guide[] }) {
     <section className="mx-auto w-full max-w-[1440px] px-5 pb-12 sm:px-8 lg:px-10">
       <div className="flex flex-wrap items-end justify-between gap-3 border-t border-line pt-10">
         <div>
-          <p className="text-[13px] tracking-[0.02em] text-forest">{LEARN_NAME}</p>
+          <p className="text-[13px] tracking-[0.02em] text-sun-ink">{LEARN_NAME}</p>
           <h2 className="mt-1 text-[28px] font-normal tracking-[-0.03em] lg:text-[34px]">New to solar? Start here.</h2>
         </div>
         <Link

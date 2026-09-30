@@ -94,7 +94,7 @@ export function HowItWorks() {
         {HOW_IT_WORKS.map((step, i) => (
           <li key={step.title}>
             <Card className="h-full p-6">
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-sage text-[14px] text-forest">{i + 1}</span>
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-sun text-[14px] text-sun-ink">{i + 1}</span>
               <p className="mt-4 text-[17px] text-ink">{step.title}</p>
               <p className="mt-1.5 text-[14.5px] leading-relaxed text-muted">{step.detail}</p>
             </Card>

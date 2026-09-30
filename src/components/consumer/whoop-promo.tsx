@@ -11,8 +11,8 @@ import { useWhoopOpen } from "@/lib/services/whoop";
 export function WhoopStrip({ className }: { className?: string }) {
   if (!useWhoopOpen()) return null;
   return (
-    <p className={cn("flex items-start gap-2.5 rounded-2xl bg-sun px-4 py-3 text-[13.5px] leading-snug text-sun-ink", className)}>
-      <Gift className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
+    <p className={cn("flex items-start gap-2.5 rounded-2xl bg-ink px-4 py-3 text-[13.5px] leading-snug text-canvas", className)}>
+      <Gift className="mt-0.5 h-4 w-4 shrink-0 text-sun-bright" strokeWidth={1.7} aria-hidden />
       <span>
         {WHOOP_COPY.strip} · <span className="font-medium">{WHOOP_COPY.first}</span>
       </span>
@@ -57,8 +57,8 @@ export function WhoopBanner() {
 export function WhoopOptionNote({ hasBattery, className }: { hasBattery: boolean; className?: string }) {
   if (!useWhoopOpen()) return null;
   return hasBattery ? (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full bg-sun px-2.5 py-1 text-[12px] text-sun-ink", className)}>
-      <Gift className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden /> {WHOOP_COPY.badge}
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full bg-ink px-2.5 py-1 text-[12px] text-canvas", className)}>
+      <Gift className="h-3.5 w-3.5 text-sun-bright" strokeWidth={1.8} aria-hidden /> {WHOOP_COPY.badge}
     </span>
   ) : (
     <span className={cn("block text-[12px] leading-snug text-muted", className)}>{WHOOP_COPY.addBattery}</span>
@@ -69,8 +69,8 @@ export function WhoopOptionNote({ hasBattery, className }: { hasBattery: boolean
 export function WhoopGuideLine() {
   if (!useWhoopOpen()) return null;
   return (
-    <p className="mt-8 flex gap-2.5 rounded-2xl bg-sun px-5 py-4 text-[14.5px] leading-relaxed text-sun-ink">
-      <Gift className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
+    <p className="mt-8 flex gap-2.5 rounded-2xl bg-ink px-5 py-4 text-[14.5px] leading-relaxed text-canvas">
+      <Gift className="mt-0.5 h-4 w-4 shrink-0 text-sun-bright" strokeWidth={1.7} aria-hidden />
       <span>
         {WHOOP_COPY.guideLine}{" "}
         <Link href="/#plan" className="underline underline-offset-4">

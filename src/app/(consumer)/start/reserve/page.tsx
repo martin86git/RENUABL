@@ -217,7 +217,7 @@ function ReserveScreen() {
         ))}
         {whoopOpen && whoopEligible(config) && (
           <li className="flex items-center gap-3 py-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sun text-sun-ink">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-ink text-sun-bright">
               <Gift className="h-5 w-5" strokeWidth={1.6} aria-hidden />
             </span>
             <div className="min-w-0 flex-1">

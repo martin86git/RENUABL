@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { healthyHomeText } from "./healthy-home";
+import { HOME_HERO, healthyHomeText } from "./healthy-home";
 import { HEALTH_ITEMS, HEALTH_QUESTIONS, cleanAnswers, healthPlan, shareableAnswers } from "./home-health";
 import { WHOOP_COPY, WHOOP_OFFER, nextWhoopStatus, whoopEligible, whoopOfferOpen } from "./whoop-offer";
 
 const BANNED = /\b(cure|treat|prevent|guaranteed?|best|first ever|leading|AI|installer)\b|\$\d/i;
 
 describe("Healthy Home copy", () => {
+  it('has exactly one "sun" in the headline (the home page highlights it)', () => {
+    expect(HOME_HERO.headline.split("sun")).toHaveLength(2);
+  });
+
   it("prices nothing and claims no health outcomes", () => {
     expect(healthyHomeText()).not.toMatch(BANNED);
   });

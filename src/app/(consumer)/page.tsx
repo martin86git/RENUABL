@@ -13,6 +13,9 @@ import { ExamplePlanCard, HealthTeaser, HowItWorks, PackagesSection } from "@/co
 import { WhoopBanner } from "@/components/consumer/whoop-promo";
 import { HOME_HERO } from "@/lib/domain/healthy-home";
 
+// "…powered by the sun." with a warm marker under "sun".
+const [headlineBefore, headlineAfter] = HOME_HERO.headline.split("sun");
+
 const heroLink = "tap-area inline-flex items-center gap-1.5 text-[14px] text-forest underline-offset-4 hover:underline";
 
 const FEATURED = LEARN_POPUP.featured.map(guideBySlug).filter((g): g is Guide => Boolean(g));
@@ -40,18 +43,25 @@ export default function HomePage() {
       <MobileHeader partners />
       <ConsumerTopBar className="hidden lg:flex" partners />
 
-      <main className="mx-auto grid w-full max-w-[1440px] grid-cols-1 items-center gap-10 px-5 pb-4 pt-6 sm:px-8 lg:grid-cols-12 lg:gap-8 lg:border-t lg:border-line lg:px-10 lg:pt-12">
+      <main className="relative isolate mx-auto grid w-full max-w-[1440px] grid-cols-1 items-center gap-10 px-5 pb-4 pt-6 sm:px-8 lg:grid-cols-12 lg:gap-8 lg:border-t lg:border-line lg:px-10 lg:pt-12">
+        {/* A soft sun glow behind the hero (decorative). */}
+        <div
+          className="sun-glow pointer-events-none absolute -right-24 -top-16 -z-10 h-[340px] w-[340px] lg:right-0 lg:top-0 lg:h-[620px] lg:w-[760px]"
+          aria-hidden
+        />
         <section className="lg:col-span-7 xl:col-span-6 xl:col-start-2">
           <p className="text-[13px] tracking-[0.02em] text-forest lg:text-[14px]">{HOME_HERO.eyebrow}</p>
           <h1 className="mt-3 text-[40px] font-normal leading-[1.02] tracking-[-0.04em] sm:text-[52px] lg:text-[60px]">
-            {HOME_HERO.headline}
+            {headlineBefore}
+            <span className="sun-mark">sun</span>
+            {headlineAfter}
           </h1>
           <p className="mt-4 max-w-xl text-[16px] leading-relaxed text-muted lg:text-[17px]">{HOME_HERO.sub}</p>
           <ol className="mt-5 space-y-2 text-[16px] text-muted lg:mt-6 lg:text-[17px]">
             {HOME_HERO.steps.map((step, i) => (
               <li key={step} className="flex items-center gap-3">
                 <span
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sage text-[12px] text-forest"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sun text-[12px] text-sun-ink"
                   aria-hidden
                 >
                   {i + 1}
