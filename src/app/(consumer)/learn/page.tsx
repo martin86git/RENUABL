@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { GuideCard, GuideCta, GuideFrame } from "@/components/consumer/guide-page";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
-import { GUIDES, GUIDES_TAGLINE } from "@/lib/domain/guides";
+import { GUIDES, GUIDES_TAGLINE, LEARN_NAME } from "@/lib/domain/guides";
 
 export const metadata: Metadata = {
-  title: "Energy guides from Revo: solar, batteries and rebates in plain English",
+  title: "Learn with Revo: solar, batteries and rebates in plain English",
   description: "Plain-language guides to sizing solar from your bill, home batteries and Victorian rebates. " + GUIDES_TAGLINE,
   alternates: { canonical: "/learn" },
 };
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function LearnPage() {
   return (
     <GuideFrame wide>
-      <p className="text-[13px] tracking-[0.02em] text-forest lg:text-[14px]">Energy intelligence from Revo</p>
+      <p className="text-[13px] tracking-[0.02em] text-forest lg:text-[14px]">{LEARN_NAME}</p>
       <h1 className="mt-3 max-w-3xl text-[38px] font-normal leading-[1.05] tracking-[-0.04em] lg:text-[56px]">
         Solar, batteries and rebates, in plain English.
       </h1>

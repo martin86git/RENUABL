@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuideBody, GuideCard, GuideCta, GuideFrame } from "@/components/consumer/guide-page";
-import { GUIDES, guideBySlug } from "@/lib/domain/guides";
+import { GUIDES, LEARN_NAME, guideBySlug } from "@/lib/domain/guides";
 import { publicSiteUrl } from "@/lib/domain/site";
 
 export const dynamicParams = false;
@@ -47,7 +47,7 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
     <GuideFrame>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <Link href="/learn" className="tap-area text-[13px] text-forest underline-offset-4 hover:underline">
-        Revo&apos;s energy guides
+        {LEARN_NAME}
       </Link>
       <article>
         <p className="mt-6 text-[13px] text-muted">

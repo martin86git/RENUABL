@@ -1,5 +1,6 @@
 import { ChevronDown, UserRound } from "lucide-react";
 import Link from "next/link";
+import { LEARN_NAME } from "@/lib/domain/guides";
 import { Wordmark, cn } from "@/components/ui/primitives";
 import { MobileMenu } from "./mobile-menu";
 
@@ -14,7 +15,7 @@ export function ConsumerTopBar({
 }: {
   className?: string;
   account?: string;
-  /** "Energy guides" and "Become a partner" (home page only, not mid-purchase). */
+  /** "Learn with Revo" and "Become a partner" (home page only, not mid-purchase). */
   partners?: boolean;
 }) {
   return (
@@ -24,7 +25,7 @@ export function ConsumerTopBar({
       </Link>
       {partners && (
         <Link href="/learn" className="ml-auto text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline">
-          Energy guides
+          {LEARN_NAME}
         </Link>
       )}
       {partners && (

@@ -20,6 +20,8 @@ export type GuideBlock =
 export interface Guide {
   slug: string;
   title: string;
+  /** A short title for tight spaces (the home page pop-up). */
+  short?: string;
   /** One or two sentences: the meta description and the card text on /learn. */
   summary: string;
   /** Short label shown above the title. */
@@ -40,6 +42,7 @@ export const GUIDES: Guide[] = [
   {
     slug: "how-to-size-solar-from-your-bill",
     title: "How big should my solar system be? Sizing solar from your electricity bill",
+    short: "How big should my solar be?",
     summary:
       "Your bill already knows how much electricity your home uses. Here's how we turn it into one recommended solar and battery system, step by step.",
     topic: "Sizing",
@@ -92,6 +95,7 @@ export const GUIDES: Guide[] = [
   {
     slug: "victorian-solar-battery-rebates-explained",
     title: "Solar and battery rebates in Victoria, explained simply",
+    short: "Victorian rebates, explained",
     summary:
       "The federal STC incentive, the battery incentive and Solar Victoria's rebate and interest-free loan: what each one is, who it's for, and where to check you're eligible.",
     topic: "Rebates",
@@ -146,6 +150,7 @@ export const GUIDES: Guide[] = [
   {
     slug: "do-i-need-a-home-battery",
     title: "Do I need a home battery? A straightforward way to decide",
+    short: "Do I need a battery?",
     summary:
       "A battery makes sense when you use a lot of electricity after dark. Here's how to tell from your bill, and what blackout backup really means.",
     topic: "Batteries",
@@ -329,4 +334,23 @@ export function guideText(g: Guide): string {
     else parts.push(b.text);
   }
   return parts.join("\n");
+}
+
+/** What the guides are called to customers (one place, so it's easy to rename). */
+export const LEARN_NAME = "Learn with Revo";
+
+/** The home page pop-up that introduces the guides. */
+export const LEARN_POPUP = {
+  /** Seconds on the home page before it appears. */
+  delaySeconds: 6,
+  /** Once closed (or used), it stays away this long. */
+  quietDays: 7,
+  /** The guides it features, in order. */
+  featured: ["how-to-size-solar-from-your-bill", "victorian-solar-battery-rebates-explained", "do-i-need-a-home-battery"],
+} as const;
+
+/** Whether the pop-up may show: not within `quietDays` of last being closed or used. */
+export function shouldShowLearnPopup(lastClosedAt: number | null, now: number): boolean {
+  if (lastClosedAt === null || !Number.isFinite(lastClosedAt)) return true;
+  return now - lastClosedAt >= LEARN_POPUP.quietDays * 86_400_000;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GUIDES, GUIDES_TAGLINE, guideBySlug, guideText } from "./guides";
+import { GUIDES, GUIDES_TAGLINE, LEARN_POPUP, guideBySlug, guideText, shouldShowLearnPopup } from "./guides";
 
 describe("Revo's guides", () => {
   it("have unique, URL-safe slugs and short meta descriptions", () => {
@@ -24,5 +24,19 @@ describe("Revo's guides", () => {
   it("link only to official https sources", () => {
     for (const g of GUIDES)
       for (const b of g.body) if (b.type === "link") expect(b.href).toMatch(/^https:\/\/(www\.)?(solar\.vic\.gov\.au|cer\.gov\.au)\//);
+  });
+});
+
+describe("Learn with Revo pop-up", () => {
+  const day = 86_400_000;
+  it("shows to new visitors and stays away for a week once closed", () => {
+    expect(shouldShowLearnPopup(null, 1000)).toBe(true);
+    expect(shouldShowLearnPopup(0, LEARN_POPUP.quietDays * day - 1)).toBe(false);
+    expect(shouldShowLearnPopup(0, LEARN_POPUP.quietDays * day)).toBe(true);
+    expect(shouldShowLearnPopup(Number.NaN, 0)).toBe(true);
+  });
+
+  it("features guides that exist", () => {
+    for (const slug of LEARN_POPUP.featured) expect(guideBySlug(slug)).toBeDefined();
   });
 });

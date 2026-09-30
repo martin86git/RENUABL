@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ConsumerTopBar, MobileHeader } from "@/components/consumer/consumer-top-bar";
 import { LegalFooter } from "@/components/consumer/legal-page";
 import { ButtonLink } from "@/components/ui/primitives";
-import type { Guide, GuideBlock } from "@/lib/domain/guides";
+import { LEARN_NAME, type Guide, type GuideBlock } from "@/lib/domain/guides";
 import { REVO_PAGE_LINES } from "@/lib/domain/revo";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 
@@ -67,7 +67,7 @@ export function GuidesStrip({ guides }: { guides: Guide[] }) {
     <section className="mx-auto w-full max-w-[1440px] px-5 pb-12 sm:px-8 lg:px-10">
       <div className="flex flex-wrap items-end justify-between gap-3 border-t border-line pt-10">
         <div>
-          <p className="text-[13px] tracking-[0.02em] text-forest">Energy guides from Revo</p>
+          <p className="text-[13px] tracking-[0.02em] text-forest">{LEARN_NAME}</p>
           <h2 className="mt-1 text-[28px] font-normal tracking-[-0.03em] lg:text-[34px]">New to solar? Start here.</h2>
         </div>
         <Link

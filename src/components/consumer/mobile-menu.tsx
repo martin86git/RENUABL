@@ -4,6 +4,7 @@ import { ArrowRight, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { Dialog } from "radix-ui";
 import { useState } from "react";
+import { LEARN_NAME } from "@/lib/domain/guides";
 
 /** The mobile menu: the few places a customer goes (no website-style link bar). */
 export function MobileMenu() {
@@ -34,7 +35,7 @@ export function MobileMenu() {
               My RENUABL <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
             </Link>
             <Link href="/learn" className={item} onClick={() => setOpen(false)}>
-              Energy guides <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
+              {LEARN_NAME} <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
             </Link>
             <Link href="/login" className={item} onClick={() => setOpen(false)}>
               Log in <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
