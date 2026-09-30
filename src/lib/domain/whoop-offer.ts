@@ -9,6 +9,8 @@ import type { SystemConfig } from "./types";
 export const WHOOP_OFFER = {
   product: "WHOOP One",
   membership: "12-month membership",
+  /** The only colour we supply. */
+  colour: "Jet Black",
   /** VERIFY on launch day: WHOOP One's Australian retail price, in dollars. */
   value: 299,
   cap: 50,
@@ -32,8 +34,8 @@ export const WHOOP_COPY = {
   first: `First ${WHOOP_OFFER.cap} customers`,
   bannerLabel: `For our first ${WHOOP_OFFER.cap} founding customers`,
   bannerHeading: "A free WHOOP with any plan that includes a battery.",
-  bannerSmall: `Valued at ${value} (${WHOOP_OFFER.product}, ${WHOOP_OFFER.membership}). First ${WHOOP_OFFER.cap} customers. Ships after installation.`,
-  giftLine: `${WHOOP_OFFER.product} — ${WHOOP_OFFER.membership}. Gift. Valued at ${value}.`,
+  bannerSmall: `Valued at ${value} (${WHOOP_OFFER.product} in ${WHOOP_OFFER.colour}, ${WHOOP_OFFER.membership}). First ${WHOOP_OFFER.cap} customers. Ships after installation.`,
+  giftLine: `${WHOOP_OFFER.product} in ${WHOOP_OFFER.colour} — ${WHOOP_OFFER.membership}. Gift. Valued at ${value}.`,
   ships: "Ships after installation.",
   confirmed: "Your free WHOOP ships after your installation.",
   guideLine: `Founding offer: a free WHOOP (valued at ${value}) with any plan that includes a battery, for our first ${WHOOP_OFFER.cap} customers.`,

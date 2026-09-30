@@ -22,6 +22,7 @@ export default function OfferTermsPage() {
           A {WHOOP_OFFER.product} with a {WHOOP_OFFER.membership}, valued at {value} (the recommended retail price in Australia when the
           offer was published).
         </li>
+        <li>It comes in {WHOOP_OFFER.colour} only. Other colours, bands and accessories aren&apos;t included and can&apos;t be swapped.</li>
         <li>One per order.</li>
         <li>No cash alternative, and it can&apos;t be exchanged or transferred.</li>
       </ul>
