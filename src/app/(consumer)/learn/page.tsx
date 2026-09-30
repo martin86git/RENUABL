@@ -7,6 +7,14 @@ export const metadata: Metadata = {
   title: "Learn with Revo: solar, batteries and rebates in plain English",
   description: "Plain-language guides to sizing solar from your bill, home batteries and Victorian rebates. " + GUIDES_TAGLINE,
   alternates: { canonical: "/learn" },
+  openGraph: {
+    type: "website",
+    siteName: "RENUABL",
+    locale: "en_AU",
+    title: "Learn with Revo: solar, batteries and rebates in plain English",
+    url: "/learn",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
+  },
 };
 
 export default function LearnPage() {

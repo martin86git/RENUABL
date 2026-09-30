@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuideBody, GuideCard, GuideCta, GuideFrame, ShortAnswer } from "@/components/consumer/guide-page";
 import { GUIDES, LEARN_NAME, guideBySlug } from "@/lib/domain/guides";
+import { breadcrumbJsonLd, jsonLdHtml } from "@/lib/domain/seo";
 import { publicSiteUrl } from "@/lib/domain/site";
 
 export const dynamicParams = false;
@@ -18,7 +19,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: guide.title,
     description: guide.summary,
     alternates: { canonical: `/learn/${guide.slug}` },
-    openGraph: { type: "article", title: guide.title, description: guide.summary, modifiedTime: guide.updated },
+    openGraph: {
+      type: "article",
+      siteName: "RENUABL",
+      locale: "en_AU",
+      title: guide.title,
+      description: guide.summary,
+      modifiedTime: guide.updated,
+    },
   };
 }
 
@@ -30,6 +38,8 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
     "@context": "https://schema.org",
     "@type": "Article",
     headline: guide.title,
+    abstract: guide.answer,
+    inLanguage: "en-AU",
     description: guide.summary,
     dateModified: guide.updated,
     mainEntityOfPage: `${site}/learn/${guide.slug}`,
@@ -46,7 +56,19 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
   });
   return (
     <GuideFrame>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLdHtml([
+            jsonLd,
+            breadcrumbJsonLd(site, [
+              { name: "Home", path: "" },
+              { name: LEARN_NAME, path: "/learn" },
+              { name: guide.short ?? guide.title, path: `/learn/${guide.slug}` },
+            ]),
+          ]),
+        }}
+      />
       <Link href="/learn" className="tap-area text-[13px] text-forest underline-offset-4 hover:underline">
         {LEARN_NAME}
       </Link>

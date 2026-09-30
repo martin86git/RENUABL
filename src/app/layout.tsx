@@ -15,6 +15,8 @@ export const metadata: Metadata = {
   description: "Solar and batteries, sized to your bill. One system made for your home, one installer, one price.",
   // Keep Vercel preview deployments (not the live site) out of search results.
   robots: searchIndexing() ? undefined : { index: false, follow: false },
+  openGraph: { type: "website", siteName: "RENUABL", locale: "en_AU" },
+  twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = {

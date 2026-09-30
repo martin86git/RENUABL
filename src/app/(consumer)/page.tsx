@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { AddressEntry } from "@/components/consumer/address-entry";
@@ -5,6 +6,8 @@ import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { ConsumerTopBar, MobileHeader } from "@/components/consumer/consumer-top-bar";
 import { GuidesStrip } from "@/components/consumer/guide-page";
 import { LegalFooter } from "@/components/consumer/legal-page";
+import { HOME_DESCRIPTION, HOME_TITLE, jsonLdHtml, siteJsonLd } from "@/lib/domain/seo";
+import { publicSiteUrl } from "@/lib/domain/site";
 import { LEARN_NAME, LEARN_POPUP, guideBySlug, type Guide } from "@/lib/domain/guides";
 import { LearnPopup } from "@/components/consumer/learn-popup";
 import { Mascot } from "@/components/ui/brand-art";
@@ -12,9 +15,26 @@ import { Script } from "@/components/ui/primitives";
 
 const FEATURED = LEARN_POPUP.featured.map(guideBySlug).filter((g): g is Guide => Boolean(g));
 
+export const metadata: Metadata = {
+  title: { absolute: `${HOME_TITLE} · RENUABL` },
+  description: HOME_DESCRIPTION,
+  alternates: { canonical: "/" },
+  // Setting openGraph here replaces the site-wide one, so repeat the share image and site details.
+  openGraph: {
+    type: "website",
+    siteName: "RENUABL",
+    locale: "en_AU",
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+    url: "/",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "RENUABL: solar and batteries, sized to your bill" }],
+  },
+};
+
 export default function HomePage() {
   return (
     <div className="flex min-h-dvh flex-col">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(siteJsonLd(publicSiteUrl())) }} />
       <MobileHeader partners />
       <ConsumerTopBar className="hidden lg:flex" partners />
 
