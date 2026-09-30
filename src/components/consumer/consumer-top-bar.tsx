@@ -14,7 +14,7 @@ export function ConsumerTopBar({
 }: {
   className?: string;
   account?: string;
-  /** "Become a partner" for installers and retailers (home page only, not mid-purchase). */
+  /** "Energy guides" and "Become a partner" (home page only, not mid-purchase). */
   partners?: boolean;
 }) {
   return (
@@ -23,7 +23,12 @@ export function ConsumerTopBar({
         <Wordmark className="text-[22px]" />
       </Link>
       {partners && (
-        <Link href="/partners" className="ml-auto text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline">
+        <Link href="/learn" className="ml-auto text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline">
+          Energy guides
+        </Link>
+      )}
+      {partners && (
+        <Link href="/partners" className=" text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline">
           Become a partner
         </Link>
       )}

@@ -2,7 +2,7 @@ import { askSystemPrompt, cleanAskInput, type AskContext, type AskSnapshot } fro
 import { AskError, answerWithClaude } from "@/lib/server/ask-claude";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 
-const CONTEXTS: AskContext[] = ["home", "profile", "recommendation", "extras", "installer", "schedule", "checkout", "my"];
+const CONTEXTS: AskContext[] = ["home", "profile", "recommendation", "extras", "installer", "schedule", "checkout", "my", "learn"];
 
 /**
  * POST { question, context, snapshot, history } → { answer }. Without a Claude

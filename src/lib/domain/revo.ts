@@ -78,3 +78,9 @@ export function revoContext(step: string): AskContext {
   };
   return map[step] ?? "home";
 }
+
+/** Revo's bubble on pages outside the flow (no figures or claims). */
+export const REVO_PAGE_LINES = {
+  home: "Hi, I'm Revo! Got a question about solar, batteries or rebates? Chat with me.",
+  learn: "Reading up? Ask me anything as you go.",
+} as const;

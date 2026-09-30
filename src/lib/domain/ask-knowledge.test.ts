@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ASK_FACTS, askSystemPrompt, cleanAskInput, describeSnapshot } from "./ask-knowledge";
+import { ASK_FACTS, REVO_GREETINGS, askSystemPrompt, cleanAskInput, describeSnapshot } from "./ask-knowledge";
+import { REVO_PAGE_LINES } from "./revo";
 
 describe("Ask Revo grounding", () => {
   it("knows flat roofs can be laid flat or tilted, and tilting is checked on the call", () => {
@@ -28,11 +29,31 @@ describe("Ask Revo grounding", () => {
     expect(cleanAskInput({ question: " " })).toBeNull();
     const long = cleanAskInput({
       question: "x".repeat(900),
-      history: Array(8)
+      history: Array(14)
         .fill({ q: "a", a: "b" })
         .concat([{ q: 1 }]),
     })!;
     expect(long.question).toHaveLength(500);
-    expect(long.history).toHaveLength(4);
+    expect(long.history).toHaveLength(10);
+  });
+});
+
+describe("Revo's chat", () => {
+  it("greets on every screen without figures, claims or asking for personal details", () => {
+    for (const text of [...Object.values(REVO_GREETINGS), ...Object.values(REVO_PAGE_LINES)]) {
+      expect(text).not.toMatch(/\d/);
+      expect(text).not.toMatch(/\b(exact|precise|guaranteed?|AI|bot|installer)\b/i);
+      expect(text).not.toMatch(/\b(email|phone|mobile)\b/i);
+    }
+  });
+
+  it("is told to hold a conversation, never to ask for personal details", () => {
+    for (const context of ["home", "learn", "profile"] as const) {
+      const prompt = askSystemPrompt(context, {});
+      expect(prompt).toMatch(/conversation/);
+      expect(prompt).toMatch(/Never ask for their name, email, phone number, address/);
+    }
+    expect(askSystemPrompt("learn", {})).toMatch(/start with their address/);
+    expect(askSystemPrompt("profile", {})).toMatch(/carry on with the step/);
   });
 });

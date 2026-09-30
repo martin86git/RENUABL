@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowRight, ArrowUp, X } from "lucide-react";
+import { ArrowRight, ArrowUp, RotateCcw, X } from "lucide-react";
 import { Dialog } from "radix-ui";
-import { useEffect, useState, type FormEvent } from "react";
-import { askRenuabl, SUGGESTED_QUESTIONS, type AskContext, type AskSnapshot } from "@/lib/services/ask";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { askRenuabl, REVO_GREETINGS, SUGGESTED_QUESTIONS, type AskContext, type AskSnapshot } from "@/lib/services/ask";
+import { useRevoChat } from "@/lib/services/revo-chat";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { TIER_LABELS, describeSystem } from "@/lib/domain/recommendation";
 import { formatDate } from "@/lib/domain/format";
@@ -44,19 +45,22 @@ function useAskSnapshot(context: AskContext): AskSnapshot {
  * opens Ask Revo. A new line brings the bubble back after it's closed.
  * Mobile: above the sticky Continue button; desktop: bottom right.
  */
-function RevoCompanion({ line, className }: { line: string; className?: string }) {
+function RevoCompanion({ line, page, className }: { line: string; page?: boolean; className?: string }) {
   const [closed, setClosed] = useState<string | null>(null);
   const showBubble = Boolean(line) && closed !== line;
   // On phones the bubble tucks away after a few seconds so it doesn't cover the step; each new line brings it back.
   useEffect(() => {
-    if (!line || typeof window === "undefined" || window.matchMedia("(min-width: 1024px)").matches) return;
+    // Outside the flow it tucks away on every screen size, so it doesn't cover the page.
+    if (!line || typeof window === "undefined" || (!page && window.matchMedia("(min-width: 1024px)").matches)) return;
     const t = window.setTimeout(() => setClosed(line), 7000);
     return () => window.clearTimeout(t);
-  }, [line]);
+  }, [line, page]);
   return (
     <div
       className={cn(
-        "pointer-events-none fixed bottom-[108px] right-4 z-30 flex max-w-[calc(100vw-2rem)] items-end gap-2 lg:bottom-6 lg:right-6",
+        "pointer-events-none fixed right-4 z-30 flex max-w-[calc(100vw-2rem)] items-end gap-2 lg:bottom-6 lg:right-6",
+        // Flow steps have a sticky Continue button on phones; other pages don't.
+        page ? "bottom-4" : "bottom-[108px]",
         className,
       )}
     >
@@ -94,11 +98,6 @@ function RevoCompanion({ line, className }: { line: string; className?: string }
   );
 }
 
-interface Turn {
-  q: string;
-  a: string | null;
-}
-
 /**
  * "Ask Revo" — present as quiet intelligence, never labelled as AI.
  * variant="card" is the design's mascot card with an arrow button;
@@ -112,6 +111,7 @@ export function AskRenuabl({
   arrow = "dark",
   className,
   line,
+  page,
 }: {
   context: AskContext;
   /** "revo": the persistent companion (a speech bubble with Revo's `line`, and Revo's avatar). */
@@ -121,23 +121,31 @@ export function AskRenuabl({
   arrow?: "dark" | "light";
   className?: string;
   line?: string;
+  /** variant="revo" on a page without a sticky Continue button (home page, guides). */
+  page?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const chat = useRevoChat();
+  const { turns, busy } = chat;
   const [draft, setDraft] = useState("");
   const [followUps, setFollowUps] = useState<string[]>(SUGGESTED_QUESTIONS[context]);
-  const busy = turns.at(-1)?.a === null;
   const snapshot = useAskSnapshot(context);
+  const end = useRef<HTMLDivElement>(null);
+
+  // Keep the newest message in view.
+  useEffect(() => {
+    if (open) end.current?.scrollIntoView({ block: "end" });
+  }, [open, turns]);
 
   async function ask(question: string) {
     const q = question.trim();
     if (!q || busy) return;
     setOpen(true);
     setDraft("");
-    setTurns((t) => [...t, { q, a: null }]);
-    const history = turns.filter((t): t is { q: string; a: string } => t.a !== null);
+    const history = chat.history();
+    chat.start(q);
     const res = await askRenuabl(q, context, snapshot, history);
-    setTurns((t) => t.map((turn, i) => (i === t.length - 1 ? { ...turn, a: res.answer } : turn)));
+    chat.finish(res.answer);
     setFollowUps(res.followUps);
   }
 
@@ -149,7 +157,7 @@ export function AskRenuabl({
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       {variant === "revo" ? (
-        <RevoCompanion line={line ?? ""} className={className} />
+        <RevoCompanion line={line ?? ""} page={page} className={className} />
       ) : variant === "link" ? (
         <Dialog.Trigger asChild>
           <button type="button" className={cn("tap-area inline-flex items-center gap-2 text-[14px] text-ink-2 hover:text-ink", className)}>
@@ -196,30 +204,53 @@ export function AskRenuabl({
             <Dialog.Title className="flex items-center gap-3 text-[17px] font-medium">
               <MascotAvatar className="h-9 w-9" /> Ask Revo
             </Dialog.Title>
-            <Dialog.Close className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2" aria-label="Close">
-              <X className="h-5 w-5" />
-            </Dialog.Close>
+            <div className="flex items-center gap-1">
+              {turns.length > 0 && !busy && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    chat.clear();
+                    setFollowUps(SUGGESTED_QUESTIONS[context]);
+                  }}
+                  className="tap-area flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] text-muted hover:bg-surface-2 hover:text-ink"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Start again
+                </button>
+              )}
+              <Dialog.Close className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2" aria-label="Close">
+                <X className="h-5 w-5" />
+              </Dialog.Close>
+            </div>
           </div>
           <Dialog.Description className="px-5 pt-1 text-[13px] text-muted sm:px-6">
-            Straight answers about your home, your system and what happens next.
+            Chat with Revo about your home, solar, batteries and rebates.
           </Dialog.Description>
 
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5 sm:px-6" aria-live="polite">
-            {turns.length === 0 && <p className="text-[15px] text-ink-2">What would you like to know?</p>}
+            <div className="flex items-end gap-2">
+              <MascotAvatar className="h-7 w-7 shrink-0" />
+              <p className="max-w-[88%] rounded-2xl rounded-bl-md bg-surface px-4 py-3 text-[15px] leading-relaxed shadow-[var(--shadow-soft)]">
+                {REVO_GREETINGS[context]}
+              </p>
+            </div>
             {turns.map((t, i) => (
               <div key={i} className="space-y-3 animate-fade-up">
                 <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[15px] text-primary-ink">
                   {t.q}
                 </p>
-                <p className="max-w-[92%] rounded-2xl rounded-bl-md bg-surface px-4 py-3 text-[15px] leading-relaxed shadow-[var(--shadow-soft)]">
-                  {t.a ?? (
-                    <span className="inline-flex gap-1 text-muted">
-                      Thinking<span className="animate-pulse">…</span>
-                    </span>
-                  )}
-                </p>
+                <div className="flex items-end gap-2">
+                  <MascotAvatar className="h-7 w-7 shrink-0" />
+                  <p className="max-w-[88%] whitespace-pre-line rounded-2xl rounded-bl-md bg-surface px-4 py-3 text-[15px] leading-relaxed shadow-[var(--shadow-soft)]">
+                    {t.a ?? (
+                      <span className="inline-flex gap-1 text-muted">
+                        Revo is typing<span className="animate-pulse">…</span>
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
             ))}
+            <div ref={end} />
           </div>
 
           <div className="border-t border-line px-5 pb-5 pt-3 sm:px-6">
@@ -243,8 +274,8 @@ export function AskRenuabl({
               <input
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="Type a question"
-                aria-label="Your question"
+                placeholder="Message Revo"
+                aria-label="Your message to Revo"
                 className="flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted focus-visible:outline-none"
               />
               <button

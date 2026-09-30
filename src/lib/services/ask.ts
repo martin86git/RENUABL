@@ -6,6 +6,7 @@
 import type { AskContext, AskSnapshot } from "@/lib/domain/ask-knowledge";
 
 export type { AskContext, AskSnapshot } from "@/lib/domain/ask-knowledge";
+export { REVO_GREETINGS } from "@/lib/domain/ask-knowledge";
 
 export interface AskAnswer {
   answer: string;
@@ -82,6 +83,7 @@ export const SUGGESTED_QUESTIONS: Record<AskContext, string[]> = {
   installer: ["How do you choose partners?", "Can I pick someone else?"],
   schedule: ["How long does install take?", "Can I change the date later?"],
   checkout: ["Is the deposit refundable?", "When do I pay the rest?"],
+  learn: ["Do I need a battery?", "What rebates can I get?", "How do you size my system?"],
   my: ["How can I improve my savings?", "Why did I use grid power last night?", "Should I add more panels?"],
 };
 

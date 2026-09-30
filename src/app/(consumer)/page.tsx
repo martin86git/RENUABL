@@ -1,9 +1,18 @@
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 import { AddressEntry } from "@/components/consumer/address-entry";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { ConsumerTopBar, MobileHeader } from "@/components/consumer/consumer-top-bar";
+import { GuidesStrip } from "@/components/consumer/guide-page";
 import { LegalFooter } from "@/components/consumer/legal-page";
+import { guideBySlug, type Guide } from "@/lib/domain/guides";
+import { REVO_PAGE_LINES } from "@/lib/domain/revo";
 import { Mascot } from "@/components/ui/brand-art";
 import { Script } from "@/components/ui/primitives";
+
+const FEATURED = ["how-to-size-solar-from-your-bill", "victorian-solar-battery-rebates-explained", "do-i-need-a-home-battery"]
+  .map(guideBySlug)
+  .filter((g): g is Guide => Boolean(g));
 
 export default function HomePage() {
   return (
@@ -32,8 +41,22 @@ export default function HomePage() {
           </ol>
           <p className="mt-5 text-[15px] text-forest lg:mt-7 lg:text-[16px]">Your system, priced in about two minutes.</p>
           <AddressEntry className="mt-4 max-w-lg lg:mt-5" />
+          <Link
+            href="/learn"
+            className="tap-area mt-3 inline-flex items-center gap-1.5 text-[14px] text-forest underline-offset-4 hover:underline lg:hidden"
+          >
+            New to solar? Read Revo&apos;s energy guides <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
+          </Link>
           <div className="mt-4 hidden lg:block">
-            <AskRenuabl context="home" variant="link" title="Not sure yet? Ask Revo" />
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <AskRenuabl context="home" variant="link" title="Not sure yet? Ask Revo" />
+              <Link
+                href="/learn"
+                className="tap-area inline-flex items-center gap-1.5 text-[14px] text-forest underline-offset-4 hover:underline"
+              >
+                New to solar? Read the energy guides <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
+              </Link>
+            </div>
           </div>
 
           {/* Mobile mascot sits below the address. */}
@@ -58,7 +81,9 @@ export default function HomePage() {
           </Script>
         </div>
       </main>
+      <GuidesStrip guides={FEATURED} />
       <LegalFooter />
+      <AskRenuabl context="home" variant="revo" page line={REVO_PAGE_LINES.home} />
     </div>
   );
 }

@@ -43,6 +43,7 @@ export const ASK_FACTS = [
   `Blackout backup: a battery can keep chosen circuits on in a blackout, but wiring those backup circuits in is an optional extra ("Blackout Backup", ${money(sellPrice(COSTING.backupCircuitsInstall))} installed, including GST), added on the Extras step. Which circuits is agreed on the 15-minute call. It needs a battery: Essential (solar only) has no backup. Without Blackout Backup, the battery doesn't power the home during a blackout.`,
   `Battery sizes are shown as the battery's full (nominal) size; RENUABL sizes batteries assuming about 90% of that is usable. Equipment: between reserving and the 15-minute call, RENUABL designs the customer's system for their home, including the exact panels, inverter and battery and how many panels fit on the roof. On the call the specialist walks them through the design and every product and answers questions. Nothing is final or charged until they're happy, and reserving is free with no commitment. The panels and batteries RENUABL uses are listed on the system step (tap Solar System or Battery Storage): ${PANEL_RANGE.map(panelLabel).join("; ")} panels, and ${BATTERY_RANGE.map(batteryLabel).join("; ")} batteries. Share these if asked; the exact equipment for their home is chosen in their design and shown on the call.`,
   "A smart EV charger can be added at checkout. Smart switchboards aren't priced online yet: the customer can tick them to discuss, and they're talked through and quoted on the 15-minute call. Reverse-cycle heating and cooling and heat pump hot water are coming soon: RENUABL doesn't sell them yet, and the customer can ask to be told when they're available. Never quote a price for any of them.",
+  "RENUABL's free energy guides (Energy guides, at renuabl.com.au/learn) explain in plain English how solar is sized from a bill, Victorian solar and battery rebates, whether a battery is worth it, how to read an electricity bill, what happens after reserving, and comparing quotes.",
 ];
 
 /** The customer's own answers and system, as plain lines for the model. */
@@ -103,6 +104,23 @@ const SCREENS: Record<AskContext, string> = {
   schedule: "the install date step",
   checkout: "the reserve step (basket, rebates, contact details)",
   my: "My RENUABL, the app for installed customers (showing an example home)",
+  learn: "Revo's energy guides, plain-language articles about sizing solar from a bill, rebates, batteries and reading a bill",
+};
+
+/** Before the flow (home page, guides) the next step is their address; inside it, the step they're on. */
+const PRE_FLOW: AskContext[] = ["home", "learn"];
+
+/** Revo's opening message in the chat, before the customer has asked anything. No figures or claims. */
+export const REVO_GREETINGS: Record<AskContext, string> = {
+  home: "Hi, I'm Revo! I can explain how solar and batteries would work for your home, what rebates you might get, or how RENUABL works. What's on your mind?",
+  learn: "Hi, I'm Revo! Reading up on solar? Ask me anything as you go, and I'll keep it simple.",
+  profile: "Hi, I'm Revo! Questions about your bill or your home? Ask away.",
+  recommendation: "Hi, I'm Revo! Want to know why we picked this system, or what the options mean? Just ask.",
+  extras: "Hi, I'm Revo! Wondering which extras make sense for your home? Ask me.",
+  installer: "Hi, I'm Revo! Ask me anything about your installation partner or how we match you.",
+  schedule: "Hi, I'm Revo! Questions about install day or your call? I'm here.",
+  checkout: "Hi, I'm Revo! Ask me anything before you reserve. Reserving is free.",
+  my: "Hi, I'm Revo! Ask me about your system, your energy use or your savings.",
 };
 
 export function askSystemPrompt(context: AskContext, snapshot: AskSnapshot): string {
@@ -110,6 +128,11 @@ export function askSystemPrompt(context: AskContext, snapshot: AskSnapshot): str
   return [
     'You are Revo (shown to customers as "Ask Revo"), RENUABL\'s help assistant on its website for Victorian homeowners buying solar and batteries.',
     "Voice: clear, reassuring, human and optimistic. Australian English. Plain words, no jargon. Two to four short sentences; no lists, headings or emoji.",
+    "This is a conversation: the customer sees your earlier replies. Be warm and natural, and build on what they've already told you rather than repeating yourself.",
+    "When it would help you guide them, end with one short, easy question back about their home or plans (for example whether someone is home during the day, or whether they're thinking about an electric car). Not every reply needs a question.",
+    PRE_FLOW.includes(context)
+      ? "Never ask for their name, email, phone number, address or account details. When they want their own system or price, invite them to start with their address on the home page: it takes about two minutes with their latest bill."
+      : "Never ask for their name, email, phone number, address or account details. When they're ready, encourage them to carry on with the step they're on.",
     "Answer the customer's actual question directly first, using the facts and their answers below. If they mention something about their home (for example 'my roof is flat'), explain what it means for them.",
     "Only state what the facts or their answers support. Never invent prices, savings, figures, rebate amounts, timeframes, guarantees or product claims, and never say anything is exact, precise or guaranteed. If you don't know, say their RENUABL specialist will confirm it on the 15-minute call.",
     "If an answer on their screen needs changing (for example a different roof type), tell them which option to pick.",
@@ -136,7 +159,7 @@ export function cleanAskInput(input: { question?: unknown; history?: unknown }):
   const history = Array.isArray(input.history)
     ? input.history
         .filter((t): t is { q: string; a: string } => typeof t?.q === "string" && typeof t?.a === "string")
-        .slice(-4)
+        .slice(-10)
         .map((t) => ({ q: t.q.slice(0, 500), a: t.a.slice(0, 1200) }))
     : [];
   return { question, history };

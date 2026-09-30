@@ -18,7 +18,7 @@ export default function LearnPage() {
       </h1>
       <p className="mt-4 max-w-2xl text-[16px] text-muted lg:text-[17px]">{GUIDES_TAGLINE}</p>
       <div className="mt-4">
-        <AskRenuabl context="home" variant="link" title="Got a question? Ask Revo" />
+        <AskRenuabl context="learn" variant="link" title="Got a question? Chat with Revo" />
       </div>
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {GUIDES.map((g) => (

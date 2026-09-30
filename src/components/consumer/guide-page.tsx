@@ -5,6 +5,8 @@ import { ConsumerTopBar, MobileHeader } from "@/components/consumer/consumer-top
 import { LegalFooter } from "@/components/consumer/legal-page";
 import { ButtonLink } from "@/components/ui/primitives";
 import type { Guide, GuideBlock } from "@/lib/domain/guides";
+import { REVO_PAGE_LINES } from "@/lib/domain/revo";
+import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 
 /** The reading frame for Revo's guides: the wordmark header, a centred column and the legal footer. */
 export function GuideFrame({ children, wide }: { children: ReactNode; wide?: boolean }) {
@@ -14,6 +16,7 @@ export function GuideFrame({ children, wide }: { children: ReactNode; wide?: boo
       <ConsumerTopBar className="hidden lg:flex" />
       <main className={`mx-auto w-full flex-1 px-5 pb-16 pt-6 sm:px-8 lg:pt-12 ${wide ? "max-w-5xl" : "max-w-2xl"}`}>{children}</main>
       <LegalFooter />
+      <AskRenuabl context="learn" variant="revo" page line={REVO_PAGE_LINES.learn} />
     </div>
   );
 }
@@ -55,6 +58,31 @@ export function GuideBody({ blocks }: { blocks: GuideBlock[] }) {
         return <p key={i}>{b.text}</p>;
       })}
     </div>
+  );
+}
+
+/** Three guides on the home page, so the guides are easy to find. */
+export function GuidesStrip({ guides }: { guides: Guide[] }) {
+  return (
+    <section className="mx-auto w-full max-w-[1440px] px-5 pb-12 sm:px-8 lg:px-10">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-t border-line pt-10">
+        <div>
+          <p className="text-[13px] tracking-[0.02em] text-forest">Energy guides from Revo</p>
+          <h2 className="mt-1 text-[28px] font-normal tracking-[-0.03em] lg:text-[34px]">New to solar? Start here.</h2>
+        </div>
+        <Link
+          href="/learn"
+          className="tap-area inline-flex items-center gap-1.5 text-[14px] text-forest underline-offset-4 hover:underline"
+        >
+          See all guides <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
+        </Link>
+      </div>
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        {guides.map((g) => (
+          <GuideCard key={g.slug} guide={g} />
+        ))}
+      </div>
+    </section>
   );
 }
 
