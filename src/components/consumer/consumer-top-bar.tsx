@@ -56,9 +56,9 @@ export function MobileHeader({
   className?: string;
 }) {
   return (
-    <header className={cn("flex h-14 items-center justify-between px-5 lg:hidden", className)}>
+    <header className={cn("relative flex h-14 items-center justify-between px-5 lg:hidden", className)}>
       <MobileMenu />
-      <Link href="/" aria-label="RENUABL home">
+      <Link href="/" aria-label="RENUABL home" className="absolute left-1/2 -translate-x-1/2">
         <Wordmark className="text-[19px] tracking-[0.12em]" />
       </Link>
       {account ? (
@@ -66,9 +66,14 @@ export function MobileHeader({
           <UserRound className="h-5 w-5" strokeWidth={1.5} />
         </Link>
       ) : partners ? (
-        <Link href="/login" className="tap-area -mr-1 text-[13px] text-ink-2">
-          Log in
-        </Link>
+        <span className="-mr-1 flex items-center gap-4 text-[13px] text-ink-2">
+          <Link href="/learn" className="tap-area relative">
+            Learn
+          </Link>
+          <Link href="/login" className="tap-area relative">
+            Log in
+          </Link>
+        </span>
       ) : (
         <span className="w-9" />
       )}

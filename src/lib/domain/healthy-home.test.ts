@@ -16,6 +16,8 @@ const BANNED = /\b(cure|treat|prevent|guaranteed?|best|first ever|leading|AI|ins
 describe("Healthy Home copy", () => {
   it('has exactly one "sun" in the headline (the home page highlights it)', () => {
     expect(HOME_HERO.headline.split("sun")).toHaveLength(2);
+    expect(HOME_HERO.headlineLines.join(" ")).toBe(HOME_HERO.headline);
+    expect(HOME_HERO.headlineLines.at(-1)).toContain("sun");
   });
 
   it("prices nothing and claims no health outcomes", () => {

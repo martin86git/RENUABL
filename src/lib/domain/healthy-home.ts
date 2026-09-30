@@ -7,9 +7,12 @@
 export const HOME_HERO = {
   eyebrow: "One platform. One journey.",
   headline: "A healthier home, powered by the sun.",
+  /** The headline as it's set on the home page: three lines. */
+  headlineLines: ["A healthier home,", "powered by", "the sun."],
   steps: ["Upload your bill", "Pick your install date", "Make your home healthier"],
   label: "Your home plan, priced in about two minutes.",
   healthLink: "Healthy home? Take the check",
+  learnLine: "Plain-English guides to solar, batteries, rebates and a healthier home.",
 } as const;
 
 /** The example card beside the hero (always labelled "Example"). */
