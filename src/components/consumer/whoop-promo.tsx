@@ -11,7 +11,7 @@ import { useWhoopOpen } from "@/lib/services/whoop";
 export function WhoopStrip({ className }: { className?: string }) {
   if (!useWhoopOpen()) return null;
   return (
-    <p className={cn("flex items-start gap-2.5 rounded-2xl bg-sage px-4 py-3 text-[13.5px] leading-snug text-forest", className)}>
+    <p className={cn("flex items-start gap-2.5 rounded-2xl bg-sun px-4 py-3 text-[13.5px] leading-snug text-sun-ink", className)}>
       <Gift className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
       <span>
         {WHOOP_COPY.strip} · <span className="font-medium">{WHOOP_COPY.first}</span>
@@ -31,7 +31,9 @@ export function WhoopBanner() {
     <section className="mx-auto w-full max-w-[1440px] px-5 pt-16 sm:px-8 lg:px-10">
       <div className="flex flex-col gap-6 rounded-[var(--radius-card)] bg-primary px-6 py-8 text-primary-ink sm:px-10 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-2xl">
-          <p className="text-[13px] tracking-[0.02em] opacity-80">{WHOOP_COPY.bannerLabel}</p>
+          <p className="flex items-center gap-2 text-[13px] tracking-[0.02em] text-sun-bright">
+            <Gift className="h-4 w-4" strokeWidth={1.7} aria-hidden /> {WHOOP_COPY.bannerLabel}
+          </p>
           <h2 className="mt-2 text-[28px] font-normal leading-tight tracking-[-0.03em] lg:text-[36px]">{WHOOP_COPY.bannerHeading}</h2>
           <p className="mt-3 text-[13px] leading-relaxed opacity-80">
             {WHOOP_COPY.bannerSmall}{" "}
@@ -55,7 +57,7 @@ export function WhoopBanner() {
 export function WhoopOptionNote({ hasBattery, className }: { hasBattery: boolean; className?: string }) {
   if (!useWhoopOpen()) return null;
   return hasBattery ? (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full bg-sage px-2.5 py-1 text-[12px] text-forest", className)}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full bg-sun px-2.5 py-1 text-[12px] text-sun-ink", className)}>
       <Gift className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden /> {WHOOP_COPY.badge}
     </span>
   ) : (
@@ -67,7 +69,7 @@ export function WhoopOptionNote({ hasBattery, className }: { hasBattery: boolean
 export function WhoopGuideLine() {
   if (!useWhoopOpen()) return null;
   return (
-    <p className="mt-8 flex gap-2.5 rounded-2xl bg-sage px-5 py-4 text-[14.5px] leading-relaxed text-forest">
+    <p className="mt-8 flex gap-2.5 rounded-2xl bg-sun px-5 py-4 text-[14.5px] leading-relaxed text-sun-ink">
       <Gift className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
       <span>
         {WHOOP_COPY.guideLine}{" "}

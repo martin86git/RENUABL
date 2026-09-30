@@ -3,6 +3,7 @@
 /*
  * RENUABL design tokens — from the brand sheet.
  *   Background #FAF9F6 · Sand #F0ECE7 · Sage #D9E7DC · Forest #1E3A2E · Charcoal #1A1A1A · White
+ *   Sun (warm accent, small highlights only: offers, "Free", the odd icon) #F8E6C4 with #7A4F0E text
  * Semantic tokens (canvas, surface, ink, …) are shared by both products.
  * The consumer experience is light and warm; `.theme-installer` swaps the
  * same tokens for the dark, professional installer palette.
@@ -23,6 +24,9 @@
   --primary-ink: #ffffff;
   --forest: #1e3a2e;
   --sage: #d9e7dc;
+  --sun: #f8e6c4;
+  --sun-ink: #7a4f0e;
+  --sun-bright: #f2c97e;
   --leaf: #5b9f7d;
   --positive: #2f7d55;
   --positive-soft: #d9e7dc;
@@ -47,6 +51,9 @@
   --primary: #f7f6f2;
   --primary-ink: #171c1e;
   --sage: #2d4a3d;
+  --sun: rgba(242, 201, 126, 0.16);
+  --sun-ink: #f2c97e;
+  --sun-bright: #f2c97e;
   --leaf: #6fb690;
   /* Green is reserved for confirmed / on-track / available / positive. */
   --positive: #8fd0ad;
@@ -73,6 +80,9 @@
   --color-primary-ink: var(--primary-ink);
   --color-forest: var(--forest);
   --color-sage: var(--sage);
+  --color-sun: var(--sun);
+  --color-sun-ink: var(--sun-ink);
+  --color-sun-bright: var(--sun-bright);
   --color-leaf: var(--leaf);
   --color-positive: var(--positive);
   --color-positive-soft: var(--positive-soft);

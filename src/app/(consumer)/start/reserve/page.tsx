@@ -217,14 +217,14 @@ function ReserveScreen() {
         ))}
         {whoopOpen && whoopEligible(config) && (
           <li className="flex items-center gap-3 py-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sage text-forest">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sun text-sun-ink">
               <Gift className="h-5 w-5" strokeWidth={1.6} aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[14px] text-ink">{WHOOP_COPY.giftLine}</p>
               <p className="text-[12px] text-muted">{WHOOP_COPY.ships}</p>
             </div>
-            <p className="text-[14px] font-semibold tabular-nums text-positive">$0</p>
+            <p className="text-[14px] font-semibold tabular-nums text-sun-ink">$0</p>
           </li>
         )}
         {careIncluded && (

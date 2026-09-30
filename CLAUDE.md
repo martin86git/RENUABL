@@ -69,7 +69,7 @@
 
 ## Brand system (from `docs/design/brand-and-desktop.webp`)
 
-- Colours: Background `#FAF9F6`, Sand `#F0ECE7`, Sage `#D9E7DC`, Forest `#1E3A2E`, Charcoal `#1A1A1A`, White. They live as tokens in `src/app/globals.css`; use `bg-canvas`, `bg-surface`, `bg-sage`, `text-forest`, `bg-primary`, etc.
+- Colours: Background `#FAF9F6`, Sand `#F0ECE7`, Sage `#D9E7DC`, Forest `#1E3A2E`, Charcoal `#1A1A1A`, White, plus a warm Sun accent (`bg-sun` `#F8E6C4` with `text-sun-ink` `#7A4F0E`; `text-sun-bright` on dark backgrounds) used only for small highlights: the WHOOP offer, gift and "Free" lines, the odd sun icon. Never for buttons, prices or rebates (rebates stay `positive` green). Forest is the Renewable/energy colour, Sage the Healthy home colour (package chips, the example plan, the Home Health teaser and results). They live as tokens in `src/app/globals.css`; use `bg-canvas`, `bg-surface`, `bg-sage`, `bg-sun`, `text-forest`, `bg-primary`, etc.
 - Type: Inter for UI (headlines large, regular weight, tight tracking), Source Serif for editorial lines ("Cleaner homes. Lower bills."), Caveat script for handwritten accents (`<Script>`).
 - Voice: clear, reassuring, human, optimistic, modern, built for everyday people.
 - Mascot and photography: `src/components/ui/brand-art.tsx`. "About your home" uses the battery mascot (`pose="battery"`, image B), still: a bounce moved the image past its page-coloured backing and showed a white edge. Files in `public/brand/` are crops from the mockups (placeholders); replace them with the original renders and licensed photos under the same names, then clear `.next/cache/images` locally.

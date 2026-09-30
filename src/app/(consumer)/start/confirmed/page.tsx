@@ -21,10 +21,10 @@ import { getWindow } from "@/lib/domain/scheduling";
 import { formatAddress } from "@/lib/mock/addresses";
 import { getInstaller } from "@/lib/services/consumer";
 
-function Item({ icon: Icon, title, detail }: { icon: LucideIcon; title: string; detail: ReactNode }) {
+function Item({ icon: Icon, title, detail, sun }: { icon: LucideIcon; title: string; detail: ReactNode; sun?: boolean }) {
   return (
     <li className="flex items-start gap-4 px-5 py-4">
-      <Icon className="mt-0.5 h-6 w-6 shrink-0 text-ink" strokeWidth={1.3} aria-hidden />
+      <Icon className={sun ? "mt-0.5 h-6 w-6 shrink-0 text-sun-ink" : "mt-0.5 h-6 w-6 shrink-0 text-ink"} strokeWidth={1.3} aria-hidden />
       <div className="min-w-0">
         <p className="text-[14px] text-ink">{title}</p>
         {typeof detail === "string" ? <p className="text-[12.5px] leading-snug text-muted">{detail}</p> : detail}
@@ -120,7 +120,7 @@ function ConfirmedScreen() {
                 detail={`We've emailed your order and price breakdown to ${state.contact.email}.`}
               />
             )}
-            {state.reservation?.whoop && <Item icon={Gift} title={`Free ${WHOOP_OFFER.product}`} detail={WHOOP_COPY.confirmed} />}
+            {state.reservation?.whoop && <Item icon={Gift} sun title={`Free ${WHOOP_OFFER.product}`} detail={WHOOP_COPY.confirmed} />}
             {state.reservation?.careIncluded && (
               <Item
                 icon={Gift}
