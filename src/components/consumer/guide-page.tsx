@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ConsumerTopBar, MobileHeader } from "@/components/consumer/consumer-top-bar";
 import { LegalFooter } from "@/components/consumer/legal-page";
+import { MascotAvatar } from "@/components/ui/brand-art";
 import { ButtonLink } from "@/components/ui/primitives";
 import { LEARN_NAME, type Guide, type GuideBlock } from "@/lib/domain/guides";
 import { REVO_PAGE_LINES } from "@/lib/domain/revo";
@@ -47,6 +48,16 @@ export function GuideBody({ blocks }: { blocks: GuideBlock[] }) {
               {b.text}
             </p>
           );
+        if (b.type === "tip")
+          return (
+            <div key={i} className="flex items-start gap-3 rounded-2xl bg-surface px-4 py-4 shadow-[var(--shadow-soft)]">
+              <MascotAvatar className="h-9 w-9 shrink-0" />
+              <p className="text-[15px] leading-relaxed text-ink-2">
+                <span className="block text-[13px] font-medium text-forest">Revo&apos;s tip</span>
+                {b.text}
+              </p>
+            </div>
+          );
         if (b.type === "link")
           return (
             <p key={i}>
@@ -83,6 +94,19 @@ export function GuidesStrip({ guides }: { guides: Guide[] }) {
         ))}
       </div>
     </section>
+  );
+}
+
+/** "The short answer" at the top of every guide: a reader who stops here still has the answer. */
+export function ShortAnswer({ text }: { text: string }) {
+  return (
+    <aside className="mt-6 flex items-start gap-3 rounded-[var(--radius-card)] bg-sage px-5 py-5 text-forest">
+      <MascotAvatar className="h-10 w-10 shrink-0" />
+      <div>
+        <p className="text-[13px] font-medium">The short answer</p>
+        <p className="mt-1 text-[16.5px] leading-relaxed">{text}</p>
+      </div>
+    </aside>
   );
 }
 

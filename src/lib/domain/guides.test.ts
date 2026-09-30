@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GUIDES, GUIDES_TAGLINE, LEARN_POPUP, guideBySlug, guideText, shouldShowLearnPopup } from "./guides";
+import { GUIDES, GUIDES_TAGLINE, GUIDE_TOPICS, LEARN_POPUP, guideBySlug, guideText, shouldShowLearnPopup } from "./guides";
 
 describe("Revo's guides", () => {
   it("have unique, URL-safe slugs and short meta descriptions", () => {
@@ -17,13 +17,29 @@ describe("Revo's guides", () => {
       expect(text).not.toMatch(/\b(exact|exactly|precise|precisely|guaranteed?)\b/i);
       expect(text).not.toMatch(/\bAI\b|artificial intelligence/i);
       expect(text).not.toMatch(/\binstallers?\b/i);
-      expect(text).not.toMatch(/\b(first|number one|#1|best|leading)\b/i);
+      expect(text).not.toMatch(/\b(the first|number one|best|leading)\b|#1/i);
     }
   });
 
   it("link only to official https sources", () => {
     for (const g of GUIDES)
-      for (const b of g.body) if (b.type === "link") expect(b.href).toMatch(/^https:\/\/(www\.)?(solar\.vic\.gov\.au|cer\.gov\.au)\//);
+      for (const b of g.body)
+        if (b.type === "link") expect(b.href).toMatch(/^https:\/\/(www\.)?(solar\.vic\.gov\.au|cer\.gov\.au|esc\.vic\.gov\.au)\//);
+  });
+});
+
+describe("Revo's lighter reading", () => {
+  it("opens every guide with a short answer and keeps it a quick read", () => {
+    for (const g of GUIDES) {
+      expect(g.answer.length).toBeGreaterThan(40);
+      expect(g.answer.length).toBeLessThanOrEqual(320);
+      expect(g.minutes).toBeLessThanOrEqual(6);
+      expect(GUIDE_TOPICS).toContain(g.topic);
+    }
+  });
+
+  it("keeps paragraphs short enough to skim", () => {
+    for (const g of GUIDES) for (const b of g.body) if (b.type === "p") expect(b.text.length).toBeLessThanOrEqual(480);
   });
 });
 

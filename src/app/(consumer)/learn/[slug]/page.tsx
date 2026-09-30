@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { GuideBody, GuideCard, GuideCta, GuideFrame } from "@/components/consumer/guide-page";
+import { GuideBody, GuideCard, GuideCta, GuideFrame, ShortAnswer } from "@/components/consumer/guide-page";
 import { GUIDES, LEARN_NAME, guideBySlug } from "@/lib/domain/guides";
 import { publicSiteUrl } from "@/lib/domain/site";
 
@@ -36,7 +36,8 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
     author: { "@type": "Organization", name: "RENUABL", url: site },
     publisher: { "@type": "Organization", name: "RENUABL", url: site },
   };
-  const more = GUIDES.filter((g) => g.slug !== guide.slug).slice(0, 2);
+  const others = GUIDES.filter((g) => g.slug !== guide.slug);
+  const more = [...others.filter((g) => g.topic === guide.topic), ...others.filter((g) => g.topic !== guide.topic)].slice(0, 2);
   const updated = new Date(`${guide.updated}T00:00:00Z`).toLocaleDateString("en-AU", {
     day: "numeric",
     month: "long",
@@ -55,6 +56,7 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
         </p>
         <h1 className="mt-2 text-[34px] font-normal leading-[1.08] tracking-[-0.035em] lg:text-[44px]">{guide.title}</h1>
         <p className="mt-4 text-[18px] leading-relaxed text-muted">{guide.summary}</p>
+        <ShortAnswer text={guide.answer} />
         <GuideBody blocks={guide.body} />
       </article>
       <GuideCta />

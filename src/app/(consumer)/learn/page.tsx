@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { GuideCard, GuideCta, GuideFrame } from "@/components/consumer/guide-page";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
-import { GUIDES, GUIDES_TAGLINE, LEARN_NAME } from "@/lib/domain/guides";
+import { GUIDES, GUIDES_TAGLINE, GUIDE_TOPICS, LEARN_NAME } from "@/lib/domain/guides";
 
 export const metadata: Metadata = {
   title: "Learn with Revo: solar, batteries and rebates in plain English",
@@ -20,11 +20,20 @@ export default function LearnPage() {
       <div className="mt-4">
         <AskRenuabl context="learn" variant="link" title="Got a question? Chat with Revo" />
       </div>
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {GUIDES.map((g) => (
-          <GuideCard key={g.slug} guide={g} />
-        ))}
-      </div>
+      {GUIDE_TOPICS.map((topic) => {
+        const guides = GUIDES.filter((g) => g.topic === topic);
+        if (!guides.length) return null;
+        return (
+          <section key={topic} className="mt-10">
+            <h2 className="text-[20px] font-normal tracking-[-0.02em]">{topic}</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {guides.map((g) => (
+                <GuideCard key={g.slug} guide={g} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
       <div className="mx-auto max-w-2xl">
         <GuideCta />
       </div>

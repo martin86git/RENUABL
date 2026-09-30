@@ -15,7 +15,9 @@ export type GuideBlock =
   | { type: "h2"; text: string }
   | { type: "list"; items: string[] }
   | { type: "note"; text: string }
-  | { type: "link"; text: string; href: string };
+  | { type: "link"; text: string; href: string }
+  /** "Revo's tip": one practical, friendly pointer. */
+  | { type: "tip"; text: string };
 
 export interface Guide {
   slug: string;
@@ -25,12 +27,27 @@ export interface Guide {
   /** One or two sentences: the meta description and the card text on /learn. */
   summary: string;
   /** Short label shown above the title. */
-  topic: "Sizing" | "Rebates" | "Batteries" | "Your bill" | "The process" | "Choosing";
+  topic: GuideTopic;
   /** When the facts were last checked (ISO date). */
   updated: string;
   minutes: number;
+  /** "The short answer": two or three sentences at the top, so a reader who stops there still has the answer. */
+  answer: string;
   body: GuideBlock[];
 }
+
+/** Topics, in the order /learn shows them. */
+export const GUIDE_TOPICS = [
+  "Sizing",
+  "Batteries",
+  "Rebates",
+  "Your bill",
+  "Your home",
+  "Everyday solar",
+  "Choosing",
+  "The process",
+] as const;
+export type GuideTopic = (typeof GUIDE_TOPICS)[number];
 
 /** How RENUABL describes itself in search results. Not "the first": that can't be proven (Australian Consumer Law). */
 export const GUIDES_TAGLINE =
@@ -48,6 +65,8 @@ export const GUIDES: Guide[] = [
     topic: "Sizing",
     updated: "2026-09-30",
     minutes: 5,
+    answer:
+      "Start with your bill, not a package. Enough solar to cover your yearly use is the starting point; if you want a battery, add enough to charge it on a winter day. We do this for you from your bill in about two minutes.",
     body: [
       {
         type: "p",
@@ -101,6 +120,8 @@ export const GUIDES: Guide[] = [
     topic: "Rebates",
     updated: "2026-09-30",
     minutes: 6,
+    answer:
+      "Most Victorian homes can get a federal discount on solar and batteries, taken straight off the price. Eligible households may also get a Solar Victoria rebate and an interest-free loan. We show each one as its own line on your price.",
     body: [
       {
         type: "p",
@@ -156,6 +177,8 @@ export const GUIDES: Guide[] = [
     topic: "Batteries",
     updated: "2026-09-30",
     minutes: 4,
+    answer:
+      "A battery pays off when you use a lot of power after dark and export a lot during the day. If someone's home all day using the solar as it's made, solar alone may be enough.",
     body: [
       {
         type: "p",
@@ -200,6 +223,8 @@ export const GUIDES: Guide[] = [
     topic: "Your bill",
     updated: "2026-09-30",
     minutes: 4,
+    answer:
+      "You only need three numbers: how much you use (kWh), what you pay per kWh, and what you're paid for exports. Everything else on the bill can wait.",
     body: [
       {
         type: "p",
@@ -243,6 +268,8 @@ export const GUIDES: Guide[] = [
     topic: "The process",
     updated: "2026-09-30",
     minutes: 4,
+    answer:
+      "Reserve for free, have a 15-minute confirmation call, pay a refundable deposit only if you're happy, then your installation partner arrives on the day you chose.",
     body: [
       {
         type: "p",
@@ -287,6 +314,8 @@ export const GUIDES: Guide[] = [
     topic: "Choosing",
     updated: "2026-09-30",
     minutes: 4,
+    answer:
+      "Three quotes often means three different systems, so they're hard to compare. What matters is a system sized from your bill, a full price with rebates shown separately, and an accredited team to install it.",
     body: [
       {
         type: "p",
@@ -329,6 +358,8 @@ export const GUIDES: Guide[] = [
     topic: "Batteries",
     updated: "2026-09-30",
     minutes: 3,
+    answer:
+      "Check your bill first. Divide the solar you exported by the days in the billing period: that's roughly what can fill a battery each day. Then size for your evening use.",
     body: [
       {
         type: "p",
@@ -368,6 +399,327 @@ export const GUIDES: Guide[] = [
       },
     ],
   },
+  {
+    slug: "how-does-solar-work",
+    title: "How does solar work? The 60-second version",
+    short: "How does solar work?",
+    summary: "Panels make power from daylight, your home uses it first, and the spare goes to the grid or a battery. That's really it.",
+    topic: "Everyday solar",
+    updated: "2026-09-30",
+    minutes: 2,
+    answer:
+      "Panels on your roof turn daylight into electricity. Your home uses it first, any spare goes to a battery (if you have one) or out to the grid, and at night you draw from the battery or the grid as usual.",
+    body: [
+      { type: "h2", text: "1. Panels make power from daylight" },
+      {
+        type: "p",
+        text: "Solar panels make electricity whenever there's daylight: most around the middle of the day, less in the morning, the evening and on cloudy days.",
+      },
+      { type: "h2", text: "2. The inverter makes it usable" },
+      {
+        type: "p",
+        text: "Panels make a kind of electricity (DC) your home can't use directly. The inverter, a box usually on a wall near your switchboard, turns it into the kind your appliances use (AC).",
+      },
+      { type: "h2", text: "3. Your home uses it first" },
+      {
+        type: "p",
+        text: "Whatever's running while the sun is up (the fridge, the washing machine, the air conditioner) runs on your solar first. That's the power you no longer buy.",
+      },
+      { type: "h2", text: "4. The spare goes somewhere useful" },
+      {
+        type: "p",
+        text: "If you make more than you're using, the spare charges your battery, if you have one, or goes to the grid for a feed-in credit on your bill.",
+      },
+      { type: "h2", text: "5. At night, nothing changes" },
+      {
+        type: "p",
+        text: "After dark your home runs on your battery or on grid power, just like before. You don't need to do anything: it all switches automatically.",
+      },
+      {
+        type: "tip",
+        text: "Run the dishwasher, washing machine and pool pump in the middle of the day. It's the easiest way to get more from your solar without spending a cent.",
+      },
+    ],
+  },
+  {
+    slug: "what-is-an-inverter",
+    title: "What is a solar inverter, and why does it matter?",
+    short: "What's an inverter?",
+    summary: "The inverter is the brain of a solar system. Here's what it does, why its size matters and what a hybrid inverter is.",
+    topic: "Everyday solar",
+    updated: "2026-09-30",
+    minutes: 2,
+    answer:
+      "The inverter turns your panels' power into the power your home uses, and keeps track of what your system makes. A hybrid inverter can also run a battery, which is what we use whenever a battery is part of the plan.",
+    body: [
+      { type: "h2", text: "What it does" },
+      {
+        type: "list",
+        items: [
+          "Converts the panels' DC power into the AC power your home uses.",
+          "Works out, second by second, whether to power the home, charge a battery or export.",
+          "Records what your system makes, which you can usually see in an app.",
+        ],
+      },
+      { type: "h2", text: "Why the size matters" },
+      {
+        type: "p",
+        text: "Inverters are rated in kilowatts (kW). It's normal, and allowed within limits, for the panels to add up to a bit more than the inverter's rating, because panels rarely make their full rating at once. We size the inverter to your panels for you.",
+      },
+      { type: "h2", text: "String or hybrid?" },
+      {
+        type: "p",
+        text: "A string inverter handles solar only. A hybrid inverter also manages a battery. If you're getting a battery now, or think you will, a hybrid saves replacing the inverter later.",
+      },
+      {
+        type: "tip",
+        text: "Your inverter usually lives on an outside wall or in the garage near the switchboard. Somewhere shaded and out of the weather helps it last.",
+      },
+    ],
+  },
+  {
+    slug: "is-my-roof-right-for-solar",
+    title: "Is my roof right for solar? Direction, shade and roof type",
+    short: "Is my roof right for solar?",
+    summary: "North is great, east and west work well, shade matters most. A plain-English check of your roof before you buy.",
+    topic: "Your home",
+    updated: "2026-09-30",
+    minutes: 3,
+    answer:
+      "Most Victorian roofs work. North-facing roofs get the most sun, east and west are good too, and shade is the thing to watch. Tile, tin and flat roofs can all take panels; the fittings are just different.",
+    body: [
+      { type: "h2", text: "Which way does it face?" },
+      {
+        type: "list",
+        items: [
+          "North: the most sun over the day in Australia.",
+          "East and west: a little less overall, but spread across morning and afternoon, which can suit how you use power.",
+          "South: usually the last choice, used only when other roofs are full or shaded.",
+        ],
+      },
+      { type: "h2", text: "Shade is the big one" },
+      {
+        type: "p",
+        text: "Trees, chimneys, a taller building next door or a roof that shades itself can all cut what panels make. When we look at your home we use Google's roof data, which includes shading, and your partner checks it again before anything is final.",
+      },
+      { type: "h2", text: "Tile, tin or flat?" },
+      {
+        type: "list",
+        items: [
+          "Tile: panels mount on brackets hooked under the tiles.",
+          "Tin (Colorbond or similar): brackets fix straight to the roof.",
+          "Flat: panels can lie flat, or be tilted on frames to catch more sun. Tilting depends on roof space and how it looks, and it's checked on your call.",
+        ],
+      },
+      { type: "h2", text: "How much space?" },
+      {
+        type: "p",
+        text: "Each panel is roughly the size of a door lying down. We never recommend more panels than Google's roof data suggests will fit, and the final layout is confirmed with you before install.",
+      },
+      {
+        type: "tip",
+        text: "Not sure which way your roof faces? Open a map on your phone in satellite view: the top of the screen is north.",
+      },
+    ],
+  },
+  {
+    slug: "single-phase-or-three-phase",
+    title: "Single phase or three phase? How to tell in two minutes",
+    short: "Single or three phase?",
+    summary: "Most homes are single phase. Here's how to check yours, and why it matters for solar.",
+    topic: "Your home",
+    updated: "2026-09-30",
+    minutes: 2,
+    answer:
+      "Most Australian homes are single phase. Three phase is more common in bigger or newer homes, and it lets you have a bigger solar system. If you're not sure, say so: we'll plan for single phase and check on the call.",
+    body: [
+      { type: "h2", text: "Why it matters" },
+      {
+        type: "p",
+        text: "The electricity network limits how big a solar system each home can connect, and three-phase homes can usually connect more. It also decides which inverter your home needs.",
+      },
+      { type: "h2", text: "Three ways to check" },
+      {
+        type: "list",
+        items: [
+          "Look at your switchboard: a main switch that's three switches joined together often means three phase. A single one usually means single phase.",
+          "Check your meter or bill: some show 'three phase' or list three sets of readings.",
+          "Ask an electrician, or tick 'not sure' and we'll check for you.",
+        ],
+      },
+      {
+        type: "note",
+        text: "Only a licensed electrician should open or work on your switchboard. Looking at the front is fine; leave the rest to the professionals.",
+      },
+      { type: "tip", text: "Snap a photo of your switchboard with the cover open (don't touch anything) and keep it handy for your call." },
+    ],
+  },
+  {
+    slug: "feed-in-tariffs-explained",
+    title: "Feed-in tariffs: why exporting solar pays less than you think",
+    short: "Feed-in tariffs, explained",
+    summary:
+      "You're paid a little for solar you send to the grid, but it's usually far less than what you pay for power. Here's what that means for you.",
+    topic: "Your bill",
+    updated: "2026-09-30",
+    minutes: 2,
+    answer:
+      "A feed-in tariff is the credit your retailer pays for solar you send to the grid. It's usually a small fraction of what you pay per kWh, so solar is worth the most when you use it yourself or store it.",
+    body: [
+      { type: "h2", text: "A quick comparison" },
+      {
+        type: "p",
+        text: "Look at your bill: the price you pay for each kWh from the grid is usually several times the credit you get for each kWh you export. Every kWh you use yourself saves you the full price; every kWh you export earns you the small credit.",
+      },
+      { type: "h2", text: "What this means in practice" },
+      {
+        type: "list",
+        items: [
+          "Using your solar during the day is worth more than exporting it.",
+          "A battery turns cheap exports into evening power you'd otherwise buy at full price.",
+          "Feed-in rates vary between retailers and change over time, so it's worth checking your plan once a year.",
+        ],
+      },
+      { type: "h2", text: "Who sets it?" },
+      {
+        type: "p",
+        text: "Your electricity retailer sets the rate on your plan. In Victoria, the Essential Services Commission sets a minimum each year.",
+      },
+      {
+        type: "link",
+        text: "Essential Services Commission: minimum feed-in tariff",
+        href: "https://www.esc.vic.gov.au/electricity-and-gas/prices-tariffs-and-benchmarks/minimum-feed-tariff",
+      },
+      {
+        type: "tip",
+        text: "When you compare electricity plans after getting solar, don't just chase the highest feed-in rate: a plan with a lower usage price can save you more.",
+      },
+    ],
+  },
+  {
+    slug: "solar-myths",
+    title: "Five solar myths, busted (cloudy days, blackouts and more)",
+    short: "Five solar myths, busted",
+    summary:
+      "Does solar work on cloudy days? Will it keep my lights on in a blackout? Quick, honest answers to the things people often get wrong.",
+    topic: "Everyday solar",
+    updated: "2026-09-30",
+    minutes: 3,
+    answer:
+      "Solar still works on cloudy days (just less), doesn't power your home in a blackout unless it's set up for backup, and panels don't need to face north to be worth it.",
+    body: [
+      { type: "h2", text: "Myth 1: solar doesn't work on cloudy days" },
+      {
+        type: "p",
+        text: "Panels make power from daylight, not heat, so they keep working when it's cloudy, just less. Your savings are worked out over a whole year, cloudy days included.",
+      },
+      { type: "h2", text: "Myth 2: solar keeps the lights on in a blackout" },
+      {
+        type: "p",
+        text: "Most systems switch off in a blackout, as Australian standards require, so they don't send power into lines that people may be working on. To keep chosen circuits running you need a battery set up for backup (with us, that's Blackout Backup).",
+      },
+      { type: "h2", text: "Myth 3: panels have to face north" },
+      {
+        type: "p",
+        text: "North gets the most sun, but east and west roofs work well and spread your solar across the morning and afternoon.",
+      },
+      { type: "h2", text: "Myth 4: solar is only worth it if you're home all day" },
+      {
+        type: "p",
+        text: "Being home helps you use more of it, but the fridge, hot water timers and appliances you schedule for the day all count. A battery covers the evening.",
+      },
+      { type: "h2", text: "Myth 5: panels need lots of maintenance" },
+      {
+        type: "p",
+        text: "Not really. Rain cleans most tilted panels, and an occasional check is usually all they need. See our guide to looking after your panels.",
+      },
+      {
+        type: "tip",
+        text: "Heard something else about solar and not sure if it's true? Ask me in the chat. I'll give you a straight answer.",
+      },
+    ],
+  },
+  {
+    slug: "solar-and-electric-cars",
+    title: "Solar and electric cars: charging your car from your roof",
+    short: "Charging an EV with solar",
+    summary:
+      "An electric car can soak up your spare solar. Here's how it works, what a smart charger does and when charging at home makes sense.",
+    topic: "Everyday solar",
+    updated: "2026-09-30",
+    minutes: 2,
+    answer:
+      "An electric car is a great way to use spare solar: plug it in during the day and it charges from your roof instead of the grid. A smart charger can do this automatically, using only the solar you'd otherwise export.",
+    body: [
+      { type: "h2", text: "Why they pair so well" },
+      {
+        type: "p",
+        text: "A car battery is big, so it can soak up solar that would otherwise go to the grid for a small credit. Driving on your own sunshine is usually the cheapest way to run a car.",
+      },
+      { type: "h2", text: "What a smart charger does" },
+      {
+        type: "list",
+        items: [
+          "Charges faster than a normal power point.",
+          "Can follow your solar, speeding up when there's spare and slowing down when there isn't.",
+          "Lets you set times, so it tops up off-peak if the car's home at night.",
+        ],
+      },
+      { type: "h2", text: "What if the car's at work all day?" },
+      {
+        type: "p",
+        text: "Then weekends and days at home are your solar charging days, and a home battery or an off-peak plan can help the rest of the week.",
+      },
+      { type: "p", text: "Our Maximum option includes a smart EV charger, and you can switch it on or off when you look at your system." },
+      { type: "tip", text: "Planning an EV in the next few years? Mention it when you size your solar, so the system has room for it." },
+    ],
+  },
+  {
+    slug: "looking-after-your-solar-panels",
+    title: "Looking after your solar panels: cleaning, checks and warranties",
+    short: "Looking after your panels",
+    summary: "Panels need very little care. Here's what's worth doing, what to leave alone, and what the warranties usually cover.",
+    topic: "Everyday solar",
+    updated: "2026-09-30",
+    minutes: 3,
+    answer:
+      "Panels need very little looking after. Rain cleans most of them, a glance at your app tells you they're working, and the warranties cover the panels, the inverter, any battery and the installation separately.",
+    body: [
+      { type: "h2", text: "Cleaning" },
+      {
+        type: "list",
+        items: [
+          "Tilted panels are usually cleaned by the rain.",
+          "Flat panels, or homes near the coast, dusty roads or trees, may need an occasional clean.",
+          "Hose from the ground, or use a professional. Please don't climb onto the roof.",
+        ],
+      },
+      { type: "h2", text: "Easy checks" },
+      {
+        type: "list",
+        items: [
+          "Look at your system's app now and then: a sudden drop on a sunny day is worth a question.",
+          "Check the inverter for warning lights.",
+          "Keep an eye on trees growing into the panels' sun.",
+        ],
+      },
+      { type: "h2", text: "What the warranties usually cover" },
+      {
+        type: "list",
+        items: [
+          "Panels: a product warranty and a performance warranty, often 25 years or more.",
+          "Inverter: usually a shorter warranty than the panels.",
+          "Battery: often around 10 years.",
+          "Installation: the workmanship, from whoever installed it.",
+        ],
+      },
+      {
+        type: "note",
+        text: "Warranty terms differ by product and maker. The documents for your system are the ones that count, and they're kept on your installation record in My RENUABL.",
+      },
+      { type: "tip", text: "If something looks off, book a service visit in My RENUABL. Warranty work is free." },
+    ],
+  },
 ];
 
 export function guideBySlug(slug: string): Guide | undefined {
@@ -381,6 +733,7 @@ export function guideText(g: Guide): string {
     if (b.type === "list") parts.push(...b.items);
     else parts.push(b.text);
   }
+  parts.push(g.answer);
   return parts.join("\n");
 }
 
