@@ -1,4 +1,5 @@
 import { ArrowRight, Droplets, Sun } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { ButtonLink, Card } from "@/components/ui/primitives";
 import { EXAMPLE_PLAN, HEALTH_TEASER, HOW_IT_WORKS, PACKAGES } from "@/lib/domain/healthy-home";
@@ -52,8 +53,14 @@ export function PackagesSection() {
       <div className="mt-8 grid gap-5 md:grid-cols-2">
         {PACKAGES.cards.map((card) => (
           <Card key={card.name} className="overflow-hidden">
-            {/* Photo slot: a neutral placeholder until the photos arrive. */}
-            <div className="aspect-[5/2] bg-surface-2" aria-hidden />
+            {/* Photo slot: a neutral placeholder until each package's photo arrives. */}
+            {card.image ? (
+              <div className="relative aspect-[1200/628] bg-surface-2">
+                <Image src={card.image.src} alt={card.image.alt} fill sizes="(min-width: 768px) 50vw, 100vw" className="object-cover" />
+              </div>
+            ) : (
+              <div className="aspect-[1200/628] bg-surface-2" aria-hidden />
+            )}
             <div className="p-6">
               <p className="text-[20px] tracking-[-0.02em] text-ink">{card.name}</p>
               <p className="mt-1 text-[15px] text-muted">{card.line}</p>

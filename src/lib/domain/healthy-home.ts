@@ -39,11 +39,16 @@ export const PACKAGES = {
     {
       name: "Renewable package",
       line: "Make and store your own clean power.",
+      image: {
+        src: "/brand/package-renewable.webp",
+        alt: "A street at night during a blackout, with one home lit up by its solar and battery",
+      },
       chips: ["Solar", "Battery", "EV charger", "Heat-pump hot water", "Induction cooking", "Blackout backup"],
     },
     {
       name: "Healthy home package",
       line: "Cleaner air, better water, better sleep.",
+      image: null,
       chips: [
         "Air purification",
         "Air-quality monitoring",
