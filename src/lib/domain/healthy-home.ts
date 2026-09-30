@@ -9,7 +9,7 @@ export const HOME_HERO = {
   headline: "A healthier home, powered by the sun.",
   /** The headline as it's set on the home page: three lines. */
   headlineLines: ["A healthier home,", "powered by", "the sun."],
-  steps: ["Upload your bill", "Pick your install date", "Make your home healthier"],
+  steps: ["Upload your bill", "Get your solar and battery plan", "Pick your install date"],
   label: "Your home plan, priced in about two minutes.",
   healthLink: "Healthy home? Take the check",
   learnLine: "Plain-English guides to solar, batteries, rebates and a healthier home.",
@@ -70,7 +70,7 @@ export const HOW_IT_WORKS = [
   { title: "Upload your bill", detail: "We size your solar and battery from how your home actually uses power." },
   { title: "Pick your install date", detail: "Accredited local partners install everything. We handle rebates and paperwork." },
   {
-    title: "Make your home healthier",
+    title: "Check your home's health",
     detail: "After you reserve, a quick Home Health check gives you ideas and free tips for your air, water, comfort and sleep.",
   },
 ] as const;
