@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
-import { PREVIEW_MODE } from "@/lib/config";
-import { publicSiteUrl } from "@/lib/domain/site";
+import { publicSiteUrl, searchIndexing } from "@/lib/domain/site";
 
+/** Production allows every crawler (private areas aside) and lists the sitemap; other deployments stay out of search. */
 export default function robots(): MetadataRoute.Robots {
-  if (PREVIEW_MODE) return { rules: { userAgent: "*", disallow: "/" } };
+  if (!searchIndexing()) return { rules: { userAgent: "*", disallow: "/" } };
   return {
-    rules: { userAgent: "*", allow: "/", disallow: ["/installer", "/admin", "/api/", "/my", "/start"] },
+    rules: { userAgent: "*", allow: "/", disallow: ["/installer", "/admin", "/api/", "/my", "/start", "/login", "/deposit"] },
     sitemap: `${publicSiteUrl()}/sitemap.xml`,
   };
 }

@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Caveat, Inter, Source_Serif_4 } from "next/font/google";
-import { PREVIEW_MODE } from "@/lib/config";
-import { publicSiteUrl } from "@/lib/domain/site";
+import { publicSiteUrl, searchIndexing } from "@/lib/domain/site";
 import { MetaPixel } from "@/components/meta-pixel";
 import "./globals.css";
 
@@ -14,8 +13,8 @@ export const metadata: Metadata = {
   metadataBase: new URL(publicSiteUrl()),
   title: { default: "RENUABL — Renewable energy on your terms", template: "%s · RENUABL" },
   description: "Solar and batteries, sized to your bill. One system made for your home, one installer, one price.",
-  // Keep preview deployments out of search results.
-  robots: PREVIEW_MODE ? { index: false, follow: false } : undefined,
+  // Keep Vercel preview deployments (not the live site) out of search results.
+  robots: searchIndexing() ? undefined : { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
