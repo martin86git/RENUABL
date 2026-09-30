@@ -56,7 +56,6 @@ export default function HomePage() {
             <span className="sun-mark">sun</span>
             {headlineAfter}
           </h1>
-          <p className="mt-4 max-w-xl text-[16px] leading-relaxed text-muted lg:text-[17px]">{HOME_HERO.sub}</p>
           <ol className="mt-5 space-y-2 text-[16px] text-muted lg:mt-6 lg:text-[17px]">
             {HOME_HERO.steps.map((step, i) => (
               <li key={step} className="flex items-center gap-3">

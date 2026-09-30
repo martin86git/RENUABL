@@ -19,7 +19,10 @@ export default function Image() {
         color: "#1A1A1A",
       }}
     >
-      <div style={{ fontSize: 34, letterSpacing: 12, color: "#1E3A2E" }}>RENUABL</div>
+      <div style={{ display: "flex", flexDirection: "column", color: "#1E3A2E" }}>
+        <div style={{ fontSize: 34, letterSpacing: 12 }}>RENUABL</div>
+        <div style={{ fontSize: 14, letterSpacing: 7, marginTop: 6 }}>HOME &amp; ENERGY</div>
+      </div>
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div style={{ fontSize: 76, lineHeight: 1.05, letterSpacing: -2 }}>A healthier home,</div>
         <div style={{ fontSize: 76, lineHeight: 1.05, letterSpacing: -2 }}>powered by the sun.</div>

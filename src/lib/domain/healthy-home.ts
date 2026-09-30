@@ -7,7 +7,6 @@
 export const HOME_HERO = {
   eyebrow: "One platform. One journey.",
   headline: "A healthier home, powered by the sun.",
-  sub: "Solar and a battery sized to your bill, plus cleaner air, filtered water and lighting designed for better sleep. Planned together, installed by accredited local partners.",
   steps: ["Upload your bill", "Pick your install date", "Make your home healthier"],
   label: "Your home plan, priced in about two minutes.",
   healthLink: "Healthy home? Take the check",

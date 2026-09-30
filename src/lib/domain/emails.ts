@@ -58,7 +58,7 @@ export function orderConfirmationEmail(o: OrderEmail): { subject: string; html: 
 
   const html = `<!doctype html><html><body style="margin:0;background:#FAF9F6;font-family:Inter,Arial,sans-serif;color:#1A1A1A">
 <div style="max-width:560px;margin:0 auto;padding:32px 20px">
-<p style="letter-spacing:.28em;font-size:14px;margin:0 0 24px">RENUABL</p>
+<p style="letter-spacing:.28em;font-size:14px;margin:0">RENUABL</p><p style="letter-spacing:.42em;font-size:8px;color:#1E3A2E;margin:4px 0 24px">HOME &amp; ENERGY</p>
 <h1 style="font-weight:400;font-size:28px;margin:0 0 8px">You're all set, ${esc(clip(o.firstName, 40))}.</h1>
 <p style="color:#6B6B6B;margin:0 0 24px">Your date is reserved (${esc(o.reference)}). There's nothing to pay today.</p>
 <div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:16px">
@@ -125,7 +125,7 @@ export function callBookedEmail(o: { reference: string; firstName: string; call:
   const heading = o.changed ? `Your call has moved, ${clip(o.firstName, 40)}.` : `Your call is booked, ${clip(o.firstName, 40)}.`;
   const body = `We'll call you on ${o.call} for your 15-minute system confirmation. We'll confirm your roof, switchboard and access, and show you your design and products. It isn't a sales call. Reservation ${o.reference}.`;
   const html = `<!doctype html><html><body style="margin:0;background:#FAF9F6;font-family:Inter,Arial,sans-serif;color:#1A1A1A"><div style="max-width:560px;margin:0 auto;padding:32px 20px">
-<p style="letter-spacing:.28em;font-size:14px;margin:0 0 24px">RENUABL</p>
+<p style="letter-spacing:.28em;font-size:14px;margin:0">RENUABL</p><p style="letter-spacing:.42em;font-size:8px;color:#1E3A2E;margin:4px 0 24px">HOME &amp; ENERGY</p>
 <h1 style="font-weight:400;font-size:26px;margin:0 0 12px">${esc(heading)}</h1>
 <p style="margin:0">${esc(body)}</p>
 <p style="margin:16px 0 0">${esc(CHANGE_BOOKING_NOTE)}</p>
@@ -223,7 +223,7 @@ export function partnerReceivedEmail(o: { reference: string; firstName: string; 
   const subject = `We've received your RENUABL application (${o.reference})`;
   const body = `Thanks for applying to become a RENUABL ${role}. We'll check your accreditation, licence and insurance and be in touch shortly. Your reference is ${o.reference}.`;
   const html = `<!doctype html><html><body style="margin:0;background:#FAF9F6;font-family:Inter,Arial,sans-serif;color:#1A1A1A"><div style="max-width:560px;margin:0 auto;padding:32px 20px">
-<p style="letter-spacing:.28em;font-size:14px;margin:0 0 24px">RENUABL</p>
+<p style="letter-spacing:.28em;font-size:14px;margin:0">RENUABL</p><p style="letter-spacing:.42em;font-size:8px;color:#1E3A2E;margin:4px 0 24px">HOME &amp; ENERGY</p>
 <h1 style="font-weight:400;font-size:26px;margin:0 0 12px">Thanks, ${esc(plainText(o.firstName, 40) || "there")}.</h1>
 <p style="margin:0">${esc(body)}</p>
 <p style="color:#6B6B6B;font-size:12px;margin-top:24px">Questions? Just reply to this email.</p>
@@ -240,7 +240,7 @@ function simpleEmail(o: { subject: string; heading: string; lines: string[]; but
     ? `<p style="margin:24px 0"><a href="${esc(o.button.href)}" style="display:inline-block;background:#1E3A2E;color:#fff;text-decoration:none;padding:14px 22px;border-radius:999px;font-size:15px">${esc(o.button.label)}</a></p>`
     : "";
   const html = `<!doctype html><html><body style="margin:0;background:#FAF9F6;font-family:Inter,Arial,sans-serif;color:#1A1A1A"><div style="max-width:560px;margin:0 auto;padding:32px 20px">
-<p style="letter-spacing:.28em;font-size:14px;margin:0 0 24px">RENUABL</p>
+<p style="letter-spacing:.28em;font-size:14px;margin:0">RENUABL</p><p style="letter-spacing:.42em;font-size:8px;color:#1E3A2E;margin:4px 0 24px">HOME &amp; ENERGY</p>
 <h1 style="font-weight:400;font-size:26px;margin:0 0 12px">${esc(o.heading)}</h1>
 ${o.lines.map((l) => `<p style="margin:0 0 10px">${esc(l)}</p>`).join("\n")}
 ${btn}
