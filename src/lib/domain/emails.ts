@@ -1,3 +1,4 @@
+import { WHOOP_COPY } from "./whoop-offer";
 /** Customer emails, as subject + HTML + plain text. Pure and tested; sending is in src/lib/server/email.ts. */
 
 export interface OrderEmail {
@@ -22,6 +23,8 @@ export interface OrderEmail {
   interested?: string[];
   /** "Tuesday 13 October at 10:30am", when the call is already booked. */
   call?: string;
+  /** A founding WHOOP was claimed for this order (set on the server, never from the browser). */
+  whoop?: boolean;
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
@@ -49,6 +52,7 @@ export function orderConfirmationEmail(o: OrderEmail): { subject: string; html: 
           row("Your upfront cost", money(o.outOfPocket ?? o.total), { bold: true }),
         ]
       : []),
+    ...(o.whoop ? [row(WHOOP_COPY.giftLine, "$0", { green: true })] : []),
     row("Due today", "$0"),
   ].join("");
 
@@ -71,6 +75,7 @@ ${o.interested?.length ? `<p style="font-size:14px;margin:12px 0 0">Coming soon:
 <div style="background:#D9E7DC;border-radius:16px;padding:20px;color:#1E3A2E;font-size:14px">
 <p style="margin:0 0 6px"><strong>What happens next</strong></p>
 <p style="margin:0">${esc(next)} After the call we'll send a secure link for the ${money(o.deposit)} refundable deposit to lock in your date.</p>
+${o.whoop ? `<p style="margin:10px 0 0">${esc(WHOOP_COPY.confirmed)}</p>` : ""}
 <p style="margin:10px 0 0">${esc(CHANGE_BOOKING_NOTE)}</p>
 </div>
 <p style="color:#6B6B6B;font-size:12px;margin-top:24px">Questions? Just reply to this email.</p>
@@ -91,12 +96,14 @@ ${o.interested?.length ? `<p style="font-size:14px;margin:12px 0 0">Coming soon:
     ...o.rebates.map((r) => `${r.label}: -${money(r.amount)}`),
     `Total after rebates: ${money(o.total)}`,
     ...(o.loan ? [`Solar Victoria interest-free loan: -${money(o.loan)}`, `Your upfront cost: ${money(o.outOfPocket ?? o.total)}`] : []),
+    o.whoop && `${WHOOP_COPY.giftLine}: $0`,
     "Due today: $0",
     o.discuss?.length && `To discuss on your call: ${o.discuss.join(", ")} (not included in your price).`,
     o.interested?.length && `Coming soon: ${o.interested.join(", ")}. We'll let you know when it's available.`,
     "",
     next,
     `After the call we'll send a secure link for the ${money(o.deposit)} refundable deposit to lock in your date.`,
+    o.whoop && WHOOP_COPY.confirmed,
     CHANGE_BOOKING_NOTE,
   ]
     .filter((l): l is string => typeof l === "string")
@@ -291,6 +298,21 @@ export function finishLaterEmail(o: { link: string }) {
   });
 }
 
+/** Sent once, two days after a reservation, when the Home Health check hasn't been done. */
+export function healthReminderEmail(o: { firstName: string; link: string }) {
+  const first = plainText(o.firstName, 40) || "there";
+  return simpleEmail({
+    subject: "How healthy is your home?",
+    heading: `Hi ${first}, two minutes for a healthier home?`,
+    lines: [
+      "Answer a few quick questions about your air, water, comfort and sleep, and we'll show you what would make the biggest difference, including free fixes.",
+      "If anything's worth doing, it can often be installed on the same visit as your solar. Every question is optional.",
+    ],
+    button: { label: "Take the Home Health check", href: o.link },
+    footer: "You're getting this because you reserved an installation with RENUABL. Just reply if you have any questions.",
+  });
+}
+
 /** The installation partner has designed the customer's panel layout: a look before install day. */
 export function layoutReadyEmail(o: { customer: string; panels: number; partner: string; link: string }) {
   const first = plainText(o.customer, 40).split(" ")[0] || "there";
@@ -318,7 +340,7 @@ export function leadAlertRecipients(raw: string | undefined): string[] {
 
 /** Internal: a new lead, to RENUABL staff (not the customer). Plain text only; nothing from the browser is linked. */
 export function newLeadEmail(o: {
-  kind: "reservation" | "no-bill";
+  kind: "reservation" | "no-bill" | "home-health";
   reference?: string;
   name?: string;
   email: string;
@@ -345,12 +367,19 @@ export function newLeadEmail(o: {
         lines: [...(o.reference ? [`Reference: ${plainText(o.reference, 20)}`] : []), ...lines],
         footer: "Also in HubSpot. The job has been offered to the installation partner.",
       })
-    : simpleEmail({
-        subject: `New lead (no bill yet): ${who}`,
-        heading: "New lead: didn't have their bill handy",
-        lines: [...lines, "They've been emailed a link to come back and finish. Worth a follow-up call or email."],
-        footer: "Also in HubSpot.",
-      });
+    : o.kind === "home-health"
+      ? simpleEmail({
+          subject: `Home Health check: ${who}`,
+          heading: "Someone completed the Home Health check",
+          lines: [...lines, "Follow up on any quote requests before their install date, so upgrades can go in on the same visit."],
+          footer: "Also in HubSpot and on /admin.",
+        })
+      : simpleEmail({
+          subject: `New lead (no bill yet): ${who}`,
+          heading: "New lead: didn't have their bill handy",
+          lines: [...lines, "They've been emailed a link to come back and finish. Worth a follow-up call or email."],
+          footer: "Also in HubSpot.",
+        });
 }
 
 /** To the job's installation partner: the customer moved their install day. Suburb only, like an offer; the job page has the rest. */

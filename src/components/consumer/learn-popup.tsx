@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { MascotAvatar } from "@/components/ui/brand-art";
-import { REVO_PAGE_LINES } from "@/lib/domain/revo";
 import { LEARN_NAME, LEARN_POPUP, guideBySlug, shouldShowLearnPopup, type Guide } from "@/lib/domain/guides";
 import { closeLearnPopup, learnPopupClosedAt } from "@/lib/services/learn-popup";
 
@@ -41,8 +40,8 @@ export function LearnPopup() {
     setOpen(false);
   };
 
-  // Revo's corner avatar; its speech bubble steps aside while the pop-up is open.
-  const revo = <AskRenuabl context="home" variant="revo" page line={open ? "" : REVO_PAGE_LINES.home} />;
+  // The small "Ask Revo" launcher in the corner; the pop-up sits just above it.
+  const revo = <AskRenuabl context="home" variant="launcher" title="Ask Revo" />;
   if (!open) return revo;
 
   return (

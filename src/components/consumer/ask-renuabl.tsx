@@ -114,8 +114,8 @@ export function AskRenuabl({
   page,
 }: {
   context: AskContext;
-  /** "revo": the persistent companion (a speech bubble with Revo's `line`, and Revo's avatar). */
-  variant?: "card" | "link" | "revo";
+  /** "revo": the persistent companion (a speech bubble with Revo's `line`, and Revo's avatar). "launcher": a small floating "Ask Revo" button. */
+  variant?: "card" | "link" | "revo" | "launcher";
   title?: string;
   subtitle?: string;
   arrow?: "dark" | "light";
@@ -158,6 +158,19 @@ export function AskRenuabl({
     <Dialog.Root open={open} onOpenChange={setOpen}>
       {variant === "revo" ? (
         <RevoCompanion line={line ?? ""} page={page} className={className} />
+      ) : variant === "launcher" ? (
+        <Dialog.Trigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "fixed bottom-4 right-4 z-30 flex items-center gap-2 rounded-full bg-surface py-1.5 pl-1.5 pr-4 text-[14px] text-ink shadow-[var(--shadow-lift)] transition hover:scale-[1.03] lg:bottom-6 lg:right-6",
+              className,
+            )}
+          >
+            <MascotAvatar className="h-9 w-9" />
+            {title}
+          </button>
+        </Dialog.Trigger>
       ) : variant === "link" ? (
         <Dialog.Trigger asChild>
           <button type="button" className={cn("tap-area inline-flex items-center gap-2 text-[14px] text-ink-2 hover:text-ink", className)}>

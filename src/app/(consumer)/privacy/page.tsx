@@ -23,6 +23,7 @@ export default function PrivacyPage() {
           and don&apos;t keep the file.
         </li>
         <li>Photos you upload of an existing inverter, which we read for its make and model and don&apos;t keep.</li>
+        <li>Your answers to the Home Health check, if you take it (see below).</li>
         <li>For installation partners: business, licence, insurance and payment details given when applying or working with us.</li>
         <li>How you use our website, such as the pages you visit and where you came from (for example an advertisement).</li>
       </ul>
@@ -57,12 +58,24 @@ export default function PrivacyPage() {
         make sure they protect it.
       </p>
 
+      <h2>Home Health check</h2>
+      <p>
+        The Home Health check asks optional questions about your home&apos;s air, water, comfort, sleep and lighting. Every question is
+        optional. We use your answers only to recommend healthy home upgrades and to quote the ones you ask about, and we keep them with
+        your order so you can see them in My RENUABL.
+      </p>
+      <p>
+        One question asks whether anyone in the home has allergies or sensitive breathing. That&apos;s health information, so we only record
+        your answer if you tick to agree, we use it only for your recommendations, and we don&apos;t share it with anyone, including our
+        advertising, customer records or installation partners. You can ask us to delete it at any time.
+      </p>
+
       <h2>Advertising</h2>
       <p>
         We advertise on Facebook and Instagram and use the Meta Pixel to see whether our ads work. It runs only on our public pages and the
-        steps to price a system, and tells Meta when a page is visited and when a bill has been read. We never send Meta your bill, its
-        contents, your address, name, email, phone number or prices. Meta may use cookies to link these visits to your Facebook or Instagram
-        account; you can manage this in your Meta ad settings or by blocking cookies in your browser.
+        steps to price a system (never on the Home Health check), and tells Meta when a page is visited and when a bill has been read. We
+        never send Meta your bill, its contents, your address, name, email, phone number or prices. Meta may use cookies to link these
+        visits to your Facebook or Instagram account; you can manage this in your Meta ad settings or by blocking cookies in your browser.
       </p>
 
       <h2>Keeping it safe</h2>

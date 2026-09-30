@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { HEALTH_TEASER } from "@/lib/domain/healthy-home";
+import { WHOOP_COPY, WHOOP_OFFER } from "@/lib/domain/whoop-offer";
 import { ArrowRight, CalendarDays, Check, Gift, HeartPulse, Lock, Mail, PhoneCall, UserRound, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { AddToCalendar } from "@/components/consumer/add-to-calendar";
@@ -43,8 +46,8 @@ function ConfirmedScreen() {
       hideMobileHeader
       title={<span className="sr-only">Confirmation</span>}
       cta={
-        <ButtonLink href="/my" size="lg" className="w-full lg:w-80">
-          Preview your RENUABL home <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
+        <ButtonLink href="/home-health" size="lg" className="w-full lg:w-80">
+          Next: How healthy is your home? <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
         </ButtonLink>
       }
     >
@@ -117,6 +120,7 @@ function ConfirmedScreen() {
                 detail={`We've emailed your order and price breakdown to ${state.contact.email}.`}
               />
             )}
+            {state.reservation?.whoop && <Item icon={Gift} title={`Free ${WHOOP_OFFER.product}`} detail={WHOOP_COPY.confirmed} />}
             {state.reservation?.careIncluded && (
               <Item
                 icon={Gift}
@@ -137,6 +141,20 @@ function ConfirmedScreen() {
           Need to change something? Use &ldquo;Change call time&rdquo; or &ldquo;Change install date&rdquo; above, or just reply to your
           confirmation email and we&apos;ll sort it out.
         </p>
+
+        <Card className="mt-6 bg-sage p-5 text-left text-forest">
+          <p className="text-[17px]">{HEALTH_TEASER.heading}</p>
+          <p className="mt-1 text-[13.5px] leading-relaxed">
+            About two minutes. We&apos;ll show what would help most in your home, including free fixes. Upgrades can often go in on your
+            install day.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-4">
+            <ButtonLink href="/home-health">{HEALTH_TEASER.button}</ButtonLink>
+            <Link href="/my" className="tap-area text-[13.5px] underline underline-offset-4">
+              Skip for now
+            </Link>
+          </div>
+        </Card>
 
         <div className="mt-8 text-left">
           <p className="text-[15px] text-ink">After your system is switched on</p>

@@ -24,7 +24,8 @@ describe("Revo's guides", () => {
   it("link only to official https sources", () => {
     for (const g of GUIDES)
       for (const b of g.body)
-        if (b.type === "link") expect(b.href).toMatch(/^https:\/\/(www\.)?(solar\.vic\.gov\.au|cer\.gov\.au|esc\.vic\.gov\.au)\//);
+        if (b.type === "link" && !b.href.startsWith("/"))
+          expect(b.href).toMatch(/^https:\/\/(www\.)?(solar\.vic\.gov\.au|cer\.gov\.au|esc\.vic\.gov\.au)\//);
   });
 });
 

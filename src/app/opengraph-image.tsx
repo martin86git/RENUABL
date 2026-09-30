@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "RENUABL: solar and batteries, sized to your bill";
+export const alt = "RENUABL: a healthier home, powered by the sun";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -21,11 +21,11 @@ export default function Image() {
     >
       <div style={{ fontSize: 34, letterSpacing: 12, color: "#1E3A2E" }}>RENUABL</div>
       <div style={{ display: "flex", flexDirection: "column" }}>
-        <div style={{ fontSize: 76, lineHeight: 1.05, letterSpacing: -2 }}>Solar and batteries,</div>
-        <div style={{ fontSize: 76, lineHeight: 1.05, letterSpacing: -2 }}>sized to your bill.</div>
+        <div style={{ fontSize: 76, lineHeight: 1.05, letterSpacing: -2 }}>A healthier home,</div>
+        <div style={{ fontSize: 76, lineHeight: 1.05, letterSpacing: -2 }}>powered by the sun.</div>
       </div>
       <div style={{ display: "flex", fontSize: 30, color: "#1E3A2E" }}>
-        <div style={{ background: "#D9E7DC", borderRadius: 999, padding: "12px 28px" }}>Your system, priced in about two minutes</div>
+        <div style={{ background: "#D9E7DC", borderRadius: 999, padding: "12px 28px" }}>Your home plan, priced in about two minutes</div>
       </div>
     </div>,
     size,

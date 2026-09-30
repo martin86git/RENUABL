@@ -139,6 +139,8 @@ export interface ReservationResult {
   careIncluded: boolean;
   /** The order confirmation email went out. */
   emailed?: boolean;
+  /** A founding WHOOP was claimed for this order (the server's answer). */
+  whoop?: boolean;
 }
 
 export type ReserveResult = { ok: true; reservation: ReservationResult } | { ok: false; message?: string; errors?: ContactErrors };
@@ -182,6 +184,8 @@ export async function reserveInstall(input: {
   call?: CallSlot | null;
   /** The tickboxes: Terms and Privacy (required) and tips and offers (optional). */
   consent: { terms: boolean; marketing: boolean };
+  /** "I'm interested in healthy home upgrades" (optional, unticked). */
+  healthyHomeInterest?: boolean;
 }): Promise<ReserveResult> {
   try {
     const res = await fetch("/api/reserve", {
@@ -195,12 +199,14 @@ export async function reserveInstall(input: {
         job: input.job,
         call: input.call ?? undefined,
         consent: input.consent,
+        healthyHomeInterest: input.healthyHomeInterest === true,
       }),
     });
     const json = (await res.json()) as {
       ok: boolean;
       reservationId?: string;
       emailed?: boolean;
+      whoop?: boolean;
       message?: string;
       errors?: ContactErrors;
     };
@@ -213,6 +219,7 @@ export async function reserveInstall(input: {
         care: input.careIncluded ? null : input.care,
         careIncluded: input.careIncluded,
         emailed: json.emailed === true,
+        whoop: json.whoop === true,
       },
     };
   } catch {

@@ -3,6 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuideBody, GuideCard, GuideCta, GuideFrame, ShortAnswer } from "@/components/consumer/guide-page";
 import { GUIDES, LEARN_NAME, guideBySlug } from "@/lib/domain/guides";
+import { WhoopGuideLine } from "@/components/consumer/whoop-promo";
+
+/** The battery guides end with the founding WHOOP offer. */
+const WHOOP_GUIDES = new Set(["do-i-need-a-home-battery", "what-size-battery-do-i-need"]);
 import { breadcrumbJsonLd, jsonLdHtml } from "@/lib/domain/seo";
 import { publicSiteUrl } from "@/lib/domain/site";
 
@@ -80,6 +84,7 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
         <p className="mt-4 text-[18px] leading-relaxed text-muted">{guide.summary}</p>
         <ShortAnswer text={guide.answer} />
         <GuideBody blocks={guide.body} />
+        {WHOOP_GUIDES.has(guide.slug) && <WhoopGuideLine />}
       </article>
       <GuideCta />
       <h2 className="mt-12 text-[19px] font-normal">Keep reading</h2>

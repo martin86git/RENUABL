@@ -9,7 +9,9 @@ import { cleanOrder, orderConfirmationEmail, plainText } from "@/lib/domain/emai
 import { cleanJobRequest } from "@/lib/domain/jobs";
 import { dbConfigured } from "@/lib/server/db";
 import { sendEmail } from "@/lib/server/email";
-import { createJob, referenceTaken } from "@/lib/server/jobs-repo";
+import { createJob, referenceTaken, setHealthyInterest } from "@/lib/server/jobs-repo";
+import { claimWhoop } from "@/lib/server/whoop-repo";
+import { whoopEligible } from "@/lib/domain/whoop-offer";
 import { alertNewLead } from "@/lib/server/lead-alert";
 import { offerNext } from "@/lib/server/offers-engine";
 import { addNote, reservationNote, upsertContact } from "@/lib/server/hubspot-crm";
@@ -25,6 +27,7 @@ export async function POST(request: Request) {
     contact?: Record<string, unknown>;
     details?: Record<string, unknown>;
     consent?: unknown;
+    healthyHomeInterest?: unknown;
     order?: unknown;
     installDate?: string;
     job?: unknown;
@@ -51,7 +54,13 @@ export async function POST(request: Request) {
   if (call) details["Confirmation call booked"] = call.label;
   details.Consent = consentRecord({ kind: "reserve", marketing: consent.marketing, at: new Date(), timeZone: LAUNCH_MARKET.timeZone });
   const reservationId = await newReference();
-  await saveJob(reservationId, checked.contact, body.job);
+  const healthyInterest = body.healthyHomeInterest === true;
+  if (healthyInterest) details["Healthy home interest"] = "Yes: interested in air, water or lighting upgrades";
+  await saveJob(reservationId, checked.contact, body.job, healthyInterest);
+  // Founding WHOOP: one per order with a battery, counted on the server against the cap.
+  const whoop = await claimWhoopFor(reservationId, body.job);
+  if (whoop !== null)
+    details["WHOOP founding offer"] = whoop ? "Claimed: ships after installation" : "Not claimed: all founding WHOOPs are taken";
   // Straight to RENUABL's inbox too, whatever happens with HubSpot.
   await alertNewLead({
     kind: "reservation",
@@ -61,21 +70,21 @@ export async function POST(request: Request) {
     mobile: checked.contact.mobile,
     details,
   });
-  const email = () => confirmationEmail(reservationId, checked.contact, body.order, body.installDate, call);
+  const email = () => confirmationEmail(reservationId, checked.contact, body.order, body.installDate, call, whoop === true);
 
   const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
   if (!token) {
     // No CRM yet: keep the lead in the logs rather than lose it.
     console.warn(`reservation ${reservationId} (HubSpot not configured)`, JSON.stringify({ contact: checked.contact, details }));
     const emailed = await email();
-    return Response.json({ ok: true, reservationId, emailed });
+    return Response.json({ ok: true, reservationId, emailed, whoop: whoop === true });
   }
 
   try {
     const contactId = await upsertContact(checked.contact, token);
     await addNote(contactId, reservationNote(reservationId, details), token);
     const emailed = await email();
-    return Response.json({ ok: true, reservationId, emailed });
+    return Response.json({ ok: true, reservationId, emailed, whoop: whoop === true });
   } catch (e) {
     console.error(
       `reservation ${reservationId} failed to reach HubSpot`,
@@ -97,6 +106,7 @@ async function confirmationEmail(
   rawOrder: unknown,
   installDate: string | undefined,
   call: { date: string; time: string; label: string } | null,
+  whoop: boolean,
 ): Promise<boolean> {
   const order = cleanOrder(rawOrder);
   if (!order) return false;
@@ -104,6 +114,7 @@ async function confirmationEmail(
     const mail = orderConfirmationEmail({
       ...order,
       call: call?.label,
+      whoop,
       reference,
       firstName: plainText(contact.firstName, 40) || "there",
     });
@@ -159,6 +170,7 @@ async function saveJob(
   reference: string,
   contact: { firstName: string; lastName: string; mobile: string; email: string },
   rawJob: unknown,
+  healthyInterest: boolean,
 ) {
   if (!dbConfigured()) return;
   const req = cleanJobRequest(rawJob);
@@ -172,8 +184,21 @@ async function saveJob(
       { name: `${contact.firstName} ${contact.lastName}`.trim(), phone: contact.mobile, email: contact.email },
       req,
     );
+    if (healthyInterest) await setHealthyInterest(reference);
     await offerNext(job.id);
   } catch (e) {
     console.error(`reservation ${reference}: job not saved`, e instanceof Error ? e.message : e);
+  }
+}
+
+/** Claims a founding WHOOP when the order includes a battery. null = not eligible or can't be counted. */
+async function claimWhoopFor(reference: string, rawJob: unknown): Promise<boolean | null> {
+  const req = cleanJobRequest(rawJob);
+  if (!req || !whoopEligible(req.system) || !dbConfigured()) return null;
+  try {
+    return await claimWhoop(reference);
+  } catch (e) {
+    console.error(`reservation ${reference}: WHOOP claim failed`, e instanceof Error ? e.message : e);
+    return null;
   }
 }

@@ -283,3 +283,20 @@ export async function obstructionsFor(recordKey: string): Promise<unknown> {
     (await query<{ obstructions: unknown }>(`select obstructions from jobs where record_key = $1`, [recordKey]))[0]?.obstructions ?? null
   );
 }
+
+/** The customer ticked "I'm interested in healthy home upgrades". */
+export async function setHealthyInterest(reference: string) {
+  await query(`update jobs set healthy_home_interest = true where reference = $1`, [reference]);
+}
+
+/** A reservation's own job, checked by reference and email (the customer's proof it's theirs). */
+export async function jobByReferenceAndEmail(
+  reference: string,
+  email: string,
+): Promise<{ reference: string; install_date: string | null } | null> {
+  const rows = await query<{ reference: string; install_date: string | null }>(
+    `select reference, to_char(install_date, 'YYYY-MM-DD') as install_date from jobs where reference = $1 and customer_email = $2`,
+    [reference, email.toLowerCase()],
+  );
+  return rows[0] ?? null;
+}

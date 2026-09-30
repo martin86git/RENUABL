@@ -73,6 +73,8 @@ export interface FlowState {
   attribution: Attribution | null;
   /** The Meta Pixel Lead event has been sent this visit (once, on the first bill read). */
   leadTracked: boolean;
+  /** "I'm interested in healthy home upgrades" on the reserve step (optional, unticked). */
+  healthyInterest: boolean;
 }
 
 const EMPTY: FlowState = {
@@ -99,6 +101,7 @@ const EMPTY: FlowState = {
   call: null,
   attribution: null,
   leadTracked: false,
+  healthyInterest: false,
 };
 
 const DEFAULT_PROFILE: EnergyProfile = { ev: false, evPlanned: false, wantsBattery: false, backup: false };

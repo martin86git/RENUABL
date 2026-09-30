@@ -109,6 +109,36 @@ create table if not exists price_overrides (
   upload_id text references price_uploads(id),
   updated_at timestamptz not null default now()
 );
+create table if not exists whoop_claims (
+  job_reference text primary key,
+  status text not null default 'claimed',
+  claimed_at timestamptz not null default now(),
+  shipped_at timestamptz,
+  delivered_at timestamptz,
+  released_at timestamptz
+);
+alter table jobs add column if not exists healthy_home_interest boolean not null default false;
+alter table jobs add column if not exists health_reminded_at timestamptz;
+create table if not exists home_health (
+  id text primary key,
+  job_reference text unique,
+  email text,
+  address text,
+  answers jsonb not null,
+  plan jsonb not null,
+  sensitive_consent boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists health_quotes (
+  id text primary key,
+  job_reference text,
+  email text,
+  item text not null,
+  status text not null default 'requested',
+  created_at timestamptz not null default now(),
+  unique (job_reference, item)
+);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,
@@ -128,6 +158,27 @@ async function ensureSchema() {
       throw e;
     });
   return g.__renuablSchema;
+}
+
+/** Runs `fn` in one transaction on one connection (for counters that must not overshoot). */
+export async function transaction<T>(
+  fn: (q: <R extends QueryResultRow = QueryResultRow>(text: string, params?: unknown[]) => Promise<R[]>) => Promise<T>,
+): Promise<T> {
+  await ensureSchema();
+  const client = await pool().connect();
+  try {
+    await client.query("begin");
+    const result = await fn(
+      async <R extends QueryResultRow = QueryResultRow>(text: string, params: unknown[] = []) => (await client.query<R>(text, params)).rows,
+    );
+    await client.query("commit");
+    return result;
+  } catch (e) {
+    await client.query("rollback").catch(() => undefined);
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 export async function query<T extends QueryResultRow = QueryResultRow>(text: string, params: unknown[] = []): Promise<T[]> {

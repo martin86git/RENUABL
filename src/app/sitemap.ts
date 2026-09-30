@@ -4,7 +4,7 @@ import { publicSiteUrl } from "@/lib/domain/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const site = publicSiteUrl();
-  const pages = ["", "/learn", "/partners", "/privacy", "/terms", "/contact"].map((path) => ({
+  const pages = ["", "/learn", "/home-health", "/partners", "/offer-terms", "/privacy", "/terms", "/contact"].map((path) => ({
     url: `${site}${path}`,
     changeFrequency: "monthly" as const,
     priority: path === "" ? 1 : path === "/learn" ? 0.8 : 0.4,

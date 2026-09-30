@@ -61,9 +61,15 @@ export function GuideBody({ blocks }: { blocks: GuideBlock[] }) {
         if (b.type === "link")
           return (
             <p key={i}>
-              <a href={b.href} target="_blank" rel="noopener noreferrer" className="tap-area text-forest underline underline-offset-4">
-                {b.text}
-              </a>
+              {b.href.startsWith("/") ? (
+                <Link href={b.href} className="tap-area text-forest underline underline-offset-4">
+                  {b.text}
+                </Link>
+              ) : (
+                <a href={b.href} target="_blank" rel="noopener noreferrer" className="tap-area text-forest underline underline-offset-4">
+                  {b.text}
+                </a>
+              )}
             </p>
           );
         return <p key={i}>{b.text}</p>;

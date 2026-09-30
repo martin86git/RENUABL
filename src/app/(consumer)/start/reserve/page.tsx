@@ -18,6 +18,9 @@ import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_PLAN, careIncludedFor, careInclude
 import { formatCurrency, formatDate } from "@/lib/domain/format";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { describeInverter } from "@/lib/domain/inverter";
+import { useWhoopOpen } from "@/lib/services/whoop";
+import { WHOOP_COPY, whoopEligible } from "@/lib/domain/whoop-offer";
+import { HEALTHY_INTEREST_LABEL } from "@/lib/domain/healthy-home";
 import { ConsentBoxes, NO_CONSENT, type ConsentState } from "@/components/consumer/consent-boxes";
 import { PRICE_INCLUDES, RESERVE_NO_COMMITMENT, TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
 import { solarVictoriaApplies } from "@/lib/domain/rebates";
@@ -64,6 +67,7 @@ function ReserveScreen() {
   const consentRef = useRef<HTMLDivElement>(null);
   const callRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const whoopOpen = useWhoopOpen();
   const installer = state.installerId ? getInstaller(state.installerId) : undefined;
   const window = state.windowId ? getWindow(state.windowId) : undefined;
 
@@ -91,6 +95,7 @@ function ReserveScreen() {
       installDate: state.installDate,
       call: state.call,
       consent,
+      healthyHomeInterest: state.healthyInterest,
       job: {
         address: state.address,
         system: config,
@@ -210,6 +215,18 @@ function ReserveScreen() {
             <p className="text-[14px] tabular-nums text-ink">{formatCurrency(l.amount)}</p>
           </li>
         ))}
+        {whoopOpen && whoopEligible(config) && (
+          <li className="flex items-center gap-3 py-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sage text-forest">
+              <Gift className="h-5 w-5" strokeWidth={1.6} aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] text-ink">{WHOOP_COPY.giftLine}</p>
+              <p className="text-[12px] text-muted">{WHOOP_COPY.ships}</p>
+            </div>
+            <p className="text-[14px] font-semibold tabular-nums text-positive">$0</p>
+          </li>
+        )}
         {careIncluded && (
           <li className="flex items-center gap-3 py-3">
             <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sage text-forest">
@@ -498,6 +515,17 @@ function ReserveScreen() {
       <p className="mt-4 flex items-center gap-2 text-[12px] text-muted">
         <Lock className="h-3.5 w-3.5 shrink-0" strokeWidth={1.6} /> We only use your details for your RENUABL system. No spam.
       </p>
+      <label className="mt-4 flex cursor-pointer items-start gap-2.5 px-3.5 text-[12.5px] leading-snug text-ink-2">
+        <input
+          type="checkbox"
+          checked={state.healthyInterest}
+          onChange={(e) => update({ healthyInterest: e.target.checked })}
+          className="mt-px h-4 w-4 shrink-0 accent-[var(--primary)]"
+        />
+        <span>
+          {HEALTHY_INTEREST_LABEL} <span className="text-muted">(Optional)</span>
+        </span>
+      </label>
       <div ref={consentRef} className="scroll-mt-6">
         <ConsentBoxes kind="reserve" value={consent} onChange={setConsent} missing={consentMissing} className="mt-4" />
       </div>

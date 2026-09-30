@@ -40,6 +40,7 @@ export interface Guide {
 export const GUIDE_TOPICS = [
   "Sizing",
   "Batteries",
+  "Healthy home",
   "Rebates",
   "Your bill",
   "Your home",
@@ -718,6 +719,197 @@ export const GUIDES: Guide[] = [
         text: "Warranty terms differ by product and maker. The documents for your system are the ones that count, and they're kept on your installation record in My RENUABL.",
       },
       { type: "tip", text: "If something looks off, book a service visit in My RENUABL. Warranty work is free." },
+    ],
+  },
+  {
+    slug: "gas-cooking-and-indoor-air",
+    title: "Cooking on gas: what it means for the air in your kitchen",
+    short: "Gas cooking and indoor air",
+    summary:
+      "A gas cooktop burns gas inside your home. Here's what that puts into the air, and simple ways to keep your kitchen air fresher.",
+    topic: "Healthy home",
+    updated: "2026-09-30",
+    minutes: 3,
+    answer:
+      "Burning gas releases combustion gases, including nitrogen dioxide, into your kitchen. A rangehood that vents outside helps a lot. Induction cooking avoids it altogether because nothing is burned.",
+    body: [
+      { type: "h2", text: "What's in the air when you cook on gas" },
+      {
+        type: "p",
+        text: "A gas flame is combustion, like a small fire. Along with heat, it gives off gases such as nitrogen dioxide and carbon monoxide, plus fine particles from the cooking itself. In a kitchen, those mix straight into the air you breathe.",
+      },
+      { type: "h2", text: "Why ventilation matters" },
+      {
+        type: "list",
+        items: [
+          "A rangehood ducted to the outside removes fumes at the source. Recirculating hoods filter grease but don't take gases outside.",
+          "Use the back burners when you can: most rangehoods capture more from there.",
+          "Open a window while cooking if you don't have a ducted rangehood.",
+        ],
+      },
+      { type: "h2", text: "What induction changes" },
+      {
+        type: "p",
+        text: "An induction cooktop heats the pan with a magnetic field, so there's no flame and no combustion gases. It's also quick, easy to clean and runs on electricity, which your solar can supply during the day.",
+      },
+      { type: "h2", text: "Is it worth switching?" },
+      {
+        type: "list",
+        items: [
+          "Switching usually means a new cooktop, a quick electrical check and sometimes new pans (a magnet should stick to the base).",
+          "If you're planning to leave gas altogether, induction is a common place to start, alongside heat-pump hot water.",
+          "Doing it at the same time as solar means one visit and one plan.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Turn the rangehood on before you start cooking and leave it running for a few minutes after. It's the easiest free fix there is.",
+      },
+      { type: "link", text: "Take the Home Health check", href: "/home-health" },
+    ],
+  },
+  {
+    slug: "better-bedroom-air-overnight",
+    title: "How to improve the air in your bedroom overnight",
+    short: "Fresher bedroom air overnight",
+    summary:
+      "Waking up to a stuffy room is common in closed-up bedrooms. Here's why it happens and what helps, starting with the free fixes.",
+    topic: "Healthy home",
+    updated: "2026-09-30",
+    minutes: 3,
+    answer:
+      "A closed bedroom slowly fills with the air you breathe out, which is why it can feel stuffy by morning. A little fresh air overnight is the simplest fix; a monitor shows you when it's needed, and fresh-air ventilation does it for you.",
+    body: [
+      { type: "h2", text: "Why bedrooms get stuffy" },
+      {
+        type: "p",
+        text: "Every breath adds carbon dioxide and moisture to the room. With the door and windows shut for eight hours, levels build up, especially in smaller rooms or with two people. That's the heavy, stale feeling some people notice when they wake up.",
+      },
+      { type: "h2", text: "Free fixes to try first" },
+      {
+        type: "list",
+        items: [
+          "Leave a window open a crack, or the bedroom door ajar.",
+          "Air the room out for ten minutes in the morning.",
+          "Keep the bedroom a little cooler: stale air feels worse in a warm room.",
+        ],
+      },
+      { type: "h2", text: "When a monitor helps" },
+      {
+        type: "p",
+        text: "An air-quality monitor measures carbon dioxide, humidity and particles and shows them on a small display or your phone. It takes the guesswork out: you can see whether the room needs more fresh air, and whether what you've changed is working.",
+      },
+      { type: "h2", text: "Fresh-air ventilation" },
+      {
+        type: "p",
+        text: "A fresh-air system brings filtered outdoor air in and takes stale air out, without opening windows. That suits homes near busy roads, with noise at night, or where windows stay shut in winter. Some systems recover heat from the outgoing air, so the house doesn't lose its warmth.",
+      },
+      { type: "h2", text: "Condensation or mould?" },
+      {
+        type: "p",
+        text: "Water on the windows in the morning, or mould in corners, usually means moist air isn't getting out. Ventilation or a dehumidifier helps, and it's worth fixing sooner rather than later.",
+      },
+      {
+        type: "tip",
+        text: "Try one week with the window open a crack and one with it closed. If mornings feel noticeably fresher, fresh air is what the room needs.",
+      },
+      { type: "link", text: "Take the Home Health check", href: "/home-health" },
+    ],
+  },
+  {
+    slug: "water-filtration-explained",
+    title: "Water filtration explained: jug, under-sink or whole-house?",
+    short: "Water filtration explained",
+    summary:
+      "Australian tap water is treated to strict guidelines. Filters are about taste, chlorine and peace of mind. Here's how the main types compare.",
+    topic: "Healthy home",
+    updated: "2026-09-30",
+    minutes: 3,
+    answer:
+      "Tap water in Victoria is treated to meet the Australian Drinking Water Guidelines. Filters mostly change taste and smell (chlorine) and catch sediment. A tap or under-sink filter covers drinking and cooking water; a whole-house filter covers every tap and shower.",
+    body: [
+      { type: "h2", text: "Why people filter" },
+      {
+        type: "list",
+        items: [
+          "Taste and smell: mostly the chlorine used to keep water safe on its way to you.",
+          "Sediment from older pipes, or after works on the mains.",
+          "Water in the shower that feels softer on skin and hair (a common reason for whole-house filters).",
+        ],
+      },
+      { type: "h2", text: "The main types" },
+      {
+        type: "list",
+        items: [
+          "Jug filters: cheap and simple, for drinking water only. Cartridges need changing often.",
+          "Under-sink filters: a filter under the kitchen sink with its own tap or through your mixer. Filters drinking and cooking water with little fuss.",
+          "Reverse osmosis: filters more finely, but wastes some water and needs more maintenance.",
+          "Whole-house filters: fitted where water enters the home, so every tap and shower is filtered.",
+        ],
+      },
+      { type: "h2", text: "What to check" },
+      {
+        type: "list",
+        items: [
+          "What it's certified to remove. Look for independent certification, not just a brand claim.",
+          "How often cartridges need changing, and what they cost.",
+          "Whether a licensed plumber needs to fit it (under-sink and whole-house filters usually do).",
+        ],
+      },
+      {
+        type: "note",
+        text: "A filter only works if it's maintained. An old cartridge can do more harm than good, so set a reminder to change it.",
+      },
+      { type: "tip", text: "Not sure what's in your water? Your water retailer publishes a yearly water quality report for your area." },
+      { type: "link", text: "Take the Home Health check", href: "/home-health" },
+    ],
+  },
+  {
+    slug: "circadian-lighting-explained",
+    title: "Circadian lighting explained: bright mornings, warm evenings",
+    short: "Circadian lighting explained",
+    summary:
+      "Lights that change brightness and colour through the day, following natural daylight. Here's what circadian lighting is and how it works in a home.",
+    topic: "Healthy home",
+    updated: "2026-09-30",
+    minutes: 3,
+    answer:
+      "Circadian lighting changes its brightness and colour through the day: bright, cooler light in the morning and dim, warm light in the evening, following natural daylight. It runs on a schedule, so you don't have to think about it.",
+    body: [
+      { type: "h2", text: "What it does" },
+      {
+        type: "p",
+        text: "Daylight changes from bright and cool at midday to warm and soft at sunset. Circadian lighting follows the same pattern indoors, using smart globes or fittings that can change their colour temperature and brightness on a schedule.",
+      },
+      { type: "h2", text: "What it looks like at home" },
+      {
+        type: "list",
+        items: [
+          "Mornings: lights brighten gently before your alarm, like a sunrise.",
+          "Daytime: brighter, cooler light for cooking, working and reading.",
+          "Evenings: warmer, dimmer light, instead of harsh white overhead lights.",
+          "Night: a soft, low path light for getting up without switching everything on.",
+        ],
+      },
+      { type: "h2", text: "Where to start" },
+      {
+        type: "list",
+        items: [
+          "The main bedroom is the usual first room: a gentle morning light makes a noticeable difference to waking up in a dark room.",
+          "Living areas next, where evening lighting matters most.",
+          "It can often reuse your existing light points, so it's mostly a change of globes, switches or fittings.",
+        ],
+      },
+      { type: "h2", text: "Pairs well with" },
+      {
+        type: "p",
+        text: "Blackout or smart blinds keep streetlights and early sunrise out, so the lighting you choose is the light you get. Both can be planned and installed alongside your solar.",
+      },
+      {
+        type: "tip",
+        text: "Harsh evening lights? Swap the globe you use most after dark for a warm-white one. It's a small change you'll notice straight away.",
+      },
+      { type: "link", text: "Take the Home Health check", href: "/home-health" },
     ],
   },
 ];

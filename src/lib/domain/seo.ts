@@ -6,8 +6,8 @@
 import { LEGAL } from "./legal";
 import { LAUNCH_MARKET } from "./market";
 
-export const HOME_TITLE = "Solar and batteries in Melbourne, sized to your bill";
-export const HOME_DESCRIPTION = `Upload your power bill and see one solar and battery system sized for your ${LAUNCH_MARKET.name} home, priced with rebates, in about two minutes. Reserving is free.`;
+export const HOME_TITLE = "Solar, batteries and a healthier home in Melbourne";
+export const HOME_DESCRIPTION = `Solar and a battery sized to your power bill, plus cleaner air, filtered water and better lighting for your ${LAUNCH_MARKET.name} home. Priced with rebates in about two minutes.`;
 
 /** Organization + WebSite for the home page. */
 export function siteJsonLd(site: string) {

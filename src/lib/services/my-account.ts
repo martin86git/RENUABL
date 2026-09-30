@@ -1,4 +1,7 @@
 /** Server only. The signed-in customer's own reservations, for My RENUABL. */
+import { WHOOP_STATUS_LABELS, type WhoopStatus } from "@/lib/domain/whoop-offer";
+import { latestHealthFor, quotedItems } from "@/lib/server/home-health-repo";
+import { whoopClaimFor } from "@/lib/server/whoop-repo";
 import type { JobStatus } from "@/lib/domain/jobs";
 import { currentSession } from "@/lib/server/accounts";
 import { dbConfigured, query } from "@/lib/server/db";
@@ -47,8 +50,12 @@ export async function getMyReservations() {
     return f ? customerOutlookLine(f) : null;
   };
   const forecasts = await Promise.all(jobs.map(forecastLine));
+  const whoop = await Promise.all(jobs.map((j) => whoopClaimFor(j.reference).catch(() => null)));
+  const health = await latestHealthFor(session.email).catch(() => null);
+  const quoted = health ? await quotedItems(health).catch(() => []) : [];
   return {
     email: session.email,
+    health: health ? { plan: health.plan, quoted } : null,
     reservations: jobs.map((j, i) => ({
       forecast: forecasts[i],
       reference: j.reference,
@@ -57,6 +64,7 @@ export async function getMyReservations() {
       status: CUSTOMER_STATUS[j.status],
       partner: j.partnerId ? (names.get(j.partnerId) ?? null) : null,
       recordKey: j.recordKey,
+      whoop: whoop[i] && whoop[i].status !== "released" ? WHOOP_STATUS_LABELS[whoop[i].status as Exclude<WhoopStatus, "released">] : null,
     })),
   };
 }

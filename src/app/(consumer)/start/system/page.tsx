@@ -1,5 +1,6 @@
 "use client";
 
+import { WhoopOptionNote } from "@/components/consumer/whoop-promo";
 import {
   ArrowRight,
   Battery,
@@ -229,6 +230,7 @@ function SystemScreen() {
           onChange={(t) => update({ tier: t, config: null })}
           options={(Object.keys(TIER_LABELS) as SystemTier[]).map((t) => ({ value: t, label: TIER_LABELS[t] }))}
         />
+        <WhoopOptionNote hasBattery={config.batteryKwh > 0} />
         {!CARE_ENABLED ? null : careIncludedFor(state.tier) ? (
           <CareIncludedCard />
         ) : (
