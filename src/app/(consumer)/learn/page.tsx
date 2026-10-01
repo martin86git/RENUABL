@@ -4,14 +4,14 @@ import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { GUIDES, GUIDES_TAGLINE, GUIDE_TOPICS, LEARN_NAME } from "@/lib/domain/guides";
 
 export const metadata: Metadata = {
-  title: "Learn with Revo: solar, batteries and rebates in plain English",
+  title: "Learn with Revo: solar, batteries, rebates and home health in plain English",
   description: "Plain-language guides to sizing solar from your bill, home batteries and Victorian rebates. " + GUIDES_TAGLINE,
   alternates: { canonical: "/learn" },
   openGraph: {
     type: "website",
     siteName: "RENUABL",
     locale: "en_AU",
-    title: "Learn with Revo: solar, batteries and rebates in plain English",
+    title: "Learn with Revo: solar, batteries, rebates and home health in plain English",
     url: "/learn",
     images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
   },
@@ -22,7 +22,7 @@ export default function LearnPage() {
     <GuideFrame wide>
       <p className="text-[13px] tracking-[0.02em] text-forest lg:text-[14px]">{LEARN_NAME}</p>
       <h1 className="mt-3 max-w-3xl text-[38px] font-normal leading-[1.05] tracking-[-0.04em] lg:text-[56px]">
-        Solar, batteries and rebates, in plain English.
+        Solar, batteries, rebates and home health, in plain English.
       </h1>
       <p className="mt-4 max-w-2xl text-[16px] text-muted lg:text-[17px]">{GUIDES_TAGLINE}</p>
       <div className="mt-4">

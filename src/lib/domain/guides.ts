@@ -911,6 +911,69 @@ export const GUIDES: Guide[] = [
       { type: "link", text: "Take the Home Health check", href: "/home-health" },
     ],
   },
+  {
+    slug: "how-lighting-affects-mood",
+    title: "How lighting changes the mood of your home",
+    short: "Lighting and mood",
+    summary:
+      "Warm or cool, bright or dim, overhead or low: the light in a room changes how it feels. Here's how to use it at home, room by room, without rewiring.",
+    topic: "Healthy home",
+    updated: "2026-10-01",
+    minutes: 4,
+    answer:
+      "Light sets the feel of a room. Bright, cool light feels crisp and wide awake; dim, warm light feels calm and cosy. Matching the light to the time of day and what you're doing is one of the easiest ways to change how your home feels.",
+    body: [
+      { type: "h2", text: "1. Colour: warm or cool" },
+      {
+        type: "p",
+        text: "Light has a colour, measured in kelvin (K). Lower numbers are warmer and more golden, like candlelight or a sunset. Higher numbers are cooler and whiter, like a bright overcast day. The number is printed on the globe's box.",
+      },
+      {
+        type: "list",
+        items: [
+          "2,700K (warm white): soft and golden. Living rooms and bedrooms in the evening.",
+          "3,000K to 4,000K (neutral): clear but friendly. Kitchens, bathrooms, laundries.",
+          "5,000K and up (cool white): crisp and bright. Garages, workshops and task lights.",
+        ],
+      },
+      { type: "h2", text: "2. Brightness: how much, and where" },
+      {
+        type: "p",
+        text: "One bright light in the middle of the ceiling makes a room feel flat. Several softer lights at different heights, like a floor lamp, a lamp on a side table and lights under the kitchen cupboards, make it feel layered and relaxed. Dimmers let one room do both.",
+      },
+      { type: "h2", text: "3. Timing: follow the day" },
+      {
+        type: "p",
+        text: "Daylight changes all day: bright and cool around midday, warm and low at sunset. Many people find their home feels more natural when the lights do the same, brighter in the morning and softer as the evening goes on. Smart globes can do this on a schedule, so you don't have to remember.",
+      },
+      { type: "h2", text: "Room by room" },
+      {
+        type: "list",
+        items: [
+          "Kitchen: bright, neutral light over the bench where you work, and something softer for the evening.",
+          "Living room: warm lamps after dark instead of the main ceiling light.",
+          "Bedroom: warm and dim in the evening, and a gentle light that brightens in the morning if you wake in the dark.",
+          "Home office: bright, neutral light from the side, so there's no glare on the screen.",
+          "Hallways at night: a low, warm night light, so a midnight trip doesn't mean switching everything on.",
+        ],
+      },
+      { type: "h2", text: "Don't forget daylight" },
+      {
+        type: "p",
+        text: "The most mood-changing light is free. Open the blinds first thing, keep a seat near the brightest window and trim anything blocking it. In the evening, blinds or curtains keep streetlights out, so the lighting you've chosen is the light you get.",
+      },
+      { type: "h2", text: "What it costs to run" },
+      {
+        type: "p",
+        text: "Modern LED globes use a fraction of the power of old halogen or incandescent ones, so a few extra lamps add very little to your bill. With solar, the lights you use during the day run on your own sunshine, and with a battery, your evening lights can too.",
+      },
+      {
+        type: "tip",
+        text: "Start with one swap: put a warm-white (2,700K) globe in the lamp you use most after dark. You'll feel the difference that same evening.",
+      },
+      { type: "link", text: "Take the Home Health check", href: "/home-health" },
+    ],
+  },
 ];
 
 export function guideBySlug(slug: string): Guide | undefined {

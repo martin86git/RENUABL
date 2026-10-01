@@ -30,7 +30,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
         <div>{LEARN_NAME}</div>
       </div>
       <div style={{ fontSize: guide && guide.title.length > 60 ? 58 : 68, lineHeight: 1.1, letterSpacing: -1.5 }}>
-        {guide?.title ?? "Solar, batteries and rebates, in plain English."}
+        {guide?.title ?? "Solar, batteries, rebates and home health, in plain English."}
       </div>
       <div style={{ display: "flex", fontSize: 28, color: "#1E3A2E" }}>
         <div style={{ background: "#D9E7DC", borderRadius: 999, padding: "10px 26px" }}>

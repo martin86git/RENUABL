@@ -72,7 +72,7 @@ export function LearnPopup() {
           </div>
         </div>
         <p className="mt-3 text-[14px] leading-snug text-ink-2">
-          Plain-English guides to solar, batteries and rebates, so you know what you&apos;re buying.
+          Plain-English guides to solar, batteries, rebates and home health, so you know what you&apos;re buying.
         </p>
         <ul className="mt-3 space-y-1">
           {FEATURED.map((g) => (
