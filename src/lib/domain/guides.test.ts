@@ -25,7 +25,9 @@ describe("Revo's guides", () => {
     for (const g of GUIDES)
       for (const b of g.body)
         if (b.type === "link" && !b.href.startsWith("/"))
-          expect(b.href).toMatch(/^https:\/\/(www\.)?(solar\.vic\.gov\.au|cer\.gov\.au|esc\.vic\.gov\.au)\//);
+          expect(b.href).toMatch(
+            /^https:\/\/(www\.)?(solar\.vic\.gov\.au|cer\.gov\.au|esc\.vic\.gov\.au|melbournewater\.com\.au|yvw\.com\.au|southeastwater\.com\.au|gww\.com\.au|nhmrc\.gov\.au|health\.vic\.gov\.au)\//,
+          );
   });
 });
 

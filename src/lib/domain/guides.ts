@@ -974,6 +974,186 @@ export const GUIDES: Guide[] = [
       { type: "link", text: "Take the Home Health check", href: "/home-health" },
     ],
   },
+  {
+    slug: "kitchen-tap-or-whole-house-water-filter",
+    title: "Kitchen tap or whole-house water filter? What each does, and when one is enough",
+    short: "Kitchen tap or whole-house filter?",
+    summary:
+      "A filter at the kitchen tap treats the water you drink and cook with; a whole-house filter treats every tap and shower. Here's what each does, what it takes to look after, and how to choose.",
+    topic: "Healthy home",
+    updated: "2026-10-01",
+    minutes: 4,
+    answer:
+      "A kitchen tap filter treats the water you drink and cook with. A whole-house filter treats every tap and shower. If drinking water is what matters to you, a kitchen filter is often enough; if you also notice chlorine in the shower, look at whole-house.",
+    body: [
+      { type: "h2", text: "Kitchen tap (under-sink) filters" },
+      {
+        type: "list",
+        items: [
+          "Fits in the cupboard under the sink, usually with its own small tap or feeding your existing one.",
+          "Carbon filters reduce chlorine taste and smell and many other compounds. Some models add a finer stage for very small particles.",
+          "Reverse osmosis systems go further and remove most dissolved minerals (including fluoride), but they're bigger and send some water down the drain as they work.",
+          "Upkeep: a new cartridge every 6 to 12 months for most models, often a five-minute twist-off job.",
+        ],
+      },
+      { type: "h2", text: "Whole-house filters" },
+      {
+        type: "list",
+        items: [
+          "Installed by a plumber where the water main enters your home, so every tap and shower gets filtered water.",
+          "Usually a sediment stage (for grit and rust) then a larger carbon stage (for chlorine taste and smell).",
+          "Upkeep: the sediment cartridge every 6 to 12 months, and the carbon stage every few years, depending on the model and how much water you use.",
+          "Most use no electricity at all. Systems with UV treatment use a small, steady amount of power.",
+        ],
+      },
+      { type: "h2", text: "When one is enough" },
+      {
+        type: "list",
+        items: [
+          "Mainly want nicer drinking water? A kitchen tap filter.",
+          "Notice chlorine in the shower, or want filtered water everywhere? Whole-house.",
+          "Renting, or not ready to call a plumber? A jug or benchtop filter is a low-cost place to start.",
+          "On tank water? Talk to a plumber about sediment and UV treatment first: tank water has different needs to mains water.",
+        ],
+      },
+      { type: "h2", text: "What to check before you buy" },
+      {
+        type: "list",
+        items: [
+          "What it's certified to reduce: look for independent certification (for example, to NSF/ANSI standards) for the things you care about.",
+          "How often the cartridges need changing, and what they cost. That's the real running cost.",
+          "Flow rate for whole-house systems, so your showers keep their pressure.",
+          "Who installs it: plumbing work in Victoria must be done by a licensed plumber.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Set a phone reminder when you fit a new cartridge. An old, clogged filter stops doing its job long before the water stops flowing.",
+      },
+      { type: "link", text: "Take the Home Health check", href: "/home-health" },
+    ],
+  },
+  {
+    slug: "whats-in-melbourne-tap-water",
+    title: "What's actually in Melbourne tap water? Chlorine, fluoride and hardness explained",
+    short: "What's in Melbourne tap water?",
+    summary:
+      "Melbourne's tap water is treated, tested and reported on every year. Here's what the chlorine, fluoride and hardness figures mean, and where to read your own area's results.",
+    topic: "Healthy home",
+    // VERIFY: figures (fluoride about 1 mg/L, hardness well under 60 mg/L) against the current Melbourne Water and retailer reports.
+    updated: "2026-10-01",
+    minutes: 4,
+    answer:
+      "Melbourne's water comes mostly from protected forest catchments. It has a little chlorine to keep it clean in the pipes and fluoride for dental health, and it's very soft. It's tested against national guidelines, with results published every year.",
+    body: [
+      { type: "h2", text: "Where it comes from" },
+      {
+        type: "p",
+        text: "Most of Melbourne's water is collected in closed, forested catchments in the Yarra Ranges, with the desalination plant and other sources topping it up when needed. Melbourne Water treats and supplies it, and your local retailer (Greater Western Water, South East Water or Yarra Valley Water) delivers it to your tap.",
+      },
+      { type: "h2", text: "Chlorine" },
+      {
+        type: "list",
+        items: [
+          "A small amount is added so the water stays clean on its long trip through the pipes.",
+          "Levels are typically well under 1 mg/L at the tap. The Australian Drinking Water Guidelines' limit is 5 mg/L.",
+          "It's what you can sometimes taste or smell. A carbon filter, or a jug left in the fridge, reduces it.",
+          "A few outer areas use chloramine instead, which lasts longer in the pipes.",
+        ],
+      },
+      { type: "h2", text: "Fluoride" },
+      {
+        type: "list",
+        items: [
+          "Added to Melbourne's water since 1977, as required in Victoria, at around 1 mg/L.",
+          "The guidelines' limit is 1.5 mg/L.",
+          "Most carbon filters don't remove fluoride. Reverse osmosis does.",
+        ],
+      },
+      { type: "h2", text: "Hardness" },
+      {
+        type: "list",
+        items: [
+          "Hardness is the calcium and magnesium in water, the stuff that leaves white scale in kettles.",
+          "Melbourne's water is among the softest in Australia, typically well under 60 mg/L, the line between soft and hard.",
+          "That's why scale is rarely a problem here, and why most Melbourne homes don't need a water softener.",
+        ],
+      },
+      { type: "h2", text: "Check your own area" },
+      {
+        type: "p",
+        text: "Water quality is reported by supply zone. Your retailer's annual drinking water quality report lists the results for your area, and Melbourne Water explains how the water is tested along the way.",
+      },
+      {
+        type: "link",
+        text: "How Melbourne Water tests your water",
+        href: "https://www.melbournewater.com.au/water-and-environment/water-management/water-quality/water-quality-testing",
+      },
+      {
+        type: "link",
+        text: "Australian Drinking Water Guidelines (NHMRC)",
+        href: "https://www.nhmrc.gov.au/about-us/publications/australian-drinking-water-guidelines",
+      },
+      {
+        type: "tip",
+        text: "Water tastes of chlorine after a holiday? Run the cold tap for a minute first thing. It clears the water that's been sitting in your pipes.",
+      },
+      { type: "link", text: "Take the Home Health check", href: "/home-health" },
+    ],
+  },
+  {
+    slug: "fresh-air-ventilation-explained",
+    title: "Fresh-air ventilation explained: filtered air without opening a window",
+    short: "Fresh-air ventilation explained",
+    summary:
+      "A heat-recovery ventilation system swaps stale indoor air for filtered outdoor air, while keeping most of the warmth or cool you've paid for. Here's how it works and when it's worth it.",
+    topic: "Healthy home",
+    updated: "2026-10-01",
+    minutes: 4,
+    answer:
+      "A heat-recovery system quietly swaps stale indoor air for filtered outdoor air, all day. The two airflows pass each other in a heat exchanger, so most of your heating or cooling stays inside. It's most worth it in newer, well-sealed homes.",
+    body: [
+      { type: "h2", text: "Why homes need fresh air" },
+      {
+        type: "p",
+        text: "Cooking, showers, drying clothes and simply breathing all add moisture and stale air to a home. Older, draughty homes swap air through gaps whether you like it or not. Newer homes are built much tighter to save energy, which is great for bills, but it means fresh air has to be planned in rather than leaking in.",
+      },
+      { type: "h2", text: "How heat recovery works" },
+      {
+        type: "list",
+        items: [
+          "One small fan draws stale air out of wet and busy rooms: kitchen, bathrooms, laundry.",
+          "Another brings outdoor air in through a filter that catches dust and pollen.",
+          "The two airflows pass each other, without mixing, through a heat exchanger. In winter the outgoing warm air warms the incoming fresh air; in summer it works the other way.",
+          "Ducts deliver the fresh air to bedrooms and living areas. It runs all the time at a low, quiet speed, with a boost for cooking or showers.",
+        ],
+      },
+      { type: "h2", text: "When it's worth it" },
+      {
+        type: "list",
+        items: [
+          "New builds and major renovations, when ducts are easy to run.",
+          "Well-sealed homes, where condensation or stuffy rooms are a sign that air isn't changing enough.",
+          "Homes near busy roads, or where you'd rather keep windows closed for noise, pollen or smoke.",
+          "Less worth it in a very draughty older home: sealing the gaps comes first, or the system has to work against them.",
+        ],
+      },
+      { type: "h2", text: "What it takes to run" },
+      {
+        type: "list",
+        items: [
+          "The fans are small and use a modest amount of power, running around the clock. With solar, the daytime running is on your own sunshine.",
+          "Filters need cleaning or changing, usually every few months to a year, depending on the model and how dusty it is outside.",
+          "Installation needs ceiling space for the unit and ducts, and a qualified technician to set up and balance the airflows.",
+        ],
+      },
+      {
+        type: "tip",
+        text: "Before any system, try the free version: run the bathroom and rangehood fans while you shower and cook, and leave them on for ten minutes after.",
+      },
+      { type: "link", text: "Take the Home Health check", href: "/home-health" },
+    ],
+  },
 ];
 
 export function guideBySlug(slug: string): Guide | undefined {
