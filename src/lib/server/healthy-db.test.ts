@@ -54,7 +54,7 @@ describe.skipIf(!url)("WHOOP claims and Home Health (database)", () => {
   });
 
   it("saves a check and lists its answers for the tallies", async () => {
-    const answers = { "gas-cooking": "yes" };
+    const answers = { "drinking-filter": "no" };
     const saved = await health.saveHealthCheck({
       reference: null,
       email: "sam@example.com",
@@ -64,7 +64,7 @@ describe.skipIf(!url)("WHOOP claims and Home Health (database)", () => {
       sensitiveConsent: false,
     });
     const record = (await health.healthRecord(saved.id))!;
-    expect(record.plan.recommendations[0].item).toBe("induction");
+    expect(record.plan.recommendations[0].item).toBe("drinking-filter");
     expect(await health.allHealthAnswers()).toContainEqual(answers);
     expect((await health.latestHealthFor("SAM@example.com"))?.id).toBe(saved.id);
   });

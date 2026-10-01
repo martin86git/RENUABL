@@ -758,7 +758,6 @@ export const GUIDES: Guide[] = [
         items: [
           "Switching usually means a new cooktop, a quick electrical check and sometimes new pans (a magnet should stick to the base).",
           "If you're planning to leave gas altogether, induction is a common place to start, alongside heat-pump hot water.",
-          "If you're already having electrical work done, such as solar, doing it at the same time can save a visit.",
         ],
       },
       {

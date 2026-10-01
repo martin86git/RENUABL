@@ -63,9 +63,10 @@ describe("Home Health check", () => {
     for (const q of HEALTH_QUESTIONS) expect(q.options.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("recommends induction and a rangehood free fix for gas cooking", () => {
+  it("gives a rangehood free fix for gas cooking, and never recommends induction (not offered)", () => {
     const plan = healthPlan({ "gas-cooking": "yes" });
-    expect(plan.recommendations[0].item).toBe("induction");
+    expect(plan.recommendations).toHaveLength(0);
+    expect(Object.keys(HEALTH_ITEMS)).not.toContain("induction");
     expect(plan.freeFixes.map((f) => f.title)).toContain("Use the rangehood every time you cook");
   });
 

@@ -149,7 +149,6 @@ export const HEALTH_RESULTS_COPY = {
 
 /** Healthy home product types we recommend (not sold yet: information only). */
 export const HEALTH_ITEMS = {
-  induction: "Induction cooktop",
   "aq-monitor": "Air-quality monitor",
   ventilation: "Fresh-air ventilation",
   dehumidifier: "Dehumidifier",
@@ -203,7 +202,6 @@ export function healthPlan(a: HealthAnswers): HealthPlan {
   };
 
   if (is(a, "gas-cooking", "yes")) {
-    add("induction", "Gas cooktops burn gas inside your kitchen. Induction cooks without a flame, so there's no combustion in the room.");
     fixes.push({
       title: "Use the rangehood every time you cook",
       why: "It draws cooking fumes out of the kitchen. Leave it on for a few minutes after.",

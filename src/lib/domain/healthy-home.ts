@@ -46,7 +46,7 @@ export const PACKAGES = {
         src: "/brand/package-renewable.webp",
         alt: "A street at night during a blackout, with one home lit up by its solar and battery",
       },
-      chips: ["Solar", "Battery", "EV charger", "Heat-pump hot water", "Induction cooking", "Blackout backup"],
+      chips: ["Solar", "Battery", "EV charger", "Heat-pump hot water", "Blackout backup"],
     },
     {
       name: "Healthy home package",
