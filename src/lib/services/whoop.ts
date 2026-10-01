@@ -1,6 +1,6 @@
 "use client";
 
-/** Whether the founding WHOOP offer is open, asked once per page. Hidden until the server says it's open. */
+/** Whether the October WHOOP offer is open, asked once per page. Hidden until the server says it's open. */
 import { useEffect, useState } from "react";
 
 let pending: Promise<boolean> | null = null;

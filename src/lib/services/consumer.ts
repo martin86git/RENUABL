@@ -139,7 +139,7 @@ export interface ReservationResult {
   careIncluded: boolean;
   /** The order confirmation email went out. */
   emailed?: boolean;
-  /** A founding WHOOP was claimed for this order (the server's answer). */
+  /** An October-offer WHOOP was claimed for this order (the server's answer). */
   whoop?: boolean;
 }
 

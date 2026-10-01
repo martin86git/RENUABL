@@ -9,7 +9,7 @@ import {
   interestSummary,
   shareableAnswers,
 } from "./home-health";
-import { WHOOP_COPY, WHOOP_OFFER, nextWhoopStatus, whoopEligible, whoopOfferOpen } from "./whoop-offer";
+import { WHOOP_COPY, WHOOP_ENDS, WHOOP_OFFER, nextWhoopStatus, whoopEligible, whoopOfferOpen } from "./whoop-offer";
 
 const BANNED = /\b(cure|treat|prevent|guaranteed?|best|first ever|leading|AI|installer)\b|\$\d/i;
 
@@ -37,8 +37,18 @@ describe("WHOOP offer", () => {
   });
 
   it("closes at the cap", () => {
-    expect(whoopOfferOpen(WHOOP_OFFER.cap - 1)).toBe(true);
-    expect(whoopOfferOpen(WHOOP_OFFER.cap)).toBe(false);
+    expect(whoopOfferOpen(WHOOP_OFFER.cap - 1, "2026-10-15")).toBe(true);
+    expect(whoopOfferOpen(WHOOP_OFFER.cap, "2026-10-15")).toBe(false);
+  });
+
+  it("is the October offer: open to the end of 31 October, then closed", () => {
+    expect(WHOOP_OFFER.endsOn).toBe("2026-10-31");
+    expect(WHOOP_ENDS).toBe("31 October 2026");
+    expect(whoopOfferOpen(0, "2026-10-31")).toBe(true);
+    expect(whoopOfferOpen(0, "2026-11-01")).toBe(false);
+    expect(WHOOP_COPY.bannerLabel).toBe("October offer");
+    expect(WHOOP_COPY.bannerSmall).toContain("31 October 2026");
+    expect(JSON.stringify(WHOOP_COPY)).not.toMatch(/founding|first \d/i);
   });
 
   it("only moves forward, and only an unshipped claim can be released", () => {
@@ -52,7 +62,7 @@ describe("WHOOP offer", () => {
 
   it("states the value and the cap from one place", () => {
     expect(WHOOP_COPY.strip).toContain(`$${WHOOP_OFFER.value}`);
-    expect(WHOOP_COPY.first).toContain(String(WHOOP_OFFER.cap));
+    expect(WHOOP_COPY.bannerSmall).toContain(String(WHOOP_OFFER.cap));
   });
 });
 

@@ -5,7 +5,7 @@ import { GuideBody, GuideCard, GuideCta, GuideFrame, ShortAnswer } from "@/compo
 import { GUIDES, LEARN_NAME, guideBySlug } from "@/lib/domain/guides";
 import { WhoopGuideLine } from "@/components/consumer/whoop-promo";
 
-/** The battery guides end with the founding WHOOP offer. */
+/** The battery guides end with the October WHOOP offer. */
 const WHOOP_GUIDES = new Set(["do-i-need-a-home-battery", "what-size-battery-do-i-need"]);
 import { breadcrumbJsonLd, jsonLdHtml } from "@/lib/domain/seo";
 import { publicSiteUrl } from "@/lib/domain/site";

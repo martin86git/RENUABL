@@ -2,18 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage } from "@/components/consumer/legal-page";
 import { LEGAL } from "@/lib/domain/legal";
-import { WHOOP_OFFER } from "@/lib/domain/whoop-offer";
+import { WHOOP_ENDS, WHOOP_OFFER } from "@/lib/domain/whoop-offer";
 
-export const metadata: Metadata = { title: "Founding offer terms", alternates: { canonical: "/offer-terms" } };
+export const metadata: Metadata = { title: "October offer terms", alternates: { canonical: "/offer-terms" } };
 
-/** Terms for the founding WHOOP offer. Drafted for launch: to be reviewed before relying on it. */
+/** Terms for the October WHOOP offer. Drafted for launch: to be reviewed before relying on it. */
 export default function OfferTermsPage() {
   const value = `$${WHOOP_OFFER.value}`;
   return (
-    <LegalPage title="Founding offer terms">
+    <LegalPage title="October offer terms">
       <p>
-        These terms apply to the free {WHOOP_OFFER.product} founding offer from {LEGAL.company} trading as {LEGAL.tradingAs} (ABN{" "}
-        {LEGAL.abn}), &ldquo;we&rdquo;.
+        These terms apply to the free {WHOOP_OFFER.product} {WHOOP_OFFER.name.toLowerCase()} from {LEGAL.company} trading as{" "}
+        {LEGAL.tradingAs} (ABN {LEGAL.abn}), &ldquo;we&rdquo;.
       </p>
 
       <h2>The offer</h2>
@@ -31,8 +31,9 @@ export default function OfferTermsPage() {
       <ul>
         <li>Orders that include a home battery.</li>
         <li>
-          The first {WHOOP_OFFER.cap} confirmed customers. An order is counted when its reservation is confirmed; once {WHOOP_OFFER.cap}{" "}
-          have been claimed, the offer ends and is removed from our website.
+          Reservations made from 1 October to {WHOOP_ENDS} (Melbourne time), while stocks last: {WHOOP_OFFER.cap} are available. A claim is
+          made when the reservation is confirmed. The offer ends at the end of {WHOOP_ENDS}, or earlier once all {WHOOP_OFFER.cap} have been
+          claimed, and is then removed from our website.
         </li>
         <li>If an order is cancelled before installation, its claim is released and may go to another customer.</li>
       </ul>
@@ -51,8 +52,8 @@ export default function OfferTermsPage() {
       <ul>
         <li>The offer doesn&apos;t change your system&apos;s price, your rebates or your right to cancel under our Terms of Use.</li>
         <li>
-          We may end the offer once {WHOOP_OFFER.cap} have been claimed, or if we can no longer supply it (we&apos;ll honour claims already
-          made).
+          We may end the offer early once {WHOOP_OFFER.cap} have been claimed, or if we can no longer supply it (we&apos;ll honour claims
+          already made).
         </li>
         <li>WHOOP is a trademark of its owner. This offer is made by {LEGAL.tradingAs} and isn&apos;t sponsored or endorsed by WHOOP.</li>
       </ul>

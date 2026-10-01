@@ -23,7 +23,7 @@ export interface OrderEmail {
   interested?: string[];
   /** "Tuesday 13 October at 10:30am", when the call is already booked. */
   call?: string;
-  /** A founding WHOOP was claimed for this order (set on the server, never from the browser). */
+  /** An October-offer WHOOP was claimed for this order (set on the server, never from the browser). */
   whoop?: boolean;
 }
 

@@ -1,9 +1,10 @@
 /**
- * Server only. WHOOP founding-offer claims: one row per order, counted against
+ * Server only. WHOOP October-offer claims: one row per order, counted against
  * the cap in a transaction with an advisory lock so two reservations at once
  * can't take claim 51. Released claims don't count.
  */
 import { WHOOP_OFFER, nextWhoopStatus, whoopOfferOpen, type WhoopStatus } from "@/lib/domain/whoop-offer";
+import { todayInMarket } from "@/lib/domain/market";
 import { dbConfigured, query, transaction } from "./db";
 
 const LOCK = 7_171_050;
@@ -22,10 +23,10 @@ export async function heldClaims(): Promise<number> {
 }
 
 /** Whether the offer is open. Without a database nothing can be counted, so it stays closed. */
-export async function whoopOpen(): Promise<boolean> {
+export async function whoopOpen(today: string = todayInMarket()): Promise<boolean> {
   if (!dbConfigured()) return false;
   try {
-    return whoopOfferOpen(await heldClaims());
+    return whoopOfferOpen(await heldClaims(), today);
   } catch (e) {
     console.error("whoop count failed", e instanceof Error ? e.message : e);
     return false;
@@ -33,11 +34,12 @@ export async function whoopOpen(): Promise<boolean> {
 }
 
 /** Claims a WHOOP for this order if one is left. Returns true when the order holds a claim. */
-export async function claimWhoop(reference: string): Promise<boolean> {
+export async function claimWhoop(reference: string, today: string = todayInMarket()): Promise<boolean> {
   return transaction(async (q) => {
     await q(`select pg_advisory_xact_lock($1)`, [LOCK]);
     const existing = await q<{ status: WhoopStatus }>(`select status from whoop_claims where job_reference = $1`, [reference]);
     if (existing[0] && existing[0].status !== "released") return true;
+    if (today > WHOOP_OFFER.endsOn) return false;
     const held = Number((await q<{ n: string }>(`select count(*)::text as n from whoop_claims where status <> 'released'`))[0]?.n ?? 0);
     if (held >= WHOOP_OFFER.cap) return false;
     await q(

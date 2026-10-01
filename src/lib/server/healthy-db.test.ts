@@ -29,21 +29,21 @@ describe.skipIf(!url)("WHOOP claims and Home Health (database)", () => {
 
   it("never gives out more than the cap, even all at once", async () => {
     const refs = Array.from({ length: WHOOP_OFFER.cap + 5 }, (_, i) => `RN-${9000 + i}`);
-    const results = await Promise.all(refs.map((r) => whoop.claimWhoop(r)));
+    const results = await Promise.all(refs.map((r) => whoop.claimWhoop(r, "2026-10-15")));
     expect(results.filter(Boolean)).toHaveLength(WHOOP_OFFER.cap);
     expect(await whoop.heldClaims()).toBe(WHOOP_OFFER.cap);
-    expect(await whoop.whoopOpen()).toBe(false);
+    expect(await whoop.whoopOpen("2026-10-15")).toBe(false);
   });
 
   it("is one per order, and a release frees a claim for someone else", async () => {
     const held = (await db.query<{ job_reference: string }>(`select job_reference from whoop_claims where status = 'claimed' limit 1`))[0]
       .job_reference;
-    expect(await whoop.claimWhoop(held)).toBe(true);
+    expect(await whoop.claimWhoop(held, "2026-10-15")).toBe(true);
     expect(await whoop.heldClaims()).toBe(WHOOP_OFFER.cap);
     expect(await whoop.setWhoopStatus(held, "released")).toBe(true);
-    expect(await whoop.whoopOpen()).toBe(true);
-    expect(await whoop.claimWhoop("RN-99999")).toBe(true);
-    expect(await whoop.whoopOpen()).toBe(false);
+    expect(await whoop.whoopOpen("2026-10-15")).toBe(true);
+    expect(await whoop.claimWhoop("RN-99999", "2026-10-15")).toBe(true);
+    expect(await whoop.whoopOpen("2026-10-15")).toBe(false);
   });
 
   it("moves claims forward only", async () => {

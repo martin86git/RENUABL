@@ -17,7 +17,7 @@ import { allHealthAnswers } from "@/lib/server/home-health-repo";
 import { listWhoopClaims } from "@/lib/server/whoop-repo";
 import { WhoopActions } from "@/components/admin/healthy-actions";
 import { interestSummary } from "@/lib/domain/home-health";
-import { WHOOP_OFFER } from "@/lib/domain/whoop-offer";
+import { WHOOP_ENDS, WHOOP_OFFER } from "@/lib/domain/whoop-offer";
 
 export const metadata = { title: "Partners and jobs" };
 
@@ -194,10 +194,11 @@ export default async function AdminPage() {
         )}
       </Panel>
 
-      <Panel title={`WHOOP founding offer · ${held} of ${WHOOP_OFFER.cap} claimed`}>
+      <Panel title={`WHOOP October offer · ${held} of ${WHOOP_OFFER.cap} claimed`}>
         {claims.length === 0 ? (
           <p className="px-5 py-4 text-[14px] text-muted">
-            No claims yet. Each reservation with a battery claims one until all {WHOOP_OFFER.cap} are taken.
+            No claims yet. Each reservation with a battery claims one until the end of {WHOOP_ENDS} or until all {WHOOP_OFFER.cap} are
+            taken.
           </p>
         ) : (
           <ul className="divide-y divide-line">
