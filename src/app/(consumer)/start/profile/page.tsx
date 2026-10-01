@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BatteryCharging, Car, Home as HomeIcon, House, Info, PlugZap, Sun, type LucideIcon } from "lucide-react";
+import { ArrowRight, BatteryCharging, Car, Home as HomeIcon, House, Info, PlugZap, Sun, Zap, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
@@ -54,56 +54,80 @@ function ExistingSolar({
   onInverter: (i: InverterSummary) => void;
 }) {
   const showPlan = profile.existingSize === "unsure";
-  return (
-    <div className="rounded-[var(--radius-card)] bg-surface px-5 py-4 shadow-[var(--shadow-soft)]">
-      <div className="flex gap-5">
-        <Sun className="mt-1 h-7 w-7 shrink-0 text-ink" strokeWidth={1.3} aria-hidden />
-        <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] leading-snug text-ink-2">How big is your current solar system?</p>
-          <div className="mt-2.5">
-            <ChoiceChips<ExistingSolarSize>
-              label="How big is your current solar system?"
-              options={EXISTING_SIZE_OPTIONS}
-              value={profile.existingSize}
-              onChange={(existingSize) =>
-                onChange({ existingSize, existingPlan: existingSize === "unsure" ? profile.existingPlan : undefined })
-              }
-            />
-          </div>
-          {showPlan && (
-            <>
-              <p className="mt-4 text-[13.5px] leading-snug text-ink-2">Would you like to replace your existing system, or expand it?</p>
-              <div className="mt-2.5">
-                <ChoiceChips<ExistingSolarPlan>
-                  label="Replace or expand your existing system"
-                  options={EXISTING_PLAN_OPTIONS}
-                  value={profile.existingPlan}
-                  onChange={(existingPlan) => onChange({ existingPlan })}
-                />
-              </div>
-            </>
-          )}
-          {profile.existingSize && situation === "expand" && (!showPlan || profile.existingPlan) && (
-            <>
-              {!inverter && (
-                <p className="mt-4 flex gap-2.5 rounded-xl bg-sage/50 px-3.5 py-3 text-[12.5px] leading-snug text-forest" role="note">
-                  <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
-                  {EXPAND_DISCLAIMER}
-                </p>
-              )}
-              <InverterPhotos inverter={inverter} onRead={onInverter} />
-            </>
-          )}
-          {situation === "replace" && (
-            <p className="mt-4 flex gap-2.5 rounded-xl bg-canvas px-3.5 py-3 text-[12.5px] leading-snug text-ink-2" role="note">
+  // The notes follow the last question shown, inside its card.
+  const notes = (
+    <>
+      {profile.existingSize && situation === "expand" && (!showPlan || profile.existingPlan) && (
+        <>
+          {!inverter && (
+            <p className="mt-4 flex gap-2.5 rounded-xl bg-sage/50 px-3.5 py-3 text-[12.5px] leading-snug text-forest" role="note">
               <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
-              Your bill only shows the power you buy. We&apos;ll estimate what your current panels cover from what they export, and confirm
-              your new system on the 15-minute call.
+              {EXPAND_DISCLAIMER}
             </p>
           )}
+          <InverterPhotos inverter={inverter} onRead={onInverter} />
+        </>
+      )}
+      {situation === "replace" && (
+        <p className="mt-4 flex gap-2.5 rounded-xl bg-canvas px-3.5 py-3 text-[12.5px] leading-snug text-ink-2" role="note">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden />
+          Your bill only shows the power you buy. We&apos;ll estimate what your current panels cover from what they export, and confirm your
+          new system on the 15-minute call.
+        </p>
+      )}
+    </>
+  );
+  return (
+    <>
+      <QuestionCard icon={Sun} question="How big is your current solar system?">
+        <ChoiceChips<ExistingSolarSize>
+          label="How big is your current solar system?"
+          options={EXISTING_SIZE_OPTIONS}
+          value={profile.existingSize}
+          onChange={(existingSize) =>
+            onChange({ existingSize, existingPlan: existingSize === "unsure" ? profile.existingPlan : undefined })
+          }
+        />
+        {!showPlan && notes}
+      </QuestionCard>
+      {showPlan && (
+        <QuestionCard icon={Sun} question="Would you like to replace your existing system, or expand it?">
+          <ChoiceChips<ExistingSolarPlan>
+            label="Replace or expand your existing system"
+            options={EXISTING_PLAN_OPTIONS}
+            value={profile.existingPlan}
+            onChange={(existingPlan) => onChange({ existingPlan })}
+          />
+          {notes}
+        </QuestionCard>
+      )}
+    </>
+  );
+}
+
+/** One question to a card (icon on desktop). `aside` sits on the right, e.g. a switch. */
+function QuestionCard({
+  icon: Icon,
+  question,
+  aside,
+  children,
+}: {
+  icon: LucideIcon;
+  question: string;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="flex gap-5 rounded-[var(--radius-card)] bg-surface px-5 py-4 shadow-[var(--shadow-soft)]" aria-label={question}>
+      <Icon className="mt-1 hidden h-7 w-7 shrink-0 text-ink lg:block" strokeWidth={1.3} aria-hidden />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-[14px] leading-snug text-ink-2 lg:text-[13.5px]">{question}</p>
+          {aside}
         </div>
+        <div className={aside ? "" : "mt-2.5"}>{children}</div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -179,89 +203,62 @@ export default function ProfilePage() {
               onInverter={(existingInverter) => update({ existingInverter })}
             />
           )}
-          <div className="flex gap-5 rounded-[var(--radius-card)] bg-surface px-5 py-4 shadow-[var(--shadow-soft)]">
-            <HomeIcon className="mt-1 hidden h-7 w-7 shrink-0 text-ink lg:block" strokeWidth={1.3} aria-hidden />
-            <div className="min-w-0 flex-1 space-y-4">
-              <div>
-                <p className="text-[13.5px] leading-snug text-ink-2">What&apos;s your roof made of?</p>
-                <div className="mt-2.5">
-                  <ChoiceChips<RoofType>
-                    label="What's your roof made of?"
-                    options={ROOF_OPTIONS}
-                    value={profile.roofType}
-                    onChange={(roofType) => change({ roofType })}
-                  />
-                </div>
-                {profile.roofType === "flat" && (
-                  <div className="mt-4">
-                    <p className="text-[13.5px] leading-snug text-ink-2">How would you like your panels?</p>
-                    <div className="mt-2.5">
-                      <ChoiceChips<FlatMount>
-                        label="How would you like your panels?"
-                        options={FLAT_MOUNT_OPTIONS}
-                        value={profile.flatMount ?? "flat"}
-                        onChange={(flatMount) => change({ flatMount })}
-                      />
-                    </div>
-                    <p className="mt-2 text-[12px] leading-snug text-muted">{FLAT_MOUNT_NOTE[profile.flatMount ?? "flat"]}</p>
-                  </div>
-                )}
+          {/* One card per question: nothing shares a card, so each question reads on its own. */}
+          <QuestionCard icon={HomeIcon} question="What's your roof made of?">
+            <ChoiceChips<RoofType>
+              label="What's your roof made of?"
+              options={ROOF_OPTIONS}
+              value={profile.roofType}
+              onChange={(roofType) => change({ roofType })}
+            />
+            {profile.roofType === "unsure" && (
+              <p className="mt-2 text-[12px] text-muted">No problem. We&apos;ll confirm it on your call.</p>
+            )}
+          </QuestionCard>
+          {profile.roofType === "flat" && (
+            <QuestionCard icon={Sun} question="How would you like your panels?">
+              <ChoiceChips<FlatMount>
+                label="How would you like your panels?"
+                options={FLAT_MOUNT_OPTIONS}
+                value={profile.flatMount ?? "flat"}
+                onChange={(flatMount) => change({ flatMount })}
+              />
+              <p className="mt-2 text-[12px] leading-snug text-muted">{FLAT_MOUNT_NOTE[profile.flatMount ?? "flat"]}</p>
+            </QuestionCard>
+          )}
+          <QuestionCard
+            icon={House}
+            question="Double-storey home?"
+            aside={
+              <Toggle
+                label="Double-storey home"
+                checked={profile.storeys === "double"}
+                onChange={(double) => change({ storeys: double ? "double" : "single" })}
+              />
+            }
+          >
+            <p className="text-[12px] text-muted">{profile.storeys === "double" ? "Double storey" : "Single storey"}</p>
+          </QuestionCard>
+          <QuestionCard icon={Zap} question="Is your power single or three phase?">
+            <ChoiceChips<"single" | "three" | "unsure">
+              label="Is your power single or three phase?"
+              options={PHASE_OPTIONS}
+              value={profile.phase}
+              onChange={(phase) => change({ phase })}
+            />
+            <p className="mt-2 text-[12px] leading-snug text-muted">
+              {profile.phase === "unsure"
+                ? "No problem. We'll confirm it on your call."
+                : "Tip: three main switches side by side in your switchboard usually means three phase."}
+            </p>
+          </QuestionCard>
+          {questions.map(({ key, label, icon }) => (
+            <QuestionCard key={key} icon={icon} question={label}>
+              <div className="flex justify-end lg:justify-start">
+                <YesNo label={label} value={profile[key]} onChange={(v) => set(key, v)} />
               </div>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[13.5px] leading-snug text-ink-2">Double-storey home?</p>
-                  <p className="text-[12px] text-muted">{profile.storeys === "double" ? "Double storey" : "Single storey"}</p>
-                </div>
-                <Toggle
-                  label="Double-storey home"
-                  checked={profile.storeys === "double"}
-                  onChange={(double) => change({ storeys: double ? "double" : "single" })}
-                />
-              </div>
-              <div>
-                <p className="text-[13.5px] leading-snug text-ink-2">Is your power single or three phase?</p>
-                <div className="mt-2.5">
-                  <ChoiceChips<"single" | "three" | "unsure">
-                    label="Is your power single or three phase?"
-                    options={PHASE_OPTIONS}
-                    value={profile.phase}
-                    onChange={(phase) => change({ phase })}
-                  />
-                </div>
-                <p className="mt-2 text-[12px] leading-snug text-muted">
-                  Tip: three main switches side by side in your switchboard usually means three phase.
-                </p>
-              </div>
-              {(profile.roofType === "unsure" || profile.phase === "unsure") && (
-                <p className="text-[12px] text-muted">No problem. We&apos;ll confirm it on your call.</p>
-              )}
-            </div>
-          </div>
-          {/* Desktop: icon cards. Mobile: one card with rows, toggles right-aligned. */}
-          <ul className="hidden space-y-2.5 lg:block">
-            {questions.map(({ key, label, icon: Icon }) => (
-              <li key={key} className="flex gap-5 rounded-[var(--radius-card)] bg-surface px-5 py-4 shadow-[var(--shadow-soft)]">
-                <Icon className="mt-1 h-7 w-7 shrink-0 text-ink" strokeWidth={1.3} aria-hidden />
-                <div>
-                  <p className="max-w-[280px] text-[13.5px] leading-snug text-ink-2">{label}</p>
-                  <div className="mt-2.5">
-                    <YesNo label={label} value={profile[key]} onChange={(v) => set(key, v)} />
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          <ul className="divide-y divide-line rounded-[var(--radius-card)] bg-surface px-5 shadow-[var(--shadow-soft)] lg:hidden">
-            {questions.map(({ key, label }) => (
-              <li key={key} className="py-4">
-                <p className="text-[14px] text-ink-2">{label}</p>
-                <div className="mt-2 flex justify-end">
-                  <YesNo label={label} value={profile[key]} onChange={(v) => set(key, v)} />
-                </div>
-              </li>
-            ))}
-          </ul>
+            </QuestionCard>
+          ))}
         </div>
 
         {/* Mascot and script travel together and stay in view. Sticky makes its own layer, so it needs the page colour for the mascot's multiply blend. */}
