@@ -9,7 +9,7 @@ import { CallBooking } from "@/components/consumer/call-booking";
 import { CareIncludedCard, CareUpsell } from "@/components/consumer/care-upsell";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
-import { useFlow, useSystem } from "@/components/consumer/flow-state";
+import { useFlow, useInstallLead, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
 import { PRODUCT_IMAGES } from "@/components/ui/brand-art";
 import { Toggle } from "@/components/ui/controls";
@@ -25,7 +25,7 @@ import { RESERVED_CELEBRATION, priceHeader } from "@/lib/domain/flow-moments";
 import { ConsentBoxes, NO_CONSENT, type ConsentState } from "@/components/consumer/consent-boxes";
 import { PRICE_INCLUDES, RESERVE_NO_COMMITMENT, TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
 import { solarVictoriaApplies } from "@/lib/domain/rebates";
-import { SOLAR_VIC_DATE_NOTE, getWindow } from "@/lib/domain/scheduling";
+import { getWindow, installDateNote } from "@/lib/domain/scheduling";
 import type { AddOnId, LineItemId } from "@/lib/domain/types";
 import { formatAddress } from "@/lib/mock/addresses";
 import { getInstaller, reserveInstall } from "@/lib/services/consumer";
@@ -69,6 +69,7 @@ function ReserveScreen() {
   const callRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const whoopOpen = useWhoopOpen();
+  const lead = useInstallLead();
   const installer = state.installerId ? getInstaller(state.installerId) : undefined;
   const window = state.windowId ? getWindow(state.windowId) : undefined;
 
@@ -451,9 +452,7 @@ function ReserveScreen() {
             value={`${formatDate(state.installDate, { weekday: "short", day: "numeric", month: "short" })}${window ? ` · arrival ${window.label}` : ""}`}
           />
         )}
-        {state.installDate && price.rebateLines.some((r) => r.id.startsWith("sv-")) && (
-          <p className="py-2 text-[12px] leading-snug text-muted">{SOLAR_VIC_DATE_NOTE}</p>
-        )}
+        {state.installDate && <p className="py-2 text-[12px] leading-snug text-muted">{installDateNote(lead.solarVic)}</p>}
         <StatRow label="System after rebates" value={formatCurrency(price.total)} />
         {careIncluded ? (
           <StatRow label={CARE_PLAN.name} value={<span className="text-positive">{CARE_FREE_MONTHS} months free</span>} />

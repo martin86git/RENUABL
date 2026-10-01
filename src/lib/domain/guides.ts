@@ -119,7 +119,7 @@ export const GUIDES: Guide[] = [
     summary:
       "The federal STC incentive, the battery incentive and Solar Victoria's rebate and interest-free loan: what each one is, who it's for, and where to check you're eligible.",
     topic: "Rebates",
-    updated: "2026-09-30",
+    updated: "2026-10-01",
     minutes: 6,
     answer:
       "Most Victorian homes can get a federal discount on solar and batteries, taken straight off the price. Eligible households may also get a Solar Victoria rebate and an interest-free loan. We show each one as its own line on your price.",

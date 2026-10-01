@@ -7,11 +7,12 @@ import {
   buildAvailability,
   installLeadDays,
   isBookableInstallDate,
+  installDateNote,
   isInstallDay,
 } from "./scheduling";
 
 describe("install dates and Solar Victoria", () => {
-  it("start about three weeks out for new Victorian systems, so there's time for approval", () => {
+  it("start two weeks out where Solar Victoria may apply, a week otherwise", () => {
     expect(installLeadDays({ state: "VIC", expandingExistingSolar: false })).toBe(SOLAR_VIC_LEAD_DAYS);
     expect(installLeadDays({ state: "vic", expandingExistingSolar: true })).toBe(LEAD_TIME_DAYS);
     expect(installLeadDays({ state: "NSW", expandingExistingSolar: false })).toBe(LEAD_TIME_DAYS);
@@ -42,6 +43,9 @@ describe("install dates and Solar Victoria", () => {
   it("offers nothing past the end of the holiday list (extend it each year)", () => {
     expect(isInstallDay("2028-01-04")).toBe(false);
     expect(LEAD_TIME_DAYS).toBe(7);
+    expect(SOLAR_VIC_LEAD_DAYS).toBe(14);
+    expect(installDateNote(true)).toBe("This date is subject to your rebate approval.");
+    expect(installDateNote(false)).toMatch(/installation calendar capacity/);
   });
 });
 

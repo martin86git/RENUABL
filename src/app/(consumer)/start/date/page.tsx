@@ -11,7 +11,7 @@ import { MonthCalendar } from "@/components/ui/month-calendar";
 import { Button, Card } from "@/components/ui/primitives";
 import { formatDate } from "@/lib/domain/format";
 import { earliestInstallLine, pickedInstallLine } from "@/lib/domain/flow-moments";
-import { INSTALL_ARRIVAL, SOLAR_VIC_DATE_NOTE } from "@/lib/domain/scheduling";
+import { INSTALL_ARRIVAL, installDateNote } from "@/lib/domain/scheduling";
 import { getAvailability, getInstaller } from "@/lib/services/consumer";
 
 function DateScreen() {
@@ -40,9 +40,9 @@ function DateScreen() {
           </p>
         </div>
       </div>
-      {day && lead.solarVic && (
+      {day && (
         <p className="mt-3 rounded-xl bg-sage/60 px-3.5 py-2.5 text-[13px] leading-snug text-forest" role="note">
-          {SOLAR_VIC_DATE_NOTE}
+          {installDateNote(lead.solarVic)}
         </p>
       )}
       <p className="mt-3 text-[12.5px] leading-snug text-muted">
@@ -87,11 +87,13 @@ function DateScreen() {
         </Card>
         <div className="space-y-5">
           {arrival}
-          {lead.solarVic && (
+          {lead.solarVic ? (
             <p className="text-[12.5px] text-muted">
-              Dates start about three weeks away, so there&apos;s time to apply for Solar Victoria&apos;s rebate and have it approved
-              (usually 7 to 10 business days).
+              Dates start two weeks away, so there&apos;s time to apply for Solar Victoria&apos;s rebate and have it approved (usually 7 to
+              10 business days).
             </p>
+          ) : (
+            <p className="text-[12.5px] text-muted">Dates start a week away, subject to installation calendar capacity.</p>
           )}
           <p className="text-[12.5px] text-muted">Reschedule free up to 72 hours before.</p>
         </div>

@@ -1,4 +1,5 @@
 import { WHOOP_COPY } from "./whoop-offer";
+import { PROVISIONAL_DATE_NOTE } from "./scheduling";
 /** Customer emails, as subject + HTML + plain text. Pure and tested; sending is in src/lib/server/email.ts. */
 
 export interface OrderEmail {
@@ -64,7 +65,7 @@ export function orderConfirmationEmail(o: OrderEmail): { subject: string; html: 
 <div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:16px">
 <table style="width:100%;border-collapse:collapse;font-size:14px">
 ${o.address ? row("Home", o.address) : ""}${o.installer ? row("Installation partner", o.installer) : ""}${o.installDate ? row("Installation", `${o.installDate}${o.arrival ? `, arrival ${o.arrival}` : ""}`) : ""}${o.call ? row("Confirmation call", o.call) : ""}
-</table></div>
+</table>${o.installDate ? `<p style="color:#6B6B6B;font-size:12.5px;margin:12px 0 0">${esc(PROVISIONAL_DATE_NOTE)}</p>` : ""}</div>
 <div style="background:#fff;border-radius:16px;padding:20px;margin-bottom:16px">
 <p style="margin:0 0 8px">${esc(clip(o.system, 200))}</p>
 <table style="width:100%;border-collapse:collapse;font-size:14px">${lines}</table>
@@ -88,6 +89,7 @@ ${o.whoop ? `<p style="margin:10px 0 0">${esc(WHOOP_COPY.confirmed)}</p>` : ""}
     o.address && `Home: ${o.address}`,
     o.installer && `Installation partner: ${o.installer}`,
     o.installDate && `Installation: ${o.installDate}${o.arrival ? `, arrival ${o.arrival}` : ""}`,
+    o.installDate && PROVISIONAL_DATE_NOTE,
     o.call && `Confirmation call: ${o.call}`,
     "",
     o.system,
@@ -141,7 +143,7 @@ export function installMovedEmail(o: { reference: string; firstName: string; ins
     heading: `Your installation has moved, ${plainText(o.firstName, 40) || "there"}.`,
     lines: [
       `Your new provisional installation date is ${plainText(o.installDate, 60)}, arriving ${plainText(o.arrival, 30)}. Reservation ${plainText(o.reference, 20)}.`,
-      "We'll confirm everything on your 15-minute call.",
+      PROVISIONAL_DATE_NOTE,
       CHANGE_BOOKING_NOTE,
     ],
     footer: "The calendar invite is attached.",

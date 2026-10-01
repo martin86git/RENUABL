@@ -10,7 +10,7 @@ import { CallBooking } from "@/components/consumer/call-booking";
 import { ChangeInstallDate } from "@/components/consumer/change-install-date";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
-import { useFlow } from "@/components/consumer/flow-state";
+import { useFlow, useInstallLead } from "@/components/consumer/flow-state";
 import { PortalTeaser } from "@/components/consumer/portal-preview";
 import { Mascot } from "@/components/ui/brand-art";
 import { Confetti } from "@/components/ui/confetti";
@@ -19,7 +19,7 @@ import { ButtonLink, Card } from "@/components/ui/primitives";
 import { callEvent, installEvent } from "@/lib/domain/calendar";
 import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_PLAN, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
 import { formatCurrency, formatDate } from "@/lib/domain/format";
-import { getWindow } from "@/lib/domain/scheduling";
+import { getWindow, installDateNote } from "@/lib/domain/scheduling";
 import { formatAddress } from "@/lib/mock/addresses";
 import { getInstaller } from "@/lib/services/consumer";
 
@@ -37,6 +37,7 @@ function Item({ icon: Icon, title, detail, sun }: { icon: LucideIcon; title: str
 
 function ConfirmedScreen() {
   const { state } = useFlow();
+  const lead = useInstallLead();
   const installer = state.installerId ? getInstaller(state.installerId) : undefined;
   const window = state.windowId ? getWindow(state.windowId) : undefined;
   const reference = state.reservation?.reservationId ?? "RENUABL";
@@ -105,6 +106,7 @@ function ConfirmedScreen() {
                       {formatDate(state.installDate, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                       {window ? ` · arrival ${window.label}` : ""}
                     </p>
+                    <p className="mt-0.5 text-[12px] leading-snug text-muted">{installDateNote(lead.solarVic)}</p>
                     <AddToCalendar
                       event={installEvent({
                         reference,

@@ -7,19 +7,30 @@ import type { DayAvailability, ISODate, TimeWindow } from "./types";
 export const INSTALL_ARRIVAL: TimeWindow = { id: "0700", label: "7am–9am", detail: "Estimated arrival" };
 export const INSTALL_WINDOWS: TimeWindow[] = [INSTALL_ARRIVAL];
 
+/** Without the Solar Victoria rebate: the first week is kept free to arrange the job. */
 export const LEAD_TIME_DAYS = 7;
 
 /**
- * New systems in Victoria may use the Solar Victoria rebate: the customer
- * applies, then approval takes about 7–10 business days, so the first install
- * day is this far out. PLACEHOLDER: confirm with Primero.
+ * Where the Solar Victoria rebate may apply (new systems in Victoria): the
+ * customer applies and approval usually takes 7–10 business days, so the
+ * first install day is two weeks out.
  */
-export const SOLAR_VIC_LEAD_DAYS = 21;
+export const SOLAR_VIC_LEAD_DAYS = 14;
 
-/** Shown with a chosen date when Solar Victoria may apply. */
-export const SOLAR_VIC_DATE_NOTE = "This date will be subject to your Solar Victoria application being approved.";
+/** Carried with every chosen date where Solar Victoria may apply. */
+export const REBATE_DATE_NOTE = "This date is subject to your rebate approval.";
+/** Carried with every chosen date otherwise. */
+export const CAPACITY_DATE_NOTE = "This date is subject to installation calendar capacity, confirmed on your call.";
 
-/** Days before the first install day: longer where Solar Victoria approval may be needed (new systems in Victoria). */
+/** In emails, where the server doesn't know whether Solar Victoria applies: both conditions. */
+export const PROVISIONAL_DATE_NOTE =
+  "Your installation date is provisional: it's subject to your rebate approval where a rebate applies, and to installation calendar capacity. We confirm it on your call.";
+
+export function installDateNote(solarVic: boolean): string {
+  return solarVic ? REBATE_DATE_NOTE : CAPACITY_DATE_NOTE;
+}
+
+/** Days before the first install day: two weeks where Solar Victoria may apply (new systems in Victoria), else one. */
 export function installLeadDays(o: { state: string | null | undefined; expandingExistingSolar: boolean }) {
   return o.state?.toUpperCase() === "VIC" && !o.expandingExistingSolar ? SOLAR_VIC_LEAD_DAYS : LEAD_TIME_DAYS;
 }

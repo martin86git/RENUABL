@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { MonthCalendar } from "@/components/ui/month-calendar";
 import { Button } from "@/components/ui/primitives";
 import { formatDate } from "@/lib/domain/format";
-import { INSTALL_ARRIVAL, SOLAR_VIC_DATE_NOTE } from "@/lib/domain/scheduling";
+import { INSTALL_ARRIVAL, installDateNote } from "@/lib/domain/scheduling";
 import { getAvailability, moveInstallDay } from "@/lib/services/consumer";
 import { useFlow, useInstallLead } from "./flow-state";
 
@@ -61,7 +61,7 @@ export function ChangeInstallDate() {
             <div className="rounded-2xl bg-surface p-4">
               <MonthCalendar available={available} value={date} onChange={setDate} />
             </div>
-            {lead.solarVic && <p className="mt-3 text-[12.5px] text-muted">{SOLAR_VIC_DATE_NOTE}</p>}
+            <p className="mt-3 text-[12.5px] text-muted">{installDateNote(lead.solarVic)}</p>
             {problem && (
               <p className="mt-3 text-[13px] text-danger" role="alert">
                 {problem}
