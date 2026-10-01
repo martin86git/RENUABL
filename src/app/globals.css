@@ -103,6 +103,8 @@ html,
 body {
   background: var(--canvas);
   color: var(--ink);
+  /* Nothing may make a page slide sideways on a phone (clip, unlike hidden, keeps sticky headers working). */
+  overflow-x: clip;
 }
 
 body {

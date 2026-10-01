@@ -46,7 +46,7 @@ export default function HomePage() {
       <MobileHeader partners />
       <ConsumerTopBar className="hidden lg:flex" partners />
 
-      <main className="relative isolate mx-auto grid w-full max-w-[1440px] grid-cols-1 items-center gap-10 px-5 pb-4 pt-6 sm:px-8 lg:grid-cols-12 lg:gap-8 lg:border-t lg:border-line lg:px-10 lg:pt-12">
+      <main className="relative isolate mx-auto grid overflow-x-clip w-full max-w-[1440px] grid-cols-1 items-center gap-10 px-5 pb-4 pt-6 sm:px-8 lg:grid-cols-12 lg:gap-8 lg:border-t lg:border-line lg:px-10 lg:pt-12">
         {/* A soft sun glow behind the hero (decorative). */}
         <div
           className="sun-glow pointer-events-none absolute -right-24 -top-16 -z-10 h-[340px] w-[340px] lg:right-0 lg:top-0 lg:h-[620px] lg:w-[760px]"
