@@ -10,7 +10,7 @@ export const HOME_HERO = {
   /** The headline as it's set on the home page: three lines. */
   headlineLines: ["A healthier home,", "powered by", "the sun."],
   steps: ["Upload your bill", "Get your solar and battery plan", "Pick your install date"],
-  label: "Your home plan, priced in about two minutes.",
+  label: "Your home plan, priced in about 2 minutes.",
   healthLink: "Healthy home? Take the check",
   learnLine: "Plain-English guides to solar, batteries, rebates and a healthier home.",
 } as const;

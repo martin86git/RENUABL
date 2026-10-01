@@ -433,10 +433,10 @@ export function sizingExplanation(
   return lines;
 }
 
-export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: PriceBreakdown): SystemEstimate {
+/** Yearly savings for a system at this home (the same rule of thumb as the sizing). Doesn't depend on the price. */
+export function savingsFor(config: SystemConfig, usage: UsageBasis): Omit<SystemEstimate, "paybackYears"> {
   const solarKw = panelsToKw(config.panelCount);
   const generation = Math.round(solarKw * usage.dailyYieldKwhPerKw * 365);
-  const payback = (savings: number) => (savings > 0 ? Math.round((price.total / savings) * 10) / 10 : 0);
 
   if (usage.existingSolar) {
     // Existing solar: the battery stores exports (and any new panels) for the evening.
@@ -452,7 +452,6 @@ export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: 
       solarKw,
       annualGenerationKwh: generation,
       annualSavings,
-      paybackYears: payback(annualSavings),
       selfPoweredShare: usage.annualKwh > 0 ? Math.min(ASSUMPTIONS.maxSolarShare, stored / usage.annualKwh) : 0,
     };
   }
@@ -473,9 +472,14 @@ export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: 
     solarKw,
     annualGenerationKwh: generation,
     annualSavings,
-    paybackYears: payback(annualSavings),
     selfPoweredShare: usage.annualKwh > 0 ? consumedFromSolar / usage.annualKwh : 0,
   };
+}
+
+export function estimateOutcome(config: SystemConfig, usage: UsageBasis, price: PriceBreakdown): SystemEstimate {
+  const saved = savingsFor(config, usage);
+  const paybackYears = saved.annualSavings > 0 ? Math.round((price.total / saved.annualSavings) * 10) / 10 : 0;
+  return { ...saved, paybackYears };
 }
 
 export interface Site {

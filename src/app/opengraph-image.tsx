@@ -25,7 +25,7 @@ export default function Image() {
         <div style={{ fontSize: 76, lineHeight: 1.05, letterSpacing: -2 }}>powered by the sun.</div>
       </div>
       <div style={{ display: "flex", fontSize: 30, color: "#1E3A2E" }}>
-        <div style={{ background: "#D9E7DC", borderRadius: 999, padding: "12px 28px" }}>Your home plan, priced in about two minutes</div>
+        <div style={{ background: "#D9E7DC", borderRadius: 999, padding: "12px 28px" }}>Your home plan, priced in about 2 minutes</div>
       </div>
     </div>,
     size,

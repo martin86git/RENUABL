@@ -7,6 +7,7 @@ import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { BillLater } from "@/components/consumer/bill-later";
 import { BillUpload } from "@/components/consumer/bill-upload";
+import { SavingsReveal } from "@/components/consumer/savings-reveal";
 import { InverterPhotos } from "@/components/consumer/inverter-photos";
 import { isAboutComplete, useFlow } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
@@ -159,6 +160,7 @@ export default function ProfilePage() {
                 update({ bill, config: null, leadTracked: true });
               }}
             />
+            {state.bill && <SavingsReveal />}
             {missingBill && !state.bill && (
               <>
                 <p className="text-[13.5px] text-ink-2" role="alert">

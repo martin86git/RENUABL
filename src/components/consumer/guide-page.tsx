@@ -121,7 +121,7 @@ export function GuideCta() {
   return (
     <section className="mt-12 rounded-[var(--radius-card)] bg-surface p-6 shadow-[var(--shadow-soft)] sm:p-8">
       <h2 className="text-[24px] font-normal tracking-[-0.03em]">See what this means for your home.</h2>
-      <p className="mt-2 text-[15px] text-muted">Enter your address and upload your bill. Your system, priced in about two minutes.</p>
+      <p className="mt-2 text-[15px] text-muted">Enter your address and upload your bill. Your system, priced in about 2 minutes.</p>
       <ButtonLink href="/" className="mt-5">
         Start with your address <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
       </ButtonLink>
