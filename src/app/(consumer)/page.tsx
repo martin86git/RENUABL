@@ -76,7 +76,7 @@ export default function HomePage() {
                 {HOME_HERO.steps.map((step, i) => (
                   <li key={step} className="flex items-center gap-2.5">
                     <span
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sun text-[11px] text-sun-ink"
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] border-sun-line text-[11px] text-sun-line-ink"
                       aria-hidden
                     >
                       {i + 1}

@@ -27,6 +27,9 @@
   --sun: #f8e6c4;
   --sun-ink: #7a4f0e;
   --sun-bright: #f2c97e;
+  /* The gold line under "sun" and the outlined step numbers (home page). */
+  --sun-line: #e9b949;
+  --sun-line-ink: #8f6210;
   --leaf: #5b9f7d;
   --positive: #2f7d55;
   --positive-soft: #d9e7dc;
@@ -54,6 +57,8 @@
   --sun: rgba(242, 201, 126, 0.16);
   --sun-ink: #f2c97e;
   --sun-bright: #f2c97e;
+  --sun-line: #e9b949;
+  --sun-line-ink: #f2c97e;
   --leaf: #6fb690;
   /* Green is reserved for confirmed / on-track / available / positive. */
   --positive: #8fd0ad;
@@ -83,6 +88,8 @@
   --color-sun: var(--sun);
   --color-sun-ink: var(--sun-ink);
   --color-sun-bright: var(--sun-bright);
+  --color-sun-line: var(--sun-line);
+  --color-sun-line-ink: var(--sun-line-ink);
   --color-leaf: var(--leaf);
   --color-positive: var(--positive);
   --color-positive-soft: var(--positive-soft);
@@ -257,6 +264,6 @@ body:has(.theme-installer) {
   background: radial-gradient(closest-side, color-mix(in srgb, var(--sun) 85%, transparent), transparent);
 }
 .sun-mark {
-  background: linear-gradient(transparent 64%, var(--sun) 64%, var(--sun) 92%, transparent 92%);
-  padding: 0 0.06em;
+  /* A thin gold line under "sun" (scales with the headline). */
+  box-shadow: inset 0 -0.11em 0 var(--sun-line);
 }
