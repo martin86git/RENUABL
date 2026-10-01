@@ -4,7 +4,7 @@ import { installMovedEmail, jobMovedEmail, plainText } from "@/lib/domain/emails
 import { siteUrl } from "@/lib/domain/sms";
 import { formatDate } from "@/lib/domain/format";
 import { todayInMarket } from "@/lib/domain/market";
-import { INSTALL_ARRIVAL, LEAD_TIME_DAYS, addDays, fromISODate, toISODate } from "@/lib/domain/scheduling";
+import { INSTALL_ARRIVAL, LEAD_TIME_DAYS, isBookableInstallDate } from "@/lib/domain/scheduling";
 import { dbConfigured } from "@/lib/server/db";
 import { sendEmail } from "@/lib/server/email";
 import { addNote, contactIdByEmail, reservationNote } from "@/lib/server/hubspot-crm";
@@ -31,8 +31,9 @@ export async function POST(request: Request) {
   const date = typeof b.installDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.installDate) ? b.installDate : null;
   if (!reference || !email || !date)
     return Response.json({ ok: false, message: "Something's missing. Please try again." }, { status: 400 });
-  const earliest = toISODate(addDays(fromISODate(todayInMarket()), LEAD_TIME_DAYS));
-  if (date < earliest) return Response.json({ ok: false, message: "Please choose a later day." }, { status: 422 });
+  // Never sooner than the lead time, a weekend or a Victorian public holiday.
+  if (!isBookableInstallDate(date, todayInMarket(), LEAD_TIME_DAYS))
+    return Response.json({ ok: false, message: "Please choose another weekday, at least a week away." }, { status: 422 });
 
   let moved: { id: string; was: string | null } | null = null;
   if (dbConfigured()) {

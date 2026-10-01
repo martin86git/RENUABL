@@ -7,7 +7,7 @@
 import { BATTERY_RANGE, PANEL_RANGE, batteryLabel, panelLabel } from "./catalogue";
 import { COSTING, sellPrice } from "./costing";
 import { ASSUMPTIONS } from "./recommendation";
-import { INSTALL_ARRIVAL } from "./scheduling";
+import { INSTALL_ARRIVAL, LEAD_TIME_DAYS } from "./scheduling";
 import type { AskContext } from "./ask-types";
 
 export type { AskContext } from "./ask-types";
@@ -30,11 +30,12 @@ export const ASK_FACTS = [
   // Existing solar
   "Homes with existing solar can replace it or expand it. Expanding keeps the existing panels and adds a battery (plus new panels on a new inverter if needed); the existing inverter is confirmed on the call.",
   // Price, rebates, payment
+  "The flow shows what the customer gets first: a first savings estimate after the bill, then the system with its estimated savings and the rebates they're eligible for, the earliest install date, and the full price after rebates on the reserve step. If they ask about price earlier, it's fine to give it from their answers.",
   "Prices are built from current supplier costs plus installation, and include GST. Federal rebates (STCs for solar and batteries) are shown as separate lines and already taken off the total.",
   "Victorian homes may be eligible for Solar Victoria's solar panel rebate and interest-free loan (new solar systems only, subject to Solar Victoria's eligibility criteria). The customer can switch these on at checkout.",
   `Reserving an install date is free. After the 15-minute confirmation call, a ${money(ASSUMPTIONS.deposit)} refundable deposit locks in the date; the balance is due once the system is installed and switched on.`,
   // Installation
-  `The customer picks the install day; the installation partner arrives between ${INSTALL_ARRIVAL.label}. Most installs take one day. For new systems in Victoria, install dates start about three weeks away, because the customer may apply for Solar Victoria's rebate and approval usually takes 7 to 10 business days; the chosen date is subject to that application being approved.`,
+  `The customer picks the install day; the installation partner arrives between ${INSTALL_ARRIVAL.label}. Most installs take one day. Installs are on weekdays only, never on weekends or Victorian public holidays, and the first ${LEAD_TIME_DAYS} days from today are kept free to arrange the job. For new systems in Victoria, install dates start about three weeks away, because the customer may apply for Solar Victoria's rebate and approval usually takes 7 to 10 business days; the chosen date is subject to that application being approved.`,
   "The 15-minute confirmation call is a check of the details (roof, switchboard, access), not a sales call. The customer books it themselves after reserving.",
   "RENUABL calls the installers it works with 'installation partners'; use that term. In Victoria the matched installation partner is Primero Electric & Solar. Alternatives are available if the customer asks.",
   // After install

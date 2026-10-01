@@ -1,15 +1,47 @@
 import { describe, expect, it } from "vitest";
 import { revoContext, revoLine } from "./revo";
-import { LEAD_TIME_DAYS, SOLAR_VIC_LEAD_DAYS, buildAvailability, installLeadDays, toISODate, addDays } from "./scheduling";
+import {
+  LEAD_TIME_DAYS,
+  SOLAR_VIC_LEAD_DAYS,
+  addDaysISO,
+  buildAvailability,
+  installLeadDays,
+  isBookableInstallDate,
+  isInstallDay,
+} from "./scheduling";
 
 describe("install dates and Solar Victoria", () => {
   it("start about three weeks out for new Victorian systems, so there's time for approval", () => {
     expect(installLeadDays({ state: "VIC", expandingExistingSolar: false })).toBe(SOLAR_VIC_LEAD_DAYS);
     expect(installLeadDays({ state: "vic", expandingExistingSolar: true })).toBe(LEAD_TIME_DAYS);
     expect(installLeadDays({ state: "NSW", expandingExistingSolar: false })).toBe(LEAD_TIME_DAYS);
-    const from = new Date(2026, 9, 1);
-    const days = buildAvailability("ins_primero", from, 56, SOLAR_VIC_LEAD_DAYS);
-    expect(days[0].date >= toISODate(addDays(from, SOLAR_VIC_LEAD_DAYS))).toBe(true);
+    const days = buildAvailability("ins_primero", "2026-10-01", 56, SOLAR_VIC_LEAD_DAYS);
+    expect(days[0].date >= addDaysISO("2026-10-01", SOLAR_VIC_LEAD_DAYS)).toBe(true);
+  });
+
+  it("keeps the next 7 days free to arrange the job: on 1 October, the 8th is the first day", () => {
+    const days = buildAvailability("ins_primero", "2026-10-01", 14).map((d) => d.date);
+    expect(days[0]).toBe("2026-10-08");
+    expect(isBookableInstallDate("2026-10-07", "2026-10-01")).toBe(false);
+    expect(isBookableInstallDate("2026-10-08", "2026-10-01")).toBe(true);
+  });
+
+  it("never offers weekends or Victorian public holidays", () => {
+    const days = buildAvailability("ins_primero", "2026-10-01", 120).map((d) => d.date);
+    expect(days).not.toContain("2026-10-10"); // Saturday
+    expect(days).not.toContain("2026-10-11"); // Sunday
+    expect(days).not.toContain("2026-11-03"); // Melbourne Cup Day
+    expect(days).not.toContain("2026-12-25"); // Christmas Day
+    expect(days).not.toContain("2026-12-28"); // Boxing Day (additional day)
+    expect(days).toContain("2026-10-12"); // an ordinary Monday
+    expect(days.every(isInstallDay)).toBe(true);
+    // Every weekday from the 8th is offered (no random gaps).
+    expect(days.slice(0, 5)).toEqual(["2026-10-08", "2026-10-09", "2026-10-12", "2026-10-13", "2026-10-14"]);
+  });
+
+  it("offers nothing past the end of the holiday list (extend it each year)", () => {
+    expect(isInstallDay("2028-01-04")).toBe(false);
+    expect(LEAD_TIME_DAYS).toBe(7);
   });
 });
 

@@ -4,7 +4,8 @@ import { formatCallTime } from "@/lib/domain/booking";
 import { buildIcs, callEvent, installEvent } from "@/lib/domain/calendar";
 import { formatDate } from "@/lib/domain/format";
 import { CONSENT_MISSING, consentRecord, readConsent } from "@/lib/domain/legal";
-import { LAUNCH_MARKET } from "@/lib/domain/market";
+import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
+import { LEAD_TIME_DAYS, isBookableInstallDate } from "@/lib/domain/scheduling";
 import { cleanOrder, orderConfirmationEmail, plainText } from "@/lib/domain/emails";
 import { cleanJobRequest } from "@/lib/domain/jobs";
 import { dbConfigured } from "@/lib/server/db";
@@ -44,6 +45,11 @@ export async function POST(request: Request) {
   // The required box: Terms, Privacy and contact about their plan. Marketing is separate and optional.
   const consent = readConsent(body.consent);
   if (!consent.accepted) return Response.json({ ok: false, consent: true, message: CONSENT_MISSING }, { status: 422 });
+
+  // The install day must be one we offer: at least a week away, a weekday, not a Victorian public holiday.
+  if (body.installDate && !isBookableInstallDate(body.installDate, todayInMarket(), LEAD_TIME_DAYS)) {
+    return Response.json({ ok: false, message: "That install day isn't available any more. Please pick another." }, { status: 422 });
+  }
 
   const details: Record<string, string> = {};
   for (const [k, v] of Object.entries(body.details ?? {})) {

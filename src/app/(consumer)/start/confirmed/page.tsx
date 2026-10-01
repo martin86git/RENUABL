@@ -13,6 +13,8 @@ import { FlowStep } from "@/components/consumer/flow-shell";
 import { useFlow } from "@/components/consumer/flow-state";
 import { PortalTeaser } from "@/components/consumer/portal-preview";
 import { Mascot } from "@/components/ui/brand-art";
+import { Confetti } from "@/components/ui/confetti";
+import { RESERVED_CELEBRATION } from "@/lib/domain/flow-moments";
 import { ButtonLink, Card } from "@/components/ui/primitives";
 import { callEvent, installEvent } from "@/lib/domain/calendar";
 import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_PLAN, careIncludedValue, carePriceLabel } from "@/lib/domain/care";
@@ -53,17 +55,29 @@ function ConfirmedScreen() {
     >
       <div className="mx-auto max-w-md text-center">
         <div className="relative mx-auto w-[170px]">
+          <Confetti />
           <Mascot className="h-auto w-full" float priority />
           <span className="absolute bottom-2 right-0 grid h-11 w-11 place-items-center rounded-full bg-forest text-white ring-4 ring-canvas">
             <Check className="h-5 w-5" strokeWidth={2.4} />
           </span>
         </div>
-        <h2 className="mt-8 text-[34px] font-normal tracking-[-0.035em]">You&apos;re all set.</h2>
+        <h2 className="mt-8 text-[34px] font-normal tracking-[-0.035em]">{RESERVED_CELEBRATION.title}</h2>
         <p className="mt-1 text-[15px] text-muted">
           {state.contact?.firstName ? `Thanks, ${state.contact.firstName}. ` : ""}Your date is reserved
           {state.reservation?.reservationId ? ` (${state.reservation.reservationId})` : ""}.
         </p>
 
+        {state.reservation?.whoop && (
+          <div className="mt-6 flex animate-fade-up items-center gap-3 rounded-2xl bg-ink px-4 py-3.5 text-left text-canvas [animation-delay:400ms]">
+            <Gift className="h-6 w-6 shrink-0 text-sun-bright" strokeWidth={1.6} aria-hidden />
+            <div>
+              <p className="text-[12px] uppercase tracking-[0.12em] text-sun-bright">{RESERVED_CELEBRATION.whoopUnlocked}</p>
+              <p className="text-[14.5px]">
+                Free {WHOOP_OFFER.product} in {WHOOP_OFFER.colour}, with a {WHOOP_OFFER.membership}. {WHOOP_COPY.ships}
+              </p>
+            </div>
+          </div>
+        )}
         <Card className="mt-6 text-left">
           <ul className="divide-y divide-line">
             <Item
@@ -120,7 +134,6 @@ function ConfirmedScreen() {
                 detail={`We've emailed your order and price breakdown to ${state.contact.email}.`}
               />
             )}
-            {state.reservation?.whoop && <Item icon={Gift} sun title={`Free ${WHOOP_OFFER.product}`} detail={WHOOP_COPY.confirmed} />}
             {state.reservation?.careIncluded && (
               <Item
                 icon={Gift}

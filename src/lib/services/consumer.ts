@@ -125,8 +125,8 @@ export function getInstaller(id: string) {
   return INSTALLERS.find((i) => i.id === id);
 }
 
-export function getAvailability(installerId: string, leadDays?: number, from = new Date()) {
-  return buildAvailability(installerId, from, 56, leadDays);
+export function getAvailability(installerId: string, leadDays?: number, today = todayInMarket()) {
+  return buildAvailability(installerId, today, 56, leadDays);
 }
 
 export interface ReservationResult {

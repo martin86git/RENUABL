@@ -95,8 +95,8 @@ function ExtrasScreen() {
         })}
       </ul>
       <p className="mt-5 text-[13px] text-muted" aria-live="polite">
-        Your system: {formatCurrency(price.total)} after rebates
-        {price.discuss.length ? ` · ${price.discuss.length} to discuss on your call` : ""}. Optional: you can add these any time later.
+        {price.discuss.length ? `${price.discuss.length} to discuss on your call. ` : ""}Optional: you can add these any time later.
+        You&apos;ll see your full price, after rebates, when you reserve.
       </p>
     </FlowStep>
   );

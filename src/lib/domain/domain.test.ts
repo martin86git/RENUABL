@@ -323,17 +323,17 @@ describe("launch market time", () => {
 describe("buildAvailability", () => {
   it("offers days, not times: every install arrives 7am–9am", () => {
     expect(INSTALL_ARRIVAL.label).toBe("7am–9am");
-    expect(buildAvailability("ins_primero", new Date(2026, 8, 1)).every((d) => d.windows.join() === INSTALL_ARRIVAL.id)).toBe(true);
+    expect(buildAvailability("ins_primero", "2026-09-01").every((d) => d.windows.join() === INSTALL_ARRIVAL.id)).toBe(true);
   });
 
-  it("respects lead time and skips Sundays", () => {
-    const from = new Date(2026, 8, 1);
-    const days = buildAvailability("ins_primero", from);
+  it("respects lead time and skips weekends", () => {
+    const days = buildAvailability("ins_primero", "2026-09-01");
     expect(days.length).toBeGreaterThan(10);
     for (const d of days) {
-      const date = fromISODate(d.date);
-      expect(date.getDay()).not.toBe(0);
-      expect(date.getTime()).toBeGreaterThan(from.getTime());
+      const day = fromISODate(d.date).getDay();
+      expect(day).not.toBe(0);
+      expect(day).not.toBe(6);
+      expect(d.date > "2026-09-07").toBe(true);
       expect(d.windows.length).toBeGreaterThan(0);
     }
   });

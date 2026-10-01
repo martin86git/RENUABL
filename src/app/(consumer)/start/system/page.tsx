@@ -10,6 +10,7 @@ import {
   Gauge,
   Gift,
   Info,
+  PartyPopper,
   PlugZap,
   RotateCcw,
   Sun,
@@ -28,13 +29,14 @@ import { RoofCheck } from "@/components/consumer/roof-check";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
 import { Disclosure, Segmented, Toggle } from "@/components/ui/controls";
-import { Button, Card, StatRow, cn } from "@/components/ui/primitives";
+import { CountUp } from "@/components/ui/count-up";
+import { SYSTEM_REVEAL, rebateReward } from "@/lib/domain/flow-moments";
+import { Button, Card, cn } from "@/components/ui/primitives";
 import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
 import { expandNote, solarSituation } from "@/lib/domain/existing-solar";
 import { formatCurrency, formatPercent } from "@/lib/domain/format";
 import {
   ASSUMPTIONS,
-  PRICE_INCLUDES,
   backupNote,
   DESIGN_ON_CALL,
   TIER_LABELS,
@@ -155,11 +157,16 @@ function SystemScreen() {
       : "Keeping your existing solar"
     : `${outcome.solarKw} kW · ${PANEL.watts} W panels`;
 
+  const rebates = price.rebateLines.reduce((sum, r) => sum + r.amount, 0);
+  const reward = rebateReward(rebates);
+  const svMaybe = !existing && solarVictoriaApplies(state.address?.state ?? null) && !price.rebateLines.some((r) => r.id.startsWith("sv-"));
+
+  // The price comes last (on the reserve step, after the rebates): here, what's in it for them.
   const estimate = (
     <Card className="p-5">
       <p className="text-[13px] text-muted">Estimated savings</p>
-      <p className="mt-1 text-[30px] font-normal tracking-tight tabular-nums">
-        {formatCurrency(outcome.annualSavings)}
+      <p className="mt-1 text-[30px] font-normal tracking-tight tabular-nums text-positive">
+        <CountUp value={outcome.annualSavings} format={formatCurrency} />
         <span className="text-[14px] text-muted"> / year</span>
       </p>
       <p className="text-[13px] text-muted">
@@ -167,31 +174,43 @@ function SystemScreen() {
           ? `Cuts about ${formatPercent(outcome.selfPoweredShare)} of the power you buy from the grid.`
           : `About ${formatPercent(outcome.selfPoweredShare)} of your home powered by the sun.`}
       </p>
-      <div className="mt-3 divide-y divide-line border-t border-line">
-        {price.rebateLines.length > 0 && <StatRow label="Price before rebates" value={formatCurrency(price.gross)} />}
-        {price.rebateLines.map((r) => (
-          <div key={r.id} className="flex items-baseline justify-between gap-3 py-2.5">
-            <span className="text-[13.5px] font-medium text-positive">{r.label}</span>
-            <span className="text-[14px] font-semibold tabular-nums text-positive">−{formatCurrency(r.amount)}</span>
-          </div>
-        ))}
-        {!existing && solarVictoriaApplies(state.address?.state ?? null) && !price.rebateLines.some((r) => r.id.startsWith("sv-")) && (
-          <p className="py-2.5 text-[13px] text-positive">
-            <span className="font-medium">Solar Victoria Rebate:</span> you may also be eligible. Switch it on when you reserve.
-          </p>
-        )}
-        <StatRow label="Price after rebates" value={formatCurrency(price.total)} />
-        <StatRow label="Pays for itself in" value={`~${outcome.paybackYears} years`} />
-        <StatRow label="Due today" value="$0 to reserve" />
-      </div>
-      <p className="mt-2 text-[12px] text-muted">{PRICE_INCLUDES}</p>
+      {(reward || svMaybe) && (
+        <div className="mt-4 rounded-2xl bg-sage/60 p-4 text-forest" aria-live="polite">
+          {reward && (
+            <>
+              <p className="flex items-center gap-2 text-[13px]">
+                <PartyPopper className="h-4 w-4 shrink-0" strokeWidth={1.7} aria-hidden /> {reward.heading}
+              </p>
+              <p className="mt-1 text-[26px] font-normal leading-none tracking-tight tabular-nums">
+                <CountUp value={rebates} format={formatCurrency} />
+              </p>
+              <p className="mt-1.5 text-[12.5px] leading-snug text-forest/85">{reward.note}</p>
+              <ul className="mt-2 space-y-0.5 text-[12.5px]">
+                {price.rebateLines.map((r) => (
+                  <li key={r.id} className="flex items-center gap-2">
+                    <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden /> {r.label}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {svMaybe && (
+            <p className={cn("text-[12.5px] leading-snug", reward && "mt-2 border-t border-forest/15 pt-2")}>
+              <span className="font-medium">Solar Victoria Rebate:</span> you may also be eligible. Switch it on when you reserve.
+            </p>
+          )}
+        </div>
+      )}
+      <p className="mt-3 text-[12px] leading-snug text-muted">
+        You&apos;ll see your price, after rebates, when you reserve. Nothing to pay today.
+      </p>
     </Card>
   );
 
   return (
     <FlowStep
       width="regular"
-      title="Your recommended system."
+      title={SYSTEM_REVEAL.title}
       subtitle={subtitle}
       aside={
         <div className="sticky top-6 space-y-4">
@@ -213,7 +232,7 @@ function SystemScreen() {
         </Button>
       }
     >
-      <div className="max-w-xl space-y-4">
+      <div className="max-w-xl space-y-4 [&>*]:animate-fade-up [&>*:nth-child(2)]:[animation-delay:120ms] [&>*:nth-child(3)]:[animation-delay:220ms] [&>*:nth-child(4)]:[animation-delay:320ms] [&>*:nth-child(n+5)]:[animation-delay:420ms]">
         {!existing && (
           <RoofCheck
             roof={state.roof?.data}
@@ -231,6 +250,8 @@ function SystemScreen() {
           options={(Object.keys(TIER_LABELS) as SystemTier[]).map((t) => ({ value: t, label: TIER_LABELS[t] }))}
         />
         <WhoopOptionNote hasBattery={config.batteryKwh > 0} />
+        {/* On phones the reward comes straight after the options (desktop shows it alongside). */}
+        <div className="xl:hidden">{estimate}</div>
         {!CARE_ENABLED ? null : careIncludedFor(state.tier) ? (
           <CareIncludedCard />
         ) : (
@@ -318,8 +339,7 @@ function SystemScreen() {
           )}
         </Card>
 
-        <div className="space-y-4 xl:hidden">
-          {estimate}
+        <div className="xl:hidden">
           <PortalTeaser />
         </div>
       </div>

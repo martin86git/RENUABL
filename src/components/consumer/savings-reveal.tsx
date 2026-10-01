@@ -4,26 +4,9 @@ import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSystem } from "@/components/consumer/flow-state";
 import { Toggle } from "@/components/ui/controls";
+import { useCountUp } from "@/components/ui/count-up";
 import { formatCurrency } from "@/lib/domain/format";
 import { SAVINGS_PREVIEW, savingsPreview, type SavingsPreview } from "@/lib/domain/savings-preview";
-
-/** Counts up from 0 on mount (straight to the figure for people who prefer less motion). */
-function useCountUp(target: number, ms = 900) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    const instant = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let frame = 0;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = instant ? 1 : Math.min(1, (now - start) / ms);
-      setValue(Math.round(target * (1 - Math.pow(1 - t, 3))));
-      if (t < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [target, ms]);
-  return value;
-}
 
 /** Straight after the bill is read: "See how much I could save", then a first estimate. */
 export function SavingsReveal() {

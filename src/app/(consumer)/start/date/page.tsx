@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Clock } from "lucide-react";
+import { ArrowRight, Clock, Sun } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef } from "react";
 import { FlowGuard } from "@/components/consumer/flow-guard";
@@ -10,6 +10,7 @@ import { stepHref } from "@/components/consumer/steps";
 import { MonthCalendar } from "@/components/ui/month-calendar";
 import { Button, Card } from "@/components/ui/primitives";
 import { formatDate } from "@/lib/domain/format";
+import { earliestInstallLine, pickedInstallLine } from "@/lib/domain/flow-moments";
 import { INSTALL_ARRIVAL, SOLAR_VIC_DATE_NOTE } from "@/lib/domain/scheduling";
 import { getAvailability, getInstaller } from "@/lib/services/consumer";
 
@@ -23,6 +24,8 @@ function DateScreen() {
   const ready = Boolean(day && state.windowId);
   const timesRef = useRef<HTMLDivElement>(null);
   const installer = state.installerId ? getInstaller(state.installerId) : undefined;
+  // The reward for this step: how soon it could happen, then the day they chose.
+  const moment = day ? pickedInstallLine(day.date) : earliestInstallLine(dates[0]);
 
   const arrival = (
     <div ref={timesRef} className="rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--shadow-soft)]" aria-live="polite">
@@ -59,6 +62,15 @@ function DateScreen() {
         </Button>
       }
     >
+      {moment && (
+        <p
+          key={moment}
+          className="mb-5 flex max-w-4xl animate-fade-up items-center gap-3 rounded-2xl bg-sun px-4 py-3 text-[14.5px] text-sun-ink"
+          aria-live="polite"
+        >
+          <Sun className="h-5 w-5 shrink-0" strokeWidth={1.7} aria-hidden /> {moment}
+        </p>
+      )}
       <div className="grid max-w-4xl grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
         <Card className="p-5">
           <MonthCalendar

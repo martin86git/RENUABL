@@ -21,6 +21,7 @@ import { describeInverter } from "@/lib/domain/inverter";
 import { useWhoopOpen } from "@/lib/services/whoop";
 import { WHOOP_COPY, whoopEligible } from "@/lib/domain/whoop-offer";
 import { HEALTHY_INTEREST_LABEL } from "@/lib/domain/healthy-home";
+import { RESERVED_CELEBRATION, priceHeader } from "@/lib/domain/flow-moments";
 import { ConsentBoxes, NO_CONSENT, type ConsentState } from "@/components/consumer/consent-boxes";
 import { PRICE_INCLUDES, RESERVE_NO_COMMITMENT, TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
 import { solarVictoriaApplies } from "@/lib/domain/rebates";
@@ -178,15 +179,16 @@ function ReserveScreen() {
   };
   const suggestions = suggestedAdditions(config, recommendation.tiers.recommended.config, state.addOns, site);
   const careIncluded = careIncludedFor(state.tier);
+  const rebateTotal = price.rebateLines.reduce((sum, r) => sum + r.amount, 0);
 
   const basket = (
     <Card className="p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[15px] text-ink">Your RENUABL System</p>
+          <p className="text-[15px] text-ink">{priceHeader(rebateTotal)}</p>
           <p className="mt-0.5 text-[12.5px] leading-snug text-muted">{describeSystem(config)}</p>
         </div>
-        <p className="text-[19px] tabular-nums text-ink">{formatCurrency(price.total)}</p>
+        <p className="animate-fade-up text-[22px] tabular-nums text-ink">{formatCurrency(price.total)}</p>
       </div>
       <ul className="mt-4 divide-y divide-line border-t border-line">
         {price.lines.map((l) => (
@@ -222,7 +224,9 @@ function ReserveScreen() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[14px] text-ink">{WHOOP_COPY.giftLine}</p>
-              <p className="text-[12px] text-muted">{WHOOP_COPY.ships}</p>
+              <p className="text-[12px] text-muted">
+                <span className="font-medium text-sun-ink">{RESERVED_CELEBRATION.whoopUnlocked}</span> · {WHOOP_COPY.ships}
+              </p>
             </div>
             <p className="text-[14px] font-semibold tabular-nums text-sun-ink">$0</p>
           </li>
