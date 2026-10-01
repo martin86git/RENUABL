@@ -97,7 +97,7 @@ export const ADD_ONS: AddOn[] = [
     price: sellPrice(COSTING.backupCircuitsInstall),
     needsBattery: true,
   },
-  { id: "smart-switchboard", name: "Smart Switchboard", blurb: "Prepare for a smarter, safer home.", price: null },
+  { id: "surge-protection", name: "Surge Protection", blurb: "Protect my appliances from power surges.", price: null },
   {
     id: "reverse-cycle",
     name: "Reverse-Cycle Heating & Cooling",

@@ -111,7 +111,7 @@ export function ServiceBooking({ availability, installer }: { availability: DayA
       </Link>
       <p className="text-[13px] text-muted">Book a service</p>
       <h1 className="mt-2 text-[32px] font-normal tracking-[-0.035em] sm:text-[40px]">Let&apos;s get it sorted.</h1>
-      <p className="mt-1 max-w-xl text-[15px] text-muted">Book {installer}, your installation partner, at a time that suits you.</p>
+      <p className="mt-1 max-w-xl text-[15px] text-muted">Book a visit with your installation partner, at a time that suits you.</p>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <div className="space-y-5">

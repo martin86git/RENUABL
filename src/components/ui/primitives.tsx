@@ -48,9 +48,12 @@ export function ButtonLink({
   return <Link className={buttonClass(variant, size, className)} {...props} />;
 }
 
-/** Soft white card — no hard borders, as in the brand sheet. */
+/** Soft white card — no hard borders, as in the brand sheet. A `bg-…` in className replaces the white (cn doesn't merge classes). */
 export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-soft)]", className)} {...props} />;
+  const ownBackground = /(^|\s)bg-/.test(className ?? "");
+  return (
+    <div className={cn("rounded-[var(--radius-card)] shadow-[var(--shadow-soft)]", !ownBackground && "bg-surface", className)} {...props} />
+  );
 }
 
 export function Eyebrow({ className, ...props }: ComponentProps<"p">) {

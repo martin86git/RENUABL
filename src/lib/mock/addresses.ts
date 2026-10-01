@@ -2,7 +2,7 @@ import type { Address } from "@/lib/domain/types";
 
 // Stand-in for an address autocomplete provider. Launch market: Victoria.
 export const SAMPLE_ADDRESSES: Address[] = [
-  { line: "2 Hanwell Court", suburb: "Glen Waverley", state: "VIC", postcode: "3150" },
+  { line: "8 Example Court", suburb: "Glen Waverley", state: "VIC", postcode: "3150" },
   { line: "14 Wattle Street", suburb: "Brunswick", state: "VIC", postcode: "3056" },
   { line: "22 Jacaranda Avenue", suburb: "Northcote", state: "VIC", postcode: "3070" },
   { line: "9 Elm Grove", suburb: "Richmond", state: "VIC", postcode: "3121" },

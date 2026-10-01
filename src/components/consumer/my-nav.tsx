@@ -14,8 +14,12 @@ export const MY_TABS = [
   { href: "/my/profile", label: "Profile", icon: UserRound },
 ] as const;
 
+/** Pages reached from a tab count as that tab: "Book a service" sits under Support. */
+const TAB_CHILDREN: Record<string, string[]> = { "/my/support": ["/my/service"] };
+
 function isActive(pathname: string, href: string) {
-  return href === "/my" ? pathname === "/my" : pathname.startsWith(href);
+  if (href === "/my") return pathname === "/my";
+  return pathname.startsWith(href) || (TAB_CHILDREN[href] ?? []).some((c) => pathname.startsWith(c));
 }
 
 export function MyTopBar({ name }: { name: string }) {
@@ -59,7 +63,7 @@ export function MyBottomNav() {
                 aria-current={active ? "page" : undefined}
                 className={cn("flex flex-col items-center gap-1 pt-2.5 text-[11px]", active ? "text-ink" : "text-muted")}
               >
-                <Icon className={cn("h-6 w-6", active && "fill-ink")} strokeWidth={1.5} aria-hidden />
+                <Icon className="h-6 w-6" strokeWidth={active ? 2.2 : 1.5} aria-hidden />
                 {label}
               </Link>
             </li>

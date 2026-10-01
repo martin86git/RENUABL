@@ -36,11 +36,12 @@ export interface Upgrade {
 
 export const HOME_SYSTEM = {
   owner: "Sarah",
-  address: "2 Hanwell Court, Glen Waverley",
+  address: "8 Example Court, Glen Waverley",
   installedOn: "2026-06-18",
   solarKw: 13.2,
   batteryKwh: 13.5,
-  installer: "Primero Electric & Solar",
+  // The example home never names a real business.
+  installer: "Your installation partner",
   installerId: "ins_primero",
   phone: "0401 555 567",
 };

@@ -58,7 +58,7 @@ export function buildJobs(now = new Date()): Job[] {
       id: "job_1042",
       reference: "RN-1042",
       customer: { name: "Sarah Chen", phone: "0401 555 567", email: "sarah.chen@example.com" },
-      address: { line: "2 Hanwell Court", suburb: "Glen Waverley", state: "VIC", postcode: "3150" },
+      address: { line: "8 Example Court", suburb: "Glen Waverley", state: "VIC", postcode: "3150" },
       packageName: "Whole Home · 13.2 kW + 13.5 kWh",
       solarVictoria: true,
       system: { panelCount: 30, batteryKwh: 13.5, evCharger: false },

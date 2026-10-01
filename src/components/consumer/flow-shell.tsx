@@ -112,7 +112,9 @@ function RevoGuide({ slug }: { slug: string }) {
     evCharger: config.evCharger,
     backupAdded: state.addOns.includes("home-backup"),
     addOns: state.addOns.length,
-    partner: state.installerId ? getInstaller(state.installerId)?.name : undefined,
+    // Never name the partner while "Finding your installation partner" is still playing.
+    partner:
+      state.installerId && state.matchedPostcode === (state.address?.postcode ?? "") ? getInstaller(state.installerId)?.name : undefined,
     installDate: state.installDate ? formatDate(state.installDate, { weekday: "long", day: "numeric", month: "long" }) : undefined,
     firstName: state.contact?.firstName,
   });

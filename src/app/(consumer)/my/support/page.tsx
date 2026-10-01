@@ -28,14 +28,15 @@ export default function SupportPage() {
       <AskRenuabl context="my" title="Ask Revo" subtitle="Straight answers about your system, any time." />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Link href="/my/service" className="block sm:order-first">
-          <Card className="h-full bg-forest p-5 text-white transition hover:opacity-95">
+          {/* Not Card: its white background would win over bg-forest (cn doesn't merge), hiding the white text. */}
+          <div className="h-full rounded-[var(--radius-card)] bg-forest p-5 text-white shadow-[var(--shadow-soft)] transition hover:opacity-95">
             <Wrench className="h-5 w-5 text-white/80" aria-hidden />
             <p className="mt-3 text-[16px] font-medium">Book a service</p>
             <p className="text-[14px] text-white/75">Your installation partner, at a time that suits.</p>
             <p className="mt-3 inline-flex items-center gap-1.5 text-[13px]">
               Book now <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
             </p>
-          </Card>
+          </div>
         </Link>
         {[
           { icon: MessageCircle, title: "Message us", body: "Replies within the hour, 7am–9pm." },

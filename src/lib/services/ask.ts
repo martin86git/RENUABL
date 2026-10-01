@@ -30,9 +30,9 @@ const INTENTS: { match: RegExp; answer: string }[] = [
       "We need your latest electricity bill to size your system, so it can't be skipped. The quickest way is to download it (PDF) from your energy retailer's app, website or email, or take a photo of the paper bill. A screenshot works too. Your answers are kept while you get it. Can't get it now? Leave your email in the box under the upload and we'll get in touch.",
   },
   {
-    match: /heat pump|hot water|reverse.?cycle|air ?con|upgrade|switchboard|smart home/i,
+    match: /heat pump|hot water|reverse.?cycle|air ?con|upgrade|switchboard|surge|smart home/i,
     answer:
-      "Upgrades are worth it when they move energy use into the daytime, when your solar is free. Smart switchboards aren't priced online yet: tick them and we'll quote them on your 15-minute call. Blackout Backup (backup circuits for your battery) can be added with a battery. Heat pump hot water and reverse-cycle heating and cooling are coming soon: tick them and we'll let you know when they're available.",
+      "Upgrades are worth it when they move energy use into the daytime, when your solar is free. Surge protection isn't priced online yet: tick it and we'll quote it on your 15-minute call. Blackout Backup (backup circuits for your battery) can be added with a battery. Heat pump hot water and reverse-cycle heating and cooling are coming soon: tick them and we'll let you know when they're available.",
   },
   {
     match: /bill|upload|usage|pool|spa|heating|cooling/i,

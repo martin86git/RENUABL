@@ -152,7 +152,7 @@ export interface Recommendation {
   usage: UsageBasis;
 }
 
-export type AddOnId = "heat-pump" | "reverse-cycle" | "smart-switchboard" | "home-backup" | "smart-home";
+export type AddOnId = "heat-pump" | "reverse-cycle" | "surge-protection" | "home-backup" | "smart-home";
 
 export interface AddOn {
   id: AddOnId;

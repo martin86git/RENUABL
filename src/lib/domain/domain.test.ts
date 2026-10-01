@@ -230,7 +230,7 @@ describe("priceSystem", () => {
   it("applies rebates, includes add-ons and keeps a fixed deposit", () => {
     const config = { panelCount: 30, batteryKwh: 13.5, evCharger: true };
     const plain = priceSystem(config, { storeys: "double", roof: "tile", phase: "single" });
-    const withAddOns = priceSystem(config, { storeys: "double", roof: "tile", phase: "single" }, ["heat-pump", "smart-switchboard"]);
+    const withAddOns = priceSystem(config, { storeys: "double", roof: "tile", phase: "single" }, ["heat-pump", "surge-protection"]);
     expect(plain.total).toBe(plain.gross - plain.rebates);
     expect(plain.deposit).toBe(499);
     expect(plain.bom.find((l) => l.description === "Double-storey installation")?.total).toBe(400);
@@ -239,7 +239,7 @@ describe("priceSystem", () => {
     expect(withAddOns.total).toBe(plain.total);
     expect(withAddOns.lines.some((l) => l.id === "heat-pump")).toBe(false);
     expect(withAddOns.bom.some((l) => l.group === "heat-pump")).toBe(false);
-    expect(withAddOns.discuss.map((d) => d.id)).toEqual(["smart-switchboard"]);
+    expect(withAddOns.discuss.map((d) => d.id)).toEqual(["surge-protection"]);
     expect(withAddOns.interested.map((d) => d.id)).toEqual(["heat-pump"]);
     expect(plain.discuss).toEqual([]);
     expect(plain.interested).toEqual([]);

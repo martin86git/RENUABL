@@ -12,11 +12,11 @@ export const SYSTEM_REVEAL = {
   title: "Here's your system.",
 } as const;
 
-/** "Good news: you're eligible for about $4,350 in rebates." Null when there are none. */
+/** "Good news: this system is eligible for about $4,350 in rebates." Null when there are none. */
 export function rebateReward(total: number): { heading: string; amount: string; note: string } | null {
   if (!(total > 0)) return null;
   return {
-    heading: "Good news: you're eligible for about",
+    heading: "Good news: this system is eligible for about",
     amount: formatCurrency(total),
     note: "in rebates. We take them off your price at the end, and confirm them on your call.",
   };
