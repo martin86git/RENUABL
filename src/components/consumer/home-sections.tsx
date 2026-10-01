@@ -2,7 +2,9 @@ import { ArrowRight, Droplets, Sun } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ButtonLink, Card } from "@/components/ui/primitives";
-import { EXAMPLE_PLAN, HEALTH_TEASER, HOW_IT_WORKS, PACKAGES } from "@/lib/domain/healthy-home";
+import { COMING_SOON, EXAMPLE_PLAN, HEALTH_TEASER, HOW_IT_WORKS, PACKAGES } from "@/lib/domain/healthy-home";
+
+const soonPill = "ml-auto shrink-0 whitespace-nowrap rounded-full border border-forest/25 px-2.5 py-0.5 text-[11.5px] text-forest";
 import { WhoopStrip } from "./whoop-promo";
 
 const section = "mx-auto w-full max-w-[1440px] px-5 pt-16 sm:px-8 lg:px-10 lg:pt-24";
@@ -27,6 +29,7 @@ export function ExamplePlanCard() {
                   <Droplets className="h-4 w-4" strokeWidth={1.6} aria-hidden />
                 )}
                 {group.name}
+                {"comingSoon" in group && group.comingSoon && <span className={soonPill}>{COMING_SOON}</span>}
               </p>
               <ul className="mt-2 divide-y divide-line">
                 {group.items.map((item) => (
@@ -69,7 +72,10 @@ export function PackagesSection() {
               <div className={ci === 0 ? "aspect-[1200/628] bg-surface-2" : "aspect-[1200/628] bg-sage/70"} aria-hidden />
             )}
             <div className="p-6">
-              <p className="text-[20px] tracking-[-0.02em] text-ink">{card.name}</p>
+              <p className="flex items-center gap-3 text-[20px] tracking-[-0.02em] text-ink">
+                {card.name}
+                {"comingSoon" in card && card.comingSoon && <span className={soonPill}>{COMING_SOON}</span>}
+              </p>
               <p className="mt-1 text-[15px] text-muted">{card.line}</p>
               <ul className="mt-4 flex flex-wrap gap-2">
                 {card.chips.map((chip) => (

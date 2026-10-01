@@ -26,6 +26,7 @@ export const EXAMPLE_PLAN = [
   },
   {
     name: "Healthy home package",
+    comingSoon: true,
     items: [
       { label: "Air purification", value: "Bedrooms" },
       { label: "Whole-house water filtration", value: "Added" },
@@ -49,6 +50,7 @@ export const PACKAGES = {
     },
     {
       name: "Healthy home package",
+      comingSoon: true,
       line: "Cleaner air, better water, better sleep.",
       image: {
         src: "/brand/package-healthy.webp",
@@ -88,6 +90,9 @@ export const HEALTH_TEASER = {
     "Any mould or condensation?",
   ],
 } as const;
+
+/** On the Healthy home package while its products aren't offered yet (the Home Health check is research). */
+export const COMING_SOON = "Coming soon";
 
 /** The optional, unticked checkbox near the end of the quote flow. */
 export const HEALTHY_INTEREST_LABEL = "I'm interested in healthy home upgrades (air, water, lighting).";

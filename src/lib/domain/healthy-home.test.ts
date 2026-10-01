@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HOME_HERO, healthyHomeText } from "./healthy-home";
+import { EXAMPLE_PLAN, HOME_HERO, PACKAGES, healthyHomeText } from "./healthy-home";
 import {
   HEALTH_ITEMS,
   HEALTH_QUESTIONS,
@@ -14,6 +14,11 @@ import { WHOOP_COPY, WHOOP_OFFER, nextWhoopStatus, whoopEligible, whoopOfferOpen
 const BANNED = /\b(cure|treat|prevent|guaranteed?|best|first ever|leading|AI|installer)\b|\$\d/i;
 
 describe("Healthy Home copy", () => {
+  it("marks the Healthy home package coming soon while its products aren't offered", () => {
+    expect(PACKAGES.cards.find((c) => c.name === "Healthy home package")).toMatchObject({ comingSoon: true });
+    expect(EXAMPLE_PLAN.find((g) => g.name === "Healthy home package")).toMatchObject({ comingSoon: true });
+  });
+
   it('has exactly one "sun" in the headline (the home page highlights it)', () => {
     expect(HOME_HERO.headline.split("sun")).toHaveLength(2);
     expect(HOME_HERO.headlineLines.join(" ")).toBe(HOME_HERO.headline);
