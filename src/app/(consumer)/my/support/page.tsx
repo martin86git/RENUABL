@@ -15,7 +15,10 @@ const FAQ = [
     q: "Can I change my installation date?",
     a: "Yes — free of charge up to 72 hours before. Message us and we'll arrange it with your installation partner.",
   },
-  { q: "What does my warranty cover?", a: "25 years on panels, 10 years on inverter and battery, plus the RENUABL workmanship guarantee." },
+  {
+    q: "What does my warranty cover?",
+    a: "Your panels, inverter and battery are covered by their manufacturers' warranties, and the installation by your installation partner's workmanship warranty. The exact terms are in the documents on your installation record.",
+  },
 ];
 
 export default function SupportPage() {

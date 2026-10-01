@@ -85,6 +85,7 @@
 - "Setting up your plan" (`/start/analysing`, `src/lib/domain/sources.ts`) is headed "How we're working out your energy plan." and ticks off our trusted sources: Google Maps (only for Google addresses), NASA POWER (only once its sunshine arrives; otherwise "Local sunshine averages"), the Clean Energy Regulator and Solar Victoria (VIC only). A tick means that data has arrived. Never "exact", "precise" or "guaranteed" (tested). Text only, no third-party logos.
 
 - Primero Electric & Solar is the installer of choice in Victoria. Only show figures that are real and attributed (its Google rating: 4.7 from 141 reviews, as supplied). Never invent ratings, review counts, install numbers or testimonials for a real business: `verifiedStats`/`reviewSource` on `Installer` gate what customers see.
+- RENUABL gives no workmanship guarantee and doesn't guarantee installation work: the installation partner warrants their workmanship, and products carry their manufacturers' warranties. Never say otherwise (support FAQ, Revo's facts, guides).
 - RENUABL has no customer reviews yet: don't show ratings, review counts, "homes powered" or testimonials for RENUABL until there are real, verifiable figures (Australian Consumer Law).
 
 ## Launch market
