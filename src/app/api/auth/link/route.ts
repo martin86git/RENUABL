@@ -48,6 +48,13 @@ export async function POST(request: Request) {
     }
   } else if ((await jobsForCustomer(email)).length > 0) role = "customer";
 
+  // For diagnosing "I didn't get my link" in the Vercel logs. Never the email address itself.
+  console.info(
+    role
+      ? `sign-in link: sending (${role}, chose ${body.as === "partner" ? "partner" : "customer"})`
+      : `sign-in link: none sent, no ${body.as === "partner" ? "approved partner" : "customer reservation"} or staff entry for that email`,
+  );
+
   if (role) {
     const token = await createLoginToken(email, role, safeNext(body.next, role));
     try {
@@ -59,6 +66,7 @@ export async function POST(request: Request) {
           forPartner: role === "partner",
         }),
       });
+      console.info(`sign-in link: handed to the email service (${role})`);
     } catch (e) {
       const detail = e instanceof Error ? e.message : String(e);
       console.error("sign-in email failed", detail);
