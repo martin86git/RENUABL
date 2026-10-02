@@ -72,7 +72,10 @@ export interface FlowState {
   call: CallSlot | null;
   attribution: Attribution | null;
   /** The Meta Pixel Lead event has been sent this visit (once, on the first bill read). */
-  leadTracked: boolean;
+  /** Meta BillUploaded sent for this visit (once a bill is read). */
+  billTracked: boolean;
+  /** Meta Lead sent for this visit (once a date is reserved). */
+  reservedTracked: boolean;
   /** "I'm interested in healthy home upgrades" on the reserve step (optional, unticked). */
   healthyInterest: boolean;
 }
@@ -100,7 +103,8 @@ const EMPTY: FlowState = {
   callBooked: false,
   call: null,
   attribution: null,
-  leadTracked: false,
+  billTracked: false,
+  reservedTracked: false,
   healthyInterest: false,
 };
 

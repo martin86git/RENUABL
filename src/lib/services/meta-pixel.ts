@@ -4,7 +4,7 @@
  * button tracking are switched off, so the pixel sends exactly what we fire:
  * PageView, and Lead once a bill has been read. No parameters, ever.
  */
-import { metaPixelId } from "@/lib/domain/meta-pixel";
+import { META_EVENTS, metaPixelId } from "@/lib/domain/meta-pixel";
 
 const PIXEL_ID = metaPixelId(process.env.NEXT_PUBLIC_META_PIXEL_ID);
 
@@ -57,12 +57,19 @@ function load(id: string) {
 export function trackPageView() {
   if (!PIXEL_ID) return;
   load(PIXEL_ID);
-  window.fbq?.("track", "PageView");
+  window.fbq?.("track", META_EVENTS.pageView);
 }
 
-/** The visitor's bill has been read and their system priced. No parameters are sent. */
+/** The visitor's bill has been read (step 2). A custom event, no parameters. */
+export function trackBillUploaded() {
+  if (!PIXEL_ID) return;
+  load(PIXEL_ID);
+  window.fbq?.("trackCustom", META_EVENTS.billUploaded);
+}
+
+/** The date was reserved: the lead and their details are with us (HubSpot, staff email). No parameters are sent. */
 export function trackLead() {
   if (!PIXEL_ID) return;
   load(PIXEL_ID);
-  window.fbq?.("track", "Lead");
+  window.fbq?.("track", META_EVENTS.lead);
 }

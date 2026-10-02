@@ -1,7 +1,8 @@
 /**
  * Meta Pixel rules (for Meta ads). The pixel only ever sees public pages and
- * two events: PageView and one Lead when a bill has been read, with no
- * parameters. Private pages are left out because their URLs can carry sign-in
+ * three events, all without parameters: PageView, BillUploaded (custom) once
+ * a bill has been read, and Lead once a date is reserved, when the customer's
+ * details reach us. Private pages are left out because their URLs can carry sign-in
  * links or private record keys (/login, /my, /deposit, /installer, /admin).
  * Pure and tested.
  */
@@ -19,3 +20,12 @@ export function pixelAllowedPath(pathname: string): boolean {
   if (pathname === "/") return true;
   return PIXEL_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
+
+/** The events we send. Lead is the reservation (what HubSpot and staff see); a bill alone is BillUploaded. */
+export const META_EVENTS = {
+  pageView: "PageView",
+  /** Custom event: the bill was read at step 2 (no contact details yet). For audiences and retargeting. */
+  billUploaded: "BillUploaded",
+  /** Standard event: the date was reserved and the lead is in HubSpot. Ads optimise for this. */
+  lead: "Lead",
+} as const;

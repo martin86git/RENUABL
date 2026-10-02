@@ -19,6 +19,7 @@ import { formatCurrency, formatDate } from "@/lib/domain/format";
 import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { describeInverter } from "@/lib/domain/inverter";
 import { useWhoopOpen } from "@/lib/services/whoop";
+import { trackLead } from "@/lib/services/meta-pixel";
 import { WHOOP_COPY, whoopEligible } from "@/lib/domain/whoop-offer";
 import { HEALTHY_INTEREST_LABEL } from "@/lib/domain/healthy-home";
 import { RESERVED_CELEBRATION, priceHeader } from "@/lib/domain/flow-moments";
@@ -163,7 +164,9 @@ function ReserveScreen() {
       setProblem(result.message ?? (result.errors ? "Please check your details." : "Something went wrong. Please try again."));
       return;
     }
-    update({ reservation: result.reservation, contact });
+    // The reservation is the lead (it's now in HubSpot): count it once for Meta, with no details.
+    if (!state.reservedTracked) trackLead();
+    update({ reservation: result.reservation, contact, reservedTracked: true });
     router.push(stepHref("confirmed"));
   }
 

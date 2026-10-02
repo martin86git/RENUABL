@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { metaPixelId, pixelAllowedPath } from "./meta-pixel";
+import { META_EVENTS, metaPixelId, pixelAllowedPath } from "./meta-pixel";
 
 describe("Meta Pixel", () => {
   it("accepts only a numeric pixel ID", () => {
@@ -26,5 +26,8 @@ describe("Meta Pixel", () => {
       "/learning",
     ])
       expect(pixelAllowedPath(p)).toBe(false);
+  });
+  it("counts a lead at the reservation, and a bill on its own as BillUploaded", () => {
+    expect(META_EVENTS).toEqual({ pageView: "PageView", billUploaded: "BillUploaded", lead: "Lead" });
   });
 });
