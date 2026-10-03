@@ -9,16 +9,16 @@ describe("15-minute call for prospects", () => {
     const first = buildCallAvailability(today, null)[0];
     expect(isBookableCallSlot(today, first.date, first.times[0])).toBe(true);
     expect(isBookableCallSlot(today, today, "10:00")).toBe(false); // not today
-    expect(isBookableCallSlot(today, "2026-10-10", "10:00")).toBe(false); // a Saturday
+    expect(isBookableCallSlot(today, "2026-10-11", "10:00")).toBe(false); // a Sunday
     expect(isBookableCallSlot(today, first.date, "21:00")).toBe(false);
   });
 
-  it("never offers Sundays, Saturdays or Victorian public holidays", () => {
+  it("offers Saturdays, never Sundays or Victorian public holidays", () => {
     // Melbourne Cup Day, Tuesday 3 November 2026.
     const days = buildCallAvailability("2026-10-29", null).map((d) => d.date);
     expect(days).not.toContain("2026-11-03");
     expect(days).not.toContain("2026-11-01"); // Sunday
-    expect(days).not.toContain("2026-10-31"); // Saturday
+    expect(days).toContain("2026-10-31"); // Saturday
     expect(days).toContain("2026-11-02");
     // Christmas to New Year.
     const summer = buildCallAvailability("2026-12-23", null).map((d) => d.date);

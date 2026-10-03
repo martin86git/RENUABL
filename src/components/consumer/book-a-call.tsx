@@ -17,7 +17,7 @@ const field =
 
 type Details = { firstName: string; lastName: string; mobile: string; email: string };
 
-/** /book-a-call: pick a weekday time, leave name, mobile and email, and the team calls. HubSpot Meetings when configured. */
+/** /book-a-call: pick a time (Monday to Saturday), leave name, mobile and email, and the team calls. HubSpot Meetings when configured. */
 export function BookACall() {
   const { state } = useFlow();
   const availability = useMemo(() => getCallAvailability(null), []);

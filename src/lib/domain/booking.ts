@@ -1,4 +1,4 @@
-import { addDays, fromISODate, isInstallDay, stableHash, toISODate } from "./scheduling";
+import { addDays, fromISODate, HOLIDAYS_LISTED_UNTIL, stableHash, toISODate, VIC_PUBLIC_HOLIDAYS } from "./scheduling";
 import type { ISODate } from "./types";
 
 /**
@@ -45,7 +45,7 @@ export function isHubspotBookedMessage(origin: string, data: unknown): boolean {
 // In-app booking (used when no HubSpot link is configured)
 // ---------------------------------------------------------------------------
 
-/** Call times in Melbourne time, every 30 minutes, 9am to 4:30pm, weekdays. */
+/** Call times in Melbourne time, every 30 minutes, 9am to 4:30pm, Monday to Saturday. */
 export const CALL_TIMES = [
   "09:00",
   "09:30",
@@ -70,8 +70,8 @@ export interface CallDay {
 }
 
 /**
- * Days and times the 15-minute calls can be booked: weekdays from tomorrow,
- * never weekends or Victorian public holidays, and always before the install
+ * Days and times the 15-minute calls can be booked: Monday to Saturday from
+ * tomorrow, never Sundays or Victorian public holidays, and always before the install
  * date (when there is one) so it's confirmed in time.
  */
 export function buildCallAvailability(today: ISODate, installDate: ISODate | null, days = 14): CallDay[] {
@@ -81,8 +81,8 @@ export function buildCallAvailability(today: ISODate, installDate: ISODate | nul
     const date = addDays(start, i);
     const iso = toISODate(date);
     if (installDate && iso >= installDate) break;
-    // Weekdays only: never Saturdays, Sundays or Victorian public holidays (the same days as installs).
-    if (!isInstallDay(iso)) continue;
+    // Monday to Saturday: never Sundays or Victorian public holidays.
+    if (date.getDay() === 0 || VIC_PUBLIC_HOLIDAYS[iso] || iso > HOLIDAYS_LISTED_UNTIL) continue;
     const h = stableHash(`call:${iso}`);
     const times = CALL_TIMES.filter((_, idx) => (h >> idx) % 5 !== 0);
     if (times.length) out.push({ date: iso, times });
@@ -109,7 +109,7 @@ export const CONSULT_CALL = {
   note: "No obligation and nothing to pay. Have your latest electricity bill handy if you can, but you don't need it.",
 } as const;
 
-/** True when the day and time is one the page offered (weekday, from tomorrow, a listed time), so the server can check it. */
+/** True when the day and time is one the page offered (Monday to Saturday, from tomorrow, a listed time), so the server can check it. */
 export function isBookableCallSlot(today: ISODate, date: string, time: string): boolean {
   return buildCallAvailability(today, null).some((d) => d.date === date && d.times.includes(time));
 }
