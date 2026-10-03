@@ -136,7 +136,7 @@ export default function ProfilePage() {
   const { state, update } = useFlow();
   const profile = state.profile;
   const complete = isAboutComplete(state);
-  // "Don't have your bill handy?" appears only when someone tries to continue without one.
+  // Pressing Continue without a bill points back to the upload.
   const [missingBill, setMissingBill] = useState(false);
   const billRef = useRef<HTMLDivElement>(null);
   const next = () => {
@@ -186,12 +186,9 @@ export default function ProfilePage() {
             />
             {state.bill && <SavingsReveal />}
             {missingBill && !state.bill && (
-              <>
-                <p className="text-[13.5px] text-ink-2" role="alert">
-                  Please upload your latest bill to continue: we size your system from it.
-                </p>
-                <BillLater />
-              </>
+              <p className="text-[13.5px] text-ink-2" role="alert">
+                Please upload your latest bill to continue: we size your system from it.
+              </p>
             )}
           </div>
           {existing.size && (
@@ -259,6 +256,8 @@ export default function ProfilePage() {
               </div>
             </QuestionCard>
           ))}
+          {/* Last, just above Continue: anyone without their bill can leave an email or mobile instead of leaving. */}
+          <BillLater />
         </div>
 
         {/* Mascot and script travel together and stay in view. Sticky makes its own layer, so it needs the page colour for the mascot's multiply blend. */}

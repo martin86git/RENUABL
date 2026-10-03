@@ -345,18 +345,20 @@ export function newLeadEmail(o: {
   kind: "reservation" | "no-bill" | "home-health";
   reference?: string;
   name?: string;
-  email: string;
+  /** A "no bill yet" lead may leave a mobile instead. */
+  email?: string;
   mobile?: string;
   details: Record<string, string | undefined>;
 }) {
   const name = plainText(o.name, 80);
   // Checked on the server already; plainText would strip it (it removes addresses from customer text).
-  const email = o.email.replace(/[^\w.+@-]/g, "").slice(0, 120);
-  const who = name || email;
+  const email = (o.email ?? "").replace(/[^\w.+@-]/g, "").slice(0, 120);
+  const mobile = o.mobile ? plainText(o.mobile, 30) : "";
+  const who = name || email || mobile;
   const lines = [
     ...(name ? [`Name: ${name}`] : []),
-    `Email: ${email}`,
-    ...(o.mobile ? [`Mobile: ${plainText(o.mobile, 30)}`] : []),
+    ...(email ? [`Email: ${email}`] : []),
+    ...(mobile ? [`Mobile: ${mobile}`] : []),
     ...Object.entries(o.details)
       .filter((e): e is [string, string] => typeof e[1] === "string" && e[1].trim() !== "")
       .slice(0, 30)
@@ -379,7 +381,12 @@ export function newLeadEmail(o: {
       : simpleEmail({
           subject: `New lead (no bill yet): ${who}`,
           heading: "New lead: didn't have their bill handy",
-          lines: [...lines, "They've been emailed a link to come back and finish. Worth a follow-up call or email."],
+          lines: [
+            ...lines,
+            email
+              ? "They've been emailed a link to come back and finish. Worth a follow-up call or email."
+              : "They left a mobile only: give them a call.",
+          ],
           footer: "Also in HubSpot.",
         });
 }

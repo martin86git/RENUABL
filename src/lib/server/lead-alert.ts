@@ -6,13 +6,16 @@
 import { leadAlertRecipients, newLeadEmail } from "@/lib/domain/emails";
 import { sendEmail } from "./email";
 
-export async function alertNewLead(lead: Parameters<typeof newLeadEmail>[0]): Promise<void> {
+/** Resolves to true when at least one staff member was emailed. */
+export async function alertNewLead(lead: Parameters<typeof newLeadEmail>[0]): Promise<boolean> {
   const mail = newLeadEmail(lead);
+  let sent = false;
   for (const to of leadAlertRecipients(process.env.LEAD_ALERT_EMAILS)) {
     try {
-      await sendEmail({ to, ...mail });
+      if ((await sendEmail({ to, ...mail })) === "sent") sent = true;
     } catch (e) {
       console.error(`lead alert to ${to} failed`, e instanceof Error ? e.message : e);
     }
   }
+  return sent;
 }

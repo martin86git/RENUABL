@@ -29,5 +29,9 @@ describe("lead alerts", () => {
     const mail = newLeadEmail({ kind: "no-bill", email: "sam@example.com", details: { Home: "Glen Waverley" } });
     expect(mail.subject).toBe("New lead (no bill yet): sam@example.com");
     expect(mail.text).toContain("follow-up");
+    const phoneOnly = newLeadEmail({ kind: "no-bill", mobile: "+61412345678", details: {} });
+    expect(phoneOnly.subject).toBe("New lead (no bill yet): +61412345678");
+    expect(phoneOnly.text).not.toContain("Email:");
+    expect(phoneOnly.text).toContain("give them a call");
   });
 });

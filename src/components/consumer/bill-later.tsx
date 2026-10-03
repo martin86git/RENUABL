@@ -8,13 +8,18 @@ import { requestFollowUp } from "@/lib/services/consumer";
 import { ConsentBoxes, NO_CONSENT, type ConsentState } from "./consent-boxes";
 import { useFlow } from "./flow-state";
 
+const field =
+  "h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-[15px] text-ink outline-none placeholder:text-muted focus:border-ink";
+
 /**
- * "Don't have your bill handy?": the visitor leaves their email so we can
- * follow up, instead of leaving. They still need the bill to continue.
+ * "Don't have your bill handy?": the visitor leaves their email, mobile or both
+ * (at least one) so we can follow up, instead of leaving. They still need the
+ * bill to continue.
  */
 export function BillLater() {
   const { state } = useFlow();
   const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -22,9 +27,14 @@ export function BillLater() {
   const [consentMissing, setConsentMissing] = useState(false);
 
   if (state.bill) return null;
+  const given = Boolean(email.trim() || mobile.trim());
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!given) {
+      setProblem("Enter your email or mobile so we can get in touch.");
+      return;
+    }
     if (!consent.terms) {
       setConsentMissing(true);
       return;
@@ -32,7 +42,8 @@ export function BillLater() {
     setBusy(true);
     setProblem(null);
     const r = await requestFollowUp({
-      email,
+      email: email.trim() || undefined,
+      mobile: mobile.trim() || undefined,
       home: state.address ? formatAddress(state.address) : undefined,
       source: [state.attribution?.source, state.attribution?.campaign].filter(Boolean).join(" / ") || undefined,
       consent,
@@ -44,7 +55,7 @@ export function BillLater() {
 
   if (done) {
     return (
-      <div className="flex items-start gap-3 rounded-[var(--radius-card)] bg-sage/50 px-5 py-4 text-forest" role="status">
+      <div className="flex items-start gap-3 rounded-[var(--radius-card)] bg-sage px-5 py-4 text-forest" role="status">
         <Check className="mt-0.5 h-5 w-5 shrink-0" strokeWidth={2} aria-hidden />
         <p className="text-[14px]">Thanks. We&apos;ll be in touch, and you can come back and add your bill any time.</p>
       </div>
@@ -52,25 +63,34 @@ export function BillLater() {
   }
 
   return (
-    <form onSubmit={(e) => void submit(e)} className="rounded-[var(--radius-card)] border border-line px-5 py-4">
-      <p className="text-[15px] text-ink">Don&apos;t have your bill handy right now?</p>
-      <p className="mt-0.5 text-[13px] text-muted">Enter your email and we&apos;ll get in touch.</p>
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <label className="min-w-0 flex-1">
+    <form onSubmit={(e) => void submit(e)} noValidate className="rounded-[var(--radius-card)] bg-sage px-5 py-5">
+      <p className="text-[16px] text-forest">Don&apos;t have your bill handy right now?</p>
+      <p className="mt-0.5 text-[13px] text-ink-2">Leave your email or mobile and we&apos;ll get in touch. You only need one.</p>
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <label>
           <span className="sr-only">Email</span>
           <input
             type="email"
-            required
+            inputMode="email"
             autoComplete="email"
-            placeholder="you@example.com"
+            placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-[15px] text-ink outline-none focus:border-ink"
+            className={field}
           />
         </label>
-        <Button type="submit" variant="secondary" disabled={busy || !email.trim()}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Get in touch"}
-        </Button>
+        <label>
+          <span className="sr-only">Mobile</span>
+          <input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="Mobile"
+            value={mobile}
+            onChange={(e) => setMobile(e.target.value)}
+            className={field}
+          />
+        </label>
       </div>
       {problem && (
         <p className="mt-2 text-[13px] text-danger" role="alert">
@@ -78,6 +98,9 @@ export function BillLater() {
         </p>
       )}
       <ConsentBoxes kind="follow-up" value={consent} onChange={setConsent} missing={consentMissing} className="mt-3" />
+      <Button type="submit" className="mt-3 w-full" disabled={busy || !given}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Get in touch"}
+      </Button>
     </form>
   );
 }

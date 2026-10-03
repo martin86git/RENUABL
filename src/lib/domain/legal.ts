@@ -22,14 +22,15 @@ export const LEGAL = {
  * never a condition of reserving. Bump CONSENT_VERSION whenever the wording
  * changes: the version is saved with each consent as the record.
  */
-export const CONSENT_VERSION = "2026-09-30";
+export const CONSENT_VERSION = "2026-10-03";
 
 /** Reserve step, after "I've read and accept the Terms of Use and Privacy Policy." */
 export const CONTACT_CONSENT =
   "RENUABL and my installation partner may contact me by phone, SMS and email about my system, call and installation. Message rates may apply. Reply STOP to any text to opt out.";
 
 /** "Don't have your bill handy?", after the same Terms and Privacy line. */
-export const FOLLOW_UP_CONSENT = "RENUABL may email me about finishing my plan.";
+export const FOLLOW_UP_CONSENT =
+  "RENUABL may contact me by email, phone or SMS about finishing my plan. Reply STOP to any text to opt out.";
 
 /** The optional box (reserve step and "Don't have your bill handy?"). */
 export const MARKETING_CONSENT = "Send me occasional solar tips and offers from RENUABL. You can unsubscribe any time.";

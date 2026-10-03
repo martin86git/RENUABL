@@ -30,6 +30,41 @@ export async function contactIdByEmail(email: string, token: string): Promise<st
   return json.id;
 }
 
+/**
+ * "Don't have your bill handy?": the contact for an email and/or mobile. By email when there is one (adding the
+ * mobile if HubSpot has none yet); otherwise found by mobile, or created with just the mobile.
+ */
+export async function followUpContactId(who: { email: string | null; mobile: string | null }, token: string): Promise<string> {
+  if (who.email) {
+    const id = await contactIdByEmail(who.email, token);
+    if (who.mobile) {
+      const res = await call(`/contacts/${id}?properties=mobilephone`, token, "GET");
+      const json = res.ok ? ((await res.json()) as { properties?: { mobilephone?: string | null } }) : {};
+      if (res.ok && !json.properties?.mobilephone) {
+        await call(`/contacts/${id}`, token, "PATCH", { properties: { mobilephone: who.mobile, phone: who.mobile } });
+      }
+    }
+    return id;
+  }
+  if (!who.mobile) throw new HubspotError("No email or mobile");
+  const found = await call("/contacts/search", token, "POST", {
+    filterGroups: [{ filters: [{ propertyName: "mobilephone", operator: "EQ", value: who.mobile }] }],
+    limit: 1,
+  });
+  if (found.ok) {
+    const json = (await found.json()) as { results?: { id?: string }[] };
+    const id = json.results?.[0]?.id;
+    if (id) return id;
+  }
+  const res = await call("/contacts", token, "POST", {
+    properties: { mobilephone: who.mobile, phone: who.mobile, lifecyclestage: "lead" },
+  });
+  if (!res.ok) throw new HubspotError(`HubSpot contact ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const json = (await res.json()) as { id?: string };
+  if (!json.id) throw new HubspotError("HubSpot returned no contact id");
+  return json.id;
+}
+
 /** Creates the contact, or updates it when that email already exists. Returns the contact id. */
 export async function upsertContact(
   contact: ContactDetails,

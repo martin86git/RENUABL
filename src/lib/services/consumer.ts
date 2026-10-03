@@ -151,7 +151,9 @@ export type ReserveResult = { ok: true; reservation: ReservationResult } | { ok:
  */
 /** A visitor without their bill handy leaves their email so we can follow up. */
 export async function requestFollowUp(input: {
-  email: string;
+  /** An email, a mobile, or both. */
+  email?: string;
+  mobile?: string;
   home?: string;
   source?: string;
   /** The tickboxes: Terms and Privacy (required) and tips and offers (optional). */
