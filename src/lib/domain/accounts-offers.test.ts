@@ -10,6 +10,9 @@ describe("accounts", () => {
     expect(normaliseEmail("  Sam@Example.COM ")).toBe("sam@example.com");
     expect(normaliseEmail("nope")).toBeNull();
     expect([...staffEmails("a@renuabl.com.au, B@renuabl.com.au;bad")]).toEqual(["a@renuabl.com.au", "b@renuabl.com.au"]);
+    // Quote marks pasted into Vercel around the value or an address don't stop it matching.
+    expect([...staffEmails('"martin@renuabl.com.au"')]).toEqual(["martin@renuabl.com.au"]);
+    expect([...staffEmails("'a@renuabl.com.au', <b@renuabl.com.au>")]).toEqual(["a@renuabl.com.au", "b@renuabl.com.au"]);
   });
 
   it("only sends people to their own area after signing in", () => {

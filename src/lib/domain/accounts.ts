@@ -22,12 +22,12 @@ export function normaliseEmail(raw: unknown): string | null {
   return e.length <= 200 && EMAIL.test(e) ? e : null;
 }
 
-/** RENUABL staff, from ADMIN_EMAILS (comma or space separated). */
+/** RENUABL staff, from ADMIN_EMAILS (comma or space separated; quote marks and <> pasted around addresses are ignored). */
 export function staffEmails(raw: string | undefined): Set<string> {
   return new Set(
     (raw ?? "")
       .split(/[\s,;]+/)
-      .map((e) => normaliseEmail(e))
+      .map((e) => normaliseEmail(e.replace(/["'`<>\u2018\u2019\u201c\u201d]/g, "")))
       .filter((e): e is string => Boolean(e)),
   );
 }
