@@ -458,12 +458,12 @@ describe("system options", () => {
 });
 
 describe("confirmation call booking", () => {
-  it("offers weekday times from tomorrow, all before the install date", () => {
+  it("offers Monday to Saturday times from tomorrow, all before the install date", () => {
     const days = buildCallAvailability("2026-09-28", "2026-10-06");
     expect(days.length).toBeGreaterThan(3);
     for (const d of days) {
       expect(d.date > "2026-09-28" && d.date < "2026-10-06").toBe(true);
-      expect([0, 6]).not.toContain(fromISODate(d.date).getDay());
+      expect(fromISODate(d.date).getDay()).not.toBe(0);
       expect(d.times.length).toBeGreaterThan(0);
     }
   });
