@@ -13,6 +13,18 @@ describe("15-minute call for prospects", () => {
     expect(isBookableCallSlot(today, first.date, "21:00")).toBe(false);
   });
 
+  it("never offers Sundays, Saturdays or Victorian public holidays", () => {
+    // Melbourne Cup Day, Tuesday 3 November 2026.
+    const days = buildCallAvailability("2026-10-29", null).map((d) => d.date);
+    expect(days).not.toContain("2026-11-03");
+    expect(days).not.toContain("2026-11-01"); // Sunday
+    expect(days).not.toContain("2026-10-31"); // Saturday
+    expect(days).toContain("2026-11-02");
+    // Christmas to New Year.
+    const summer = buildCallAvailability("2026-12-23", null).map((d) => d.date);
+    for (const holiday of ["2026-12-25", "2026-12-28", "2027-01-01"]) expect(summer).not.toContain(holiday);
+  });
+
   it("the finish-later email offers the call as well as the plan", () => {
     const mail = finishLaterEmail({ link: "https://www.renuabl.com.au/", callLink: "https://www.renuabl.com.au/book-a-call" });
     expect(mail.html).toContain("Book a 15-minute call");

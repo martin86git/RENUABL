@@ -1,4 +1,4 @@
-import { addDays, fromISODate, stableHash, toISODate } from "./scheduling";
+import { addDays, fromISODate, isInstallDay, stableHash, toISODate } from "./scheduling";
 import type { ISODate } from "./types";
 
 /**
@@ -70,8 +70,9 @@ export interface CallDay {
 }
 
 /**
- * Days and times the 15-minute confirmation call can be booked: weekdays from
- * tomorrow, and always before the install date so it's confirmed in time.
+ * Days and times the 15-minute calls can be booked: weekdays from tomorrow,
+ * never weekends or Victorian public holidays, and always before the install
+ * date (when there is one) so it's confirmed in time.
  */
 export function buildCallAvailability(today: ISODate, installDate: ISODate | null, days = 14): CallDay[] {
   const start = fromISODate(today);
@@ -80,8 +81,8 @@ export function buildCallAvailability(today: ISODate, installDate: ISODate | nul
     const date = addDays(start, i);
     const iso = toISODate(date);
     if (installDate && iso >= installDate) break;
-    const dow = date.getDay();
-    if (dow === 0 || dow === 6) continue;
+    // Weekdays only: never Saturdays, Sundays or Victorian public holidays (the same days as installs).
+    if (!isInstallDay(iso)) continue;
     const h = stableHash(`call:${iso}`);
     const times = CALL_TIMES.filter((_, idx) => (h >> idx) % 5 !== 0);
     if (times.length) out.push({ date: iso, times });
