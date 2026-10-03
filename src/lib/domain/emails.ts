@@ -136,6 +136,20 @@ export function callBookedEmail(o: { reference: string; firstName: string; call:
   return { subject, html, text: `${heading}\n\n${body}\n\n${CHANGE_BOOKING_NOTE}` };
 }
 
+/** A prospect booked a 15-minute call from /book-a-call (no reservation yet). */
+export function consultBookedEmail(o: { firstName: string; call: string; link: string }) {
+  return simpleEmail({
+    subject: `Your RENUABL call: ${plainText(o.call, 80)}`,
+    heading: `Your call is booked, ${plainText(o.firstName, 40) || "there"}.`,
+    lines: [
+      `One of our team will call you on ${plainText(o.call, 80)}. It takes about 15 minutes, with no obligation.`,
+      "Have your latest electricity bill handy if you can: it helps us talk about your home's actual use. Need a different time? Just reply to this email.",
+    ],
+    button: { label: "See your home plan", href: o.link },
+    footer: "The calendar invite is attached.",
+  });
+}
+
 /** The customer moved their installation date after reserving. */
 export function installMovedEmail(o: { reference: string; firstName: string; installDate: string; arrival: string }) {
   return simpleEmail({
@@ -237,10 +251,22 @@ export function partnerReceivedEmail(o: { reference: string; firstName: string; 
  * A short email with one button. The link is always built on the server from
  * the site's own address (never taken from the browser).
  */
-function simpleEmail(o: { subject: string; heading: string; lines: string[]; button?: { label: string; href: string }; footer?: string }) {
-  const btn = o.button
-    ? `<p style="margin:24px 0"><a href="${esc(o.button.href)}" style="display:inline-block;background:#1E3A2E;color:#fff;text-decoration:none;padding:14px 22px;border-radius:999px;font-size:15px">${esc(o.button.label)}</a></p>`
-    : "";
+function simpleEmail(o: {
+  subject: string;
+  heading: string;
+  lines: string[];
+  button?: { label: string; href: string };
+  /** A second, outlined button with a line of its own above it. */
+  second?: { line: string; label: string; href: string };
+  footer?: string;
+}) {
+  const btn =
+    (o.button
+      ? `<p style="margin:24px 0"><a href="${esc(o.button.href)}" style="display:inline-block;background:#1E3A2E;color:#fff;text-decoration:none;padding:14px 22px;border-radius:999px;font-size:15px">${esc(o.button.label)}</a></p>`
+      : "") +
+    (o.second
+      ? `<p style="margin:28px 0 0">${esc(o.second.line)}</p><p style="margin:14px 0 24px"><a href="${esc(o.second.href)}" style="display:inline-block;background:#D9E7DC;color:#1E3A2E;text-decoration:none;padding:13px 21px;border-radius:999px;font-size:15px;border:1px solid #1E3A2E">${esc(o.second.label)}</a></p>`
+      : "");
   const html = `<!doctype html><html><body style="margin:0;background:#FAF9F6;font-family:Inter,Arial,sans-serif;color:#1A1A1A"><div style="max-width:560px;margin:0 auto;padding:32px 20px">
 <p style="letter-spacing:.28em;font-size:14px;margin:0 0 24px">RENUABL</p>
 <h1 style="font-weight:400;font-size:26px;margin:0 0 12px">${esc(o.heading)}</h1>
@@ -248,7 +274,15 @@ ${o.lines.map((l) => `<p style="margin:0 0 10px">${esc(l)}</p>`).join("\n")}
 ${btn}
 <p style="color:#6B6B6B;font-size:12px;margin-top:24px">${esc(o.footer ?? "Questions? Just reply to this email.")}</p>
 </div></body></html>`;
-  const text = [o.heading, "", ...o.lines, ...(o.button ? ["", `${o.button.label}: ${o.button.href}`] : []), "", o.footer ?? ""]
+  const text = [
+    o.heading,
+    "",
+    ...o.lines,
+    ...(o.button ? ["", `${o.button.label}: ${o.button.href}`] : []),
+    ...(o.second ? ["", o.second.line, `${o.second.label}: ${o.second.href}`] : []),
+    "",
+    o.footer ?? "",
+  ]
     .join("\n")
     .trim();
   return { subject: o.subject, html, text };
@@ -287,7 +321,7 @@ export function partnerApprovedEmail(o: { firstName: string; link: string }) {
 }
 
 /** Sent when a visitor doesn't have their bill handy and leaves their email to finish later. */
-export function finishLaterEmail(o: { link: string }) {
+export function finishLaterEmail(o: { link: string; callLink: string }) {
   return simpleEmail({
     subject: "Pick up where you left off",
     heading: "Your solar plan is one bill away.",
@@ -296,6 +330,11 @@ export function finishLaterEmail(o: { link: string }) {
       "Most people find their bill in their energy retailer's app or email as a PDF. A photo of the paper bill works too. We'll also be in touch to help.",
     ],
     button: { label: "Continue my plan", href: o.link },
+    second: {
+      line: "Rather talk it through first? Book a free 15-minute call with one of our team at a time that suits you.",
+      label: "Book a 15-minute call",
+      href: o.callLink,
+    },
     footer: "You're getting this because you asked us to get in touch. Just reply if you have any questions.",
   });
 }
@@ -342,7 +381,7 @@ export function leadAlertRecipients(raw: string | undefined): string[] {
 
 /** Internal: a new lead, to RENUABL staff (not the customer). Plain text only; nothing from the browser is linked. */
 export function newLeadEmail(o: {
-  kind: "reservation" | "no-bill" | "home-health";
+  kind: "reservation" | "no-bill" | "home-health" | "call";
   reference?: string;
   name?: string;
   /** A "no bill yet" lead may leave a mobile instead. */
@@ -371,24 +410,31 @@ export function newLeadEmail(o: {
         lines: [...(o.reference ? [`Reference: ${plainText(o.reference, 20)}`] : []), ...lines],
         footer: "Also in HubSpot. The job has been offered to the installation partner.",
       })
-    : o.kind === "home-health"
+    : o.kind === "call"
       ? simpleEmail({
-          subject: `Home Health check: ${who}`,
-          heading: "Someone completed the Home Health check",
-          lines: [...lines, "Research only: healthy home products aren't offered yet, so don't promise or quote anything."],
-          footer: "Also in HubSpot and on /admin.",
-        })
-      : simpleEmail({
-          subject: `New lead (no bill yet): ${who}`,
-          heading: "New lead: didn't have their bill handy",
-          lines: [
-            ...lines,
-            email
-              ? "They've been emailed a link to come back and finish. Worth a follow-up call or email."
-              : "They left a mobile only: give them a call.",
-          ],
+          subject: `Call booked: ${who}`,
+          heading: "Someone booked a 15-minute call",
+          lines: [...lines, "No reservation yet: call them at that time (Melbourne time)."],
           footer: "Also in HubSpot.",
-        });
+        })
+      : o.kind === "home-health"
+        ? simpleEmail({
+            subject: `Home Health check: ${who}`,
+            heading: "Someone completed the Home Health check",
+            lines: [...lines, "Research only: healthy home products aren't offered yet, so don't promise or quote anything."],
+            footer: "Also in HubSpot and on /admin.",
+          })
+        : simpleEmail({
+            subject: `New lead (no bill yet): ${who}`,
+            heading: "New lead: didn't have their bill handy",
+            lines: [
+              ...lines,
+              email
+                ? "They've been emailed a link to come back and finish. Worth a follow-up call or email."
+                : "They left a mobile only: give them a call.",
+            ],
+            footer: "Also in HubSpot.",
+          });
 }
 
 /** To the job's installation partner: the customer moved their install day. Suburb only, like an offer; the job page has the rest. */

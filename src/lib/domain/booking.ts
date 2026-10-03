@@ -95,3 +95,20 @@ export function formatCallTime(time: string): string {
   const suffix = h >= 12 ? "pm" : "am";
   return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""}${suffix}`;
 }
+
+// ---------------------------------------------------------------------------
+// "Book a 15-minute call" for prospects without a reservation (/book-a-call)
+// ---------------------------------------------------------------------------
+
+/** What the prospect sees and what the invite says. A chat about their home, not the post-reservation confirmation. */
+export const CONSULT_CALL = {
+  title: "Book a 15-minute call.",
+  intro:
+    "Talk it through with one of our team: what your home needs, the rebates and how it all works. We'll call you at the time you choose.",
+  note: "No obligation and nothing to pay. Have your latest electricity bill handy if you can, but you don't need it.",
+} as const;
+
+/** True when the day and time is one the page offered (weekday, from tomorrow, a listed time), so the server can check it. */
+export function isBookableCallSlot(today: ISODate, date: string, time: string): boolean {
+  return buildCallAvailability(today, null).some((d) => d.date === date && d.times.includes(time));
+}

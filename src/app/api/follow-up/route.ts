@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   let emailed = false;
   if (site && email) {
     try {
-      emailed = (await sendEmail({ to: email, ...finishLaterEmail({ link: `${site}/` }) })) === "sent";
+      emailed = (await sendEmail({ to: email, ...finishLaterEmail({ link: `${site}/`, callLink: `${site}/book-a-call` }) })) === "sent";
     } catch (e) {
       console.error("follow-up email failed", e instanceof Error ? e.message : e);
     }

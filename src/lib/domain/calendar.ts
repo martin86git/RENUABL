@@ -80,6 +80,19 @@ export function installEvent(opts: { reference: string; date: string; installer?
 }
 
 /** The 15-minute confirmation call, at a "HH:MM" Melbourne time. */
+/** The 15-minute call a prospect booked from /book-a-call. */
+export function consultEvent(opts: { id: string; date: string; time: string }): CalendarEvent {
+  const [h, m] = opts.time.split(":").map(Number);
+  const start = marketDateTime(opts.date, h, m);
+  return {
+    id: `${opts.id}-consult`,
+    title: "RENUABL 15-minute call",
+    description: "One of the RENUABL team will call you to talk through solar, batteries and rebates for your home. No obligation.",
+    start,
+    end: new Date(new Date(start).getTime() + 15 * 60_000).toISOString(),
+  };
+}
+
 export function callEvent(opts: { reference: string; date: string; time: string }): CalendarEvent {
   const [h, m] = opts.time.split(":").map(Number);
   const start = marketDateTime(opts.date, h, m);

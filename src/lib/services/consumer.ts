@@ -449,3 +449,26 @@ export function roofImageSrc(lat: number, lng: number) {
   // v: bump to skip photos browsers kept from before a fix.
   return `/api/roof/image?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}&v=2`;
 }
+
+/** Books a 15-minute call from /book-a-call (no reservation yet). */
+export async function bookConsultCall(input: {
+  firstName: string;
+  lastName: string;
+  mobile: string;
+  email: string;
+  date: ISODate;
+  time: string;
+  source?: string;
+  consent: { terms: boolean; marketing: boolean };
+}): Promise<{ ok: boolean; call?: string; emailed?: boolean; message?: string; errors?: Record<string, string> }> {
+  try {
+    const res = await fetch("/api/consult", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    return (await res.json()) as { ok: boolean; call?: string; emailed?: boolean; message?: string; errors?: Record<string, string> };
+  } catch {
+    return { ok: false, message: "That didn't send. Check your connection and try again." };
+  }
+}
