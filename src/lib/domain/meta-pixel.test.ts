@@ -10,7 +10,17 @@ describe("Meta Pixel", () => {
   });
 
   it("loads on public pages and the flow only", () => {
-    for (const p of ["/", "/learn", "/learn/do-i-need-a-home-battery", "/start", "/start/profile", "/privacy", "/terms", "/contact"])
+    for (const p of [
+      "/",
+      "/learn",
+      "/learn/do-i-need-a-home-battery",
+      "/start",
+      "/start/profile",
+      "/book-a-call",
+      "/privacy",
+      "/terms",
+      "/contact",
+    ])
       expect(pixelAllowedPath(p)).toBe(true);
     // These URLs can carry sign-in links or private record keys.
     for (const p of [
@@ -28,6 +38,13 @@ describe("Meta Pixel", () => {
       expect(pixelAllowedPath(p)).toBe(false);
   });
   it("counts a lead at the reservation, and a bill on its own as BillUploaded", () => {
-    expect(META_EVENTS).toEqual({ pageView: "PageView", billUploaded: "BillUploaded", spendEstimated: "SpendEstimated", lead: "Lead" });
+    expect(META_EVENTS).toEqual({
+      pageView: "PageView",
+      billUploaded: "BillUploaded",
+      spendEstimated: "SpendEstimated",
+      contact: "Contact",
+      schedule: "Schedule",
+      lead: "Lead",
+    });
   });
 });

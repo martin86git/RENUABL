@@ -20,6 +20,7 @@ import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { describeInverter } from "@/lib/domain/inverter";
 import { useWhoopOpen } from "@/lib/services/whoop";
 import { trackLead } from "@/lib/services/meta-pixel";
+import { trackGoogleConversion } from "@/lib/services/google-ads";
 import { SPEND_COPY, isIndicative, spendDescription } from "@/lib/domain/spend-estimate";
 import { WHOOP_COPY, whoopEligible } from "@/lib/domain/whoop-offer";
 import { HEALTHY_INTEREST_LABEL } from "@/lib/domain/healthy-home";
@@ -171,7 +172,10 @@ function ReserveScreen() {
       return;
     }
     // The reservation is the lead (it's now in HubSpot): count it once for Meta, with no details.
-    if (!state.reservedTracked) trackLead();
+    if (!state.reservedTracked) {
+      trackLead();
+      trackGoogleConversion("reservation");
+    }
     update({ reservation: result.reservation, contact, reservedTracked: true });
     router.push(stepHref("confirmed"));
   }

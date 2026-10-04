@@ -9,6 +9,8 @@ import { CONSULT_CALL, formatCallTime, hubspotEmbedSrc } from "@/lib/domain/book
 import { formatDate } from "@/lib/domain/format";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { bookConsultCall, getCallAvailability } from "@/lib/services/consumer";
+import { trackGoogleConversion } from "@/lib/services/google-ads";
+import { trackCallBooked } from "@/lib/services/meta-pixel";
 import { ConsentBoxes, NO_CONSENT, type ConsentState } from "./consent-boxes";
 import { useFlow } from "./flow-state";
 
@@ -53,8 +55,12 @@ export function BookACall() {
       consent,
     });
     setBusy(false);
-    if (r.ok && r.call) setBooked({ call: r.call, emailed: Boolean(r.emailed) });
-    else {
+    if (r.ok && r.call) {
+      // Booked and in HubSpot: counted for the ads, with no details.
+      trackCallBooked();
+      trackGoogleConversion("call");
+      setBooked({ call: r.call, emailed: Boolean(r.emailed) });
+    } else {
       setErrors(r.errors ?? {});
       setProblem(r.message ?? (r.errors ? "Please check your details." : "That didn't send. Please try again."));
     }

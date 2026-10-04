@@ -5,6 +5,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/primitives";
 import { formatAddress } from "@/lib/mock/addresses";
 import { requestFollowUp } from "@/lib/services/consumer";
+import { trackGoogleConversion } from "@/lib/services/google-ads";
+import { trackFollowUp } from "@/lib/services/meta-pixel";
 import { ConsentBoxes, NO_CONSENT, type ConsentState } from "./consent-boxes";
 import { useFlow } from "./flow-state";
 
@@ -49,8 +51,12 @@ export function BillLater() {
       consent,
     });
     setBusy(false);
-    if (r.ok) setDone(true);
-    else setProblem(r.message ?? "That didn't send. Please try again.");
+    if (r.ok) {
+      // A real lead (it's in HubSpot): counted for the ads, with no details.
+      trackFollowUp();
+      trackGoogleConversion("follow-up");
+      setDone(true);
+    } else setProblem(r.message ?? "That didn't send. Please try again.");
   }
 
   if (done) {

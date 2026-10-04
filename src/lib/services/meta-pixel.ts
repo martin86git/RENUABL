@@ -1,8 +1,9 @@
 /**
  * The Meta Pixel in the browser. Loaded only when NEXT_PUBLIC_META_PIXEL_ID is
  * set and only on public pages (`pixelAllowedPath`). Automatic page-view and
- * button tracking are switched off, so the pixel sends exactly what we fire:
- * PageView, and Lead once a bill has been read. No parameters, ever.
+ * button tracking are switched off, so the pixel sends exactly what we fire
+ * (META_EVENTS): page views, a bill read or a spend range picked, a follow-up
+ * request, a booked call and a reservation. No parameters, ever.
  */
 import { META_EVENTS, metaPixelId } from "@/lib/domain/meta-pixel";
 
@@ -72,6 +73,20 @@ export function trackSpendEstimated() {
   if (!PIXEL_ID) return;
   load(PIXEL_ID);
   window.fbq?.("trackCustom", META_EVENTS.spendEstimated);
+}
+
+/** No bill yet: they left an email or mobile for us to follow up. Standard Contact event, no parameters. */
+export function trackFollowUp() {
+  if (!PIXEL_ID) return;
+  load(PIXEL_ID);
+  window.fbq?.("track", META_EVENTS.contact);
+}
+
+/** They booked a 15-minute call with the team. Standard Schedule event, no parameters. */
+export function trackCallBooked() {
+  if (!PIXEL_ID) return;
+  load(PIXEL_ID);
+  window.fbq?.("track", META_EVENTS.schedule);
 }
 
 /** The date was reserved: the lead and their details are with us (HubSpot, staff email). No parameters are sent. */

@@ -1,4 +1,6 @@
 import { connection } from "next/server";
+import { conversionLabel, googleAdsId } from "@/lib/domain/google-ads";
+import { metaPixelId } from "@/lib/domain/meta-pixel";
 import { siteUrl } from "@/lib/domain/sms";
 import { stripeKeyMode } from "@/lib/domain/status";
 import { stripeClient } from "@/lib/server/stripe";
@@ -45,6 +47,14 @@ export async function GET() {
       google: set(process.env.GOOGLE_MAPS_API_KEY),
       claude: set(process.env.ANTHROPIC_API_KEY),
       sms: smsConfigured(),
+      // Browser tags (public IDs): which are set, so missing ones are easy to spot.
+      metaPixel: Boolean(metaPixelId(process.env.NEXT_PUBLIC_META_PIXEL_ID)),
+      googleAds: {
+        tag: Boolean(googleAdsId(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID)),
+        reservation: Boolean(conversionLabel(process.env.NEXT_PUBLIC_GOOGLE_ADS_RESERVATION_LABEL)),
+        call: Boolean(conversionLabel(process.env.NEXT_PUBLIC_GOOGLE_ADS_CALL_LABEL)),
+        followUp: Boolean(conversionLabel(process.env.NEXT_PUBLIC_GOOGLE_ADS_FOLLOW_UP_LABEL)),
+      },
     },
     { headers: { "cache-control": "no-store" } },
   );

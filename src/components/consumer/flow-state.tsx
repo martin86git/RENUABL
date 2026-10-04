@@ -1,5 +1,6 @@
 "use client";
 
+import { landingSource } from "@/lib/domain/google-ads";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BillSummary } from "@/lib/domain/bill";
 import type { ContactDetails } from "@/lib/domain/contact";
@@ -156,7 +157,8 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     if (!loaded.attribution) {
       const params = new URLSearchParams(window.location.search);
       loaded.attribution = {
-        source: params.get("utm_source"),
+        // utm_source when the ad link has one, else "google"/"meta" from their click IDs.
+        source: landingSource(window.location.search),
         campaign: params.get("utm_campaign"),
         landedAt: new Date().toISOString(),
       };

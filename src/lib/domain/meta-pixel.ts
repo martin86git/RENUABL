@@ -14,7 +14,7 @@ export function metaPixelId(raw: string | undefined): string | null {
 }
 
 /** Public pages the pixel may load and count visits on. */
-const PIXEL_PATHS = ["/learn", "/start", "/privacy", "/terms", "/contact"];
+const PIXEL_PATHS = ["/learn", "/start", "/book-a-call", "/privacy", "/terms", "/contact"];
 
 export function pixelAllowedPath(pathname: string): boolean {
   if (pathname === "/") return true;
@@ -28,6 +28,10 @@ export const META_EVENTS = {
   billUploaded: "BillUploaded",
   /** Custom event: no bill, they picked a spend range instead (the 7-day trial from 4 Oct 2026). */
   spendEstimated: "SpendEstimated",
+  /** Standard event: no bill yet, they left an email or mobile for us to follow up ("Don't have your bill handy?"). */
+  contact: "Contact",
+  /** Standard event: they booked a 15-minute call with the team (/book-a-call). */
+  schedule: "Schedule",
   /** Standard event: the date was reserved and the lead is in HubSpot. Ads optimise for this. */
   lead: "Lead",
 } as const;

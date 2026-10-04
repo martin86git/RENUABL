@@ -72,11 +72,12 @@ export default function PrivacyPage() {
 
       <h2>Advertising</h2>
       <p>
-        We advertise on Facebook and Instagram and use the Meta Pixel to see whether our ads work. It runs only on our public pages and the
-        steps to price a system (never on the Home Health check), and tells Meta when a page is visited, when a bill has been read and when
-        an installation date is reserved. We never send Meta your bill, its contents, your address, name, email, phone number or prices.
-        Meta may use cookies to link these visits to your Facebook or Instagram account; you can manage this in your Meta ad settings or by
-        blocking cookies in your browser.
+        We advertise on Facebook, Instagram and Google, and use the Meta Pixel and the Google tag to see whether our ads work. They run only
+        on our public pages and the steps to price a system (never on the Home Health check), and tell Meta and Google when a page is
+        visited, when a bill has been read or a spend range chosen, when you ask us to follow up or book a call, and when an installation
+        date is reserved. We never send them your bill, its contents, your address, name, email, phone number or prices. Meta and Google may
+        use cookies to link these visits to your accounts with them; you can manage this in your Meta and Google ad settings or by blocking
+        cookies in your browser.
       </p>
 
       <h2>Keeping it safe</h2>
