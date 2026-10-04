@@ -15,7 +15,8 @@ function newSession() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now());
 }
 
-export function AddressEntry({ className }: { className?: string }) {
+/** The address box. By default a chosen address starts the plan; `onPick` hands it back instead (the guided brief). */
+export function AddressEntry({ className, onPick }: { className?: string; onPick?: (address: Address) => void }) {
   const router = useRouter();
   const { update } = useFlow();
   const [query, setQuery] = useState("");
@@ -52,7 +53,8 @@ export function AddressEntry({ className }: { className?: string }) {
       return;
     }
     update({ address });
-    router.push(stepHref("analysing"));
+    if (onPick) onPick(address);
+    else router.push(stepHref("analysing"));
   }
 
   async function pick(s: AddressSuggestion) {

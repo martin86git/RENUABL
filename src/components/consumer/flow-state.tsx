@@ -1,8 +1,8 @@
 "use client";
 
-import { landingSource } from "@/lib/domain/google-ads";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BillSummary } from "@/lib/domain/bill";
+import { landingSource } from "@/lib/domain/google-ads";
 import type { ContactDetails } from "@/lib/domain/contact";
 import type { InverterSummary } from "@/lib/domain/inverter";
 import { VERIFIED_RATES, type RebateRates } from "@/lib/domain/rebates";
@@ -299,7 +299,14 @@ export function useSystem() {
     const partner = partnerPricingFor(state.installerId ? getInstaller(state.installerId) : undefined, state.address);
     const price = priceSystem(config, site, state.addOns, incentives, rates, partner, state.prices?.costs);
     const outcome = estimateOutcome(config, recommendation.usage, price);
-    return { profile, analysis, site, recommendation, tier, config, price, outcome, rates };
+    // The two systems the guided brief puts side by side: solar only, and solar with the battery we'd suggest.
+    const option = (t: SystemTier) => {
+      const c = recommendation.tiers[t].config;
+      const p = priceSystem(c, site, state.addOns, incentives, rates, partner, state.prices?.costs);
+      return { tier: t, config: c, price: p, outcome: estimateOutcome(c, recommendation.usage, p) };
+    };
+    const options = { essential: option("essential"), recommended: option("recommended") };
+    return { profile, analysis, site, recommendation, tier, config, price, outcome, rates, options };
   }, [
     state.profile,
     state.address,

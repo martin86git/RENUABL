@@ -140,6 +140,20 @@ create table if not exists health_quotes (
   created_at timestamptz not null default now(),
   unique (job_reference, item)
 );
+create table if not exists briefs (
+  key text primary key,
+  first_name text not null,
+  mobile text,
+  email text,
+  created_by text,
+  answers jsonb not null default '{}',
+  summary jsonb,
+  status text not null default 'sent',
+  call_label text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  booked_at timestamptz
+);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

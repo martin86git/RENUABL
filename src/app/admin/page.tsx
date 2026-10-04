@@ -18,6 +18,9 @@ import { listWhoopClaims } from "@/lib/server/whoop-repo";
 import { WhoopActions } from "@/components/admin/healthy-actions";
 import { interestSummary } from "@/lib/domain/home-health";
 import { WHOOP_ENDS, WHOOP_OFFER } from "@/lib/domain/whoop-offer";
+import { BriefSender } from "@/components/admin/brief-sender";
+import { SCORE_LABELS, cleanBriefAnswers, scoreBrief } from "@/lib/domain/brief";
+import { listBriefs } from "@/lib/server/briefs-repo";
 
 export const metadata = { title: "Partners and jobs" };
 
@@ -40,12 +43,13 @@ export default async function AdminPage() {
   const session = await currentSession();
   if (session?.role !== "staff") redirect("/login?as=partner&next=/admin");
   await processOffersSoon();
-  const [partners, jobs, uploads, claims, checks] = await Promise.all([
+  const [partners, jobs, uploads, claims, checks, briefs] = await Promise.all([
     listPartners(),
     listAllJobs(),
     listPriceUploads(),
     listWhoopClaims(),
     allHealthAnswers(),
+    listBriefs(),
   ]);
   const tallies = interestSummary(checks);
   const held = claims.filter((c) => c.status !== "released").length;
@@ -55,7 +59,42 @@ export default async function AdminPage() {
   return (
     <>
       <PageHeader title="Partners and jobs" subtitle={`Signed in as ${session.email}`} />
-      <Panel title={`Partners${pending ? ` · ${pending} to review` : ""}`}>
+      <Panel title="Send a brief">
+        <BriefSender />
+      </Panel>
+      {briefs.length > 0 && (
+        <Panel className="mt-6" title={`Briefs · ${briefs.length}`}>
+          <ul className="divide-y divide-line">
+            {briefs.map((b) => {
+              const answers = cleanBriefAnswers(b.answers);
+              const { score, flags } = scoreBrief({ answers, billRead: Boolean(b.summary?.billRead), booked: b.status === "booked" });
+              return (
+                <li key={b.key} className="px-5 py-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[15px] font-medium">{b.first_name}</span>
+                    <Badge tone={b.status === "booked" ? "positive" : b.status === "started" ? "info" : "neutral"}>
+                      {b.status === "booked" ? "Call booked" : b.status === "started" ? "Filling it in" : "Sent"}
+                    </Badge>
+                    <Badge tone={score === "hot" ? "positive" : score === "warm" ? "warning" : "neutral"}>{SCORE_LABELS[score]}</Badge>
+                  </div>
+                  <p className="mt-1 text-[13px] text-muted">
+                    {b.mobile ?? "No mobile"} · {Object.keys(answers).length} answers · updated{" "}
+                    {b.updated_on ? formatDate(b.updated_on, { day: "numeric", month: "short" }) : ""}
+                    {b.call_label ? ` · call ${b.call_label}` : ""}
+                  </p>
+                  {b.summary && (
+                    <p className="text-[13px] text-muted">
+                      {[b.summary.home, b.summary.usage, b.summary.system, b.summary.price].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                  {b.status !== "sent" && flags.length > 0 && <p className="text-[12.5px] text-warning">{flags.join(". ")}</p>}
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+      )}
+      <Panel className="mt-6" title={`Partners${pending ? ` · ${pending} to review` : ""}`}>
         {partners.length === 0 ? (
           <p className="px-5 py-4 text-[14px] text-muted">No applications yet. Partners apply at /partners.</p>
         ) : (
