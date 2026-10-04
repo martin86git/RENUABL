@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { conversionLabel, googleAdsId } from "@/lib/domain/google-ads";
+import { googleAdsConfig } from "@/lib/domain/google-ads";
 import { metaPixelId } from "@/lib/domain/meta-pixel";
 import { siteUrl } from "@/lib/domain/sms";
 import { stripeKeyMode } from "@/lib/domain/status";
@@ -18,6 +18,7 @@ const set = (v: string | undefined) => Boolean(v?.trim());
 export async function GET() {
   await connection();
   const mode = stripeKeyMode(process.env.STRIPE_SECRET_KEY);
+  const gads = googleAdsConfig(process.env);
   let stripeWorks: boolean | null = null;
   const stripe = mode === "test" || mode === "live" ? stripeClient() : null;
   if (stripe) {
@@ -50,10 +51,10 @@ export async function GET() {
       // Browser tags (public IDs): which are set, so missing ones are easy to spot.
       metaPixel: Boolean(metaPixelId(process.env.NEXT_PUBLIC_META_PIXEL_ID)),
       googleAds: {
-        tag: Boolean(googleAdsId(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID)),
-        reservation: Boolean(conversionLabel(process.env.NEXT_PUBLIC_GOOGLE_ADS_RESERVATION_LABEL)),
-        call: Boolean(conversionLabel(process.env.NEXT_PUBLIC_GOOGLE_ADS_CALL_LABEL)),
-        followUp: Boolean(conversionLabel(process.env.NEXT_PUBLIC_GOOGLE_ADS_FOLLOW_UP_LABEL)),
+        tag: Boolean(gads.id),
+        reservation: Boolean(gads.labels.reservation),
+        call: Boolean(gads.labels.call),
+        followUp: Boolean(gads.labels["follow-up"]),
       },
     },
     { headers: { "cache-control": "no-store" } },
