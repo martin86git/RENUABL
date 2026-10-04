@@ -9,6 +9,7 @@ import { COSTING, sellPrice } from "./costing";
 import { ASSUMPTIONS } from "./recommendation";
 import { INSTALL_ARRIVAL, LEAD_TIME_DAYS, SOLAR_VIC_LEAD_DAYS } from "./scheduling";
 import type { AskContext } from "./ask-types";
+import { WHOOP_OFFER } from "./whoop-offer";
 
 export type { AskContext } from "./ask-types";
 
@@ -49,7 +50,7 @@ export const ASK_FACTS = [
   "RENUABL plans two packages together. The Renewable package: solar, battery, EV charger, heat-pump hot water and blackout backup. RENUABL doesn't offer induction cooktops. The Healthy home package: air purification, air-quality monitoring, water filtration, circadian lighting, fresh-air ventilation and leak detection. RENUABL doesn't offer or quote healthy home products yet: the free Home Health check (after reserving, or at renuabl.com.au/home-health) gives ideas and free tips, and the answers help RENUABL decide which products to offer first. Never say they can be added, quoted or installed now. Before checkout the flow stays on the energy package.",
   "After reserving, customers can take the optional Home Health check (about two minutes, every question optional, at renuabl.com.au/home-health; also open to anyone from the home page). It shows the top recommendations and at least one free fix. There's no health score, and RENUABL doesn't give medical advice.",
   "Once the bill is read, \"See how much I could save\" shows a first yearly saving for solar only and for solar with a battery, from the bill alone, rounded down. It's an estimate: the system step firms it up with the roof and the customer's answers, and the 15-minute call confirms it.",
-  "October offer: a free WHOOP One in Jet Black with a 12-month membership (valued at $299) for orders that include a battery and are reserved by 31 October 2026 (Melbourne time), one per order, while stocks last, shipped after installation. The membership renews at the customer's own cost with WHOOP after 12 months unless cancelled. Terms at renuabl.com.au/offer-terms. Revo can't see how many are left, so say 'while stocks last'.",
+  `${WHOOP_OFFER.name}: a free WHOOP One in Jet Black with a 12-month membership (valued at $${WHOOP_OFFER.value}) for orders that include a battery, one per order, while stocks last (no end date), shipped after installation. The membership renews at the customer's own cost with WHOOP after 12 months unless cancelled. Terms at renuabl.com.au/offer-terms. Revo can't see how many are left, so say 'while stocks last'.`,
 ];
 
 /** The customer's own answers and system, as plain lines for the model. */

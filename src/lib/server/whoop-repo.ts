@@ -1,9 +1,9 @@
 /**
- * Server only. WHOOP October-offer claims: one row per order, counted against
+ * Server only. WHOOP launch-offer claims: one row per order, counted against
  * the cap in a transaction with an advisory lock so two reservations at once
  * can't take claim 51. Released claims don't count.
  */
-import { WHOOP_OFFER, nextWhoopStatus, whoopOfferOpen, type WhoopStatus } from "@/lib/domain/whoop-offer";
+import { WHOOP_OFFER, nextWhoopStatus, whoopOfferEnded, whoopOfferOpen, type WhoopStatus } from "@/lib/domain/whoop-offer";
 import { todayInMarket } from "@/lib/domain/market";
 import { dbConfigured, query, transaction } from "./db";
 
@@ -39,7 +39,7 @@ export async function claimWhoop(reference: string, today: string = todayInMarke
     await q(`select pg_advisory_xact_lock($1)`, [LOCK]);
     const existing = await q<{ status: WhoopStatus }>(`select status from whoop_claims where job_reference = $1`, [reference]);
     if (existing[0] && existing[0].status !== "released") return true;
-    if (today > WHOOP_OFFER.endsOn) return false;
+    if (whoopOfferEnded(today)) return false;
     const held = Number((await q<{ n: string }>(`select count(*)::text as n from whoop_claims where status <> 'released'`))[0]?.n ?? 0);
     if (held >= WHOOP_OFFER.cap) return false;
     await q(

@@ -41,13 +41,14 @@ describe("WHOOP offer", () => {
     expect(whoopOfferOpen(WHOOP_OFFER.cap, "2026-10-15")).toBe(false);
   });
 
-  it("is the October offer: open to the end of 31 October, then closed", () => {
-    expect(WHOOP_OFFER.endsOn).toBe("2026-10-31");
-    expect(WHOOP_ENDS).toBe("31 October 2026");
-    expect(whoopOfferOpen(0, "2026-10-31")).toBe(true);
-    expect(whoopOfferOpen(0, "2026-11-01")).toBe(false);
-    expect(WHOOP_COPY.bannerLabel).toBe("October offer");
-    expect(WHOOP_COPY.bannerSmall).toContain("31 October 2026");
+  it("is the launch offer: no end date, open while stocks last", () => {
+    expect(WHOOP_OFFER.endsOn).toBeNull();
+    expect(WHOOP_ENDS).toBeNull();
+    expect(whoopOfferOpen(0, "2026-11-01")).toBe(true);
+    expect(whoopOfferOpen(0, "2027-06-30")).toBe(true);
+    expect(WHOOP_COPY.bannerLabel).toBe("Launch offer");
+    expect(WHOOP_COPY.bannerSmall).toContain("While stocks last (50 available)");
+    expect(JSON.stringify(WHOOP_COPY)).not.toMatch(/october|reserve by/i);
     expect(JSON.stringify(WHOOP_COPY)).not.toMatch(/founding|first \d/i);
   });
 

@@ -26,7 +26,7 @@ export interface OrderEmail {
   indicative?: boolean;
   /** "Tuesday 13 October at 10:30am", when the call is already booked. */
   call?: string;
-  /** An October-offer WHOOP was claimed for this order (set on the server, never from the browser). */
+  /** A launch-offer WHOOP was claimed for this order (set on the server, never from the browser). */
   whoop?: boolean;
 }
 

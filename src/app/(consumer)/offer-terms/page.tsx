@@ -4,13 +4,13 @@ import { LegalPage } from "@/components/consumer/legal-page";
 import { LEGAL } from "@/lib/domain/legal";
 import { WHOOP_ENDS, WHOOP_OFFER } from "@/lib/domain/whoop-offer";
 
-export const metadata: Metadata = { title: "October offer terms", alternates: { canonical: "/offer-terms" } };
+export const metadata: Metadata = { title: `${WHOOP_OFFER.name} terms`, alternates: { canonical: "/offer-terms" } };
 
-/** Terms for the October WHOOP offer. Drafted for launch: to be reviewed before relying on it. */
+/** Terms for the WHOOP launch offer. Drafted for launch: to be reviewed before relying on it. */
 export default function OfferTermsPage() {
   const value = `$${WHOOP_OFFER.value}`;
   return (
-    <LegalPage title="October offer terms">
+    <LegalPage title={`${WHOOP_OFFER.name} terms`}>
       <p>
         These terms apply to the free {WHOOP_OFFER.product} {WHOOP_OFFER.name.toLowerCase()} from {LEGAL.company} trading as{" "}
         {LEGAL.tradingAs} (ABN {LEGAL.abn}), &ldquo;we&rdquo;.
@@ -31,9 +31,12 @@ export default function OfferTermsPage() {
       <ul>
         <li>Orders that include a home battery.</li>
         <li>
-          Reservations made from 1 October to {WHOOP_ENDS} (Melbourne time), while stocks last: {WHOOP_OFFER.cap} are available. A claim is
-          made when the reservation is confirmed. The offer ends at the end of {WHOOP_ENDS}, or earlier once all {WHOOP_OFFER.cap} have been
-          claimed, and is then removed from our website.
+          {WHOOP_ENDS
+            ? `Reservations made from 1 October 2026 to ${WHOOP_ENDS} (Melbourne time), while stocks last: ${WHOOP_OFFER.cap} are available. `
+            : `Reservations made from 1 October 2026, while stocks last: ${WHOOP_OFFER.cap} are available. `}
+          A claim is made when the reservation is confirmed. The offer ends
+          {WHOOP_ENDS ? ` at the end of ${WHOOP_ENDS}, or earlier` : ""} once all {WHOOP_OFFER.cap} have been claimed, and is then removed
+          from our website. We may end the offer earlier by removing it from our website; reservations made before then keep their claim.
         </li>
         <li>If an order is cancelled before installation, its claim is released and may go to another customer.</li>
       </ul>

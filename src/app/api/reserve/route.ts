@@ -63,10 +63,10 @@ export async function POST(request: Request) {
   const healthyInterest = body.healthyHomeInterest === true;
   if (healthyInterest) details["Healthy home interest"] = "Yes: interested in air, water or lighting upgrades";
   await saveJob(reservationId, checked.contact, body.job, healthyInterest);
-  // October WHOOP offer: one per order with a battery, counted on the server (date and stock).
+  // WHOOP launch offer: one per order with a battery, counted on the server (date and stock).
   const whoop = await claimWhoopFor(reservationId, body.job);
   if (whoop !== null)
-    details["WHOOP October offer"] = whoop ? "Claimed: ships after installation" : "Not claimed: the offer has ended or all are taken";
+    details["WHOOP offer"] = whoop ? "Claimed: ships after installation" : "Not claimed: the offer has ended or all are taken";
   // Straight to RENUABL's inbox too, whatever happens with HubSpot.
   await alertNewLead({
     kind: "reservation",
@@ -197,7 +197,7 @@ async function saveJob(
   }
 }
 
-/** Claims an October-offer WHOOP when the order includes a battery. null = not eligible or can't be counted. */
+/** Claims a launch-offer WHOOP when the order includes a battery. null = not eligible or can't be counted. */
 async function claimWhoopFor(reference: string, rawJob: unknown): Promise<boolean | null> {
   const req = cleanJobRequest(rawJob);
   if (!req || !whoopEligible(req.system) || !dbConfigured()) return null;
