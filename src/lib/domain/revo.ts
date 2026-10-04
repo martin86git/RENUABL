@@ -10,6 +10,8 @@ export interface RevoFacts {
   step: string;
   suburb?: string;
   dailyKwh?: number;
+  /** The daily use is from a spend range, not a bill. */
+  indicative?: boolean;
   hasSolar?: boolean;
   wantsBattery?: boolean;
   tier?: "essential" | "recommended" | "independence";
@@ -31,19 +33,23 @@ export function revoLine(f: RevoFacts): string {
       return "Hi, I'm Revo. I'm looking at the sunshine where you live.";
     case "profile":
       if (f.dailyKwh === undefined)
-        return `Hi, I'm Revo. Pop in your latest electricity bill and I'll size a system to what your home really uses.`;
+        return `Hi, I'm Revo. Pop in your latest electricity bill for the most accurate plan, or tell me roughly what you spend.`;
       if (f.wantsBattery === true) return "A battery's a great call: it keeps your sunshine for the evening.";
       if (f.wantsBattery === false) return "Solar only is a great start. You can add a battery any time later.";
       return f.hasSolar
         ? `Got it: about ${kwh(f.dailyKwh)} kWh a day, and you already have solar. A few quick questions and I'll do the rest.`
-        : `Got it: about ${kwh(f.dailyKwh)} kWh a day. A few quick questions about your home and I'll do the rest.`;
+        : f.indicative
+          ? `Got it: about ${kwh(f.dailyKwh)} kWh a day, from what you spend. Your bill makes it most accurate.`
+          : `Got it: about ${kwh(f.dailyKwh)} kWh a day. A few quick questions about your home and I'll do the rest.`;
     case "system":
       if (f.tier === "essential")
         return "Essential keeps it simple: solar only, at the lowest upfront cost. You can add a battery any time.";
       if (f.tier === "independence") return "Maximum adds a smart EV charger, so your car can run on your own sunshine too.";
       return f.batteryKwh
         ? `Recommended pairs your solar with a ${kwh(f.batteryKwh)} kWh battery, so you use your own sunshine well into the evening.`
-        : "Here's the system I've sized from your bill. Tap any part to see how it works.";
+        : f.indicative
+          ? "Here's an indicative system from what you spend. Your bill will firm it up."
+          : "Here's the system I've sized from your bill. Tap any part to see how it works.";
     case "extras":
       if (f.backupAdded) return "Blackout Backup added: your chosen circuits stay on when the grid goes down.";
       if (f.addOns) return "Nice. Anything you've ticked to talk about, we'll go through on your 15-minute call.";

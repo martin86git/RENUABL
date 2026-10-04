@@ -26,6 +26,8 @@ export const META_EVENTS = {
   pageView: "PageView",
   /** Custom event: the bill was read at step 2 (no contact details yet). For audiences and retargeting. */
   billUploaded: "BillUploaded",
+  /** Custom event: no bill, they picked a spend range instead (the 7-day trial from 4 Oct 2026). */
+  spendEstimated: "SpendEstimated",
   /** Standard event: the date was reserved and the lead is in HubSpot. Ads optimise for this. */
   lead: "Lead",
 } as const;

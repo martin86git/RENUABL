@@ -14,17 +14,20 @@ const offline = () =>
   );
 
 describe("Ask Revo and the bill", () => {
-  it("tells Claude the bill can't be skipped", () => {
-    const fact = ASK_FACTS.find((f) => f.startsWith("A bill is required"));
-    expect(fact).toContain("Never say they can skip it");
+  it("tells Claude the bill is the most accurate and a spend range is indicative", () => {
+    const fact = ASK_FACTS.find((f) => f.startsWith("Two ways to continue"));
+    expect(fact).toContain("the most accurate");
+    expect(fact).toContain("indicative");
+    expect(fact).toContain("Never say a spend range is as accurate as the bill");
   });
 
   it.each(["I don't have my bill handy", "Can I continue without a bill?", "can I skip the bill", "I lost my bill"])(
-    "says the bill is needed and how to get it: %s",
+    "offers the spend range and how to get the bill: %s",
     async (q) => {
       offline();
       const { answer } = await askRenuabl(q, "profile");
-      expect(answer).toContain("can't be skipped");
+      expect(answer).toContain("indicative plan");
+      expect(answer).toContain("most accurate");
       expect(answer).toMatch(/retailer's app/);
     },
   );

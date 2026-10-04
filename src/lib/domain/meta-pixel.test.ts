@@ -28,6 +28,6 @@ describe("Meta Pixel", () => {
       expect(pixelAllowedPath(p)).toBe(false);
   });
   it("counts a lead at the reservation, and a bill on its own as BillUploaded", () => {
-    expect(META_EVENTS).toEqual({ pageView: "PageView", billUploaded: "BillUploaded", lead: "Lead" });
+    expect(META_EVENTS).toEqual({ pageView: "PageView", billUploaded: "BillUploaded", spendEstimated: "SpendEstimated", lead: "Lead" });
   });
 });

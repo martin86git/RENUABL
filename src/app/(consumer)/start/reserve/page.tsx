@@ -20,6 +20,7 @@ import type { ContactDetails, ContactErrors } from "@/lib/domain/contact";
 import { describeInverter } from "@/lib/domain/inverter";
 import { useWhoopOpen } from "@/lib/services/whoop";
 import { trackLead } from "@/lib/services/meta-pixel";
+import { SPEND_COPY, isIndicative, spendDescription } from "@/lib/domain/spend-estimate";
 import { WHOOP_COPY, whoopEligible } from "@/lib/domain/whoop-offer";
 import { HEALTHY_INTEREST_LABEL } from "@/lib/domain/healthy-home";
 import { RESERVED_CELEBRATION, priceHeader } from "@/lib/domain/flow-moments";
@@ -124,6 +125,7 @@ function ReserveScreen() {
         outOfPocket: price.outOfPocket,
         deposit: price.deposit,
         discuss: price.discuss.map((d) => d.label),
+        indicative: isIndicative(state.bill),
         interested: price.interested.map((d) => d.label),
       },
       details: {
@@ -144,7 +146,11 @@ function ReserveScreen() {
             : state.care
               ? carePriceLabel(state.care)
               : "Not added",
-        "Bill usage": state.bill ? `${state.bill.dailyUsageKwh} kWh/day${state.bill.sample ? " (sample bill)" : ""}` : undefined,
+        "Bill usage": state.bill
+          ? state.bill.estimate
+            ? `${state.bill.dailyUsageKwh} kWh/day, INDICATIVE: no bill, they said they spend ${spendDescription(state.bill.estimate.period, state.bill.estimate.band)}. Get the bill on the call.`
+            : `${state.bill.dailyUsageKwh} kWh/day${state.bill.sample ? " (sample bill)" : ""}`
+          : undefined,
         "Existing solar": state.bill?.hasSolar
           ? `${profile.existingSize ?? "?"}${profile.existingPlan ? `, ${profile.existingPlan}` : ""}`
           : undefined,
@@ -191,6 +197,12 @@ function ReserveScreen() {
         <div>
           <p className="text-[15px] text-ink">{priceHeader(rebateTotal)}</p>
           <p className="mt-0.5 text-[12.5px] leading-snug text-muted">{describeSystem(config)}</p>
+          {isIndicative(state.bill) && (
+            <p className="mt-2 text-[12.5px] leading-snug text-ink-2">
+              <span className="mr-1.5 rounded-full bg-surface-2 px-2 py-px text-[11px] text-muted">{SPEND_COPY.indicative}</span>
+              {SPEND_COPY.priceNote}
+            </p>
+          )}
         </div>
         <p className="animate-fade-up text-[22px] tabular-nums text-ink">{formatCurrency(price.total)}</p>
       </div>

@@ -22,6 +22,8 @@ export interface OrderEmail {
   discuss?: string[];
   /** Coming-soon products the customer wants to hear about. */
   interested?: string[];
+  /** No bill: the plan came from a spend range, so the price is indicative. */
+  indicative?: boolean;
   /** "Tuesday 13 October at 10:30am", when the call is already booked. */
   call?: string;
   /** An October-offer WHOOP was claimed for this order (set on the server, never from the browser). */
@@ -71,6 +73,7 @@ ${o.address ? row("Home", o.address) : ""}${o.installer ? row("Installation part
 <table style="width:100%;border-collapse:collapse;font-size:14px">${lines}</table>
 ${o.discuss?.length ? `<p style="font-size:14px;margin:12px 0 0">To discuss on your call: ${esc(o.discuss.map((d) => clip(d, 60)).join(", "))} (not included in your price).</p>` : ""}
 ${o.interested?.length ? `<p style="font-size:14px;margin:12px 0 0">Coming soon: ${esc(o.interested.map((d) => clip(d, 60)).join(", "))}. We'll let you know when it's available.</p>` : ""}
+${o.indicative ? `<p style="font-size:14px;margin:12px 0 0">${esc(INDICATIVE_PRICE_NOTE)}</p>` : ""}
 <p style="color:#6B6B6B;font-size:12px;margin:12px 0 0">Rebates and your final price are confirmed on your call before anything is final. Solar Victoria support is subject to its eligibility criteria.</p>
 </div>
 <div style="background:#D9E7DC;border-radius:16px;padding:20px;color:#1E3A2E;font-size:14px">
@@ -102,6 +105,7 @@ ${o.whoop ? `<p style="margin:10px 0 0">${esc(WHOOP_COPY.confirmed)}</p>` : ""}
     "Due today: $0",
     o.discuss?.length && `To discuss on your call: ${o.discuss.join(", ")} (not included in your price).`,
     o.interested?.length && `Coming soon: ${o.interested.join(", ")}. We'll let you know when it's available.`,
+    o.indicative && INDICATIVE_PRICE_NOTE,
     "",
     next,
     `After the call we'll send a secure link for the ${money(o.deposit)} refundable deposit to lock in your date.`,
@@ -113,6 +117,10 @@ ${o.whoop ? `<p style="margin:10px 0 0">${esc(WHOOP_COPY.confirmed)}</p>` : ""}
 
   return { subject, html, text };
 }
+
+/** In the order email when the plan came from a spend range rather than a bill. */
+export const INDICATIVE_PRICE_NOTE =
+  "This price is indicative: it's based on what you told us you spend, not your bill. Have your latest bill ready for your 15-minute call and we'll confirm your system and price from it.";
 
 /** How to change a booking, in every booking email. */
 export const CHANGE_BOOKING_NOTE =
@@ -226,6 +234,7 @@ export function cleanOrder(raw: unknown): Omit<OrderEmail, "reference" | "firstN
           .map((d) => plainText(d, 60))
           .filter(Boolean)
       : undefined,
+    indicative: r.indicative === true || undefined,
   };
 }
 

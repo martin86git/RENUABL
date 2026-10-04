@@ -39,6 +39,8 @@ export interface BillSummary {
   exportedDailyKwh: number | null;
   /** True when this is a stand-in reading (preview without a Claude API key). */
   sample?: boolean;
+  /** Set when there's no bill: built from the customer's spend range (`billFromSpend`), so everything is indicative. */
+  estimate?: { period: "monthly" | "two-monthly" | "quarterly"; band: "low" | "medium" | "high" | "very-high" };
 }
 
 export type BillProblem = "not-a-bill" | "unreadable";

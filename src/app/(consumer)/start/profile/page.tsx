@@ -14,7 +14,9 @@ import { stepHref } from "@/components/consumer/steps";
 import { Mascot } from "@/components/ui/brand-art";
 import { ChoiceChips, Toggle, YesNo } from "@/components/ui/controls";
 import { Button, Script } from "@/components/ui/primitives";
-import { trackBillUploaded } from "@/lib/services/meta-pixel";
+import { trackBillUploaded, trackSpendEstimated } from "@/lib/services/meta-pixel";
+import { SPEND_COPY, SPEND_ESTIMATE_ENABLED, isIndicative } from "@/lib/domain/spend-estimate";
+import { SpendEstimate } from "@/components/consumer/spend-estimate";
 import {
   EXISTING_PLAN_OPTIONS,
   EXISTING_SIZE_OPTIONS,
@@ -175,19 +177,38 @@ export default function ProfilePage() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,420px)_1fr]">
         <div className="space-y-4">
           <div ref={billRef} className="scroll-mt-6 space-y-4">
+            {/* A real bill replaces a spend estimate; while there's only an estimate, the upload stays open. */}
             <BillUpload
-              bill={state.bill}
+              bill={isIndicative(state.bill) ? null : state.bill}
               address={state.address ? formatAddress(state.address) : undefined}
               onRead={(bill) => {
-                // The bill was read by the server: count it once as a Meta lead (no details sent).
+                // The bill was read by the server: counted once for Meta (no details sent).
                 if (!state.billTracked) trackBillUploaded();
                 update({ bill, config: null, billTracked: true });
               }}
             />
+            {SPEND_ESTIMATE_ENABLED && (!state.bill || isIndicative(state.bill)) && (
+              <>
+                <p className="flex items-center gap-3 text-[12.5px] uppercase tracking-[0.12em] text-muted" aria-hidden>
+                  <span className="h-px flex-1 bg-line" />
+                  {SPEND_COPY.or}
+                  <span className="h-px flex-1 bg-line" />
+                </p>
+                <SpendEstimate
+                  bill={state.bill}
+                  onPick={(bill) => {
+                    if (!state.spendTracked) trackSpendEstimated();
+                    update({ bill, config: null, spendTracked: true });
+                  }}
+                />
+              </>
+            )}
             {state.bill && <SavingsReveal />}
             {missingBill && !state.bill && (
               <p className="text-[13.5px] text-ink-2" role="alert">
-                Please upload your latest bill to continue: we size your system from it.
+                {SPEND_ESTIMATE_ENABLED
+                  ? "Please upload your latest bill, or tell us roughly what you spend, to continue."
+                  : "Please upload your latest bill to continue: we size your system from it."}
               </p>
             )}
           </div>

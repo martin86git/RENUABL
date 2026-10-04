@@ -4,6 +4,7 @@ import { Camera, Check, FileText, Loader2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/primitives";
 import { BILL_UPLOAD, type BillSummary } from "@/lib/domain/bill";
+import { SPEND_COPY, SPEND_ESTIMATE_ENABLED } from "@/lib/domain/spend-estimate";
 import { readEnergyBill } from "@/lib/services/consumer";
 
 const kwh = (n: number) => n.toLocaleString("en-AU", { maximumFractionDigits: 1 });
@@ -118,8 +119,13 @@ export function BillUpload({
     <div className="rounded-[var(--radius-card)] bg-surface px-5 py-5 shadow-[var(--shadow-soft)]">
       <div className="flex items-start gap-4">
         <FileText className="mt-0.5 h-7 w-7 shrink-0 text-ink" strokeWidth={1.3} aria-hidden />
-        <div>
-          <p className="text-[15px] text-ink">Add your latest electricity bill</p>
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] text-ink">
+            Add your latest electricity bill
+            {SPEND_ESTIMATE_ENABLED && (
+              <span className="rounded-full bg-sage px-2.5 py-0.5 text-[11.5px] text-forest">{SPEND_COPY.billBadge}</span>
+            )}
+          </p>
           <p className="mt-0.5 text-[13px] leading-snug text-muted">
             A clear photo or the PDF. We size your system to what your home actually uses, nothing more.
           </p>

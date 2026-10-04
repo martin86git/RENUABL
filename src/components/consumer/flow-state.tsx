@@ -71,9 +71,10 @@ export interface FlowState {
   /** The time picked in the in-app calendar (null when booked through HubSpot or not yet booked). */
   call: CallSlot | null;
   attribution: Attribution | null;
-  /** The Meta Pixel Lead event has been sent this visit (once, on the first bill read). */
   /** Meta BillUploaded sent for this visit (once a bill is read). */
   billTracked: boolean;
+  /** The spend-range estimate was sent to Meta once (SpendEstimated). */
+  spendTracked: boolean;
   /** Meta Lead sent for this visit (once a date is reserved). */
   reservedTracked: boolean;
   /** "I'm interested in healthy home upgrades" on the reserve step (optional, unticked). */
@@ -104,6 +105,7 @@ const EMPTY: FlowState = {
   call: null,
   attribution: null,
   billTracked: false,
+  spendTracked: false,
   reservedTracked: false,
   healthyInterest: false,
 };

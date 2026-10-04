@@ -105,6 +105,7 @@ function RevoGuide({ slug }: { slug: string }) {
     step: slug,
     suburb: state.address?.suburb,
     dailyKwh: state.bill?.dailyUsageKwh,
+    indicative: Boolean(state.bill?.estimate),
     hasSolar: state.bill?.hasSolar,
     wantsBattery: state.profile.wantsBattery,
     tier: state.tier,

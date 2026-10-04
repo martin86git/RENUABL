@@ -2,15 +2,18 @@
 
 import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useSystem } from "@/components/consumer/flow-state";
+import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { Toggle } from "@/components/ui/controls";
 import { useCountUp } from "@/components/ui/count-up";
 import { formatCurrency } from "@/lib/domain/format";
 import { SAVINGS_PREVIEW, savingsPreview, type SavingsPreview } from "@/lib/domain/savings-preview";
+import { SPEND_COPY, isIndicative } from "@/lib/domain/spend-estimate";
 
 /** Straight after the bill is read: "See how much I could save", then a first estimate. */
 export function SavingsReveal() {
   const { recommendation } = useSystem();
+  const { state } = useFlow();
+  const indicative = isIndicative(state.bill);
   const preview = savingsPreview(recommendation);
   const [on, setOn] = useState(false);
   if (!preview) return null;
@@ -23,13 +26,13 @@ export function SavingsReveal() {
         </span>
         <Toggle checked={on} onChange={setOn} label={SAVINGS_PREVIEW.toggle} />
       </label>
-      {on && <SavingsFigures preview={preview} />}
+      {on && <SavingsFigures preview={preview} indicative={indicative} />}
     </div>
   );
 }
 
 /** Mounted when the switch goes on, so the count-up and the bars play each time. */
-function SavingsFigures({ preview }: { preview: SavingsPreview }) {
+function SavingsFigures({ preview, indicative }: { preview: SavingsPreview; indicative: boolean }) {
   const low = useCountUp(preview.low);
   const high = useCountUp(preview.high);
   const [grown, setGrown] = useState(false);
@@ -41,7 +44,10 @@ function SavingsFigures({ preview }: { preview: SavingsPreview }) {
 
   return (
     <div className="mt-4 border-t border-line pt-4" aria-live="polite">
-      <p className="text-[13px] text-muted">{SAVINGS_PREVIEW.heading}</p>
+      <p className="flex items-center gap-2 text-[13px] text-muted">
+        {SAVINGS_PREVIEW.heading}
+        {indicative && <span className="rounded-full bg-surface-2 px-2 py-px text-[11px]">{SPEND_COPY.indicative}</span>}
+      </p>
       <p className="mt-1 text-[34px] font-normal leading-none tracking-[-0.03em] text-positive tabular-nums">
         {single ? formatCurrency(high) : `${formatCurrency(low)}–${formatCurrency(high)}`}
         <span className="ml-2 text-[15px] tracking-normal text-muted">{SAVINGS_PREVIEW.perYear}</span>
@@ -62,7 +68,7 @@ function SavingsFigures({ preview }: { preview: SavingsPreview }) {
           </li>
         ))}
       </ul>
-      <p className="mt-4 text-[12.5px] leading-snug text-muted">{SAVINGS_PREVIEW.note}</p>
+      <p className="mt-4 text-[12.5px] leading-snug text-muted">{indicative ? SPEND_COPY.savingsNote : SAVINGS_PREVIEW.note}</p>
     </div>
   );
 }

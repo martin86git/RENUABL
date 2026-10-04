@@ -67,6 +67,13 @@ export function trackBillUploaded() {
   window.fbq?.("trackCustom", META_EVENTS.billUploaded);
 }
 
+/** No bill: the visitor picked a spend range instead. A custom event, no parameters (never the amount). */
+export function trackSpendEstimated() {
+  if (!PIXEL_ID) return;
+  load(PIXEL_ID);
+  window.fbq?.("trackCustom", META_EVENTS.spendEstimated);
+}
+
 /** The date was reserved: the lead and their details are with us (HubSpot, staff email). No parameters are sent. */
 export function trackLead() {
   if (!PIXEL_ID) return;

@@ -30,6 +30,7 @@ import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
 import { Disclosure, Segmented, Toggle } from "@/components/ui/controls";
 import { CountUp } from "@/components/ui/count-up";
+import { SPEND_COPY, isIndicative } from "@/lib/domain/spend-estimate";
 import { SYSTEM_REVEAL, rebateReward } from "@/lib/domain/flow-moments";
 import { Button, Card, cn } from "@/components/ui/primitives";
 import { CARE_ENABLED, CARE_FREE_MONTHS, CARE_INCLUDED_TIER, careIncludedFor, careIncludedValue } from "@/lib/domain/care";
@@ -146,11 +147,14 @@ function SystemScreen() {
     !(state.roof && Math.abs(state.roof.lat - home.lat) < 1e-5 && Math.abs(state.roof.lng - home.lng) < 1e-5);
   const replacing = state.bill ? solarSituation(state.bill, profile) === "replace" : false;
   const daily = recommendation.usage.dailyKwh;
-  const subtitle = existing
-    ? `Built around your existing solar: you buy about ${daily} kWh a day from the grid.`
-    : replacing
-      ? `A new system to replace your current one, sized to about ${daily} kWh a day (estimated from your bill).`
-      : `Sized to your bill: about ${state.bill?.dailyUsageKwh ?? daily} kWh a day${profile.evPlanned ? ", plus your future EV" : ""}.`;
+  const indicative = isIndicative(state.bill);
+  const subtitle = indicative
+    ? `Sized to what you spend: about ${daily} kWh a day${profile.evPlanned ? ", plus your future EV" : ""}. ${SPEND_COPY.indicative}: your bill gives the most accurate plan.`
+    : existing
+      ? `Built around your existing solar: you buy about ${daily} kWh a day from the grid.`
+      : replacing
+        ? `A new system to replace your current one, sized to about ${daily} kWh a day (estimated from your bill).`
+        : `Sized to your bill: about ${state.bill?.dailyUsageKwh ?? daily} kWh a day${profile.evPlanned ? ", plus your future EV" : ""}.`;
   const solarSubtitle = existing
     ? config.panelCount > 0
       ? `Your existing solar + ${outcome.solarKw} kW new panels`
@@ -164,7 +168,10 @@ function SystemScreen() {
   // The price comes last (on the reserve step, after the rebates): here, what's in it for them.
   const estimate = (
     <Card className="p-5">
-      <p className="text-[13px] text-muted">Estimated savings</p>
+      <p className="flex items-center gap-2 text-[13px] text-muted">
+        Estimated savings
+        {indicative && <span className="rounded-full bg-surface-2 px-2 py-px text-[11px]">{SPEND_COPY.indicative}</span>}
+      </p>
       <p className="mt-1 text-[30px] font-normal tracking-tight tabular-nums text-positive">
         <CountUp value={outcome.annualSavings} format={formatCurrency} />
         <span className="text-[14px] text-muted"> / year</span>
@@ -201,6 +208,7 @@ function SystemScreen() {
           )}
         </div>
       )}
+      {indicative && <p className="mt-3 text-[12px] leading-snug text-muted">{SPEND_COPY.savingsNote}</p>}
       <p className="mt-3 text-[12px] leading-snug text-muted">
         You&apos;ll see your price, after rebates, when you reserve. Nothing to pay today.
       </p>
@@ -331,7 +339,7 @@ function SystemScreen() {
           {!existing && (
             <Disclosure title="How we worked this out" className="mt-3 border-t border-line">
               <ul className="space-y-2 text-[14px] text-muted">
-                {sizingExplanation(recommendation.usage, config, { nasa: Boolean(state.sunshine), replacing }).map((line) => (
+                {sizingExplanation(recommendation.usage, config, { nasa: Boolean(state.sunshine), replacing, indicative }).map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>
@@ -366,7 +374,12 @@ function SystemScreen() {
             </p>
             <p>
               That&apos;s sized to what your home uses: about {daily} kWh a day ({recommendation.usage.annualKwh.toLocaleString("en-AU")}{" "}
-              kWh a year) {replacing ? "estimated from your bill and what your current panels export" : "from your bill"}
+              kWh a year){" "}
+              {indicative
+                ? "an indicative figure from what you spend"
+                : replacing
+                  ? "estimated from your bill and what your current panels export"
+                  : "from your bill"}
               {profile.evPlanned ? ", plus your future EV" : ""}.
               {config.batteryKwh > 0
                 ? " With your battery it's sized for winter, so the spare solar can fill the battery for the evening."

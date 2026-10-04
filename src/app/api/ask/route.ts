@@ -43,6 +43,7 @@ function snapshotFrom(raw: unknown): AskSnapshot {
     suburb: str("suburb"),
     state: str("state"),
     dailyUsageKwh: num("dailyUsageKwh"),
+    indicative: bool("indicative"),
     hasSolar: bool("hasSolar"),
     roof: str("roof"),
     flatMount: str("flatMount"),

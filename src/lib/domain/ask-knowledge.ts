@@ -20,7 +20,7 @@ export const ASK_FACTS = [
   `Systems are never smaller than ${ASSUMPTIONS.minSystemKw} kW. Essential (solar only) is the least solar that covers what the home uses in a year. How sizing works (shown under "How we worked this out" on the system step): the home's daily use comes from the bill; sunshine comes from NASA's records for the home (about ${ASSUMPTIONS.dailyYieldKwhPerKw} kWh a day per kW of panels in Melbourne over a year, about half that in winter); as a rule of thumb a home uses about ${Math.round(ASSUMPTIONS.baseSelfConsumption * 100)}% of its solar as it's made and the rest is spare, which charges a battery and then goes to the grid. With a battery, the system is sized for winter: enough solar that a winter day's spare can fill the battery for what the home uses after dark, and the battery is the smallest size (${ASSUMPTIONS.batterySizes[0]} kWh modules, ${Math.round(ASSUMPTIONS.batteryUsableShare * 100)}% usable) that holds that. A battery inverter can take panels up to ${Math.round(COSTING.maxArrayToHybridWithBattery * 100)}% of its rating (133% without a battery), so the inverter is filled. These are estimates, confirmed on the 15-minute call.`,
   "Three options: Essential (solar only), Recommended (solar and a battery sized to evening use) and Maximum (solar, the same battery and a smart EV charger). Any option can be adjusted on the system step.",
   "The bill is read for usage and prices only; the file isn't stored and no personal details are taken from it.",
-  "A bill is required: the customer can't continue past \"About your home\" without uploading their latest electricity bill, because the system is sized from it. Never say they can skip it, proceed without one, or enter their usage by hand. If they don't have it handy: download the latest bill (PDF) from their energy retailer's app, website or email, take a photo of the paper bill, or use a screenshot. Any recent electricity bill for their home works (it must be for the address they entered); a full quarter or month is best. Their answers are kept while they fetch it. If they can't get it now, they can leave their email or mobile in the \"Don't have your bill handy right now?\" box at the bottom of the page, and RENUABL will get in touch.",
+  'Two ways to continue past "About your home": upload their latest electricity bill (the most accurate: the system is sized from it), or, under "Tell us roughly what you spend", pick how often they\'re billed (monthly, every 2 months or quarterly) and a spend range. A spend range gives an indicative plan: savings and price are marked indicative and confirmed from their bill on the 15-minute call. Never say a spend range is as accurate as the bill, and never let them type in kWh figures. If they want to use their bill but don\'t have it handy: download the latest bill (PDF) from their energy retailer\'s app, website or email, take a photo of the paper bill, or use a screenshot. Any recent electricity bill for their home works (it must be for the address they entered); a full quarter or month is best. Their answers are kept while they fetch it. If they can\'t get it now, they can leave their email or mobile in the "Don\'t have your bill handy right now?" box at the bottom of the page, and RENUABL will get in touch.',
   // Roof and home
   "Roof types: tin (Colorbond), tiles, flat, or not sure.",
   "On a flat roof the customer chooses panels laid flat (the default: low profile and hard to see, a little less power, so the system is sized larger to make up for it) or tilted 10–15° towards the sun (more power, at extra cost, shown in the price). Tilting only works if the roof has room for all the panels tilted (tilted rows need space between them so they don't shade each other), and tilted panels can be seen from the street. Both are checked on the 15-minute call; if tilting doesn't suit, the panels are laid flat and the price is updated.",
@@ -57,6 +57,8 @@ export interface AskSnapshot {
   suburb?: string;
   state?: string;
   dailyUsageKwh?: number;
+  /** The daily use came from a spend range, not a bill. */
+  indicative?: boolean;
   hasSolar?: boolean;
   roof?: string;
   /** Flat roofs: "flat" (laid flat) or "tilt". */
@@ -83,7 +85,10 @@ const ROOF_LABELS: Record<string, string> = {
 export function describeSnapshot(s: AskSnapshot): string[] {
   const out: string[] = [];
   if (s.suburb || s.state) out.push(`Home: ${[s.suburb, s.state].filter(Boolean).join(", ")}`);
-  if (s.dailyUsageKwh) out.push(`Uses about ${s.dailyUsageKwh} kWh a day (from their bill)`);
+  if (s.dailyUsageKwh)
+    out.push(
+      `Uses about ${s.dailyUsageKwh} kWh a day (${s.indicative ? "indicative, from a spend range they picked: no bill yet" : "from their bill"})`,
+    );
   if (s.hasSolar) out.push("Already has solar");
   if (s.roof) {
     const mount = s.roof === "flat" ? (s.flatMount === "tilt" ? ", panels tilted (if the roof has room)" : ", panels laid flat") : "";

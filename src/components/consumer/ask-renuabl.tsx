@@ -23,6 +23,7 @@ function useAskSnapshot(context: AskContext): AskSnapshot {
     suburb: state.address?.suburb,
     state: state.address?.state,
     dailyUsageKwh: state.bill?.dailyUsageKwh,
+    indicative: state.bill?.estimate ? true : undefined,
     hasSolar: state.bill?.hasSolar,
     roof: state.profile.roofType,
     flatMount: state.profile.roofType === "flat" ? (state.profile.flatMount ?? "flat") : undefined,

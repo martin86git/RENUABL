@@ -403,12 +403,12 @@ export const RESERVE_NO_COMMITMENT =
 export function sizingExplanation(
   usage: UsageBasis,
   config: Pick<SystemConfig, "panelCount" | "batteryKwh">,
-  opts: { nasa: boolean; replacing?: boolean },
+  opts: { nasa: boolean; replacing?: boolean; indicative?: boolean },
 ): string[] {
   const one = (n: number) => kwh(Math.round(n * 10) / 10);
   const selfUse = Math.round(ASSUMPTIONS.baseSelfConsumption * 100);
   const lines = [
-    `Your home uses about ${one(usage.dailyKwh)} kWh a day, ${opts.replacing ? "estimated from your bill and what your current panels export" : "from your bill"}.`,
+    `Your home uses about ${one(usage.dailyKwh)} kWh a day, ${opts.indicative ? "an indicative figure from what you told us you spend (your bill gives the most accurate figure)" : opts.replacing ? "estimated from your bill and what your current panels export" : "from your bill"}.`,
     `${opts.nasa ? "NASA's sunshine records for your home" : "Melbourne's sunshine averages"} say each kW of panels makes about ${one(usage.dailyYieldKwhPerKw)} kWh a day over a year, and about ${one(usage.winterYieldKwhPerKw)} in winter (June to August), when the sun is weakest.`,
     `As a rule of thumb, a home uses about ${selfUse}% of its solar as it's made. The other ${100 - selfUse}% is spare: it charges a battery, then goes to the grid.`,
   ];
