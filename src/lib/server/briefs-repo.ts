@@ -18,6 +18,10 @@ export interface BriefRow {
   summary: BriefSummary | null;
   status: BriefStatus;
   call_label: string | null;
+  /** The lead's HubSpot contact, once known. */
+  hubspot_id?: string | null;
+  /** When staff were told the brief stopped partway (once). */
+  unfinished_noted_at?: string | null;
   /** "2026-10-06T11:30" (Melbourne time), for the add-to-calendar buttons. */
   call_slot: string | null;
   created_at: string;
@@ -84,6 +88,23 @@ export async function markBriefBooked(key: string, callLabel: string, slot: stri
     `update briefs set status = 'booked', call_label = $2, call_slot = $3, booked_at = now(), updated_at = now() where key = $1`,
     [key, callLabel, slot],
   );
+}
+
+export async function setBriefHubspot(key: string, contactId: string) {
+  await query(`update briefs set hubspot_id = $2 where key = $1`, [key, contactId]);
+}
+
+/** Started, not booked, quiet for `hours`, and not yet reported. */
+export async function staleBriefs(hours: number): Promise<BriefRow[]> {
+  return query<BriefRow>(
+    `select * from briefs where status = 'started' and booked_at is null and unfinished_noted_at is null
+       and updated_at < now() - make_interval(hours => $1) order by updated_at limit 20`,
+    [hours],
+  );
+}
+
+export async function markUnfinishedNoted(key: string) {
+  await query(`update briefs set unfinished_noted_at = now() where key = $1`, [key]);
 }
 
 export async function listBriefs(limit = 50): Promise<BriefRow[]> {

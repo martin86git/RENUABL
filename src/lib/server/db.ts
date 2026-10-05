@@ -155,6 +155,8 @@ create table if not exists briefs (
   booked_at timestamptz
 );
 alter table briefs add column if not exists call_slot text;
+alter table briefs add column if not exists hubspot_id text;
+alter table briefs add column if not exists unfinished_noted_at timestamptz;
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

@@ -420,6 +420,9 @@ export const BRIEF_COPY = {
   doneTitle: "You're booked in.",
 } as const;
 
+/** A brief that's been started and then left this long without booking gets a "not finished" note for staff. */
+export const BRIEF_UNFINISHED_HOURS = 3;
+
 /** Private brief links: 40 hex characters (20 random bytes). */
 export function isBriefKey(key: string): boolean {
   return /^[a-f0-9]{40}$/.test(key);

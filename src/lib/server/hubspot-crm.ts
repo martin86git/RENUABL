@@ -34,15 +34,20 @@ export async function contactIdByEmail(email: string, token: string): Promise<st
  * "Don't have your bill handy?": the contact for an email and/or mobile. By email when there is one (adding the
  * mobile if HubSpot has none yet); otherwise found by mobile, or created with just the mobile.
  */
-export async function followUpContactId(who: { email: string | null; mobile: string | null }, token: string): Promise<string> {
+export async function followUpContactId(
+  who: { email: string | null; mobile: string | null; firstName?: string },
+  token: string,
+): Promise<string> {
   if (who.email) {
     const id = await contactIdByEmail(who.email, token);
-    if (who.mobile) {
-      const res = await call(`/contacts/${id}?properties=mobilephone`, token, "GET");
-      const json = res.ok ? ((await res.json()) as { properties?: { mobilephone?: string | null } }) : {};
-      if (res.ok && !json.properties?.mobilephone) {
-        await call(`/contacts/${id}`, token, "PATCH", { properties: { mobilephone: who.mobile, phone: who.mobile } });
-      }
+    if (who.mobile || who.firstName) {
+      // Only fill in what HubSpot doesn't have yet: never overwrite.
+      const res = await call(`/contacts/${id}?properties=mobilephone,firstname`, token, "GET");
+      const json = res.ok ? ((await res.json()) as { properties?: { mobilephone?: string | null; firstname?: string | null } }) : {};
+      const add: Record<string, string> = {};
+      if (who.mobile && !json.properties?.mobilephone) Object.assign(add, { mobilephone: who.mobile, phone: who.mobile });
+      if (who.firstName && !json.properties?.firstname) add.firstname = who.firstName;
+      if (res.ok && Object.keys(add).length) await call(`/contacts/${id}`, token, "PATCH", { properties: add });
     }
     return id;
   }
@@ -57,7 +62,12 @@ export async function followUpContactId(who: { email: string | null; mobile: str
     if (id) return id;
   }
   const res = await call("/contacts", token, "POST", {
-    properties: { mobilephone: who.mobile, phone: who.mobile, lifecyclestage: "lead" },
+    properties: {
+      mobilephone: who.mobile,
+      phone: who.mobile,
+      lifecyclestage: "lead",
+      ...(who.firstName ? { firstname: who.firstName } : {}),
+    },
   });
   if (!res.ok) throw new HubspotError(`HubSpot contact ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const json = (await res.json()) as { id?: string };

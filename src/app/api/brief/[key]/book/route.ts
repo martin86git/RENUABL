@@ -82,7 +82,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/brief/[key]
   const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
   if (token) {
     try {
-      const id = await followUpContactId({ email, mobile: phone }, token);
+      const id = brief.hubspot_id ?? (await followUpContactId({ email, mobile: phone, firstName: brief.first_name }, token));
       await addNote(id, crmNote(`RENUABL brief: 15-minute call ${label}`, details), token);
       saved = true;
     } catch (e) {

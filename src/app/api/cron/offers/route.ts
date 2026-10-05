@@ -1,11 +1,12 @@
 import { dbConfigured } from "@/lib/server/db";
+import { noteUnfinishedBriefs } from "@/lib/server/brief-hubspot";
 import { sendHealthReminders } from "@/lib/server/health-reminders";
 import { processOffers } from "@/lib/server/offers-engine";
 
 /**
  * Vercel cron (vercel.json): moves lapsed offers on to the next partner and
  * retries jobs nobody could take, and sends the Home Health reminder two days
- * after reserving. Vercel sends CRON_SECRET as a bearer token;
+ * after reserving, and the "brief not finished" notes. Vercel sends CRON_SECRET as a bearer token;
  * without it set, the route does nothing.
  */
 export async function GET(request: Request) {
@@ -17,5 +18,6 @@ export async function GET(request: Request) {
     console.error("health reminders failed", e instanceof Error ? e.message : e);
     return 0;
   });
-  return Response.json({ ok: true, ...offers, healthReminders });
+  const unfinishedBriefs = await noteUnfinishedBriefs();
+  return Response.json({ ok: true, ...offers, healthReminders, unfinishedBriefs });
 }

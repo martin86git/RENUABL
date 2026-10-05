@@ -15,7 +15,7 @@ export function BriefSender() {
   const [from, setFrom] = useState("Martin");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [made, setMade] = useState<{ link: string; sms: string; mobile: string | null } | null>(null);
+  const [made, setMade] = useState<{ link: string; sms: string; mobile: string | null; inHubspot: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
 
   async function create(e: React.FormEvent) {
@@ -28,8 +28,15 @@ export function BriefSender() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ firstName, mobile, email, from }),
       });
-      const r = (await res.json()) as { ok: boolean; link?: string; sms?: string; mobile?: string | null; message?: string };
-      if (r.ok && r.link && r.sms) setMade({ link: r.link, sms: r.sms, mobile: r.mobile ?? null });
+      const r = (await res.json()) as {
+        ok: boolean;
+        link?: string;
+        sms?: string;
+        mobile?: string | null;
+        inHubspot?: boolean;
+        message?: string;
+      };
+      if (r.ok && r.link && r.sms) setMade({ link: r.link, sms: r.sms, mobile: r.mobile ?? null, inHubspot: Boolean(r.inHubspot) });
       else setProblem(r.message ?? "That didn't work. Please try again.");
     } catch {
       setProblem("That didn't work. Check your connection.");
@@ -74,6 +81,11 @@ export function BriefSender() {
             Another lead
           </Button>
         </div>
+        <p className="text-[12px] text-muted">
+          {made.inHubspot
+            ? 'Added to HubSpot with a "Brief sent" note.'
+            : "Not added to HubSpot (no mobile or email given, or HubSpot didn't answer)."}
+        </p>
         <p className="text-[12px] text-muted">
           The link is private to them: anyone with it can fill in the brief. It appears below as they go.
         </p>

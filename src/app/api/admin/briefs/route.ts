@@ -4,6 +4,7 @@ import { normaliseEmail } from "@/lib/domain/accounts";
 import { publicSiteUrl } from "@/lib/domain/site";
 import { siteUrl } from "@/lib/domain/sms";
 import { currentSession } from "@/lib/server/accounts";
+import { noteBriefSent } from "@/lib/server/brief-hubspot";
 import { createBrief } from "@/lib/server/briefs-repo";
 import { dbConfigured } from "@/lib/server/db";
 
@@ -45,5 +46,7 @@ export async function POST(request: Request) {
 
   const key = await createBrief({ firstName, mobile, email, createdBy: session.email });
   const link = `${siteUrl() ?? publicSiteUrl()}/brief/${key}`;
-  return Response.json({ ok: true, key, link, mobile, sms: briefSms({ firstName, link, from }) });
+  // The lead is in HubSpot from the start (a contact and a "Brief sent" note); never blocks the link.
+  const inHubspot = await noteBriefSent({ key, first_name: firstName, mobile, email }, { link, sentBy: session.email });
+  return Response.json({ ok: true, key, link, mobile, inHubspot, sms: briefSms({ firstName, link, from }) });
 }

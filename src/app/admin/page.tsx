@@ -21,6 +21,7 @@ import { WHOOP_ENDS, WHOOP_OFFER } from "@/lib/domain/whoop-offer";
 import { BriefSender } from "@/components/admin/brief-sender";
 import { SCORE_LABELS, cleanBriefAnswers, scoreBrief } from "@/lib/domain/brief";
 import { listBriefs } from "@/lib/server/briefs-repo";
+import { noteUnfinishedBriefs } from "@/lib/server/brief-hubspot";
 
 export const metadata = { title: "Partners and jobs" };
 
@@ -43,6 +44,8 @@ export default async function AdminPage() {
   const session = await currentSession();
   if (session?.role !== "staff") redirect("/login?as=partner&next=/admin");
   await processOffersSoon();
+  // Briefs left partway for a few hours get their "not finished" note when staff look (and from the daily cron).
+  await noteUnfinishedBriefs();
   const [partners, jobs, uploads, claims, checks, briefs] = await Promise.all([
     listPartners(),
     listAllJobs(),
