@@ -27,7 +27,7 @@ export default async function BriefPage({ params }: PageProps<"/brief/[key]">) {
       mobile={brief.mobile}
       email={brief.email}
       initialAnswers={cleanBriefAnswers(brief.answers)}
-      booked={brief.status === "booked" ? brief.call_label : null}
+      booked={brief.status === "booked" && brief.call_label ? { call: brief.call_label, slot: brief.call_slot } : null}
     />
   );
 }

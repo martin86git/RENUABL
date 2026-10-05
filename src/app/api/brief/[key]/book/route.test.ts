@@ -3,7 +3,7 @@ import { buildCallAvailability } from "@/lib/domain/booking";
 import { todayInMarket } from "@/lib/domain/market";
 
 const KEY = "a".repeat(40);
-const saved: { booked?: string; answers?: unknown } = {};
+const saved: { booked?: string; slot?: string; answers?: unknown } = {};
 
 vi.mock("@/lib/server/db", () => ({ dbConfigured: () => true }));
 vi.mock("@/lib/server/briefs-repo", async (orig) => {
@@ -16,8 +16,9 @@ vi.mock("@/lib/server/briefs-repo", async (orig) => {
       saved.answers = answers;
       return true;
     },
-    markBriefBooked: async (_k: string, label: string) => {
+    markBriefBooked: async (_k: string, label: string, slot: string) => {
       saved.booked = label;
+      saved.slot = slot;
     },
   };
 });
@@ -91,5 +92,11 @@ describe("POST /api/brief/[key]/book", () => {
     expect(note.body).toContain("+61412345678");
     const mail = calls.find((c) => c.url.includes("sendgrid"))!;
     expect(mail.body).toContain("martin@renuabl.com.au");
+    // Martin's email carries the call as a calendar invite, with who to ring.
+    expect(mail.body).toContain("renuabl-call.ics");
+    const ics = Buffer.from(JSON.parse(mail.body).attachments[0].content, "base64").toString();
+    expect(ics).toContain("RENUABL call: Sam +61412345678");
+    expect(json.date).toBe(slot().date);
+    expect(saved.slot).toBe(`${slot().date}T${slot().time}`);
   });
 });

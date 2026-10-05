@@ -28,7 +28,9 @@ import { formatAddress } from "@/lib/mock/addresses";
 import { roundDownSavings } from "@/lib/domain/savings-preview";
 import { getAvailability, roofImageSrc } from "@/lib/services/consumer";
 import { saveBrief, type BriefSummaryInput } from "@/lib/services/brief";
-import { BriefBooking } from "./brief-booking";
+import { AddToCalendar } from "@/components/consumer/add-to-calendar";
+import { consultEvent } from "@/lib/domain/calendar";
+import { BriefBooking, type BriefBooked } from "./brief-booking";
 import { BriefHouse } from "./brief-house";
 
 const stepId = (s: StepKind) => (s.kind === "question" ? `q:${s.id}` : s.kind);
@@ -47,7 +49,7 @@ export function BriefFlow({
   mobile: string | null;
   email: string | null;
   initialAnswers: BriefAnswers;
-  booked: string | null;
+  booked: { call: string; slot: string | null } | null;
 }) {
   const { state, update, hydrated } = useFlow();
   const system = useSystem();
@@ -55,7 +57,7 @@ export function BriefFlow({
   const [answers, setAnswers] = useState<BriefAnswers>(initialAnswers);
   const [at, setAt] = useState<string>("welcome");
   const [unfinished, setUnfinished] = useState(false);
-  const [done, setDone] = useState<{ call: string; emailed: boolean } | null>(booked ? { call: booked, emailed: false } : null);
+  const [done, setDone] = useState<BriefBooked | null>(booked ? { ...booked, emailed: false } : null);
   const steps = useMemo(() => briefSteps(answers, state.address?.state ?? null), [answers, state.address?.state]);
   const index = Math.max(
     0,
@@ -339,6 +341,15 @@ export function BriefFlow({
             <h1 className="mt-3 text-[32px] font-normal leading-tight tracking-[-0.03em]">{BRIEF_COPY.doneTitle}</h1>
             {done && <p className="mt-2 text-[15px] text-ink-2">We&apos;ll call you on {done.call}.</p>}
             {done?.emailed && <p className="mt-1 text-[13.5px] text-muted">We&apos;ve emailed you the details with a calendar invite.</p>}
+            {done?.slot && (
+              <div className="mt-4">
+                <p className="text-[13.5px] text-ink-2">Add it to your calendar</p>
+                <AddToCalendar
+                  event={consultEvent({ id: `brief-${briefKey.slice(0, 8)}`, date: done.slot.slice(0, 10), time: done.slot.slice(11, 16) })}
+                  filename="renuabl-call.ics"
+                />
+              </div>
+            )}
             <h2 className="mt-8 text-[15px] font-medium">If you go ahead, here&apos;s what happens</h2>
             <ol className="mt-3 space-y-3">
               {BRIEF_NEXT_STEPS.map((s, i) => (

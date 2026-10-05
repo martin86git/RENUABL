@@ -93,6 +93,32 @@ export function consultEvent(opts: { id: string; date: string; time: string }): 
   };
 }
 
+/** The same call in a staff calendar: who to ring, and on which number. Sent only to staff, never shown to customers. */
+export function staffCallEvent(opts: {
+  id: string;
+  date: string;
+  time: string;
+  name: string;
+  phone: string;
+  note?: string;
+}): CalendarEvent {
+  const [h, m] = opts.time.split(":").map(Number);
+  const start = marketDateTime(opts.date, h, m);
+  const name =
+    opts.name
+      .replace(/[\u0000-\u001f]/g, " ")
+      .trim()
+      .slice(0, 60) || "Customer";
+  const phone = opts.phone.replace(/[^\d+ ]/g, "").slice(0, 20);
+  return {
+    id: `${opts.id}-staff`,
+    title: `RENUABL call: ${name} ${phone}`,
+    description: `Call ${name} on ${phone}. ${opts.note ? `${opts.note.slice(0, 200)} ` : ""}Their answers are in HubSpot.`,
+    start,
+    end: new Date(new Date(start).getTime() + 15 * 60_000).toISOString(),
+  };
+}
+
 export function callEvent(opts: { reference: string; date: string; time: string }): CalendarEvent {
   const [h, m] = opts.time.split(":").map(Number);
   const start = marketDateTime(opts.date, h, m);

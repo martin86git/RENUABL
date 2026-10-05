@@ -40,14 +40,14 @@ export interface BriefBookingInput {
 export async function bookBriefCall(
   key: string,
   input: BriefBookingInput,
-): Promise<{ ok: boolean; call?: string; emailed?: boolean; message?: string }> {
+): Promise<{ ok: boolean; call?: string; date?: string; time?: string; emailed?: boolean; message?: string }> {
   try {
     const res = await fetch(`/api/brief/${key}/book`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
     });
-    return (await res.json()) as { ok: boolean; call?: string; emailed?: boolean; message?: string };
+    return (await res.json()) as { ok: boolean; call?: string; date?: string; time?: string; emailed?: boolean; message?: string };
   } catch {
     return { ok: false, message: "That didn't send. Check your connection and try again." };
   }

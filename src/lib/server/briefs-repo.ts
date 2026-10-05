@@ -18,6 +18,8 @@ export interface BriefRow {
   summary: BriefSummary | null;
   status: BriefStatus;
   call_label: string | null;
+  /** "2026-10-06T11:30" (Melbourne time), for the add-to-calendar buttons. */
+  call_slot: string | null;
   created_at: string;
   updated_at: string;
   booked_at: string | null;
@@ -77,11 +79,11 @@ export async function saveBriefProgress(key: string, answers: unknown, summary: 
   return rows.length > 0;
 }
 
-export async function markBriefBooked(key: string, callLabel: string) {
-  await query(`update briefs set status = 'booked', call_label = $2, booked_at = now(), updated_at = now() where key = $1`, [
-    key,
-    callLabel,
-  ]);
+export async function markBriefBooked(key: string, callLabel: string, slot: string) {
+  await query(
+    `update briefs set status = 'booked', call_label = $2, call_slot = $3, booked_at = now(), updated_at = now() where key = $1`,
+    [key, callLabel, slot],
+  );
 }
 
 export async function listBriefs(limit = 50): Promise<BriefRow[]> {

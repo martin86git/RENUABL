@@ -1,6 +1,6 @@
 import { formatCallTime, isBookableCallSlot } from "@/lib/domain/booking";
 import { SCORE_LABELS, briefAnswerLines, cleanBriefAnswers, isBriefKey, scoreBrief, solarVicLook } from "@/lib/domain/brief";
-import { buildIcs, consultEvent } from "@/lib/domain/calendar";
+import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
 import { normaliseMobile } from "@/lib/domain/contact";
 import { normaliseEmail } from "@/lib/domain/accounts";
 import { consultBookedEmail } from "@/lib/domain/emails";
@@ -51,7 +51,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/brief/[key]
   const summary = cleanSummary(b.summary);
   await saveBriefProgress(key, answers, summary);
   const label = `${formatDate(date, { weekday: "long", day: "numeric", month: "long" })} at ${formatCallTime(time)} (${LAUNCH_MARKET.capital} time)`;
-  await markBriefBooked(key, label);
+  await markBriefBooked(key, label, `${date}T${time}`);
 
   const { score, flags } = scoreBrief({ answers, billRead: Boolean(summary?.billRead), booked: true });
   const sv = answers.sv_income ? solarVicLook(answers) : null;
@@ -89,7 +89,19 @@ export async function POST(request: Request, ctx: RouteContext<"/api/brief/[key]
       console.error("brief booking not saved to HubSpot", e instanceof Error ? e.message : e);
     }
   }
-  await alertNewLead({ kind: "call", name: brief.first_name, email: email ?? undefined, mobile: phone, details });
+  const staffIcs = buildIcs([
+    staffCallEvent({
+      id: `brief-${key.slice(0, 8)}`,
+      date,
+      time,
+      name: brief.first_name,
+      phone,
+      note: summary?.home ? `Home: ${summary.home}.` : undefined,
+    }),
+  ]);
+  await alertNewLead({ kind: "call", name: brief.first_name, email: email ?? undefined, mobile: phone, details }, [
+    { filename: "renuabl-call.ics", content: staffIcs, contentType: "text/calendar" },
+  ]);
   if (!saved) console.warn("brief booking (not in HubSpot)", key.slice(0, 6));
 
   let emailed = false;
@@ -110,5 +122,5 @@ export async function POST(request: Request, ctx: RouteContext<"/api/brief/[key]
       console.error("brief booking email failed", e instanceof Error ? e.message : e);
     }
   }
-  return Response.json({ ok: true, call: label, emailed }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ ok: true, call: label, date, time, emailed }, { headers: { "cache-control": "no-store" } });
 }

@@ -7,8 +7,12 @@ import { leadAlertRecipients, newLeadEmail } from "@/lib/domain/emails";
 import { sendEmail } from "./email";
 
 /** Resolves to true when at least one staff member was emailed. */
-export async function alertNewLead(lead: Parameters<typeof newLeadEmail>[0]): Promise<boolean> {
-  const mail = newLeadEmail(lead);
+export async function alertNewLead(
+  lead: Parameters<typeof newLeadEmail>[0],
+  /** e.g. the call's calendar invite, so staff can add it in one tap. */
+  attachments?: { filename: string; content: string; contentType?: string }[],
+): Promise<boolean> {
+  const mail = { ...newLeadEmail(lead), ...(attachments?.length ? { attachments } : {}) };
   let sent = false;
   for (const to of leadAlertRecipients(process.env.LEAD_ALERT_EMAILS)) {
     try {

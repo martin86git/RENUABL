@@ -1,5 +1,5 @@
 import { formatCallTime, isBookableCallSlot } from "@/lib/domain/booking";
-import { buildIcs, consultEvent } from "@/lib/domain/calendar";
+import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
 import { validateContact } from "@/lib/domain/contact";
 import { consultBookedEmail, plainText } from "@/lib/domain/emails";
 import { formatDate } from "@/lib/domain/format";
@@ -58,13 +58,19 @@ export async function POST(request: Request) {
   }
   if (!saved) console.warn("call booking (not in HubSpot)", JSON.stringify({ ...contact, ...details }));
 
-  const alerted = await alertNewLead({
-    kind: "call",
-    name: `${contact.firstName} ${contact.lastName}`,
-    email: contact.email,
-    mobile: contact.mobile,
-    details,
-  });
+  const staffIcs = buildIcs([
+    staffCallEvent({
+      id: `call-${date}-${time.replace(":", "")}`,
+      date,
+      time,
+      name: `${contact.firstName} ${contact.lastName}`,
+      phone: contact.mobile,
+    }),
+  ]);
+  const alerted = await alertNewLead(
+    { kind: "call", name: `${contact.firstName} ${contact.lastName}`, email: contact.email, mobile: contact.mobile, details },
+    [{ filename: "renuabl-call.ics", content: staffIcs, contentType: "text/calendar" }],
+  );
   if (!saved && !alerted)
     return Response.json({ ok: false, message: "We couldn't book that just now. Please try again." }, { status: 502 });
 
@@ -81,5 +87,5 @@ export async function POST(request: Request) {
   } catch (e) {
     console.error("call booking email failed", e instanceof Error ? e.message : e);
   }
-  return Response.json({ ok: true, call: label, emailed });
+  return Response.json({ ok: true, call: label, date, time, emailed });
 }

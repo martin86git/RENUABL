@@ -11,6 +11,13 @@ import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { getCallAvailability } from "@/lib/services/consumer";
 import { bookBriefCall, type BriefBookingInput } from "@/lib/services/brief";
 
+export interface BriefBooked {
+  call: string;
+  /** "2026-10-06T11:30" */
+  slot: string | null;
+  emailed: boolean;
+}
+
 const field =
   "h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-[15px] text-ink outline-none placeholder:text-muted focus:border-ink";
 
@@ -26,7 +33,7 @@ export function BriefBooking({
   mobile: string | null;
   email: string | null;
   payload: () => Omit<BriefBookingInput, "date" | "time" | "phone" | "email" | "consent">;
-  onBooked: (r: { call: string; emailed: boolean }) => void;
+  onBooked: (r: BriefBooked) => void;
 }) {
   const availability = useMemo(() => getCallAvailability(null), []);
   const [date, setDate] = useState<string | null>(availability[0]?.date ?? null);
@@ -46,7 +53,7 @@ export function BriefBooking({
     setProblem(null);
     const r = await bookBriefCall(briefKey, { ...payload(), date, time, phone, email: email.trim() || undefined, consent });
     setBusy(false);
-    if (r.ok && r.call) onBooked({ call: r.call, emailed: Boolean(r.emailed) });
+    if (r.ok && r.call) onBooked({ call: r.call, slot: r.date && r.time ? `${r.date}T${r.time}` : null, emailed: Boolean(r.emailed) });
     else setProblem(r.message ?? "That didn't go through. Please try again.");
   }
 

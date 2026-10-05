@@ -11,6 +11,8 @@ import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { bookConsultCall, getCallAvailability } from "@/lib/services/consumer";
 import { trackGoogleConversion } from "@/lib/services/google-ads";
 import { trackCallBooked } from "@/lib/services/meta-pixel";
+import { consultEvent } from "@/lib/domain/calendar";
+import { AddToCalendar } from "./add-to-calendar";
 import { ConsentBoxes, NO_CONSENT, type ConsentState } from "./consent-boxes";
 import { useFlow } from "./flow-state";
 
@@ -31,7 +33,7 @@ export function BookACall() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [booked, setBooked] = useState<{ call: string; emailed: boolean } | null>(null);
+  const [booked, setBooked] = useState<{ call: string; date: string; time: string; emailed: boolean } | null>(null);
   const day = availability.find((d) => d.date === date);
 
   async function submit(e: React.FormEvent) {
@@ -59,7 +61,7 @@ export function BookACall() {
       // Booked and in HubSpot: counted for the ads, with no details.
       trackCallBooked();
       trackGoogleConversion("call");
-      setBooked({ call: r.call, emailed: Boolean(r.emailed) });
+      setBooked({ call: r.call, date, time, emailed: Boolean(r.emailed) });
     } else {
       setErrors(r.errors ?? {});
       setProblem(r.message ?? (r.errors ? "Please check your details." : "That didn't send. Please try again."));
@@ -98,6 +100,11 @@ export function BookACall() {
             ? "We've emailed you the details with a calendar invite."
             : "Need a different time? Reply to any of our emails, or contact us."}
         </p>
+        <p className="mt-5 text-[13.5px] text-ink-2">Add it to your calendar</p>
+        <AddToCalendar
+          event={consultEvent({ id: `call-${booked.date}`, date: booked.date, time: booked.time })}
+          filename="renuabl-call.ics"
+        />
         <ButtonLink href="/" variant="secondary" className="mt-6">
           See your home plan
         </ButtonLink>

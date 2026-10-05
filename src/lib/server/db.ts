@@ -154,6 +154,7 @@ create table if not exists briefs (
   updated_at timestamptz not null default now(),
   booked_at timestamptz
 );
+alter table briefs add column if not exists call_slot text;
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,
