@@ -92,7 +92,7 @@
 
 ## Launch market
 
-- Victoria first. Use `LAUNCH_MARKET`, `todayInMarket()` and `marketDateTime()` from `src/lib/domain/market.ts` instead of hard-coding a state, postcode, time zone or the server's local date (Vercel runs in UTC).
+- Victoria first. Address search covers all of Australia; picking an address outside the launch market stops there with a friendly card (`outsideMarketMessage` in `domain/address.ts`, tested: "Sorry, we're not servicing <suburb> at this time.", then that we install in Victoria for now), in the home page and the guided brief alike. Use `LAUNCH_MARKET`, `todayInMarket()` and `marketDateTime()` from `src/lib/domain/market.ts` instead of hard-coding a state, postcode, time zone or the server's local date (Vercel runs in UTC).
 
 ## Architecture rules
 

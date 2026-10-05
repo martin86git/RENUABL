@@ -3,8 +3,7 @@
 import { ArrowRight, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { inLaunchMarket, type AddressSuggestion } from "@/lib/domain/address";
-import { LAUNCH_MARKET } from "@/lib/domain/market";
+import { inLaunchMarket, outsideMarketMessage, type AddressSuggestion } from "@/lib/domain/address";
 import type { Address } from "@/lib/domain/types";
 import { parseAddress, resolveAddress, suggestAddresses } from "@/lib/services/consumer";
 import { cn } from "@/components/ui/primitives";
@@ -23,6 +22,7 @@ export function AddressEntry({ className, onPick }: { className?: string; onPick
   const [focused, setFocused] = useState(false);
   const [active, setActive] = useState(-1);
   const [error, setError] = useState<string | null>(null);
+  const [outside, setOutside] = useState<{ title: string; body: string } | null>(null);
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [source, setSource] = useState<"google" | "sample">("google");
   const [busy, setBusy] = useState(false);
@@ -49,9 +49,13 @@ export function AddressEntry({ className, onPick }: { className?: string; onPick
 
   function go(address: Address) {
     if (!inLaunchMarket(address)) {
-      setError(`We're starting in ${LAUNCH_MARKET.name}. We'll be in your state soon.`);
+      setError(null);
+      // Close the list (it isn't searched again until they type).
+      setSuggestions([]);
+      setOutside(outsideMarketMessage(address));
       return;
     }
+    setOutside(null);
     update({ address });
     if (onPick) onPick(address);
     else router.push(stepHref("analysing"));
@@ -100,6 +104,7 @@ export function AddressEntry({ className, onPick }: { className?: string; onPick
             if (e.target.value.trim().length < 3) setSuggestions([]);
             setActive(-1);
             setError(null);
+            setOutside(null);
           }}
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 120)}
@@ -128,6 +133,12 @@ export function AddressEntry({ className, onPick }: { className?: string; onPick
         <p className="mt-2 pl-5 text-[13px] text-danger" role="alert">
           {error}
         </p>
+      )}
+      {outside && (
+        <div className="mt-3 rounded-2xl bg-surface-2 px-5 py-4 text-left" role="status">
+          <p className="text-[15px] text-ink">{outside.title}</p>
+          <p className="mt-1 text-[13.5px] leading-snug text-ink-2">{outside.body}</p>
+        </div>
       )}
       {showList && (
         <ul

@@ -35,6 +35,26 @@ export function addressFromComponents(
   return { line, suburb, state, postcode, ...extra };
 }
 
+const STATE_NAMES: Record<string, string> = {
+  NSW: "New South Wales",
+  QLD: "Queensland",
+  SA: "South Australia",
+  WA: "Western Australia",
+  TAS: "Tasmania",
+  NT: "the Northern Territory",
+  ACT: "the ACT",
+  VIC: "Victoria",
+};
+
+/** What we say when someone enters an address outside the launch market: plainly, without blaming them. */
+export function outsideMarketMessage(address: Pick<Address, "state" | "suburb">): { title: string; body: string } {
+  const where = address.suburb?.trim() || STATE_NAMES[address.state.toUpperCase()] || "your area";
+  return {
+    title: `Sorry, we're not servicing ${where} at this time.`,
+    body: `RENUABL is installing in ${LAUNCH_MARKET.name} for now. We're working on more areas and hope to be with you soon.`,
+  };
+}
+
 /** RENUABL installs in Victoria first. */
 export function inLaunchMarket(address: Pick<Address, "state">) {
   return address.state.toUpperCase() === LAUNCH_MARKET.state;
