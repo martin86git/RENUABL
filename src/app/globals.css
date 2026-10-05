@@ -114,6 +114,19 @@ body {
   overflow-x: clip;
 }
 
+/*
+ * iPhone zooms in on any text box under 16px when it's tapped, and often stays zoomed, so the page then
+ * slides sideways. On touch screens every typing box is at least 16px (outside a layer, so it beats the
+ * utilities). Desktop keeps the designed sizes.
+ */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
 body {
   font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "cv11", "ss01";
