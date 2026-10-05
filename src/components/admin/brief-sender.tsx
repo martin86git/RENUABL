@@ -83,7 +83,7 @@ export function BriefSender() {
 
   return (
     <form onSubmit={(e) => void create(e)} className="grid grid-cols-1 gap-2 px-5 py-4 sm:grid-cols-2">
-      <input className={field} placeholder="Their first name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+      <input className={field} placeholder="Their name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
       <input className={field} placeholder="Their mobile" type="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} />
       <input className={field} placeholder="Their email (optional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <input className={field} placeholder="Your first name (in the text)" value={from} onChange={(e) => setFrom(e.target.value)} />

@@ -63,6 +63,8 @@ export function BriefFlow({
   );
   const step = done ? ({ kind: "done" } as StepKind) : steps[index];
   const indicative = isIndicative(state.bill);
+  // "Hi Martin", even when staff typed the full name.
+  const greetingName = firstName.trim().split(/\s+/)[0] || "there";
 
   // Pick up where they left off on this device.
   const restored = useRef(false);
@@ -173,23 +175,28 @@ export function BriefFlow({
 
       <main className="mt-5 flex-1 animate-fade-up" key={done ? "done" : stepId(step)}>
         {step.kind === "welcome" && (
-          <section>
-            <h1 className="text-[36px] font-normal leading-[1.05] tracking-[-0.03em]">Hi {firstName}.</h1>
-            <p className="mt-2 text-[22px] leading-snug text-ink-2">{BRIEF_COPY.welcomeLead}</p>
-            <ol className="mt-6 space-y-3">
+          // Fills the first screen: a roomy greeting, the three steps, and the button at the bottom.
+          <section className="flex min-h-[calc(100svh-7.5rem)] flex-col lg:min-h-0">
+            <div className="pt-8 lg:pt-16">
+              <h1 className="text-[42px] lg:text-[52px] font-normal leading-[1.05] tracking-[-0.03em]">Hi {greetingName}.</h1>
+              <p className="mt-4 text-[22px] leading-snug text-ink-2">{BRIEF_COPY.welcomeLead}</p>
+            </div>
+            <ol className="mt-12 space-y-6">
               {BRIEF_COPY.welcomeSteps.map((s, i) => (
-                <li key={s} className="flex items-center gap-3 text-[15px] text-ink-2">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border-[1.5px] border-sun-line text-[12px] text-sun-line-ink">
+                <li key={s} className="flex items-center gap-4 text-[16px] leading-snug text-ink-2">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border-[1.5px] border-sun-line text-[13px] text-sun-line-ink">
                     {i + 1}
                   </span>
                   {s}
                 </li>
               ))}
             </ol>
-            <p className="mt-6 text-[13px] text-muted">{BRIEF_COPY.welcomeTime}</p>
-            <Button size="lg" className="mt-6 w-full" onClick={() => go(1)}>
-              Let&apos;s start <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
-            </Button>
+            <div className="mt-auto pt-12 lg:mt-14 lg:pt-0">
+              <p className="text-[13.5px] leading-relaxed text-muted">{BRIEF_COPY.welcomeTime}</p>
+              <Button size="lg" className="mt-5 w-full" onClick={() => go(1)}>
+                Let&apos;s start <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
+              </Button>
+            </div>
           </section>
         )}
 

@@ -402,7 +402,7 @@ export const BRIEF_COPY = {
   welcomeSteps: [
     "A few quick taps about your home",
     "See where your power would come from",
-    "Your price after rebates, then a 15-minute call",
+    "Your price after rebates, then a 15‑minute call",
   ],
   welcomeTime: "About 5 minutes. You can stop and come back to this link any time.",
   shortcut: "Don't have time to finish? Book a call",

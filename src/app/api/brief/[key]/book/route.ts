@@ -99,7 +99,11 @@ export async function POST(request: Request, ctx: RouteContext<"/api/brief/[key]
       emailed =
         (await sendEmail({
           to: email,
-          ...consultBookedEmail({ firstName: brief.first_name, call: label, link: `${siteUrl() ?? publicSiteUrl()}/brief/${key}` }),
+          ...consultBookedEmail({
+            firstName: brief.first_name.split(/\s+/)[0],
+            call: label,
+            link: `${siteUrl() ?? publicSiteUrl()}/brief/${key}`,
+          }),
           attachments: [{ filename: "renuabl-call.ics", content: ics, contentType: "text/calendar" }],
         })) === "sent";
     } catch (e) {
