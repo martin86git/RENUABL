@@ -59,6 +59,8 @@ describe("POST /api/follow-up", () => {
     expect(await res.json()).toEqual({ ok: true, emailed: false, texted: false });
     const created = calls.find((c) => c.url.endsWith("/contacts"))!;
     expect(created.body).toContain("+61412345678");
+    // Named so it's easy to find in HubSpot's contact list.
+    expect(created.body).toContain('"firstname":"New lead"');
     expect(calls.find((c) => c.url.endsWith("/notes"))!.body).toContain("Finish later: no bill yet");
     const mails = calls.filter((c) => c.url.includes("sendgrid"));
     expect(mails).toHaveLength(1);

@@ -66,7 +66,9 @@ export async function followUpContactId(
       mobilephone: who.mobile,
       phone: who.mobile,
       lifecyclestage: "lead",
-      ...(who.firstName ? { firstname: who.firstName } : {}),
+      // A mobile-only lead has no name or email, so HubSpot would list it as a blank row: give it one to spot it by.
+      firstname: who.firstName || "New lead",
+      ...(who.firstName ? {} : { lastname: `(mobile ${who.mobile})` }),
     },
   });
   if (!res.ok) throw new HubspotError(`HubSpot contact ${res.status}: ${(await res.text()).slice(0, 300)}`);
