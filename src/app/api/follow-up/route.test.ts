@@ -148,7 +148,7 @@ describe("POST /api/follow-up", () => {
       nextIp(),
     );
     expect(await res.json()).toEqual({ ok: true, emailed: false, texted: true });
-    expect(calls.find((c) => c.url.endsWith("/notes"))!.body).toContain("Started their plan: call now");
+    expect(calls.find((c) => c.url.endsWith("/notes"))!.body).toContain("Started their plan: contact now");
     expect(calls.find((c) => c.url.endsWith("/notes"))!.body).toContain("Got solar? Add a battery");
     const texts = calls.filter((c) => c.url.includes("twilio")).map((c) => new URLSearchParams(c.body));
     expect(texts.map((t) => t.get("To"))).toEqual(["+61412345678", "+61400111222"]);
@@ -161,8 +161,27 @@ describe("POST /api/follow-up", () => {
     expect(mail.body).toContain("started their plan");
   });
 
-  it("started needs a mobile (an email alone isn't enough)", async () => {
+  it("started with an email: emailed straight away that we'll be in touch (no SMS needed)", async () => {
+    vi.stubEnv("HUBSPOT_PRIVATE_APP_TOKEN", "pat-test");
+    vi.stubEnv("SENDGRID_API_KEY", "SG.test");
+    vi.stubEnv("EMAIL_FROM", "RENUABL <hello@renuabl.com.au>");
+    vi.stubEnv("SITE_URL", "https://www.renuabl.com.au");
+    vi.stubEnv("LEAD_ALERT_EMAILS", "martin@renuabl.com.au");
+    const calls: { url: string; body: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: unknown, init?: RequestInit) => {
+        calls.push({ url: String(url), body: String(init?.body ?? "") });
+        if (String(url).includes("sendgrid")) return new Response(null, { status: 202 });
+        if (init?.method === "GET") return new Response("{}", { status: 404 });
+        return Response.json({ id: "c4" });
+      }),
+    );
     const res = await post({ email: "sam@example.com", stage: "started", consent: { terms: true } }, nextIp());
-    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ ok: true, emailed: true, texted: false });
+    const mails = calls.filter((c) => c.url.includes("sendgrid")).map((c) => c.body);
+    expect(mails.some((m) => m.includes("sam@example.com") && m.includes("Thanks for starting your solar plan"))).toBe(true);
+    expect(mails.some((m) => m.includes("martin@renuabl.com.au") && m.includes("by email"))).toBe(true);
+    expect(calls.find((c) => c.url.endsWith("/notes"))!.body).toContain("Started their plan: contact now");
   });
 });

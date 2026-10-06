@@ -11,10 +11,10 @@ describe("lead texts", () => {
   });
 
   it("tells staff to call now, suburb only", () => {
-    const sms = newLeadStaffSms({ mobile: "+61412345678", suburb: "Glen Waverley", entry: "Got solar? Add a battery" });
+    const sms = newLeadStaffSms({ contact: "+61412345678", suburb: "Glen Waverley", entry: "Got solar? Add a battery" });
     expect(sms).toContain("+61412345678");
     expect(sms).toContain("Glen Waverley");
-    expect(sms).toContain("Call them now");
+    expect(sms).toContain("Get in touch now");
   });
 
   it("reads staff mobiles, ignoring anything that isn't an Australian mobile", () => {

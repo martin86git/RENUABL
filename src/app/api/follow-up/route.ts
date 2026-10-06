@@ -1,5 +1,5 @@
 import { readFollowUpContact } from "@/lib/domain/contact";
-import { finishLaterEmail, plainText } from "@/lib/domain/emails";
+import { finishLaterEmail, plainText, startedPlanEmail } from "@/lib/domain/emails";
 import { CONSENT_MISSING, consentRecord, readConsent } from "@/lib/domain/legal";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { newLeadStaffSms, siteUrl, startedPlanSms } from "@/lib/domain/sms";
@@ -15,9 +15,9 @@ import { sendSms } from "@/lib/server/sms";
  * stage "no-bill" (default): a visitor without their bill handy leaves their email, mobile or both (at least one) so
  * we can follow up; anyone who gave an email is emailed a link back. They still can't continue without a bill.
  *
- * stage "started": a mobile left at the top of "About your home", before the bill (speed to lead). They're texted
- * straight away that we'll call (with a link to book a set time), and staff are texted (LEAD_ALERT_MOBILES) and
- * emailed to call now.
+ * stage "started": a mobile, an email or both left at the top of "About your home", before the bill (speed to lead).
+ * They're emailed (and texted, when SMS is set up) straight away that we'll be in touch, with a link to book a set
+ * time, and staff are texted (LEAD_ALERT_MOBILES) and emailed to get in touch now.
  *
  * Either way it becomes a HubSpot contact with a note (home, ad source, landing page, plain text).
  */
@@ -42,11 +42,10 @@ export async function POST(request: Request) {
   if ("error" in who) return Response.json({ ok: false, message: who.error }, { status: 422 });
   const { email, mobile } = who;
   const started = body.stage === "started";
-  if (started && !mobile) return Response.json({ ok: false, message: "Enter an Australian mobile, e.g. 0412 345 678." }, { status: 422 });
   const consent = readConsent(body.consent);
   if (!consent.accepted) return Response.json({ ok: false, consent: true, message: CONSENT_MISSING }, { status: 422 });
   const details = {
-    Stage: started ? "Started their plan: left a mobile before their bill. Call now" : "Didn't have their bill handy: follow up",
+    Stage: started ? "Started their plan: left their details before their bill. Contact now" : "Didn't have their bill handy: follow up",
     Home: plainText(body.home, 160) || undefined,
     "Ad source": plainText(body.source, 120) || undefined,
     "Landing page": plainText(body.entry, 60) || undefined,
@@ -58,7 +57,7 @@ export async function POST(request: Request) {
   if (token) {
     try {
       const id = await followUpContactId(who, token);
-      await addNote(id, crmNote(started ? "Started their plan: call now" : "Finish later: no bill yet", details), token);
+      await addNote(id, crmNote(started ? "Started their plan: contact now" : "Finish later: no bill yet", details), token);
       saved = true;
     } catch (e) {
       console.error("follow-up not saved to HubSpot", e instanceof Error ? e.message : e);
@@ -73,13 +72,22 @@ export async function POST(request: Request) {
   let emailed = false;
   let texted = false;
   if (started && site && mobile) texted = (await sendSms(mobile, startedPlanSms({ link: `${site}/book-a-call` }))) === "sent";
-  if (started && mobile)
+  if (started)
     await textStaff(
-      newLeadStaffSms({ mobile, suburb: plainText(body.suburb, 40) || undefined, entry: plainText(body.entry, 40) || undefined }),
+      newLeadStaffSms({
+        contact: mobile ?? email ?? "",
+        suburb: plainText(body.suburb, 40) || undefined,
+        entry: plainText(body.entry, 40) || undefined,
+      }),
     );
-  if (!started && site && email) {
+  if (site && email) {
+    const links = { link: `${site}/`, callLink: `${site}/book-a-call` };
     try {
-      emailed = (await sendEmail({ to: email, ...finishLaterEmail({ link: `${site}/`, callLink: `${site}/book-a-call` }) })) === "sent";
+      emailed =
+        (await sendEmail({
+          to: email,
+          ...(started ? startedPlanEmail({ ...links, calling: Boolean(mobile) }) : finishLaterEmail(links)),
+        })) === "sent";
     } catch (e) {
       console.error("follow-up email failed", e instanceof Error ? e.message : e);
     }
@@ -88,7 +96,13 @@ export async function POST(request: Request) {
     kind: started ? "started" : "no-bill",
     email: email ?? undefined,
     mobile: mobile ?? undefined,
-    details: started ? { ...details, "Texted them": texted ? "yes" : "no (SMS not set up or failed)" } : details,
+    details: started
+      ? {
+          ...details,
+          "Told them we'll be in touch":
+            [emailed && "by email", texted && "by text"].filter(Boolean).join(", ") || "no (email and SMS not sent)",
+        }
+      : details,
   });
   if (!saved && !emailed && !alerted)
     return Response.json({ ok: false, message: "We couldn't save that just now. Please try again." }, { status: 502 });

@@ -53,11 +53,13 @@ export function startedPlanSms(o: { link: string }) {
   );
 }
 
-/** To staff (LEAD_ALERT_MOBILES): a new lead to call now. Suburb only, plus how they came in. */
-export function newLeadStaffSms(o: { mobile: string; suburb?: string; entry?: string }) {
+/** To staff (LEAD_ALERT_MOBILES): a new lead to contact now (their mobile, else email). Suburb only, plus how they came in. */
+export function newLeadStaffSms(o: { contact: string; suburb?: string; entry?: string }) {
   const where = o.suburb ? ` in ${plainText(o.suburb, 40)}` : "";
   const via = o.entry ? ` (${plainText(o.entry, 40)})` : "";
-  return clip(`RENUABL lead${where}${via}: ${plainText(o.mobile, 20)} just started a plan. Call them now while it's fresh.`);
+  return clip(
+    `RENUABL lead${where}${via}: ${o.contact.replace(/[^\w.+@-]/g, "").slice(0, 80)} just started a plan. Get in touch now while it's fresh.`,
+  );
 }
 
 /** Staff mobiles for lead texts: LEAD_ALERT_MOBILES, comma-separated Australian mobiles (none by default). */

@@ -348,6 +348,27 @@ export function finishLaterEmail(o: { link: string; callLink: string }) {
   });
 }
 
+/** "Prefer a hand with this?": straight away, so they know someone is getting in touch (speed to lead). */
+export function startedPlanEmail(o: { link: string; callLink: string; calling: boolean }) {
+  return simpleEmail({
+    subject: "Thanks for starting your solar plan",
+    heading: "We'll be in touch soon.",
+    lines: [
+      o.calling
+        ? "Thanks for starting your solar and battery plan. Someone from our team will call you soon to help."
+        : "Thanks for starting your solar and battery plan. Someone from our team will be in touch soon to help.",
+      "You can carry on in the meantime: upload your latest bill and we'll size one system to what your home actually uses and show you the price, rebates included.",
+    ],
+    button: { label: "Continue my plan", href: o.link },
+    second: {
+      line: "Prefer a set time? Book a free 15-minute call with one of our team.",
+      label: "Book a 15-minute call",
+      href: o.callLink,
+    },
+    footer: "You're getting this because you asked us to get in touch. Just reply if you have any questions.",
+  });
+}
+
 /** Sent once, two days after a reservation, when the Home Health check hasn't been done. */
 export function healthReminderEmail(o: { firstName: string; link: string }) {
   const first = plainText(o.firstName, 40) || "there";
@@ -432,7 +453,7 @@ export function newLeadEmail(o: {
             heading: "Call now: someone just started their plan",
             lines: [
               ...lines,
-              "They left their mobile before their bill and were texted that we'll call. Call them now: the sooner, the better.",
+              "They left their details before their bill and were told we'll be in touch. Contact them now: the sooner, the better.",
             ],
             footer: "Also in HubSpot.",
           })
