@@ -3,6 +3,7 @@
 import { Check, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/primitives";
+import { landingLabel } from "@/lib/domain/landing";
 import { formatAddress } from "@/lib/mock/addresses";
 import { requestFollowUp } from "@/lib/services/consumer";
 import { trackGoogleConversion } from "@/lib/services/google-ads";
@@ -28,7 +29,8 @@ export function BillLater() {
   const [consent, setConsent] = useState<ConsentState>(NO_CONSENT);
   const [consentMissing, setConsentMissing] = useState(false);
 
-  if (state.bill) return null;
+  // Not needed once there's a bill, or a mobile was left at the top of the page.
+  if (state.bill || state.earlyContact) return null;
   const given = Boolean(email.trim() || mobile.trim());
 
   async function submit(e: React.FormEvent) {
@@ -48,6 +50,7 @@ export function BillLater() {
       mobile: mobile.trim() || undefined,
       home: state.address ? formatAddress(state.address) : undefined,
       source: [state.attribution?.source, state.attribution?.campaign].filter(Boolean).join(" / ") || undefined,
+      entry: landingLabel(state.entry),
       consent,
     });
     setBusy(false);

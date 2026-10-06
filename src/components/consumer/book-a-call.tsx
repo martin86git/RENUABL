@@ -1,5 +1,6 @@
 "use client";
 
+import { landingLabel } from "@/lib/domain/landing";
 import { CalendarCheck, Loader2, Phone } from "lucide-react";
 import { useMemo, useState } from "react";
 import { MonthCalendar } from "@/components/ui/month-calendar";
@@ -53,7 +54,7 @@ export function BookACall() {
       ...details,
       date,
       time,
-      source: [state.attribution?.source, state.attribution?.campaign].filter(Boolean).join(" / ") || undefined,
+      source: [state.attribution?.source, state.attribution?.campaign, landingLabel(state.entry)].filter(Boolean).join(" / ") || undefined,
       consent,
     });
     setBusy(false);

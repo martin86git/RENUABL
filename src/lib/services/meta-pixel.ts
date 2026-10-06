@@ -95,3 +95,24 @@ export function trackLead() {
   load(PIXEL_ID);
   window.fbq?.("track", META_EVENTS.lead);
 }
+
+const FUNNEL_KEY = "renuabl.funnel.v1";
+
+/** A flow step was reached (`funnelEvent`): its custom event, once per visit, no parameters. */
+export function trackFunnelStep(event: string) {
+  if (!PIXEL_ID) return;
+  let seen: string[] = [];
+  try {
+    seen = JSON.parse(window.sessionStorage.getItem(FUNNEL_KEY) ?? "[]") as string[];
+  } catch {
+    /* storage unavailable: may count a step twice in a visit */
+  }
+  if (seen.includes(event)) return;
+  try {
+    window.sessionStorage.setItem(FUNNEL_KEY, JSON.stringify([...seen, event]));
+  } catch {
+    /* ignore */
+  }
+  load(PIXEL_ID);
+  window.fbq?.("trackCustom", event);
+}

@@ -15,6 +15,7 @@ describe("Meta Pixel", () => {
       "/learn",
       "/learn/do-i-need-a-home-battery",
       "/start",
+      "/battery",
       "/start/profile",
       "/book-a-call",
       "/privacy",

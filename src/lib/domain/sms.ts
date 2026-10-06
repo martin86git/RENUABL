@@ -3,6 +3,7 @@
  * Links are built on the server from the site's own address, never from the
  * request. No prices or personal details beyond a first name and suburb.
  */
+import { normaliseMobile } from "./contact";
 import { plainText } from "./emails";
 
 /** One SMS segment is 160 characters; keep messages to two at most. */
@@ -40,6 +41,29 @@ export function layoutReadySms(o: { customer: string; link: string }) {
 export function complianceReminderSms(o: { label: string; days: number; link: string }) {
   const when = o.days <= 0 ? "expires today" : o.days === 1 ? "expires tomorrow" : `expires in ${o.days} days`;
   return clip(`RENUABL: your ${o.label.toLowerCase()} ${when}. Upload the new one so job offers keep coming: ${o.link}`);
+}
+
+/**
+ * To someone who left their mobile at the start of their plan: straight away, so
+ * they know it's real and who's calling. One link (book a time), "Reply STOP".
+ */
+export function startedPlanSms(o: { link: string }) {
+  return clip(
+    `RENUABL: thanks for starting your solar and battery plan. Someone from our team will call you soon to help. Prefer a set time? Book a 15-minute call: ${o.link} Reply STOP to opt out.`,
+  );
+}
+
+/** To staff (LEAD_ALERT_MOBILES): a new lead to call now. Suburb only, plus how they came in. */
+export function newLeadStaffSms(o: { mobile: string; suburb?: string; entry?: string }) {
+  const where = o.suburb ? ` in ${plainText(o.suburb, 40)}` : "";
+  const via = o.entry ? ` (${plainText(o.entry, 40)})` : "";
+  return clip(`RENUABL lead${where}${via}: ${plainText(o.mobile, 20)} just started a plan. Call them now while it's fresh.`);
+}
+
+/** Staff mobiles for lead texts: LEAD_ALERT_MOBILES, comma-separated Australian mobiles (none by default). */
+export function staffMobiles(raw: string | undefined): string[] {
+  const list = (raw ?? "").split(",").map((s) => normaliseMobile(s.trim()));
+  return [...new Set(list.filter((m): m is string => Boolean(m)))];
 }
 
 /** The site's own address for links: SITE_URL, else Vercel's production domain. */

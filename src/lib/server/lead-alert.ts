@@ -1,10 +1,13 @@
 /**
  * Server only. Emails every new lead to RENUABL staff (LEAD_ALERT_EMAILS,
- * else martin@renuabl.com.au). Never throws: a lead is never lost or blocked
+ * else martin@renuabl.com.au), and texts the ones to call now to
+ * LEAD_ALERT_MOBILES. Never throws: a lead is never lost or blocked
  * because the alert didn't send.
  */
 import { leadAlertRecipients, newLeadEmail } from "@/lib/domain/emails";
+import { staffMobiles } from "@/lib/domain/sms";
 import { sendEmail } from "./email";
+import { sendSms } from "./sms";
 
 /** Resolves to true when at least one staff member was emailed. */
 export async function alertNewLead(
@@ -20,6 +23,15 @@ export async function alertNewLead(
     } catch (e) {
       console.error(`lead alert to ${to} failed`, e instanceof Error ? e.message : e);
     }
+  }
+  return sent;
+}
+
+/** Texts staff (LEAD_ALERT_MOBILES, none by default) about a lead to call now. Never throws. */
+export async function textStaff(body: string): Promise<boolean> {
+  let sent = false;
+  for (const to of staffMobiles(process.env.LEAD_ALERT_MOBILES)) {
+    if ((await sendSms(to, body)) === "sent") sent = true;
   }
   return sent;
 }

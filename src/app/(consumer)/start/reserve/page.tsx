@@ -1,5 +1,6 @@
 "use client";
 
+import { landingLabel } from "@/lib/domain/landing";
 import { Battery, Gauge, Gift, House, Loader2, Lock, PhoneCall, Plus, PlugZap, Sun } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -163,6 +164,7 @@ function ReserveScreen() {
         Storeys: profile.storeys ?? "single",
         Phase: profile.phase,
         "Ad source": [state.attribution?.source, state.attribution?.campaign].filter(Boolean).join(" / ") || undefined,
+        "Landing page": landingLabel(state.entry),
       },
     });
     setBusy(false);

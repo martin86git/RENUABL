@@ -14,7 +14,7 @@ export function metaPixelId(raw: string | undefined): string | null {
 }
 
 /** Public pages the pixel may load and count visits on. */
-const PIXEL_PATHS = ["/learn", "/start", "/book-a-call", "/privacy", "/terms", "/contact"];
+const PIXEL_PATHS = ["/learn", "/start", "/battery", "/book-a-call", "/privacy", "/terms", "/contact"];
 
 export function pixelAllowedPath(pathname: string): boolean {
   if (pathname === "/") return true;
@@ -35,3 +35,4 @@ export const META_EVENTS = {
   /** Standard event: the date was reserved and the lead is in HubSpot. Ads optimise for this. */
   lead: "Lead",
 } as const;
+// Plus one custom event per flow step reached (StepAddress … StepReserve, `FUNNEL_EVENTS` in funnel.ts).

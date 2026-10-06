@@ -4,6 +4,7 @@ import { ArrowRight, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { inLaunchMarket, outsideMarketMessage, type AddressSuggestion } from "@/lib/domain/address";
+import type { LandingKey } from "@/lib/domain/landing";
 import type { Address } from "@/lib/domain/types";
 import { parseAddress, resolveAddress, suggestAddresses } from "@/lib/services/consumer";
 import { cn } from "@/components/ui/primitives";
@@ -14,10 +15,21 @@ function newSession() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now());
 }
 
-/** The address box. By default a chosen address starts the plan; `onPick` hands it back instead (the guided brief). */
-export function AddressEntry({ className, onPick }: { className?: string; onPick?: (address: Address) => void }) {
+/**
+ * The address box. By default a chosen address starts the plan; `onPick` hands it back instead (the guided brief).
+ * A landing page passes `entry`: the plan remembers where it started and wants a battery from the start.
+ */
+export function AddressEntry({
+  className,
+  onPick,
+  entry,
+}: {
+  className?: string;
+  onPick?: (address: Address) => void;
+  entry?: LandingKey;
+}) {
   const router = useRouter();
-  const { update } = useFlow();
+  const { state, update } = useFlow();
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [active, setActive] = useState(-1);
@@ -56,7 +68,10 @@ export function AddressEntry({ className, onPick }: { className?: string; onPick
       return;
     }
     setOutside(null);
-    update({ address });
+    if (entry === "battery")
+      // "Got solar? Add a battery": "Would you like a battery?" starts as yes, leading with the battery option.
+      update({ address, entry, profile: { ...state.profile, wantsBattery: true }, tier: "recommended", config: null });
+    else update({ address });
     if (onPick) onPick(address);
     else router.push(stepHref("analysing"));
   }

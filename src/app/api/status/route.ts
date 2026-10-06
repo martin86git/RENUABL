@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { googleAdsConfig } from "@/lib/domain/google-ads";
 import { metaPixelId } from "@/lib/domain/meta-pixel";
-import { siteUrl } from "@/lib/domain/sms";
+import { siteUrl, staffMobiles } from "@/lib/domain/sms";
 import { stripeKeyMode } from "@/lib/domain/status";
 import { stripeClient } from "@/lib/server/stripe";
 import { dbConfigured } from "@/lib/server/db";
@@ -48,6 +48,8 @@ export async function GET() {
       google: set(process.env.GOOGLE_MAPS_API_KEY),
       claude: set(process.env.ANTHROPIC_API_KEY),
       sms: smsConfigured(),
+      // Staff mobiles texted about new leads to call now.
+      leadTexts: staffMobiles(process.env.LEAD_ALERT_MOBILES).length > 0,
       // Browser tags (public IDs): which are set, so missing ones are easy to spot.
       metaPixel: Boolean(metaPixelId(process.env.NEXT_PUBLIC_META_PIXEL_ID)),
       googleAds: {

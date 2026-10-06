@@ -155,17 +155,23 @@ export async function requestFollowUp(input: {
   email?: string;
   mobile?: string;
   home?: string;
+  /** The home's suburb, for the staff text (no street address in texts). */
+  suburb?: string;
   source?: string;
+  /** The landing page they started from, e.g. "Got solar? Add a battery". */
+  entry?: string;
+  /** "started": a mobile left before the bill (texted straight away); default: no bill handy. */
+  stage?: "started";
   /** The tickboxes: Terms and Privacy (required) and tips and offers (optional). */
   consent: { terms: boolean; marketing: boolean };
-}): Promise<{ ok: boolean; message?: string }> {
+}): Promise<{ ok: boolean; message?: string; texted?: boolean }> {
   try {
     const res = await fetch("/api/follow-up", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
     });
-    return (await res.json()) as { ok: boolean; message?: string };
+    return (await res.json()) as { ok: boolean; message?: string; texted?: boolean };
   } catch {
     return { ok: false, message: "That didn't send. Check your connection and try again." };
   }

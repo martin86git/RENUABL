@@ -11,6 +11,7 @@ import { isAboutComplete as aboutComplete, solarSituation } from "@/lib/domain/e
 import { SOLAR_VIC_LEAD_DAYS, installLeadDays } from "@/lib/domain/scheduling";
 import { ASSUMPTIONS, estimateOutcome, priceSystem, recommendSystem } from "@/lib/domain/recommendation";
 import type { CareBilling } from "@/lib/domain/care";
+import type { LandingKey } from "@/lib/domain/landing";
 import type { Address, AddOnId, EnergyProfile, SystemConfig, SystemTier } from "@/lib/domain/types";
 import { partnerPricingFor } from "@/lib/domain/partner";
 import {
@@ -80,6 +81,10 @@ export interface FlowState {
   reservedTracked: boolean;
   /** "I'm interested in healthy home upgrades" on the reserve step (optional, unticked). */
   healthyInterest: boolean;
+  /** The landing page the plan started from (`LANDING_PAGES`), e.g. "battery"; null = the home page. */
+  entry: LandingKey | null;
+  /** A mobile was left at the top of "About your home" (we've texted them and staff will call). */
+  earlyContact: boolean;
 }
 
 const EMPTY: FlowState = {
@@ -109,6 +114,8 @@ const EMPTY: FlowState = {
   spendTracked: false,
   reservedTracked: false,
   healthyInterest: false,
+  entry: null,
+  earlyContact: false,
 };
 
 const DEFAULT_PROFILE: EnergyProfile = { ev: false, evPlanned: false, wantsBattery: false, backup: false };

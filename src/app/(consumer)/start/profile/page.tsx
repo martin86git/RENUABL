@@ -7,6 +7,7 @@ import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { FlowStep } from "@/components/consumer/flow-shell";
 import { BillLater } from "@/components/consumer/bill-later";
 import { BillUpload } from "@/components/consumer/bill-upload";
+import { EarlyContact } from "@/components/consumer/early-contact";
 import { SavingsReveal } from "@/components/consumer/savings-reveal";
 import { InverterPhotos } from "@/components/consumer/inverter-photos";
 import { isAboutComplete, useFlow } from "@/components/consumer/flow-state";
@@ -176,6 +177,8 @@ export default function ProfilePage() {
     >
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,420px)_1fr]">
         <div className="space-y-4">
+          {/* Before the bill: an optional mobile so the team can call to help (texted straight away). */}
+          <EarlyContact />
           <div ref={billRef} className="scroll-mt-6 space-y-4">
             {/* A real bill replaces a spend estimate; while there's only an estimate, the upload stays open. */}
             <BillUpload

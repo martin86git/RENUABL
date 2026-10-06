@@ -390,7 +390,7 @@ export function leadAlertRecipients(raw: string | undefined): string[] {
 
 /** Internal: a new lead, to RENUABL staff (not the customer). Plain text only; nothing from the browser is linked. */
 export function newLeadEmail(o: {
-  kind: "reservation" | "no-bill" | "home-health" | "call" | "brief-unfinished";
+  kind: "reservation" | "no-bill" | "started" | "home-health" | "call" | "brief-unfinished";
   reference?: string;
   name?: string;
   /** A "no bill yet" lead may leave a mobile instead. */
@@ -426,31 +426,41 @@ export function newLeadEmail(o: {
           lines: [...lines, "They haven't booked a call yet. Worth a call or a text."],
           footer: "Also in HubSpot and on /admin.",
         })
-      : o.kind === "call"
+      : o.kind === "started"
         ? simpleEmail({
-            subject: `Call booked: ${who}`,
-            heading: "Someone booked a 15-minute call",
-            lines: [...lines, "No reservation yet: call them at that time (Melbourne time)."],
+            subject: `New lead (started their plan): ${who}`,
+            heading: "Call now: someone just started their plan",
+            lines: [
+              ...lines,
+              "They left their mobile before their bill and were texted that we'll call. Call them now: the sooner, the better.",
+            ],
             footer: "Also in HubSpot.",
           })
-        : o.kind === "home-health"
+        : o.kind === "call"
           ? simpleEmail({
-              subject: `Home Health check: ${who}`,
-              heading: "Someone completed the Home Health check",
-              lines: [...lines, "Research only: healthy home products aren't offered yet, so don't promise or quote anything."],
-              footer: "Also in HubSpot and on /admin.",
-            })
-          : simpleEmail({
-              subject: `New lead (no bill yet): ${who}`,
-              heading: "New lead: didn't have their bill handy",
-              lines: [
-                ...lines,
-                email
-                  ? "They've been emailed a link to come back and finish. Worth a follow-up call or email."
-                  : "They left a mobile only: give them a call.",
-              ],
+              subject: `Call booked: ${who}`,
+              heading: "Someone booked a 15-minute call",
+              lines: [...lines, "No reservation yet: call them at that time (Melbourne time)."],
               footer: "Also in HubSpot.",
-            });
+            })
+          : o.kind === "home-health"
+            ? simpleEmail({
+                subject: `Home Health check: ${who}`,
+                heading: "Someone completed the Home Health check",
+                lines: [...lines, "Research only: healthy home products aren't offered yet, so don't promise or quote anything."],
+                footer: "Also in HubSpot and on /admin.",
+              })
+            : simpleEmail({
+                subject: `New lead (no bill yet): ${who}`,
+                heading: "New lead: didn't have their bill handy",
+                lines: [
+                  ...lines,
+                  email
+                    ? "They've been emailed a link to come back and finish. Worth a follow-up call or email."
+                    : "They left a mobile only: give them a call.",
+                ],
+                footer: "Also in HubSpot.",
+              });
 }
 
 /** To the job's installation partner: the customer moved their install day. Suburb only, like an offer; the job page has the rest. */
