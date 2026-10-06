@@ -3,6 +3,7 @@ import { Caveat, Inter, Source_Serif_4 } from "next/font/google";
 import { publicSiteUrl, searchIndexing } from "@/lib/domain/site";
 import { AdTags } from "@/components/ad-tags";
 import { googleAdsConfig } from "@/lib/domain/google-ads";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 // Brand type: Inter for UI, a light serif for editorial lines, a handwritten script for accents.
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
         {/* Google Ads IDs are public; read here so short Vercel names (GADS_*) work. */}
         <AdTags googleAds={googleAdsConfig(process.env)} />
+        <Analytics />
       </body>
     </html>
   );
