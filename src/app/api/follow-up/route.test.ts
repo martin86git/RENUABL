@@ -182,6 +182,28 @@ describe("POST /api/follow-up", () => {
     const mails = calls.filter((c) => c.url.includes("sendgrid")).map((c) => c.body);
     expect(mails.some((m) => m.includes("sam@example.com") && m.includes("Thanks for starting your solar plan"))).toBe(true);
     expect(mails.some((m) => m.includes("martin@renuabl.com.au") && m.includes("by email"))).toBe(true);
+    // Staff can see straight away whether HubSpot took it.
+    expect(mails.some((m) => m.includes("martin@renuabl.com.au") && m.includes("HubSpot: saved"))).toBe(true);
     expect(calls.find((c) => c.url.endsWith("/notes"))!.body).toContain("Started their plan: contact now");
+  });
+
+  it("tells staff when HubSpot refused the lead, and why", async () => {
+    vi.stubEnv("HUBSPOT_PRIVATE_APP_TOKEN", "pat-test");
+    vi.stubEnv("SENDGRID_API_KEY", "SG.test");
+    vi.stubEnv("EMAIL_FROM", "RENUABL <hello@renuabl.com.au>");
+    vi.stubEnv("LEAD_ALERT_EMAILS", "martin@renuabl.com.au");
+    const calls: { url: string; body: string }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: unknown, init?: RequestInit) => {
+        calls.push({ url: String(url), body: String(init?.body ?? "") });
+        if (String(url).includes("sendgrid")) return new Response(null, { status: 202 });
+        return new Response("This app hasn't been granted all required scopes", { status: 403 });
+      }),
+    );
+    const res = await post({ email: "sam@example.com", stage: "started", consent: { terms: true } }, nextIp());
+    expect((await res.json()).ok).toBe(true);
+    const staff = calls.find((c) => c.url.includes("sendgrid") && c.body.includes("martin@renuabl.com.au"))!;
+    expect(staff.body).toContain("HubSpot: NOT saved: HubSpot contact 403");
   });
 });

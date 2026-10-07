@@ -53,14 +53,19 @@ export async function POST(request: Request) {
   };
 
   let saved = false;
+  // For the staff email: whether HubSpot took it, and if not, why (so a broken connection shows up straight away).
+  let hubspot = "not connected (HUBSPOT_PRIVATE_APP_TOKEN isn't set in Vercel)";
   const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
   if (token) {
     try {
       const id = await followUpContactId(who, token);
       await addNote(id, crmNote(started ? "Started their plan: contact now" : "Finish later: no bill yet", details), token);
       saved = true;
+      hubspot = "saved";
     } catch (e) {
-      console.error("follow-up not saved to HubSpot", e instanceof Error ? e.message : e);
+      const reason = e instanceof Error ? e.message : String(e);
+      hubspot = `NOT saved: ${reason.slice(0, 200)}`;
+      console.error("follow-up not saved to HubSpot", reason);
     }
   }
   if (!saved) {
@@ -98,11 +103,12 @@ export async function POST(request: Request) {
     mobile: mobile ?? undefined,
     details: started
       ? {
+          HubSpot: hubspot,
           ...details,
           "Told them we'll be in touch":
             [emailed && "by email", texted && "by text"].filter(Boolean).join(", ") || "no (email and SMS not sent)",
         }
-      : details,
+      : { ...details, HubSpot: hubspot },
   });
   if (!saved && !emailed && !alerted)
     return Response.json({ ok: false, message: "We couldn't save that just now. Please try again." }, { status: 502 });
