@@ -62,6 +62,13 @@ export default async function AdminPage() {
   return (
     <>
       <PageHeader title="Partners and jobs" subtitle={`Signed in as ${session.email}`} />
+      <p className="-mt-2 mb-6 text-[13px] text-muted">
+        Leads not reaching HubSpot?{" "}
+        <a href="/api/admin/hubspot-test" target="_blank" rel="noreferrer" className="underline underline-offset-4">
+          Test HubSpot
+        </a>{" "}
+        saves a note on RENUABL&apos;s own test contact and shows HubSpot&apos;s reply.
+      </p>
       <Panel title="Send a brief">
         <BriefSender />
       </Panel>
