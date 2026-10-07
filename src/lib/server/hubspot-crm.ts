@@ -16,6 +16,27 @@ export function hubspotToken(): string | null {
   return hubspotTokenFrom(process.env);
 }
 
+/** Scopes every lead needs (contacts and their notes). */
+const NEEDED_SCOPES = ["crm.objects.contacts.read", "crm.objects.contacts.write"];
+
+/** The needed scopes this private app token lacks, from HubSpot's token info; null when HubSpot doesn't say. */
+async function missingHubspotScopes(token: string): Promise<string[] | null> {
+  try {
+    const res = await fetch("https://api.hubapi.com/oauth/v2/private-apps/get/access-token-info", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ tokenKey: token }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { scopes?: unknown };
+    if (!Array.isArray(json.scopes)) return null;
+    return NEEDED_SCOPES.filter((s) => !(json.scopes as unknown[]).includes(s));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * For /api/status: does HubSpot accept the token, and may it write contacts? Reads one contact (no details kept)
  * and returns a plain answer, never the token or HubSpot's reply.
@@ -23,7 +44,11 @@ export function hubspotToken(): string | null {
 export async function checkHubspot(token: string): Promise<string> {
   try {
     const res = await call("/contacts?limit=1", token, "GET");
-    if (res.ok) return "ok";
+    if (res.ok) {
+      // Reading works; writing needs its own scope, so check what the token was given.
+      const missing = await missingHubspotScopes(token);
+      return missing?.length ? `can read but not save leads: give the private app the ${missing.join(" and ")} scope` : "ok";
+    }
     if (res.status === 401) return "token rejected (401): make a new private app token and paste it into Vercel";
     if (res.status === 403) return "missing permission (403): give the private app the crm.objects.contacts.read and .write scopes";
     return `HubSpot error ${res.status}`;
