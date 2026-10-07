@@ -6,6 +6,8 @@ import { stripeKeyMode } from "@/lib/domain/status";
 import { stripeClient } from "@/lib/server/stripe";
 import { dbConfigured } from "@/lib/server/db";
 import { emailProvider } from "@/lib/server/email";
+import { checkHubspot, hubspotToken } from "@/lib/server/hubspot-crm";
+import { looksLikeHubspotToken } from "@/lib/domain/hubspot-token";
 import { smsConfigured } from "@/lib/server/sms";
 import { storageConfigured } from "@/lib/server/storage";
 
@@ -29,10 +31,15 @@ export async function GET() {
       stripeWorks = false;
     }
   }
+  const hubToken = hubspotToken();
+  const hubspotCheck = hubToken ? await checkHubspot(hubToken) : "not set (HUBSPOT_PRIVATE_APP_TOKEN or HUBSPOT_TOKEN)";
   return Response.json(
     {
       stripe: { key: mode, accepted: stripeWorks, webhookSecret: set(process.env.STRIPE_WEBHOOK_SECRET) },
-      hubspot: set(process.env.HUBSPOT_PRIVATE_APP_TOKEN),
+      hubspot: Boolean(hubToken),
+      // A live check: "ok", or what's wrong in plain words.
+      hubspotCheck,
+      hubspotTokenLooksRight: looksLikeHubspotToken(hubToken),
       email: emailProvider() !== null,
       // Which service sends, and which part is missing when email is false.
       emailSetup: {

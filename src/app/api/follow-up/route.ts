@@ -4,7 +4,7 @@ import { CONSENT_MISSING, consentRecord, readConsent } from "@/lib/domain/legal"
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { newLeadStaffSms, siteUrl, startedPlanSms } from "@/lib/domain/sms";
 import { sendEmail } from "@/lib/server/email";
-import { addNote, crmNote, followUpContactId } from "@/lib/server/hubspot-crm";
+import { addNote, crmNote, followUpContactId, hubspotToken } from "@/lib/server/hubspot-crm";
 import { alertNewLead, textStaff } from "@/lib/server/lead-alert";
 import { allow } from "@/lib/server/rate-limit";
 import { sendSms } from "@/lib/server/sms";
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
   let saved = false;
   // For the staff email: whether HubSpot took it, and if not, why (so a broken connection shows up straight away).
   let hubspot = "not connected (HUBSPOT_PRIVATE_APP_TOKEN isn't set in Vercel)";
-  const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
+  const token = hubspotToken();
   if (token) {
     try {
       const id = await followUpContactId(who, token);

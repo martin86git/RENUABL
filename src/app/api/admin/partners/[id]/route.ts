@@ -3,7 +3,7 @@ import { siteUrl } from "@/lib/domain/sms";
 import { currentSession } from "@/lib/server/accounts";
 import { dbConfigured } from "@/lib/server/db";
 import { sendEmail } from "@/lib/server/email";
-import { addNote, contactIdByEmail, crmNote } from "@/lib/server/hubspot-crm";
+import { addNote, contactIdByEmail, crmNote, hubspotToken } from "@/lib/server/hubspot-crm";
 import { processOffers } from "@/lib/server/offers-engine";
 import { setPartnerStatus } from "@/lib/server/partners-repo";
 
@@ -39,7 +39,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/admin/partn
       ...partnerApprovedEmail({ firstName: partner.full_name.split(" ")[0], link: `${site}/login?as=partner` }),
     }).catch((e) => console.error("approval email failed", e instanceof Error ? e.message : e));
   }
-  const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
+  const token = hubspotToken();
   if (token) {
     try {
       const contactId = await contactIdByEmail(partner.email, token);

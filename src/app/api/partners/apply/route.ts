@@ -4,7 +4,7 @@ import { CERTIFICATE_UPLOAD, partnerSummary, validatePartnerApplication } from "
 import { partnerReceivedEmail } from "@/lib/domain/emails";
 import { dbConfigured } from "@/lib/server/db";
 import { sendEmail } from "@/lib/server/email";
-import { addNote, crmNote, upsertContact } from "@/lib/server/hubspot-crm";
+import { addNote, crmNote, upsertContact, hubspotToken } from "@/lib/server/hubspot-crm";
 import { savePartnerApplication } from "@/lib/server/partners-repo";
 import { saveFile, saveJson, storageConfigured } from "@/lib/server/storage";
 
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
+  const token = hubspotToken();
   if (token) {
     try {
       const [firstName, ...rest] = app.fullName.split(/\s+/);

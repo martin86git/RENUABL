@@ -5,7 +5,7 @@ import { formatDate } from "@/lib/domain/format";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { parseReference } from "@/lib/domain/deposit";
 import { sendEmail } from "@/lib/server/email";
-import { addNote, contactIdByEmail, reservationNote } from "@/lib/server/hubspot-crm";
+import { addNote, contactIdByEmail, reservationNote, hubspotToken } from "@/lib/server/hubspot-crm";
 
 /** POST { reference, email, firstName, date, time, label } → books the confirmation call (in-app calendar). */
 export async function POST(request: Request) {
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   // Built here rather than trusted from the browser: "Tuesday 13 October at 10:30am (Melbourne time)".
   const label = `${formatDate(date, { weekday: "long", day: "numeric", month: "long" })} at ${formatCallTime(time)} (${LAUNCH_MARKET.capital} time)`;
 
-  const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
+  const token = hubspotToken();
   try {
     if (token && email) {
       const id = await contactIdByEmail(email, token);

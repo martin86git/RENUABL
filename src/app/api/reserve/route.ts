@@ -15,7 +15,7 @@ import { claimWhoop } from "@/lib/server/whoop-repo";
 import { whoopEligible } from "@/lib/domain/whoop-offer";
 import { alertNewLead } from "@/lib/server/lead-alert";
 import { offerNext } from "@/lib/server/offers-engine";
-import { addNote, reservationNote, upsertContact } from "@/lib/server/hubspot-crm";
+import { addNote, reservationNote, upsertContact, hubspotToken } from "@/lib/server/hubspot-crm";
 
 /**
  * POST a reservation: { contact, details, order, installDate, job }. Nothing is
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
   });
   const email = () => confirmationEmail(reservationId, checked.contact, body.order, body.installDate, call, whoop === true);
 
-  const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
+  const token = hubspotToken();
   if (!token) {
     // No CRM yet: keep the lead in the logs rather than lose it.
     console.warn(`reservation ${reservationId} (HubSpot not configured)`, JSON.stringify({ contact: checked.contact, details }));

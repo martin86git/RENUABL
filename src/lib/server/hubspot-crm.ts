@@ -5,10 +5,32 @@
  * crm.objects.contacts.write scope.
  */
 import type { ContactDetails } from "@/lib/domain/contact";
+import { hubspotTokenFrom } from "@/lib/domain/hubspot-token";
 
 const API = "https://api.hubapi.com/crm/v3/objects";
 
 export class HubspotError extends Error {}
+
+/** The token from Vercel (HUBSPOT_PRIVATE_APP_TOKEN or HUBSPOT_TOKEN), cleaned of paste slips; null when unset. */
+export function hubspotToken(): string | null {
+  return hubspotTokenFrom(process.env);
+}
+
+/**
+ * For /api/status: does HubSpot accept the token, and may it write contacts? Reads one contact (no details kept)
+ * and returns a plain answer, never the token or HubSpot's reply.
+ */
+export async function checkHubspot(token: string): Promise<string> {
+  try {
+    const res = await call("/contacts?limit=1", token, "GET");
+    if (res.ok) return "ok";
+    if (res.status === 401) return "token rejected (401): make a new private app token and paste it into Vercel";
+    if (res.status === 403) return "missing permission (403): give the private app the crm.objects.contacts.read and .write scopes";
+    return `HubSpot error ${res.status}`;
+  } catch {
+    return "no response from HubSpot";
+  }
+}
 
 async function call(path: string, token: string, method: "GET" | "POST" | "PATCH", body?: unknown) {
   const res = await fetch(`${API}${path}`, {

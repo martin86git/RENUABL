@@ -6,11 +6,11 @@
  * Never throws: HubSpot being down never blocks a brief.
  */
 import { BRIEF_UNFINISHED_HOURS, SCORE_LABELS, briefAnswerLines, cleanBriefAnswers, scoreBrief } from "@/lib/domain/brief";
-import { addNote, crmNote, followUpContactId } from "./hubspot-crm";
+import { addNote, crmNote, followUpContactId, hubspotToken } from "./hubspot-crm";
 import { alertNewLead } from "./lead-alert";
 import { markUnfinishedNoted, setBriefHubspot, staleBriefs, type BriefRow } from "./briefs-repo";
 
-const token = () => process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim() || null;
+const token = () => hubspotToken();
 
 async function contactFor(b: Pick<BriefRow, "key" | "first_name" | "mobile" | "email" | "hubspot_id">, t: string) {
   if (b.hubspot_id) return b.hubspot_id;

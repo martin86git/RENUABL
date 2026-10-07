@@ -5,7 +5,7 @@ import { CONSENT_MISSING, consentRecord, readConsent } from "@/lib/domain/legal"
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { dbConfigured } from "@/lib/server/db";
 import { saveHealthCheck } from "@/lib/server/home-health-repo";
-import { addNote, contactIdByEmail, crmNote } from "@/lib/server/hubspot-crm";
+import { addNote, contactIdByEmail, crmNote, hubspotToken } from "@/lib/server/hubspot-crm";
 import { jobByReferenceAndEmail } from "@/lib/server/jobs-repo";
 import { alertNewLead } from "@/lib/server/lead-alert";
 import { allow } from "@/lib/server/rate-limit";
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
           }),
         }),
   };
-  const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
+  const token = hubspotToken();
   if (token && email) {
     try {
       await addNote(await contactIdByEmail(email, token), crmNote("Home Health check", details), token);

@@ -12,7 +12,7 @@ import { siteUrl } from "@/lib/domain/sms";
 import { cleanSummary, getBrief, markBriefBooked, saveBriefProgress } from "@/lib/server/briefs-repo";
 import { dbConfigured } from "@/lib/server/db";
 import { sendEmail } from "@/lib/server/email";
-import { addNote, crmNote, followUpContactId } from "@/lib/server/hubspot-crm";
+import { addNote, crmNote, followUpContactId, hubspotToken } from "@/lib/server/hubspot-crm";
 import { alertNewLead } from "@/lib/server/lead-alert";
 import { allow } from "@/lib/server/rate-limit";
 
@@ -79,7 +79,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/brief/[key]
   };
 
   let saved = false;
-  const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
+  const token = hubspotToken();
   if (token) {
     try {
       const id = brief.hubspot_id ?? (await followUpContactId({ email, mobile: phone, firstName: brief.first_name }, token));

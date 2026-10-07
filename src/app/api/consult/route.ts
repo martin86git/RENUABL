@@ -8,7 +8,7 @@ import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
 import { publicSiteUrl } from "@/lib/domain/site";
 import { siteUrl } from "@/lib/domain/sms";
 import { sendEmail } from "@/lib/server/email";
-import { addNote, crmNote, upsertContact } from "@/lib/server/hubspot-crm";
+import { addNote, crmNote, upsertContact, hubspotToken } from "@/lib/server/hubspot-crm";
 import { alertNewLead } from "@/lib/server/lead-alert";
 import { allow } from "@/lib/server/rate-limit";
 
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   };
 
   let saved = false;
-  const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
+  const token = hubspotToken();
   if (token) {
     try {
       const id = await upsertContact(contact, token);

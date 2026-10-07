@@ -8,7 +8,12 @@ vi.mock("@/lib/server/storage", () => ({
   saveJson: async (path: string) => void saved.push(path),
 }));
 vi.mock("@/lib/server/email", () => ({ sendEmail: async () => "skipped" }));
-vi.mock("@/lib/server/hubspot-crm", () => ({ upsertContact: vi.fn(), addNote: vi.fn(), crmNote: () => "" }));
+vi.mock("@/lib/server/hubspot-crm", () => ({
+  upsertContact: vi.fn(),
+  addNote: vi.fn(),
+  crmNote: () => "",
+  hubspotToken: () => process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim() || null,
+}));
 
 const application = {
   type: "installer",

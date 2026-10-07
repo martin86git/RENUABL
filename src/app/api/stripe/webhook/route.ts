@@ -1,5 +1,5 @@
 import type Stripe from "stripe";
-import { addNote, contactIdByEmail, reservationNote } from "@/lib/server/hubspot-crm";
+import { addNote, contactIdByEmail, reservationNote, hubspotToken } from "@/lib/server/hubspot-crm";
 import { stripeClient } from "@/lib/server/stripe";
 
 /**
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     const email = session.customer_details?.email;
     const amount = (session.amount_total ?? 0) / 100;
     console.log(`deposit paid ${reference} $${amount} ${session.payment_status}`);
-    const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
+    const token = hubspotToken();
     if (token && email && session.payment_status === "paid") {
       try {
         const contactId = await contactIdByEmail(email, token);

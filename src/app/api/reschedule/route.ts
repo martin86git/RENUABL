@@ -7,7 +7,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import { INSTALL_ARRIVAL, LEAD_TIME_DAYS, isBookableInstallDate } from "@/lib/domain/scheduling";
 import { dbConfigured } from "@/lib/server/db";
 import { sendEmail } from "@/lib/server/email";
-import { addNote, contactIdByEmail, reservationNote } from "@/lib/server/hubspot-crm";
+import { addNote, contactIdByEmail, reservationNote, hubspotToken } from "@/lib/server/hubspot-crm";
 import { getJobRow, moveInstallDate } from "@/lib/server/jobs-repo";
 import { getPartner } from "@/lib/server/partners-repo";
 import { allow } from "@/lib/server/rate-limit";
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   }
 
   const label = formatDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  const token = process.env.HUBSPOT_PRIVATE_APP_TOKEN?.trim();
+  const token = hubspotToken();
   try {
     if (token) {
       const id = await contactIdByEmail(email, token);
