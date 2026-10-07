@@ -17,7 +17,7 @@ export async function alertNewLead(
 ): Promise<boolean> {
   const mail = { ...newLeadEmail(lead), ...(attachments?.length ? { attachments } : {}) };
   let sent = false;
-  for (const to of leadAlertRecipients(process.env.LEAD_ALERT_EMAILS)) {
+  for (const to of leadAlertRecipients(process.env.LEAD_ALERT_EMAILS || process.env.ALERT_EMAILS)) {
     try {
       if ((await sendEmail({ to, ...mail })) === "sent") sent = true;
     } catch (e) {
@@ -30,7 +30,7 @@ export async function alertNewLead(
 /** Texts staff (LEAD_ALERT_MOBILES, none by default) about a lead to call now. Never throws. */
 export async function textStaff(body: string): Promise<boolean> {
   let sent = false;
-  for (const to of staffMobiles(process.env.LEAD_ALERT_MOBILES)) {
+  for (const to of staffMobiles(process.env.LEAD_ALERT_MOBILES || process.env.ALERT_MOBILES)) {
     if ((await sendSms(to, body)) === "sent") sent = true;
   }
   return sent;

@@ -11,7 +11,7 @@ import { allow } from "@/lib/server/rate-limit";
 export async function GET(request: Request) {
   if (!PREVIEW_MODE) return Response.json({ ok: false }, { status: 404 });
   if (!allow(request, "email-test", 5)) return Response.json({ ok: false, message: "Try again in an hour." }, { status: 429 });
-  const to = leadAlertRecipients(process.env.LEAD_ALERT_EMAILS)[0];
+  const to = leadAlertRecipients(process.env.LEAD_ALERT_EMAILS || process.env.ALERT_EMAILS)[0];
   const result = await emailDiagnostics({
     to,
     subject: "RENUABL test email",

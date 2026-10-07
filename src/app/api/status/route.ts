@@ -49,7 +49,7 @@ export async function GET() {
       claude: set(process.env.ANTHROPIC_API_KEY),
       sms: smsConfigured(),
       // Staff mobiles texted about new leads to call now.
-      leadTexts: staffMobiles(process.env.LEAD_ALERT_MOBILES).length > 0,
+      leadTexts: staffMobiles(process.env.LEAD_ALERT_MOBILES || process.env.ALERT_MOBILES).length > 0,
       // Browser tags (public IDs): which are set, so missing ones are easy to spot.
       metaPixel: Boolean(metaPixelId(process.env.NEXT_PUBLIC_META_PIXEL_ID)),
       googleAds: {
