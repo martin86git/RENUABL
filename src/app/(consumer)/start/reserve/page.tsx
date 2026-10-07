@@ -175,7 +175,8 @@ function ReserveScreen() {
     }
     // The reservation is the lead (it's now in HubSpot): count it once for Meta, with no details.
     if (!state.reservedTracked) {
-      trackLead();
+      // A lead from the /quote page was counted as Meta's Lead already.
+      if (!state.quoteTracked) trackLead();
       trackGoogleConversion("reservation");
     }
     update({ reservation: result.reservation, contact, reservedTracked: true });

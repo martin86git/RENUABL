@@ -1,6 +1,6 @@
 # Meta ad: "Got solar? Add a battery"
 
-For Victorian homes that already have solar. Notes style, like `notes-ad.md`. Links to the landing page **https://www.renuabl.com.au/battery**, where the plan starts already wanting a battery.
+For Victorian homes that already have solar. Notes style, like `notes-ad.md`. Links to the quick-quote landing page **https://www.renuabl.com.au/quote?for=battery**, which starts with "A battery for my solar" chosen.
 
 ## Images
 
@@ -17,7 +17,7 @@ For Victorian homes that already have solar. Notes style, like `notes-ad.md`. Li
 - **Headline:** Got solar? Keep it for the evening
 - **Description:** Battery priced in about 2 minutes
 - **Call to action:** Get quote
-- **Link:** https://www.renuabl.com.au/battery?utm_source=meta&utm_campaign=battery
+- **Link:** https://www.renuabl.com.au/quote?for=battery&utm_source=meta&utm_campaign=battery
 
 ## Audience
 

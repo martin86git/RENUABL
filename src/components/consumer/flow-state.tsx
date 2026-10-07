@@ -85,6 +85,8 @@ export interface FlowState {
   entry: LandingKey | null;
   /** A mobile was left at the top of "About your home" (we've texted them and staff will call). */
   earlyContact: boolean;
+  /** Meta Lead already sent from the /quote landing page, so reserving doesn't count the same person twice. */
+  quoteTracked: boolean;
 }
 
 const EMPTY: FlowState = {
@@ -116,6 +118,7 @@ const EMPTY: FlowState = {
   healthyInterest: false,
   entry: null,
   earlyContact: false,
+  quoteTracked: false,
 };
 
 const DEFAULT_PROFILE: EnergyProfile = { ev: false, evPlanned: false, wantsBattery: false, backup: false };

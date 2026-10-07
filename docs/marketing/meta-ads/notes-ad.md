@@ -17,7 +17,7 @@ An iPhone Notes-style list. Two ways people usually do it are crossed out (three
 - **Headline:** Your solar + battery price in 2 minutes
 - **Description:** Free to reserve. Victoria.
 - **Call to action:** Get quote
-- **Link:** https://www.renuabl.com.au
+- **Link:** https://www.renuabl.com.au/quote?utm_source=meta&utm_campaign=notes
 
 Without WHOOP, drop the sentence "Free WHOOP with a battery while stocks last."
 

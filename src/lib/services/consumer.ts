@@ -2,6 +2,7 @@
  * Consumer-facing service layer. Every function here is the seam where a real
  * API replaces mock data; UI code should only talk to these functions.
  */
+import type { QuoteAnswers } from "@/lib/domain/quick-quote";
 import { cleanGeoFrame, type GeoFrame, type RoofModel } from "@/lib/domain/roof-layout";
 import { cleanBox, cleanSunSummary, type SunSummary } from "@/lib/domain/sun-map";
 import type { RoofInsights } from "@/lib/domain/solar-roof";
@@ -172,6 +173,30 @@ export async function requestFollowUp(input: {
       body: JSON.stringify(input),
     });
     return (await res.json()) as { ok: boolean; message?: string; texted?: boolean };
+  } catch {
+    return { ok: false, message: "That didn't send. Check your connection and try again." };
+  }
+}
+
+/** The /quote landing page's lead: first name, mobile, optional email and the tap answers. */
+export async function sendQuickQuote(input: {
+  firstName: string;
+  mobile: string;
+  email?: string;
+  answers: QuoteAnswers;
+  home?: string;
+  suburb?: string;
+  source?: string;
+  entry?: string;
+  consent: { terms: boolean; marketing: boolean };
+}): Promise<{ ok: boolean; emailed?: boolean; field?: string; message?: string }> {
+  try {
+    const res = await fetch("/api/quote-lead", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    return (await res.json()) as { ok: boolean; emailed?: boolean; field?: string; message?: string };
   } catch {
     return { ok: false, message: "That didn't send. Check your connection and try again." };
   }
