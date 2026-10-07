@@ -79,6 +79,10 @@ export default function PrivacyPage() {
         use cookies to link these visits to your accounts with them; you can manage this in your Meta and Google ad settings or by blocking
         cookies in your browser.
       </p>
+      <p>
+        We also use HubSpot, where we keep our customer records, and its tracking code on the same pages. It uses cookies to show us which
+        of those pages someone visited before they got in touch, so we can help them better. You can block these cookies in your browser.
+      </p>
 
       <h2>Keeping it safe</h2>
       <p>
