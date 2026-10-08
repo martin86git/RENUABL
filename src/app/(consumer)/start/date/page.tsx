@@ -54,8 +54,8 @@ function DateScreen() {
   return (
     <FlowStep
       width="wide"
-      title="Select your installation date."
-      subtitle={`Choose the day that suits you with ${installer ? installer.name : "your matched installer"}.`}
+      title="Choose a tentative installation date."
+      subtitle={`A day that would suit you with ${installer ? installer.name : "your installation partner"}. It's not locked in: we confirm it on your 15-minute call, and you can change it any time.`}
       cta={
         <Button size="lg" className="w-full lg:w-72" disabled={!ready} onClick={() => router.push(stepHref("reserve"))}>
           Continue <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
@@ -95,7 +95,10 @@ function DateScreen() {
           ) : (
             <p className="text-[12.5px] text-muted">Dates start a week away, subject to installation calendar capacity.</p>
           )}
-          <p className="text-[12.5px] text-muted">Reschedule free up to 72 hours before.</p>
+          <p className="text-[12.5px] text-muted">
+            Not sure yet? Pick any day that looks good. Nothing is booked until you&apos;re happy, and changing it is free up to 72 hours
+            before.
+          </p>
         </div>
       </div>
     </FlowStep>

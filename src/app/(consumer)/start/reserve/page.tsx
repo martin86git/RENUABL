@@ -198,8 +198,71 @@ function ReserveScreen() {
   const careIncluded = careIncludedFor(state.tier);
   const rebateTotal = price.rebateLines.reduce((sum, r) => sum + r.amount, 0);
 
+  // Solar Victoria (VIC homes only), inside the price: the panel rebate and its loan are for new solar systems.
+  const sv = rates.solarVictoria;
+  const loanMonthly = price.loan > 0 ? Math.round((price.loan / sv.loanMonths) * 100) / 100 : 0;
+  const svEligibleSystem = config.panelCount > 0 && !config.existingSolar && sv.pvRebateMax > 0;
+  const svLink = (
+    <a href={sv.eligibilityUrl} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-4">
+      Check eligibility
+    </a>
+  );
+  const svRows = !solarVictoriaApplies(state.address?.state ?? null) ? null : !svEligibleSystem ? (
+    <p className="text-[12px] leading-snug text-muted">
+      {config.existingSolar
+        ? "Solar Victoria's rebate and loan are for new solar systems, so they don't apply when adding to your panels."
+        : "Solar Victoria's rebate and loan are for new solar panels, so they don't apply here."}
+    </p>
+  ) : (
+    <div className="space-y-3 rounded-xl bg-canvas px-3.5 py-3">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[13.5px] text-ink">Solar Victoria rebate</p>
+          <p className="text-[12px] leading-snug text-muted">
+            Up to {formatCurrency(sv.pvRebateMax)} if you&apos;re eligible. {svLink}
+          </p>
+        </div>
+        <Toggle
+          label="Apply the Solar Victoria rebate"
+          checked={state.solarVic.rebate}
+          onChange={(rebate) => update({ solarVic: { rebate, loan: rebate && state.solarVic.loan } })}
+        />
+      </div>
+      {sv.pvLoanMax > 0 && (
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[13.5px] text-ink">Interest-free loan</p>
+            <p className="text-[12px] leading-snug text-muted">
+              Up to {formatCurrency(sv.pvLoanMax)} off your upfront cost. Comes with the rebate.
+            </p>
+          </div>
+          <Toggle
+            label="Take the Solar Victoria interest-free loan"
+            checked={state.solarVic.rebate && state.solarVic.loan}
+            onChange={(loan) => update({ solarVic: { rebate: loan || state.solarVic.rebate, loan } })}
+          />
+        </div>
+      )}
+    </div>
+  );
+
   const basket = (
     <Card className="p-5">
+      <div className="-mt-1 mb-4 divide-y divide-line border-b border-line">
+        {state.address && (
+          <StatRow label="Home" value={<span className="block max-w-[240px] truncate">{formatAddress(state.address)}</span>} />
+        )}
+        {installer && <StatRow label="Installation partner" value={installer.name} />}
+        {state.installDate && (
+          <StatRow
+            label="Tentative install date"
+            value={`${formatDate(state.installDate, { weekday: "short", day: "numeric", month: "short" })}${window ? ` · arrival ${window.label}` : ""}`}
+          />
+        )}
+        {state.installDate && (
+          <p className="py-2 text-[12px] leading-snug text-muted">{installDateNote(lead.solarVic)} You can change it on your call.</p>
+        )}
+      </div>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[15px] text-ink">{priceHeader(rebateTotal)}</p>
@@ -286,6 +349,7 @@ function ReserveScreen() {
             <p className="text-[14px] font-semibold tabular-nums text-positive">−{formatCurrency(r.amount)}</p>
           </li>
         ))}
+        {svRows && <li className="py-3">{svRows}</li>}
         <li>
           <StatRow label={<span className="text-ink">Total after rebates</span>} value={formatCurrency(price.total)} />
           <p className="pb-2 text-[12px] text-muted">{PRICE_INCLUDES}</p>
@@ -303,6 +367,10 @@ function ReserveScreen() {
                 label={<span className="font-medium text-ink">Your upfront cost</span>}
                 value={<span className="font-medium">{formatCurrency(price.outOfPocket)}</span>}
               />
+              <p className="pb-2 text-[12px] leading-snug text-muted">
+                Then {formatCurrency(loanMonthly)} a month for {sv.loanMonths / 12} years to Solar Victoria, interest free. Subject to their
+                eligibility criteria.
+              </p>
             </li>
           </>
         )}
@@ -350,78 +418,14 @@ function ReserveScreen() {
       {rates.source !== "live" && (
         <p className="mt-3 text-[11.5px] leading-snug text-muted">Rebate amounts are confirmed on your call before anything is final.</p>
       )}
-    </Card>
-  );
-
-  // Solar Victoria (VIC homes only): the panel rebate and its loan are for new solar systems, including replacements.
-  const sv = rates.solarVictoria;
-  const loanMonthly = price.loan > 0 ? Math.round((price.loan / sv.loanMonths) * 100) / 100 : 0;
-  const svEligibleSystem = config.panelCount > 0 && !config.existingSolar && sv.pvRebateMax > 0;
-  const solarVic = solarVictoriaApplies(state.address?.state ?? null) && (
-    <Card className="p-5">
-      <p className="text-[15px] text-ink">Solar Victoria</p>
-      {!svEligibleSystem ? (
-        <p className="mt-0.5 text-[12.5px] leading-snug text-muted">
-          {config.existingSolar
-            ? "Solar Victoria's rebate and interest-free loan are for new solar systems, so they don't apply when adding to the panels you have."
-            : "Solar Victoria's rebate and interest-free loan are for new solar panels, so they don't apply to this system."}{" "}
-          <a href={sv.eligibilityUrl} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-4">
-            Solar Victoria&apos;s criteria
-          </a>
-        </p>
-      ) : (
-        <>
-          <p className="mt-0.5 text-[12.5px] leading-snug text-muted">
-            Victorian homes may be eligible for a solar panel rebate of up to {formatCurrency(sv.pvRebateMax)}
-            {sv.pvLoanMax > 0 ? ` and an interest-free loan of up to ${formatCurrency(sv.pvLoanMax)}` : ""}.{" "}
-            <a href={sv.eligibilityUrl} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-4">
-              Check eligibility
-            </a>
-          </p>
-          <div className="mt-4 flex items-center justify-between gap-4">
-            <div>
-              <p className="text-[14px] text-ink">Apply the Solar Victoria rebate</p>
-              <p className="text-[12px] text-muted">If you&apos;re eligible. We confirm it with you on the call.</p>
-            </div>
-            <Toggle
-              label="Apply the Solar Victoria rebate"
-              checked={state.solarVic.rebate}
-              onChange={(rebate) => update({ solarVic: { rebate, loan: rebate && state.solarVic.loan } })}
-            />
-          </div>
-          {sv.pvLoanMax > 0 && (
-            <div className="mt-4 border-t border-line pt-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[14px] text-ink">Take the interest-free loan</p>
-                  <p className="text-[12px] text-muted">
-                    Up to {formatCurrency(sv.pvLoanMax)} off your upfront cost, repaid to Solar Victoria interest free. Comes with the
-                    rebate.
-                  </p>
-                </div>
-                <Toggle
-                  label="Take the Solar Victoria interest-free loan"
-                  checked={state.solarVic.rebate && state.solarVic.loan}
-                  onChange={(loan) => update({ solarVic: { rebate: loan || state.solarVic.rebate, loan } })}
-                />
-              </div>
-              {price.loan > 0 && (
-                <div className="mt-3 rounded-xl bg-sage/50 px-3.5 py-3 text-forest" aria-live="polite">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-[13.5px]">Your upfront cost with the loan</p>
-                    <p className="text-[18px] font-medium tabular-nums">{formatCurrency(price.outOfPocket)}</p>
-                  </div>
-                  <p className="mt-1 text-[12px] leading-snug text-forest/80">
-                    {formatCurrency(price.total)} after rebates, less the {formatCurrency(price.loan)} loan. Then{" "}
-                    {formatCurrency(loanMonthly)} a month for {sv.loanMonths / 12} years, interest free. Subject to Solar Victoria&apos;s
-                    eligibility criteria.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
+      <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
+        <p className="text-[15px] text-ink">Due today</p>
+        <p className="text-[19px] tabular-nums text-positive">$0</p>
+      </div>
+      <p className="mt-1 text-[12px] leading-snug text-muted">
+        Nothing is final until your call. If you&apos;re happy to go ahead after it, we&apos;ll send a secure link for a{" "}
+        {formatCurrency(price.deposit)} refundable deposit.
+      </p>
     </Card>
   );
 
@@ -460,42 +464,6 @@ function ReserveScreen() {
     <CareUpsell value={state.care} onChange={(c) => update({ care: c })} />
   );
 
-  const summary = (
-    <Card className="p-5">
-      <p className="text-[15px] text-ink">Order summary</p>
-      <div className="mt-2 divide-y divide-line">
-        {state.address && (
-          <StatRow label="Home" value={<span className="block max-w-[220px] truncate">{formatAddress(state.address)}</span>} />
-        )}
-        {installer && <StatRow label="Installation partner" value={installer.name} />}
-        {state.installDate && (
-          <StatRow
-            label="Installation"
-            value={`${formatDate(state.installDate, { weekday: "short", day: "numeric", month: "short" })}${window ? ` · arrival ${window.label}` : ""}`}
-          />
-        )}
-        {state.installDate && <p className="py-2 text-[12px] leading-snug text-muted">{installDateNote(lead.solarVic)}</p>}
-        <StatRow label="System after rebates" value={formatCurrency(price.total)} />
-        {careIncluded ? (
-          <StatRow label={CARE_PLAN.name} value={<span className="text-positive">{CARE_FREE_MONTHS} months free</span>} />
-        ) : (
-          CARE_ENABLED &&
-          state.care && (
-            <StatRow label={CARE_PLAN.name} value={<span className="text-right">{carePriceLabel(state.care)} · after switch-on</span>} />
-          )
-        )}
-      </div>
-      <div className="mt-2 flex items-center justify-between border-t border-line pt-4">
-        <p className="text-[15px] text-ink">Due today</p>
-        <p className="text-[19px] tabular-nums text-positive">$0</p>
-      </div>
-      <p className="mt-1 text-[12px] leading-snug text-muted">
-        After your 15-minute confirmation call we&apos;ll send a secure link for a {formatCurrency(price.deposit)} refundable deposit to
-        lock in your date.
-      </p>
-    </Card>
-  );
-
   const fieldProps = (key: keyof ContactDetails) => ({
     value: contact[key],
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -511,8 +479,8 @@ function ReserveScreen() {
 
   const details = (
     <Card className="p-5">
-      <p className="text-[15px] text-ink">Your details</p>
-      <p className="text-[12.5px] text-muted">So we can confirm your system and your date.</p>
+      <p className="text-[15px] text-ink">Who should we call?</p>
+      <p className="text-[12.5px] text-muted">For your 15-minute call. We&apos;ll send the details by email.</p>
       <div className="mt-4 space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
@@ -568,16 +536,17 @@ function ReserveScreen() {
         <div className="flex items-start gap-4">
           <PhoneCall className="mt-0.5 h-6 w-6 shrink-0 text-ink" strokeWidth={1.3} aria-hidden />
           <div className="min-w-0">
-            <p className="text-[15px] text-ink">Book your 15-minute call</p>
+            <p className="text-[17px] text-ink">Book your free 15-minute call</p>
             <p className="text-[12.5px] leading-snug text-muted">
-              Needed to reserve. We check your roof, switchboard and access, and show you your design and products. Not a sales call.
+              Talk through your order with our team. We check your roof and switchboard, and show you your design and products. No
+              obligation, not a sales call.
             </p>
             <div className="mt-2">
               <CallBooking prompt="Pick a day and time that suits you." />
             </div>
             {callMissing && !state.callBooked && (
               <p className="mt-2 text-[13px] text-danger" role="alert">
-                Please choose a time for your 15-minute call to reserve your date.
+                Please choose a time for your 15-minute call.
               </p>
             )}
           </div>
@@ -586,32 +555,35 @@ function ReserveScreen() {
     </div>
   );
 
+  // Before a call time is picked, the button takes them to the booking; afterwards it confirms the call.
+  const toCall = () => callRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   return (
     <FlowStep
       width="wide"
-      title="Reserve your date."
-      subtitle="Nothing to pay today. Reserve your installation date; on a quick call we'll show you your design and products."
+      title="Your order summary."
+      subtitle="Nothing to pay today. Check your system and price, then book a free 15-minute call to talk it through."
       cta={
         <div>
-          <Button size="lg" className="w-full lg:w-80" disabled={busy} onClick={() => void reserve()}>
-            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Reserve my date"}
-          </Button>
+          {state.callBooked ? (
+            <Button size="lg" className="w-full lg:w-80" disabled={busy} onClick={() => void reserve()}>
+              {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Confirm my call"}
+            </Button>
+          ) : (
+            <Button size="lg" className="w-full lg:w-80" onClick={toCall}>
+              Book my 15-minute call
+            </Button>
+          )}
           <p className="mt-2 max-w-md text-center text-[11.5px] leading-snug text-muted lg:text-left">{RESERVE_NO_COMMITMENT}</p>
         </div>
       }
     >
-      <div className="grid max-w-5xl grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start lg:gap-6">
-        <div className="space-y-5">
-          {basket}
-          {solarVic}
-          {additions}
-          {care}
-        </div>
-        <div className="space-y-5 lg:sticky lg:top-6">
-          {details}
-          {callCard}
-          {summary}
-        </div>
+      <div className="mx-auto max-w-2xl space-y-5">
+        {basket}
+        {additions}
+        {care}
+        {callCard}
+        {/* Their details only once a call time is picked: they're for the call, not a commitment to the order. */}
+        {state.callBooked && details}
       </div>
     </FlowStep>
   );
