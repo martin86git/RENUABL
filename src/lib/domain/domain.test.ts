@@ -44,7 +44,15 @@ import {
 import { REBATE_RATES, batteryFactor, batteryStcs, deemingYears, rebatesFor, solarStcs, taperedKwh } from "./rebates";
 import { zoneRating } from "./zone-ratings";
 import { HYBRID_INVERTERS, STRING_INVERTERS } from "./catalogue";
-import { EXPAND_DISCLAIMER, existingSolarQuestions, expandNote, isAboutComplete, realAnnualUse, solarSituation } from "./existing-solar";
+import {
+  EXPAND_DISCLAIMER,
+  existingSolarQuestions,
+  expandNote,
+  homeDetailsSummary,
+  isAboutComplete,
+  realAnnualUse,
+  solarSituation,
+} from "./existing-solar";
 import { INSTALL_ARRIVAL, buildAvailability, fromISODate } from "./scheduling";
 import { SERVICE_WINDOWS, buildServiceAvailability, mayBeWarranty } from "./service";
 import type { EnergyProfile, HomeAnalysis } from "./types";
@@ -516,7 +524,14 @@ describe("existing solar", () => {
       storeys: "single" as const,
       phase: "single" as const,
     };
-    expect(isAboutComplete(bill, { ev: false, evPlanned: false, backup: false, wantsBattery: false })).toBe(false); // roof not answered
+    // Roof, storeys, phase, EVs and backup are optional: the bill and the battery question are enough.
+    expect(isAboutComplete(bill, { wantsBattery: false })).toBe(true);
+    expect(isAboutComplete(bill, {})).toBe(false);
+    expect(isAboutComplete(null, { wantsBattery: true })).toBe(false);
+    expect(homeDetailsSummary({})).toBe("Tiled roof, single storey, single-phase power.");
+    expect(homeDetailsSummary({ roofType: "tin", storeys: "double", phase: "three", evPlanned: true })).toBe(
+      "Tin roof, double storey, three-phase power, an EV planned.",
+    );
     expect(isAboutComplete(solarBill, answers)).toBe(false);
     expect(isAboutComplete(solarBill, { ...answers, existingSize: "unsure" })).toBe(false);
     // Expanding: every option has a battery, so the battery question isn't asked.

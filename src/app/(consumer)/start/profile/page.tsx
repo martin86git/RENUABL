@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { FlowStep } from "@/components/consumer/flow-shell";
-import { BillLater } from "@/components/consumer/bill-later";
 import { BillUpload } from "@/components/consumer/bill-upload";
 import { EarlyContact } from "@/components/consumer/early-contact";
 import { SavingsReveal } from "@/components/consumer/savings-reveal";
@@ -28,6 +27,7 @@ import {
   ROOF_OPTIONS,
   asksAboutBattery,
   existingSolarQuestions,
+  homeDetailsSummary,
   solarSituation,
 } from "@/lib/domain/existing-solar";
 import type { InverterSummary } from "@/lib/domain/inverter";
@@ -153,7 +153,8 @@ export default function ProfilePage() {
 
   const situation = state.bill ? solarSituation(state.bill, profile) : "new";
   const existing = existingSolarQuestions(state.bill, profile);
-  const questions = QUESTIONS.filter((q) => q.key !== "wantsBattery" || asksAboutBattery(state.bill, profile));
+  const batteryQuestion = QUESTIONS.filter((q) => q.key === "wantsBattery" && asksAboutBattery(state.bill, profile));
+  const otherQuestions = QUESTIONS.filter((q) => q.key !== "wantsBattery");
 
   // Changing answers resets manual adjustments so the recommendation stays honest.
   const change = (patch: Partial<EnergyProfile>) => update({ profile: { ...profile, ...patch }, config: null });
@@ -167,7 +168,7 @@ export default function ProfilePage() {
     <FlowStep
       width="wide"
       title="Tell us about your home."
-      subtitle="Your latest bill and a few quick questions, so we size your system to what you actually use."
+      subtitle="Your latest bill is all we need to size your system to what you actually use."
       ask={<AskRenuabl context="profile" title="Not sure?" subtitle="Ask Revo anything about your home." arrow="light" />}
       cta={
         <Button size="lg" className="w-full lg:w-72" disabled={Boolean(state.bill) && !complete} onClick={next}>
@@ -224,64 +225,80 @@ export default function ProfilePage() {
               onInverter={(existingInverter) => update({ existingInverter })}
             />
           )}
-          {/* One card per question: nothing shares a card, so each question reads on its own. */}
-          <QuestionCard icon={HomeIcon} question="What's your roof made of?">
-            <ChoiceChips<RoofType>
-              label="What's your roof made of?"
-              options={ROOF_OPTIONS}
-              value={profile.roofType}
-              onChange={(roofType) => change({ roofType })}
-            />
-            {profile.roofType === "unsure" && (
-              <p className="mt-2 text-[12px] text-muted">No problem. We&apos;ll confirm it on your call.</p>
-            )}
-          </QuestionCard>
-          {profile.roofType === "flat" && (
-            <QuestionCard icon={Sun} question="How would you like your panels?">
-              <ChoiceChips<FlatMount>
-                label="How would you like your panels?"
-                options={FLAT_MOUNT_OPTIONS}
-                value={profile.flatMount ?? "flat"}
-                onChange={(flatMount) => change({ flatMount })}
-              />
-              <p className="mt-2 text-[12px] leading-snug text-muted">{FLAT_MOUNT_NOTE[profile.flatMount ?? "flat"]}</p>
-            </QuestionCard>
-          )}
-          <QuestionCard
-            icon={House}
-            question="Double-storey home?"
-            aside={
-              <Toggle
-                label="Double-storey home"
-                checked={profile.storeys === "double"}
-                onChange={(double) => change({ storeys: double ? "double" : "single" })}
-              />
-            }
-          >
-            <p className="text-[12px] text-muted">{profile.storeys === "double" ? "Double storey" : "Single storey"}</p>
-          </QuestionCard>
-          <QuestionCard icon={Zap} question="Is your power single or three phase?">
-            <ChoiceChips<"single" | "three" | "unsure">
-              label="Is your power single or three phase?"
-              options={PHASE_OPTIONS}
-              value={profile.phase}
-              onChange={(phase) => change({ phase })}
-            />
-            <p className="mt-2 text-[12px] leading-snug text-muted">
-              {profile.phase === "unsure"
-                ? "No problem. We'll confirm it on your call."
-                : "Tip: three main switches side by side in your switchboard usually means three phase."}
-            </p>
-          </QuestionCard>
-          {questions.map(({ key, label, icon }) => (
-            <QuestionCard key={key} icon={icon} question={label}>
-              <div className="flex justify-end lg:justify-start">
-                <YesNo label={label} value={profile[key]} onChange={(v) => set(key, v)} />
+          {/* After the bill, one question: the battery. Everything else is optional, with defaults, and checked on the call. */}
+          {state.bill &&
+            batteryQuestion.map(({ key, label, icon }) => (
+              <QuestionCard key={key} icon={icon} question={label}>
+                <div className="flex justify-end lg:justify-start">
+                  <YesNo label={label} value={profile[key]} onChange={(v) => set(key, v)} />
+                </div>
+              </QuestionCard>
+            ))}
+          {state.bill && (
+            <details className="group rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-soft)]">
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
+                <span>
+                  <span className="block text-[14px] text-ink">Your home details (optional)</span>
+                  <span className="block text-[12.5px] leading-snug text-muted">
+                    {homeDetailsSummary(profile)} Change anything that&apos;s different, or we&apos;ll check it on your call.
+                  </span>
+                </span>
+                <span className="shrink-0 text-[13px] text-forest underline-offset-4 group-open:hidden">Change</span>
+              </summary>
+              <div className="space-y-4 px-5 pb-5">
+                <QuestionCard icon={HomeIcon} question="What's your roof made of?">
+                  <ChoiceChips<RoofType>
+                    label="What's your roof made of?"
+                    options={ROOF_OPTIONS}
+                    value={profile.roofType}
+                    onChange={(roofType) => change({ roofType })}
+                  />
+                </QuestionCard>
+                {profile.roofType === "flat" && (
+                  <QuestionCard icon={Sun} question="How would you like your panels?">
+                    <ChoiceChips<FlatMount>
+                      label="How would you like your panels?"
+                      options={FLAT_MOUNT_OPTIONS}
+                      value={profile.flatMount ?? "flat"}
+                      onChange={(flatMount) => change({ flatMount })}
+                    />
+                    <p className="mt-2 text-[12px] leading-snug text-muted">{FLAT_MOUNT_NOTE[profile.flatMount ?? "flat"]}</p>
+                  </QuestionCard>
+                )}
+                <QuestionCard
+                  icon={House}
+                  question="Double-storey home?"
+                  aside={
+                    <Toggle
+                      label="Double-storey home"
+                      checked={profile.storeys === "double"}
+                      onChange={(double) => change({ storeys: double ? "double" : "single" })}
+                    />
+                  }
+                >
+                  <p className="text-[12px] text-muted">{profile.storeys === "double" ? "Double storey" : "Single storey"}</p>
+                </QuestionCard>
+                <QuestionCard icon={Zap} question="Is your power single or three phase?">
+                  <ChoiceChips<"single" | "three" | "unsure">
+                    label="Is your power single or three phase?"
+                    options={PHASE_OPTIONS}
+                    value={profile.phase}
+                    onChange={(phase) => change({ phase })}
+                  />
+                  <p className="mt-2 text-[12px] leading-snug text-muted">
+                    Tip: three main switches side by side in your switchboard usually means three phase.
+                  </p>
+                </QuestionCard>
+                {otherQuestions.map(({ key, label, icon }) => (
+                  <QuestionCard key={key} icon={icon} question={label}>
+                    <div className="flex justify-end lg:justify-start">
+                      <YesNo label={label} value={profile[key]} onChange={(v) => set(key, v)} />
+                    </div>
+                  </QuestionCard>
+                ))}
               </div>
-            </QuestionCard>
-          ))}
-          {/* Last, just above Continue: anyone without their bill can leave an email or mobile instead of leaving. */}
-          <BillLater />
+            </details>
+          )}
         </div>
 
         {/* Mascot and script travel together and stay in view. Sticky makes its own layer, so it needs the page colour for the mascot's multiply blend. */}

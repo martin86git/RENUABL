@@ -7,7 +7,6 @@ import {
   Check,
   ChevronRight,
   ClipboardCheck,
-  Gauge,
   Gift,
   Info,
   PartyPopper,
@@ -24,7 +23,7 @@ import { AskRenuabl } from "@/components/consumer/ask-renuabl";
 import { CareIncludedCard } from "@/components/consumer/care-upsell";
 import { FlowGuard } from "@/components/consumer/flow-guard";
 import { FlowStep } from "@/components/consumer/flow-shell";
-import { PortalPreview, PortalTeaser } from "@/components/consumer/portal-preview";
+import { PortalPreview } from "@/components/consumer/portal-preview";
 import { RoofCheck } from "@/components/consumer/roof-check";
 import { useFlow, useSystem } from "@/components/consumer/flow-state";
 import { stepHref } from "@/components/consumer/steps";
@@ -220,12 +219,7 @@ function SystemScreen() {
       width="regular"
       title={SYSTEM_REVEAL.title}
       subtitle={subtitle}
-      aside={
-        <div className="sticky top-6 space-y-4">
-          {estimate}
-          <PortalTeaser />
-        </div>
-      }
+      aside={<div className="sticky top-6 space-y-4">{estimate}</div>}
       ask={
         <AskRenuabl
           context="recommendation"
@@ -235,7 +229,7 @@ function SystemScreen() {
         />
       }
       cta={
-        <Button size="lg" className="w-full lg:w-72" onClick={() => router.push(stepHref("extras"))}>
+        <Button size="lg" className="w-full lg:w-72" onClick={() => router.push(stepHref("installer"))}>
           Continue <ArrowRight className="h-[18px] w-[18px]" strokeWidth={1.6} />
         </Button>
       }
@@ -304,7 +298,6 @@ function SystemScreen() {
               muted={!config.evCharger}
               onOpen={() => setOpen("ev")}
             />
-            <Row icon={Gauge} title="Energy Monitoring" subtitle="Track and optimise in real time" onOpen={() => setOpen("monitoring")} />
           </ul>
           {adjusted && (
             <div className="flex items-center justify-between border-t border-line px-5 py-3 text-[13px]">
@@ -327,29 +320,24 @@ function SystemScreen() {
           </div>
         </div>
 
-        <Card className="p-5">
-          <p className="text-[15px] text-ink">Why this system?</p>
-          <ul className="mt-3 space-y-2">
-            {tier.why.map((w) => (
-              <li key={w} className="flex items-center gap-3 text-[14px] text-muted">
-                <Check className="h-4 w-4 shrink-0 text-positive" strokeWidth={2} aria-hidden /> {w}
-              </li>
-            ))}
-          </ul>
-          {!existing && (
-            <Disclosure title="How we worked this out" className="mt-3 border-t border-line">
-              <ul className="space-y-2 text-[14px] text-muted">
+        <Card className="px-5 py-1">
+          <Disclosure title="Why this system, and how we worked it out">
+            <ul className="space-y-2">
+              {tier.why.map((w) => (
+                <li key={w} className="flex items-center gap-3 text-[14px] text-muted">
+                  <Check className="h-4 w-4 shrink-0 text-positive" strokeWidth={2} aria-hidden /> {w}
+                </li>
+              ))}
+            </ul>
+            {!existing && (
+              <ul className="mt-3 space-y-2 border-t border-line pt-3 text-[14px] text-muted">
                 {sizingExplanation(recommendation.usage, config, { nasa: Boolean(state.sunshine), replacing, indicative }).map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>
-            </Disclosure>
-          )}
+            )}
+          </Disclosure>
         </Card>
-
-        <div className="xl:hidden">
-          <PortalTeaser />
-        </div>
       </div>
 
       <PartSheet open={open === "solar"} onOpenChange={(o) => setOpen(o ? "solar" : null)} title="Solar System">

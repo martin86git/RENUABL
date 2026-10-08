@@ -389,7 +389,7 @@ export function backupNote(hasBackup: boolean) {
  */
 export const DESIGN_ON_CALL = {
   title: "Your design and products, shown on your call",
-  body: "Between now and your 15-minute call, we design your system for your home: the exact panels, inverter and battery, and how many panels fit on your roof. On the call we walk you through the design and every product, and answer your questions. Nothing is final, and nothing is charged, until you're happy.",
+  body: "Before your 15-minute call we design it for your home: the exact panels, inverter and battery, and how many fit on your roof. Nothing is final or charged until you're happy.",
 } as const;
 
 /** By the reserve button: reserving doesn't commit the customer to anything. */

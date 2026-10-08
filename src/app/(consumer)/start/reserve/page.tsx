@@ -27,7 +27,14 @@ import { WHOOP_COPY, whoopEligible } from "@/lib/domain/whoop-offer";
 import { HEALTHY_INTEREST_LABEL } from "@/lib/domain/healthy-home";
 import { RESERVED_CELEBRATION, priceHeader } from "@/lib/domain/flow-moments";
 import { ConsentBoxes, NO_CONSENT, type ConsentState } from "@/components/consumer/consent-boxes";
-import { PRICE_INCLUDES, RESERVE_NO_COMMITMENT, TIER_LABELS, describeSystem, suggestedAdditions } from "@/lib/domain/recommendation";
+import {
+  ADD_ONS,
+  PRICE_INCLUDES,
+  RESERVE_NO_COMMITMENT,
+  TIER_LABELS,
+  describeSystem,
+  suggestedAdditions,
+} from "@/lib/domain/recommendation";
 import { solarVictoriaApplies } from "@/lib/domain/rebates";
 import { getWindow, installDateNote } from "@/lib/domain/scheduling";
 import type { AddOnId, LineItemId } from "@/lib/domain/types";
@@ -429,11 +436,17 @@ function ReserveScreen() {
     </Card>
   );
 
-  const additions = suggestions.length > 0 && (
+  // Unpriced extras (talked through on the call) and ones coming soon: small optional chips, instead of a whole Extras step.
+  const callTopics = ADD_ONS.filter((a) => a.price == null && (!a.needsBattery || config.batteryKwh > 0));
+  const additions = (suggestions.length > 0 || callTopics.length > 0) && (
     <Card className="p-5">
-      <p className="text-[15px] text-ink">Add to your system</p>
-      <p className="text-[12.5px] text-muted">Homes like yours often add these. Installed on the same day.</p>
-      <ul className="mt-3 divide-y divide-line">
+      {suggestions.length > 0 && (
+        <>
+          <p className="text-[15px] text-ink">Add to your system</p>
+          <p className="text-[12.5px] text-muted">Homes like yours often add these. Installed on the same day.</p>
+        </>
+      )}
+      <ul className={cn(suggestions.length > 0 && "mt-3", "divide-y divide-line")}>
         {suggestions.map((sg) => (
           <li key={sg.id} className="flex items-center gap-3 py-3">
             <ItemArt id={sg.id} />
@@ -455,6 +468,31 @@ function ReserveScreen() {
           </li>
         ))}
       </ul>
+      {callTopics.length > 0 && (
+        <div className={cn(suggestions.length > 0 && "mt-2 border-t border-line pt-4")}>
+          <p className="text-[13px] text-ink-2">Interested in anything else? Tap to mention it on your call.</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {callTopics.map((t) => {
+              const on = state.addOns.includes(t.id);
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => (on ? removeItem(t.id) : addItem(t.id))}
+                  className={cn(
+                    "h-9 rounded-full px-3.5 text-[13px] transition",
+                    on ? "bg-ink text-canvas" : "bg-surface text-ink-2 shadow-[0_0_0_1px_var(--line)] hover:text-ink",
+                  )}
+                >
+                  {t.name}
+                  {t.comingSoon ? " (coming soon)" : ""}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </Card>
   );
 

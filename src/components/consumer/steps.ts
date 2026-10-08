@@ -25,8 +25,9 @@ export function stepHref(slug: FlowSlug) {
 export function previousHref(slug: string) {
   const i = FLOW_ROUTES.indexOf(slug as FlowSlug);
   if (i <= 0) return "/";
-  // Skip the automatic analysing screen when going back.
-  const prev = FLOW_ROUTES[i - 1];
+  // Skip the automatic analysing screen when going back, and the extras page (no longer a step: extras are on the reserve step).
+  let prev = FLOW_ROUTES[i - 1];
+  if (prev === "extras") prev = FLOW_ROUTES[i - 2];
   return prev === "analysing" ? "/" : stepHref(prev);
 }
 

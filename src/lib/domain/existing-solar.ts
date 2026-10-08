@@ -82,13 +82,26 @@ export const PHASE_OPTIONS: { value: "single" | "three" | "unsure"; label: strin
 ];
 
 /** "About your home" is done once the bill is read and every question shown is answered. */
+/**
+ * Ready to continue: a bill (or spend range), the existing-solar questions when the bill shows panels, and the
+ * battery question. Roof, storeys, phase, EVs and backup are optional (8 Oct 2026, to cut overwhelm): unanswered,
+ * they're quoted as a tiled, single-storey, single-phase home with no EV or backup, and checked on the call.
+ */
 export function isAboutComplete(bill: BillSummary | null, profile: Partial<EnergyProfile>): boolean {
-  if (!bill || !profile.roofType || !profile.phase) return false; // storeys defaults to single
+  if (!bill) return false;
   const q = existingSolarQuestions(bill, profile);
   if (q.size && !profile.existingSize) return false;
   if (q.plan && !profile.existingPlan) return false;
-  if (asksAboutBattery(bill, profile) && profile.wantsBattery === undefined) return false;
-  return profile.ev !== undefined && profile.evPlanned !== undefined && profile.backup !== undefined;
+  return !(asksAboutBattery(bill, profile) && profile.wantsBattery === undefined);
+}
+
+/** One line for the optional details panel: what we've assumed, or what they told us. */
+export function homeDetailsSummary(profile: Partial<EnergyProfile>): string {
+  const roof = profile.roofType === "tin" ? "tin roof" : profile.roofType === "flat" ? "flat roof" : "tiled roof";
+  const storeys = profile.storeys === "double" ? "double storey" : "single storey";
+  const phase = profile.phase === "three" ? "three-phase power" : "single-phase power";
+  const extras = [profile.ev && "an EV", profile.evPlanned && "an EV planned", profile.backup && "blackout backup"].filter(Boolean);
+  return `${roof[0].toUpperCase()}${roof.slice(1)}, ${storeys}, ${phase}${extras.length ? `, ${extras.join(", ")}` : ""}.`;
 }
 
 /** Annual use including the solar a home already uses itself (for a replacement). */
