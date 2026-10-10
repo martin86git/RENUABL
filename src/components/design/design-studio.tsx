@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddressEntry } from "@/components/consumer/address-entry";
 import { Wordmark } from "@/components/ui/primitives";
@@ -21,6 +22,7 @@ import {
   type DesignRoof,
   savedLabel,
 } from "@/lib/services/design-store";
+import { loadJob, saveJob } from "@/lib/services/crm";
 import { DesignAccountLink, DesignKeptNote, DesignRoofList } from "./design-account";
 import { RoofDesigner } from "./roof-designer";
 
@@ -36,7 +38,7 @@ const STEPS = [
 ] as const;
 
 /**
- * The roof designer as a page of its own (/design): an address first, then the
+ * The design tool (/design/roof): an address first, then the
  * designer on that roof. Designs are kept for the signed-in business, or on this device when nobody is signed in
  * (`design-store.ts`).
  */
@@ -45,6 +47,9 @@ export function DesignStudio() {
   const [ready, setReady] = useState(false);
   const [roof, setRoof] = useState<DesignRoof | null>(null);
   const [work, setWork] = useState<{ set: DesignSet; extras: DesignExtras } | null>(null);
+  // The customer's job this roof is being designed for, when the designer was opened from one (/design/roof?job=…).
+  const jobId = useSearchParams().get("job");
+  const [job, setJob] = useState<{ id: string; customerId: string; customerName: string; lat: number; lng: number } | null>(null);
   // The business's price lists and settings; and the STC rules, today's when they can be had.
   const [workspace, setWorkspace] = useState<Workspace>(DEFAULT_WORKSPACE);
   const [rates, setRates] = useState<RebateRates>(VERIFIED_RATES);
@@ -111,9 +116,20 @@ export function DesignStudio() {
     void (async () => {
       try {
         const settings = await loadWorkspace();
-        const last = loadLastRoof();
+        // A job's own address comes first; otherwise the roof last opened.
+        const asked = jobId ? await loadJob(jobId) : null;
+        const forJob =
+          asked?.ok && asked.job.lat !== null && asked.job.lng !== null
+            ? { address: asked.job.address, lat: asked.job.lat, lng: asked.job.lng }
+            : null;
+        const last = forJob ?? loadLastRoof();
         const loaded = last ? await loadRoofWork(last, settings) : null;
         if (gone) return;
+        if (asked?.ok && forJob) {
+          setJob({ id: asked.job.id, customerId: asked.customer.id, customerName: asked.customer.name, lat: forJob.lat, lng: forJob.lng });
+          rememberRoof(forJob);
+        } else if (jobId)
+          setProblem(asked && !asked.ok ? asked.message : "That job has no address on the map yet. Add one on the customer's page.");
         setWorkspace(settings);
         if (last && loaded) {
           setRoof(last);
@@ -127,7 +143,7 @@ export function DesignStudio() {
     return () => {
       gone = true;
     };
-  }, []);
+  }, [jobId]);
 
   // What the designer offers: the products on the uploaded price lists, or our own range for a kind the lists don't carry.
   const catalogue = useMemo(() => {
@@ -160,6 +176,9 @@ export function DesignStudio() {
     });
   };
 
+  // The job only counts while its own roof is the one open.
+  const onJob = job && roof && job.lat === roof.lat && job.lng === roof.lng ? job : null;
+
   if (roof && work && image)
     return (
       <div className="theme-studio min-h-dvh px-4 pb-20 sm:px-6 lg:px-8">
@@ -177,14 +196,28 @@ export function DesignStudio() {
           inverters={catalogue.inverters}
           batteries={catalogue.batteries}
           yieldPerKwDay={YIELD_PER_KW_DAY}
-          onSave={async (next, extras) => saveRoofWork(roof, next, extras)}
+          onSave={async (next, extras, net) => {
+            const problem = await saveRoofWork(roof, next, extras);
+            // Designed for a customer's job: the job carries the quote's price, so the pipeline shows what it is worth.
+            if (!problem && onJob && net !== null) void saveJob(onJob.id, { value: net });
+            return problem;
+          }}
           savedLabel={kept}
           onUnsaved={noteUnsaved}
           bar={
             <>
-              <Link href="/" aria-label="RENUABL home">
+              <Link href="/design" aria-label="RENUABL">
                 <Wordmark className="text-[17px]" />
               </Link>
+              {onJob && (
+                <Link
+                  href={`/design/customers/${onJob.customerId}`}
+                  className="max-w-40 shrink-0 truncate rounded bg-surface-2 px-2.5 py-1.5 text-[13px] font-medium text-ink hover:bg-sage"
+                  title="Back to this customer"
+                >
+                  {onJob.customerName}
+                </Link>
+              )}
               {/* Another roof, without leaving the designer. */}
               <div className="w-64 shrink-0 xl:w-80">
                 <AddressEntry compact placeholder="Search another address" onPick={pick} />
@@ -219,7 +252,7 @@ export function DesignStudio() {
   return (
     <div className="theme-studio flex min-h-dvh flex-col">
       <header className="flex h-16 items-center px-5 lg:px-10">
-        <Link href="/" aria-label="RENUABL home">
+        <Link href="/design" aria-label="RENUABL">
           <Wordmark />
         </Link>
       </header>

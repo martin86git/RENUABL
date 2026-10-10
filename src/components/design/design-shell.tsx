@@ -1,0 +1,152 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { CircleUserRound, LayoutDashboard, PenTool, SlidersHorizontal, TrendingUp, Users, type LucideIcon } from "lucide-react";
+import clsx from "clsx";
+import { Wordmark } from "@/components/ui/primitives";
+import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
+
+/** Where everything in the product lives. */
+export const PATHS = {
+  home: "/design",
+  sales: "/design/sales",
+  customers: "/design/customers",
+  designer: "/design/roof",
+  settings: "/design/settings",
+  account: "/design/account",
+  signIn: "/design/sign-in",
+} as const;
+
+const NAV: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: PATHS.home, label: "Overview", icon: LayoutDashboard },
+  { href: PATHS.sales, label: "Sales", icon: TrendingUp },
+  { href: PATHS.customers, label: "Customers", icon: Users },
+  { href: PATHS.designer, label: "Design tool", icon: PenTool },
+];
+
+/**
+ * The frame every signed-in screen sits in: the product's sections down the
+ * left (Overview, Sales, Customers, Design tool), with the business's settings
+ * and account at its foot. `compact` keeps only the icons, for the design
+ * tool, where the roof needs the room. On a phone the sections run across the
+ * top instead. Signed out, a screen that needs an account (`needsAccount`)
+ * asks for one; the others (the design tool, its settings) are shown bare, as
+ * they work on the device without one.
+ */
+export function DesignShell(props: { children: React.ReactNode; compact?: boolean; needsAccount?: boolean }) {
+  return (
+    <DesignAccountGate>
+      <Shell {...props} />
+    </DesignAccountGate>
+  );
+}
+
+function Shell({ children, compact, needsAccount }: { children: React.ReactNode; compact?: boolean; needsAccount?: boolean }) {
+  const [account] = useDesignAccount();
+  const path = usePathname();
+  if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
+  if (!account.signedIn) {
+    if (!needsAccount) return <>{children}</>;
+    return (
+      <div className="theme-studio flex min-h-dvh flex-col items-center justify-center px-5 text-center">
+        <Wordmark />
+        <p className="mt-6 max-w-sm text-[15px] leading-relaxed text-ink-2">
+          {account.unreachable
+            ? "We couldn't reach your account just now. Try again in a moment."
+            : "Sign in to your business to see this."}
+        </p>
+        <Link
+          href={PATHS.home}
+          className="mt-5 inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-ink hover:bg-forest"
+        >
+          Sign in
+        </Link>
+      </div>
+    );
+  }
+
+  const active = (href: string) => (href === PATHS.home ? path === href : path === href || path.startsWith(`${href}/`));
+  const item = (href: string, label: string, Icon: LucideIcon) => (
+    <Link
+      key={href}
+      href={href}
+      title={compact ? label : undefined}
+      aria-label={compact ? label : undefined}
+      aria-current={active(href) ? "page" : undefined}
+      className={clsx(
+        "flex h-10 shrink-0 items-center gap-3 rounded-md text-sm font-medium",
+        compact ? "w-10 justify-center lg:w-10" : "px-3",
+        active(href) ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+      )}
+    >
+      <Icon className="size-[18px] shrink-0" aria-hidden />
+      {!compact && <span className="truncate">{label}</span>}
+    </Link>
+  );
+
+  return (
+    <div className="theme-studio flex min-h-dvh flex-col lg:flex-row">
+      <nav
+        aria-label="Sections"
+        className={clsx(
+          "z-40 flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2",
+          "lg:sticky lg:top-0 lg:h-dvh lg:flex-col lg:items-stretch lg:overflow-visible lg:border-b-0 lg:border-r lg:px-2.5 lg:py-4",
+          compact ? "lg:w-[3.75rem]" : "lg:w-56",
+        )}
+      >
+        <Link
+          href={PATHS.home}
+          aria-label="RENUABL"
+          className={clsx("mr-3 shrink-0 lg:mb-5 lg:mr-0", compact ? "lg:text-center" : "lg:px-3")}
+        >
+          {compact ? (
+            <span className="hidden text-[17px] font-normal tracking-[0.1em] text-ink lg:inline">R</span>
+          ) : (
+            <Wordmark className="text-[16px]" />
+          )}
+          {compact && <Wordmark className="text-[16px] lg:hidden" />}
+        </Link>
+        {NAV.map((n) => item(n.href, n.label, n.icon))}
+        <span className="hidden flex-1 lg:block" aria-hidden />
+        {item(PATHS.settings, "Prices and settings", SlidersHorizontal)}
+        {item(PATHS.account, account.business?.name ?? "Your account", CircleUserRound)}
+        {!compact && (
+          <div className="hidden px-3 pt-2 lg:block">
+            <p className="truncate text-[11px] text-muted">{account.email}</p>
+            <SignOut className="mt-1 text-[12px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink" />
+          </div>
+        )}
+      </nav>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
+/** The heading every section's page opens with, and room for its main action. */
+export function PageHead({ eyebrow, title, children }: { eyebrow: string; title: string; children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{eyebrow}</p>
+        <h1 className="mt-1.5 text-[28px] leading-tight tracking-tight text-ink">{title}</h1>
+      </div>
+      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+    </div>
+  );
+}
+
+/** Shared looks for the sections' screens. */
+export const ui = {
+  page: "mx-auto w-full max-w-6xl px-5 py-8 lg:px-10",
+  card: "rounded-lg bg-surface shadow-[var(--shadow-soft)] ring-1 ring-line",
+  primary:
+    "inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted",
+  quiet:
+    "inline-flex h-10 items-center justify-center gap-2 rounded-md border border-line bg-surface px-4 text-sm font-medium text-ink hover:border-forest disabled:bg-surface-2 disabled:text-muted",
+  input:
+    "block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-forest disabled:bg-surface-2 disabled:text-muted",
+  label: "block text-[13px] font-medium text-ink-2",
+  eyebrow: "text-[11px] font-medium uppercase tracking-[0.16em] text-muted",
+  link: "font-medium text-ink underline underline-offset-4 hover:text-ink-2",
+} as const;

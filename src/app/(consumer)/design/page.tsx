@@ -1,20 +1,14 @@
 import type { Metadata } from "next";
-import { DesignAccountGate } from "@/components/design/design-account";
-import { DesignStudio } from "@/components/design/design-studio";
+import { DesignHome } from "@/components/design/design-home";
 
 export const metadata: Metadata = {
-  title: "Roof designer",
-  description: "Lay out solar panels on a roof seen from above, and check the strings against the inverter.",
+  title: "For solar installers and retailers",
+  description: "Design a roof, see the quote build beside it, and keep every customer and job moving from lead to installed.",
   // In development: kept out of search until it's ready to be found.
   robots: { index: false, follow: false },
 };
 
-/** The roof designer as a product of its own. */
-export default function DesignPage() {
-  // The gate settles who is signed in (and brings a device's work into a new account) before the page loads its data.
-  return (
-    <DesignAccountGate>
-      <DesignStudio />
-    </DesignAccountGate>
-  );
+/** The product's front page with the way in; signed in, the business's overview. */
+export default function DesignHomePage() {
+  return <DesignHome />;
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DesignAccountGate } from "@/components/design/design-account";
+import { DesignShell } from "@/components/design/design-shell";
 import { DesignSettings } from "@/components/design/design-settings";
 
 export const metadata: Metadata = {
@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 export default function DesignSettingsPage() {
   // The gate settles who is signed in (and brings a device's work into a new account) before the page loads its data.
   return (
-    <DesignAccountGate>
+    <DesignShell>
       <DesignSettings />
-    </DesignAccountGate>
+    </DesignShell>
   );
 }

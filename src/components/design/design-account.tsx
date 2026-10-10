@@ -30,7 +30,7 @@ const card = "rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-
 const eyebrow = "text-[12px] font-medium uppercase tracking-[0.16em] text-forest";
 
 /** Who is using the designer, once the server has said. Null while it is being asked. */
-function useDesignAccount(): [DesignAccount | null, () => void] {
+export function useDesignAccount(): [DesignAccount | null, () => void] {
   const [account, setAccount] = useState<DesignAccount | null>(null);
   const [asks, setAsks] = useState(0);
   useEffect(() => {
@@ -58,7 +58,7 @@ function Frame({ children }: { children: React.ReactNode }) {
 }
 
 /** Ends the session on the server and comes back to the designer, signed out. The device forgets it had an account. */
-function SignOut({ className }: { className?: string }) {
+export function SignOut({ className }: { className?: string }) {
   return (
     <form
       action="/api/auth/signout?to=design"
@@ -346,7 +346,7 @@ export function DesignSignIn({ expired }: { expired?: boolean }) {
       )}
       <p className="mt-8 text-[13px] leading-relaxed text-muted">
         Just trying it out?{" "}
-        <Link href="/design" className="font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
+        <Link href="/design/roof" className="font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
           Use the designer without signing in
         </Link>
         : your work stays on this device.
@@ -419,7 +419,7 @@ export function DesignAccountPage() {
           <Wordmark className="text-[17px]" />
         </Link>
         <span className="text-sm text-ink-2">Your account</span>
-        <Link href="/design" className={`${primary} ml-auto h-10 px-5`}>
+        <Link href="/design/roof" className={`${primary} ml-auto h-10 px-5`}>
           Back to the designer
         </Link>
       </header>

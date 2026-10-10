@@ -124,7 +124,7 @@ export function DesignSettings() {
   return (
     <div className="theme-studio min-h-dvh pb-24">
       <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line bg-canvas/95 px-5 py-3 backdrop-blur lg:px-10">
-        <Link href="/" aria-label="RENUABL home">
+        <Link href="/design" aria-label="RENUABL">
           <Wordmark className="text-[17px]" />
         </Link>
         <span className="text-sm text-ink-2">Prices and settings</span>
@@ -133,7 +133,7 @@ export function DesignSettings() {
         </span>
         <DesignAccountLink />
         <Link
-          href="/design"
+          href="/design/roof"
           className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest"
         >
           Back to the designer

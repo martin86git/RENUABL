@@ -199,7 +199,7 @@ export function RoofDesigner(props: {
   /** The customer's bill, and each design's quote settings and hand changes, as last saved. */
   extras: DesignExtras;
   /** Keeps the designs, the bill and the quotes: resolves to an error message when they couldn't be kept. */
-  onSave: (set: DesignSet, extras: DesignExtras) => Promise<string | null>;
+  onSave: (set: DesignSet, extras: DesignExtras, net: number | null) => Promise<string | null>;
   /** What to say once saved: where the work is kept ("Saved to your account", "Saved on this device"). */
   savedLabel?: string;
   /** Told whenever the design gains or loses unsaved changes, so the page can ask before leaving it. */
@@ -1338,7 +1338,12 @@ export function RoofDesigner(props: {
 
   const save = async () => {
     setSaved("saving");
-    const problem = await props.onSave({ designs: everyDesign(), primary, comments }, { bill, quotes: everyQuote() });
+    // The price after STCs goes with it only when the primary design is the one open: that is the one a job is quoted on.
+    const problem = await props.onSave(
+      { designs: everyDesign(), primary, comments },
+      { bill, quotes: everyQuote() },
+      active === primary ? net : null,
+    );
     setSaved(problem ? { error: problem } : "saved");
   };
 
