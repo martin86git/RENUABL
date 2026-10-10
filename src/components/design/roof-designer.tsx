@@ -1,0 +1,3101 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import clsx from "clsx";
+import {
+  BatteryCharging,
+  Cable,
+  Check,
+  Copy,
+  Hand,
+  Layers,
+  LayoutGrid,
+  Maximize,
+  MessageCircle,
+  MousePointer2,
+  PenTool,
+  ReceiptText,
+  Plus,
+  Redo2,
+  Ruler,
+  SquarePlus,
+  Star,
+  Tag,
+  Sparkles,
+  Trash2,
+  Undo2,
+  Zap,
+  ZoomIn,
+  ZoomOut,
+  type LucideIcon,
+} from "lucide-react";
+import { DESIGN_TEMPERATURES, HOT_CELL, checkString, type StringCheck } from "@/lib/domain/design/electrical";
+import type { CatalogueBattery, CatalogueInverter, CataloguePanel } from "@/lib/domain/design/catalogue";
+import type { Workspace } from "@/lib/domain/design/pricing";
+import {
+  defaultQuote,
+  designFinance,
+  type BillInterval,
+  type DesignExtras,
+  type QuoteFields,
+  type SystemSpec,
+} from "@/lib/domain/design/quote";
+import type { RebateRates } from "@/lib/domain/rebates";
+import { DesignQuote } from "./design-quote";
+import { suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
+import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
+import {
+  FACINGS,
+  LABEL_KINDS,
+  MAX_BATTERY_QTY,
+  MAX_DESIGNS,
+  MAX_INVERTERS,
+  ROOF_IMAGE,
+  angleOfLongestEdge,
+  applyCommentOp,
+  arrayCount,
+  designPanels,
+  designSummary,
+  faceArea,
+  faceFacing,
+  freed,
+  inside,
+  looseCorners,
+  metresPerPixel,
+  monthlyProduction,
+  panelFacing,
+  panelOf,
+  panelPlaces,
+  stringIsMixed,
+  tiltedPanels,
+  type DesignBattery,
+  type DesignComment,
+  type DesignSet,
+  type DesignLabel,
+  type Face,
+  type Facing,
+  type GuideLine,
+  type InverterSpec,
+  type LabelKind,
+  type LoosePanel,
+  type PanelSpec,
+  type PanelString,
+  type Point,
+  type RoofDesign,
+} from "@/lib/domain/design/roof-design";
+
+const GOLD = "var(--sun-line)";
+/** One colour a string, so they can be told apart on the roof. */
+const STRING_COLOURS = ["#86efac", "#f9a8d4", "#fdba74", "#fde047", "#7dd3fc", "#c4b5fd", "#fca5a5", "#5eead4"];
+/** Strings are lettered: A, B, C. */
+const letter = (index: number) => String.fromCharCode(65 + (index % 26));
+/** A string check's verdict as a mark and a colour. */
+const VERDICT: Record<StringCheck["verdict"], { mark: string; tone: string; pad: string }> = {
+  good: { mark: "✓", tone: "text-positive", pad: "bg-white/10 text-white" },
+  caution: { mark: "!", tone: "text-sun-ink", pad: "bg-sun-bright text-ink" },
+  bad: { mark: "✕", tone: "text-danger", pad: "bg-[#fdecea] text-danger" },
+  unknown: { mark: "?", tone: "text-muted", pad: "bg-white/10 text-white/80" },
+};
+
+type Tool = "select" | "pan" | "trace" | "rule" | "panel" | "string" | "label" | "comment";
+const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
+  {
+    tool: "select",
+    icon: MousePointer2,
+    name: "Select",
+    hint: "Click a panel or label to pick it. Shift-click, or drag a box, to pick several. Drag to move them. Ctrl+C then Ctrl+V pastes a copy under the pointer.",
+  },
+  {
+    tool: "pan",
+    icon: Hand,
+    name: "Move the picture",
+    hint: "Zoom in with the mouse wheel or the + button, then press and drag the picture to move around it.",
+  },
+  {
+    tool: "trace",
+    icon: PenTool,
+    name: "Trace a roof face",
+    hint: "Click each corner of the roof face, in order. The rows line up with its longest edge.",
+  },
+  {
+    tool: "rule",
+    icon: Ruler,
+    name: "Guide line",
+    hint: "Click one end of a roof edge, then the other: a gold line stays there to line panels up with, and picked panels show how far they are from it. Click a guide line with this tool to remove it.",
+  },
+  {
+    tool: "panel",
+    icon: SquarePlus,
+    name: "Add a panel",
+    hint: "The outline of the next panel follows the pointer: beside a panel it takes the place the pointer is in, laid the same way; in the open it sits under the pointer. Click to place it, or press and drag to lay rows. Traced roof faces light up in gold, with the distance to each edge. What you've just laid stays picked: drag its round white handle to spin it into position.",
+  },
+  {
+    tool: "string",
+    icon: Cable,
+    name: "String panels",
+    hint: "Press and drag across panels to wire them in the order you pass over them, round corners and from row to row; or click them one at a time. Click one again to take it off. The strings are listed on the picture: start a new one there, and set the inverter input each is on. Hover over a string to see it checked against the inverter.",
+  },
+  { tool: "label", icon: Tag, name: "Add a label", hint: "Click where the inverter, battery, switchboard or a note belongs." },
+  {
+    tool: "comment",
+    icon: MessageCircle,
+    name: "Comment",
+    hint: "Click a spot and type your remark in the box that opens there. Comments are kept with the designs.",
+  },
+];
+
+/** Something picked on the drawing: a panel in a row, a panel placed by hand, or a label. */
+type Pick = { kind: "grid"; face: string; index: number } | { kind: "loose"; id: string } | { kind: "label"; id: string };
+
+const keyOf = (p: Pick) => (p.kind === "grid" ? `g:${p.face}:${p.index}` : p.kind === "loose" ? `l:${p.id}` : `n:${p.id}`);
+const same = (a: Pick, b: Pick) => keyOf(a) === keyOf(b);
+// Ids are made many at a time when an array is laid, so they count up as well as carrying the time.
+let made = 0;
+const newId = (prefix: string) => `${prefix}${Date.now().toString(36).slice(-5)}${(made++ % 46656).toString(36)}`;
+const middle = (corners: readonly Point[]): Point => ({
+  x: corners.reduce((n, c) => n + c.x, 0) / corners.length,
+  y: corners.reduce((n, c) => n + c.y, 0) / corners.length,
+});
+// A panel's angle goes all the way round: turned half way it looks the same, but faces the other way.
+const full = (angle: number) => ((angle % 360) + 360) % 360;
+/** What a tilt and direction make over a year beside lying flat, in words. */
+const besideFlat = (tilt: number, facing: number) => {
+  if (tilt === 0) return "Lying flat";
+  const gain = Math.round(gainOverFlat(tilt, facing) * 100);
+  return gain === 0 ? "The same as lying flat" : `${Math.abs(gain)}% ${gain > 0 ? "more" : "less"} than lying flat`;
+};
+const cm = (n: number) => Math.round(n * 100) / 100;
+const WHOLE: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: ROOF_IMAGE.width, h: ROOF_IMAGE.height };
+
+/**
+ * The roof designer: the roof from above, to scale, with a bar of tools down
+ * its side. Trace roof faces and panels fill them in rows; pick panels one or
+ * several at a time and move, turn or remove them; place single panels;
+ * string panels up in wiring order; pin labels for the inverter, battery and
+ * switchboard; zoom in and move around. Everything is saved with the design.
+ */
+export function RoofDesigner(props: {
+  address: string;
+  image: string;
+  /** The designs for this roof: up to five options, one of them the primary. */
+  set: DesignSet;
+  /** The panels, inverters and batteries to choose from. Never their costs. */
+  catalogue: CataloguePanel[];
+  inverters: CatalogueInverter[];
+  batteries: CatalogueBattery[];
+  yieldPerKwDay: number;
+  /** The business's price lists, parts, installation rates and margin: what the quote is worked out from. */
+  workspace: Workspace;
+  /** The STC rules, as last read. */
+  rates: RebateRates;
+  /** For the quote's rebate zone. */
+  postcode: string;
+  /** The customer's bill, and each design's quote settings and hand changes, as last saved. */
+  extras: DesignExtras;
+  /** Keeps the designs, the bill and the quotes: resolves to an error message when they couldn't be kept. */
+  onSave: (set: DesignSet, extras: DesignExtras) => Promise<string | null>;
+  /** The start of the bar at the top of the page (the wordmark and the address), and the way out, drawn by the page. */
+  bar?: React.ReactNode;
+  back?: React.ReactNode;
+}) {
+  // The design being worked on is held in the states below; the others wait in `designs`, whose entry for the
+  // one being worked on is out of date until it is put away again (`everyDesign`).
+  const first = props.set.designs[props.set.primary] ?? props.set.designs[0];
+  const spot = { lat: first.lat, lng: first.lng };
+  const [designs, setDesigns] = useState<RoofDesign[]>(props.set.designs);
+  const [active, setActive] = useState(props.set.primary);
+  const [primary, setPrimary] = useState(props.set.primary);
+  // What is typed to narrow a list on the bar (the inverters, the batteries): emptied whenever a list opens or closes.
+  const [seek, setSeek] = useState("");
+  const [menu, setMenu] = useState<"designs" | "panels" | "inverters" | "batteries" | "bill" | false>(false);
+  // The bar across the top of the picture: a press anywhere else puts its open list away.
+  const topBar = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const away = (e: PointerEvent) => {
+      if (topBar.current && !topBar.current.contains(e.target as Node)) {
+        setMenu(false);
+        setSeek("");
+      }
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [menu]);
+  /** Opens one of the bar's lists, or closes them: always with the search box empty. */
+  const openMenu = (to: typeof menu) => {
+    setMenu(to);
+    setSeek("");
+  };
+  // The battery on this design, and where it stands on the picture.
+  const [battery, setBattery] = useState<DesignBattery | undefined>(first.battery);
+  // The customer's electricity bill, as typed in from it: what the summary's bill, saving and payback are worked out from.
+  const [bill, setBillFields] = useState(props.extras.bill);
+  // Each design's quote settings and hand changes, in the designs' order.
+  const [quotes, setQuotes] = useState<QuoteFields[]>(props.extras.quotes);
+  // The price after STCs, as the quote builder last worked it out; null when there is nothing to price.
+  const [net, setNet] = useState<number | null>(null);
+  const onNet = useCallback((value: number | null) => setNet(value), []);
+  // The design someone has asked to delete, until they say they mean it.
+  const [doomed, setDoomed] = useState<number | null>(null);
+  const [faces, setFaces] = useState<Face[]>(first.faces);
+  const [loose, setLoose] = useState<LoosePanel[]>(first.loose ?? []);
+  const [strings, setStrings] = useState<PanelString[]>(first.strings ?? []);
+  const [labels, setLabels] = useState<DesignLabel[]>(first.labels ?? []);
+  const [panel, setPanel] = useState<PanelSpec | undefined>(first.panel);
+  const [designLabel, setDesignLabel] = useState(first.label ?? "");
+  // Guide lines along roof edges, and the one being drawn: its first end, and where the pointer has it reaching.
+  const [rules, setRules] = useState<GuideLine[]>(first.guides ?? []);
+  const [ruling, setRuling] = useState<{ a: Point; b: Point } | null>(null);
+  // The inverters on this design: one, or more on a larger system.
+  const [fitted, setFitted] = useState<InverterSpec[]>(first.inverters ?? []);
+  // Whether the inverter list is showing its suggestions for the panels on the design.
+  const [suggesting, setSuggesting] = useState(false);
+  // The string the pointer is over, on the picture or in the list of strings: its check is shown.
+  const [hover, setHover] = useState<string | null>(null);
+  const [tool, setTool] = useState<Tool>("select");
+  const [view, setView] = useState(WHOLE);
+  const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
+  const [picks, setPicks] = useState<Pick[]>([]);
+  const [wiring, setWiring] = useState<string | null>(first.strings?.[0]?.id ?? null);
+  const [labelKind, setLabelKind] = useState<LabelKind>("Inverter");
+  const [labelText, setLabelText] = useState("");
+  // The corners of a face being traced, before it is closed.
+  const [tracing, setTracing] = useState<Point[]>([]);
+  // The box being dragged out to pick several things.
+  const [band, setBand] = useState<{ a: Point; b: Point } | null>(null);
+  // The outline of the panel the "place a panel" tool would put down.
+  const [ghosts, setGhosts] = useState<LoosePanel[]>([]);
+  // Which way a picked group's turn handle points, in degrees from straight up: it follows the pointer while the group is spun.
+  const [spinAt, setSpinAt] = useState(0);
+  // The discussion: saved the moment something is said, apart from the drawing.
+  const [comments, setComments] = useState<DesignComment[]>(props.set.comments);
+  // The bubble that is open: one already there, or a spot waiting for its first words.
+  const [thread, setThread] = useState<{ id: string } | { at: Point } | null>(null);
+  const [words, setWords] = useState("");
+  const [talking, setTalking] = useState<"idle" | "sending" | { error: string }>("idle");
+
+  const say = (op: Record<string, unknown>) => {
+    const next = applyCommentOp(comments, op, "You", new Date().toISOString().slice(0, 16), newId("c"));
+    if (!next) return setTalking({ error: "That couldn't be saved." });
+    setComments(next);
+    setWords("");
+    setTalking("idle");
+    setSaved("changed");
+    // A new bubble opens as itself; one that has been removed closes.
+    if (op.do === "add") setThread(next.length ? { id: next[next.length - 1].id } : null);
+    if (op.do === "remove") setThread(null);
+  };
+  const [saved, setSaved] = useState<"saved" | "saving" | "changed" | { error: string }>("saved");
+  const svg = useRef<SVGSVGElement>(null);
+  // A press that may turn into a drag: of what is picked, of a box to pick with, or of the picture itself.
+  const press = useRef<
+    | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point> | null }
+    | { mode: "band"; at: Point; face: string | null; add: boolean; moved: boolean }
+    | { mode: "pan"; x: number; y: number; from: typeof WHOLE }
+    | { mode: "turn"; id: string; centre: Point }
+    | { mode: "array"; anchor: LoosePanel }
+    | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
+    | { mode: "battery"; dx: number; dy: number }
+    | { mode: "spin"; centre: Point; from: number; starts: Record<string, LoosePanel> }
+    | null
+  >(null);
+
+  // Undo and redo. The drawing (faces, panels, strings, labels) is remembered each time it changes: once for
+  // a click, and once for a whole drag however far it went. Comments aren't part of it: they are saved as posted.
+  const drawing = useMemo(
+    () => ({ faces, loose, strings, labels, panel, fitted, rules, battery }),
+    [faces, loose, strings, labels, panel, fitted, rules, battery],
+  );
+  const history = useRef({ past: [] as (typeof drawing)[], future: [] as (typeof drawing)[], last: drawing, restoring: false });
+  // Bumped when a drag ends, so the drawing is looked at again once the pointer has let go.
+  const [settled, setSettled] = useState(0);
+  // A slider being dragged changes the drawing at every notch: it is one step too.
+  const sliding = useRef(false);
+  const slides = {
+    onPointerDown: () => {
+      sliding.current = true;
+    },
+    onPointerUp: () => {
+      sliding.current = false;
+      setSettled((n) => n + 1);
+    },
+    onPointerCancel: () => {
+      sliding.current = false;
+      setSettled((n) => n + 1);
+    },
+  };
+  useEffect(() => {
+    const h = history.current;
+    if (h.last === drawing) return;
+    if (h.restoring) {
+      // This change is an undo or redo itself: it is where we are now, not a new step.
+      h.restoring = false;
+      h.last = drawing;
+      return;
+    }
+    // Mid-drag, every movement changes the drawing: wait for the drag to end, and remember where it began.
+    if (press.current || sliding.current) return;
+    h.past.push(h.last);
+    if (h.past.length > 100) h.past.shift();
+    h.future = [];
+    h.last = drawing;
+  }, [drawing, settled]);
+
+  const restore = (to: typeof drawing) => {
+    history.current.restoring = true;
+    setFaces(to.faces);
+    setLoose(to.loose);
+    setStrings(to.strings);
+    setLabels(to.labels);
+    setPanel(to.panel);
+    setFitted(to.fitted);
+    setRules(to.rules);
+    setBattery(to.battery);
+    setRuling(null);
+    setPicks([]);
+    setGhosts([]);
+    setSaved("changed");
+  };
+  const undo = () => {
+    const h = history.current;
+    const back = h.past.pop();
+    if (!back) return;
+    h.future.push(h.last);
+    restore(back);
+  };
+  const redo = () => {
+    const h = history.current;
+    const forward = h.future.pop();
+    if (!forward) return;
+    h.past.push(h.last);
+    restore(forward);
+  };
+
+  const scale = metresPerPixel(spot.lat);
+  // Line weights and sizes are in picture pixels, so they are thinned as the view is drawn in closer.
+  const u = view.w / ROOF_IMAGE.width;
+  const px = (p: Point) => [ROOF_IMAGE.width / 2 + p.x / scale, ROOF_IMAGE.height / 2 + p.y / scale] as const;
+  const path = (points: readonly Point[]) => points.map((p) => px(p).join(",")).join(" ");
+  const design = useMemo(() => ({ faces, loose, panel }), [faces, loose, panel]);
+  // The panel this design is drawn with: its size on the roof and its output.
+  const size = useMemo(() => panelOf({ panel }), [panel]);
+  const chosen = panel?.sku ?? props.catalogue[0]?.sku ?? "";
+  const chosenPanel = props.catalogue.find((p) => p.sku === chosen);
+
+  /** The design being worked on, as it would be saved. */
+  const working = (): RoofDesign => ({
+    ...spot,
+    faces,
+    loose,
+    strings,
+    labels,
+    ...(panel ? { panel } : {}),
+    ...(fitted.length ? { inverters: fitted } : {}),
+    ...(rules.length ? { guides: rules } : {}),
+    ...(battery ? { battery } : {}),
+    ...(designLabel.trim() ? { label: designLabel.trim().slice(0, 40) } : {}),
+  });
+  /** Every design, with the one being worked on as it stands now. */
+  const everyDesign = () => designs.map((d, i) => (i === active ? working() : d));
+  /** Puts a list of designs in place and opens one of them. Undo starts afresh: it doesn't reach across designs. */
+  const show = (list: RoofDesign[], index: number) => {
+    const next = list[index];
+    history.current.past = [];
+    history.current.future = [];
+    history.current.restoring = true;
+    setDesigns(list);
+    setActive(index);
+    // Fresh lists, so the drawing is seen to have changed even when the design opened is a copy of the last.
+    setFaces([...next.faces]);
+    setLoose([...(next.loose ?? [])]);
+    setStrings(next.strings ?? []);
+    setLabels(next.labels ?? []);
+    setPanel(next.panel);
+    setFitted(next.inverters ?? []);
+    setRules(next.guides ?? []);
+    setBattery(next.battery);
+    setRuling(null);
+    setHover(null);
+    setDesignLabel(next.label ?? "");
+    setSelected(next.faces[0]?.id ?? null);
+    setWiring(next.strings?.[0]?.id ?? null);
+    setPicks([]);
+    setTracing([]);
+    setGhosts([]);
+    setDoomed(null);
+    openMenu(false);
+  };
+  const setBill = (next: typeof bill) => {
+    setBillFields(next);
+    setSaved("changed");
+  };
+  const quoteNow = quotes[active] ?? defaultQuote(props.postcode);
+  const everyQuote = () => designs.map((_, i) => quotes[i] ?? defaultQuote(props.postcode));
+  const setQuote = (next: QuoteFields) => {
+    setQuotes(designs.map((_, i) => (i === active ? next : (quotes[i] ?? defaultQuote(props.postcode)))));
+    setSaved("changed");
+  };
+  const addDesign = (copy: boolean) => {
+    const list = everyDesign();
+    if (list.length >= MAX_DESIGNS) return;
+    const made: RoofDesign = copy
+      ? { ...working(), label: undefined }
+      : { ...spot, faces: [], loose: [], ...(panel ? { panel } : {}), ...(fitted.length ? { inverters: fitted } : {}) };
+    // A copy takes its quote's settings and hand changes with it; a new design starts with the same home and no changes.
+    setQuotes([...everyQuote(), copy ? quoteNow : { form: quoteNow.form, edits: {} }]);
+    show([...list, made], list.length);
+    setSaved("changed");
+  };
+  const removeDesign = (index: number) => {
+    const list = everyDesign().filter((_, i) => i !== index);
+    if (list.length) setQuotes(everyQuote().filter((_, i) => i !== index));
+    if (!list.length) return;
+    // Deleting the primary leaves the first design as the primary.
+    setPrimary(index === primary ? 0 : index < primary ? primary - 1 : primary);
+    if (index === active) show(list, Math.min(index, list.length - 1));
+    else {
+      setDesigns(list);
+      setActive(index < active ? active - 1 : active);
+      setDoomed(null);
+    }
+    setSaved("changed");
+  };
+  // The inverters, and each string checked against the input it is on.
+  const fittedItems = fitted.map((spec) => props.inverters.find((i) => i.sku === spec.sku));
+  const fittedKw = Math.round(fitted.reduce((n, i) => n + i.kw, 0) * 100) / 100;
+  const inputsOf = (n: number) => fittedItems[n]?.electrical?.mppts.length ?? 4;
+  const onInput = (n: number, index: number) => strings.filter((x) => (x.inverter ?? 0) === n && (x.mppt ?? 0) === index).length;
+  const checks = strings.map((x) =>
+    checkString({
+      panels: x.panels.length,
+      panel: chosenPanel?.electrical,
+      inverter: fittedItems[x.inverter ?? 0]?.electrical,
+      inverterChosen: Boolean(fitted[x.inverter ?? 0]),
+      panelName: panel?.name ?? chosenPanel?.name,
+      mppt: x.mppt ?? 0,
+      sharing: onInput(x.inverter ?? 0, x.mppt ?? 0),
+      mixed: stringIsMixed(design, x),
+    }),
+  );
+  /** Where a new string goes: the first input, on the first inverter, with a connector to spare. */
+  const freeInput = (): { inverter?: number; mppt: number } => {
+    for (let n = 0; n < fittedItems.length; n++) {
+      const free = fittedItems[n]?.electrical?.mppts.findIndex((m, index) => onInput(n, index) < m.strings) ?? -1;
+      if (free >= 0) return { ...(n > 0 ? { inverter: n } : {}), mppt: free };
+    }
+    return { mppt: 0 };
+  };
+  /** The inverters that would suit the panels on the design, worked out by rule (`inverter-suggest.ts`). */
+
+  /** Puts a suggestion on the design in place of whatever inverters were there. Strings on an inverter that is gone go back to the first. */
+  const takeSuggestion = (to: InverterSuggestion) => {
+    setFitted(Array.from({ length: to.count }, () => ({ sku: to.inverter.sku, name: to.inverter.name, kw: to.inverter.kw })));
+    setStrings(strings.map((x) => ((x.inverter ?? 0) < to.count ? x : { id: x.id, panels: x.panels, mppt: 0 })));
+    setSuggesting(false);
+    openMenu(false);
+    setSaved("changed");
+  };
+  /** The battery: another product from the catalogue (keeping how many, and where it stands), or more or fewer of it. */
+  const chooseBattery = (to: CatalogueBattery) => {
+    setBattery({
+      sku: to.sku,
+      name: to.name,
+      kwh: to.kwh,
+      qty: battery?.qty ?? 1,
+      // A new battery stands low on the right of what is in view, clear of the roof as a rule, to be dragged to its wall.
+      x: battery?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
+      y: battery?.y ?? cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
+    });
+    openMenu(false);
+    setSeek("");
+    setSaved("changed");
+  };
+  const batteryKwh = battery ? Math.round(battery.kwh * battery.qty * 10) / 10 : 0;
+  const addInverter = (to: CatalogueInverter) => {
+    if (fitted.length >= MAX_INVERTERS) return;
+    setFitted([...fitted, { sku: to.sku, name: to.name, kw: to.kw }]);
+    openMenu(false);
+    setSeek("");
+    setSaved("changed");
+  };
+  /** Takes an inverter off the design. Its strings go to the first input of the first inverter, to be placed again. */
+  const removeInverter = (n: number) => {
+    setFitted(fitted.filter((_, i) => i !== n));
+    setStrings(
+      strings.map((x) => {
+        const on = x.inverter ?? 0;
+        if (on === n) return { id: x.id, panels: x.panels, mppt: 0 };
+        return on > n ? { ...x, inverter: on - 1 > 0 ? on - 1 : undefined } : x;
+      }),
+    );
+    setSaved("changed");
+  };
+
+  /** Another panel from the catalogue. One of another size lays every face's rows out afresh. */
+  const choosePanel = (sku: string) => {
+    const to = props.catalogue.find((p) => p.sku === sku);
+    if (!to) return;
+    const resized = to.long !== size.long || to.short !== size.short;
+    setPanel({ sku: to.sku, name: to.name, watts: to.watts, long: to.long, short: to.short });
+    if (resized) {
+      setFaces(faces.map((f) => ({ ...f, off: [] })));
+      setStrings(strings.map((x) => ({ ...x, panels: x.panels.filter((k) => !k.startsWith("g:")) })).filter((x) => x.panels.length));
+      setPicks([]);
+    }
+    setSaved("changed");
+  };
+  const summary = useMemo(() => designSummary(design, props.yieldPerKwDay), [design, props.yieldPerKwDay]);
+  const year = useMemo(() => monthlyProduction(design, props.yieldPerKwDay), [design, props.yieldPerKwDay]);
+  // For the quote: the separate arrays on the roof, and the panels drawn at a tilt.
+  const arrays = useMemo(() => arrayCount(design), [design]);
+  const tilts = useMemo(() => tiltedPanels(design), [design]);
+  const centres = useMemo(() => Object.fromEntries(designPanels(design).map((p) => [p.key, middle(p.corners)])), [design]);
+  const face = faces.find((f) => f.id === selected) ?? null;
+  const isPicked = (pick: Pick) => picks.some((p) => same(p, pick));
+  const panelPicks = picks.filter((p) => p.kind !== "label");
+  const changed = () => setSaved("changed");
+  // Where the open comment's bubble is, as a share of the picture on screen, so its box can open beside it.
+  const threadAt = thread ? ("at" in thread ? thread.at : comments.find((c) => c.id === thread.id)) : null;
+  const threadSpot = threadAt
+    ? {
+        left: ((ROOF_IMAGE.width / 2 + threadAt.x / scale - view.x) / view.w) * 100,
+        top: ((ROOF_IMAGE.height / 2 + threadAt.y / scale - view.y) / view.h) * 100,
+      }
+    : null;
+
+  const update = (id: string, patch: Partial<Face>) => {
+    setFaces(faces.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+    changed();
+  };
+
+  /** Where on the roof the pointer is, in metres. */
+  const pointAt = (e: { clientX: number; clientY: number }): Point | null => {
+    const box = svg.current?.getBoundingClientRect();
+    if (!box) return null;
+    const x = view.x + ((e.clientX - box.left) / box.width) * view.w;
+    const y = view.y + ((e.clientY - box.top) / box.height) * view.h;
+    return { x: cm((x - ROOF_IMAGE.width / 2) * scale), y: cm((y - ROOF_IMAGE.height / 2) * scale) };
+  };
+
+  // The mouse wheel zooms in and out about the pointer, so the spot under it stays put.
+  useEffect(() => {
+    const el = svg.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const box = el.getBoundingClientRect();
+      const fx = (e.clientX - box.left) / box.width;
+      const fy = (e.clientY - box.top) / box.height;
+      setView((v) => {
+        const w = Math.min(ROOF_IMAGE.width, Math.max(40, v.w * (e.deltaY > 0 ? 1.15 : 1 / 1.15)));
+        const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
+        return {
+          x: Math.min(Math.max(0, v.x + fx * v.w - fx * w), ROOF_IMAGE.width - w),
+          y: Math.min(Math.max(0, v.y + fy * v.h - fy * h), ROOF_IMAGE.height - h),
+          w,
+          h,
+        };
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  /** A picked panel as one placed by hand would be: where its middle is and how it is turned, whichever kind it is. */
+  const standing = (pick: Pick): LoosePanel | null => {
+    if (pick.kind === "loose") return loose.find((p) => p.id === pick.id) ?? null;
+    if (pick.kind !== "grid") return null;
+    const from = faces.find((f) => f.id === pick.face);
+    const place = from && panelPlaces(from, size).find((p) => p.index === pick.index);
+    return from && place && !from.off.includes(pick.index) ? freed(from, place, "x") : null;
+  };
+
+  /**
+   * The panel the "place a panel" tool would put down at a point. Over a panel already there, it is the next
+   * one along: beside it on the side the pointer is nearest, at the same angle, a panel's gap away. Anywhere
+   * else it is a panel under the pointer, turned the way the face under it runs.
+   */
+  const ghostAt = (p: Point): LoosePanel | null => {
+    const hit = hitAt(p);
+    const base = hit && !hit.empty && hit.pick.kind !== "label" ? standing(hit.pick) : null;
+    if (!base) {
+      // In the open, next to a panel: the outline takes the place the pointer is in, beside, above, below or at a
+      // corner of the nearest panel, laid the way that panel is. Further off, it is a panel under the pointer.
+      const stepX = size.short + size.gap;
+      const stepY = size.long + size.gap;
+      let beside: { from: LoosePanel; i: number; j: number; away: number } | null = null;
+      const standingNow = [
+        ...loose,
+        ...faces.flatMap((f) =>
+          panelPlaces(f, size)
+            .filter((place) => !f.off.includes(place.index))
+            .map((place) => freed(f, place, "x")),
+        ),
+      ];
+      for (const from of standingNow) {
+        const away = Math.hypot(p.x - from.x, p.y - from.y);
+        if (away > stepY * 1.6 || (beside && away >= beside.away)) continue;
+        const t = (from.angle * Math.PI) / 180;
+        const i = Math.round(((p.x - from.x) * Math.cos(t) + (p.y - from.y) * Math.sin(t)) / stepX);
+        const j = Math.round((-(p.x - from.x) * Math.sin(t) + (p.y - from.y) * Math.cos(t)) / stepY);
+        if ((i || j) && Math.abs(i) <= 1 && Math.abs(j) <= 1) beside = { from, i, j, away };
+      }
+      if (beside) {
+        const t = (beside.from.angle * Math.PI) / 180;
+        const x = cm(beside.from.x + beside.i * stepX * Math.cos(t) - beside.j * stepY * Math.sin(t));
+        const y = cm(beside.from.y + beside.i * stepX * Math.sin(t) + beside.j * stepY * Math.cos(t));
+        if (!standingNow.some((other) => Math.hypot(other.x - x, other.y - y) < 0.4)) return { ...beside.from, id: "ghost", x, y };
+      }
+      const on = [...faces].reverse().find((f) => inside(p, f.points));
+      return on
+        ? { ...freed(on, { index: 0, corners: [p, p, p, p] }, "ghost"), x: p.x, y: p.y }
+        : { id: "ghost", x: p.x, y: p.y, angle: 0, tilt: TILT.roof };
+    }
+    const a = (base.angle * Math.PI) / 180;
+    // The pointer in the panel's own frame: across its short side (lx) and along its long side (ly).
+    const dx = p.x - base.x;
+    const dy = p.y - base.y;
+    const lx = dx * Math.cos(a) + dy * Math.sin(a);
+    const ly = -dx * Math.sin(a) + dy * Math.cos(a);
+    const across = Math.abs(lx) / (size.short / 2) > Math.abs(ly) / (size.long / 2);
+    const ox = across ? Math.sign(lx || 1) * (size.short + size.gap) : 0;
+    const oy = across ? 0 : Math.sign(ly || 1) * (size.long + size.gap);
+    const next = {
+      ...base,
+      id: "ghost",
+      x: cm(base.x + ox * Math.cos(a) - oy * Math.sin(a)),
+      y: cm(base.y + ox * Math.sin(a) + oy * Math.cos(a)),
+      angle: base.angle,
+    };
+    // Nothing is offered where a panel already stands.
+    const taken = designPanels(design).some(
+      (panel) => Math.hypot(middle(panel.corners).x - next.x, middle(panel.corners).y - next.y) < 0.4,
+    );
+    return taken ? null : next;
+  };
+
+  /**
+   * The panels a drag would place: from the first one, out to the pointer. Dragging across adds panels to the
+   * row; dragging up or down adds rows. Everything is in the first panel's own frame, so a turned panel makes a
+   * turned array. Places where a panel already stands are left out.
+   */
+  const arrayFrom = (anchor: LoosePanel, p: Point): LoosePanel[] => {
+    const a = (anchor.angle * Math.PI) / 180;
+    const dx = p.x - anchor.x;
+    const dy = p.y - anchor.y;
+    const stepX = size.short + size.gap;
+    const stepY = size.long + size.gap;
+    // How many panels the pointer is away from the first, across and along, in that panel's frame.
+    const across = Math.max(-40, Math.min(40, Math.round((dx * Math.cos(a) + dy * Math.sin(a)) / stepX)));
+    const along = Math.max(-20, Math.min(20, Math.round((-dx * Math.sin(a) + dy * Math.cos(a)) / stepY)));
+    const standingNow = designPanels(design).map((panel) => middle(panel.corners));
+    const out: LoosePanel[] = [];
+    for (let j = 0; j <= Math.abs(along); j++) {
+      for (let i = 0; i <= Math.abs(across); i++) {
+        const ox = i * Math.sign(across) * stepX;
+        const oy = j * Math.sign(along) * stepY;
+        const x = cm(anchor.x + ox * Math.cos(a) - oy * Math.sin(a));
+        const y = cm(anchor.y + ox * Math.sin(a) + oy * Math.cos(a));
+        if (standingNow.some((c) => Math.hypot(c.x - x, c.y - y) < 0.4)) continue;
+        out.push({ ...anchor, id: `ghost${i}x${j}`, x, y });
+      }
+    }
+    return out;
+  };
+
+  // With exactly one panel picked, the select tool shows a grip to drag it by and a handle to turn it with.
+  const handles = tool === "select" || tool === "panel";
+  const gripPanel = handles && panelPicks.length === 1 && picks.length === 1 ? standing(panelPicks[0]) : null;
+  const grip = gripPanel
+    ? {
+        panel: gripPanel,
+        turn: {
+          x: gripPanel.x + (size.long / 2 + 9 * u * scale) * Math.sin((gripPanel.angle * Math.PI) / 180),
+          y: gripPanel.y - (size.long / 2 + 9 * u * scale) * Math.cos((gripPanel.angle * Math.PI) / 180),
+        },
+      }
+    : null;
+
+  // Several panels picked: one handle to spin the whole group about its middle, standing clear of its furthest panel.
+  const spinGroup = (() => {
+    if (!handles || panelPicks.length < 2) return null;
+    const all = panelPicks.map(standing).filter((p): p is LoosePanel => p !== null);
+    if (all.length < 2) return null;
+    const centre = middle(all);
+    const reach = Math.max(...all.map((p) => Math.hypot(p.x - centre.x, p.y - centre.y))) + size.long / 2 + 9 * u * scale;
+    const a = (spinAt * Math.PI) / 180;
+    return { centre, turn: { x: centre.x + reach * Math.sin(a), y: centre.y - reach * Math.cos(a) } };
+  })();
+  /** The direction of a point from a centre, in degrees clockwise from straight up. */
+  const bearing = (p: Point, centre: Point) => (Math.atan2(p.x - centre.x, -(p.y - centre.y)) * 180) / Math.PI;
+
+  const zoom = (factor: number) => {
+    const w = Math.min(ROOF_IMAGE.width, Math.max(40, view.w * factor));
+    const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
+    const cx = view.x + view.w / 2;
+    const cy = view.y + view.h / 2;
+    setView({
+      x: Math.min(Math.max(0, cx - w / 2), ROOF_IMAGE.width - w),
+      y: Math.min(Math.max(0, cy - h / 2), ROOF_IMAGE.height - h),
+      w,
+      h,
+    });
+  };
+
+  const finish = (points: Point[]) => {
+    setTracing([]);
+    if (points.length < 3) return;
+    const id = newId("f");
+    const made: Face = { id, points, angle: 0, landscape: false, setback: 0.3, facing: "N", tilt: TILT.roof, off: [] };
+    setFaces([...faces, { ...made, angle: angleOfLongestEdge(made) }]);
+    changed();
+    setSelected(id);
+    setPicks([]);
+    setTool("select");
+  };
+
+  /**
+   * The picked panels, all as panels placed by hand: any that were in a row are taken out of it, where they
+   * stand. Returns the new faces and panels, the ids of the picked ones, and the new names of any that were
+   * renamed (a string must keep hold of a panel that has come out of its row).
+   */
+  const byHand = (chosen: Pick[]) => {
+    let nextFaces = faces;
+    const nextLoose = [...loose];
+    const ids: string[] = [];
+    const renamed: Record<string, string> = {};
+    for (const pick of chosen) {
+      if (pick.kind === "label") continue;
+      if (pick.kind === "loose") {
+        ids.push(pick.id);
+        continue;
+      }
+      const from = nextFaces.find((f) => f.id === pick.face);
+      const place = from && panelPlaces(from, size).find((p) => p.index === pick.index);
+      if (!from || !place || from.off.includes(pick.index)) continue;
+      const panel = freed(from, place, newId("p"));
+      nextFaces = nextFaces.map((f) => (f.id === from.id ? { ...f, off: [...f.off, pick.index] } : f));
+      nextLoose.push(panel);
+      ids.push(panel.id);
+      renamed[keyOf(pick)] = `l:${panel.id}`;
+    }
+    const nextStrings = Object.keys(renamed).length
+      ? strings.map((s) => ({ ...s, panels: s.panels.map((k) => renamed[k] ?? k) }))
+      : strings;
+    return { faces: nextFaces, loose: nextLoose, strings: nextStrings, ids };
+  };
+
+  /** Turns the picked panels together, about the middle of the group. */
+  const turn = (degrees: number) => {
+    if (!panelPicks.length) return;
+    const next = byHand(panelPicks);
+    const group = next.loose.filter((p) => next.ids.includes(p.id));
+    const centre = middle(group);
+    const a = (degrees * Math.PI) / 180;
+    setFaces(next.faces);
+    setStrings(next.strings);
+    setLoose(
+      next.loose.map((p) => {
+        if (!next.ids.includes(p.id)) return p;
+        const dx = p.x - centre.x;
+        const dy = p.y - centre.y;
+        return {
+          ...p,
+          x: cm(centre.x + dx * Math.cos(a) - dy * Math.sin(a)),
+          y: cm(centre.y + dx * Math.sin(a) + dy * Math.cos(a)),
+          angle: full(p.angle + degrees),
+        };
+      }),
+    );
+    setPicks([...next.ids.map((id): Pick => ({ kind: "loose", id })), ...picks.filter((p) => p.kind === "label")]);
+    changed();
+  };
+
+  /** Changes each picked panel where it stands (its tilt). One in a row comes out of the row. */
+  const amend = (change: (panel: LoosePanel) => LoosePanel) => {
+    if (!panelPicks.length) return;
+    const next = byHand(panelPicks);
+    setFaces(next.faces);
+    setStrings(next.strings);
+    setLoose(next.loose.map((p) => (next.ids.includes(p.id) ? change(p) : p)));
+    setPicks([...next.ids.map((id): Pick => ({ kind: "loose", id })), ...picks.filter((p) => p.kind === "label")]);
+    changed();
+  };
+
+  // Copy and paste (Ctrl+C, Ctrl+X, Ctrl+V): the picked panels as they stand, and where the pointer is on the picture.
+  const copied = useRef<{ panels: LoosePanel[]; centre: Point; pointer: Point | null } | null>(null);
+  const pointer = useRef<Point | null>(null);
+  const copyPicked = () => {
+    const panels = panelPicks.map(standing).filter((p): p is LoosePanel => p !== null);
+    if (!panels.length) return false;
+    copied.current = { panels, centre: middle(panels), pointer: pointer.current };
+    return true;
+  };
+  /**
+   * Puts down a copy of what was copied, picked and ready to drag or turn: under the pointer when it has moved
+   * since the copy or the last paste, otherwise a panel's width down and across from the last one, so pasting
+   * again and again without moving the mouse steps the copies out rather than stacking them.
+   */
+  const paste = () => {
+    const clip = copied.current;
+    if (!clip) return;
+    const at = pointer.current;
+    const moved = at && (!clip.pointer || Math.hypot(at.x - clip.pointer.x, at.y - clip.pointer.y) > 0.2);
+    const step = size.short + size.gap;
+    const to = moved && at ? at : { x: clip.centre.x + step, y: clip.centre.y + step };
+    const placed = clip.panels.map((p) => ({ ...p, id: newId("p"), x: cm(p.x - clip.centre.x + to.x), y: cm(p.y - clip.centre.y + to.y) }));
+    // The next paste is measured from this one.
+    copied.current = { panels: placed, centre: to, pointer: at };
+    setLoose([...loose, ...placed]);
+    setPicks(placed.map((p): Pick => ({ kind: "loose", id: p.id })));
+    setGhosts([]);
+    changed();
+  };
+
+  const removePicked = () => {
+    const keys = new Set(picks.map(keyOf));
+    setFaces(
+      faces.map((f) => {
+        const out = picks.filter((p) => p.kind === "grid" && p.face === f.id).map((p) => (p as { index: number }).index);
+        return out.length ? { ...f, off: [...new Set([...f.off, ...out])] } : f;
+      }),
+    );
+    setLoose(loose.filter((p) => !keys.has(`l:${p.id}`)));
+    setLabels(labels.filter((l) => !keys.has(`n:${l.id}`)));
+    setStrings(strings.map((s) => ({ ...s, panels: s.panels.filter((k) => !keys.has(k)) })).filter((s) => s.panels.length));
+    setPicks([]);
+    changed();
+  };
+
+  // The keyboard: Delete or Backspace takes out whatever is picked, and Escape picks nothing. Not while typing in a box.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing =
+        el &&
+        (el.tagName === "TEXTAREA" ||
+          el.isContentEditable ||
+          (el.tagName === "INPUT" && !["range", "checkbox", "radio", "button", "submit"].includes((el as HTMLInputElement).type)));
+      // An open comment with nothing being typed into it: Delete removes it.
+      if (e.key === "Delete" && thread && "id" in thread && !words && talking !== "sending") {
+        e.preventDefault();
+        void say({ do: "remove", id: thread.id });
+        return;
+      }
+      if (typing) return;
+      const command = e.ctrlKey || e.metaKey;
+      if (command && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (command && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+      } else if (command && ["c", "x"].includes(e.key.toLowerCase())) {
+        // Not while words on the page are selected: that copy is the browser's.
+        if (window.getSelection()?.toString() || !copyPicked()) return;
+        e.preventDefault();
+        if (e.key.toLowerCase() === "x") removePicked();
+      } else if (command && e.key.toLowerCase() === "v") {
+        if (!copied.current) return;
+        e.preventDefault();
+        paste();
+      } else if ((e.key === "Delete" || e.key === "Backspace") && picks.length) {
+        e.preventDefault();
+        removePicked();
+      } else if (e.key === "Escape") {
+        setPicks([]);
+        setTracing([]);
+        setThread(null);
+        openMenu(false);
+        setRuling(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  /** What is under a point: a label first, then a panel placed by hand, then one in a row. */
+  const hitAt = (p: Point): { pick: Pick; face: string | null; empty?: boolean } | null => {
+    const label = [...labels].reverse().find((l) => Math.hypot(l.x - p.x, l.y - p.y) < 9 * u * scale);
+    if (label) return { pick: { kind: "label", id: label.id }, face: null };
+    const hand = [...loose].reverse().find((panel) => inside(p, [...looseCorners(panel, size)]));
+    if (hand) return { pick: { kind: "loose", id: hand.id }, face: null };
+    for (const f of [...faces].reverse()) {
+      if (!inside(p, f.points)) continue;
+      const place = panelPlaces(f, size).find((panel) => inside(p, [...panel.corners]));
+      if (place) return { pick: { kind: "grid", face: f.id, index: place.index }, face: f.id, empty: f.off.includes(place.index) };
+    }
+    return null;
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    // A press puts the string check away: it would sit over what is being dragged.
+    setHover(null);
+    // Working on the picture takes the keyboard with it: a slider or button used a moment ago lets go of it.
+    const focused = document.activeElement as HTMLElement | null;
+    if (focused && focused !== document.body && focused.tagName !== "TEXTAREA") focused.blur();
+    const p = pointAt(e);
+    if (!p) return;
+    if (tool === "pan") {
+      svg.current?.setPointerCapture(e.pointerId);
+      press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: view };
+      return;
+    }
+    // A speech bubble opens its thread, whichever tool is on. The bubble is drawn up and to the right of the spot
+    // it is pinned to, so the click is tested against the bubble itself as well as its point.
+    const bubble = [...comments]
+      .reverse()
+      .find(
+        (c) =>
+          Math.hypot(c.x - p.x, c.y - p.y) < 5 * u * scale ||
+          (Math.abs(p.x - (c.x + 3.5 * u * scale)) < 11 * u * scale && Math.abs(p.y - (c.y - 12 * u * scale)) < 9 * u * scale),
+      );
+    if (bubble && tool !== "trace") {
+      setWords("");
+      setTalking("idle");
+      setPicks([]);
+      return setThread({ id: bubble.id });
+    }
+    if (battery && tool === "select" && Math.abs(p.x - battery.x) < 15 * u * scale && Math.abs(p.y - battery.y) < 26 * u * scale) {
+      // The battery: press it and drag it to the wall it will stand against.
+      svg.current?.setPointerCapture(e.pointerId);
+      setPicks([]);
+      press.current = { mode: "battery", dx: p.x - battery.x, dy: p.y - battery.y };
+      return;
+    }
+    if (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 7 * u * scale) {
+      // The group's turn handle: every picked panel swings round the middle of the group as the pointer goes round it.
+      // Any that were in a row come out of it first.
+      svg.current?.setPointerCapture(e.pointerId);
+      const next = byHand(panelPicks);
+      setFaces(next.faces);
+      setLoose(next.loose);
+      setStrings(next.strings);
+      setPicks([...next.ids.map((id): Pick => ({ kind: "loose", id })), ...picks.filter((x) => x.kind === "label")]);
+      setGhosts([]);
+      press.current = {
+        mode: "spin",
+        centre: spinGroup.centre,
+        from: bearing(p, spinGroup.centre),
+        starts: Object.fromEntries(next.loose.filter((x) => next.ids.includes(x.id)).map((x) => [x.id, x])),
+      };
+      return;
+    }
+    if (tool === "panel" && grip && Math.hypot(p.x - grip.turn.x, p.y - grip.turn.y) < 6 * u * scale) {
+      // The single panel's turn handle, while still adding panels.
+      const pick = panelPicks[0];
+      if (pick.kind === "loose") {
+        svg.current?.setPointerCapture(e.pointerId);
+        setGhosts([]);
+        press.current = { mode: "turn", id: pick.id, centre: { x: grip.panel.x, y: grip.panel.y } };
+        return;
+      }
+    }
+    if (tool === "rule") {
+      // A click on a guide line that is there takes it away; otherwise the first click starts one and the second ends it.
+      const near = (g: GuideLine) => {
+        const dx = g.b.x - g.a.x;
+        const dy = g.b.y - g.a.y;
+        const t = Math.max(0, Math.min(1, ((p.x - g.a.x) * dx + (p.y - g.a.y) * dy) / (dx * dx + dy * dy || 1)));
+        return Math.hypot(p.x - (g.a.x + t * dx), p.y - (g.a.y + t * dy)) < 4 * u * scale;
+      };
+      const there = ruling ? undefined : rules.find(near);
+      if (there) {
+        setRules(rules.filter((g) => g !== there));
+        return changed();
+      }
+      if (!ruling) return setRuling({ a: p, b: p });
+      if (Math.hypot(p.x - ruling.a.x, p.y - ruling.a.y) >= 0.2) {
+        setRules([...rules, { id: newId("r"), a: ruling.a, b: p }]);
+        changed();
+      }
+      return setRuling(null);
+    }
+    if (tool === "trace") {
+      // Clicking back on the first corner closes the face.
+      const [fx, fy] = tracing[0] ? px(tracing[0]) : [0, 0];
+      const [cx, cy] = px(p);
+      if (tracing.length >= 3 && Math.hypot(cx - fx, cy - fy) < 8 * u) return finish(tracing);
+      return setTracing([...tracing, p]);
+    }
+    if (tool === "panel") {
+      // The press starts where the outline was: beside the panel under the pointer, or under the pointer itself. Letting go
+      // places it; dragging first pulls it out into a row, and up or down into more rows (see `arrayFrom`).
+      const shown = ghostAt(p);
+      if (!shown) return;
+      svg.current?.setPointerCapture(e.pointerId);
+      press.current = { mode: "array", anchor: shown };
+      return setGhosts([shown]);
+    }
+    if (tool === "label") {
+      const label: DesignLabel = {
+        id: newId("n"),
+        x: p.x,
+        y: p.y,
+        kind: labelKind,
+        text: labelKind === "Note" ? labelText.trim().slice(0, 80) : "",
+      };
+      setLabels([...labels, label]);
+      setPicks([{ kind: "label", id: label.id }]);
+      setTool("select");
+      return changed();
+    }
+    if (tool === "comment") {
+      setWords("");
+      setTalking("idle");
+      return setThread({ at: p });
+    }
+    const hit = hitAt(p);
+    if (tool === "string") {
+      if (!hit || hit.pick.kind === "label" || hit.empty) return;
+      const key = keyOf(hit.pick);
+      const id = wiring && strings.some((s) => s.id === wiring) ? wiring : newId("s");
+      const others = strings.map((s) => (s.id === id ? s : { ...s, panels: s.panels.filter((k) => k !== key) }));
+      const mine: PanelString = others.find((s) => s.id === id) ?? { id, panels: [], ...freeInput() };
+      // A panel not yet on this string joins it at once. One already on it comes off when the press ends as a plain
+      // click; if the press turns into a drag, it is where the drag carries on from.
+      const had = mine.panels.includes(key);
+      const panels = had ? mine.panels : [...mine.panels, key];
+      setStrings([...others.filter((s) => s.id !== id && s.panels.length), { ...mine, panels }].sort((a, b) => a.id.localeCompare(b.id)));
+      setWiring(id);
+      svg.current?.setPointerCapture(e.pointerId);
+      press.current = { mode: "wire", id, first: key, had, dragged: false };
+      return changed();
+    }
+    // The select tool.
+    svg.current?.setPointerCapture(e.pointerId);
+    if (grip && Math.hypot(p.x - grip.turn.x, p.y - grip.turn.y) < 6 * u * scale) {
+      // The turn handle: the panel follows the pointer round its middle. One in a row comes out of the row first.
+      const pick = panelPicks[0];
+      let id = pick.kind === "loose" ? pick.id : null;
+      if (pick.kind === "grid") {
+        const next = byHand([pick]);
+        setFaces(next.faces);
+        setLoose(next.loose);
+        setStrings(next.strings);
+        id = next.ids[0] ?? null;
+        if (id) setPicks([{ kind: "loose", id }]);
+      }
+      if (id) press.current = { mode: "turn", id, centre: { x: grip.panel.x, y: grip.panel.y } };
+      return;
+    }
+    if (hit?.empty && hit.pick.kind === "grid") {
+      // An empty place in a row: the panel goes back.
+      const back = hit.pick;
+      const f = faces.find((x) => x.id === back.face);
+      if (f) update(f.id, { off: f.off.filter((i) => i !== back.index) });
+      setSelected(back.face);
+      return setPicks([back]);
+    }
+    if (hit) {
+      if (hit.face) setSelected(hit.face);
+      if (e.shiftKey) return setPicks(isPicked(hit.pick) ? picks.filter((x) => !same(x, hit.pick)) : [...picks, hit.pick]);
+      // Pressing something picked keeps the whole group, ready to drag; pressing anything else picks just that.
+      const group = isPicked(hit.pick) ? picks : [hit.pick];
+      setPicks(group);
+      press.current = { mode: "move", at: p, picks: group, starts: null };
+      return;
+    }
+    const on = [...faces].reverse().find((f) => inside(p, f.points));
+    press.current = { mode: "band", at: p, face: on?.id ?? null, add: e.shiftKey, moved: false };
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    pointer.current = pointAt(e);
+    const held = press.current;
+    if (!held) {
+      const under = pointer.current ? hitAt(pointer.current) : null;
+      const key = under && !under.empty && under.pick.kind !== "label" ? keyOf(under.pick) : null;
+      const over = key ? (strings.find((x) => x.panels.includes(key))?.id ?? null) : null;
+      if (over !== hover) setHover(over);
+      // A guide line being drawn reaches to the pointer.
+      if (tool === "rule" && ruling && pointer.current) setRuling({ a: ruling.a, b: pointer.current });
+      // Placing panels: the outline of the one a click would put down follows the pointer.
+      if (tool === "panel") {
+        const p = pointAt(e);
+        const next = p ? ghostAt(p) : null;
+        setGhosts(next ? [next] : []);
+      }
+      return;
+    }
+    if (held.mode === "array") {
+      const p = pointAt(e);
+      if (p) setGhosts(arrayFrom(held.anchor, p));
+      return;
+    }
+    if (held.mode === "battery") {
+      const p = pointAt(e);
+      if (!p) return;
+      setBattery((b) => (b ? { ...b, x: cm(p.x - held.dx), y: cm(p.y - held.dy) } : b));
+      return changed();
+    }
+    if (held.mode === "wire") {
+      // Each panel the pointer comes onto joins the end of the string, leaving any other string it was on: the
+      // path of the drag is the path of the wiring, round corners and from row to row.
+      const p = pointAt(e);
+      const under = p ? hitAt(p) : null;
+      if (!under || under.empty || under.pick.kind === "label") return;
+      const key = keyOf(under.pick);
+      if (key !== held.first) held.dragged = true;
+      // Worked out from the strings as they stand when this is applied, not as they were when the page last drew: the
+      // pointer can cross two panels between one drawing and the next.
+      setStrings((all) => {
+        const mine = all.find((x) => x.id === held.id);
+        if (!mine || mine.panels.includes(key)) return all;
+        return all
+          .map((x) => (x.id === held.id ? { ...x, panels: [...x.panels, key] } : { ...x, panels: x.panels.filter((k) => k !== key) }))
+          .filter((x) => x.panels.length);
+      });
+      return changed();
+    }
+    if (held.mode === "spin") {
+      const p = pointAt(e);
+      if (!p) return;
+      const now = bearing(p, held.centre);
+      const by = now - held.from;
+      const a = (by * Math.PI) / 180;
+      setLoose((all) =>
+        all.map((panel) => {
+          const start = held.starts[panel.id];
+          if (!start) return panel;
+          const dx = start.x - held.centre.x;
+          const dy = start.y - held.centre.y;
+          return {
+            ...panel,
+            x: cm(held.centre.x + dx * Math.cos(a) - dy * Math.sin(a)),
+            y: cm(held.centre.y + dx * Math.sin(a) + dy * Math.cos(a)),
+            angle: full(Math.round(start.angle + by)),
+          };
+        }),
+      );
+      setSpinAt(now);
+      return changed();
+    }
+    if (held.mode === "turn") {
+      const p = pointAt(e);
+      if (!p) return;
+      // The handle sits beyond the panel's top edge, so the panel's long side points at the pointer.
+      const angle = full(Math.round((Math.atan2(p.x - held.centre.x, -(p.y - held.centre.y)) * 180) / Math.PI));
+      setLoose((all) => all.map((panel) => (panel.id === held.id ? { ...panel, angle } : panel)));
+      return changed();
+    }
+    if (held.mode === "pan") {
+      const box = svg.current?.getBoundingClientRect();
+      if (!box) return;
+      const dx = ((e.clientX - held.x) / box.width) * held.from.w;
+      const dy = ((e.clientY - held.y) / box.height) * held.from.h;
+      return setView({
+        ...held.from,
+        x: Math.min(Math.max(0, held.from.x - dx), ROOF_IMAGE.width - held.from.w),
+        y: Math.min(Math.max(0, held.from.y - dy), ROOF_IMAGE.height - held.from.h),
+      });
+    }
+    const p = pointAt(e);
+    if (!p) return;
+    // A press only becomes a drag once it has gone a little way: a click shouldn't nudge anything.
+    const far = Math.hypot(p.x - held.at.x, p.y - held.at.y) >= 4 * u * scale;
+    if (held.mode === "band") {
+      if (!held.moved && !far) return;
+      held.moved = true;
+      return setBand({ a: held.at, b: p });
+    }
+    if (!held.starts) {
+      if (!far) return;
+      // The drag begins: every picked panel becomes one placed by hand, and where each thing started is remembered.
+      const next = byHand(held.picks);
+      const labelIds = held.picks.filter((x) => x.kind === "label").map((x) => (x as { id: string }).id);
+      held.starts = Object.fromEntries([
+        ...next.loose.filter((x) => next.ids.includes(x.id)).map((x) => [`l:${x.id}`, { x: x.x, y: x.y }]),
+        ...labels.filter((l) => labelIds.includes(l.id)).map((l) => [`n:${l.id}`, { x: l.x, y: l.y }]),
+      ]);
+      setFaces(next.faces);
+      setLoose(next.loose);
+      setStrings(next.strings);
+      setPicks([...next.ids.map((id): Pick => ({ kind: "loose", id })), ...labelIds.map((id): Pick => ({ kind: "label", id }))]);
+    }
+    const starts = held.starts ?? {};
+    const dx = p.x - held.at.x;
+    const dy = p.y - held.at.y;
+    const moved = <T extends { id: string; x: number; y: number }>(prefix: string, item: T): T => {
+      const start = starts[`${prefix}:${item.id}`];
+      return start ? { ...item, x: cm(start.x + dx), y: cm(start.y + dy) } : item;
+    };
+    setLoose((all) => all.map((panel) => moved("l", panel)));
+    setLabels((all) => all.map((label) => moved("n", label)));
+    changed();
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    const held = press.current;
+    press.current = null;
+    svg.current?.releasePointerCapture(e.pointerId);
+    // The drag is over: whatever it changed becomes one step to undo.
+    setSettled((n) => n + 1);
+    if (held?.mode === "spin") return setSpinAt(0);
+    if (held?.mode === "wire") {
+      // A plain click on a panel that was already on the string takes it off.
+      if (held.had && !held.dragged)
+        setStrings(
+          strings
+            .map((x) => (x.id === held.id ? { ...x, panels: x.panels.filter((k) => k !== held.first) } : x))
+            .filter((x) => x.panels.length),
+        );
+      return;
+    }
+    if (held?.mode === "array") {
+      // Everything outlined is placed, and picked, so the whole array can be nudged or turned straight away.
+      const placed = ghosts.map((g) => ({ ...g, id: newId("p") }));
+      if (placed.length) {
+        setLoose([...loose, ...placed]);
+        setPicks(placed.map((g): Pick => ({ kind: "loose", id: g.id })));
+        changed();
+      }
+      return setGhosts([]);
+    }
+    if (held?.mode !== "band") return;
+    if (!held.moved || !band) {
+      // A plain click off everything: the face under it is the one to work on, and nothing is picked.
+      setSelected(held.face);
+      if (!held.add) setPicks([]);
+      return setBand(null);
+    }
+    // Everything whose middle is inside the box is picked.
+    const [x1, x2] = [Math.min(band.a.x, band.b.x), Math.max(band.a.x, band.b.x)];
+    const [y1, y2] = [Math.min(band.a.y, band.b.y), Math.max(band.a.y, band.b.y)];
+    const within = (c: Point) => c.x >= x1 && c.x <= x2 && c.y >= y1 && c.y <= y2;
+    const caught: Pick[] = [
+      ...faces.flatMap((f) =>
+        panelPlaces(f, size)
+          .filter((place) => !f.off.includes(place.index) && within(middle(place.corners)))
+          .map((place): Pick => ({ kind: "grid", face: f.id, index: place.index })),
+      ),
+      ...loose.filter(within).map((panel): Pick => ({ kind: "loose", id: panel.id })),
+      ...labels.filter(within).map((label): Pick => ({ kind: "label", id: label.id })),
+    ];
+    setPicks(held.add ? [...picks, ...caught.filter((c) => !isPicked(c))] : caught);
+    setBand(null);
+  };
+
+  const save = async () => {
+    setSaved("saving");
+    const problem = await props.onSave({ designs: everyDesign(), primary, comments }, { bill, quotes: everyQuote() });
+    setSaved(problem ? { error: problem } : "saved");
+  };
+
+  const button =
+    "inline-flex min-h-10 items-center rounded-full border border-line bg-surface px-4 text-sm font-medium hover:border-forest disabled:bg-surface-2 disabled:text-muted disabled:hover:border-line";
+  const label = "text-[10px] font-medium uppercase tracking-[0.18em] text-muted";
+  const onlyOne = picks.length === 1 && picks[0].kind === "loose" ? loose.find((p) => p.id === (picks[0] as { id: string }).id) : null;
+  const stringOf = (key: string) => strings.findIndex((s) => s.panels.includes(key));
+  // The picked panels' tilt and direction, when they all share one.
+  const pickedPanels = panelPicks.map(standing).filter((p): p is LoosePanel => p !== null);
+  const shared = (of: (p: LoosePanel) => number) =>
+    pickedPanels.length && pickedPanels.every((p) => of(p) === of(pickedPanels[0])) ? of(pickedPanels[0]) : null;
+  const pickedTilt = shared((p) => p.tilt ?? TILT.roof);
+  const pickedFacing = shared(panelFacing);
+  // What the design does to the customer's bill, once their bill is typed in.
+  const finance =
+    summary.panels > 0
+      ? designFinance(
+          {
+            interval: bill.interval,
+            amount: Number(bill.amount) || 0,
+            supplyPerDay: Number(bill.supplyPerDay) || 0,
+            rate: Number(bill.rate) || 0,
+            feedIn: Number(bill.feedIn) || 0,
+          },
+          year,
+          batteryKwh,
+          props.workspace.settings.bill.selfUseShare,
+        )
+      : null;
+  const dollars = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
+  const panelName = panel?.name ?? chosenPanel?.name ?? "Panels";
+  const spec: SystemSpec = {
+    panels: summary.panels,
+    panel: { sku: chosen, name: panelName, watts: size.watts, short: size.short },
+    inverters: fitted.map((i) => ({ sku: i.sku, name: i.name })),
+    battery: battery ? { sku: battery.sku, name: battery.name, kwh: battery.kwh, qty: battery.qty } : null,
+    arrays,
+    tiltedPanels: tilts.count,
+    tiltDegrees: tilts.steepest,
+  };
+  const suggestions = suggesting
+    ? suggestInverters({
+        arrayKw: summary.kw,
+        inverters: props.inverters,
+        panel: chosenPanel?.electrical,
+        strings: strings.map((x) => x.panels.length),
+      })
+    : [];
+  // Lining panels up with the roof: while panels are being added, or are picked, every traced face's outline is
+  // lit in gold, and the face they stand on shows how far they are from each of its edges.
+  const guide = tool === "panel" || tool === "rule" || pickedPanels.length > 0;
+  /**
+   * How far the panels are from what is around them: **four distances, square to the panels** (off each side of
+   * the group, in the panels' own directions), each to the first traced roof edge or guide line that way. The
+   * gutter, the ridge and the two ends, which is what a layout is measured from: not a line to every edge of the
+   * face, which on a roof with many edges crossed and overlapped.
+   */
+  const measures = (() => {
+    const group = pickedPanels.length ? pickedPanels : tool === "panel" ? ghosts : [];
+    if (!group.length) return [];
+    const edges = [...faces.flatMap((face) => face.points.map((a, i) => ({ a, b: face.points[(i + 1) % face.points.length] }))), ...rules];
+    if (!edges.length) return [];
+    const corners = group.flatMap((p) => [...looseCorners(p, size)]);
+    // The panels' own frame: along their long edge, and across it.
+    const turned = (group[0].angle * Math.PI) / 180;
+    const along = { x: Math.sin(turned), y: -Math.cos(turned) };
+    const across = { x: Math.cos(turned), y: Math.sin(turned) };
+    const spread = (axis: Point) => {
+      const at = corners.map((c) => c.x * axis.x + c.y * axis.y);
+      return { least: Math.min(...at), most: Math.max(...at) };
+    };
+    const [l, w] = [spread(along), spread(across)];
+    const midL = (l.least + l.most) / 2;
+    const midW = (w.least + w.most) / 2;
+    const place = (onAlong: number, onAcross: number): Point => ({
+      x: onAlong * along.x + onAcross * across.x,
+      y: onAlong * along.y + onAcross * across.y,
+    });
+    const rays = [
+      { from: place(l.most, midW), way: along },
+      { from: place(l.least, midW), way: { x: -along.x, y: -along.y } },
+      { from: place(midL, w.most), way: across },
+      { from: place(midL, w.least), way: { x: -across.x, y: -across.y } },
+    ];
+    return rays.flatMap(({ from, way }) => {
+      let gap = Infinity;
+      for (const { a, b } of edges) {
+        const ex = b.x - a.x;
+        const ey = b.y - a.y;
+        const cross = way.x * ey - way.y * ex;
+        if (Math.abs(cross) < 1e-9) continue;
+        const t = ((a.x - from.x) * ey - (a.y - from.y) * ex) / cross;
+        const on = ((a.x - from.x) * way.y - (a.y - from.y) * way.x) / cross;
+        if (t >= 0 && t < gap && on >= 0 && on <= 1) gap = t;
+      }
+      return gap < 60 ? [{ gap, from, to: { x: from.x + way.x * gap, y: from.y + way.y * gap }, way }] : [];
+    });
+  })();
+  /**
+   * The mark in the middle of a panel: an arrow pointing the way it faces (down its slope), or a ring when it
+   * lies flat and faces nowhere.
+   */
+  const aspect = (centre: Point, facing: number, tilt: number, colour: string, weight = 0.8) => {
+    const [cx, cy] = px(centre);
+    if (tilt === 0)
+      return <circle cx={cx} cy={cy} r={0.16 / scale} fill="none" stroke={colour} strokeWidth={weight * u} pointerEvents="none" />;
+    const a = (facing * Math.PI) / 180;
+    const reach = 0.36 / scale;
+    const [tx, ty] = [cx + Math.sin(a) * reach, cy - Math.cos(a) * reach];
+    const barb = (off: number) => `${tx - (Math.sin(a + off) * 0.22) / scale},${ty + (Math.cos(a + off) * 0.22) / scale}`;
+    return (
+      <path
+        d={`M${cx - Math.sin(a) * reach},${cy + Math.cos(a) * reach} L${tx},${ty} M${barb(0.55)} L${tx},${ty} L${barb(-0.55)}`}
+        fill="none"
+        stroke={colour}
+        strokeWidth={weight * u}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        pointerEvents="none"
+      />
+    );
+  };
+  const top = Math.max(1, ...year);
+
+  return (
+    <div>
+      {/* The bar that stays at the top of the page: the wordmark, the address being designed, and saving. */}
+      <header className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line bg-canvas/95 px-4 py-2 text-ink backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        {props.bar}
+        <dl className="flex min-w-0 flex-1 basis-56 items-center gap-x-6 overflow-hidden border-line lg:border-l lg:pl-5">
+          <div className="min-w-0 flex-1">
+            <dt className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">Address</dt>
+            <dd className="truncate text-sm">
+              <h1>{props.address}</h1>
+            </dd>
+          </div>
+        </dl>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="text-xs text-muted" role="status">
+            {saved === "saved"
+              ? "Saved on this device"
+              : saved === "saving"
+                ? "Saving…"
+                : saved === "changed"
+                  ? "Not saved yet"
+                  : saved.error}
+          </span>
+          <button
+            onClick={save}
+            disabled={saved === "saved" || saved === "saving"}
+            className="inline-flex h-10 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+          >
+            Save design
+          </button>
+          {props.back}
+        </div>
+      </header>
+
+      <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_23rem] 2xl:grid-cols-[minmax(0,1fr)_26rem]">
+        <div className="min-w-0">
+          <div>
+            {/* The figures, in one slim row over the picture, in the site's drawn style: small capitals, thin rules, and the year as fine gold lines. */}
+            <section
+              className="relative mx-auto mb-2 flex items-center gap-4 overflow-hidden rounded-2xl bg-forest px-4 py-2 text-white"
+              style={{ maxWidth: "calc((100dvh - 11rem) * 1.6)" }}
+              aria-label="This design in figures"
+            >
+              <dl className="relative flex shrink-0 divide-x divide-white/15">
+                {[
+                  ["Panels", String(summary.panels)],
+                  ["kW", summary.kw.toFixed(2)],
+                  ["kWh/day", String(summary.kwhPerDay)],
+                  ["kWh/year", year.reduce((n, kwh) => n + kwh, 0).toLocaleString("en-AU")],
+                ].map(([name, value]) => (
+                  <div key={name} className="px-3 first:pl-0">
+                    <dt className="text-[9px] font-medium uppercase tracking-[0.16em] text-white/55">{name}</dt>
+                    <dd className="text-base font-semibold tabular-nums leading-tight">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div
+                className="relative flex w-44 shrink-0 items-end gap-0.5 border-l border-white/15 pl-4"
+                role="img"
+                aria-label={`Monthly output, from ${year[0]} kWh in January to ${year[5]} in June`}
+              >
+                {year.map((kwh, m) => (
+                  <div key={m} className="flex min-w-0 flex-1 flex-col items-center" title={`${kwh.toLocaleString("en-AU")} kWh`}>
+                    <div className="flex h-7 w-full items-end justify-center gap-[2px] border-b border-white/40">
+                      {[0.6, 1].map((strength, n) => (
+                        <span
+                          key={n}
+                          className="w-px bg-sun-bright"
+                          style={{ height: `${Math.max(6, (kwh / top) * 100)}%`, opacity: strength }}
+                        />
+                      ))}
+                    </div>
+                    <span className="mt-0.5 text-[8px] leading-none text-white/55">{"JFMAMJJASOND"[m]}</span>
+                  </div>
+                ))}
+              </div>
+              {/* The system, summed up: what it is, and what it does to this home's bill once the bill is typed in. */}
+              <dl
+                className="relative flex min-w-0 flex-1 flex-wrap gap-y-1 divide-x divide-white/15 border-l border-white/15"
+                aria-label="System summary"
+              >
+                {(
+                  [
+                    ["Inverter", fitted.length ? `${fittedKw} kW` : "–"],
+                    ["Battery", battery ? `${batteryKwh} kWh` : "none"],
+                    ["Self-use", finance ? `${Math.round(finance.selfConsumption * 100)}%` : "–"],
+                    ["Bill now", finance ? dollars(finance.billNow) : "–"],
+                    ["Bill after", finance ? dollars(finance.billAfter) : "–"],
+                    ["Saves a year", finance ? dollars(finance.saving) : "–"],
+                    ["After STCs", net !== null ? dollars(net) : "–"],
+                    ["Payback", finance && net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–"],
+                  ] as const
+                ).map(([name, value]) => (
+                  <div key={name} className="px-3">
+                    <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.16em] text-white/55">{name}</dt>
+                    <dd
+                      className={clsx(
+                        "whitespace-nowrap text-base font-semibold tabular-nums leading-tight",
+                        name === "Saves a year" && finance && "text-sun-bright",
+                      )}
+                    >
+                      {value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+            <div className="relative mx-auto" style={{ maxWidth: "calc((100dvh - 11rem) * 1.6)" }}>
+              <div className="overflow-hidden rounded-2xl bg-ink">
+                <svg
+                  ref={svg}
+                  viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
+                  className={clsx(
+                    "block w-full touch-none select-none",
+                    tool === "pan" ? "cursor-grab" : tool === "select" ? "cursor-default" : "cursor-crosshair",
+                  )}
+                  onPointerDown={onPointerDown}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                  onPointerCancel={onPointerUp}
+                  onPointerLeave={() => {
+                    pointer.current = null;
+                    setHover(null);
+                    if (!press.current) setGhosts([]);
+                  }}
+                  role="img"
+                  aria-label={`The roof at ${props.address} from above, with ${summary.panels} panels placed`}
+                >
+                  {props.image && <image href={props.image} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} />}
+                  {faces.map((f) => {
+                    const on = f.id === selected;
+                    const off = new Set(f.off);
+                    return (
+                      <g key={f.id}>
+                        <polygon
+                          points={path(f.points)}
+                          fill={GOLD}
+                          fillOpacity={on ? 0.1 : 0.04}
+                          stroke={on ? "#ffffff" : GOLD}
+                          strokeWidth={(on ? 1.4 : 1) * u}
+                        />
+                        {panelPlaces(f, size).map((panel) => {
+                          if (off.has(panel.index))
+                            // A place with its panel taken out: only shown on the face being worked on, so it can be put back.
+                            return on ? (
+                              <polygon
+                                key={panel.index}
+                                points={path(panel.corners)}
+                                fill="none"
+                                stroke="#ffffff"
+                                strokeOpacity="0.4"
+                                strokeWidth={0.5 * u}
+                                strokeDasharray={`${2 * u} ${2 * u}`}
+                              />
+                            ) : null;
+                          const pick: Pick = { kind: "grid", face: f.id, index: panel.index };
+                          const lit = isPicked(pick);
+                          const wired = stringOf(keyOf(pick));
+                          return (
+                            <g key={panel.index}>
+                              <polygon
+                                points={path(panel.corners)}
+                                fill={wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#0b0c0e"}
+                                fillOpacity={wired >= 0 ? 0.72 : 0.82}
+                                stroke={lit ? "#ffffff" : wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : GOLD}
+                                strokeWidth={(lit ? 1.6 : 0.7) * u}
+                              />
+                              {aspect(
+                                middle(panel.corners),
+                                faceFacing(f),
+                                f.tilt ?? TILT.roof,
+                                wired >= 0 ? "#0b0c0e" : lit ? "#ffffff" : GOLD,
+                              )}
+                            </g>
+                          );
+                        })}
+                      </g>
+                    );
+                  })}
+                  {/* Panels placed by hand, on top. */}
+                  {loose.map((panel) => {
+                    const pick: Pick = { kind: "loose", id: panel.id };
+                    const lit = isPicked(pick);
+                    const wired = stringOf(keyOf(pick));
+                    return (
+                      <g key={panel.id}>
+                        <polygon
+                          points={path(looseCorners(panel, size))}
+                          fill={wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#0b0c0e"}
+                          fillOpacity={wired >= 0 ? 0.72 : 0.82}
+                          stroke={lit ? "#ffffff" : wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : GOLD}
+                          strokeWidth={(lit ? 1.6 : 0.7) * u}
+                        />
+                        {aspect(panel, panelFacing(panel), panel.tilt ?? TILT.roof, wired >= 0 ? "#0b0c0e" : lit ? "#ffffff" : GOLD)}
+                      </g>
+                    );
+                  })}
+                  {/* Guide lines, at rest: thin gold lines along the roof edges they were drawn on. */}
+                  {!guide &&
+                    rules.map((g) => (
+                      <line
+                        key={g.id}
+                        x1={px(g.a)[0]}
+                        y1={px(g.a)[1]}
+                        x2={px(g.b)[0]}
+                        y2={px(g.b)[1]}
+                        stroke={GOLD}
+                        strokeWidth={1.1 * u}
+                        strokeLinecap="round"
+                        pointerEvents="none"
+                      />
+                    ))}
+                  {ruling && (
+                    <g pointerEvents="none">
+                      <line
+                        x1={px(ruling.a)[0]}
+                        y1={px(ruling.a)[1]}
+                        x2={px(ruling.b)[0]}
+                        y2={px(ruling.b)[1]}
+                        stroke="#ffffff"
+                        strokeWidth={1.4 * u}
+                        strokeDasharray={`${4 * u} ${3 * u}`}
+                      />
+                      <circle cx={px(ruling.a)[0]} cy={px(ruling.a)[1]} r={3 * u} fill={GOLD} stroke="#0b0c0e" strokeWidth={u} />
+                      <text
+                        x={px(ruling.b)[0] + 8 * u}
+                        y={px(ruling.b)[1] - 6 * u}
+                        fontSize={7.5 * u}
+                        fontWeight="700"
+                        fill="#ffffff"
+                        stroke="#0b0c0e"
+                        strokeWidth={2.2 * u}
+                        paintOrder="stroke"
+                      >
+                        {Math.hypot(ruling.b.x - ruling.a.x, ruling.b.y - ruling.a.y).toFixed(2)} m
+                      </text>
+                    </g>
+                  )}
+                  {/* The roof's outline, lit while panels are being placed or lined up, with the distance to each edge of the face they are on. */}
+                  {guide && (
+                    <g pointerEvents="none">
+                      {rules.map((g) => (
+                        <line
+                          key={g.id}
+                          x1={px(g.a)[0]}
+                          y1={px(g.a)[1]}
+                          x2={px(g.b)[0]}
+                          y2={px(g.b)[1]}
+                          stroke={GOLD}
+                          strokeWidth={2.4 * u}
+                          strokeLinecap="round"
+                          style={{ filter: `drop-shadow(0 0 ${3 * u}px rgba(230, 184, 74, 0.95))` }}
+                        />
+                      ))}
+                      {faces.map((f) => (
+                        <polygon
+                          key={f.id}
+                          points={path(f.points)}
+                          fill="none"
+                          stroke={GOLD}
+                          strokeWidth={2.4 * u}
+                          strokeLinejoin="round"
+                          style={{ filter: `drop-shadow(0 0 ${3 * u}px rgba(230, 184, 74, 0.95))` }}
+                        />
+                      ))}
+                      {measures.map((m, i) => {
+                        const [x1, y1] = px(m.from);
+                        const [x2, y2] = px(m.to);
+                        return (
+                          <g key={i}>
+                            <line
+                              x1={x1}
+                              y1={y1}
+                              x2={x2}
+                              y2={y2}
+                              stroke="#ffffff"
+                              strokeWidth={0.7 * u}
+                              strokeDasharray={`${2 * u} ${1.5 * u}`}
+                            />
+                            <text
+                              x={Math.hypot(x2 - x1, y2 - y1) > 34 * u ? (x1 + x2) / 2 : x2 + m.way.x * 17 * u}
+                              y={(Math.hypot(x2 - x1, y2 - y1) > 34 * u ? (y1 + y2) / 2 : y2 + m.way.y * 9 * u) + 2.5 * u}
+                              textAnchor="middle"
+                              fontSize={7.5 * u}
+                              fontWeight="700"
+                              fill="#ffffff"
+                              stroke="#0b0c0e"
+                              strokeWidth={2.2 * u}
+                              paintOrder="stroke"
+                            >
+                              {m.gap.toFixed(2)} m
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </g>
+                  )}
+                  {/* The strings: a line from panel to panel in wiring order, numbered at its first panel. */}
+                  {strings.map((s, i) => {
+                    const points = s.panels.map((k) => centres[k]).filter(Boolean);
+                    if (!points.length) return null;
+                    const colour = STRING_COLOURS[i % STRING_COLOURS.length];
+                    const [sx, sy] = px(points[0]);
+                    return (
+                      <g key={s.id} pointerEvents="none">
+                        <polyline
+                          points={path(points)}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={(s.id === hover ? 2.2 : 1.3) * u}
+                          strokeLinejoin="round"
+                          opacity={s.id === wiring || s.id === hover || tool !== "string" ? 1 : 0.6}
+                        />
+                        {points.map((p, n) => (
+                          <circle key={n} cx={px(p)[0]} cy={px(p)[1]} r={1.6 * u} fill="#ffffff" />
+                        ))}
+                        <circle cx={sx} cy={sy} r={5.5 * u} fill={colour} stroke="#0b0c0e" strokeWidth={0.8 * u} />
+                        <text x={sx} y={sy + 2.4 * u} textAnchor="middle" fontSize={6.5 * u} fontWeight="700" fill="#0b0c0e">
+                          {letter(i)}
+                        </text>
+                      </g>
+                    );
+                  })}
+                  {/* Panels on a string: their arrows again, over the wiring line, so the way each faces still shows. */}
+                  {strings.length > 0 && (
+                    <g>
+                      {faces.flatMap((f) =>
+                        panelPlaces(f, size)
+                          .filter((place) => !f.off.includes(place.index) && stringOf(`g:${f.id}:${place.index}`) >= 0)
+                          .map((place) => (
+                            <g key={`${f.id}:${place.index}`}>
+                              {aspect(middle(place.corners), faceFacing(f), f.tilt ?? TILT.roof, "#0b0c0e", 1.5)}
+                            </g>
+                          )),
+                      )}
+                      {loose
+                        .filter((panel) => stringOf(`l:${panel.id}`) >= 0)
+                        .map((panel) => (
+                          <g key={panel.id}>{aspect(panel, panelFacing(panel), panel.tilt ?? TILT.roof, "#0b0c0e", 1.5)}</g>
+                        ))}
+                    </g>
+                  )}
+                  {/* The discussion: a speech bubble at each spot, with how many things have been said. */}
+                  {[
+                    ...comments,
+                    ...(thread && "at" in thread ? [{ id: "new", x: thread.at.x, y: thread.at.y, resolved: false, notes: [] }] : []),
+                  ].map((c) => {
+                    const [bx, by] = px(c);
+                    const open = thread && "id" in thread ? thread.id === c.id : c.id === "new";
+                    return (
+                      <g key={c.id} opacity={c.resolved && !open ? 0.45 : 1}>
+                        <path
+                          d={`M${bx},${by} l${3 * u},${-5 * u} h${7 * u} a${3 * u},${3 * u} 0 0 0 ${3 * u},${-3 * u} v${-8 * u} a${3 * u},${3 * u} 0 0 0 ${-3 * u},${-3 * u} h${-16 * u} a${3 * u},${3 * u} 0 0 0 ${-3 * u},${3 * u} v${8 * u} a${3 * u},${3 * u} 0 0 0 ${3 * u},${3 * u} h${3 * u} z`}
+                          fill={open ? "#ffffff" : GOLD}
+                          stroke="#0b0c0e"
+                          strokeWidth={0.9 * u}
+                        />
+                        <text x={bx + 2 * u} y={by - 9.5 * u} textAnchor="middle" fontSize={8 * u} fontWeight="700" fill="#0b0c0e">
+                          {c.id === "new" ? "+" : c.resolved ? "✓" : c.notes.length}
+                        </text>
+                      </g>
+                    );
+                  })}
+                  {/* The battery: a stack of its modules charging from the bottom up, in a breathing glow, with the roof's power running down a line to it. */}
+                  {battery &&
+                    (() => {
+                      const [bx, by] = px(battery);
+                      const layers = Math.min(battery.qty, 8);
+                      const w = 22 * u;
+                      const lh = 5.5 * u;
+                      const top = by - (layers * lh) / 2;
+                      const roof = Object.values(centres);
+                      const from = roof.length ? px(middle(roof)) : null;
+                      const run = from ? `M${from[0]},${from[1]} L${bx},${by}` : "";
+                      return (
+                        <g pointerEvents="none">
+                          {from && (
+                            <>
+                              <path
+                                d={run}
+                                fill="none"
+                                stroke={GOLD}
+                                strokeWidth={1.1 * u}
+                                strokeDasharray={`${4 * u} ${4 * u}`}
+                                opacity="0.9"
+                              >
+                                <animate attributeName="stroke-dashoffset" from={8 * u} to="0" dur="0.8s" repeatCount="indefinite" />
+                              </path>
+                              {[0, 0.8, 1.6].map((begin) => (
+                                <circle key={begin} r={1.8 * u} fill="#ffffff">
+                                  <animateMotion dur="2.4s" begin={`${begin}s`} repeatCount="indefinite" path={run} />
+                                </circle>
+                              ))}
+                            </>
+                          )}
+                          <circle cx={bx} cy={by} r={20 * u} fill={GOLD}>
+                            <animate attributeName="r" values={`${17 * u};${27 * u};${17 * u}`} dur="3s" repeatCount="indefinite" />
+                            <animate attributeName="opacity" values="0.26;0.04;0.26" dur="3s" repeatCount="indefinite" />
+                          </circle>
+                          <rect x={bx - 4.5 * u} y={top - 7 * u} width={9 * u} height={3 * u} rx={u} fill={GOLD} />
+                          <rect
+                            x={bx - w / 2 - 3 * u}
+                            y={top - 4 * u}
+                            width={w + 6 * u}
+                            height={layers * lh + 8 * u}
+                            rx={3.5 * u}
+                            fill="#0b0c0e"
+                            fillOpacity="0.92"
+                            stroke={GOLD}
+                            strokeWidth={1.1 * u}
+                          />
+                          {Array.from({ length: layers }, (_, i) => {
+                            // Counted from the bottom, so the charge climbs.
+                            const y = top + (layers - 1 - i) * lh;
+                            return (
+                              <g key={i}>
+                                <rect
+                                  x={bx - w / 2}
+                                  y={y + 0.7 * u}
+                                  width={w}
+                                  height={lh - 1.4 * u}
+                                  rx={1.2 * u}
+                                  fill="none"
+                                  stroke="#ffffff"
+                                  strokeOpacity="0.45"
+                                  strokeWidth={0.5 * u}
+                                />
+                                {Array.from({ length: 7 }, (_, k) => (
+                                  <line
+                                    key={k}
+                                    x1={bx - w / 2 + 2.5 * u + k * 2.85 * u}
+                                    x2={bx - w / 2 + 2.5 * u + k * 2.85 * u}
+                                    y1={y + 1.7 * u}
+                                    y2={y + lh - 1.7 * u}
+                                    stroke={GOLD}
+                                    strokeWidth={0.9 * u}
+                                    opacity="0.15"
+                                  >
+                                    <animate
+                                      attributeName="opacity"
+                                      values="0.15;1;1;0.15"
+                                      keyTimes="0;0.25;0.8;1"
+                                      dur={`${Math.max(3, layers * 0.6)}s`}
+                                      begin={`${i * 0.4 + k * 0.05}s`}
+                                      repeatCount="indefinite"
+                                    />
+                                  </line>
+                                ))}
+                              </g>
+                            );
+                          })}
+                          <text
+                            x={bx}
+                            y={top + layers * lh + 13 * u}
+                            textAnchor="middle"
+                            fontSize={8 * u}
+                            fontWeight="700"
+                            fill="#ffffff"
+                            stroke="#0b0c0e"
+                            strokeWidth={2.4 * u}
+                            paintOrder="stroke"
+                          >
+                            {batteryKwh} kWh
+                          </text>
+                        </g>
+                      );
+                    })()}
+                  {/* Labels: a pin and its name. */}
+                  {labels.map((l) => {
+                    const [lx, ly] = px(l);
+                    const lit = isPicked({ kind: "label", id: l.id });
+                    const words = l.kind === "Note" ? l.text || "Note" : l.kind;
+                    const width = (words.length * 4.4 + 10) * u;
+                    return (
+                      <g key={l.id}>
+                        <circle cx={lx} cy={ly} r={3 * u} fill={GOLD} stroke="#0b0c0e" strokeWidth={0.8 * u} />
+                        <rect
+                          x={lx + 5 * u}
+                          y={ly - 7 * u}
+                          width={width}
+                          height={14 * u}
+                          rx={3 * u}
+                          fill="#0b0c0e"
+                          stroke={lit ? "#ffffff" : GOLD}
+                          strokeWidth={(lit ? 1.4 : 0.8) * u}
+                        />
+                        <text x={lx + 10 * u} y={ly + 2.8 * u} fontSize={8 * u} fontWeight="600" fill="#ffffff">
+                          {words}
+                        </text>
+                      </g>
+                    );
+                  })}
+                  {tool === "trace" && tracing.length > 0 && (
+                    <g>
+                      <polyline
+                        points={path(tracing)}
+                        fill="none"
+                        stroke="#ffffff"
+                        strokeWidth={1.4 * u}
+                        strokeDasharray={`${4 * u} ${3 * u}`}
+                      />
+                      {tracing.map((p, i) => (
+                        <circle
+                          key={i}
+                          cx={px(p)[0]}
+                          cy={px(p)[1]}
+                          r={(i === 0 ? 5 : 3) * u}
+                          fill={i === 0 ? GOLD : "#ffffff"}
+                          stroke="#0b0c0e"
+                          strokeWidth={u}
+                        />
+                      ))}
+                    </g>
+                  )}
+                  {/* The panel a click would place, as an outline. */}
+                  {tool === "panel" &&
+                    ghosts.map((ghost, i) => (
+                      <g key={i} pointerEvents="none">
+                        <polygon
+                          points={path(looseCorners(ghost, size))}
+                          fill="#ffffff"
+                          fillOpacity="0.18"
+                          stroke="#ffffff"
+                          strokeWidth={u}
+                          strokeDasharray={`${3 * u} ${2 * u}`}
+                        />
+                        {aspect(ghost, panelFacing(ghost), ghost.tilt ?? TILT.roof, "#ffffff")}
+                      </g>
+                    ))}
+                  {/* Several panels picked: one handle to spin them all about the middle of the group. */}
+                  {spinGroup && (
+                    <g pointerEvents="none">
+                      <line
+                        x1={px(spinGroup.centre)[0]}
+                        y1={px(spinGroup.centre)[1]}
+                        x2={px(spinGroup.turn)[0]}
+                        y2={px(spinGroup.turn)[1]}
+                        stroke="#ffffff"
+                        strokeWidth={0.8 * u}
+                        strokeDasharray={`${3 * u} ${2 * u}`}
+                      />
+                      <circle
+                        cx={px(spinGroup.centre)[0]}
+                        cy={px(spinGroup.centre)[1]}
+                        r={2.4 * u}
+                        fill="#ffffff"
+                        stroke="#0b0c0e"
+                        strokeWidth={u}
+                      />
+                      <circle
+                        cx={px(spinGroup.turn)[0]}
+                        cy={px(spinGroup.turn)[1]}
+                        r={5 * u}
+                        fill="#ffffff"
+                        stroke="#0b0c0e"
+                        strokeWidth={u}
+                      />
+                      <path
+                        d={`M${px(spinGroup.turn)[0] - 2.5 * u},${px(spinGroup.turn)[1]} a${2.5 * u},${2.5 * u} 0 1 1 ${2.5 * u},${2.5 * u}`}
+                        fill="none"
+                        stroke="#0b0c0e"
+                        strokeWidth={u}
+                      />
+                    </g>
+                  )}
+                  {/* One panel picked: a grip in its middle to drag it by, and a handle above it to turn it with. */}
+                  {grip && (
+                    <g pointerEvents="none">
+                      <line
+                        x1={px(grip.panel)[0]}
+                        y1={px(grip.panel)[1]}
+                        x2={px(grip.turn)[0]}
+                        y2={px(grip.turn)[1]}
+                        stroke="#ffffff"
+                        strokeWidth={0.8 * u}
+                      />
+                      <circle cx={px(grip.turn)[0]} cy={px(grip.turn)[1]} r={4 * u} fill="#ffffff" stroke="#0b0c0e" strokeWidth={u} />
+                      <path
+                        d={`M${px(grip.turn)[0] - 2 * u},${px(grip.turn)[1]} a${2 * u},${2 * u} 0 1 1 ${2 * u},${2 * u}`}
+                        fill="none"
+                        stroke="#0b0c0e"
+                        strokeWidth={0.9 * u}
+                      />
+                      <circle cx={px(grip.panel)[0]} cy={px(grip.panel)[1]} r={3.2 * u} fill={GOLD} stroke="#0b0c0e" strokeWidth={u} />
+                      {[0, 90, 180, 270].map((d) => (
+                        <line
+                          key={d}
+                          x1={px(grip.panel)[0]}
+                          y1={px(grip.panel)[1] - 4.5 * u}
+                          x2={px(grip.panel)[0]}
+                          y2={px(grip.panel)[1] - 7.5 * u}
+                          stroke="#ffffff"
+                          strokeWidth={1.2 * u}
+                          strokeLinecap="round"
+                          transform={`rotate(${d} ${px(grip.panel)[0]} ${px(grip.panel)[1]})`}
+                        />
+                      ))}
+                    </g>
+                  )}
+                  {band && (
+                    <rect
+                      x={Math.min(px(band.a)[0], px(band.b)[0])}
+                      y={Math.min(px(band.a)[1], px(band.b)[1])}
+                      width={Math.abs(px(band.a)[0] - px(band.b)[0])}
+                      height={Math.abs(px(band.a)[1] - px(band.b)[1])}
+                      fill="#ffffff"
+                      fillOpacity="0.12"
+                      stroke="#ffffff"
+                      strokeWidth={u}
+                      strokeDasharray={`${4 * u} ${3 * u}`}
+                    />
+                  )}
+                  {/* A scale bar: five metres on the ground, however far in the view is. */}
+                  <g transform={`translate(${view.x + view.w - 5 / scale - 40 * u} ${view.y + 16 * u})`}>
+                    <line x1="0" x2={5 / scale} y1="0" y2="0" stroke="#ffffff" strokeWidth={2 * u} />
+                    <text x={5 / scale + 5 * u} y={3.5 * u} fill="#ffffff" fontSize={10 * u}>
+                      5 m
+                    </text>
+                  </g>
+                </svg>
+              </div>
+
+              {/* The string under the pointer, checked against the inverter input it is on. */}
+              {(() => {
+                const index = strings.findIndex((x) => x.id === hover);
+                const at = index >= 0 ? centres[strings[index].panels[0]] : null;
+                if (index < 0 || !at) return null;
+                const check = checks[index];
+                const string = strings[index];
+                const left = ((ROOF_IMAGE.width / 2 + at.x / scale - view.x) / view.w) * 100;
+                const top = ((ROOF_IMAGE.height / 2 + at.y / scale - view.y) / view.h) * 100;
+                return (
+                  <div
+                    className="pointer-events-none absolute z-20 w-[22rem] max-w-[calc(100%-1rem)] rounded-2xl bg-forest p-3 text-white shadow-lift ring-1 ring-white/15"
+                    style={{
+                      left: `clamp(0.5rem, calc(${left}% + 2rem), calc(100% - 22.5rem))`,
+                      top: `clamp(0.5rem, calc(${top}% + 1.5rem), calc(100% - 15rem))`,
+                    }}
+                    role="status"
+                  >
+                    <p className="flex items-center gap-2 text-sm font-semibold">
+                      <span
+                        className="size-3 rounded-full"
+                        style={{ background: STRING_COLOURS[index % STRING_COLOURS.length] }}
+                        aria-hidden
+                      />
+                      String {letter(index)} · {string.panels.length} panels ·
+                      {fitted.length > 1 ? ` inverter ${(string.inverter ?? 0) + 1},` : ""} input {(string.mppt ?? 0) + 1}
+                    </p>
+                    {fitted[string.inverter ?? 0] ? (
+                      <p className="mt-0.5 truncate text-xs text-white/60">{fitted[string.inverter ?? 0].name}</p>
+                    ) : null}
+                    {check.lines.length > 0 && (
+                      <table className="mt-2 w-full text-xs">
+                        <tbody>
+                          {check.lines.map((line) => (
+                            <tr key={line.what} className="align-top">
+                              <td className="py-0.5 pr-2 text-white/70">{line.what}</td>
+                              <td className="whitespace-nowrap py-0.5 text-right tabular-nums">{line.value}</td>
+                              <td className="whitespace-nowrap py-0.5 pl-2 tabular-nums text-white/60">{line.limit}</td>
+                              <td
+                                className={clsx(
+                                  "w-4 py-0.5 pl-2 font-bold",
+                                  line.ok === false && "text-[#ff8a80]",
+                                  line.ok === null && "text-sun-bright",
+                                )}
+                              >
+                                {line.ok === true ? "✓" : line.ok === false ? "✕" : line.ok === null ? "!" : ""}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                    <p className={clsx("mt-2 rounded-lg px-2 py-1.5 text-xs font-medium", VERDICT[check.verdict].pad)}>
+                      {VERDICT[check.verdict].mark} {check.words}
+                    </p>
+                    {check.basis.length > 0 && (
+                      <p className="mt-1.5 text-[10px] leading-snug text-white/50">
+                        Tested at {DESIGN_TEMPERATURES.cold} °C and {HOT_CELL} °C in the panel. Figures from: {check.basis.join("; ")}.
+                        Check them against the datasheets before relying on this.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* The open comment, beside its bubble: this is where it is read and written. */}
+              {thread && threadSpot && (
+                <div
+                  className="absolute z-20 w-72 max-w-[calc(100%-1rem)] space-y-3 rounded-2xl border-2 border-sun-line bg-surface p-4 shadow-lift"
+                  style={{
+                    left: `clamp(0.5rem, calc(${threadSpot.left}% + 1rem), calc(100% - 18.5rem))`,
+                    top: `clamp(0.5rem, ${threadSpot.top}%, calc(100% - 6rem))`,
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={label}>{"at" in thread ? "New comment" : "Comment"}</p>
+                    <button
+                      className="text-sm text-muted hover:text-ink"
+                      onClick={() => {
+                        setThread(null);
+                        setWords("");
+                      }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  {"id" in thread &&
+                    (comments.find((c) => c.id === thread.id)?.notes ?? []).map((n, i) => (
+                      <div key={i} className={clsx("rounded-xl px-3 py-2 text-sm", "bg-canvas")}>
+                        <p className="text-[11px] text-muted">{n.at.replace("T", " ")}</p>
+                        <p className="mt-0.5 whitespace-pre-wrap">{n.text}</p>
+                      </div>
+                    ))}
+                  <textarea
+                    autoFocus
+                    value={words}
+                    onChange={(e) => setWords(e.target.value)}
+                    maxLength={500}
+                    rows={3}
+                    placeholder={"at" in thread ? "What do you want to say about this spot?" : "Reply"}
+                    className="block w-full rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-forest"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className={clsx(button, "!border-primary !bg-primary !text-primary-ink")}
+                      disabled={!words.trim() || talking === "sending"}
+                      onClick={() =>
+                        void say(
+                          "at" in thread
+                            ? { do: "add", x: thread.at.x, y: thread.at.y, text: words }
+                            : { do: "reply", id: thread.id, text: words },
+                        )
+                      }
+                    >
+                      {talking === "sending" ? "Saving…" : "at" in thread ? "Post" : "Reply"}
+                    </button>
+                    {"id" in thread && (
+                      <>
+                        <button
+                          className={button}
+                          disabled={talking === "sending"}
+                          onClick={() =>
+                            void say({ do: "resolve", id: thread.id, resolved: !comments.find((c) => c.id === thread.id)?.resolved })
+                          }
+                        >
+                          {comments.find((c) => c.id === thread.id)?.resolved ? "Reopen" : "Resolve"}
+                        </button>
+                        <button
+                          className={clsx(button, "text-danger")}
+                          disabled={talking === "sending"}
+                          onClick={() => void say({ do: "remove", id: thread.id })}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted" role="status">
+                    {typeof talking === "object"
+                      ? talking.error
+                      : "Kept with the designs when you save. With the box empty, the Delete key removes the whole comment."}
+                  </p>
+                </div>
+              )}
+
+              {/* On the picture, bottom right: the controls for whatever is picked. With nothing picked, the turn buttons for the rows of the face being worked on. */}
+              {tool === "string" ? (
+                <div
+                  className="absolute bottom-3 right-3 z-10 max-h-[calc(100%-5rem)] w-72 space-y-2 overflow-y-auto rounded-2xl border border-line bg-surface p-3 shadow-lift"
+                  role="group"
+                  aria-label="Strings"
+                >
+                  <p className={label}>
+                    Strings
+                    {fitted.length
+                      ? ` · ${fitted.length > 1 ? `${fitted.length} inverters, ` : ""}${fittedKw} kW of inverter for ${summary.kw.toFixed(2)} kW of panels`
+                      : " · no inverter chosen"}
+                  </p>
+                  {strings.length === 0 && <p className="text-sm text-muted">Click panels on the roof in the order they&apos;re wired.</p>}
+                  <ul className="space-y-1">
+                    {strings.map((x, i) => (
+                      <li
+                        key={x.id}
+                        className={clsx("flex items-center gap-1 rounded-xl border p-1", x.id === wiring ? "border-forest" : "border-line")}
+                        onMouseEnter={() => setHover(x.id)}
+                        onMouseLeave={() => setHover(null)}
+                      >
+                        <button
+                          onClick={() => setWiring(x.id)}
+                          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-1 text-left"
+                        >
+                          <span
+                            className="size-3.5 shrink-0 rounded-full border border-line-strong"
+                            style={{ background: STRING_COLOURS[i % STRING_COLOURS.length] }}
+                            aria-hidden
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold">String {letter(i)}</span>
+                            <span className="block truncate text-xs tabular-nums text-muted">
+                              {x.panels.length} panels · {((x.panels.length * size.watts) / 1000).toFixed(2)} kW
+                              {checks[i].coldVoc ? ` · Voc ${Math.round(checks[i].coldVoc ?? 0)} V` : ""}
+                            </span>
+                          </span>
+                        </button>
+                        <select
+                          value={`${x.inverter ?? 0}:${x.mppt ?? 0}`}
+                          onChange={(e) => {
+                            const [n, input] = e.target.value.split(":").map(Number);
+                            setStrings(
+                              strings.map((y) =>
+                                y.id === x.id ? { id: y.id, panels: y.panels, ...(n > 0 ? { inverter: n } : {}), mppt: input } : y,
+                              ),
+                            );
+                            changed();
+                          }}
+                          aria-label={`The inverter input string ${letter(i)} is on`}
+                          title="The inverter and the input (MPPT) this string is on"
+                          className="h-8 max-w-[6.5rem] rounded-lg border border-line bg-surface px-1 text-xs font-medium"
+                        >
+                          {Array.from({ length: Math.max(1, fitted.length, (x.inverter ?? 0) + 1) }, (_, n) =>
+                            Array.from({ length: Math.max(inputsOf(n), n === (x.inverter ?? 0) ? (x.mppt ?? 0) + 1 : 0) }, (_, input) => (
+                              <option key={`${n}:${input}`} value={`${n}:${input}`}>
+                                {fitted.length > 1 ? `Inv ${n + 1} · in ${input + 1}` : `Input ${input + 1}`}
+                              </option>
+                            )),
+                          )}
+                        </select>
+                        <span
+                          className={clsx("w-5 text-center text-sm font-bold", VERDICT[checks[i].verdict].tone)}
+                          title={checks[i].words}
+                          aria-label={checks[i].words}
+                        >
+                          {VERDICT[checks[i].verdict].mark}
+                        </span>
+                        <button
+                          className="px-1 text-lg leading-none text-muted hover:text-danger"
+                          aria-label={`Delete string ${letter(i)}`}
+                          onClick={() => {
+                            setStrings(strings.filter((y) => y.id !== x.id));
+                            setHover(null);
+                            changed();
+                          }}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <button className={clsx(button, "!min-h-9 w-full justify-center")} onClick={() => setWiring(newId("s"))}>
+                    <Plus className="mr-1.5 size-4" aria-hidden /> New string
+                  </button>
+                  <p className="text-xs text-muted">
+                    {summary.panels - strings.reduce((n, x) => n + x.panels.length, 0)} of {summary.panels} panels aren&apos;t on a string.
+                    Hover over a string for its check. String last: re-laying a face&apos;s rows renumbers its panels.
+                  </p>
+                </div>
+              ) : picks.length > 0 ? (
+                <div
+                  className="absolute bottom-3 right-3 z-10 w-64 space-y-2 rounded-2xl border border-line bg-surface p-3 shadow-lift"
+                  role="group"
+                  aria-label="What is picked"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={label}>
+                      {picks.length === 1
+                        ? picks[0].kind === "label"
+                          ? "This label"
+                          : onlyOne
+                            ? "This panel"
+                            : "This panel · in its row"
+                        : `${picks.length} picked`}
+                    </p>
+                    <button
+                      className="-my-1 px-1 text-lg leading-none text-muted hover:text-ink"
+                      onClick={() => setPicks([])}
+                      aria-label="Pick none"
+                      title="Pick none (Esc)"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {panelPicks.length > 0 && (
+                    <div className="flex items-center justify-between gap-0.5" role="group" aria-label="Turn">
+                      {[-5, -1, 1, 5, 90].map((step) => (
+                        <button
+                          key={step}
+                          className="flex h-9 min-w-9 items-center justify-center rounded-lg px-1.5 text-sm font-semibold tabular-nums text-ink hover:bg-canvas"
+                          onClick={() => turn(step)}
+                          aria-label={`Turn ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
+                        >
+                          {step > 0 ? "+" : "−"}
+                          {Math.abs(step)}°
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {pickedPanels.length > 0 && (
+                    <>
+                      <label className="block text-sm">
+                        <span className="flex justify-between">
+                          Tilt <span className="tabular-nums">{pickedTilt === null ? "mixed" : `${pickedTilt}°`}</span>
+                        </span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={TILT.max}
+                          value={pickedTilt ?? TILT.roof}
+                          onChange={(e) => amend((p) => ({ ...p, tilt: Number(e.target.value) }))}
+                          {...slides}
+                          className="mt-1 w-full"
+                        />
+                      </label>
+                      <p className="text-xs text-ink-2">
+                        {pickedFacing === null ? "Facing different ways." : `Facing ${compass(pickedFacing)} (${pickedFacing}°).`}
+                        {pickedTilt !== null && pickedFacing !== null && (
+                          <>
+                            {" "}
+                            <strong className="font-semibold text-ink">{besideFlat(pickedTilt, pickedFacing)}</strong>.{" "}
+                            {bestTilt(pickedFacing) === 0 ? "Flat is best this way." : `${bestTilt(pickedFacing)}° is best this way.`}
+                          </>
+                        )}
+                      </p>
+                    </>
+                  )}
+                  <button className="text-sm font-medium text-danger hover:underline" onClick={removePicked}>
+                    {picks.length === 1 ? "Take it out" : `Take these ${picks.length} out`}{" "}
+                    <span className="font-normal text-muted">(Delete)</span>
+                  </button>
+                </div>
+              ) : (
+                face && (
+                  <div
+                    className="absolute bottom-3 right-3 flex items-center gap-1 rounded-2xl border border-line bg-surface p-1.5 shadow-lift"
+                    role="group"
+                    aria-label="Turn the rows"
+                  >
+                    <span className="px-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted">Rows {face.angle}°</span>
+                    {[-5, -1, 1, 5].map((step) => (
+                      <button
+                        key={step}
+                        onClick={() => update(face.id, { angle: Math.max(-90, Math.min(90, face.angle + step)), off: [] })}
+                        aria-label={`Turn the rows ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
+                        className="flex h-10 min-w-11 items-center justify-center rounded-xl px-2 text-sm font-semibold tabular-nums text-ink hover:bg-canvas"
+                      >
+                        {step > 0 ? "+" : "−"}
+                        {Math.abs(step)}°
+                      </button>
+                    ))}
+                  </div>
+                )
+              )}
+
+              {/* Across the top of the picture: which of the roof's designs this is, and the panel it is drawn with. */}
+              <div
+                className="absolute left-[4.25rem] top-3 z-10 flex items-center gap-1 rounded-2xl border border-line bg-surface p-1.5 shadow-lift"
+                role="toolbar"
+                aria-label="Design and panel"
+                ref={topBar}
+              >
+                <div className="relative">
+                  <button
+                    onClick={() => openMenu(menu === "designs" ? false : "designs")}
+                    aria-expanded={menu === "designs"}
+                    aria-haspopup="true"
+                    title={`Design ${active + 1} of ${designs.length}${active === primary ? " (primary)" : ""}${designLabel.trim() ? `: ${designLabel.trim()}` : ""}`}
+                    aria-label={`Designs: design ${active + 1} of ${designs.length}`}
+                    className={clsx(
+                      "flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold tabular-nums",
+                      menu === "designs" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <Layers className="size-5" aria-hidden />
+                    {active + 1}/{designs.length}
+                    {active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-hidden />}
+                  </button>
+                  {menu === "designs" && (
+                    <div className="absolute left-0 top-full mt-3 w-[22rem] max-w-[80vw] space-y-3 rounded-2xl border border-line bg-surface p-3 shadow-lift">
+                      <ul className="space-y-1.5">
+                        {everyDesign().map((d, i) => {
+                          const sum = designSummary(d);
+                          return (
+                            <li key={i} className={clsx("rounded-xl border", i === active ? "border-forest" : "border-line")}>
+                              <div className="flex items-center gap-1 p-1">
+                                <button
+                                  onClick={() => (i === active ? openMenu(false) : show(everyDesign(), i))}
+                                  className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left hover:bg-canvas"
+                                >
+                                  <span className="block truncate text-sm font-semibold">
+                                    Design {i + 1}
+                                    {d.label ? <span className="font-normal text-ink-2"> · {d.label}</span> : null}
+                                  </span>
+                                  <span className="block truncate text-xs tabular-nums text-muted">
+                                    {sum.panels} panels · {sum.kw.toFixed(2)} kW · {d.panel?.name ?? props.catalogue[0]?.name ?? "Panel"}
+                                  </span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setPrimary(i);
+                                    changed();
+                                  }}
+                                  disabled={i === primary}
+                                  title={i === primary ? "The primary design" : "Make this the primary design"}
+                                  aria-label={i === primary ? `Design ${i + 1} is the primary` : `Make design ${i + 1} the primary`}
+                                  className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
+                                >
+                                  <Star
+                                    className={clsx("size-4", i === primary ? "fill-sun-line text-sun-line" : "text-muted")}
+                                    aria-hidden
+                                  />
+                                </button>
+                                {designs.length > 1 && (
+                                  <button
+                                    onClick={() => setDoomed(doomed === i ? null : i)}
+                                    title="Delete this design"
+                                    aria-label={`Delete design ${i + 1}`}
+                                    className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-canvas hover:text-danger"
+                                  >
+                                    <Trash2 className="size-4" aria-hidden />
+                                  </button>
+                                )}
+                              </div>
+                              {doomed === i && (
+                                <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2 text-sm">
+                                  <span>Delete design {i + 1}? It can&apos;t be undone.</span>
+                                  <button className="font-semibold text-danger" onClick={() => removeDesign(i)}>
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <label className="block text-sm">
+                        A label for design {active + 1}
+                        <input
+                          value={designLabel}
+                          onChange={(e) => {
+                            setDesignLabel(e.target.value);
+                            changed();
+                          }}
+                          maxLength={40}
+                          placeholder="e.g. All on the north face"
+                          className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-3 outline-none focus:border-forest"
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(false)}>
+                          <Plus className="mr-1.5 size-4" aria-hidden /> New design
+                        </button>
+                        <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(true)}>
+                          <Copy className="mr-1.5 size-4" aria-hidden /> Copy this one
+                        </button>
+                        <span className="self-center text-xs tabular-nums text-muted">
+                          {designs.length} of {MAX_DESIGNS}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted">The starred design is the primary: the one this roof opens on.</p>
+                    </div>
+                  )}
+                </div>
+                <span className="mx-1 h-6 w-px bg-line" aria-hidden />
+                <div className="relative">
+                  <button
+                    onClick={() => openMenu(menu === "panels" ? false : "panels")}
+                    aria-expanded={menu === "panels"}
+                    aria-haspopup="true"
+                    title={`Panel: ${panel?.name ?? chosenPanel?.name ?? "Panel"}`}
+                    aria-label="The panel this design is drawn with"
+                    className={clsx(
+                      "flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold tabular-nums",
+                      menu === "panels" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <LayoutGrid className="size-5" aria-hidden />
+                    {size.watts} W
+                  </button>
+                  {menu === "panels" && (
+                    <div className="absolute left-0 top-full mt-3 max-h-[60vh] w-[24rem] max-w-[80vw] space-y-1 overflow-y-auto rounded-2xl border border-line bg-surface p-2 shadow-lift">
+                      <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
+                      {[
+                        ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
+                        ...props.catalogue.map((p) => ({ ...p, gone: false })),
+                      ].map((p) => (
+                        <button
+                          key={p.sku}
+                          onClick={() => {
+                            if (!p.gone) choosePanel(p.sku);
+                            openMenu(false);
+                          }}
+                          className={clsx(
+                            "flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left hover:bg-canvas",
+                            p.sku === chosen && "bg-canvas",
+                          )}
+                        >
+                          <Check className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")} aria-hidden />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold">{p.name}</span>
+                            <span className="block text-xs tabular-nums text-muted">
+                              {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
+                              {p.gone ? " · no longer in our range" : ""}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <span className="mx-1 h-6 w-px bg-line" aria-hidden />
+                <div className="relative">
+                  <button
+                    onClick={() => openMenu(menu === "inverters" ? false : "inverters")}
+                    aria-expanded={menu === "inverters"}
+                    aria-haspopup="true"
+                    title={fitted.length ? `Inverters: ${fitted.map((i) => i.name).join(" + ")}` : "Choose an inverter"}
+                    aria-label="The inverters this design is drawn for"
+                    className={clsx(
+                      "flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold tabular-nums",
+                      menu === "inverters" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <Zap className="size-5" aria-hidden />
+                    {fitted.length ? `${fitted.length > 1 ? `${fitted.length} × · ` : ""}${fittedKw} kW` : "Inverter"}
+                  </button>
+                  {menu === "inverters" && (
+                    <div className="absolute left-0 top-full mt-3 w-[26rem] max-w-[80vw] rounded-2xl border border-line bg-surface p-2 shadow-lift">
+                      <p className={clsx(label, "px-2 py-1")}>On this design</p>
+                      {fitted.length === 0 && (
+                        <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
+                      )}
+                      <ul className="space-y-0.5">
+                        {fitted.map((spec, n) => (
+                          <li key={n} className="flex items-center gap-2 rounded-xl bg-canvas px-2 py-1.5">
+                            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-ink">
+                              {n + 1}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold">{spec.name}</span>
+                              <span className="block text-xs tabular-nums text-muted">
+                                {spec.kw} kW ·{" "}
+                                {fittedItems[n]
+                                  ? fittedItems[n]?.electrical
+                                    ? `${inputsOf(n)} inputs · strings can be checked`
+                                    : "limits not on file"
+                                  : "no longer in our range"}
+                              </span>
+                            </span>
+                            <button
+                              onClick={() => removeInverter(n)}
+                              className="px-1 text-lg leading-none text-muted hover:text-danger"
+                              aria-label={`Take inverter ${n + 1} off the design`}
+                              title="Take it off the design"
+                            >
+                              ×
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        onClick={() => setSuggesting(!suggesting)}
+                        aria-expanded={suggesting}
+                        className={clsx(button, "mt-2 w-full justify-center", suggesting && "!border-forest")}
+                      >
+                        <Sparkles className="mr-1.5 size-4 text-sun-ink" aria-hidden /> Suggest one for these panels
+                      </button>
+                      {suggesting && (
+                        <div className="mt-1 space-y-1 rounded-xl border border-sun-line bg-sun p-2">
+                          {summary.panels === 0 && (
+                            <p className="px-1 text-sm text-ink-2">Put panels on the roof first: the suggestion is sized to them.</p>
+                          )}
+                          {summary.panels > 0 && suggestions.length === 0 && (
+                            <p className="px-1 text-sm text-ink-2">
+                              Nothing in our range suits {summary.kw.toFixed(2)} kW of panels by the usual sizing. Pick one from the list
+                              below.
+                            </p>
+                          )}
+                          {suggestions.map((sug) => (
+                            <div key={sug.inverter.sku + sug.kind} className="rounded-lg bg-surface p-2">
+                              <p className={label}>{sug.kind}</p>
+                              <p className="mt-0.5 text-sm font-semibold">
+                                {sug.count > 1 ? `${sug.count} × ` : ""}
+                                {sug.inverter.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-ink-2">{sug.why}</p>
+                              <button
+                                className="mt-1.5 text-sm font-semibold underline underline-offset-4"
+                                onClick={() => takeSuggestion(sug)}
+                              >
+                                Use {sug.count > 1 ? "these" : "this one"}
+                              </button>
+                            </div>
+                          ))}
+                          {suggestions.length > 0 && (
+                            <p className="px-1 text-[11px] text-muted">
+                              One for each kind in our range: choose by the home&apos;s supply and whether a battery is wanted. Sized by
+                              rule from the panels, not a design check.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <p className={clsx(label, "mt-2 px-2 py-1")}>
+                        {fitted.length >= MAX_INVERTERS
+                          ? `That is the most a design takes (${MAX_INVERTERS})`
+                          : fitted.length
+                            ? "Add another"
+                            : "Add one"}
+                      </p>
+                      {fitted.length < MAX_INVERTERS && (
+                        <>
+                          <input
+                            autoFocus
+                            value={seek}
+                            onChange={(e) => setSeek(e.target.value)}
+                            placeholder="Search inverters"
+                            className="block min-h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                          />
+                          <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                            {props.inverters
+                              .filter((i) =>
+                                seek
+                                  .toLowerCase()
+                                  .split(/\s+/)
+                                  .every((word) => `${i.name} ${i.sku}`.toLowerCase().includes(word)),
+                              )
+                              .map((i) => (
+                                <button
+                                  key={i.sku}
+                                  onClick={() => addInverter(i)}
+                                  className="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left hover:bg-canvas"
+                                >
+                                  <Plus className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
+                                  <span className="min-w-0">
+                                    <span className="block text-sm font-semibold">{i.name}</span>
+                                    <span className="block text-xs tabular-nums text-muted">
+                                      {i.kw} kW ·{" "}
+                                      {i.electrical
+                                        ? `${i.electrical.mppts.length} inputs, up to ${i.electrical.maxVoltage} V · strings can be checked`
+                                        : "limits not on file: strings can't be checked"}
+                                    </span>
+                                  </span>
+                                </button>
+                              ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <span className="mx-1 h-6 w-px bg-line" aria-hidden />
+                <div className="relative">
+                  <button
+                    onClick={() => openMenu(menu === "batteries" ? false : "batteries")}
+                    aria-expanded={menu === "batteries"}
+                    aria-haspopup="true"
+                    title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Choose a battery"}
+                    aria-label="The battery on this design"
+                    className={clsx(
+                      "flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold tabular-nums",
+                      menu === "batteries" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <BatteryCharging className="size-5" aria-hidden />
+                    {battery ? `${batteryKwh} kWh` : "Battery"}
+                  </button>
+                  {menu === "batteries" && (
+                    <div className="absolute left-0 top-full mt-3 w-[26rem] max-w-[80vw] rounded-2xl border border-line bg-surface p-2 shadow-lift">
+                      <p className={clsx(label, "px-2 py-1")}>On this design</p>
+                      {battery ? (
+                        <div className="rounded-xl bg-canvas px-2 py-2">
+                          <p className="truncate text-sm font-semibold">{battery.name}</p>
+                          <div className="mt-1.5 flex items-center gap-2 text-sm">
+                            <button
+                              className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface font-semibold disabled:bg-surface-2 disabled:text-muted"
+                              disabled={battery.qty <= 1}
+                              onClick={() => {
+                                setBattery({ ...battery, qty: battery.qty - 1 });
+                                changed();
+                              }}
+                              aria-label="One fewer"
+                            >
+                              −
+                            </button>
+                            <span className="min-w-28 text-center tabular-nums">
+                              {battery.qty} × {battery.kwh} kWh = <strong>{batteryKwh} kWh</strong>
+                            </span>
+                            <button
+                              className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface font-semibold disabled:bg-surface-2 disabled:text-muted"
+                              disabled={battery.qty >= MAX_BATTERY_QTY}
+                              onClick={() => {
+                                setBattery({ ...battery, qty: battery.qty + 1 });
+                                changed();
+                              }}
+                              aria-label="One more"
+                            >
+                              +
+                            </button>
+                            <button
+                              className="ml-auto text-sm font-medium text-danger hover:underline"
+                              onClick={() => {
+                                setBattery(undefined);
+                                changed();
+                              }}
+                            >
+                              Take it off
+                            </button>
+                          </div>
+                          <p className="mt-1.5 text-xs text-muted">It is on the picture: drag it to the wall it will stand against.</p>
+                        </div>
+                      ) : (
+                        <p className="px-2 pb-1 text-sm text-muted">None: this design is solar only. Choose one below.</p>
+                      )}
+                      <p className={clsx(label, "mt-2 px-2 py-1")}>
+                        {battery ? "Change it" : "Batteries to choose from"} · {props.batteries.length} to choose from
+                      </p>
+                      <input
+                        value={seek}
+                        onChange={(e) => setSeek(e.target.value)}
+                        placeholder="Search batteries"
+                        className="block min-h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                      />
+                      <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                        {props.batteries
+                          .filter((b) =>
+                            seek
+                              .toLowerCase()
+                              .split(/\s+/)
+                              .every((word) => `${b.name} ${b.sku}`.toLowerCase().includes(word)),
+                          )
+                          .map((b) => (
+                            <button
+                              key={b.sku}
+                              onClick={() => chooseBattery(b)}
+                              className={clsx(
+                                "flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left hover:bg-canvas",
+                                b.sku === battery?.sku && "bg-canvas",
+                              )}
+                            >
+                              <Check
+                                className={clsx("mt-0.5 size-4 shrink-0", b.sku === battery?.sku ? "text-ink" : "invisible")}
+                                aria-hidden
+                              />
+                              <span className="min-w-0">
+                                <span className="block text-sm font-semibold">{b.name}</span>
+                                <span className="block text-xs tabular-nums text-muted">{b.kwh} kWh each</span>
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <span className="mx-1 h-6 w-px bg-line" aria-hidden />
+                <div className="relative">
+                  <button
+                    onClick={() => openMenu(menu === "bill" ? false : "bill")}
+                    aria-expanded={menu === "bill"}
+                    aria-haspopup="true"
+                    title="The customer's electricity bill"
+                    aria-label="The customer's electricity bill"
+                    className={clsx(
+                      "flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold tabular-nums",
+                      menu === "bill" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <ReceiptText className="size-5" aria-hidden />
+                    {Number(bill.amount) > 0 ? `$${Number(bill.amount).toLocaleString("en-AU")}` : "Bill"}
+                  </button>
+                  {menu === "bill" && (
+                    <div className="absolute right-0 top-full mt-3 w-[22rem] max-w-[80vw] rounded-2xl border border-line bg-surface p-3 shadow-lift">
+                      <p className={label}>The customer&apos;s electricity bill</p>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium">
+                        <label>
+                          Billed
+                          <select
+                            value={bill.interval}
+                            onChange={(e) => setBill({ ...bill, interval: e.target.value as BillInterval })}
+                            className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest appearance-auto"
+                          >
+                            <option value="annual">Yearly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="bimonthly">Every two months</option>
+                            <option value="monthly">Monthly</option>
+                          </select>
+                        </label>
+                        <label>
+                          A typical bill ($)
+                          <input
+                            autoFocus
+                            type="number"
+                            min="0"
+                            step="10"
+                            value={bill.amount}
+                            onChange={(e) => setBill({ ...bill, amount: e.target.value })}
+                            placeholder="e.g. 350"
+                            className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                          />
+                        </label>
+                        <label>
+                          Daily supply charge ($)
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={bill.supplyPerDay}
+                            onChange={(e) => setBill({ ...bill, supplyPerDay: e.target.value })}
+                            className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                          />
+                        </label>
+                        <label>
+                          Rate ($ a kWh)
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={bill.rate}
+                            onChange={(e) => setBill({ ...bill, rate: e.target.value })}
+                            className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                          />
+                        </label>
+                        <label className="col-span-2">
+                          Feed-in tariff ($ a kWh)
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={bill.feedIn}
+                            onChange={(e) => setBill({ ...bill, feedIn: e.target.value })}
+                            className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                          />
+                        </label>
+                      </div>
+                      <p className="mt-2 text-xs text-muted">
+                        {Number(bill.amount) > 0 && !finance && summary.panels > 0
+                          ? "That bill is no more than its supply charge at these prices: check the figures."
+                          : finance
+                            ? `About ${finance.dailyKwh} kWh a day. The bill, the saving and the payback over the picture are worked out from this.`
+                            : "Typed in from their bill: the bill, the saving and the payback over the picture are worked out from it. One price at all times of day. Saved with the design."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* The tools, down the side of the picture. */}
+              <div
+                className="absolute left-3 top-3 flex flex-col gap-1 rounded-2xl border border-line bg-surface p-1.5 shadow-lift"
+                role="toolbar"
+                aria-label="Design tools"
+                aria-orientation="vertical"
+              >
+                {TOOLS.map(({ tool: t, icon: Icon, name }) => (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      setTool(t);
+                      setTracing([]);
+                      setRuling(null);
+                    }}
+                    title={name}
+                    aria-label={name}
+                    aria-pressed={tool === t}
+                    className={clsx(
+                      "flex size-10 items-center justify-center rounded-xl",
+                      tool === t ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <Icon className="size-5" aria-hidden />
+                  </button>
+                ))}
+                <span className="my-1 h-px bg-line" aria-hidden />
+                <button
+                  onClick={undo}
+                  title="Undo (Ctrl+Z)"
+                  aria-label="Undo (Ctrl+Z)"
+                  className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                >
+                  <Undo2 className="size-5" aria-hidden />
+                </button>
+                <button
+                  onClick={redo}
+                  title="Redo (Ctrl+Shift+Z)"
+                  aria-label="Redo (Ctrl+Shift+Z)"
+                  className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                >
+                  <Redo2 className="size-5" aria-hidden />
+                </button>
+                <span className="my-1 h-px bg-line" aria-hidden />
+                {(
+                  [
+                    [ZoomIn, "Zoom in", () => zoom(1 / 1.4)],
+                    [ZoomOut, "Zoom out", () => zoom(1.4)],
+                    [Maximize, "Show the whole picture", () => setView(WHOLE)],
+                  ] as const
+                ).map(([Icon, name, act]) => (
+                  <button
+                    key={name}
+                    onClick={act}
+                    title={name}
+                    aria-label={name}
+                    className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                  >
+                    <Icon className="size-5" aria-hidden />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-sage px-3 py-1 text-xs font-medium text-forest">
+                {TOOLS.find((t) => t.tool === tool)?.name}
+              </span>
+              <span className="text-sm text-muted">{TOOLS.find((t) => t.tool === tool)?.hint}</span>
+              {chosenPanel && !chosenPanel.sizeKnown && (
+                <span className="w-full text-sm text-sun-ink">
+                  This panel&apos;s size isn&apos;t on file, so it is drawn at {size.long} × {size.short} m. Check it against the datasheet
+                  before relying on how many fit.
+                </span>
+              )}
+              {tool === "trace" && tracing.length > 0 && (
+                <>
+                  <button className={button} onClick={() => finish(tracing)} disabled={tracing.length < 3}>
+                    Finish this face
+                  </button>
+                  <button className={button} onClick={() => setTracing(tracing.slice(0, -1))}>
+                    Undo last corner
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <aside className="mt-5 grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {tool === "label" && (
+              <div className="space-y-3 rounded-2xl border-2 border-forest bg-surface p-4">
+                <p className={label}>The label to place</p>
+                <div className="flex flex-wrap gap-2">
+                  {LABEL_KINDS.map((kind) => (
+                    <button
+                      key={kind}
+                      className={clsx(button, labelKind === kind && "!border-primary !bg-primary !text-primary-ink")}
+                      onClick={() => setLabelKind(kind)}
+                    >
+                      {kind}
+                    </button>
+                  ))}
+                </div>
+                {labelKind === "Note" && (
+                  <input
+                    value={labelText}
+                    onChange={(e) => setLabelText(e.target.value)}
+                    maxLength={80}
+                    placeholder="What the note says"
+                    className="block min-h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                  />
+                )}
+                <p className="text-xs text-muted">Then click the spot on the picture.</p>
+              </div>
+            )}
+
+            {face && tool !== "string" && tool !== "label" && (
+              <div className="space-y-4 rounded-2xl border border-line bg-surface p-4">
+                <p className={label}>
+                  This face · {summary.faces.find((f) => f.id === face.id)?.panels ?? 0} panels · {faceArea(face).toFixed(0)} m² from above
+                </p>
+                <label className="block text-sm">
+                  <span className="flex justify-between">
+                    Rows run at <span className="tabular-nums">{face.angle}°</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={-90}
+                    max={90}
+                    value={face.angle}
+                    onChange={(e) => update(face.id, { angle: Number(e.target.value), off: [] })}
+                    className="mt-1 w-full"
+                  />
+                </label>
+                <div className="flex gap-2">
+                  {[-5, -1, 1, 5].map((step) => (
+                    <button
+                      key={step}
+                      className={button}
+                      onClick={() => update(face.id, { angle: Math.max(-90, Math.min(90, face.angle + step)), off: [] })}
+                      aria-label={`Turn the rows ${Math.abs(step)} degrees ${step < 0 ? "anticlockwise" : "clockwise"}`}
+                    >
+                      {step > 0 ? "+" : "−"}
+                      {Math.abs(step)}°
+                    </button>
+                  ))}
+                </div>
+                <button className={button} onClick={() => update(face.id, { angle: angleOfLongestEdge(face), off: [] })}>
+                  Line up with the longest edge
+                </button>
+                <div className="flex gap-2">
+                  {[false, true].map((landscape) => (
+                    <button
+                      key={String(landscape)}
+                      className={clsx(button, face.landscape === landscape && "!border-primary !bg-primary !text-primary-ink")}
+                      onClick={() => update(face.id, { landscape, off: [] })}
+                    >
+                      {landscape ? "Landscape" : "Portrait"}
+                    </button>
+                  ))}
+                </div>
+                <label className="block text-sm">
+                  <span className="flex justify-between">
+                    Kept in from the edges <span className="tabular-nums">{face.setback.toFixed(1)} m</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1.5}
+                    step={0.1}
+                    value={face.setback}
+                    onChange={(e) => update(face.id, { setback: Number(e.target.value), off: [] })}
+                    className="mt-1 w-full"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="flex justify-between">
+                    Roof pitch <span className="tabular-nums">{face.tilt ?? TILT.roof}°</span>
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={TILT.max}
+                    value={face.tilt ?? TILT.roof}
+                    onChange={(e) => update(face.id, { tilt: Number(e.target.value) })}
+                    {...slides}
+                    className="mt-1 w-full"
+                  />
+                </label>
+                <p className="text-sm text-ink-2">
+                  Its panels face {compass(faceFacing(face))} ({faceFacing(face)}°), square to the rows: the arrows.{" "}
+                  <strong className="font-semibold text-ink">{besideFlat(face.tilt ?? TILT.roof, faceFacing(face))}</strong> over a year.
+                </p>
+                <label className="block text-sm">
+                  Slopes down towards
+                  <select
+                    value={face.facing}
+                    onChange={(e) => update(face.id, { facing: e.target.value as Facing })}
+                    className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-3"
+                  >
+                    {FACINGS.map((f) => (
+                      <option key={f}>{f}</option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-xs text-muted">
+                  Changing the rows, the layout or the edge distance lays this face&apos;s rows out afresh. Panels placed by hand stay where
+                  they are.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button className={button} onClick={() => update(face.id, { off: [] })} disabled={!face.off.length}>
+                    Put every row panel back
+                  </button>
+                  <button
+                    className={clsx(button, "text-danger")}
+                    onClick={() => {
+                      setFaces(faces.filter((f) => f.id !== face.id));
+                      setStrings(
+                        strings
+                          .map((s) => ({ ...s, panels: s.panels.filter((k) => !k.startsWith(`g:${face.id}:`)) }))
+                          .filter((s) => s.panels.length),
+                      );
+                      changed();
+                      setSelected(null);
+                      setPicks([]);
+                    }}
+                  >
+                    Delete this face
+                  </button>
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>
+        <div className="space-y-4 xl:sticky xl:top-[4.5rem] xl:max-h-[calc(100dvh-5.5rem)] xl:overflow-y-auto">
+          <DesignQuote
+            design={`Design ${active + 1}${active === primary ? " (primary)" : ""}`}
+            spec={spec}
+            workspace={props.workspace}
+            rates={props.rates}
+            value={quoteNow}
+            onChange={setQuote}
+            onNet={onNet}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

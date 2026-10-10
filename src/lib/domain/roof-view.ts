@@ -5,7 +5,7 @@
  */
 import type { Address } from "./types";
 
-export type RoofViewSize = "wide" | "thumb" | "design";
+export type RoofViewSize = "wide" | "thumb" | "design" | "designer";
 
 /** Pixel sizes before Google's 2x scale: a banner, and a square for lists. */
 export const ROOF_VIEW_SIZES: Record<RoofViewSize, { w: number; h: number; zoom: number }> = {
@@ -13,10 +13,12 @@ export const ROOF_VIEW_SIZES: Record<RoofViewSize, { w: number; h: number; zoom:
   thumb: { w: 200, h: 200, zoom: 20 },
   /** For panel layouts: must match designView() in roof-layout.ts. */
   design: { w: 640, h: 640, zoom: 20 },
+  /** For the roof designer (/design): must match ROOF_IMAGE in design/roof-design.ts. */
+  designer: { w: 640, h: 400, zoom: 20 },
 };
 
 export function isRoofViewSize(v: unknown): v is RoofViewSize {
-  return v === "wide" || v === "thumb" || v === "design";
+  return v === "wide" || v === "thumb" || v === "design" || v === "designer";
 }
 
 export function roofViewUrl(address: Address, size: RoofViewSize, key: string): string | null {
