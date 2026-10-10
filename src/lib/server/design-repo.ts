@@ -22,6 +22,7 @@ import {
 import { MAX_SUPPLIER_LISTS, type SupplierList } from "@/lib/domain/design/pricing";
 import type { DesignExtras } from "@/lib/domain/design/quote";
 import { newId, query, transaction } from "./db";
+import { linkJobsToRoof } from "./design-crm-repo";
 
 // ---------------------------------------------------------------------------
 // Businesses and members
@@ -214,7 +215,8 @@ export async function projectById(businessId: string, id: string): Promise<Proje
 /**
  * Starts the business's work on a roof. If it already has that roof (two
  * people opened the same address), the one it has is handed back untouched
- * with `existed`, so nothing is overwritten. "full" at the limit.
+ * with `existed`, so nothing is overwritten. "full" at the limit. Either way
+ * the business's jobs at that roof are joined to the design (`linkJobsToRoof`).
  */
 export async function createProject(
   businessId: string,
@@ -239,10 +241,10 @@ export async function createProject(
       by.toLowerCase(),
     ],
   );
-  if (made[0]) return { project: made[0], existed: false };
-  const existing = await projectAt(businessId, roof);
+  const existing = made[0] ?? (await projectAt(businessId, roof));
   if (!existing) throw new Error("the roof couldn't be kept");
-  return { project: existing, existed: true };
+  await linkJobsToRoof(businessId, roof, by);
+  return { project: existing, existed: !made[0] };
 }
 
 /**
@@ -260,13 +262,17 @@ export async function saveProject(
   by: string,
   address = "",
 ): Promise<{ version: number } | "conflict" | "missing"> {
-  const rows = await query<{ version: number }>(
+  const rows = await query<{ version: number; lat: number; lng: number }>(
     `update design_projects set design = $4, extras = $5, version = version + 1, updated_by = $6, updated_at = now(),
             address = case when address = '' then $7 else address end
-      where business_id = $1 and id = $2 and version = $3 returning version`,
+      where business_id = $1 and id = $2 and version = $3 returning version, lat, lng`,
     [businessId, id, version, JSON.stringify(work.design), JSON.stringify(work.extras), by.toLowerCase(), address],
   );
-  if (rows[0]) return { version: rows[0].version };
+  if (rows[0]) {
+    // A job added for this address since the roof was first drawn picks the design up here.
+    await linkJobsToRoof(businessId, rows[0], by);
+    return { version: rows[0].version };
+  }
   return (await projectById(businessId, id)) ? "conflict" : "missing";
 }
 

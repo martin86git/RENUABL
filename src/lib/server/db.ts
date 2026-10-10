@@ -210,6 +210,61 @@ create table if not exists design_projects (
   unique (business_id, roof_key),
   unique (business_id, id)
 );
+-- The roof designer's CRM (server/design-crm-repo.ts): a business's own customers, their jobs, and what happened.
+-- Jobs and activity point at their customer together with the business, so a row can never hang off another business's customer.
+alter table businesses add column if not exists samples_added_at timestamptz;
+create table if not exists design_customers (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  name text not null,
+  phone text not null default '',
+  email text not null default '',
+  address text not null default '',
+  lat double precision,
+  lng double precision,
+  source text not null default '',
+  notes text not null default '',
+  sample boolean not null default false,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (business_id, id)
+);
+create index if not exists design_customers_business on design_customers(business_id, updated_at desc);
+create table if not exists design_jobs (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  customer_id text not null,
+  title text not null,
+  address text not null default '',
+  lat double precision,
+  lng double precision,
+  roof_key text,
+  stage text not null default 'lead',
+  project_id text references design_projects(id) on delete set null,
+  value numeric,
+  install_date date,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (business_id, id),
+  foreign key (business_id, customer_id) references design_customers(business_id, id) on delete cascade
+);
+create index if not exists design_jobs_customer on design_jobs(business_id, customer_id);
+create index if not exists design_jobs_roof on design_jobs(business_id, roof_key);
+create table if not exists design_activity (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  customer_id text not null,
+  job_id text references design_jobs(id) on delete set null,
+  kind text not null,
+  text text not null,
+  by_email text not null,
+  at timestamptz not null default now(),
+  foreign key (business_id, customer_id) references design_customers(business_id, id) on delete cascade
+);
+create index if not exists design_activity_customer on design_activity(business_id, customer_id, at desc);
+create index if not exists design_activity_recent on design_activity(business_id, at desc);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,
