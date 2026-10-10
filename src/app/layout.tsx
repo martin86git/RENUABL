@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Caveat, Inter, Source_Serif_4 } from "next/font/google";
+import { Caveat, Inter, JetBrains_Mono, Source_Serif_4 } from "next/font/google";
 import { publicSiteUrl, searchIndexing } from "@/lib/domain/site";
 import { AdTags } from "@/components/ad-tags";
 import { googleAdsConfig } from "@/lib/domain/google-ads";
@@ -10,6 +10,8 @@ import "./globals.css";
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 const serif = Source_Serif_4({ variable: "--font-serif", subsets: ["latin"], weight: ["300", "400"] });
 const script = Caveat({ variable: "--font-script", subsets: ["latin"], weight: ["400", "500"] });
+// Figures in the roof designer (.theme-studio). Not preloaded: only that product uses it.
+const mono = JetBrains_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400", "500", "600"], preload: false });
 
 export const metadata: Metadata = {
   metadataBase: new URL(publicSiteUrl()),
@@ -29,7 +31,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en-AU" className={`${inter.variable} ${serif.variable} ${script.variable} h-full antialiased`}>
+    <html lang="en-AU" className={`${inter.variable} ${serif.variable} ${script.variable} ${mono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         {children}
         {/* Google Ads IDs are public; read here so short Vercel names (GADS_*) work. */}

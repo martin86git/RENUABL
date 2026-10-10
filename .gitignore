@@ -50,3 +50,6 @@ next-env.d.ts
 .idea/
 *.swp
 Thumbs.db
+
+# other sessions' working copies
+/.claude/
