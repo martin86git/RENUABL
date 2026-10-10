@@ -8,7 +8,7 @@ import { batteryCatalogue, inverterCatalogue, panelCatalogue } from "@/lib/domai
 import { MONTHLY_SUN } from "@/lib/domain/design/tilt";
 import { DEFAULT_WORKSPACE, workspaceCatalogue, type Workspace } from "@/lib/domain/design/pricing";
 import { postcodeIn, type DesignExtras } from "@/lib/domain/design/quote";
-import type { DesignSet } from "@/lib/domain/design/roof-design";
+import { ROOF_IMAGE, type DesignSet } from "@/lib/domain/design/roof-design";
 import { VERIFIED_RATES, type RebateRates } from "@/lib/domain/rebates";
 import { yieldPerKw } from "@/lib/domain/sunshine";
 import type { Address } from "@/lib/domain/types";
@@ -72,7 +72,10 @@ export function DesignStudio() {
   }, []);
   // Whether the roof's picture came: without it the designer still opens, on a plain backdrop, and says so.
   const [pictureMissing, setPictureMissing] = useState(false);
-  const image = roof ? `/api/design/roof?lat=${roof.lat.toFixed(6)}&lng=${roof.lng.toFixed(6)}` : null;
+  // The picture's shape is part of its address, so a browser never shows one it kept from before the shape changed.
+  const image = roof
+    ? `/api/design/roof?lat=${roof.lat.toFixed(6)}&lng=${roof.lng.toFixed(6)}&size=${ROOF_IMAGE.width}x${ROOF_IMAGE.height}`
+    : null;
   useEffect(() => {
     if (!image) return;
     const probe = new Image();

@@ -47,7 +47,7 @@ export function panelOf(design: { panel?: PanelSpec }): PanelSize {
 }
 
 /** The satellite picture the design sits on (`/api/project/roof`): its size in CSS pixels and its zoom. */
-export const ROOF_IMAGE = { width: 640, height: 400, zoom: 20 } as const;
+export const ROOF_IMAGE = { width: 640, height: 480, zoom: 20 } as const;
 
 /** Metres on the ground for each pixel of the picture, at a latitude (Web Mercator). */
 export function metresPerPixel(lat: number): number {

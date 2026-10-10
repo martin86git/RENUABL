@@ -14,7 +14,7 @@ export const ROOF_VIEW_SIZES: Record<RoofViewSize, { w: number; h: number; zoom:
   /** For panel layouts: must match designView() in roof-layout.ts. */
   design: { w: 640, h: 640, zoom: 20 },
   /** For the roof designer (/design): must match ROOF_IMAGE in design/roof-design.ts. */
-  designer: { w: 640, h: 400, zoom: 20 },
+  designer: { w: 640, h: 480, zoom: 20 },
 };
 
 export function isRoofViewSize(v: unknown): v is RoofViewSize {

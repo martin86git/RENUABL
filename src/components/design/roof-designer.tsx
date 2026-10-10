@@ -166,6 +166,11 @@ const besideFlat = (tilt: number, facing: number) => {
   return gain === 0 ? "The same as lying flat" : `${Math.abs(gain)}% ${gain > 0 ? "more" : "less"} than lying flat`;
 };
 const cm = (n: number) => Math.round(n * 100) / 100;
+/**
+ * The widest the picture may be and still fit the window with the bar and the figures above it: the picture is
+ * given all the room there is, since it is where the work is done.
+ */
+const FIT = `calc((100dvh - 11.5rem) * ${ROOF_IMAGE.width / ROOF_IMAGE.height})`;
 const WHOLE: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: ROOF_IMAGE.width, h: ROOF_IMAGE.height };
 
 /**
@@ -1466,7 +1471,7 @@ export function RoofDesigner(props: {
   return (
     <div>
       {/* The bar that stays at the top of the page: the wordmark, the address being designed, and saving. */}
-      <header className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line bg-canvas/95 px-4 py-2 text-ink backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <header className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center lg:flex-nowrap gap-x-5 gap-y-2 border-b border-line bg-canvas/95 px-4 py-2 text-ink backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         {props.bar}
         <dl className="flex min-w-0 flex-1 basis-56 items-center gap-x-6 overflow-hidden border-line lg:border-l lg:pl-5">
           <div className="min-w-0 flex-1">
@@ -1497,14 +1502,14 @@ export function RoofDesigner(props: {
         </div>
       </header>
 
-      <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_23rem] 2xl:grid-cols-[minmax(0,1fr)_26rem]">
+      <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_21rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="min-w-0">
           <div>
             {/* The figures over the picture, read left to right as one chain what is on the roof, what it makes, what stores and runs it, and what
                 that does to this home's bill. Each has one large figure in the same place every time, with its detail under it. */}
             <section
               className="relative mx-auto mb-2 flex flex-wrap items-stretch overflow-hidden rounded-lg bg-ink text-white"
-              style={{ maxWidth: "calc((100dvh - 11rem) * 1.6)" }}
+              style={{ maxWidth: FIT }}
               aria-label="This design in figures"
             >
               {(
@@ -1611,7 +1616,7 @@ export function RoofDesigner(props: {
             {oversize?.over && (
               <p
                 className="mx-auto mb-2 flex items-start gap-2.5 rounded-lg border border-sun-line bg-sun px-4 py-2.5 text-sm text-sun-ink"
-                style={{ maxWidth: "calc((100dvh - 11rem) * 1.6)" }}
+                style={{ maxWidth: FIT }}
                 role="alert"
               >
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -1624,7 +1629,7 @@ export function RoofDesigner(props: {
                 </span>
               </p>
             )}
-            <div className="relative mx-auto" style={{ maxWidth: "calc((100dvh - 11rem) * 1.6)" }}>
+            <div className="relative mx-auto" style={{ maxWidth: FIT }}>
               <div className="overflow-hidden rounded-lg bg-ink">
                 <svg
                   ref={svg}
@@ -2621,7 +2626,7 @@ export function RoofDesigner(props: {
 
               {/* Across the top of the picture: which of the roof's designs this is, and the panel it is drawn with. */}
               <div
-                className="absolute left-[4.25rem] top-3 z-10 flex items-center gap-1 rounded-lg border border-line bg-surface p-1.5 shadow-lift"
+                className="absolute left-[3.25rem] top-2 z-10 flex items-center gap-0.5 rounded-lg border border-line bg-surface p-1 shadow-lift"
                 role="toolbar"
                 aria-label="Design and panel"
                 ref={topBar}
@@ -2634,7 +2639,7 @@ export function RoofDesigner(props: {
                     title={`Design ${active + 1} of ${designs.length}${active === primary ? " (primary)" : ""}${designLabel.trim() ? `: ${designLabel.trim()}` : ""}`}
                     aria-label={`Designs: design ${active + 1} of ${designs.length}`}
                     className={clsx(
-                      "flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
+                      "flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-semibold tabular-nums",
                       menu === "designs" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
@@ -2737,7 +2742,7 @@ export function RoofDesigner(props: {
                     title={`Panel: ${panel?.name ?? chosenPanel?.name ?? "Panel"}`}
                     aria-label="The panel this design is drawn with"
                     className={clsx(
-                      "flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
+                      "flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-semibold tabular-nums",
                       menu === "panels" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
@@ -2797,7 +2802,7 @@ export function RoofDesigner(props: {
                     title={fitted.length ? `Inverters: ${fitted.map((i) => i.name).join(" + ")}` : "Choose an inverter"}
                     aria-label="The inverters this design is drawn for"
                     className={clsx(
-                      "flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
+                      "flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-semibold tabular-nums",
                       menu === "inverters" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
@@ -2937,7 +2942,7 @@ export function RoofDesigner(props: {
                     title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Choose a battery"}
                     aria-label="The battery on this design"
                     className={clsx(
-                      "flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
+                      "flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-semibold tabular-nums",
                       menu === "batteries" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
@@ -3046,7 +3051,7 @@ export function RoofDesigner(props: {
                       Number(bill.amount) > 0 ? "The customer's electricity bill" : "The customer's electricity bill: not entered yet"
                     }
                     className={clsx(
-                      "relative flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
+                      "relative flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-semibold tabular-nums",
                       menu === "bill"
                         ? "bg-primary text-primary-ink"
                         : Number(bill.amount) > 0
@@ -3139,7 +3144,7 @@ export function RoofDesigner(props: {
 
               {/* The tools, down the side of the picture. */}
               <div
-                className="absolute left-3 top-3 flex flex-col gap-1 rounded-lg border border-line bg-surface p-1.5 shadow-lift"
+                className="absolute left-2 top-2 flex flex-col gap-0.5 rounded-lg border border-line bg-surface p-1 shadow-lift"
                 role="toolbar"
                 aria-label="Design tools"
                 aria-orientation="vertical"
@@ -3156,31 +3161,37 @@ export function RoofDesigner(props: {
                     aria-label={name}
                     aria-pressed={tool === t}
                     className={clsx(
-                      "flex size-10 items-center justify-center rounded-md",
+                      "flex size-8 items-center justify-center rounded-md",
                       tool === t ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
-                    <Icon className="size-5" aria-hidden />
+                    <Icon className="size-[18px]" aria-hidden />
                   </button>
                 ))}
-                <span className="my-1 h-px bg-line" aria-hidden />
+              </div>
+              {/* Undo, redo and the zoom, in a row along the foot of the picture, clear of the map's own mark in the corner. */}
+              <div
+                className="absolute bottom-8 left-2 flex items-center gap-0.5 rounded-lg border border-line bg-surface p-1 shadow-lift"
+                role="toolbar"
+                aria-label="Undo and zoom"
+              >
                 <button
                   onClick={undo}
                   title="Undo (Ctrl+Z)"
                   aria-label="Undo (Ctrl+Z)"
-                  className="flex size-10 items-center justify-center rounded-md text-ink hover:bg-canvas"
+                  className="flex size-8 items-center justify-center rounded-md text-ink hover:bg-canvas"
                 >
-                  <Undo2 className="size-5" aria-hidden />
+                  <Undo2 className="size-[18px]" aria-hidden />
                 </button>
                 <button
                   onClick={redo}
                   title="Redo (Ctrl+Shift+Z)"
                   aria-label="Redo (Ctrl+Shift+Z)"
-                  className="flex size-10 items-center justify-center rounded-md text-ink hover:bg-canvas"
+                  className="flex size-8 items-center justify-center rounded-md text-ink hover:bg-canvas"
                 >
-                  <Redo2 className="size-5" aria-hidden />
+                  <Redo2 className="size-[18px]" aria-hidden />
                 </button>
-                <span className="my-1 h-px bg-line" aria-hidden />
+                <span className="mx-0.5 h-5 w-px bg-line" aria-hidden />
                 {(
                   [
                     [ZoomIn, "Zoom in", () => zoom(1 / 1.4)],
@@ -3193,9 +3204,9 @@ export function RoofDesigner(props: {
                     onClick={act}
                     title={name}
                     aria-label={name}
-                    className="flex size-10 items-center justify-center rounded-md text-ink hover:bg-canvas"
+                    className="flex size-8 items-center justify-center rounded-md text-ink hover:bg-canvas"
                   >
-                    <Icon className="size-5" aria-hidden />
+                    <Icon className="size-[18px]" aria-hidden />
                   </button>
                 ))}
               </div>
