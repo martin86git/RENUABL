@@ -18,7 +18,8 @@ import {
   type SettingField,
   type Workspace,
 } from "@/lib/domain/design/pricing";
-import { loadWorkspace, saveWorkspace } from "@/lib/services/design-store";
+import { loadWorkspace, saveWorkspace, savedLabel } from "@/lib/services/design-store";
+import { DesignAccountLink, DesignSettingsKeptNote } from "./design-account";
 
 const input =
   "block min-h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm tabular-nums outline-none focus:border-forest disabled:bg-surface-2 disabled:text-muted";
@@ -68,8 +69,8 @@ const stored = (f: SettingField, value: number) => (f.unit === "%" ? value / 100
 
 /**
  * The business's settings for the roof designer's quote (/design/settings): supplier price lists, the parts every
- * job needs, installation rates, margin, fixed costs and the bill a new job starts with. Kept on this device
- * (`design-store.ts`), saved as each thing is changed.
+ * job needs, installation rates, margin, fixed costs and the bill a new job starts with. Kept for the signed-in
+ * business, or on this device when nobody is signed in (`design-store.ts`), saved as each thing is changed.
  */
 export function DesignSettings() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -78,14 +79,20 @@ export function DesignSettings() {
   const file = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Reading this device's storage has to wait until the page is in the browser.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setWorkspace(loadWorkspace());
+    // From the account, or this device's storage. If the account can't be reached, say so rather than show the starting figures.
+    let gone = false;
+    loadWorkspace().then(
+      (loaded) => !gone && setWorkspace(loaded),
+      (e: unknown) => !gone && setStatus(e instanceof Error ? e.message : "Your settings couldn't be loaded. Reload the page."),
+    );
+    return () => {
+      gone = true;
+    };
   }, []);
 
   const change = (next: Workspace) => {
     setWorkspace(next);
-    setStatus(saveWorkspace(next) ?? "Saved on this device");
+    return saveWorkspace(next).then(async (problem) => setStatus(problem ?? (await savedLabel())));
   };
 
   const send = async (chosen: File) => {
@@ -103,7 +110,7 @@ export function DesignSettings() {
           error: true,
           message: "We couldn't find priced rows in that file. It needs a product code, a description and a price in its first columns.",
         });
-      change({ ...workspace, lists: withSupplierList(workspace.lists, list) });
+      void change({ ...workspace, lists: withSupplierList(workspace.lists, list) });
       setUpload({
         message: `Read ${list.items.length.toLocaleString("en-AU")} priced rows from ${list.name}: ${list.panels.length} panels, ${list.inverters.length} inverters, ${list.batteries.length} batteries.`,
       });
@@ -124,6 +131,7 @@ export function DesignSettings() {
         <span className="ml-auto text-xs text-muted" role="status">
           {status}
         </span>
+        <DesignAccountLink />
         <Link
           href="/design"
           className="inline-flex h-10 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest"
@@ -347,15 +355,14 @@ export function DesignSettings() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] bg-surface-2 p-5">
               <p className="max-w-xl text-sm text-ink-2">
-                These settings are kept in this browser on this device. Clearing the browser&apos;s data for this site removes them.
+                <DesignSettingsKeptNote />
               </p>
               <button
                 onClick={() => {
                   if (window.confirm("Put every setting back to the starting figures and remove your price lists?")) {
-                    change(DEFAULT_WORKSPACE);
                     setUpload({});
-                    // The boxes keep what was typed: opening the page again shows the starting figures.
-                    window.location.reload();
+                    // The boxes keep what was typed: opening the page again, once it's saved, shows the starting figures.
+                    void change(DEFAULT_WORKSPACE).then(() => window.location.reload());
                   }
                 }}
                 className="inline-flex h-10 items-center rounded-full border border-line bg-surface px-4 text-sm font-medium text-danger hover:border-danger"

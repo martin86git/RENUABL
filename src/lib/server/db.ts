@@ -1,7 +1,8 @@
 /**
  * Server only. RENUABL's database (Neon Postgres, connected to the Vercel
  * project: DATABASE_URL, or POSTGRES_URL). Holds partner accounts, jobs, job
- * offers and sign-in sessions. Tables are created on first use.
+ * offers, sign-in sessions, and the roof designer's businesses with their
+ * settings and roofs. Tables are created on first use.
  */
 import { Pool, type QueryResultRow } from "pg";
 
@@ -157,6 +158,58 @@ create table if not exists briefs (
 alter table briefs add column if not exists call_slot text;
 alter table briefs add column if not exists hubspot_id text;
 alter table briefs add column if not exists unfinished_noted_at timestamptz;
+-- The roof designer's own customers: businesses and the people in them. Not RENUABL's installation partners.
+-- Every table below carries business_id, and every query on it filters by it (server/design-repo.ts).
+create table if not exists businesses (
+  id text primary key,
+  name text not null,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists business_members (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  email text unique not null,
+  role text not null default 'member',
+  invited_by text,
+  terms_version text,
+  terms_accepted_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists business_members_business on business_members(business_id);
+create table if not exists design_settings (
+  business_id text primary key references businesses(id) on delete cascade,
+  settings jsonb not null,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+create table if not exists design_price_lists (
+  business_id text not null references businesses(id) on delete cascade,
+  name text not null,
+  data jsonb not null,
+  uploaded_by text,
+  created_at timestamptz not null default now(),
+  primary key (business_id, name)
+);
+-- unique (business_id, id): so a later table (customers, proposals, jobs) can point at a roof and its business together.
+create table if not exists design_projects (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  roof_key text not null,
+  address text not null default '',
+  lat double precision not null,
+  lng double precision not null,
+  design jsonb not null,
+  extras jsonb not null,
+  version integer not null default 1,
+  created_by text,
+  updated_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (business_id, roof_key),
+  unique (business_id, id)
+);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

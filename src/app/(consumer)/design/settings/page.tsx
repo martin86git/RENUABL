@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DesignAccountGate } from "@/components/design/design-account";
 import { DesignSettings } from "@/components/design/design-settings";
 
 export const metadata: Metadata = {
@@ -8,5 +9,10 @@ export const metadata: Metadata = {
 
 /** A business's price lists, parts, installation rates and margin for the roof designer's quote. */
 export default function DesignSettingsPage() {
-  return <DesignSettings />;
+  // The gate settles who is signed in (and brings a device's work into a new account) before the page loads its data.
+  return (
+    <DesignAccountGate>
+      <DesignSettings />
+    </DesignAccountGate>
+  );
 }

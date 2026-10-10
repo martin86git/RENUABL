@@ -309,6 +309,20 @@ export function loginLinkEmail(o: { link: string; minutes: number; forPartner: b
   });
 }
 
+/** The sign-in link for a business using the roof designer. The same email whether it's their first time or not. DRAFT wording: review before launch. */
+export function designSignInEmail(o: { link: string; minutes: number }) {
+  return simpleEmail({
+    subject: "Your sign-in link for the RENUABL roof designer",
+    heading: "Sign in to the roof designer",
+    lines: [
+      `Tap the button to sign in. The link works once and expires in ${o.minutes} minutes.`,
+      "Once you're in, your roofs, price lists and settings are kept for your business, on any device you sign in on.",
+    ],
+    button: { label: "Sign in", href: o.link },
+    footer: "Didn't ask for this? You can ignore this email: nobody can sign in without the link.",
+  });
+}
+
 export function applicationPendingEmail() {
   return simpleEmail({
     subject: "Your RENUABL application is being reviewed",

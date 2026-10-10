@@ -13,10 +13,13 @@ import { VERIFIED_RATES, type RebateRates } from "@/lib/domain/rebates";
 import { yieldPerKw } from "@/lib/domain/sunshine";
 import type { Address } from "@/lib/domain/types";
 import { loadLastRoof, loadRoofWork, loadWorkspace, rememberRoof, saveRoofWork, type DesignRoof } from "@/lib/services/design-store";
+import { DesignAccountLink, DesignKeptNote, DesignRoofList } from "./design-account";
 import { RoofDesigner } from "./roof-designer";
 
 /** What a kilowatt of panels makes in a day, from the same sunshine record the designer's months use. */
 const YIELD_PER_KW_DAY = yieldPerKw({ annual: MONTHLY_SUN.reduce((n, m) => n + m, 0) / 12 });
+
+const CANT_OPEN = "We couldn't open your saved work. Check your connection and reload the page.";
 
 const STEPS = [
   ["Find the roof", "Enter the address and see the roof from above, to scale."],
@@ -26,14 +29,15 @@ const STEPS = [
 
 /**
  * The roof designer as a page of its own (/design): an address first, then the
- * designer on that roof. Designs are kept on this device (`design-store.ts`).
+ * designer on that roof. Designs are kept for the signed-in business, or on this device when nobody is signed in
+ * (`design-store.ts`).
  */
 export function DesignStudio() {
   // Null until this device's last roof has been looked up, so the address box doesn't flash before a saved roof.
   const [ready, setReady] = useState(false);
   const [roof, setRoof] = useState<DesignRoof | null>(null);
   const [work, setWork] = useState<{ set: DesignSet; extras: DesignExtras } | null>(null);
-  // The business's price lists and settings, from this device; and the STC rules, today's when they can be had.
+  // The business's price lists and settings; and the STC rules, today's when they can be had.
   const [workspace, setWorkspace] = useState<Workspace>(DEFAULT_WORKSPACE);
   const [rates, setRates] = useState<RebateRates>(VERIFIED_RATES);
   useEffect(() => {
@@ -64,22 +68,45 @@ export function DesignStudio() {
   }, [image]);
 
   const open = (next: DesignRoof | null) => {
-    setRoof(next);
-    setWork(next ? loadRoofWork(next, workspace) : null);
+    setProblem(null);
     rememberRoof(next);
+    if (!next) {
+      setRoof(null);
+      setWork(null);
+      return;
+    }
+    // The roof opens once its saved work has arrived. If it can't be fetched, say so rather than show an empty roof.
+    loadRoofWork(next, workspace).then(
+      (loaded) => {
+        setRoof(next);
+        setWork(loaded);
+      },
+      (e: unknown) => setProblem(e instanceof Error ? e.message : CANT_OPEN),
+    );
   };
 
   useEffect(() => {
-    // Reading this device's storage has to wait until the page is in the browser.
-    const settings = loadWorkspace();
-    const last = loadLastRoof();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setWorkspace(settings);
-    if (last) {
-      setRoof(last);
-      setWork(loadRoofWork(last, settings));
-    }
-    setReady(true);
+    // The settings and the roof last opened on this device, from the account or this device's storage.
+    let gone = false;
+    void (async () => {
+      try {
+        const settings = await loadWorkspace();
+        const last = loadLastRoof();
+        const loaded = last ? await loadRoofWork(last, settings) : null;
+        if (gone) return;
+        setWorkspace(settings);
+        if (last && loaded) {
+          setRoof(last);
+          setWork(loaded);
+        }
+      } catch (e) {
+        if (!gone) setProblem(e instanceof Error ? e.message : CANT_OPEN);
+      }
+      if (!gone) setReady(true);
+    })();
+    return () => {
+      gone = true;
+    };
   }, []);
 
   // What the designer offers: the products on the uploaded price lists, or our own range for a kind the lists don't carry.
@@ -136,6 +163,7 @@ export function DesignStudio() {
               >
                 Prices and settings
               </Link>
+              <DesignAccountLink />
               <button
                 onClick={() => open(null)}
                 className="tap-area shrink-0 text-[13px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
@@ -179,6 +207,7 @@ export function DesignStudio() {
                 {problem}
               </p>
             )}
+            <DesignRoofList onOpen={open} />
           </>
         )}
         <ol className="mt-12 grid gap-4 sm:grid-cols-3">
@@ -193,7 +222,7 @@ export function DesignStudio() {
           ))}
         </ol>
         <p className="mt-8 text-[13px] leading-relaxed text-muted">
-          Designs are saved on this device. It works best on a computer with a mouse.{" "}
+          <DesignKeptNote /> It works best on a computer with a mouse.{" "}
           <Link href="/design/settings" className="font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
             Set up your price lists and rates
           </Link>
