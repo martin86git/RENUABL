@@ -194,6 +194,8 @@ export function RoofDesigner(props: {
   extras: DesignExtras;
   /** Keeps the designs, the bill and the quotes: resolves to an error message when they couldn't be kept. */
   onSave: (set: DesignSet, extras: DesignExtras) => Promise<string | null>;
+  /** What to say once saved: where the work is kept ("Saved to your account", "Saved on this device"). */
+  savedLabel?: string;
   /** The start of the bar at the top of the page (the wordmark and the address), and the way out, drawn by the page. */
   bar?: React.ReactNode;
   back?: React.ReactNode;
@@ -1421,7 +1423,7 @@ export function RoofDesigner(props: {
         <div className="flex shrink-0 items-center gap-3">
           <span className="text-xs text-muted" role="status">
             {saved === "saved"
-              ? "Saved on this device"
+              ? (props.savedLabel ?? "Saved")
               : saved === "saving"
                 ? "Saving…"
                 : saved === "changed"

@@ -12,7 +12,15 @@ import type { DesignSet } from "@/lib/domain/design/roof-design";
 import { VERIFIED_RATES, type RebateRates } from "@/lib/domain/rebates";
 import { yieldPerKw } from "@/lib/domain/sunshine";
 import type { Address } from "@/lib/domain/types";
-import { loadLastRoof, loadRoofWork, loadWorkspace, rememberRoof, saveRoofWork, type DesignRoof } from "@/lib/services/design-store";
+import {
+  loadLastRoof,
+  loadRoofWork,
+  loadWorkspace,
+  rememberRoof,
+  saveRoofWork,
+  type DesignRoof,
+  savedLabel,
+} from "@/lib/services/design-store";
 import { DesignAccountLink, DesignKeptNote, DesignRoofList } from "./design-account";
 import { RoofDesigner } from "./roof-designer";
 
@@ -53,6 +61,15 @@ export function DesignStudio() {
     return () => stop.abort();
   }, []);
   const [problem, setProblem] = useState<string | null>(null);
+  // Where saved work is kept (this device, or the business's account), for the designer's "Saved" line.
+  const [kept, setKept] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    void savedLabel().then((label) => live && setKept(label));
+    return () => {
+      live = false;
+    };
+  }, []);
   // Whether the roof's picture came: without it the designer still opens, on a plain backdrop, and says so.
   const [pictureMissing, setPictureMissing] = useState(false);
   const image = roof ? `/api/design/roof?lat=${roof.lat.toFixed(6)}&lng=${roof.lng.toFixed(6)}` : null;
@@ -150,6 +167,7 @@ export function DesignStudio() {
           batteries={catalogue.batteries}
           yieldPerKwDay={YIELD_PER_KW_DAY}
           onSave={async (next, extras) => saveRoofWork(roof, next, extras)}
+          savedLabel={kept}
           bar={
             <Link href="/" aria-label="RENUABL home">
               <Wordmark className="text-[17px]" />
