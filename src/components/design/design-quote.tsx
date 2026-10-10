@@ -127,7 +127,7 @@ export function DesignQuote(props: {
           {missing > 0 && (
             <p className="mb-3 rounded-md bg-warning-soft p-2.5 text-xs text-warning" role="status">
               {missing} {missing === 1 ? "line has" : "lines have"} no cost on file, so {missing === 1 ? "it counts" : "they count"} as $0.
-              Type a cost over {missing === 1 ? "it" : "them"} here, or{" "}
+              Each is highlighted below: type a cost over it, leave it at $0, or{" "}
               <Link href="/design/settings" className="font-semibold underline underline-offset-2">
                 upload a price list or set the part&apos;s cost
               </Link>
@@ -152,16 +152,36 @@ export function DesignQuote(props: {
                     const typed = edits[lineKey(l)]?.amount;
                     const unset = l.missing && typed === undefined;
                     return (
-                      <tr key={`${l.label}${i}`} className="group border-b border-line align-top last:border-0">
-                        <td className="py-1.5 pr-2">
+                      <tr
+                        key={`${l.label}${i}`}
+                        className={
+                          unset
+                            ? // A line with no cost asks to be dealt with: priced, or knowingly left at nothing.
+                              "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
+                            : "group border-b border-line align-top last:border-0"
+                        }
+                      >
+                        <td className={unset ? "py-1.5 pl-2.5 pr-2" : "py-1.5 pr-2"}>
                           {l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label}
                           {l.sku && <span className="block text-xs text-muted">{l.sku}</span>}
-                          {unset && <span className="block text-xs text-warning">No cost on file</span>}
-                          {typed !== undefined && (
-                            <button className="block text-xs text-sun-ink underline underline-offset-2" onClick={() => edit(l, null)}>
-                              Changed by hand: back to {l.missing ? "no cost" : money(l.amount)}
-                            </button>
+                          {unset && (
+                            <span className="mt-0.5 block text-xs text-sun-ink">
+                              <strong className="font-semibold">No cost on file.</strong> Type one, or{" "}
+                              <button className="font-semibold underline underline-offset-2" onClick={() => edit(l, { amount: 0 })}>
+                                leave it at $0
+                              </button>
+                            </span>
                           )}
+                          {typed !== undefined &&
+                            (l.missing && typed === 0 ? (
+                              <button className="block text-xs text-muted underline underline-offset-2" onClick={() => edit(l, null)}>
+                                Left at $0 (no cost on file): undo
+                              </button>
+                            ) : (
+                              <button className="block text-xs text-sun-ink underline underline-offset-2" onClick={() => edit(l, null)}>
+                                Changed by hand: back to {l.missing ? "no cost" : money(l.amount)}
+                              </button>
+                            ))}
                         </td>
                         <td className="py-1.5 text-right tabular-nums text-ink-2">{l.qty ?? ""}</td>
                         <td className="py-1 pl-1 text-right">
