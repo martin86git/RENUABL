@@ -107,7 +107,7 @@ export function DesignStudio() {
 
   if (roof && work && image)
     return (
-      <div className="px-4 pb-20 sm:px-6 lg:px-8">
+      <div className="theme-studio min-h-dvh px-4 pb-20 sm:px-6 lg:px-8">
         <RoofDesigner
           // A different roof is a different designer: nothing from the last one carries over.
           key={`${roof.lat},${roof.lng}`}
@@ -146,7 +146,7 @@ export function DesignStudio() {
           }
         />
         {pictureMissing && (
-          <p className="mx-auto mt-4 max-w-3xl rounded-2xl bg-warning-soft px-5 py-3 text-center text-[13.5px] text-warning" role="status">
+          <p className="mx-auto mt-4 max-w-3xl rounded-lg bg-warning-soft px-5 py-3 text-center text-[13.5px] text-warning" role="status">
             The picture of this roof couldn&apos;t be loaded, so there is nothing to trace yet. Try again in a moment, or change the
             address.
           </p>
@@ -159,7 +159,7 @@ export function DesignStudio() {
     );
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="theme-studio flex min-h-dvh flex-col">
       <header className="flex h-16 items-center px-5 lg:px-10">
         <Link href="/" aria-label="RENUABL home">
           <Wordmark />
@@ -183,7 +183,7 @@ export function DesignStudio() {
         )}
         <ol className="mt-12 grid gap-4 sm:grid-cols-3">
           {STEPS.map(([title, body], i) => (
-            <li key={title} className="rounded-[1.25rem] bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line">
+            <li key={title} className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line">
               <span className="grid size-7 place-items-center rounded-full border border-sun-line text-[13px] text-sun-line-ink">
                 {i + 1}
               </span>

@@ -21,7 +21,7 @@ import {
 import { loadWorkspace, saveWorkspace } from "@/lib/services/design-store";
 
 const input =
-  "block min-h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm tabular-nums outline-none focus:border-forest disabled:bg-surface-2 disabled:text-muted";
+  "block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm tabular-nums outline-none focus:border-forest disabled:bg-surface-2 disabled:text-muted";
 const eyebrow = "text-[11px] font-medium uppercase tracking-[0.14em] text-forest";
 const money = (n: number) => `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -115,7 +115,7 @@ export function DesignSettings() {
   };
 
   return (
-    <div className="min-h-dvh pb-24">
+    <div className="theme-studio min-h-dvh pb-24">
       <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line bg-canvas/95 px-5 py-3 backdrop-blur lg:px-10">
         <Link href="/" aria-label="RENUABL home">
           <Wordmark className="text-[17px]" />
@@ -126,7 +126,7 @@ export function DesignSettings() {
         </span>
         <Link
           href="/design"
-          className="inline-flex h-10 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest"
+          className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest"
         >
           Back to the designer
         </Link>
@@ -144,10 +144,7 @@ export function DesignSettings() {
 
         {!workspace ? null : (
           <>
-            <section
-              className="rounded-[1.25rem] bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6"
-              aria-labelledby="lists"
-            >
+            <section className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6" aria-labelledby="lists">
               <h2 id="lists" className="text-[19px] tracking-tight text-ink">
                 Supplier price lists
               </h2>
@@ -171,7 +168,7 @@ export function DesignSettings() {
                 />
                 <label
                   htmlFor="price-list"
-                  className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest"
+                  className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest"
                 >
                   <Upload className="size-4" aria-hidden /> {upload.busy ? "Reading…" : "Upload a price list"}
                 </label>
@@ -182,12 +179,12 @@ export function DesignSettings() {
                 )}
               </div>
               {workspace.lists.length === 0 ? (
-                <p className="mt-4 rounded-xl bg-surface-2 p-3 text-sm text-ink-2">
+                <p className="mt-4 rounded-md bg-surface-2 p-3 text-sm text-ink-2">
                   No price list yet. Until there is one, the designer offers our own range and the quote shows each product as having no
                   cost on file.
                 </p>
               ) : (
-                <ul className="mt-4 divide-y divide-line rounded-xl border border-line">
+                <ul className="mt-4 divide-y divide-line rounded-md border border-line">
                   {workspace.lists.map((list) => (
                     <li key={list.name} className="flex items-center gap-3 px-4 py-3">
                       <div className="min-w-0 flex-1">
@@ -199,7 +196,7 @@ export function DesignSettings() {
                       </div>
                       <button
                         onClick={() => change({ ...workspace, lists: workspace.lists.filter((l) => l.name !== list.name) })}
-                        className="flex size-10 items-center justify-center rounded-xl text-muted hover:bg-canvas hover:text-danger"
+                        className="flex size-10 items-center justify-center rounded-md text-muted hover:bg-canvas hover:text-danger"
                         aria-label={`Remove ${list.name}`}
                         title="Remove this list"
                       >
@@ -211,10 +208,7 @@ export function DesignSettings() {
               )}
             </section>
 
-            <section
-              className="rounded-[1.25rem] bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6"
-              aria-labelledby="parts"
-            >
+            <section className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6" aria-labelledby="parts">
               <h2 id="parts" className="text-[19px] tracking-tight text-ink">
                 Parts on every job
               </h2>
@@ -280,10 +274,7 @@ export function DesignSettings() {
               </div>
             </section>
 
-            <section
-              className="rounded-[1.25rem] bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6"
-              aria-labelledby="install"
-            >
+            <section className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6" aria-labelledby="install">
               <h2 id="install" className="text-[19px] tracking-tight text-ink">
                 Installation rates
               </h2>
@@ -315,7 +306,7 @@ export function DesignSettings() {
             {SETTING_GROUPS.map((group) => (
               <section
                 key={group.title}
-                className="rounded-[1.25rem] bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6"
+                className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6"
                 aria-label={group.title}
               >
                 <h2 className="text-[19px] tracking-tight text-ink">{group.title}</h2>
@@ -345,7 +336,7 @@ export function DesignSettings() {
               </section>
             ))}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] bg-surface-2 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2 p-5">
               <p className="max-w-xl text-sm text-ink-2">
                 These settings are kept in this browser on this device. Clearing the browser&apos;s data for this site removes them.
               </p>
@@ -358,7 +349,7 @@ export function DesignSettings() {
                     window.location.reload();
                   }
                 }}
-                className="inline-flex h-10 items-center rounded-full border border-line bg-surface px-4 text-sm font-medium text-danger hover:border-danger"
+                className="inline-flex h-10 items-center rounded-md border border-line bg-surface px-4 text-sm font-medium text-danger hover:border-danger"
               >
                 Start again
               </button>

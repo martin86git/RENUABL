@@ -18,7 +18,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import type { RebateRates } from "@/lib/domain/rebates";
 
 const money = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
-const field = "mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest";
+const field = "mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest";
 const label = "text-[10px] font-medium uppercase tracking-[0.14em] text-muted";
 
 /**
@@ -71,7 +71,7 @@ export function DesignQuote(props: {
   };
 
   return (
-    <section className="rounded-2xl border border-line bg-surface p-4" aria-label="Quote builder">
+    <section className="rounded-lg border border-line bg-surface p-4" aria-label="Quote builder">
       <div className="flex items-baseline justify-between gap-2">
         <p className={label}>Quote builder · {props.design}</p>
         <Link href="/design/settings" className="text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
@@ -112,7 +112,7 @@ export function DesignQuote(props: {
       ) : (
         <div className="mt-4">
           {missing > 0 && (
-            <p className="mb-3 rounded-xl bg-warning-soft p-2.5 text-xs text-warning" role="status">
+            <p className="mb-3 rounded-md bg-warning-soft p-2.5 text-xs text-warning" role="status">
               {missing} {missing === 1 ? "line has" : "lines have"} no cost on file, so {missing === 1 ? "it counts" : "they count"} as $0.
               Type a cost over {missing === 1 ? "it" : "them"} here, or{" "}
               <Link href="/design/settings" className="font-semibold underline underline-offset-2">
@@ -190,7 +190,7 @@ export function DesignQuote(props: {
             );
           })}
           {changed > 0 && (
-            <p className="mt-3 rounded-xl bg-sun p-2.5 text-xs text-sun-ink">
+            <p className="mt-3 rounded-md bg-sun p-2.5 text-xs text-sun-ink">
               {changed} {changed === 1 ? "line has" : "lines have"} been changed by hand
               {removed ? `, ${removed} taken out` : ""}. They stay as you set them while the design changes.{" "}
               <button className="font-semibold underline underline-offset-2" onClick={() => props.onChange({ form, edits: {} })}>
@@ -198,7 +198,7 @@ export function DesignQuote(props: {
               </button>
             </p>
           )}
-          <dl className="mt-4 space-y-1 rounded-xl bg-canvas p-3 text-sm">
+          <dl className="mt-4 space-y-1 rounded-md bg-canvas p-3 text-sm">
             {[
               ["Your cost", money(totals.cost)],
               [

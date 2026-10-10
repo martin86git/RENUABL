@@ -1284,7 +1284,7 @@ export function RoofDesigner(props: {
   };
 
   const button =
-    "inline-flex min-h-10 items-center rounded-full border border-line bg-surface px-4 text-sm font-medium hover:border-forest disabled:bg-surface-2 disabled:text-muted disabled:hover:border-line";
+    "inline-flex min-h-10 items-center rounded-md border border-line bg-surface px-4 text-sm font-medium hover:border-forest disabled:bg-surface-2 disabled:text-muted disabled:hover:border-line";
   const label = "text-[10px] font-medium uppercase tracking-[0.18em] text-muted";
   const onlyOne = picks.length === 1 && picks[0].kind === "loose" ? loose.find((p) => p.id === (picks[0] as { id: string }).id) : null;
   const stringOf = (key: string) => strings.findIndex((s) => s.panels.includes(key));
@@ -1431,7 +1431,7 @@ export function RoofDesigner(props: {
           <button
             onClick={save}
             disabled={saved === "saved" || saved === "saving"}
-            className="inline-flex h-10 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+            className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
           >
             Save design
           </button>
@@ -1444,7 +1444,7 @@ export function RoofDesigner(props: {
           <div>
             {/* The figures, in one slim row over the picture, in the site's drawn style: small capitals, thin rules, and the year as fine gold lines. */}
             <section
-              className="relative mx-auto mb-2 flex items-center gap-4 overflow-hidden rounded-2xl bg-forest px-4 py-2 text-white"
+              className="relative mx-auto mb-2 flex items-center gap-4 overflow-hidden rounded-lg bg-ink px-5 py-3 text-white"
               style={{ maxWidth: "calc((100dvh - 11rem) * 1.6)" }}
               aria-label="This design in figures"
             >
@@ -1456,8 +1456,8 @@ export function RoofDesigner(props: {
                   ["kWh/year", year.reduce((n, kwh) => n + kwh, 0).toLocaleString("en-AU")],
                 ].map(([name, value]) => (
                   <div key={name} className="px-3 first:pl-0">
-                    <dt className="text-[9px] font-medium uppercase tracking-[0.16em] text-white/55">{name}</dt>
-                    <dd className="text-base font-semibold tabular-nums leading-tight">{value}</dd>
+                    <dt className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/50">{name}</dt>
+                    <dd className="text-lg font-medium tabular-nums leading-tight">{value}</dd>
                   </div>
                 ))}
               </dl>
@@ -1499,10 +1499,10 @@ export function RoofDesigner(props: {
                   ] as const
                 ).map(([name, value]) => (
                   <div key={name} className="px-3">
-                    <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.16em] text-white/55">{name}</dt>
+                    <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.2em] text-white/50">{name}</dt>
                     <dd
                       className={clsx(
-                        "whitespace-nowrap text-base font-semibold tabular-nums leading-tight",
+                        "whitespace-nowrap text-lg font-medium tabular-nums leading-tight",
                         name === "Saves a year" && finance && "text-sun-bright",
                       )}
                     >
@@ -1513,7 +1513,7 @@ export function RoofDesigner(props: {
               </dl>
             </section>
             <div className="relative mx-auto" style={{ maxWidth: "calc((100dvh - 11rem) * 1.6)" }}>
-              <div className="overflow-hidden rounded-2xl bg-ink">
+              <div className="overflow-hidden rounded-lg bg-ink">
                 <svg
                   ref={svg}
                   viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
@@ -2038,7 +2038,7 @@ export function RoofDesigner(props: {
                 const top = ((ROOF_IMAGE.height / 2 + at.y / scale - view.y) / view.h) * 100;
                 return (
                   <div
-                    className="pointer-events-none absolute z-20 w-[22rem] max-w-[calc(100%-1rem)] rounded-2xl bg-forest p-3 text-white shadow-lift ring-1 ring-white/15"
+                    className="pointer-events-none absolute z-20 w-[22rem] max-w-[calc(100%-1rem)] rounded-lg bg-forest p-3 text-white shadow-lift ring-1 ring-white/15"
                     style={{
                       left: `clamp(0.5rem, calc(${left}% + 2rem), calc(100% - 22.5rem))`,
                       top: `clamp(0.5rem, calc(${top}% + 1.5rem), calc(100% - 15rem))`,
@@ -2095,7 +2095,7 @@ export function RoofDesigner(props: {
               {/* The open comment, beside its bubble: this is where it is read and written. */}
               {thread && threadSpot && (
                 <div
-                  className="absolute z-20 w-72 max-w-[calc(100%-1rem)] space-y-3 rounded-2xl border-2 border-sun-line bg-surface p-4 shadow-lift"
+                  className="absolute z-20 w-72 max-w-[calc(100%-1rem)] space-y-3 rounded-lg border-2 border-sun-line bg-surface p-4 shadow-lift"
                   style={{
                     left: `clamp(0.5rem, calc(${threadSpot.left}% + 1rem), calc(100% - 18.5rem))`,
                     top: `clamp(0.5rem, ${threadSpot.top}%, calc(100% - 6rem))`,
@@ -2115,7 +2115,7 @@ export function RoofDesigner(props: {
                   </div>
                   {"id" in thread &&
                     (comments.find((c) => c.id === thread.id)?.notes ?? []).map((n, i) => (
-                      <div key={i} className={clsx("rounded-xl px-3 py-2 text-sm", "bg-canvas")}>
+                      <div key={i} className={clsx("rounded-md px-3 py-2 text-sm", "bg-canvas")}>
                         <p className="text-[11px] text-muted">{n.at.replace("T", " ")}</p>
                         <p className="mt-0.5 whitespace-pre-wrap">{n.text}</p>
                       </div>
@@ -2127,7 +2127,7 @@ export function RoofDesigner(props: {
                     maxLength={500}
                     rows={3}
                     placeholder={"at" in thread ? "What do you want to say about this spot?" : "Reply"}
-                    className="block w-full rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-forest"
+                    className="block w-full rounded-md border border-line bg-surface p-3 text-sm outline-none focus:border-forest"
                   />
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -2175,7 +2175,7 @@ export function RoofDesigner(props: {
               {/* On the picture, bottom right: the controls for whatever is picked. With nothing picked, the turn buttons for the rows of the face being worked on. */}
               {tool === "string" ? (
                 <div
-                  className="absolute bottom-3 right-3 z-10 max-h-[calc(100%-5rem)] w-72 space-y-2 overflow-y-auto rounded-2xl border border-line bg-surface p-3 shadow-lift"
+                  className="absolute bottom-3 right-3 z-10 max-h-[calc(100%-5rem)] w-72 space-y-2 overflow-y-auto rounded-lg border border-line bg-surface p-3 shadow-lift"
                   role="group"
                   aria-label="Strings"
                 >
@@ -2190,7 +2190,7 @@ export function RoofDesigner(props: {
                     {strings.map((x, i) => (
                       <li
                         key={x.id}
-                        className={clsx("flex items-center gap-1 rounded-xl border p-1", x.id === wiring ? "border-forest" : "border-line")}
+                        className={clsx("flex items-center gap-1 rounded-md border p-1", x.id === wiring ? "border-forest" : "border-line")}
                         onMouseEnter={() => setHover(x.id)}
                         onMouseLeave={() => setHover(null)}
                       >
@@ -2265,7 +2265,7 @@ export function RoofDesigner(props: {
                 </div>
               ) : picks.length > 0 ? (
                 <div
-                  className="absolute bottom-3 right-3 z-10 w-64 space-y-2 rounded-2xl border border-line bg-surface p-3 shadow-lift"
+                  className="absolute bottom-3 right-3 z-10 w-64 space-y-2 rounded-lg border border-line bg-surface p-3 shadow-lift"
                   role="group"
                   aria-label="What is picked"
                 >
@@ -2339,7 +2339,7 @@ export function RoofDesigner(props: {
               ) : (
                 face && (
                   <div
-                    className="absolute bottom-3 right-3 flex items-center gap-1 rounded-2xl border border-line bg-surface p-1.5 shadow-lift"
+                    className="absolute bottom-3 right-3 flex items-center gap-1 rounded-lg border border-line bg-surface p-1.5 shadow-lift"
                     role="group"
                     aria-label="Turn the rows"
                   >
@@ -2349,7 +2349,7 @@ export function RoofDesigner(props: {
                         key={step}
                         onClick={() => update(face.id, { angle: Math.max(-90, Math.min(90, face.angle + step)), off: [] })}
                         aria-label={`Turn the rows ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
-                        className="flex h-10 min-w-11 items-center justify-center rounded-xl px-2 text-sm font-semibold tabular-nums text-ink hover:bg-canvas"
+                        className="flex h-10 min-w-11 items-center justify-center rounded-md px-2 text-sm font-semibold tabular-nums text-ink hover:bg-canvas"
                       >
                         {step > 0 ? "+" : "−"}
                         {Math.abs(step)}°
@@ -2361,7 +2361,7 @@ export function RoofDesigner(props: {
 
               {/* Across the top of the picture: which of the roof's designs this is, and the panel it is drawn with. */}
               <div
-                className="absolute left-[4.25rem] top-3 z-10 flex items-center gap-1 rounded-2xl border border-line bg-surface p-1.5 shadow-lift"
+                className="absolute left-[4.25rem] top-3 z-10 flex items-center gap-1 rounded-lg border border-line bg-surface p-1.5 shadow-lift"
                 role="toolbar"
                 aria-label="Design and panel"
                 ref={topBar}
@@ -2374,7 +2374,7 @@ export function RoofDesigner(props: {
                     title={`Design ${active + 1} of ${designs.length}${active === primary ? " (primary)" : ""}${designLabel.trim() ? `: ${designLabel.trim()}` : ""}`}
                     aria-label={`Designs: design ${active + 1} of ${designs.length}`}
                     className={clsx(
-                      "flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold tabular-nums",
+                      "flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
                       menu === "designs" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
@@ -2383,12 +2383,12 @@ export function RoofDesigner(props: {
                     {active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-hidden />}
                   </button>
                   {menu === "designs" && (
-                    <div className="absolute left-0 top-full mt-3 w-[22rem] max-w-[80vw] space-y-3 rounded-2xl border border-line bg-surface p-3 shadow-lift">
+                    <div className="absolute left-0 top-full mt-3 w-[22rem] max-w-[80vw] space-y-3 rounded-lg border border-line bg-surface p-3 shadow-lift">
                       <ul className="space-y-1.5">
                         {everyDesign().map((d, i) => {
                           const sum = designSummary(d);
                           return (
-                            <li key={i} className={clsx("rounded-xl border", i === active ? "border-forest" : "border-line")}>
+                            <li key={i} className={clsx("rounded-md border", i === active ? "border-forest" : "border-line")}>
                               <div className="flex items-center gap-1 p-1">
                                 <button
                                   onClick={() => (i === active ? openMenu(false) : show(everyDesign(), i))}
@@ -2450,7 +2450,7 @@ export function RoofDesigner(props: {
                           }}
                           maxLength={40}
                           placeholder="e.g. All on the north face"
-                          className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-3 outline-none focus:border-forest"
+                          className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-3 outline-none focus:border-forest"
                         />
                       </label>
                       <div className="flex flex-wrap gap-2">
@@ -2477,7 +2477,7 @@ export function RoofDesigner(props: {
                     title={`Panel: ${panel?.name ?? chosenPanel?.name ?? "Panel"}`}
                     aria-label="The panel this design is drawn with"
                     className={clsx(
-                      "flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold tabular-nums",
+                      "flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
                       menu === "panels" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
@@ -2485,7 +2485,7 @@ export function RoofDesigner(props: {
                     {size.watts} W
                   </button>
                   {menu === "panels" && (
-                    <div className="absolute left-0 top-full mt-3 max-h-[60vh] w-[24rem] max-w-[80vw] space-y-1 overflow-y-auto rounded-2xl border border-line bg-surface p-2 shadow-lift">
+                    <div className="absolute left-0 top-full mt-3 max-h-[60vh] w-[24rem] max-w-[80vw] space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift">
                       <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
                       {[
                         ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
@@ -2498,7 +2498,7 @@ export function RoofDesigner(props: {
                             openMenu(false);
                           }}
                           className={clsx(
-                            "flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left hover:bg-canvas",
+                            "flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
                             p.sku === chosen && "bg-canvas",
                           )}
                         >
@@ -2524,7 +2524,7 @@ export function RoofDesigner(props: {
                     title={fitted.length ? `Inverters: ${fitted.map((i) => i.name).join(" + ")}` : "Choose an inverter"}
                     aria-label="The inverters this design is drawn for"
                     className={clsx(
-                      "flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold tabular-nums",
+                      "flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
                       menu === "inverters" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
@@ -2532,14 +2532,14 @@ export function RoofDesigner(props: {
                     {fitted.length ? `${fitted.length > 1 ? `${fitted.length} × · ` : ""}${fittedKw} kW` : "Inverter"}
                   </button>
                   {menu === "inverters" && (
-                    <div className="absolute left-0 top-full mt-3 w-[26rem] max-w-[80vw] rounded-2xl border border-line bg-surface p-2 shadow-lift">
+                    <div className="absolute left-0 top-full mt-3 w-[26rem] max-w-[80vw] rounded-lg border border-line bg-surface p-2 shadow-lift">
                       <p className={clsx(label, "px-2 py-1")}>On this design</p>
                       {fitted.length === 0 && (
                         <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
                       )}
                       <ul className="space-y-0.5">
                         {fitted.map((spec, n) => (
-                          <li key={n} className="flex items-center gap-2 rounded-xl bg-canvas px-2 py-1.5">
+                          <li key={n} className="flex items-center gap-2 rounded-md bg-canvas px-2 py-1.5">
                             <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-ink">
                               {n + 1}
                             </span>
@@ -2573,7 +2573,7 @@ export function RoofDesigner(props: {
                         <Sparkles className="mr-1.5 size-4 text-sun-ink" aria-hidden /> Suggest one for these panels
                       </button>
                       {suggesting && (
-                        <div className="mt-1 space-y-1 rounded-xl border border-sun-line bg-sun p-2">
+                        <div className="mt-1 space-y-1 rounded-md border border-sun-line bg-sun p-2">
                           {summary.panels === 0 && (
                             <p className="px-1 text-sm text-ink-2">Put panels on the roof first: the suggestion is sized to them.</p>
                           )}
@@ -2621,7 +2621,7 @@ export function RoofDesigner(props: {
                             value={seek}
                             onChange={(e) => setSeek(e.target.value)}
                             placeholder="Search inverters"
-                            className="block min-h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                            className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
                           />
                           <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
                             {props.inverters
@@ -2635,7 +2635,7 @@ export function RoofDesigner(props: {
                                 <button
                                   key={i.sku}
                                   onClick={() => addInverter(i)}
-                                  className="flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left hover:bg-canvas"
+                                  className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas"
                                 >
                                   <Plus className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
                                   <span className="min-w-0">
@@ -2664,7 +2664,7 @@ export function RoofDesigner(props: {
                     title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Choose a battery"}
                     aria-label="The battery on this design"
                     className={clsx(
-                      "flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold tabular-nums",
+                      "flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
                       menu === "batteries" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
@@ -2672,10 +2672,10 @@ export function RoofDesigner(props: {
                     {battery ? `${batteryKwh} kWh` : "Battery"}
                   </button>
                   {menu === "batteries" && (
-                    <div className="absolute left-0 top-full mt-3 w-[26rem] max-w-[80vw] rounded-2xl border border-line bg-surface p-2 shadow-lift">
+                    <div className="absolute left-0 top-full mt-3 w-[26rem] max-w-[80vw] rounded-lg border border-line bg-surface p-2 shadow-lift">
                       <p className={clsx(label, "px-2 py-1")}>On this design</p>
                       {battery ? (
-                        <div className="rounded-xl bg-canvas px-2 py-2">
+                        <div className="rounded-md bg-canvas px-2 py-2">
                           <p className="truncate text-sm font-semibold">{battery.name}</p>
                           <div className="mt-1.5 flex items-center gap-2 text-sm">
                             <button
@@ -2725,7 +2725,7 @@ export function RoofDesigner(props: {
                         value={seek}
                         onChange={(e) => setSeek(e.target.value)}
                         placeholder="Search batteries"
-                        className="block min-h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                        className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
                       />
                       <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
                         {props.batteries
@@ -2740,7 +2740,7 @@ export function RoofDesigner(props: {
                               key={b.sku}
                               onClick={() => chooseBattery(b)}
                               className={clsx(
-                                "flex w-full items-start gap-2 rounded-xl px-2 py-2 text-left hover:bg-canvas",
+                                "flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
                                 b.sku === battery?.sku && "bg-canvas",
                               )}
                             >
@@ -2767,7 +2767,7 @@ export function RoofDesigner(props: {
                     title="The customer's electricity bill"
                     aria-label="The customer's electricity bill"
                     className={clsx(
-                      "flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold tabular-nums",
+                      "flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
                       menu === "bill" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
@@ -2775,7 +2775,7 @@ export function RoofDesigner(props: {
                     {Number(bill.amount) > 0 ? `$${Number(bill.amount).toLocaleString("en-AU")}` : "Bill"}
                   </button>
                   {menu === "bill" && (
-                    <div className="absolute right-0 top-full mt-3 w-[22rem] max-w-[80vw] rounded-2xl border border-line bg-surface p-3 shadow-lift">
+                    <div className="absolute right-0 top-full mt-3 w-[22rem] max-w-[80vw] rounded-lg border border-line bg-surface p-3 shadow-lift">
                       <p className={label}>The customer&apos;s electricity bill</p>
                       <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium">
                         <label>
@@ -2783,7 +2783,7 @@ export function RoofDesigner(props: {
                           <select
                             value={bill.interval}
                             onChange={(e) => setBill({ ...bill, interval: e.target.value as BillInterval })}
-                            className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest appearance-auto"
+                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest appearance-auto"
                           >
                             <option value="annual">Yearly</option>
                             <option value="quarterly">Quarterly</option>
@@ -2801,7 +2801,7 @@ export function RoofDesigner(props: {
                             value={bill.amount}
                             onChange={(e) => setBill({ ...bill, amount: e.target.value })}
                             placeholder="e.g. 350"
-                            className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
                           />
                         </label>
                         <label>
@@ -2812,7 +2812,7 @@ export function RoofDesigner(props: {
                             step="0.01"
                             value={bill.supplyPerDay}
                             onChange={(e) => setBill({ ...bill, supplyPerDay: e.target.value })}
-                            className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
                           />
                         </label>
                         <label>
@@ -2823,7 +2823,7 @@ export function RoofDesigner(props: {
                             step="0.01"
                             value={bill.rate}
                             onChange={(e) => setBill({ ...bill, rate: e.target.value })}
-                            className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
                           />
                         </label>
                         <label className="col-span-2">
@@ -2834,7 +2834,7 @@ export function RoofDesigner(props: {
                             step="0.01"
                             value={bill.feedIn}
                             onChange={(e) => setBill({ ...bill, feedIn: e.target.value })}
-                            className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
                           />
                         </label>
                       </div>
@@ -2852,7 +2852,7 @@ export function RoofDesigner(props: {
 
               {/* The tools, down the side of the picture. */}
               <div
-                className="absolute left-3 top-3 flex flex-col gap-1 rounded-2xl border border-line bg-surface p-1.5 shadow-lift"
+                className="absolute left-3 top-3 flex flex-col gap-1 rounded-lg border border-line bg-surface p-1.5 shadow-lift"
                 role="toolbar"
                 aria-label="Design tools"
                 aria-orientation="vertical"
@@ -2869,7 +2869,7 @@ export function RoofDesigner(props: {
                     aria-label={name}
                     aria-pressed={tool === t}
                     className={clsx(
-                      "flex size-10 items-center justify-center rounded-xl",
+                      "flex size-10 items-center justify-center rounded-md",
                       tool === t ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
@@ -2881,7 +2881,7 @@ export function RoofDesigner(props: {
                   onClick={undo}
                   title="Undo (Ctrl+Z)"
                   aria-label="Undo (Ctrl+Z)"
-                  className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                  className="flex size-10 items-center justify-center rounded-md text-ink hover:bg-canvas"
                 >
                   <Undo2 className="size-5" aria-hidden />
                 </button>
@@ -2889,7 +2889,7 @@ export function RoofDesigner(props: {
                   onClick={redo}
                   title="Redo (Ctrl+Shift+Z)"
                   aria-label="Redo (Ctrl+Shift+Z)"
-                  className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                  className="flex size-10 items-center justify-center rounded-md text-ink hover:bg-canvas"
                 >
                   <Redo2 className="size-5" aria-hidden />
                 </button>
@@ -2906,7 +2906,7 @@ export function RoofDesigner(props: {
                     onClick={act}
                     title={name}
                     aria-label={name}
-                    className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                    className="flex size-10 items-center justify-center rounded-md text-ink hover:bg-canvas"
                   >
                     <Icon className="size-5" aria-hidden />
                   </button>
@@ -2915,7 +2915,7 @@ export function RoofDesigner(props: {
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-sage px-3 py-1 text-xs font-medium text-forest">
+              <span className="rounded bg-primary px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-primary-ink">
                 {TOOLS.find((t) => t.tool === tool)?.name}
               </span>
               <span className="text-sm text-muted">{TOOLS.find((t) => t.tool === tool)?.hint}</span>
@@ -2940,7 +2940,7 @@ export function RoofDesigner(props: {
 
           <aside className="mt-5 grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
             {tool === "label" && (
-              <div className="space-y-3 rounded-2xl border-2 border-forest bg-surface p-4">
+              <div className="space-y-3 rounded-lg border-2 border-forest bg-surface p-4">
                 <p className={label}>The label to place</p>
                 <div className="flex flex-wrap gap-2">
                   {LABEL_KINDS.map((kind) => (
@@ -2959,7 +2959,7 @@ export function RoofDesigner(props: {
                     onChange={(e) => setLabelText(e.target.value)}
                     maxLength={80}
                     placeholder="What the note says"
-                    className="block min-h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                    className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
                   />
                 )}
                 <p className="text-xs text-muted">Then click the spot on the picture.</p>
@@ -2967,7 +2967,7 @@ export function RoofDesigner(props: {
             )}
 
             {face && tool !== "string" && tool !== "label" && (
-              <div className="space-y-4 rounded-2xl border border-line bg-surface p-4">
+              <div className="space-y-4 rounded-lg border border-line bg-surface p-4">
                 <p className={label}>
                   This face · {summary.faces.find((f) => f.id === face.id)?.panels ?? 0} panels · {faceArea(face).toFixed(0)} m² from above
                 </p>
@@ -3048,7 +3048,7 @@ export function RoofDesigner(props: {
                   <select
                     value={face.facing}
                     onChange={(e) => update(face.id, { facing: e.target.value as Facing })}
-                    className="mt-1 block min-h-10 w-full rounded-xl border border-line bg-surface px-3"
+                    className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-3"
                   >
                     {FACINGS.map((f) => (
                       <option key={f}>{f}</option>
