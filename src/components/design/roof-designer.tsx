@@ -196,6 +196,8 @@ export function RoofDesigner(props: {
   onSave: (set: DesignSet, extras: DesignExtras) => Promise<string | null>;
   /** What to say once saved: where the work is kept ("Saved to your account", "Saved on this device"). */
   savedLabel?: string;
+  /** Told whenever the design gains or loses unsaved changes, so the page can ask before leaving it. */
+  onUnsaved?: (unsaved: boolean) => void;
   /** The start of the bar at the top of the page (the wordmark and the address), and the way out, drawn by the page. */
   bar?: React.ReactNode;
   back?: React.ReactNode;
@@ -288,6 +290,8 @@ export function RoofDesigner(props: {
     if (op.do === "remove") setThread(null);
   };
   const [saved, setSaved] = useState<"saved" | "saving" | "changed" | { error: string }>("saved");
+  const { onUnsaved } = props;
+  useEffect(() => onUnsaved?.(saved !== "saved"), [onUnsaved, saved]);
   const svg = useRef<SVGSVGElement>(null);
   // A press that may turn into a drag: of what is picked, of a box to pick with, or of the picture itself.
   const press = useRef<
@@ -1082,13 +1086,11 @@ export function RoofDesigner(props: {
       if (id) press.current = { mode: "turn", id, centre: { x: grip.panel.x, y: grip.panel.y } };
       return;
     }
-    if (hit?.empty && hit.pick.kind === "grid") {
-      // An empty place in a row: the panel goes back.
-      const back = hit.pick;
-      const f = faces.find((x) => x.id === back.face);
-      if (f) update(f.id, { off: f.off.filter((i) => i !== back.index) });
-      setSelected(back.face);
-      return setPicks([back]);
+    if (hit?.empty) {
+      // An empty place in a row is empty roof: a click there picks the face, as a click beside the panels would.
+      setSelected(hit.face);
+      setPicks([]);
+      return;
     }
     if (hit) {
       if (hit.face) setSelected(hit.face);
@@ -1549,19 +1551,8 @@ export function RoofDesigner(props: {
                           strokeWidth={(on ? 1.4 : 1) * u}
                         />
                         {panelPlaces(f, size).map((panel) => {
-                          if (off.has(panel.index))
-                            // A place with its panel taken out: only shown on the face being worked on, so it can be put back.
-                            return on ? (
-                              <polygon
-                                key={panel.index}
-                                points={path(panel.corners)}
-                                fill="none"
-                                stroke="#ffffff"
-                                strokeOpacity="0.4"
-                                strokeWidth={0.5 * u}
-                                strokeDasharray={`${2 * u} ${2 * u}`}
-                              />
-                            ) : null;
+                          // A place whose panel was taken out or moved away is simply empty roof: nothing is drawn there.
+                          if (off.has(panel.index)) return null;
                           const pick: Pick = { kind: "grid", face: f.id, index: panel.index };
                           const lit = isPicked(pick);
                           const wired = stringOf(keyOf(pick));

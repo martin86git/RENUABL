@@ -23,10 +23,15 @@ export function AddressEntry({
   className,
   onPick,
   entry,
+  compact,
+  placeholder,
 }: {
   className?: string;
   onPick?: (address: Address) => void;
   entry?: LandingKey;
+  /** A slimmer box for a tool's header bar (the roof designer), in place of the home page's large one. */
+  compact?: boolean;
+  placeholder?: string;
 }) {
   const router = useRouter();
   const { state, update } = useFlow();
@@ -103,8 +108,13 @@ export function AddressEntry({
       <label htmlFor={`${listId}-input`} className="sr-only">
         Your home address
       </label>
-      <div className="flex items-center gap-2 rounded-full bg-surface p-1.5 pl-5 shadow-[var(--shadow-lift)] ring-1 ring-line focus-within:ring-ink/40">
-        <MapPin className="h-5 w-5 shrink-0 text-ink-2" strokeWidth={1.5} aria-hidden />
+      <div
+        className={cn(
+          "flex items-center bg-surface ring-1 ring-line focus-within:ring-ink/40",
+          compact ? "gap-1.5 rounded-md p-0.5 pl-3" : "gap-2 rounded-full p-1.5 pl-5 shadow-[var(--shadow-lift)]",
+        )}
+      >
+        <MapPin className={cn("shrink-0 text-ink-2", compact ? "h-4 w-4" : "h-5 w-5")} strokeWidth={1.5} aria-hidden />
         <input
           id={`${listId}-input`}
           role="combobox"
@@ -132,16 +142,22 @@ export function AddressEntry({
               setActive((a) => Math.max(-1, a - 1));
             }
           }}
-          placeholder="Enter your home address"
-          className="h-12 min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted/90 focus-visible:outline-none"
+          placeholder={placeholder ?? "Enter your home address"}
+          className={cn(
+            "min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted/90 focus-visible:outline-none",
+            compact ? "h-9 text-sm" : "h-12 text-[16px]",
+          )}
         />
         <button
           type="submit"
           aria-label="Get started"
           disabled={busy}
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-primary-ink transition hover:opacity-90 active:scale-[0.97]"
+          className={cn(
+            "grid shrink-0 place-items-center bg-primary text-primary-ink transition hover:opacity-90 active:scale-[0.97]",
+            compact ? "h-9 w-9 rounded" : "h-12 w-12 rounded-full",
+          )}
         >
-          <ArrowRight className="h-5 w-5" strokeWidth={1.6} />
+          <ArrowRight className={compact ? "h-4 w-4" : "h-5 w-5"} strokeWidth={1.6} />
         </button>
       </div>
       {error && (
@@ -159,7 +175,10 @@ export function AddressEntry({
         <ul
           id={listId}
           role="listbox"
-          className="absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-3xl bg-surface py-2 shadow-[var(--shadow-lift)] ring-1 ring-line"
+          className={cn(
+            "absolute left-0 top-full z-40 mt-2 overflow-hidden bg-surface py-2 shadow-[var(--shadow-lift)] ring-1 ring-line",
+            compact ? "w-[26rem] max-w-[90vw] rounded-lg" : "right-0 rounded-3xl",
+          )}
         >
           {suggestions.map((sg, i) => (
             <li

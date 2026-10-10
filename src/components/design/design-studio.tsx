@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddressEntry } from "@/components/consumer/address-entry";
 import { Wordmark } from "@/components/ui/primitives";
 import { batteryCatalogue, inverterCatalogue, panelCatalogue } from "@/lib/domain/design/catalogue";
@@ -136,11 +136,19 @@ export function DesignStudio() {
     };
   }, [workspace]);
 
+  // Whether the designer has changes that aren't saved: asked about before another roof replaces it.
+  const unsaved = useRef(false);
+  const noteUnsaved = useCallback((value: boolean) => {
+    unsaved.current = value;
+  }, []);
+
   const pick = (address: Address) => {
     if (typeof address.lat !== "number" || typeof address.lng !== "number")
       return setProblem(
         "We couldn't place that address on the map. Pick the street address from the list as you type. If no list appears, the address search isn't connected here (it needs GOOGLE_MAPS_API_KEY).",
       );
+    if (unsaved.current && !window.confirm("This design has changes that aren't saved. Open the other address and lose them?")) return;
+    unsaved.current = false;
     setProblem(null);
     open({
       address: [address.line, address.suburb, address.state, address.postcode].filter(Boolean).join(", "),
@@ -168,10 +176,17 @@ export function DesignStudio() {
           yieldPerKwDay={YIELD_PER_KW_DAY}
           onSave={async (next, extras) => saveRoofWork(roof, next, extras)}
           savedLabel={kept}
+          onUnsaved={noteUnsaved}
           bar={
-            <Link href="/" aria-label="RENUABL home">
-              <Wordmark className="text-[17px]" />
-            </Link>
+            <>
+              <Link href="/" aria-label="RENUABL home">
+                <Wordmark className="text-[17px]" />
+              </Link>
+              {/* Another roof, without leaving the designer. */}
+              <div className="w-64 shrink-0 xl:w-80">
+                <AddressEntry compact placeholder="Search another address" onPick={pick} />
+              </div>
+            </>
           }
           back={
             <>
@@ -182,12 +197,6 @@ export function DesignStudio() {
                 Prices and settings
               </Link>
               <DesignAccountLink />
-              <button
-                onClick={() => open(null)}
-                className="tap-area shrink-0 text-[13px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
-              >
-                Change address
-              </button>
             </>
           }
         />
