@@ -8,6 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "db:install": "npm --prefix tools/local-db install",
+    "db": "node tools/local-db/db.mjs start",
+    "db:stop": "node tools/local-db/db.mjs stop",
+    "test:db": "node tools/local-db/db.mjs test",
     "typecheck": "next typegen && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

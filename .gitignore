@@ -10,6 +10,10 @@
 !.yarn/releases
 !.yarn/versions
 
+# the local development database (npm run db): its programs and its data
+/tools/local-db/node_modules
+/.local-db/
+
 # testing
 /coverage
 
