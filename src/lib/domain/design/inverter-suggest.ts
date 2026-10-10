@@ -93,3 +93,25 @@ export function suggestInverters(input: {
   }
   return out;
 }
+
+/**
+ * Whether the panels on a design are more than its inverters may take: over 133% of their rating
+ * (`COSTING.maxArrayToInverter`). A battery on the design lifts the limit: a DC-coupled battery takes what the
+ * inverter can't pass on, so the designer says nothing then. Null when there are no inverters or no panels to compare.
+ */
+export function arrayOversize(
+  arrayKw: number,
+  inverterKw: number,
+  hasBattery: boolean,
+): { percent: number; limit: number; over: boolean; liftedByBattery: boolean } | null {
+  if (!(arrayKw > 0) || !(inverterKw > 0)) return null;
+  const ratio = arrayKw / inverterKw;
+  // A hair of tolerance, so 6.65 kW on 5 kW (exactly 133%) isn't flagged by rounding.
+  const beyond = ratio > MAX_ARRAY_RATIO + 1e-9;
+  return {
+    percent: Math.round(ratio * 100),
+    limit: Math.round(MAX_ARRAY_RATIO * 100),
+    over: beyond && !hasBattery,
+    liftedByBattery: beyond && hasBattery,
+  };
+}

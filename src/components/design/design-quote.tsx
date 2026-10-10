@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { Workspace } from "@/lib/domain/design/pricing";
 import {
   COST_GROUPS,
@@ -61,8 +61,13 @@ export function DesignQuote(props: {
   const { onNet } = props;
   useEffect(() => onNet(net), [onNet, net]);
 
-  const set = (name: keyof typeof form) => (e: { target: { value: string } }) =>
+  // The four things about the home that change the price are easy to pass over: they sit in a pad that asks to be
+  // checked, and it settles once one of them has been set on this visit.
+  const [checked, setChecked] = useState(false);
+  const set = (name: keyof typeof form) => (e: { target: { value: string } }) => {
+    setChecked(true);
     props.onChange({ form: { ...form, [name]: e.target.value } as QuoteFields["form"], edits });
+  };
   const edit = (l: CostLine, to: { amount?: number; removed?: boolean } | null) => {
     const next = { ...edits };
     if (to) next[lineKey(l)] = to;
@@ -78,33 +83,41 @@ export function DesignQuote(props: {
           Prices and settings
         </Link>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-medium">
-        <label>
-          Roof
-          <select value={form.roof} onChange={set("roof")} className={`${field} appearance-auto`}>
-            <option value="tile">Tile</option>
-            <option value="tin">Tin</option>
-            <option value="flat">Flat (Kliplok)</option>
-          </select>
-        </label>
-        <label>
-          Storeys
-          <select value={form.storeys} onChange={set("storeys")} className={`${field} appearance-auto`}>
-            <option value="single">Single</option>
-            <option value="double">Double</option>
-          </select>
-        </label>
-        <label>
-          Phase
-          <select value={form.phase} onChange={set("phase")} className={`${field} appearance-auto`}>
-            <option value="single">Single phase</option>
-            <option value="three">Three phase</option>
-          </select>
-        </label>
-        <label>
-          Postcode (rebate zone)
-          <input inputMode="numeric" maxLength={4} value={form.postcode} onChange={set("postcode")} className={field} />
-        </label>
+      <div className={checked ? "mt-3 rounded-md border border-line bg-canvas p-3" : "mt-3 rounded-md border border-sun-line bg-sun p-3"}>
+        <p className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]">
+          <span className={checked ? "text-ink-2" : "text-sun-ink"}>This home</span>
+          <span className={checked ? "text-muted" : "text-sun-ink"}>
+            {checked ? "Set on this visit" : "Check these: they change the price"}
+          </span>
+        </p>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium">
+          <label>
+            Roof
+            <select value={form.roof} onChange={set("roof")} className={`${field} appearance-auto`}>
+              <option value="tile">Tile</option>
+              <option value="tin">Tin</option>
+              <option value="flat">Flat (Kliplok)</option>
+            </select>
+          </label>
+          <label>
+            Storeys
+            <select value={form.storeys} onChange={set("storeys")} className={`${field} appearance-auto`}>
+              <option value="single">Single</option>
+              <option value="double">Double</option>
+            </select>
+          </label>
+          <label>
+            Phase
+            <select value={form.phase} onChange={set("phase")} className={`${field} appearance-auto`}>
+              <option value="single">Single phase</option>
+              <option value="three">Three phase</option>
+            </select>
+          </label>
+          <label>
+            Postcode (rebate zone)
+            <input inputMode="numeric" maxLength={4} value={form.postcode} onChange={set("postcode")} className={field} />
+          </label>
+        </div>
       </div>
 
       {empty ? (

@@ -254,6 +254,19 @@ export interface InverterSpec {
   sku: string;
   name: string;
   kw: number;
+  /** Where it stands on the drawing, in metres from the middle of the picture, once it has been put in its place. */
+  x?: number;
+  y?: number;
+}
+
+/** Where an inverter is drawn: where it was put, or until then a place of its own to the right of the picture, one under the next. */
+export function inverterSpot(spec: Pick<InverterSpec, "x" | "y">, index: number, lat: number): Point {
+  if (typeof spec.x === "number" && typeof spec.y === "number") return { x: spec.x, y: spec.y };
+  const k = metresPerPixel(lat);
+  return {
+    x: Math.round(ROOF_IMAGE.width * 0.3 * k * 100) / 100,
+    y: Math.round((-0.3 + index * 0.11) * ROOF_IMAGE.height * k * 100) / 100,
+  };
 }
 
 export const LABEL_KINDS = ["Inverter", "Battery", "Switchboard", "Meter", "Note"] as const;
@@ -689,7 +702,9 @@ function cleanInverter(raw: unknown): InverterSpec | undefined {
           .trim()
           .slice(0, 100)
       : "";
-  return { sku: p.sku, name: name || p.sku, kw };
+  const x = finite(p.x, -200, 200);
+  const y = finite(p.y, -200, 200);
+  return { sku: p.sku, name: name || p.sku, kw, ...(x !== null && y !== null ? { x, y } : {}) };
 }
 
 /** Whether a string's panels all look the same way at the same tilt: a string on one input should. */

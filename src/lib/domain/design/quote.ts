@@ -276,6 +276,8 @@ export interface DesignFinance {
   exportedKwh: number;
   /** The share of what is made that the home uses itself, 0 to 1. */
   selfConsumption: number;
+  /** The share of what the home uses that the system supplies, 0 to 1. */
+  selfReliance: number;
 }
 
 /** The share of a day's use taken to fall after dark, and what a battery gives back of what is put in. */
@@ -326,6 +328,7 @@ export function designFinance(
     usedKwh: Math.round(used),
     exportedKwh: Math.round(exported),
     selfConsumption: production > 0 ? used / production : 0,
+    selfReliance: Math.min(1, used / (dailyKwh * 365)),
   };
 }
 

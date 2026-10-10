@@ -9,7 +9,6 @@ import {
   Copy,
   Hand,
   Layers,
-  LayoutGrid,
   Maximize,
   MessageCircle,
   MousePointer2,
@@ -21,6 +20,7 @@ import {
   SquarePlus,
   Star,
   Tag,
+  TriangleAlert,
   Sparkles,
   Trash2,
   Undo2,
@@ -42,7 +42,7 @@ import {
 } from "@/lib/domain/design/quote";
 import type { RebateRates } from "@/lib/domain/rebates";
 import { DesignQuote } from "./design-quote";
-import { suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
+import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import {
   FACINGS,
@@ -59,6 +59,7 @@ import {
   faceArea,
   faceFacing,
   freed,
+  inverterSpot,
   inside,
   looseCorners,
   metresPerPixel,
@@ -256,6 +257,8 @@ export function RoofDesigner(props: {
   const [suggesting, setSuggesting] = useState(false);
   // The string the pointer is over, on the picture or in the list of strings: its check is shown.
   const [hover, setHover] = useState<string | null>(null);
+  // The battery or the inverter under the pointer: its details show beside it.
+  const [kit, setKit] = useState<"battery" | number | null>(null);
   const [tool, setTool] = useState<Tool>("select");
   const [view, setView] = useState(WHOLE);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
@@ -302,6 +305,7 @@ export function RoofDesigner(props: {
     | { mode: "array"; anchor: LoosePanel }
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
+    | { mode: "inverter"; n: number; dx: number; dy: number }
     | { mode: "spin"; centre: Point; from: number; starts: Record<string, LoosePanel> }
     | null
   >(null);
@@ -495,7 +499,16 @@ export function RoofDesigner(props: {
 
   /** Puts a suggestion on the design in place of whatever inverters were there. Strings on an inverter that is gone go back to the first. */
   const takeSuggestion = (to: InverterSuggestion) => {
-    setFitted(Array.from({ length: to.count }, () => ({ sku: to.inverter.sku, name: to.inverter.name, kw: to.inverter.kw })));
+    setFitted(
+      Array.from({ length: to.count }, (_, n) => ({
+        sku: to.inverter.sku,
+        name: to.inverter.name,
+        kw: to.inverter.kw,
+        // Where the one it replaces stood, or a place of its own in view.
+        x: fitted[n]?.x ?? cm((view.x + view.w * (0.8 - n * 0.06) - ROOF_IMAGE.width / 2) * scale),
+        y: fitted[n]?.y ?? cm((view.y + view.h * 0.36 - ROOF_IMAGE.height / 2) * scale),
+      })),
+    );
     setStrings(strings.map((x) => ((x.inverter ?? 0) < to.count ? x : { id: x.id, panels: x.panels, mppt: 0 })));
     setSuggesting(false);
     openMenu(false);
@@ -517,9 +530,32 @@ export function RoofDesigner(props: {
     setSaved("changed");
   };
   const batteryKwh = battery ? Math.round(battery.kwh * battery.qty * 10) / 10 : 0;
+  // The battery is drawn as tall as its modules stack; an inverter is one box.
+  const batteryLayers = battery ? Math.min(battery.qty, 8) : 0;
+  /** The inverter or the battery standing at a point on the drawing, if one is. */
+  const kitAt = (p: Point): "battery" | number | null => {
+    const n = fitted.findIndex((spec, i) => {
+      const at = inverterSpot(spec, i, spot.lat);
+      return Math.abs(p.x - at.x) < 13 * u * scale && Math.abs(p.y - at.y) < 17 * u * scale;
+    });
+    if (n >= 0) return n;
+    if (battery && Math.abs(p.x - battery.x) < 16 * u * scale && Math.abs(p.y - battery.y) < ((batteryLayers * 8) / 2 + 12) * u * scale)
+      return "battery";
+    return null;
+  };
   const addInverter = (to: CatalogueInverter) => {
     if (fitted.length >= MAX_INVERTERS) return;
-    setFitted([...fitted, { sku: to.sku, name: to.name, kw: to.kw }]);
+    setFitted([
+      ...fitted,
+      {
+        sku: to.sku,
+        name: to.name,
+        kw: to.kw,
+        // It stands on the drawing at once, to the right of what is in view, to be dragged to its wall.
+        x: cm((view.x + view.w * (0.8 - fitted.length * 0.06) - ROOF_IMAGE.width / 2) * scale),
+        y: cm((view.y + view.h * 0.36 - ROOF_IMAGE.height / 2) * scale),
+      },
+    ]);
     openMenu(false);
     setSeek("");
     setSaved("changed");
@@ -963,11 +999,17 @@ export function RoofDesigner(props: {
       setPicks([]);
       return setThread({ id: bubble.id });
     }
-    if (battery && tool === "select" && Math.abs(p.x - battery.x) < 15 * u * scale && Math.abs(p.y - battery.y) < 26 * u * scale) {
-      // The battery: press it and drag it to the wall it will stand against.
+    const grabbed = tool === "select" ? kitAt(p) : null;
+    if (grabbed !== null) {
+      // The battery or an inverter: press it and drag it to the wall it will go on.
       svg.current?.setPointerCapture(e.pointerId);
       setPicks([]);
-      press.current = { mode: "battery", dx: p.x - battery.x, dy: p.y - battery.y };
+      setKit(null);
+      const at = grabbed === "battery" ? (battery as DesignBattery) : inverterSpot(fitted[grabbed], grabbed, spot.lat);
+      press.current =
+        grabbed === "battery"
+          ? { mode: "battery", dx: p.x - at.x, dy: p.y - at.y }
+          : { mode: "inverter", n: grabbed, dx: p.x - at.x, dy: p.y - at.y };
       return;
     }
     if (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 7 * u * scale) {
@@ -1113,6 +1155,8 @@ export function RoofDesigner(props: {
       const key = under && !under.empty && under.pick.kind !== "label" ? keyOf(under.pick) : null;
       const over = key ? (strings.find((x) => x.panels.includes(key))?.id ?? null) : null;
       if (over !== hover) setHover(over);
+      const on = pointer.current && tool === "select" ? kitAt(pointer.current) : null;
+      if (on !== kit) setKit(on);
       // A guide line being drawn reaches to the pointer.
       if (tool === "rule" && ruling && pointer.current) setRuling({ a: ruling.a, b: pointer.current });
       // Placing panels: the outline of the one a click would put down follows the pointer.
@@ -1132,6 +1176,12 @@ export function RoofDesigner(props: {
       const p = pointAt(e);
       if (!p) return;
       setBattery((b) => (b ? { ...b, x: cm(p.x - held.dx), y: cm(p.y - held.dy) } : b));
+      return changed();
+    }
+    if (held.mode === "inverter") {
+      const p = pointAt(e);
+      if (!p) return;
+      setFitted((list) => list.map((spec, i) => (i === held.n ? { ...spec, x: cm(p.x - held.dx), y: cm(p.y - held.dy) } : spec)));
       return changed();
     }
     if (held.mode === "wire") {
@@ -1325,6 +1375,10 @@ export function RoofDesigner(props: {
     tiltedPanels: tilts.count,
     tiltDegrees: tilts.steepest,
   };
+  // Panels beyond 133% of the inverters: a warning over the picture, unless a battery is on the design.
+  const oversize = arrayOversize(summary.kw, fittedKw, Boolean(battery));
+  // A string that has been started and has no panel yet.
+  const startedString = tool === "string" && wiring !== null && !strings.some((x) => x.id === wiring);
   const suggestions = suggesting
     ? suggestInverters({
         arrayKw: summary.kw,
@@ -1446,76 +1500,130 @@ export function RoofDesigner(props: {
       <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_23rem] 2xl:grid-cols-[minmax(0,1fr)_26rem]">
         <div className="min-w-0">
           <div>
-            {/* The figures, in one slim row over the picture, in the site's drawn style: small capitals, thin rules, and the year as fine gold lines. */}
+            {/* The figures over the picture, read left to right as one chain what is on the roof, what it makes, what stores and runs it, and what
+                that does to this home's bill. Each has one large figure in the same place every time, with its detail under it. */}
             <section
-              className="relative mx-auto mb-2 flex items-center gap-4 overflow-hidden rounded-lg bg-ink px-5 py-3 text-white"
+              className="relative mx-auto mb-2 flex flex-wrap items-stretch overflow-hidden rounded-lg bg-ink text-white"
               style={{ maxWidth: "calc((100dvh - 11rem) * 1.6)" }}
               aria-label="This design in figures"
             >
-              <dl className="relative flex shrink-0 divide-x divide-white/15">
-                {[
-                  ["Panels", String(summary.panels)],
-                  ["kW", summary.kw.toFixed(2)],
-                  ["kWh/day", String(summary.kwhPerDay)],
-                  ["kWh/year", year.reduce((n, kwh) => n + kwh, 0).toLocaleString("en-AU")],
-                ].map(([name, value]) => (
-                  <div key={name} className="px-3 first:pl-0">
-                    <dt className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/50">{name}</dt>
-                    <dd className="text-lg font-medium tabular-nums leading-tight">{value}</dd>
+              {(
+                [
+                  {
+                    step: "1 · Solar",
+                    value: summary.kw.toFixed(2),
+                    unit: "kW",
+                    under: `${summary.panels} ${summary.panels === 1 ? "panel" : "panels"} of ${panelOf(design).watts} W`,
+                    gold: true,
+                  },
+                  {
+                    step: "2 · Makes",
+                    value: String(summary.kwhPerDay),
+                    unit: "kWh a day",
+                    under: `${year.reduce((n, kwh) => n + kwh, 0).toLocaleString("en-AU")} kWh a year`,
+                    chart: true,
+                  },
+                  {
+                    step: "3 · Stores",
+                    value: battery ? String(batteryKwh) : "–",
+                    unit: battery ? "kWh battery" : "no battery",
+                    under: fitted.length
+                      ? `${fittedKw} kW of inverter${oversize ? ` · panels ${oversize.percent}%` : ""}`
+                      : "no inverter chosen",
+                    warn: Boolean(oversize?.over),
+                  },
+                ] as { step: string; value: string; unit: string; under: string; gold?: boolean; chart?: boolean; warn?: boolean }[]
+              ).map((g) => (
+                <div key={g.step} className="relative flex items-center gap-4 border-r border-white/15 px-4 py-2.5">
+                  <div>
+                    <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/50">{g.step}</p>
+                    <p className="whitespace-nowrap leading-tight">
+                      <span className={clsx("text-2xl font-medium tabular-nums tracking-[-0.02em]", g.gold && "text-sun-bright")}>
+                        {g.value}
+                      </span>
+                      <span className="ml-1.5 text-xs text-white/60">{g.unit}</span>
+                    </p>
+                    <p className={clsx("whitespace-nowrap text-xs tabular-nums", g.warn ? "font-medium text-sun-bright" : "text-white/60")}>
+                      {g.under}
+                    </p>
                   </div>
-                ))}
-              </dl>
-              <div
-                className="relative flex w-44 shrink-0 items-end gap-0.5 border-l border-white/15 pl-4"
-                role="img"
-                aria-label={`Monthly output, from ${year[0]} kWh in January to ${year[5]} in June`}
-              >
-                {year.map((kwh, m) => (
-                  <div key={m} className="flex min-w-0 flex-1 flex-col items-center" title={`${kwh.toLocaleString("en-AU")} kWh`}>
-                    <div className="flex h-7 w-full items-end justify-center gap-[2px] border-b border-white/40">
-                      {[0.6, 1].map((strength, n) => (
-                        <span
-                          key={n}
-                          className="w-px bg-sun-bright"
-                          style={{ height: `${Math.max(6, (kwh / top) * 100)}%`, opacity: strength }}
-                        />
+                  {g.chart && (
+                    <div
+                      className="flex w-32 shrink-0 items-end gap-0.5"
+                      role="img"
+                      aria-label={`Monthly output, from ${year[0]} kWh in January to ${year[5]} in June`}
+                    >
+                      {year.map((kwh, m) => (
+                        <div key={m} className="flex min-w-0 flex-1 flex-col items-center" title={`${kwh.toLocaleString("en-AU")} kWh`}>
+                          <div className="flex h-8 w-full items-end justify-center gap-[2px] border-b border-white/40">
+                            {[0.6, 1].map((strength, n) => (
+                              <span
+                                key={n}
+                                className="w-px bg-sun-bright"
+                                style={{ height: `${Math.max(6, (kwh / top) * 100)}%`, opacity: strength }}
+                              />
+                            ))}
+                          </div>
+                          <span className="mt-0.5 text-[8px] leading-none text-white/55">{"JFMAMJJASOND"[m]}</span>
+                        </div>
                       ))}
                     </div>
-                    <span className="mt-0.5 text-[8px] leading-none text-white/55">{"JFMAMJJASOND"[m]}</span>
-                  </div>
-                ))}
+                  )}
+                </div>
+              ))}
+              {/* What it does for this home, once the bill is typed in (the bill button on the picture). */}
+              <div className="relative min-w-0 flex-1 px-4 py-2.5" aria-label="What it does for this home">
+                <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/50">4 · For this home</p>
+                {finance ? (
+                  <dl className="mt-0.5 flex flex-wrap gap-x-5 gap-y-1">
+                    {(
+                      [
+                        ["Home uses", `${finance.dailyKwh} kWh a day`, false],
+                        ["Runs on its own", `${Math.round(finance.selfReliance * 100)}%`, false],
+                        ["Bill", `${dollars(finance.billNow)} → ${dollars(finance.billAfter)}`, false],
+                        ["Saves a year", dollars(finance.saving), true],
+                        ["After STCs", net !== null ? dollars(net) : "–", false],
+                        ["Payback", net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–", false],
+                      ] as const
+                    ).map(([name, value, gold]) => (
+                      <div key={name}>
+                        <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.14em] text-white/55">{name}</dt>
+                        <dd
+                          className={clsx(
+                            "whitespace-nowrap text-base font-semibold tabular-nums leading-tight",
+                            gold && "text-sun-bright",
+                          )}
+                        >
+                          {value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : (
+                  <p className="mt-1 text-xs text-white/60">
+                    {net !== null ? `${dollars(net)} after STCs. ` : ""}Add the customer&apos;s bill (the Add bill button on the picture)
+                    for use, saving and payback.
+                  </p>
+                )}
               </div>
-              {/* The system, summed up: what it is, and what it does to this home's bill once the bill is typed in. */}
-              <dl
-                className="relative flex min-w-0 flex-1 flex-wrap gap-y-1 divide-x divide-white/15 border-l border-white/15"
-                aria-label="System summary"
-              >
-                {(
-                  [
-                    ["Inverter", fitted.length ? `${fittedKw} kW` : "–"],
-                    ["Battery", battery ? `${batteryKwh} kWh` : "none"],
-                    ["Self-use", finance ? `${Math.round(finance.selfConsumption * 100)}%` : "–"],
-                    ["Bill now", finance ? dollars(finance.billNow) : "–"],
-                    ["Bill after", finance ? dollars(finance.billAfter) : "–"],
-                    ["Saves a year", finance ? dollars(finance.saving) : "–"],
-                    ["After STCs", net !== null ? dollars(net) : "–"],
-                    ["Payback", finance && net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–"],
-                  ] as const
-                ).map(([name, value]) => (
-                  <div key={name} className="px-3">
-                    <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.2em] text-white/50">{name}</dt>
-                    <dd
-                      className={clsx(
-                        "whitespace-nowrap text-lg font-medium tabular-nums leading-tight",
-                        name === "Saves a year" && finance && "text-sun-bright",
-                      )}
-                    >
-                      {value}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
             </section>
+            {/* Too many panels for the inverters: said plainly over the picture. A battery on the design lifts the limit. */}
+            {oversize?.over && (
+              <p
+                className="mx-auto mb-2 flex items-start gap-2.5 rounded-lg border border-sun-line bg-sun px-4 py-2.5 text-sm text-sun-ink"
+                style={{ maxWidth: "calc((100dvh - 11rem) * 1.6)" }}
+                role="alert"
+              >
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span>
+                  <strong className="font-semibold">
+                    The panels are {oversize.percent}% of the inverter&apos;s rating: {summary.kw.toFixed(2)} kW of panels on {fittedKw} kW
+                    of inverter.
+                  </strong>{" "}
+                  Without a battery the limit is {oversize.limit}%. Choose a larger inverter, add one, take panels off, or add a battery.
+                </span>
+              </p>
+            )}
             <div className="relative mx-auto" style={{ maxWidth: "calc((100dvh - 11rem) * 1.6)" }}>
               <div className="overflow-hidden rounded-lg bg-ink">
                 <svg
@@ -1532,6 +1640,7 @@ export function RoofDesigner(props: {
                   onPointerLeave={() => {
                     pointer.current = null;
                     setHover(null);
+                    setKit(null);
                     if (!press.current) setGhosts([]);
                   }}
                   role="img"
@@ -1765,9 +1874,9 @@ export function RoofDesigner(props: {
                   {battery &&
                     (() => {
                       const [bx, by] = px(battery);
-                      const layers = Math.min(battery.qty, 8);
-                      const w = 22 * u;
-                      const lh = 5.5 * u;
+                      const layers = batteryLayers;
+                      const w = 24 * u;
+                      const lh = 8 * u;
                       const top = by - (layers * lh) / 2;
                       const roof = Object.values(centres);
                       const from = roof.length ? px(middle(roof)) : null;
@@ -1828,8 +1937,8 @@ export function RoofDesigner(props: {
                                 {Array.from({ length: 7 }, (_, k) => (
                                   <line
                                     key={k}
-                                    x1={bx - w / 2 + 2.5 * u + k * 2.85 * u}
-                                    x2={bx - w / 2 + 2.5 * u + k * 2.85 * u}
+                                    x1={bx - w / 2 + 2.7 * u + k * 3.1 * u}
+                                    x2={bx - w / 2 + 2.7 * u + k * 3.1 * u}
                                     y1={y + 1.7 * u}
                                     y2={y + lh - 1.7 * u}
                                     stroke={GOLD}
@@ -1865,6 +1974,74 @@ export function RoofDesigner(props: {
                         </g>
                       );
                     })()}
+                  {/* The inverters: a box each, in the same line style as the battery, to be dragged to the wall it will go on. */}
+                  {fitted.map((spec, n) => {
+                    const [ix, iy] = px(inverterSpot(spec, n, spot.lat));
+                    const w = 20 * u;
+                    const h = 28 * u;
+                    const lit = kit === n;
+                    return (
+                      <g key={n} pointerEvents="none">
+                        <rect
+                          x={ix - w / 2}
+                          y={iy - h / 2}
+                          width={w}
+                          height={h}
+                          rx={3 * u}
+                          fill="#0b0c0e"
+                          fillOpacity="0.92"
+                          stroke={GOLD}
+                          strokeWidth={(lit ? 1.8 : 1.1) * u}
+                        />
+                        <rect
+                          x={ix - w / 2 + 3 * u}
+                          y={iy - h / 2 + 3.5 * u}
+                          width={w - 6 * u}
+                          height={6 * u}
+                          rx={1.2 * u}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeOpacity="0.6"
+                          strokeWidth={0.5 * u}
+                        />
+                        <path
+                          d={`M${ix - w / 2 + 4.5 * u},${iy - h / 2 + 8 * u} q${2.7 * u},${-0.3 * u} ${4 * u},${-2 * u} t${3.6 * u},${-1 * u} t${3.4 * u},${2.4 * u}`}
+                          fill="none"
+                          stroke={GOLD}
+                          strokeWidth={0.6 * u}
+                        />
+                        {Array.from({ length: 6 }, (_, k) => (
+                          <line
+                            key={k}
+                            x1={ix - w / 2 + 3.75 * u + k * 2.5 * u}
+                            x2={ix - w / 2 + 3.75 * u + k * 2.5 * u}
+                            y1={iy - h / 2 + 12.5 * u}
+                            y2={iy + h / 2 - 6 * u}
+                            stroke="#ffffff"
+                            strokeOpacity="0.32"
+                            strokeWidth={0.5 * u}
+                          />
+                        ))}
+                        <circle cx={ix} cy={iy + h / 2 - 3.2 * u} r={1.1 * u} fill={GOLD}>
+                          <animate attributeName="opacity" values="1;0.3;1" dur="2.6s" repeatCount="indefinite" />
+                        </circle>
+                        <text
+                          x={ix}
+                          y={iy + h / 2 + 9 * u}
+                          textAnchor="middle"
+                          fontSize={8 * u}
+                          fontWeight="700"
+                          fill="#ffffff"
+                          stroke="#0b0c0e"
+                          strokeWidth={2.4 * u}
+                          paintOrder="stroke"
+                        >
+                          {fitted.length > 1 ? `${n + 1} · ` : ""}
+                          {spec.kw} kW
+                        </text>
+                      </g>
+                    );
+                  })}
                   {/* Labels: a pin and its name. */}
                   {labels.map((l) => {
                     const [lx, ly] = px(l);
@@ -2019,6 +2196,76 @@ export function RoofDesigner(props: {
                   </g>
                 </svg>
               </div>
+
+              {/* The battery or the inverter under the pointer: what it is, beside it. */}
+              {kit !== null &&
+                (() => {
+                  const at = kit === "battery" ? battery : fitted[kit] ? inverterSpot(fitted[kit], kit, spot.lat) : null;
+                  if (!at) return null;
+                  const left = ((ROOF_IMAGE.width / 2 + at.x / scale - view.x) / view.w) * 100;
+                  const top = ((ROOF_IMAGE.height / 2 + at.y / scale - view.y) / view.h) * 100;
+                  const item = kit === "battery" ? null : fittedItems[kit];
+                  const e = item?.electrical;
+                  const wired = kit === "battery" ? [] : strings.filter((x) => (x.inverter ?? 0) === kit);
+                  const lines: [string, string][] =
+                    kit === "battery" && battery
+                      ? [
+                          ["Modules", `${battery.qty} × ${battery.kwh} kWh`],
+                          ["Storage", `${batteryKwh} kWh`],
+                          ["Product code", battery.sku],
+                        ]
+                      : kit !== "battery"
+                        ? [
+                            ["Rated", `${fitted[kit].kw} kW`],
+                            ["Product code", fitted[kit].sku],
+                            [
+                              "Strings on it",
+                              wired.length ? `${wired.length} (${wired.reduce((n, x) => n + x.panels.length, 0)} panels)` : "none yet",
+                            ],
+                            ...(e
+                              ? ([
+                                  ["Highest DC voltage", `${e.maxVoltage} V`],
+                                  ["Tracking range", `${e.mppMin} to ${e.mppMax} V`],
+                                  ["Starts at", `${e.startVoltage} V`],
+                                  [
+                                    "Inputs (MPPT)",
+                                    e.mppts.map((m) => `${m.strings} string${m.strings === 1 ? "" : "s"}, ${m.maxCurrent} A`).join(" · "),
+                                  ],
+                                ] as [string, string][])
+                              : []),
+                          ]
+                        : [];
+                  return (
+                    <div
+                      className="pointer-events-none absolute z-20 w-[19rem] max-w-[calc(100%-1rem)] rounded-lg bg-ink p-3 text-white shadow-lift ring-1 ring-white/15"
+                      style={{
+                        left: `clamp(0.5rem, calc(${left}% + 2.5rem), calc(100% - 19.5rem))`,
+                        top: `clamp(0.5rem, calc(${top}% - 3rem), calc(100% - 14rem))`,
+                      }}
+                      role="status"
+                    >
+                      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-sun-bright">
+                        {kit === "battery" ? "Battery" : fitted.length > 1 ? `Inverter ${kit + 1}` : "Inverter"}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold leading-snug">{kit === "battery" ? battery?.name : fitted[kit]?.name}</p>
+                      <dl className="mt-2 divide-y divide-white/10 border-t border-white/10 text-xs">
+                        {lines.map(([name, value]) => (
+                          <div key={name} className="flex justify-between gap-3 py-1.5">
+                            <dt className="text-white/55">{name}</dt>
+                            <dd className="text-right">{value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      {kit !== "battery" && !e && (
+                        <p className="mt-2 text-xs text-white/55">
+                          This inverter&apos;s voltage and current limits aren&apos;t on file yet.
+                        </p>
+                      )}
+                      {e && <p className="mt-2 text-[11px] text-white/45">{e.basis}</p>}
+                      <p className="mt-2 text-[11px] text-white/45">Drag it to where it will go.</p>
+                    </div>
+                  );
+                })()}
 
               {/* The string under the pointer, checked against the inverter input it is on. */}
               {(() => {
@@ -2248,7 +2495,27 @@ export function RoofDesigner(props: {
                       </li>
                     ))}
                   </ul>
-                  <button className={clsx(button, "!min-h-9 w-full justify-center")} onClick={() => setWiring(newId("s"))}>
+                  {startedString && (
+                    <p
+                      className="flex items-center gap-2 rounded-md border border-sun-line bg-sun px-2.5 py-2 text-sm text-sun-ink"
+                      role="status"
+                    >
+                      <span
+                        className="size-3 shrink-0 rounded-full"
+                        style={{ background: STRING_COLOURS[strings.length % STRING_COLOURS.length] }}
+                        aria-hidden
+                      />
+                      <span>
+                        <strong className="font-semibold">String {letter(strings.length)} started.</strong> Click its panels in wiring
+                        order, or drag across them.
+                      </span>
+                    </p>
+                  )}
+                  <button
+                    className={clsx(button, "!min-h-9 w-full justify-center")}
+                    onClick={() => setWiring(newId("s"))}
+                    disabled={startedString}
+                  >
                     <Plus className="mr-1.5 size-4" aria-hidden /> New string
                   </button>
                   <p className="text-xs text-muted">
@@ -2474,7 +2741,20 @@ export function RoofDesigner(props: {
                       menu === "panels" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
-                    <LayoutGrid className="size-5" aria-hidden />
+                    {/* A solar panel, leaning as it does on a roof: frame, cells, and a stand. */}
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="size-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M5.2 4h13.6l2.7 12H2.5z" />
+                      <path d="M3.9 10h16.2M9.4 4 8 16M14.6 4 16 16" strokeWidth="1.2" />
+                      <path d="M12 16v4M8.5 20h7" strokeLinecap="round" />
+                    </svg>
                     {size.watts} W
                   </button>
                   {menu === "panels" && (
@@ -2757,15 +3037,29 @@ export function RoofDesigner(props: {
                     onClick={() => openMenu(menu === "bill" ? false : "bill")}
                     aria-expanded={menu === "bill"}
                     aria-haspopup="true"
-                    title="The customer's electricity bill"
-                    aria-label="The customer's electricity bill"
+                    title={
+                      Number(bill.amount) > 0
+                        ? "The customer's electricity bill"
+                        : "No electricity bill entered yet: add it for the saving and payback"
+                    }
+                    aria-label={
+                      Number(bill.amount) > 0 ? "The customer's electricity bill" : "The customer's electricity bill: not entered yet"
+                    }
                     className={clsx(
-                      "flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
-                      menu === "bill" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                      "relative flex h-10 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold tabular-nums",
+                      menu === "bill"
+                        ? "bg-primary text-primary-ink"
+                        : Number(bill.amount) > 0
+                          ? "text-ink hover:bg-canvas"
+                          : "bg-sun text-sun-ink ring-1 ring-sun-line",
                     )}
                   >
                     <ReceiptText className="size-5" aria-hidden />
-                    {Number(bill.amount) > 0 ? `$${Number(bill.amount).toLocaleString("en-AU")}` : "Bill"}
+                    {Number(bill.amount) > 0 ? `$${Number(bill.amount).toLocaleString("en-AU")}` : "Add bill"}
+                    {/* A dot that keeps asking until the bill is in. */}
+                    {!(Number(bill.amount) > 0) && menu !== "bill" && (
+                      <span className="absolute -right-1 -top-1 size-2.5 rounded-full bg-sun-line ring-2 ring-surface" aria-hidden />
+                    )}
                   </button>
                   {menu === "bill" && (
                     <div className="absolute right-0 top-full mt-3 w-[22rem] max-w-[80vw] rounded-lg border border-line bg-surface p-3 shadow-lift">

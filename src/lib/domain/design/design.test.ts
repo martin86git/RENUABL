@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { inverterCatalogue, panelCatalogue } from "./catalogue";
 import { INVERTER_ELECTRICAL, PANEL_ELECTRICAL, checkString } from "./electrical";
-import { suggestInverters } from "./inverter-suggest";
+import { arrayOversize, suggestInverters } from "./inverter-suggest";
 import {
   PANEL,
   angleOfLongestEdge,
   applyCommentOp,
   cleanDesign,
   cleanDesignSet,
+  inverterSpot,
   designPanels,
   designSummary,
   facePanels,
@@ -373,5 +374,46 @@ describe("a roof's set of designs", () => {
     expect(back.designs.map((d) => d.label)).toEqual(["A", "B", "C"]);
     expect(back.primary).toBe(1);
     expect(cleanDesignSet({ nothing: true })).toBeNull();
+  });
+});
+
+describe("panels against the inverters they are on", () => {
+  it("warns past 133% of the inverters, and not at it", () => {
+    // 14 panels of 475 W on 5 kW is exactly 133%.
+    expect(arrayOversize(6.65, 5, false)).toMatchObject({ percent: 133, limit: 133, over: false });
+    expect(arrayOversize(7.125, 5, false)).toMatchObject({ percent: 143, over: true, liftedByBattery: false });
+    expect(arrayOversize(4, 5, false)).toMatchObject({ percent: 80, over: false });
+  });
+  it("is lifted by a battery on the design", () => {
+    expect(arrayOversize(7.125, 5, true)).toMatchObject({ percent: 143, over: false, liftedByBattery: true });
+    expect(arrayOversize(6, 5, true)).toMatchObject({ over: false, liftedByBattery: false });
+  });
+  it("has nothing to say without both panels and an inverter", () => {
+    expect(arrayOversize(0, 5, false)).toBeNull();
+    expect(arrayOversize(6.65, 0, false)).toBeNull();
+  });
+});
+
+describe("an inverter standing on the drawing", () => {
+  it("keeps the place it was dragged to, and has one of its own until then", () => {
+    const kept = cleanDesign({
+      lat: -37.8,
+      lng: 145,
+      faces: [],
+      inverters: [{ sku: "SGWSG5.0RS", name: "Sungrow 5kW", kw: 5, x: 3.21, y: -4.5 }],
+    })!;
+    expect(kept.inverters![0]).toMatchObject({ x: 3.21, y: -4.5 });
+    expect(inverterSpot(kept.inverters![0], 0, -37.8)).toEqual({ x: 3.21, y: -4.5 });
+    const unplaced = cleanDesign({
+      lat: -37.8,
+      lng: 145,
+      faces: [],
+      inverters: [{ sku: "SGWSG5.0RS", name: "Sungrow 5kW", kw: 5, x: "left" }],
+    })!;
+    expect(unplaced.inverters![0].x).toBeUndefined();
+    // Unplaced inverters stand one under the next, to the right of the picture.
+    const [first, second] = [inverterSpot({}, 0, -37.8), inverterSpot({}, 1, -37.8)];
+    expect(first.x).toBeGreaterThan(0);
+    expect(second.y).toBeGreaterThan(first.y);
   });
 });
