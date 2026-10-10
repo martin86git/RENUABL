@@ -22,11 +22,11 @@ import { importDeviceWork, listSavedRoofs, rememberRoof, type DesignRoof } from 
 const SIGN_IN = "/design/sign-in";
 const ACCOUNT = "/design/account";
 const input =
-  "block min-h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-[15px] text-ink outline-none focus:border-forest disabled:bg-surface-2 disabled:text-muted";
+  "block min-h-11 w-full rounded-md border border-line bg-surface px-3.5 text-[15px] text-ink outline-none focus:border-forest disabled:bg-surface-2 disabled:text-muted";
 const primary =
-  "inline-flex h-11 items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted";
+  "inline-flex h-11 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted";
 const textLink = "tap-area shrink-0 text-[13px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink";
-const card = "rounded-[1.25rem] bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6";
+const card = "rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6";
 const eyebrow = "text-[12px] font-medium uppercase tracking-[0.16em] text-forest";
 
 /** Who is using the designer, once the server has said. Null while it is being asked. */
@@ -46,7 +46,7 @@ function useDesignAccount(): [DesignAccount | null, () => void] {
 /** The page frame the account screens share: the wordmark, and one centred column. */
 function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="theme-studio flex min-h-dvh flex-col">
       <header className="flex h-16 items-center px-5 lg:px-10">
         <Link href="/design" aria-label="Roof designer">
           <Wordmark />
@@ -121,7 +121,7 @@ function SetUp({ account, onDone }: { account: Extract<DesignAccount, { signedIn
             />
           </label>
         )}
-        <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] leading-snug text-ink-2">
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-md bg-surface-2 px-3.5 py-3 text-[13px] leading-snug text-ink-2">
           <input
             type="checkbox"
             checked={terms}
@@ -181,7 +181,7 @@ export function DesignAccountGate({ children }: { children: React.ReactNode }) {
     };
   }, [businessId]);
 
-  if (!account || (businessId && brought?.id !== businessId)) return <div className="min-h-dvh" aria-busy="true" />;
+  if (!account || (businessId && brought?.id !== businessId)) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (account.signedIn && account.state !== "ready") return <SetUp account={account} onDone={refresh} />;
   const came = [
     brought && brought.roofs > 0 ? `${brought.roofs} roof${brought.roofs === 1 ? "" : "s"}` : "",
@@ -190,9 +190,12 @@ export function DesignAccountGate({ children }: { children: React.ReactNode }) {
   return (
     <>
       {came.length > 0 && (
-        <p className="bg-surface-2 px-5 py-2.5 text-center text-[13px] text-ink-2" role="status">
-          Brought across from this device: {came.join(" and ")}. Now kept in your account.
-        </p>
+        // In a box of its own with the designer's theme: it sits above the page, outside the page's own themed box.
+        <div className="theme-studio">
+          <p className="bg-surface-2 px-5 py-2.5 text-center text-[13px] text-ink-2" role="status">
+            Brought across from this device: {came.join(" and ")}. Now kept in your account.
+          </p>
+        </div>
       )}
       {children}
     </>
@@ -256,7 +259,7 @@ export function DesignRoofList({ onOpen }: { onOpen: (roof: DesignRoof) => void 
       <h2 id="saved-roofs" className="text-[15px] font-medium text-ink">
         Your roofs
       </h2>
-      <ul className="mt-3 divide-y divide-line rounded-xl border border-line bg-surface">
+      <ul className="mt-3 divide-y divide-line rounded-md border border-line bg-surface">
         {(all ? roofs : roofs.slice(0, 6)).map((roof) => (
           <li key={roof.id}>
             <button
@@ -302,7 +305,7 @@ export function DesignSignIn({ expired }: { expired?: boolean }) {
         business next, and the roofs and prices on this device come with you.
       </p>
       {expired && !answer && (
-        <p className="mt-4 rounded-xl bg-warning-soft px-4 py-3 text-[13.5px] text-warning" role="alert">
+        <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-[13.5px] text-warning" role="alert">
           That sign-in link has expired or was already used. Enter your email for a new one.
         </p>
       )}
@@ -314,7 +317,7 @@ export function DesignSignIn({ expired }: { expired?: boolean }) {
           </Link>
         </p>
       ) : answer?.ok ? (
-        <p className="mt-6 rounded-xl bg-surface-2 px-4 py-3 text-[14px] leading-relaxed text-ink" role="status">
+        <p className="mt-6 rounded-md bg-surface-2 px-4 py-3 text-[14px] leading-relaxed text-ink" role="status">
           {answer.message}
         </p>
       ) : (
@@ -369,7 +372,7 @@ export function DesignAccountPage() {
     };
   }, [business]);
 
-  if (!account) return <div className="min-h-dvh" aria-busy="true" />;
+  if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (!account.signedIn || !business)
     return (
       <Frame>
@@ -410,7 +413,7 @@ export function DesignAccountPage() {
   };
 
   return (
-    <div className="min-h-dvh pb-24">
+    <div className="theme-studio min-h-dvh pb-24">
       <header className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line px-5 py-3 lg:px-10">
         <Link href="/design" aria-label="Roof designer">
           <Wordmark className="text-[17px]" />
@@ -462,7 +465,7 @@ export function DesignAccountPage() {
           <p className="mt-1 text-sm text-ink-2">
             Everyone here can design roofs and see and change the prices, rates and margin. Only the owner adds or removes people.
           </p>
-          <ul className="mt-4 divide-y divide-line rounded-xl border border-line">
+          <ul className="mt-4 divide-y divide-line rounded-md border border-line">
             {(members ?? []).map((m) => (
               <li key={m.email} className="flex items-center gap-3 px-4 py-2.5">
                 <div className="min-w-0 flex-1">
@@ -472,7 +475,7 @@ export function DesignAccountPage() {
                 {owner && m.role !== "owner" && (
                   <button
                     onClick={() => void remove(m.email)}
-                    className="flex size-10 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-danger"
+                    className="flex size-10 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-danger"
                     aria-label={`Remove ${m.email}`}
                     title="Remove from the business"
                   >
