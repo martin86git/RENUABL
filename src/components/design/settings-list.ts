@@ -19,44 +19,21 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
     items: [
       { slug: "electricity", label: "Electricity rates" },
       { slug: "company", label: "Company details" },
-      { slug: "theme", label: "Logo, theme and colours" },
-      {
-        slug: "customiser",
-        label: "Proposal customiser",
-        soon: "Choose which blocks a proposal has, put them in your own order, and give each its own words and pictures.",
-      },
-      {
-        slug: "payment",
-        label: "Payment terms and bank details",
-        soon: "GST shown included or excluded, the deposit (none, a percentage or a fixed amount), payment milestones, and the bank details a customer pays into.",
-      },
-      {
-        slug: "warranty",
-        label: "Workmanship warranty",
-        soon: "How many years you warrant your workmanship for, and your warranty wording at the end of each proposal.",
-      },
+      { slug: "theme", label: "Logo, theme, colours and fonts" },
+      { slug: "wording", label: "About you and wording" },
+      { slug: "customiser", label: "Proposal customiser" },
+      { slug: "payment", label: "Payment terms and bank details" },
+      { slug: "warranty", label: "Workmanship warranty" },
       { slug: "conditions", label: "Special conditions" },
-      {
-        slug: "installation-time",
-        label: "Installation time",
-        soon: "How long from acceptance to installation, as every proposal says it.",
-      },
-      {
-        slug: "signed-emails",
-        label: "Signed proposal emails",
-        soon: "Who else is emailed a copy when a customer accepts a proposal. Sending email for a business isn't set up yet.",
-      },
+      { slug: "installation-time", label: "Installation time" },
+      { slug: "signed-emails", label: "Signed proposal emails" },
     ],
   },
   {
     title: "Business",
     items: [
       { slug: "users", label: "Users and permissions" },
-      {
-        slug: "billing",
-        label: "Billing",
-        soon: "Your RENUABL plan, invoices and payment method. There is no charge while the product is in development.",
-      },
+      { slug: "billing", label: "Billing" },
     ],
   },
 ];

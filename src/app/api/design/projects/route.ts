@@ -1,4 +1,5 @@
-import { MAX_PROJECTS, MAX_PROJECT_BYTES, cleanRoofPlace, cleanRoofWork } from "@/lib/domain/design/account";
+import { MAX_PROJECTS, MAX_PROJECT_BYTES, can, cleanRoofPlace, cleanRoofWork } from "@/lib/domain/design/account";
+import { keepCostEdits, withoutCostEdits } from "@/lib/domain/design/permissions";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { createProject, listProjects, projectAt } from "@/lib/server/design-repo";
 
@@ -15,7 +16,10 @@ export async function GET(request: Request) {
     if (!params.has("lat")) return Response.json({ ok: true, projects: await listProjects(who.member.businessId) });
     const roof = cleanRoofPlace({ lat: Number(params.get("lat")), lng: Number(params.get("lng")) });
     if (!roof) return Response.json({ ok: false }, { status: 400 });
-    return Response.json({ ok: true, project: await projectAt(who.member.businessId, roof) });
+    const project = await projectAt(who.member.businessId, roof);
+    // The costs typed over a quote's lines are costs: someone who may not see costs isn't sent them.
+    const hidden = project && !can(who.member.role, "costs", who.member.permissions);
+    return Response.json({ ok: true, project: hidden ? { ...project, extras: withoutCostEdits(project.extras) } : project });
   });
 }
 
@@ -33,12 +37,16 @@ export async function POST(request: Request) {
     const roof = cleanRoofPlace(read.body);
     const work = roof && cleanRoofWork(roof, read.body.design, read.body.extras);
     if (!roof || !work) return Response.json({ ok: false, message: "That design couldn't be read." }, { status: 422 });
+    const seesCosts = can(who.member.role, "costs", who.member.permissions);
+    // Someone who can't see costs can't set them either: a quote line's cost typed by hand isn't taken from them.
+    if (!seesCosts) work.extras = keepCostEdits(work.extras, null);
     const made = await createProject(who.member.businessId, roof, work, who.member.email);
     if (made === "full")
       return Response.json(
         { ok: false, message: `A business can keep up to ${MAX_PROJECTS.toLocaleString("en-AU")} roofs for now.` },
         { status: 422 },
       );
-    return Response.json({ ok: true, project: made.project, existed: made.existed });
+    const project = seesCosts ? made.project : { ...made.project, extras: withoutCostEdits(made.project.extras) };
+    return Response.json({ ok: true, project, existed: made.existed });
   });
 }

@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
-import { BUSINESS_TERMS_MISSING, BUSINESS_TERMS_PATH, can } from "@/lib/domain/design/account";
+import { BUSINESS_TERMS_MISSING, BUSINESS_TERMS_PATH, PERMISSIONS, can, type MemberPermissions } from "@/lib/domain/design/account";
 import {
   addMember,
   designAccount,
   forgetDesignAccount,
   loadMembers,
   removeMember,
+  setMemberPermissions,
   renameBusiness,
   requestSignInLink,
   setUpBusiness,
@@ -405,6 +406,12 @@ export function DesignAccountPage() {
     setNote({ text: `${email.trim()} can now sign in to the roof designer with that email. We don't email them, so let them know.` });
     setEmail("");
   };
+  const permit = async (who: string, permissions: MemberPermissions) => {
+    const res = await setMemberPermissions(who, permissions);
+    if (res.problem) return setNote({ text: res.problem, error: true });
+    setMembers(res.members ?? members);
+    setNote({ text: `Saved what ${who} may do.` });
+  };
   const remove = async (who: string) => {
     const res = await removeMember(who);
     if (res.problem) return setNote({ text: res.problem, error: true });
@@ -463,14 +470,38 @@ export function DesignAccountPage() {
             People
           </h2>
           <p className="mt-1 text-sm text-ink-2">
-            Everyone here can design roofs and see and change the prices, rates and margin. Only the owner adds or removes people.
+            Everyone here can design roofs and work with customers and deals. What else each person may do is set below, by the owner, and
+            is checked on the server each time: switching one off takes effect with that person&apos;s next click.
           </p>
           <ul className="mt-4 divide-y divide-line rounded-md border border-line">
             {(members ?? []).map((m) => (
-              <li key={m.email} className="flex items-center gap-3 px-4 py-2.5">
+              <li key={m.email} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-ink">{m.email}</p>
-                  <p className="text-xs text-muted">{m.role === "owner" ? "Owner" : m.joined ? "Member" : "Added, hasn't signed in yet"}</p>
+                  <p className="text-xs text-muted">
+                    {m.role === "owner" ? "Owner: may do everything" : m.joined ? "Member" : "Added, hasn't signed in yet"}
+                  </p>
+                  {/* What a member may do. The owner sets it; a member sees their own, greyed. */}
+                  {m.role !== "owner" && (
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      {PERMISSIONS.map((p) => (
+                        <label
+                          key={p.key}
+                          className={`flex items-start gap-2 text-xs ${owner ? "cursor-pointer text-ink-2" : "text-muted"}`}
+                          title={p.about}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 size-3.5 accent-[var(--primary)]"
+                            checked={m.permissions[p.key]}
+                            disabled={!owner || (p.key === "prices" && !m.permissions.costs)}
+                            onChange={(e) => void permit(m.email, { ...m.permissions, [p.key]: e.target.checked })}
+                          />
+                          <span>{p.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {owner && m.role !== "owner" && (
                   <button

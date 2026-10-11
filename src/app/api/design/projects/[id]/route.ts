@@ -1,4 +1,5 @@
-import { MAX_PROJECT_BYTES, PROJECT_CONFLICT, cleanRoofPlace, cleanRoofWork } from "@/lib/domain/design/account";
+import { MAX_PROJECT_BYTES, PROJECT_CONFLICT, can, cleanRoofPlace, cleanRoofWork } from "@/lib/domain/design/account";
+import { keepCostEdits, withoutCostEdits } from "@/lib/domain/design/permissions";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { deleteProject, projectById, saveProject } from "@/lib/server/design-repo";
 
@@ -11,7 +12,10 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/proj
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const project = validId(id) ? await projectById(who.member.businessId, id) : null;
-    return project ? Response.json({ ok: true, project }) : Response.json({ ok: false }, { status: 404 });
+    if (!project) return Response.json({ ok: false }, { status: 404 });
+    // The costs typed over a quote's lines are costs: someone who may not see costs isn't sent them.
+    const hidden = !can(who.member.role, "costs", who.member.permissions);
+    return Response.json({ ok: true, project: hidden ? { ...project, extras: withoutCostEdits(project.extras) } : project });
   });
 }
 
@@ -35,6 +39,8 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/proje
     const work = cleanRoofWork({ ...project, address }, read.body.design, read.body.extras);
     if (!work || !Number.isInteger(read.body.version))
       return Response.json({ ok: false, message: "That design couldn't be read." }, { status: 422 });
+    // Someone who can't see costs was never sent the costs typed over the quote's lines: what the business had stays.
+    if (!can(who.member.role, "costs", who.member.permissions)) work.extras = keepCostEdits(work.extras, project.extras);
     const saved = await saveProject(who.member.businessId, id, read.body.version as number, work, who.member.email, address);
     if (saved === "missing") return Response.json({ ok: false }, { status: 404 });
     if (saved === "conflict") return Response.json({ ok: false, conflict: true, message: PROJECT_CONFLICT }, { status: 409 });

@@ -12,7 +12,9 @@
 import {
   MAX_MEMBERS,
   MAX_PROJECTS,
+  cleanPermissions,
   roofKey,
+  type MemberPermissions,
   type ImportRoof,
   type MemberRole,
   type RoofPlace,
@@ -35,18 +37,36 @@ export interface Member {
   role: MemberRole;
   /** The version of the terms this person accepted, or null when they haven't yet (someone added by the owner). */
   termsVersion: string | null;
+  /** What the owner lets this person do (`can`). The owner's own are never looked at. */
+  permissions: MemberPermissions;
 }
 
 /** The business this email belongs to, if any. An email is in one business at most. */
 export async function memberByEmail(email: string): Promise<Member | null> {
-  const rows = await query<{ business_id: string; name: string; email: string; role: MemberRole; terms_version: string | null }>(
-    `select m.business_id, b.name, m.email, m.role, m.terms_version
+  const rows = await query<{
+    business_id: string;
+    name: string;
+    email: string;
+    role: MemberRole;
+    terms_version: string | null;
+    permissions: unknown;
+  }>(
+    `select m.business_id, b.name, m.email, m.role, m.terms_version, m.permissions
        from business_members m join businesses b on b.id = m.business_id
       where m.email = $1`,
     [email.toLowerCase()],
   );
   const m = rows[0];
-  return m ? { businessId: m.business_id, businessName: m.name, email: m.email, role: m.role, termsVersion: m.terms_version } : null;
+  return m
+    ? {
+        businessId: m.business_id,
+        businessName: m.name,
+        email: m.email,
+        role: m.role,
+        termsVersion: m.terms_version,
+        permissions: cleanPermissions(m.permissions),
+      }
+    : null;
 }
 
 /**
@@ -90,15 +110,25 @@ export interface MemberLine {
   role: MemberRole;
   /** Whether they have signed in and accepted the terms yet. */
   joined: boolean;
+  permissions: MemberPermissions;
 }
 
 export async function listMembers(businessId: string): Promise<MemberLine[]> {
-  const rows = await query<{ email: string; role: MemberRole; joined: boolean }>(
-    `select email, role, terms_accepted_at is not null as joined from business_members
+  const rows = await query<{ email: string; role: MemberRole; joined: boolean; permissions: unknown }>(
+    `select email, role, terms_accepted_at is not null as joined, permissions from business_members
       where business_id = $1 order by (role = 'owner') desc, created_at`,
     [businessId],
   );
-  return rows;
+  return rows.map((m) => ({ ...m, permissions: cleanPermissions(m.role === "owner" ? null : m.permissions) }));
+}
+
+/** Sets what a member may do. Never the owner's (the owner may always do everything). False when there's no such member. */
+export async function setPermissions(businessId: string, email: string, permissions: MemberPermissions): Promise<boolean> {
+  const rows = await query(
+    `update business_members set permissions = $3 where business_id = $1 and email = $2 and role <> 'owner' returning id`,
+    [businessId, email.toLowerCase(), JSON.stringify(permissions)],
+  );
+  return rows.length > 0;
 }
 
 /**

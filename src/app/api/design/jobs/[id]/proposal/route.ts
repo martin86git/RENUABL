@@ -29,7 +29,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/jobs
 export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs/[id]/proposal">) {
   return answer(async () => {
     const { id } = await ctx.params;
-    const who = await requireMember("design");
+    const who = await requireMember("publish");
     if ("refuse" in who) return who.refuse;
     const read = await readBody(request, 10_000);
     if ("refuse" in read) return read.refuse;
@@ -57,7 +57,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
 export async function DELETE(_request: Request, ctx: RouteContext<"/api/design/jobs/[id]/proposal">) {
   return answer(async () => {
     const { id } = await ctx.params;
-    const who = await requireMember("design");
+    const who = await requireMember("publish");
     if ("refuse" in who) return who.refuse;
     if (!validId(id) || !(await withdrawProposal(who.member.businessId, id, who.member.email)))
       return Response.json({ ok: false, message: "There's no proposal out for this job." }, { status: 404 });

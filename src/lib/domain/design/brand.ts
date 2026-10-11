@@ -7,6 +7,7 @@
  * A proposal goes to the business's customer under the business's name, not
  * RENUABL's. Nothing here is RENUABL's brand.
  */
+import { cleanBlocks, defaultBlocks, type BlockSetting } from "./blocks";
 import type { Cleaned } from "./crm";
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,64 @@ export type PaletteId = (typeof PALETTES)[number]["id"];
 /** How long a proposal's price stands, in days: the choices, and the one a business starts with. */
 export const VALID_DAYS = [7, 14, 30] as const;
 export const DEFAULT_VALID_DAYS = 14;
+
+/**
+ * The type a proposal is set in. Only faces the site already loads, each with
+ * a face the PDF has built in (a PDF made here embeds no font files): the
+ * page and the file are close, not identical, and the settings page says so.
+ */
+export const FONTS = [
+  { id: "modern", name: "Modern", blurb: "A clean sans-serif throughout.", pdf: "Helvetica in the PDF." },
+  { id: "editorial", name: "Editorial", blurb: "Serif headings over a clean sans-serif.", pdf: "Times headings in the PDF." },
+] as const;
+export type FontId = (typeof FONTS)[number]["id"];
+
+/** How the price is written. The price itself always has GST in it: this is only whether it is shown as one figure or broken out. */
+export const GST_MODES = [
+  { id: "included", name: "GST included", blurb: "One price, with GST in it." },
+  { id: "excluded", name: "GST shown separately", blurb: "The price before GST, the GST, and the total." },
+] as const;
+export type GstMode = (typeof GST_MODES)[number]["id"];
+
+/** What is asked for up front: nothing, a share of what the customer pays, or a set amount. */
+export interface Deposit {
+  kind: "none" | "percent" | "fixed";
+  /** A percentage (1 to 100) or dollars, by `kind`. 0 with none. */
+  amount: number;
+}
+
+/** A share of the price due at a named point: "20% Deposit", "80% Installation completion". */
+export interface Milestone {
+  percent: number;
+  name: string;
+}
+export const MAX_MILESTONES = 8;
+
+/** The account a customer pays into. All of it or none of it. */
+export interface BankDetails {
+  name: string;
+  /** Six digits. */
+  bsb: string;
+  /** Digits only. */
+  number: string;
+  /** What to put as the payment's reference: "Your surname and street". */
+  reference: string;
+}
+export const NO_BANK: BankDetails = { name: "", bsb: "", number: "", reference: "" };
+
+/** How long installation usually takes from the customer going ahead. Shown as an estimate, never a promise. */
+export const INSTALL_TIMES = [
+  { id: "", label: "Don't say" },
+  { id: "1-2", label: "1 to 2 weeks" },
+  { id: "3-4", label: "3 to 4 weeks" },
+  { id: "5-8", label: "5 to 8 weeks" },
+  { id: "9-12", label: "9 to 12 weeks" },
+  { id: "tbc", label: "To be confirmed" },
+] as const;
+export type InstallTime = (typeof INSTALL_TIMES)[number]["id"];
+
+/** The most extra addresses told when a customer accepts. */
+export const MAX_NOTIFY = 5;
 
 const HEX = /^#[0-9a-f]{6}$/;
 
@@ -72,7 +131,7 @@ export function inkOn(hex: string): string {
  * for small text and marks, so where it would be hard to read on the page it
  * gives way to the page's own text colour.
  */
-export function themeVars(theme: Pick<BrandKit, "palette" | "primary" | "accent">): Record<string, string> {
+export function themeVars(theme: Pick<BrandKit, "palette" | "primary" | "accent"> & { font?: FontId }): Record<string, string> {
   const page = PALETTES.find((p) => p.id === theme.palette) ?? PALETTES[0];
   const accent = contrast(theme.accent, page.surface) >= 3 ? theme.accent : page.ink;
   return {
@@ -89,6 +148,8 @@ export function themeVars(theme: Pick<BrandKit, "palette" | "primary" | "accent"
     "--forest": theme.primary,
     "--accent": accent,
     "--positive": accent,
+    // The headings' face: the site's own serif for Editorial, else the same face as everything else.
+    "--proposal-heading": theme.font === "editorial" ? "var(--font-serif), Georgia, serif" : "inherit",
   };
 }
 
@@ -114,8 +175,23 @@ export interface BrandKit {
   points: string[];
   /** Anything it wants every proposal to say about warranties, payment or what happens next. */
   extra: string;
-  /** Its conditions of sale, shown at the foot of every proposal and accepted with it. */
+  /** Its special conditions, shown on every proposal and in the PDF, and accepted by a customer going ahead. */
   conditions: string;
+  font: FontId;
+  gst: GstMode;
+  deposit: Deposit;
+  /** Empty, or shares that add up to 100. */
+  milestones: Milestone[];
+  bank: BankDetails;
+  /** The business's own workmanship warranty, in years. Null when it doesn't state one. */
+  warrantyYears: number | null;
+  /** Its own words about that warranty. */
+  warrantyWords: string;
+  installTime: InstallTime;
+  /** Extra addresses of the business's own, told when a customer accepts a proposal. */
+  notify: string[];
+  /** The proposal's blocks: which show, in what order, with what heading, words and picture. */
+  blocks: BlockSetting[];
   template: TemplateId;
   palette: PaletteId;
   primary: string;
@@ -138,6 +214,16 @@ export function defaultBrand(businessName: string): BrandKit {
     points: [],
     extra: "",
     conditions: "",
+    font: "modern",
+    gst: "included",
+    deposit: { kind: "none", amount: 0 },
+    milestones: [],
+    bank: { ...NO_BANK },
+    warrantyYears: null,
+    warrantyWords: "",
+    installTime: "",
+    notify: [],
+    blocks: defaultBlocks(),
     template: "classic",
     palette: "paper",
     primary: "#16181d",
@@ -216,6 +302,71 @@ export const BRAND_EMAIL_WRONG = "That email address doesn't look right. Check i
 export const BRAND_WEBSITE_WRONG = "That web address doesn't look right. Something like example.com.au, or leave it empty.";
 export const BRAND_ABN_WRONG = "That ABN doesn't check out. It is 11 digits: check it, or leave it empty.";
 export const BRAND_COLOUR_WRONG = "Pick each colour from the colour box.";
+export const DEPOSIT_WRONG = "The deposit is a percentage from 1 to 100, or a dollar amount up to 1,000,000.";
+export const MILESTONE_NAME_MISSING = "Give each payment milestone a name and a percentage above 0.";
+export const milestonesWrong = (total: number) =>
+  `The payment milestones add up to ${total}%. They need to add up to 100%: change them, or take them all out.`;
+export const BANK_INCOMPLETE =
+  "For bank details, give the account name, a BSB of 6 digits and an account number of 4 to 10 digits. Or leave all three empty.";
+export const WARRANTY_WRONG = "The workmanship warranty is a whole number of years from 1 to 30, or left empty.";
+export const notifyWrong = (address: string) => `"${address}" doesn't look like an email address.`;
+
+const num = (raw: unknown) =>
+  typeof raw === "number" && Number.isFinite(raw) ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+
+/** A deposit as sent. Null when it isn't one we can ask for. */
+export function cleanDeposit(raw: unknown): Deposit | null {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Bag;
+  if (r.kind === "none" || r.kind === undefined) return { kind: "none", amount: 0 };
+  const amount = num(r.amount);
+  if (r.kind === "percent") return amount >= 1 && amount <= 100 ? { kind: "percent", amount: Math.round(amount * 10) / 10 } : null;
+  if (r.kind === "fixed") return amount > 0 && amount <= 1_000_000 ? { kind: "fixed", amount: Math.round(amount) } : null;
+  return null;
+}
+
+/** Payment milestones as sent: none at all, or named shares that add up to 100. */
+export function cleanMilestones(raw: unknown): Cleaned<Milestone[]> {
+  const out: Milestone[] = [];
+  for (const entry of Array.isArray(raw) ? raw.slice(0, MAX_MILESTONES) : []) {
+    const e = (entry && typeof entry === "object" ? entry : {}) as Bag;
+    const name = line(e.name, 60);
+    const percent = num(e.percent);
+    // A row left wholly empty is a row not filled in yet, not a mistake.
+    if (!name && !(percent > 0)) continue;
+    if (!name || !(percent > 0) || percent > 100) return { ok: false, message: MILESTONE_NAME_MISSING };
+    out.push({ percent: Math.round(percent * 10) / 10, name });
+  }
+  const total = Math.round(out.reduce((sum, m) => sum + m.percent, 0) * 10) / 10;
+  if (out.length && total !== 100) return { ok: false, message: milestonesWrong(total) };
+  return { ok: true, value: out };
+}
+
+/** Bank details as sent: all three of name, BSB and number, or none of them. Spaces and dashes in the numbers are forgiven. */
+export function cleanBank(raw: unknown): BankDetails | null {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Bag;
+  const name = line(r.name, 80);
+  const bsb = line(r.bsb, 12).replace(/[\s-]/g, "");
+  const number = line(r.number, 20).replace(/[\s-]/g, "");
+  const reference = line(r.reference, 120);
+  if (!name && !bsb && !number) return { ...NO_BANK };
+  if (name.length < 2 || !/^\d{6}$/.test(bsb) || !/^\d{4,10}$/.test(number)) return null;
+  return { name, bsb, number, reference };
+}
+
+/** A BSB as it is written: "063-000". */
+export const shownBsb = (bsb: string) => (bsb.length === 6 ? `${bsb.slice(0, 3)}-${bsb.slice(3)}` : bsb);
+
+/** Extra addresses to tell, as sent: each a real-looking address, lower case, once. */
+export function cleanNotify(raw: unknown): Cleaned<string[]> {
+  const out: string[] = [];
+  for (const entry of Array.isArray(raw) ? raw.slice(0, 40) : []) {
+    const address = line(entry, 200).toLowerCase();
+    if (!address) continue;
+    if (!EMAIL.test(address)) return { ok: false, message: notifyWrong(address) };
+    if (!out.includes(address)) out.push(address);
+  }
+  return { ok: true, value: out.slice(0, MAX_NOTIFY) };
+}
 
 /** A brand kit as sent by a browser, laid over the one the business has: anything not sent stays as it is. */
 export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit> {
@@ -233,6 +384,20 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
   const primary = sent("primary") ? cleanColour(r.primary) : current.primary;
   const accent = sent("accent") ? cleanColour(r.accent) : current.accent;
   if (!primary || !accent) return { ok: false, message: BRAND_COLOUR_WRONG };
+  const deposit = sent("deposit") ? cleanDeposit(r.deposit) : current.deposit;
+  if (!deposit) return { ok: false, message: DEPOSIT_WRONG };
+  const milestones = sent("milestones") ? cleanMilestones(r.milestones) : { ok: true as const, value: current.milestones };
+  if (!milestones.ok) return milestones;
+  const bank = sent("bank") ? cleanBank(r.bank) : current.bank;
+  if (!bank) return { ok: false, message: BANK_INCOMPLETE };
+  let warrantyYears = current.warrantyYears;
+  if (sent("warrantyYears")) {
+    const years = r.warrantyYears === null || r.warrantyYears === "" ? null : num(r.warrantyYears);
+    if (years !== null && !(Number.isInteger(years) && years >= 1 && years <= 30)) return { ok: false, message: WARRANTY_WRONG };
+    warrantyYears = years;
+  }
+  const notify = sent("notify") ? cleanNotify(r.notify) : { ok: true as const, value: current.notify };
+  if (!notify.ok) return notify;
 
   return {
     ok: true,
@@ -249,6 +414,16 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
       points: sent("points") ? lines(r.points, 5, 140) : current.points,
       extra: sent("extra") ? paragraphs(r.extra, 3000) : current.extra,
       conditions: sent("conditions") ? paragraphs(r.conditions, 60_000) : current.conditions,
+      font: FONTS.some((f) => f.id === r.font) ? (r.font as FontId) : current.font,
+      gst: GST_MODES.some((g) => g.id === r.gst) ? (r.gst as GstMode) : current.gst,
+      deposit,
+      milestones: milestones.value,
+      bank,
+      warrantyYears,
+      warrantyWords: sent("warrantyWords") ? paragraphs(r.warrantyWords, 3000) : current.warrantyWords,
+      installTime: INSTALL_TIMES.some((t) => t.id === r.installTime) ? (r.installTime as InstallTime) : current.installTime,
+      notify: notify.value,
+      blocks: sent("blocks") ? cleanBlocks(r.blocks) : current.blocks,
       template: TEMPLATES.some((t) => t.id === r.template) ? (r.template as TemplateId) : current.template,
       palette: PALETTES.some((p) => p.id === r.palette) ? (r.palette as PaletteId) : current.palette,
       primary,
@@ -264,22 +439,26 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
 export function readBrandKit(saved: unknown, businessName: string): BrandKit {
   const start = defaultBrand(businessName);
   const cleaned = cleanBrandKit(saved, start);
-  return cleaned.ok ? cleaned.value : start;
+  if (!cleaned.ok) return start;
+  // A kit saved before blocks could be arranged has none: it gets the usual ones (`cleanBlocks` fills in any that are missing).
+  return { ...cleaned.value, blocks: cleanBlocks(cleaned.value.blocks) };
 }
 
 // ---------------------------------------------------------------------------
 // Pictures
 // ---------------------------------------------------------------------------
 
-/** What a picture is for. One logo and one cover at a time; a new one takes the old one's place. */
-export const IMAGE_KINDS = ["logo", "cover", "photo"] as const;
+/** What a picture is for. One logo and one cover at a time (a new one takes the old one's place); photos for "About"; one for any block of the proposal. */
+export const IMAGE_KINDS = ["logo", "cover", "photo", "block"] as const;
 export type ImageKind = (typeof IMAGE_KINDS)[number];
 
 export const IMAGE_LIMITS = {
   /** The largest file taken, before it is made smaller on the server. */
   uploadBytes: 5 * 1024 * 1024,
   /** The longest side kept, in pixels. */
-  side: { logo: 800, cover: 1800, photo: 1600 } as Record<ImageKind, number>,
+  side: { logo: 800, cover: 1800, photo: 1600, block: 1600 } as Record<ImageKind, number>,
+  /** The most pictures kept for the proposal's blocks. */
+  blocks: 12,
   /** The most photos a business keeps (besides its logo and cover). */
   photos: 6,
 } as const;

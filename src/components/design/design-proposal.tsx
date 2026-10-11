@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, Copy, ExternalLink, FileText, Trash2, Upload } from "lucide-react";
 import clsx from "clsx";
 import {
+  FONTS,
   IMAGE_LIMITS,
   PALETTES,
   TEMPLATES,
@@ -358,6 +359,7 @@ const KIND_WORDS: Record<ImageKind, { title: string; help: string }> = {
   logo: { title: "Logo", help: "Shown at the top of every proposal and in the PDF. A PNG with a see-through background works best." },
   cover: { title: "Cover photo", help: "Across the top of the Classic template and the PDF's first page. A wide photo of your work." },
   photo: { title: "Photos", help: `Up to ${IMAGE_LIMITS.photos}, shown under "About". Your team, your installations.` },
+  block: { title: "Block pictures", help: "Pictures for the proposal's blocks. They are added from the proposal customiser." },
 };
 
 /** One picture slot (or the photos): what is there, the way to add one, the way to take one out. */
@@ -526,7 +528,7 @@ export function BrandSettings({ part }: { part: "who" | "look" | "words" }) {
       <div>
         <p className={ui.eyebrow}>Settings</p>
         <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">
-          {part === "who" ? "Company details" : part === "look" ? "Logo, theme and colours" : "Special conditions"}
+          {part === "who" ? "Company details" : part === "look" ? "Logo, theme, colours and fonts" : "About you and wording"}
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">
           Your proposals go to your customers under your name, logo and colours. What you set here is used by the next proposal you publish;
@@ -569,6 +571,20 @@ export function BrandSettings({ part }: { part: "who" | "look" | "words" }) {
         <p className="text-xs text-muted">JPEG, PNG or WebP, up to 5 MB each. We keep a smaller copy of the picture only.</p>
 
         <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
+          <label className={ui.label}>
+            Type
+            <select
+              className={clsx(ui.input, "mt-1.5 appearance-auto")}
+              value={brand.font}
+              onChange={(e) => void save({ font: e.target.value as BrandKit["font"] })}
+            >
+              {FONTS.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}: {f.blurb} {f.pdf}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className={ui.label}>
             Usual template
             <select
@@ -652,13 +668,15 @@ export function BrandSettings({ part }: { part: "who" | "look" | "words" }) {
         </h2>
         {long("about", "About your business", "A few sentences, in your own words. Only say what you can stand behind.", 5)}
         {list("points", "Reasons to choose you", "One a line, up to five.")}
-        {long("extra", "Warranties, payment and what happens next", "Shown under the price on every proposal.", 5)}
         {long(
-          "conditions",
-          "Conditions of sale",
-          "Shown at the foot of every proposal and in the PDF. When there are some, a customer going ahead also accepts them.",
-          8,
+          "extra",
+          "Anything else to say under the price",
+          "Shown under the price on every proposal: what happens next, what to expect.",
+          5,
         )}
+        <p className="text-xs text-muted">
+          Payment terms, your workmanship warranty and your special conditions each have a page of their own in Settings.
+        </p>
       </section>
     </div>
   );

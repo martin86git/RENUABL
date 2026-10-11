@@ -6,21 +6,28 @@
  * nothing else, so it cannot carry a cost, a margin or a product code: none
  * is in what it is given. One layout for every template (the templates
  * differ on the page, not in the file), in the business's own colour with
- * its logo, on A4. The roof is drawn as the layout of the panels on a plain
+ * its logo, on A4: the cover, then the blocks in the order the business has
+ * put them in, as on the page (`view.blocks`). Type is the faces built into
+ * every PDF (Helvetica, and Times for "Editorial" headings): no font file is
+ * embedded. The roof is drawn as the layout of the panels on a plain
  * ground; the picture from above stays on the page. Every estimate carries
  * the same wording as the page.
  */
 import { Document, Image, Page, Polygon, Rect, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
-import { contrast, inkOn, shownAbn, shownWebsite } from "@/lib/domain/design/brand";
+import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
+import { contrast, inkOn, shownAbn, shownBsb, shownWebsite } from "@/lib/domain/design/brand";
 import {
   ACCEPT_LINE,
   ACCEPT_WITH_CONDITIONS,
+  BANK_NOTE,
   ESTIMATE_NOTE,
   NO_SUNSHINE_NOTE,
   PRODUCTION_NOTE,
   ROOF_NOTE,
   SAVING_NOTE,
   STC_NOTE,
+  TIMING_NOTE,
+  warrantyNote,
   type ProposalView,
 } from "@/lib/domain/design/proposal";
 
@@ -131,11 +138,14 @@ function ProposalDocument({
   accepted: { name: string; at: string } | null;
 }) {
   const b = view.business;
+  const terms = view.terms;
   const colour = view.theme.primary;
   const onColour = inkOn(colour);
   // The file is always set on white, whatever page the proposal's own palette uses: it is made to be printed.
   // So a colour too pale to see on white gives way to black for the drawing and the bars.
   const accent = contrast(colour, "#ffffff") >= 1.6 ? colour : INK;
+  // Headings in the face the business chose, as near as the faces built into every PDF come to it.
+  const heading = [s.h2, { fontFamily: view.theme.font === "editorial" ? "Times-Bold" : "Helvetica-Bold" }];
   const picture = (id: string | undefined) => {
     const image = id ? images[id] : undefined;
     return image ? { data: image.bytes, format: image.contentType === "image/png" ? ("png" as const) : ("jpg" as const) } : null;
@@ -155,6 +165,191 @@ function ProposalDocument({
     </View>
   );
 
+  // Each block's own content, by its id, as on the page: null when this proposal has nothing for it.
+  const content: Record<BlockId, () => React.ReactNode> = {
+    cover: () => null,
+    system: () => (
+      <>
+        {view.system.details.map((d) => (
+          <Row key={d.label} label={d.label} value={d.value} />
+        ))}
+      </>
+    ),
+    roof: () =>
+      view.roof.panels.length > 0 ? (
+        <View wrap={false}>
+          <RoofDrawing panels={view.roof.panels} colour={accent} />
+          <Text style={[s.small, { marginTop: 6 }]}>
+            The {view.system.panels} panels as designed, seen from above, north at the top. {ROOF_NOTE}
+          </Text>
+        </View>
+      ) : null,
+    production: () =>
+      view.production ? (
+        <View wrap={false}>
+          <Months kwh={view.production.monthlyKwh} colour={accent} />
+          <Text style={[s.small, { marginTop: 6 }]}>
+            About {view.production.yearKwh.toLocaleString("en-AU")} kWh a year. {PRODUCTION_NOTE}
+          </Text>
+        </View>
+      ) : (
+        <Text style={s.muted}>{NO_SUNSHINE_NOTE}</Text>
+      ),
+    bill: () =>
+      view.bill ? (
+        <View wrap={false}>
+          <Row label="A year's bill now (estimate)" value={dollars(view.bill.now)} />
+          <Row label="A year's bill with this system (estimate)" value={dollars(view.bill.after)} />
+          <Row label="Estimated saving a year" value={`about ${dollars(view.bill.saving)}`} bold />
+          {view.paybackYears !== null && <Row label="Years for the saving to add up to the price" value={`about ${view.paybackYears}`} />}
+          <Text style={[s.small, { marginTop: 6 }]}>
+            {SAVING_NOTE} {ESTIMATE_NOTE}
+          </Text>
+          <Text style={[s.small, { marginTop: 4 }]}>
+            Worked out from: a {view.bill.assumed.interval} bill of {dollars(view.bill.assumed.amount)}, $
+            {view.bill.assumed.supplyPerDay.toFixed(2)} a day supply charge, ${view.bill.assumed.rate.toFixed(2)} a kWh, $
+            {view.bill.assumed.feedIn.toFixed(2)} a kWh feed-in, and {Math.round(view.bill.assumed.selfUseShare * 100)}% of solar used as it
+            is made.
+          </Text>
+        </View>
+      ) : null,
+    price: () => (
+      <>
+        <View wrap={false}>
+          {view.price.gstShown === "excluded" && view.price.beforeGst !== undefined && view.price.gst !== undefined ? (
+            <>
+              <Row label="Price before GST" value={dollars(view.price.beforeGst)} />
+              <Row label="GST" value={dollars(view.price.gst)} />
+              <Row label="Price with GST" value={dollars(view.price.incGst)} />
+            </>
+          ) : (
+            <Row label="Price, GST included" value={dollars(view.price.incGst)} />
+          )}
+          <Row label="Less the federal rebate (estimate)" value={`- ${dollars(view.price.stc)}`} />
+          <View
+            style={[
+              s.row,
+              { borderBottomWidth: 0, backgroundColor: colour, paddingHorizontal: 10, paddingVertical: 10, borderRadius: 4, marginTop: 6 },
+            ]}
+          >
+            <Text style={{ color: onColour, fontFamily: "Helvetica-Bold" }}>You pay</Text>
+            <Text style={{ color: onColour, fontFamily: "Helvetica-Bold", fontSize: 14 }}>{dollars(view.price.youPay)}</Text>
+          </View>
+          <Text style={[s.small, { marginTop: 8 }]}>
+            Covers: {view.price.includes.join(", ")}. {STC_NOTE} The price stands until {day(view.validUntil)}.
+          </Text>
+        </View>
+        {view.price.solarVic ? (
+          <View style={{ marginTop: 14 }} wrap={false}>
+            <Text style={{ fontFamily: "Helvetica-Bold", marginBottom: 4 }}>With Solar Victoria, if you are eligible and approved</Text>
+            <Row label="Solar Victoria rebate" value={`- ${dollars(view.price.solarVic.rebate)}`} />
+            <Row label="You would pay" value={dollars(view.price.solarVic.afterRebate)} />
+            {view.price.solarVic.loan > 0 ? (
+              <>
+                <Row label="Solar Victoria interest-free loan" value={`- ${dollars(view.price.solarVic.loan)}`} />
+                <Row label="To pay up front" value={dollars(view.price.solarVic.upfront)} />
+                <Row
+                  label={`Then, for ${view.price.solarVic.loanMonths} months, with no interest`}
+                  value={`$${view.price.solarVic.monthly.toFixed(2)} a month`}
+                />
+              </>
+            ) : null}
+            <Text style={[s.small, { marginTop: 6 }]}>{view.price.solarVic.note}</Text>
+          </View>
+        ) : null}
+        {b.extra ? <Text style={{ marginTop: 14 }}>{b.extra}</Text> : null}
+      </>
+    ),
+    payment: () =>
+      terms && (terms.deposit !== null || terms.milestones.length > 0 || terms.bank) ? (
+        <View wrap={false}>
+          {terms.deposit !== null && <Row label="Deposit to go ahead" value={dollars(terms.deposit)} bold />}
+          {terms.milestones.map((m) => (
+            <Row key={m.name} label={`${m.name} (${m.percent}%)`} value={dollars(m.amount)} />
+          ))}
+          {terms.bank ? (
+            <View style={[s.card, { marginTop: 10 }]}>
+              <Text style={{ fontFamily: "Helvetica-Bold", marginBottom: 4 }}>Pay by bank transfer to</Text>
+              <Row label="Account name" value={terms.bank.name} />
+              <Row label="BSB" value={shownBsb(terms.bank.bsb)} />
+              <Row label="Account number" value={terms.bank.number} />
+              {terms.bank.reference ? <Row label="Reference" value={terms.bank.reference} /> : null}
+              <Text style={[s.small, { marginTop: 6 }]}>{BANK_NOTE}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null,
+    timing: () =>
+      terms?.installTime ? (
+        <View wrap={false}>
+          <Row label="Usual time from going ahead to installation" value={terms.installTime} bold />
+          <Text style={[s.small, { marginTop: 6 }]}>{TIMING_NOTE}</Text>
+        </View>
+      ) : null,
+    warranty: () =>
+      terms?.warranty ? (
+        <View>
+          {terms.warranty.years !== null && (
+            <Row
+              label={`${b.name}'s workmanship warranty`}
+              value={`${terms.warranty.years} ${terms.warranty.years === 1 ? "year" : "years"}`}
+              bold
+            />
+          )}
+          {terms.warranty.words ? <Text style={{ marginTop: 6 }}>{terms.warranty.words}</Text> : null}
+          <Text style={[s.small, { marginTop: 6 }]}>{warrantyNote(b.name)}</Text>
+        </View>
+      ) : null,
+    about: () =>
+      b.about || b.points.length > 0 ? (
+        <View>
+          {b.about ? <Text>{b.about}</Text> : null}
+          {b.points.map((point) => (
+            <Text key={point} style={{ marginTop: 4 }}>
+              • {point}
+            </Text>
+          ))}
+        </View>
+      ) : null,
+    "custom-1": () => null,
+    "custom-2": () => null,
+    "custom-3": () => null,
+    accept: () => (
+      <View wrap={false}>
+        {accepted ? (
+          <View style={s.card}>
+            <Text style={{ fontFamily: "Helvetica-Bold" }}>Accepted by {accepted.name}</Text>
+            <Text style={s.small}>
+              on {day(accepted.at)}: &ldquo;{b.conditions ? ACCEPT_WITH_CONDITIONS : ACCEPT_LINE}&rdquo;
+            </Text>
+          </View>
+        ) : (
+          <Text>
+            To go ahead, open your proposal online and choose &ldquo;I&apos;d like to go ahead&rdquo;, or get in touch: {contact || b.name}.
+          </Text>
+        )}
+        {b.address ? <Text style={[s.small, { marginTop: 10 }]}>{b.address}</Text> : null}
+      </View>
+    ),
+    conditions: () => (b.conditions ? <Text style={{ fontSize: 8.5, lineHeight: 1.5 }}>{b.conditions}</Text> : null),
+  };
+
+  const blocks = viewBlocks(view);
+  const coverBlock = blocks.find((block) => block.id === "cover");
+  /** A block's own words and picture, as the business set them in the customiser. */
+  const own = (block: ViewBlock) => {
+    const image = picture(block.image?.id);
+    return (
+      <>
+        {block.words ? <Text style={{ marginBottom: 6 }}>{block.words}</Text> : null}
+        {image ? (
+          // eslint-disable-next-line jsx-a11y/alt-text -- a PDF image has no alt attribute
+          <Image src={image} style={{ maxHeight: 200, width: "100%", objectFit: "cover", borderRadius: 4, marginBottom: 8 }} />
+        ) : null}
+      </>
+    );
+  };
+
   return (
     <Document title={`${view.title}: ${view.customer.name}`} author={b.name} creator={b.name} producer={b.name}>
       <Page size="A4" style={s.page}>
@@ -173,7 +368,7 @@ function ProposalDocument({
         )}
         <View style={{ marginTop: 26, backgroundColor: colour, borderRadius: 4, padding: 22 }}>
           <Text style={[s.eyebrow, { color: onColour }]}>Proposal</Text>
-          <Text style={[s.h1, { color: onColour }]}>
+          <Text style={[s.h1, { color: onColour, fontFamily: view.theme.font === "editorial" ? "Times-Bold" : "Helvetica-Bold" }]}>
             {view.title} for {view.customer.name}
           </Text>
           <Text style={{ marginTop: 8, color: onColour }}>{view.customer.address}</Text>
@@ -182,147 +377,46 @@ function ProposalDocument({
           </Text>
         </View>
         {view.note ? <Text style={{ marginTop: 18 }}>{view.note}</Text> : null}
-
-        <View style={s.section}>
-          <Text style={s.h2}>Your system</Text>
-          <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-            {[
-              [`${view.system.kw} kW`, `${view.system.panels} panels`],
-              ...(view.system.batteryKwh ? [[`${view.system.batteryKwh} kWh`, "battery storage"]] : []),
-              ...(view.production ? [[`${view.production.yearKwh.toLocaleString("en-AU")} kWh`, "a year, estimated"]] : []),
-            ].map(([figure, words]) => (
-              <View key={words} style={[s.card, { flex: 1 }]}>
-                <Text style={{ fontSize: 16, fontFamily: "Helvetica-Bold" }}>{figure}</Text>
-                <Text style={s.small}>{words}</Text>
-              </View>
-            ))}
-          </View>
-          {view.system.details.map((d) => (
-            <Row key={d.label} label={d.label} value={d.value} />
+        {coverBlock && (coverBlock.words || coverBlock.image) ? <View style={{ marginTop: 14 }}>{own(coverBlock)}</View> : null}
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
+          {[
+            [`${view.system.kw} kW`, `${view.system.panels} panels`],
+            ...(view.system.batteryKwh ? [[`${view.system.batteryKwh} kWh`, "battery storage"]] : []),
+            ...(view.production ? [[`${view.production.yearKwh.toLocaleString("en-AU")} kWh`, "a year, estimated"]] : []),
+            [dollars(view.price.youPay), "you pay, after the federal rebate"],
+          ].map(([figure, words]) => (
+            <View key={words} style={[s.card, { flex: 1 }]}>
+              <Text style={{ fontSize: 15, fontFamily: "Helvetica-Bold" }}>{figure}</Text>
+              <Text style={s.small}>{words}</Text>
+            </View>
           ))}
         </View>
         {footer}
       </Page>
 
+      {/* The rest, in the business's own order, as on the page: each block under its heading, running on over as many pages as it needs. */}
       <Page size="A4" style={s.page}>
-        {view.roof.panels.length > 0 && (
-          <View>
-            <Text style={s.h2}>Your roof</Text>
-            <RoofDrawing panels={view.roof.panels} colour={accent} />
-            <Text style={[s.small, { marginTop: 6 }]}>
-              The {view.system.panels} panels as designed, seen from above, north at the top. {ROOF_NOTE}
-            </Text>
-          </View>
-        )}
-        <View style={s.section}>
-          <Text style={s.h2}>What it makes</Text>
-          {view.production ? (
-            <>
-              <Months kwh={view.production.monthlyKwh} colour={accent} />
-              <Text style={[s.small, { marginTop: 6 }]}>
-                About {view.production.yearKwh.toLocaleString("en-AU")} kWh a year. {PRODUCTION_NOTE}
-              </Text>
-            </>
-          ) : (
-            <Text style={s.muted}>{NO_SUNSHINE_NOTE}</Text>
-          )}
-        </View>
-        {view.bill && (
-          <View style={s.section}>
-            <Text style={s.h2}>Your power bill</Text>
-            <Row label="A year's bill now (estimate)" value={dollars(view.bill.now)} />
-            <Row label="A year's bill with this system (estimate)" value={dollars(view.bill.after)} />
-            <Row label="Estimated saving a year" value={`about ${dollars(view.bill.saving)}`} bold />
-            {view.paybackYears !== null && <Row label="Years for the saving to add up to the price" value={`about ${view.paybackYears}`} />}
-            <Text style={[s.small, { marginTop: 6 }]}>
-              {SAVING_NOTE} {ESTIMATE_NOTE}
-            </Text>
-            <Text style={[s.small, { marginTop: 4 }]}>
-              Worked out from: a {view.bill.assumed.interval} bill of {dollars(view.bill.assumed.amount)}, $
-              {view.bill.assumed.supplyPerDay.toFixed(2)} a day supply charge, ${view.bill.assumed.rate.toFixed(2)} a kWh, $
-              {view.bill.assumed.feedIn.toFixed(2)} a kWh feed-in, and {Math.round(view.bill.assumed.selfUseShare * 100)}% of solar used as
-              it is made.
-            </Text>
-          </View>
-        )}
+        {blocks
+          .filter((block) => block.id !== "cover")
+          .map((block, i) => {
+            const inner = content[block.id]();
+            const hasOwn = Boolean(block.words || block.image);
+            if (!inner && !hasOwn) return null;
+            const title = blockHeading(block, block.id === "about" ? `About ${b.name}` : block.id === "accept" ? "Going ahead" : "");
+            return (
+              <View key={block.id} style={i === 0 ? undefined : s.section}>
+                {title ? (
+                  <Text style={heading} minPresenceAhead={40}>
+                    {title}
+                  </Text>
+                ) : null}
+                {hasOwn ? own(block) : null}
+                {inner}
+              </View>
+            );
+          })}
         {footer}
       </Page>
-
-      <Page size="A4" style={s.page}>
-        <Text style={s.h2}>Your price</Text>
-        <Row label="Price, GST included" value={dollars(view.price.incGst)} />
-        <Row label="Less the federal rebate (estimate)" value={`- ${dollars(view.price.stc)}`} />
-        <View
-          style={[
-            s.row,
-            { borderBottomWidth: 0, backgroundColor: colour, paddingHorizontal: 10, paddingVertical: 10, borderRadius: 4, marginTop: 6 },
-          ]}
-        >
-          <Text style={{ color: onColour, fontFamily: "Helvetica-Bold" }}>You pay</Text>
-          <Text style={{ color: onColour, fontFamily: "Helvetica-Bold", fontSize: 14 }}>{dollars(view.price.youPay)}</Text>
-        </View>
-        <Text style={[s.small, { marginTop: 8 }]}>
-          Covers: {view.price.includes.join(", ")}. {STC_NOTE} The price stands until {day(view.validUntil)}.
-        </Text>
-        {view.price.solarVic ? (
-          <View style={{ marginTop: 14 }}>
-            <Text style={{ fontFamily: "Helvetica-Bold", marginBottom: 4 }}>With Solar Victoria, if you are eligible and approved</Text>
-            <Row label="Solar Victoria rebate" value={`- ${dollars(view.price.solarVic.rebate)}`} />
-            <Row label="You would pay" value={dollars(view.price.solarVic.afterRebate)} />
-            {view.price.solarVic.loan > 0 ? (
-              <>
-                <Row label="Solar Victoria interest-free loan" value={`- ${dollars(view.price.solarVic.loan)}`} />
-                <Row label="To pay up front" value={dollars(view.price.solarVic.upfront)} />
-                <Row
-                  label={`Then, for ${view.price.solarVic.loanMonths} months, with no interest`}
-                  value={`$${view.price.solarVic.monthly.toFixed(2)} a month`}
-                />
-              </>
-            ) : null}
-            <Text style={[s.small, { marginTop: 6 }]}>{view.price.solarVic.note}</Text>
-          </View>
-        ) : null}
-        {b.extra ? <Text style={{ marginTop: 14 }}>{b.extra}</Text> : null}
-
-        {(b.about || b.points.length > 0) && (
-          <View style={s.section}>
-            <Text style={s.h2}>About {b.name}</Text>
-            {b.about ? <Text>{b.about}</Text> : null}
-            {b.points.map((point) => (
-              <Text key={point} style={{ marginTop: 4 }}>
-                • {point}
-              </Text>
-            ))}
-          </View>
-        )}
-
-        <View style={s.section}>
-          <Text style={s.h2}>Going ahead</Text>
-          {accepted ? (
-            <View style={s.card}>
-              <Text style={{ fontFamily: "Helvetica-Bold" }}>Accepted by {accepted.name}</Text>
-              <Text style={s.small}>
-                on {day(accepted.at)}: &ldquo;{b.conditions ? ACCEPT_WITH_CONDITIONS : ACCEPT_LINE}&rdquo;
-              </Text>
-            </View>
-          ) : (
-            <Text>
-              To go ahead, open your proposal online and choose &ldquo;I&apos;d like to go ahead&rdquo;, or get in touch:{" "}
-              {contact || b.name}.
-            </Text>
-          )}
-          {b.address ? <Text style={[s.small, { marginTop: 10 }]}>{b.address}</Text> : null}
-        </View>
-        {footer}
-      </Page>
-
-      {b.conditions ? (
-        <Page size="A4" style={s.page}>
-          <Text style={s.h2}>Conditions</Text>
-          <Text style={{ fontSize: 8.5, lineHeight: 1.5 }}>{b.conditions}</Text>
-          {footer}
-        </Page>
-      ) : null}
     </Document>
   );
 }

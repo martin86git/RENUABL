@@ -6,6 +6,7 @@ import { DesignSettings, type PricePart } from "@/components/design/design-setti
 import { DesignShell } from "@/components/design/design-shell";
 import { settingBySlug } from "@/components/design/settings-list";
 import { SettingSoon, SettingsFrame } from "@/components/design/settings-nav";
+import { BillingPage, NeedsCosts, ProposalSettings, type ProposalPart } from "@/components/design/settings-proposal";
 
 export const metadata: Metadata = { title: "Settings", robots: { index: false, follow: false } };
 
@@ -17,7 +18,15 @@ const PRICES: Record<string, PricePart> = {
   margin: "margin",
   electricity: "electricity",
 };
-const BRAND: Record<string, "who" | "look" | "words"> = { company: "who", theme: "look", conditions: "words" };
+const BRAND: Record<string, "who" | "look" | "words"> = { company: "who", theme: "look", wording: "words" };
+const PROPOSAL: Record<string, ProposalPart> = {
+  payment: "payment",
+  warranty: "warranty",
+  "installation-time": "time",
+  conditions: "conditions",
+  "signed-emails": "emails",
+  customiser: "customiser",
+};
 
 /** One page of a business's settings, beside the settings' own nav. */
 export default async function DesignSettingPage({ params }: PageProps<"/design/settings/[section]">) {
@@ -32,9 +41,16 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
         {setting.soon ? (
           <SettingSoon label={setting.label} soon={setting.soon} />
         ) : section in PRICES ? (
-          <DesignSettings part={PRICES[section]} />
+          // The server sends no costs to someone who may not see them: they get a plain note in place of the page.
+          <NeedsCosts>
+            <DesignSettings part={PRICES[section]} />
+          </NeedsCosts>
         ) : section in BRAND ? (
           <BrandSettings part={BRAND[section]} />
+        ) : section in PROPOSAL ? (
+          <ProposalSettings part={PROPOSAL[section]} />
+        ) : section === "billing" ? (
+          <BillingPage />
         ) : (
           <DesignAccountPage />
         )}

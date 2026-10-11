@@ -73,10 +73,19 @@ describe.skipIf(!url)("roof designer businesses (database)", () => {
     expect(sam).toMatchObject({ businessId: a, role: "member", termsVersion: null });
     await repo.acceptTerms(a, "sam@alpha.test", BUSINESS_TERMS_VERSION);
     expect((await repo.memberByEmail("sam@alpha.test"))?.termsVersion).toBe(BUSINESS_TERMS_VERSION);
+    // A member starts able to do everything a member can: what they may do is the owner's to narrow.
+    const everything = { costs: true, prices: true, publish: true };
     expect(await repo.listMembers(a)).toEqual([
-      { email: "owner@alpha.test", role: "owner", joined: true },
-      { email: "sam@alpha.test", role: "member", joined: true },
+      { email: "owner@alpha.test", role: "owner", joined: true, permissions: everything },
+      { email: "sam@alpha.test", role: "member", joined: true, permissions: everything },
     ]);
+    // The owner narrows it; another business can't; and the owner's own are never changed.
+    expect(await repo.setPermissions(a, "sam@alpha.test", { costs: false, prices: false, publish: true })).toBe(true);
+    expect((await repo.memberByEmail("sam@alpha.test"))?.permissions).toEqual({ costs: false, prices: false, publish: true });
+    expect(await repo.setPermissions(b, "sam@alpha.test", { costs: true, prices: true, publish: true })).toBe(false);
+    expect(await repo.setPermissions(a, "owner@alpha.test", { costs: false, prices: false, publish: false })).toBe(false);
+    expect((await repo.memberByEmail("sam@alpha.test"))?.permissions.costs).toBe(false);
+    expect((await repo.memberByEmail("owner@alpha.test"))?.permissions).toEqual(everything);
     // Another business can't remove them, or accept terms for them; the owner can't be removed at all.
     expect(await repo.removeMember(b, "sam@alpha.test")).toBe(false);
     expect(await repo.removeMember(a, "owner@alpha.test")).toBe(false);

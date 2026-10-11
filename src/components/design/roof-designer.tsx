@@ -304,6 +304,11 @@ export function RoofDesigner(props: {
   onPublish?: () => Promise<string | null>;
   /** Where this roof's proposal is, once there is one. */
   proposalHref?: string | null;
+  /**
+   * The person may not see costs (the owner's setting, enforced on the server, which sends them no costs at all):
+   * no quote and no price are shown, and no price is handed on when saving.
+   */
+  costsHidden?: boolean;
   /** Told whenever the design gains or loses unsaved changes, so the page can ask before leaving it. */
   onUnsaved?: (unsaved: boolean) => void;
   /** The start of the bar at the top of the page (the wordmark and the address), and the way out, drawn by the page. */
@@ -344,7 +349,9 @@ export function RoofDesigner(props: {
   const [quotes, setQuotes] = useState<QuoteFields[]>(props.extras.quotes);
   // The price after STCs, as the quote builder last worked it out; null when there is nothing to price.
   const [net, setNet] = useState<number | null>(null);
-  const onNet = useCallback((value: number | null) => setNet(value), []);
+  // Someone who may not see costs has no real costs to price with: the quote's figure is never taken up.
+  const costsHidden = Boolean(props.costsHidden);
+  const onNet = useCallback((value: number | null) => setNet(costsHidden ? null : value), [costsHidden]);
   // The design someone has asked to delete, until they say they mean it.
   const [doomed, setDoomed] = useState<number | null>(null);
   const [faces, setFaces] = useState<Face[]>(first.faces);
@@ -1938,6 +1945,7 @@ export function RoofDesigner(props: {
           </div>
           <button
             onClick={toggleQuote}
+            hidden={costsHidden}
             aria-expanded={quoteOpen}
             title={quoteOpen ? "Close the quote: the picture takes the whole width" : "Open the quote beside the picture"}
             className={clsx(
@@ -1980,7 +1988,7 @@ export function RoofDesigner(props: {
       <div
         className={clsx(
           "mt-5 grid items-start gap-5",
-          quoteOpen && "xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]",
+          quoteOpen && !costsHidden && "xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]",
         )}
       >
         <div className="min-w-0">
@@ -4016,7 +4024,12 @@ export function RoofDesigner(props: {
           </aside>
         </div>
         {/* The quote stays worked out while it is closed (the figures above read its price); it is only out of sight. */}
-        <div className={clsx("xl:sticky xl:top-[4.5rem] xl:max-h-[calc(100dvh-5.5rem)] xl:overflow-y-auto", !quoteOpen && "hidden")}>
+        <div
+          className={clsx(
+            "xl:sticky xl:top-[4.5rem] xl:max-h-[calc(100dvh-5.5rem)] xl:overflow-y-auto",
+            (!quoteOpen || costsHidden) && "hidden",
+          )}
+        >
           <DesignQuote
             design={`Design ${active + 1}${active === primary ? " (primary)" : ""}`}
             spec={spec}
