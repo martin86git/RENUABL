@@ -42,7 +42,6 @@ export const PIPELINES: readonly Pipeline[] = [
   { id: "post-sale", name: "Post sale pipeline", stages: ["won", "ordered", "scheduled", "installed"] },
   // On the roof, and being finished off: inspection, the certificate, the grid connection, the rebates.
   { id: "post-installation", name: "Post installation pipeline", stages: ["installed", "inspection", "coes", "grid", "claimed"] },
-  { id: "all", name: "Every stage", stages: JOB_STAGES },
   { id: "lost", name: "Lost", stages: ["lost"] },
 ];
 
