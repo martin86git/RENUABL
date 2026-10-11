@@ -1765,7 +1765,7 @@ export function RoofDesigner(props: {
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
           and the address being designed; then which design this is and its quote on the left, and publishing it and
           its proposal on the right. A firmer line under it sets it off from the work below. */}
-      <header className="sticky top-0 z-30 -mx-4 border-b border-line-strong bg-canvas/95 px-4 text-ink backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <header className="sticky top-0 z-40 -mx-4 border-b border-line-strong bg-canvas/95 px-4 text-ink backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-2.5 lg:flex-nowrap">
           {props.bar}
           <dl className="flex min-w-0 flex-1 basis-56 items-center gap-x-6 overflow-hidden border-line lg:border-l lg:pl-5">
@@ -1807,7 +1807,7 @@ export function RoofDesigner(props: {
               {active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-hidden />}
             </button>
             {menu === "designs" && (
-              <div className="absolute right-0 top-full z-40 mt-2 max-h-[70vh] w-[24rem] max-w-[85vw] overflow-y-auto shadow-lift space-y-3 rounded-lg border border-line bg-surface p-3">
+              <div className="absolute left-0 top-full z-40 mt-2 max-h-[70vh] w-[24rem] max-w-[85vw] overflow-y-auto shadow-lift space-y-3 rounded-lg border border-line bg-surface p-3">
                 <ul className="space-y-1.5">
                   {everyDesign().map((d, i) => {
                     const sum = designSummary(d);
