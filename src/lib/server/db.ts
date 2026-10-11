@@ -265,6 +265,9 @@ create table if not exists design_activity (
 );
 create index if not exists design_activity_customer on design_activity(business_id, customer_id, at desc);
 create index if not exists design_activity_recent on design_activity(business_id, at desc);
+-- A customer's name in its two parts. Both empty on a customer kept before there were parts: read as the name split at its first space.
+alter table design_customers add column if not exists first_name text not null default '';
+alter table design_customers add column if not exists last_name text not null default '';
 -- System details typed in by hand on a deal, by key (domain/design/crm.ts DETAIL_KEYS).
 alter table design_jobs add column if not exists details jsonb not null default '{}'::jsonb;
 -- The pipelines a business has saved: a name for a run of stages, shared by its members.

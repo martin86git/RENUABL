@@ -26,7 +26,18 @@ import {
 import { ACTIVITY_WORD, StageTag } from "./design-home";
 import { PATHS, PageHead, ui } from "./design-shell";
 
-const BLANK: CustomerInput = { name: "", phone: "", email: "", address: "", lat: null, lng: null, source: "", notes: "" };
+const BLANK: CustomerInput = {
+  name: "",
+  firstName: "",
+  lastName: "",
+  phone: "",
+  email: "",
+  address: "",
+  lat: null,
+  lng: null,
+  source: "",
+  notes: "",
+};
 const addressLine = (a: Address) => [a.line, a.suburb, a.state, a.postcode].filter(Boolean).join(", ");
 
 /**
@@ -66,13 +77,34 @@ function AddressField(props: {
 /** A customer's details as boxes to fill in. Not a <form>: the address search inside it is one of its own. */
 function CustomerFields({ value, onChange, narrow }: { value: CustomerInput; onChange: (next: CustomerInput) => void; narrow?: boolean }) {
   const set = (name: keyof CustomerInput) => (e: { target: { value: string } }) => onChange({ ...value, [name]: e.target.value });
+  // The whole name follows its two parts.
+  const named = (part: "firstName" | "lastName") => (e: { target: { value: string } }) => {
+    const next = { ...value, [part]: e.target.value };
+    onChange({ ...next, name: `${next.firstName ?? ""} ${next.lastName ?? ""}`.trim() });
+  };
   return (
     <div className={narrow ? "grid gap-4" : "grid gap-4 sm:grid-cols-2"}>
       <label className={ui.label}>
-        Name
-        <input className={clsx(ui.input, "mt-1.5")} value={value.name} onChange={set("name")} maxLength={120} autoComplete="off" />
+        First name
+        <input
+          className={clsx(ui.input, "mt-1.5")}
+          value={value.firstName ?? ""}
+          onChange={named("firstName")}
+          maxLength={60}
+          autoComplete="off"
+        />
       </label>
       <label className={ui.label}>
+        Last name
+        <input
+          className={clsx(ui.input, "mt-1.5")}
+          value={value.lastName ?? ""}
+          onChange={named("lastName")}
+          maxLength={60}
+          autoComplete="off"
+        />
+      </label>
+      <label className={clsx(ui.label, !narrow && "sm:col-span-2")}>
         Where they came from
         <select className={clsx(ui.input, "mt-1.5 appearance-auto")} value={value.source} onChange={set("source")}>
           <option value="">Not said</option>
@@ -126,6 +158,10 @@ export function CustomersPage() {
   const [draft, setDraft] = useState<CustomerInput>(BLANK);
   const [saving, setSaving] = useState(false);
   const [addProblem, setAddProblem] = useState<string | null>(null);
+  // The customer just added, and the deal being offered for them.
+  const [deal, setDeal] = useState<{ customer: Customer; title: string; address: string; lat: number | null; lng: number | null } | null>(
+    null,
+  );
 
   useEffect(() => {
     let gone = false;
@@ -146,12 +182,32 @@ export function CustomersPage() {
   }, [customers, find]);
 
   const add = async () => {
-    if (draft.name.trim().length < 2) return setAddProblem("Enter the customer's name.");
+    if (!(draft.firstName ?? "").trim()) return setAddProblem("Enter the customer's first name.");
     setSaving(true);
-    const res = await createCustomer(draft);
+    // The customer alone: whether to start a deal for them is asked next.
+    const res = await createCustomer({ ...draft, deal: false });
     setSaving(false);
     if (!res.ok) return setAddProblem(res.message);
-    router.push(`${PATHS.customers}/${res.customer.id}`);
+    setAddProblem(null);
+    setAdding(false);
+    setDraft(BLANK);
+    setCustomers((now) => (now ? [{ ...res.customer, jobs: 0, stage: null }, ...now] : now));
+    const c = res.customer;
+    setDeal({ customer: c, title: "Solar", address: c.address, lat: c.lat, lng: c.lng });
+  };
+  const startDeal = async () => {
+    if (!deal) return;
+    setSaving(true);
+    const res = await createJob({
+      customerId: deal.customer.id,
+      title: deal.title.trim() || "Solar",
+      address: deal.address,
+      lat: deal.lat,
+      lng: deal.lng,
+    });
+    setSaving(false);
+    if (!res.ok) return setAddProblem(res.message);
+    router.push(`${PATHS.deals}/${res.job.id}`);
   };
 
   return (
@@ -189,6 +245,50 @@ export function CustomersPage() {
               }}
             >
               Cancel
+            </button>
+          </div>
+        </section>
+      )}
+
+      {deal && (
+        <section className={clsx(ui.card, "mt-6 border-l-[3px] border-sun-line p-5 sm:p-6")} aria-labelledby="new-deal">
+          <h2 id="new-deal" className="text-[17px] tracking-tight text-ink">
+            {deal.customer.name} is added. Create a deal for them?
+          </h2>
+          <p className="mt-1 text-sm text-ink-2">
+            A deal is the job you are quoting: it goes into your pipeline as a lead, and with an address found on the map its roof can be
+            designed straight away.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
+            <label className={ui.label}>
+              What it is
+              <input
+                className={clsx(ui.input, "mt-1.5")}
+                value={deal.title}
+                onChange={(e) => setDeal({ ...deal, title: e.target.value })}
+                maxLength={80}
+                placeholder="Solar, Battery…"
+              />
+            </label>
+            <div className={ui.label}>
+              Where
+              <AddressField value={deal.address} placed={deal.lat !== null} onChange={(place) => setDeal({ ...deal, ...place })} />
+            </div>
+          </div>
+          {addProblem && (
+            <p className="mt-3 text-sm text-danger" role="alert">
+              {addProblem}
+            </p>
+          )}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button className={ui.primary} onClick={startDeal} disabled={saving}>
+              {saving ? "Creating…" : "Create deal"}
+            </button>
+            <button className={ui.quiet} onClick={() => router.push(`${PATHS.customers}/${deal.customer.id}`)}>
+              Not now: open {deal.customer.firstName || "the customer"}
+            </button>
+            <button className={ui.quiet} onClick={() => setDeal(null)}>
+              Close
             </button>
           </div>
         </section>
@@ -385,6 +485,8 @@ export function CustomerPage({ id }: { id: string }) {
     const c = res.customer;
     setDraft({
       name: c.name,
+      firstName: c.firstName,
+      lastName: c.lastName,
       phone: c.phone,
       email: c.email,
       address: c.address,
@@ -401,7 +503,8 @@ export function CustomerPage({ id }: { id: string }) {
   }, [load]);
 
   const changed =
-    customer !== null && (["name", "phone", "email", "address", "source", "notes"] as const).some((k) => draft[k] !== customer[k]);
+    customer !== null &&
+    (["firstName", "lastName", "phone", "email", "address", "source", "notes"] as const).some((k) => draft[k] !== customer[k]);
 
   const save = async () => {
     setStatus("Saving…");

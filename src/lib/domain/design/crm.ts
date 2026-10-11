@@ -45,7 +45,10 @@ export const WRITTEN_KINDS = ["note", "call", "email"] as const;
 
 export interface Customer {
   id: string;
+  /** The whole name, as it is shown: the first and last names together. */
   name: string;
+  firstName: string;
+  lastName: string;
   phone: string;
   email: string;
   address: string;
@@ -162,9 +165,19 @@ function place(lat: unknown, lng: unknown): { lat: number | null; lng: number | 
 
 const PLACE_WRONG = "That address couldn't be placed on the map in Australia. Pick it from the list as you type, or leave the map out.";
 
-export type CustomerInput = Pick<Customer, "name" | "phone" | "email" | "address" | "lat" | "lng" | "source" | "notes">;
+export type CustomerInput = Pick<Customer, "name" | "phone" | "email" | "address" | "lat" | "lng" | "source" | "notes"> & {
+  /** The name in its two parts, when it was given that way. Without them the whole name is split at its first space. */
+  firstName?: string;
+  lastName?: string;
+};
 
-export const CUSTOMER_NAME_MISSING = "Enter the customer's name (2 to 120 characters).";
+/** A whole name in two parts: the first word, and the rest. */
+export function splitName(name: string): { firstName: string; lastName: string } {
+  const [first = "", ...rest] = name.trim().split(/\s+/);
+  return { firstName: first, lastName: rest.join(" ") };
+}
+
+export const CUSTOMER_NAME_MISSING = "Enter the customer's first name (their name needs 2 to 120 characters in all).";
 export const CUSTOMER_EMAIL_WRONG = "That email address doesn't look right. Check it, or leave it empty.";
 
 /**
@@ -174,8 +187,10 @@ export const CUSTOMER_EMAIL_WRONG = "That email address doesn't look right. Chec
 export function cleanCustomerInput(raw: unknown, current?: CustomerInput): Cleaned<CustomerInput> {
   const r = bag(raw);
   const sent = (key: string) => key in r;
-  const name = sent("name") || !current ? line(r.name, 120) : current.name;
-  if (name.length < 2) return { ok: false, message: CUSTOMER_NAME_MISSING };
+  // A name given as first and last is kept in its two parts, and the whole name is the two together.
+  const parts = sent("firstName") || sent("lastName") ? { firstName: line(r.firstName, 60), lastName: line(r.lastName, 60) } : null;
+  const name = parts ? `${parts.firstName} ${parts.lastName}`.trim() : sent("name") || !current ? line(r.name, 120) : current.name;
+  if (name.length < 2 || (parts && !parts.firstName)) return { ok: false, message: CUSTOMER_NAME_MISSING };
   const email = sent("email") || !current ? line(r.email, 200).toLowerCase() : current.email;
   if (email && !EMAIL.test(email)) return { ok: false, message: CUSTOMER_EMAIL_WRONG };
   const at = sent("lat") || sent("lng") || !current ? place(r.lat, r.lng) : { lat: current.lat, lng: current.lng };
@@ -184,6 +199,7 @@ export function cleanCustomerInput(raw: unknown, current?: CustomerInput): Clean
     ok: true,
     value: {
       name,
+      ...(parts ?? {}),
       phone: sent("phone") || !current ? line(r.phone, 30) : current.phone,
       email,
       address: sent("address") || !current ? line(r.address, 200) : current.address,

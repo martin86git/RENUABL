@@ -16,9 +16,10 @@ export async function GET() {
 }
 
 /**
- * POST { name, phone, email, address, lat, lng, source, notes }: a new
- * customer, checked first. With an address, their first job is made for it
- * (a lead called "Solar") and answered as `job`; without one `job` is null.
+ * POST { firstName, lastName (or name), phone, email, address, lat, lng,
+ * source, notes, deal? }: a new customer, checked first. With an address,
+ * their first job is made for it (a lead called "Solar") and answered as
+ * `job`; without one, or with `deal: false`, `job` is null.
  */
 export async function POST(request: Request) {
   return answer(async () => {
@@ -29,7 +30,8 @@ export async function POST(request: Request) {
     const customer = cleanCustomerInput(read.body);
     if (!customer.ok) return Response.json({ ok: false, message: customer.message }, { status: 422 });
     const { address, lat, lng } = customer.value;
-    const job = address ? cleanJobInput({ address, lat, lng }) : null;
+    // `deal: false` adds the customer alone: the screen then asks whether to start a deal for them.
+    const job = address && read.body.deal !== false ? cleanJobInput({ address, lat, lng }) : null;
     const made = await createCustomer(who.member.businessId, customer.value, job?.ok ? job.value : null, who.member.email);
     if (made === "full") return Response.json({ ok: false, message: CUSTOMERS_FULL }, { status: 422 });
     return Response.json({ ok: true, customer: made.customer, job: made.job });

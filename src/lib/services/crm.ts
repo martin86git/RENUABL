@@ -34,6 +34,8 @@ export type ActivityLine = Activity & { customerName: string };
 
 export interface CustomerInput {
   name: string;
+  firstName?: string;
+  lastName?: string;
   phone: string;
   email: string;
   address: string;
@@ -52,7 +54,8 @@ export interface Overview {
 }
 
 export const listCustomers = () => ask<{ customers: CustomerLine[] }>("/api/design/customers");
-export const createCustomer = (input: CustomerInput) =>
+/** A new customer. `deal: false` adds them alone, without the first job an address otherwise starts. */
+export const createCustomer = (input: CustomerInput & { deal?: boolean }) =>
   ask<{ customer: Customer; job: Job | null }>("/api/design/customers", { method: "POST", body: input });
 export const loadCustomer = (id: string) =>
   ask<{ customer: Customer; jobs: Job[]; activity: Activity[] }>(`/api/design/customers/${encodeURIComponent(id)}`);

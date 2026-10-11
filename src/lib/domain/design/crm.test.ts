@@ -18,6 +18,7 @@ import {
   cleanJobInput,
   cleanPipelineInput,
   customerStage,
+  splitName,
   stageMoveText,
   type CustomerInput,
   type JobInput,
@@ -82,6 +83,18 @@ describe("a customer as sent by a browser", () => {
     });
     for (const bad of [{}, { name: "" }, { name: " A " }, { name: 42 }, null, "Alex", []])
       expect(message(cleanCustomerInput(bad))).toBe(CUSTOMER_NAME_MISSING);
+  });
+  it("takes a name as first and last, and keeps both parts", () => {
+    expect(value(cleanCustomerInput({ firstName: " Mary Anne ", lastName: " Smith " }))).toMatchObject({
+      name: "Mary Anne Smith",
+      firstName: "Mary Anne",
+      lastName: "Smith",
+    });
+    expect(value(cleanCustomerInput({ firstName: "Cher", lastName: "" }))).toMatchObject({ name: "Cher", firstName: "Cher", lastName: "" });
+    expect(message(cleanCustomerInput({ firstName: "", lastName: "Smith" }))).toBe(CUSTOMER_NAME_MISSING);
+    // A whole name is split at its first space when its parts are needed.
+    expect(splitName("Alex  Example Jones")).toEqual({ firstName: "Alex", lastName: "Example Jones" });
+    expect(splitName("Cher")).toEqual({ firstName: "Cher", lastName: "" });
   });
   it("cuts everything to a length and strips markup and control characters", () => {
     const c = value(

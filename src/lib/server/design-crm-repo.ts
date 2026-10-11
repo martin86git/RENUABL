@@ -18,6 +18,7 @@ import {
   SAMPLE_CUSTOMERS,
   WON_STAGES,
   customerStage,
+  splitName,
   stageMoveText,
   type Activity,
   type Cleaned,
@@ -37,7 +38,10 @@ export type Q = Parameters<Parameters<typeof transaction>[0]>[0];
 /** A moment as the text the browser gets: "2026-10-10T03:15:00.000Z". */
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
-const CUSTOMER = `c.id, c.name, c.phone, c.email, c.address, c.lat, c.lng, c.source, c.notes, c.sample,
+const CUSTOMER = `c.id, c.name,
+  case when c.first_name = '' and c.last_name = '' then split_part(c.name, ' ', 1) else c.first_name end as "firstName",
+  case when c.first_name = '' and c.last_name = '' then btrim(substr(c.name, length(split_part(c.name, ' ', 1)) + 1)) else c.last_name end as "lastName",
+  c.phone, c.email, c.address, c.lat, c.lng, c.source, c.notes, c.sample,
   ${moment("c.created_at")} as "createdAt", ${moment("c.updated_at")} as "updatedAt"`;
 const JOB = `j.id, j.customer_id as "customerId", j.title, j.address, j.lat, j.lng, j.stage, j.project_id as "projectId",
   j.value::float8 as value, to_char(j.install_date, 'YYYY-MM-DD') as "installDate", j.details,
@@ -229,9 +233,23 @@ export async function createCustomer(
     if (Number(count[0]?.n ?? 0) >= MAX_CUSTOMERS) return "full";
     const id = newId("cus");
     await q(
-      `insert into design_customers (id, business_id, name, phone, email, address, lat, lng, source, notes, created_by)
-       values ($2,$1,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-      [businessId, id, input.name, input.phone, input.email, input.address, input.lat, input.lng, input.source, input.notes, who],
+      `insert into design_customers (id, business_id, name, phone, email, address, lat, lng, source, notes, created_by, first_name, last_name)
+       values ($2,$1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [
+        businessId,
+        id,
+        input.name,
+        input.phone,
+        input.email,
+        input.address,
+        input.lat,
+        input.lng,
+        input.source,
+        input.notes,
+        who,
+        input.firstName ?? splitName(input.name).firstName,
+        input.lastName ?? splitName(input.name).lastName,
+      ],
     );
     const job = firstJob ? await insertJob(q, businessId, id, firstJob, who) : null;
     const customer = await customerRow(q, businessId, id);
@@ -266,9 +284,28 @@ export async function customerDetail(
 
 export async function updateCustomer(businessId: string, id: string, input: CustomerInput): Promise<Customer | null> {
   const rows = await query(
-    `update design_customers set name = $3, phone = $4, email = $5, address = $6, lat = $7, lng = $8, source = $9, notes = $10, updated_at = now()
+    // The two parts of the name: as sent; else left as they are while the whole name is unchanged; else the new name split.
+    `update design_customers set
+        first_name = case when $11::text is not null then $11 when name = $3 then first_name else $13 end,
+        last_name = case when $12::text is not null then $12 when name = $3 then last_name else $14 end,
+        name = $3, phone = $4, email = $5, address = $6, lat = $7, lng = $8, source = $9, notes = $10, updated_at = now()
       where business_id = $1 and id = $2 returning id`,
-    [businessId, id, input.name, input.phone, input.email, input.address, input.lat, input.lng, input.source, input.notes],
+    [
+      businessId,
+      id,
+      input.name,
+      input.phone,
+      input.email,
+      input.address,
+      input.lat,
+      input.lng,
+      input.source,
+      input.notes,
+      input.firstName ?? null,
+      input.lastName ?? null,
+      splitName(input.name).firstName,
+      splitName(input.name).lastName,
+    ],
   );
   return rows.length ? customerRow(query, businessId, id) : null;
 }
