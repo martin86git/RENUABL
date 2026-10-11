@@ -160,22 +160,8 @@ const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
  * so they read as one family resting on the roof rather than as boxes stuck to it.
  */
 const GLASS = "rounded-2xl border border-line bg-surface/90 shadow-lift backdrop-blur-md";
-/** The dock's tools. The three used all the time come first, larger and named; the rest follow as icons. */
-const PRIMARY: Tool[] = ["select", "panel", "erase"];
-const SECONDARY: Tool[] = ["trace", "string", "rule", "label", "comment"];
-
-/** A tool's name as it is written in the dock. */
-const SHORT: Record<Tool, string> = {
-  select: "Select",
-  pan: "Pan",
-  trace: "Trace",
-  rule: "Guide",
-  panel: "Add panel",
-  string: "String",
-  label: "Label",
-  comment: "Comment",
-  erase: "Erase",
-};
+/** The dock's tools: the two that only annotate. The rest have pads of their own in the picture's top corners. */
+const SECONDARY: Tool[] = ["label", "comment"];
 
 /** Something picked on the drawing: a panel in a row, a panel placed by hand, or a label. */
 type Pick = { kind: "grid"; face: string; index: number } | { kind: "loose"; id: string } | { kind: "label"; id: string };
@@ -300,6 +286,26 @@ export function RoofDesigner(props: {
   // "Suggest a layout": how many panels to lay, and what came of asking.
   const [want, setWant] = useState(14);
   const [idea, setIdea] = useState<"idle" | "busy" | { note: string; bad?: boolean }>("idle");
+  // Whether the quote is open beside the picture. Closed, the picture has the whole width; the choice is kept on this device.
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  useEffect(() => {
+    try {
+      // Read once the page is in the browser.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (window.localStorage.getItem("renuabl.design.quote-open") === "1") setQuoteOpen(true);
+    } catch {
+      // Storage is off: the quote starts closed.
+    }
+  }, []);
+  const toggleQuote = () => {
+    const next = !quoteOpen;
+    setQuoteOpen(next);
+    try {
+      window.localStorage.setItem("renuabl.design.quote-open", next ? "1" : "0");
+    } catch {
+      // Nothing to do: it still opens and closes for this visit.
+    }
+  };
   // Whether "Suggest a layout" is asking how many panels.
   const [asking, setAsking] = useState(false);
   /** Takes up a tool, leaving behind anything half-drawn with the last one. */
@@ -1601,6 +1607,18 @@ export function RoofDesigner(props: {
                   : saved.error}
           </span>
           <button
+            onClick={toggleQuote}
+            aria-expanded={quoteOpen}
+            title={quoteOpen ? "Close the quote: the picture takes the whole width" : "Open the quote beside the picture"}
+            className={clsx(
+              "inline-flex h-10 items-center gap-2 rounded-md border px-4 text-sm font-medium tabular-nums",
+              quoteOpen ? "border-primary bg-surface-2 text-ink" : "border-line bg-surface text-ink hover:border-forest",
+            )}
+          >
+            <ReceiptText className="size-4" aria-hidden />
+            Quote{net !== null ? ` · ${dollars(net)}` : ""}
+          </button>
+          <button
             onClick={save}
             disabled={saved === "saved" || saved === "saving"}
             className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
@@ -1611,7 +1629,12 @@ export function RoofDesigner(props: {
         </div>
       </header>
 
-      <div className="mt-5 grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <div
+        className={clsx(
+          "mt-5 grid items-start gap-5",
+          quoteOpen && "xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]",
+        )}
+      >
         <div className="min-w-0">
           <div>
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
@@ -2302,7 +2325,7 @@ export function RoofDesigner(props: {
                     />
                   )}
                   {/* A scale bar: five metres on the ground, however far in the view is. */}
-                  <g transform={`translate(${view.x + view.w - 5 / scale - 40 * u} ${view.y + 16 * u})`}>
+                  <g transform={`translate(${view.x + 12 * u} ${view.y + view.h - 30 * u})`}>
                     <line x1="0" x2={5 / scale} y1="0" y2="0" stroke="#ffffff" strokeWidth={2 * u} />
                     <text x={5 / scale + 5 * u} y={3.5 * u} fill="#ffffff" fontSize={10 * u}>
                       5 m
@@ -2529,7 +2552,7 @@ export function RoofDesigner(props: {
               {/* On the picture, top right: the controls for whatever is picked. With nothing picked, the turn buttons for the rows of the face being worked on. */}
               {tool === "string" ? (
                 <div
-                  className="absolute right-2 top-[3.75rem] z-10 max-h-[calc(100%-9.5rem)] w-72 space-y-2 overflow-y-auto rounded-lg border border-line bg-surface p-3 shadow-lift"
+                  className="absolute right-3 top-[8rem] z-10 max-h-[calc(100%-13rem)] w-72 space-y-2 overflow-y-auto rounded-lg border border-line bg-surface p-3 shadow-lift"
                   role="group"
                   aria-label="Strings"
                 >
@@ -2639,7 +2662,7 @@ export function RoofDesigner(props: {
                 </div>
               ) : picks.length > 0 ? (
                 <div
-                  className="absolute right-2 top-[3.75rem] z-10 w-64 space-y-2 rounded-lg border border-line bg-surface p-3 shadow-lift"
+                  className="absolute right-3 top-[8rem] z-10 w-64 space-y-2 rounded-lg border border-line bg-surface p-3 shadow-lift"
                   role="group"
                   aria-label="What is picked"
                 >
@@ -2713,7 +2736,7 @@ export function RoofDesigner(props: {
               ) : (
                 face && (
                   <div
-                    className="absolute right-2 top-[3.75rem] flex items-center gap-1 rounded-lg border border-line bg-surface p-1.5 shadow-lift"
+                    className="absolute right-3 top-[8rem] flex items-center gap-1 rounded-lg border border-line bg-surface p-1.5 shadow-lift"
                     role="group"
                     aria-label="Turn the rows"
                   >
@@ -2733,14 +2756,16 @@ export function RoofDesigner(props: {
                 )
               )}
 
-              {/* The system, top left of the picture: which design this is, and its panel, inverter, battery and the customer's bill. Each opens its choices beneath it. */}
+              {/* The system, centred along the top of the picture. The kit is three rounds: the panel, the largest, in the middle,
+                  with the inverter and the battery as half-rounds growing out of it either side. The design and the
+                  customer's bill sit beside them as chips. Each opens its choices beneath it. */}
               <div
-                className={clsx(GLASS, "absolute left-2 top-2 z-20 flex max-w-[calc(100%-7rem)] flex-wrap items-center gap-0.5 p-1")}
+                className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2"
                 role="group"
                 aria-label="System"
                 ref={topBar}
               >
-                <div className="relative">
+                <div className="relative order-1">
                   <button
                     onClick={() => openMenu(menu === "designs" ? false : "designs")}
                     aria-expanded={menu === "designs"}
@@ -2748,8 +2773,9 @@ export function RoofDesigner(props: {
                     title={`Design ${active + 1} of ${designs.length}${active === primary ? " (primary)" : ""}${designLabel.trim() ? `: ${designLabel.trim()}` : ""}`}
                     aria-label={`Designs: design ${active + 1} of ${designs.length}`}
                     className={clsx(
-                      "flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium tabular-nums",
-                      menu === "designs" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
+                      GLASS,
+                      "flex h-10 items-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-medium tabular-nums",
+                      menu === "designs" ? "text-ink ring-2 ring-primary" : "text-ink hover:bg-surface",
                     )}
                   >
                     <Layers className="size-5" aria-hidden />
@@ -2759,7 +2785,7 @@ export function RoofDesigner(props: {
                     {active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-hidden />}
                   </button>
                   {menu === "designs" && (
-                    <div className="absolute left-0 top-full z-30 mt-1.5 max-h-[60vh] w-[24rem] max-w-[85vw] overflow-y-auto shadow-lift space-y-3 rounded-lg border border-line bg-surface p-3">
+                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-3 rounded-lg border border-line bg-surface p-3">
                       <ul className="space-y-1.5">
                         {everyDesign().map((d, i) => {
                           const sum = designSummary(d);
@@ -2844,22 +2870,22 @@ export function RoofDesigner(props: {
                     </div>
                   )}
                 </div>
-                <div className="relative">
+                <div className="relative z-10 order-3">
                   <button
                     onClick={() => openMenu(menu === "panels" ? false : "panels")}
                     aria-expanded={menu === "panels"}
                     aria-haspopup="true"
-                    title={`Panel: ${panel?.name ?? chosenPanel?.name ?? "Panel"}`}
+                    title={`Panels: ${summary.panels} × ${panel?.name ?? chosenPanel?.name ?? "panel"}`}
                     aria-label="The panel this design is drawn with"
                     className={clsx(
-                      "flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium tabular-nums",
-                      menu === "panels" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
+                      "flex size-16 flex-col items-center justify-center rounded-full border shadow-lift tabular-nums",
+                      menu === "panels" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
                     )}
                   >
                     {/* A solar panel, leaning as it does on a roof: frame, cells, and a stand. */}
                     <svg
                       viewBox="0 0 24 24"
-                      className="size-5"
+                      className="size-6"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="1.7"
@@ -2870,13 +2896,10 @@ export function RoofDesigner(props: {
                       <path d="M3.9 10h16.2M9.4 4 8 16M14.6 4 16 16" strokeWidth="1.2" />
                       <path d="M12 16v4M8.5 20h7" strokeLinecap="round" />
                     </svg>
-                    <span>Panels</span>
-                    <span className="text-ink-2">
-                      {summary.panels} × {size.watts} W
-                    </span>
+                    <span className="mt-0.5 text-[11px] font-medium leading-none">{summary.panels}</span>
                   </button>
                   {menu === "panels" && (
-                    <div className="absolute left-0 top-full z-30 mt-1.5 max-h-[60vh] w-[24rem] max-w-[85vw] overflow-y-auto shadow-lift space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2">
+                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2">
                       <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
                       {[
                         ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
@@ -2906,26 +2929,26 @@ export function RoofDesigner(props: {
                     </div>
                   )}
                 </div>
-                <div className="relative">
+                <div className="relative order-2 -mr-7">
                   <button
                     onClick={() => openMenu(menu === "inverters" ? false : "inverters")}
                     aria-expanded={menu === "inverters"}
                     aria-haspopup="true"
-                    title={fitted.length ? `Inverters: ${fitted.map((i) => i.name).join(" + ")}` : "Choose an inverter"}
+                    title={fitted.length ? `Inverter: ${fitted.map((i) => i.name).join(" + ")}` : "Inverter: choose one"}
                     aria-label="The inverters this design is drawn for"
                     className={clsx(
-                      "flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium tabular-nums",
-                      menu === "inverters" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
+                      "flex h-11 w-[4.25rem] items-center justify-start rounded-l-full border border-line pl-3 shadow-lift backdrop-blur-md",
+                      menu === "inverters"
+                        ? "bg-primary text-primary-ink"
+                        : fitted.length
+                          ? "bg-surface/90 text-ink hover:bg-surface"
+                          : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                     )}
                   >
                     <Zap className="size-5" aria-hidden />
-                    <span>Inverter</span>
-                    <span className={fitted.length ? "text-ink-2" : "text-muted"}>
-                      {fitted.length ? `${fitted.length > 1 ? `${fitted.length} × · ` : ""}${fittedKw} kW` : ""}
-                    </span>
                   </button>
                   {menu === "inverters" && (
-                    <div className="absolute left-0 top-full z-30 mt-1.5 max-h-[60vh] w-[24rem] max-w-[85vw] overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
                       <p className={clsx(label, "px-2 py-1")}>On this design</p>
                       {fitted.length === 0 && (
                         <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
@@ -3048,24 +3071,26 @@ export function RoofDesigner(props: {
                     </div>
                   )}
                 </div>
-                <div className="relative">
+                <div className="relative order-4 -ml-7">
                   <button
                     onClick={() => openMenu(menu === "batteries" ? false : "batteries")}
                     aria-expanded={menu === "batteries"}
                     aria-haspopup="true"
-                    title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Choose a battery"}
+                    title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Battery: add one"}
                     aria-label="The battery on this design"
                     className={clsx(
-                      "flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium tabular-nums",
-                      menu === "batteries" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
+                      "flex h-11 w-[4.25rem] items-center justify-end rounded-r-full border border-line pr-3 shadow-lift backdrop-blur-md",
+                      menu === "batteries"
+                        ? "bg-primary text-primary-ink"
+                        : battery
+                          ? "bg-surface/90 text-ink hover:bg-surface"
+                          : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                     )}
                   >
                     <BatteryCharging className="size-5" aria-hidden />
-                    <span>Battery</span>
-                    {battery && <span className="text-ink-2">{batteryKwh} kWh</span>}
                   </button>
                   {menu === "batteries" && (
-                    <div className="absolute left-0 top-full z-30 mt-1.5 max-h-[60vh] w-[24rem] max-w-[85vw] overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
                       <p className={clsx(label, "px-2 py-1")}>On this design</p>
                       {battery ? (
                         <div className="rounded-md bg-canvas px-2 py-2">
@@ -3151,7 +3176,7 @@ export function RoofDesigner(props: {
                     </div>
                   )}
                 </div>
-                <div className="relative">
+                <div className="relative order-5">
                   <button
                     onClick={() => openMenu(menu === "bill" ? false : "bill")}
                     aria-expanded={menu === "bill"}
@@ -3165,12 +3190,13 @@ export function RoofDesigner(props: {
                       Number(bill.amount) > 0 ? "The customer's electricity bill" : "The customer's electricity bill: not entered yet"
                     }
                     className={clsx(
-                      "relative flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium tabular-nums",
+                      GLASS,
+                      "flex h-10 items-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-medium tabular-nums",
                       menu === "bill"
-                        ? "bg-surface-2 text-ink"
+                        ? "text-ink ring-2 ring-primary"
                         : Number(bill.amount) > 0
-                          ? "text-ink hover:bg-canvas"
-                          : "bg-sun text-sun-ink ring-1 ring-sun-line",
+                          ? "text-ink hover:bg-surface"
+                          : "!border-sun-line !bg-sun text-sun-ink",
                     )}
                   >
                     <ReceiptText className="size-5" aria-hidden />
@@ -3180,7 +3206,7 @@ export function RoofDesigner(props: {
                     {!(Number(bill.amount) > 0) && menu !== "bill" && <span className="size-2 rounded-full bg-sun-line" aria-hidden />}
                   </button>
                   {menu === "bill" && (
-                    <div className="absolute left-0 top-full z-30 mt-1.5 max-h-[60vh] w-[24rem] max-w-[85vw] overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-3">
+                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-3">
                       <p className={label}>The customer&apos;s electricity bill</p>
                       <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium">
                         <label>
@@ -3254,6 +3280,91 @@ export function RoofDesigner(props: {
                   )}
                 </div>
               </div>
+              {/* The pad, in the top left corner: the select arrow in a circle of its own, since it is the tool every other
+                  is left for, with two smaller half-rounds growing out of it for the two things done most with it:
+                  add a panel (to its right) and erase (beneath it). */}
+              <div className="absolute left-3 top-3 z-20 size-[6.75rem]" role="toolbar" aria-label="Select, add a panel, erase">
+                <button
+                  onClick={() => pickTool("panel")}
+                  title="Add a panel"
+                  aria-label="Add a panel"
+                  aria-pressed={tool === "panel"}
+                  className={clsx(
+                    "absolute left-10 top-2.5 flex h-11 w-[4.25rem] items-center justify-end rounded-r-full border border-line pr-3 shadow-lift backdrop-blur-md",
+                    tool === "panel" ? "bg-primary text-primary-ink" : "bg-surface/90 text-ink hover:bg-surface",
+                  )}
+                >
+                  <SquarePlus className="size-5" aria-hidden />
+                </button>
+                <button
+                  onClick={() => pickTool("erase")}
+                  title="Erase"
+                  aria-label="Erase"
+                  aria-pressed={tool === "erase"}
+                  className={clsx(
+                    "absolute left-2.5 top-10 flex h-[4.25rem] w-11 items-end justify-center rounded-b-full border border-line pb-3 shadow-lift backdrop-blur-md",
+                    tool === "erase" ? "bg-primary text-primary-ink" : "bg-surface/90 text-ink hover:bg-surface",
+                  )}
+                >
+                  <Eraser className="size-5" aria-hidden />
+                </button>
+                <button
+                  onClick={() => pickTool("select")}
+                  title="Select"
+                  aria-label="Select"
+                  aria-pressed={tool === "select"}
+                  className={clsx(
+                    "absolute left-0 top-0 flex size-16 items-center justify-center rounded-full border shadow-lift",
+                    tool === "select" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
+                  )}
+                >
+                  <MousePointer2 className="size-7" aria-hidden />
+                </button>
+              </div>
+              {/* The second pad, in the top right corner, the mirror of the first: stringing the panels in its circle, with
+                  tracing a roof face (to its left) and the guide line (beneath it) as its half-rounds. */}
+              <div
+                className="absolute right-3 top-3 z-20 size-[6.75rem]"
+                role="toolbar"
+                aria-label="String panels, trace a roof face, guide line"
+              >
+                <button
+                  onClick={() => pickTool("trace")}
+                  title="Trace a roof face"
+                  aria-label="Trace a roof face"
+                  aria-pressed={tool === "trace"}
+                  className={clsx(
+                    "absolute right-10 top-2.5 flex h-11 w-[4.25rem] items-center justify-start rounded-l-full border border-line pl-3 shadow-lift backdrop-blur-md",
+                    tool === "trace" ? "bg-primary text-primary-ink" : "bg-surface/90 text-ink hover:bg-surface",
+                  )}
+                >
+                  <PenTool className="size-5" aria-hidden />
+                </button>
+                <button
+                  onClick={() => pickTool("rule")}
+                  title="Guide line"
+                  aria-label="Guide line"
+                  aria-pressed={tool === "rule"}
+                  className={clsx(
+                    "absolute right-2.5 top-10 flex h-[4.25rem] w-11 items-end justify-center rounded-b-full border border-line pb-3 shadow-lift backdrop-blur-md",
+                    tool === "rule" ? "bg-primary text-primary-ink" : "bg-surface/90 text-ink hover:bg-surface",
+                  )}
+                >
+                  <Ruler className="size-5" aria-hidden />
+                </button>
+                <button
+                  onClick={() => pickTool("string")}
+                  title="String panels"
+                  aria-label="String panels"
+                  aria-pressed={tool === "string"}
+                  className={clsx(
+                    "absolute right-0 top-0 flex size-16 items-center justify-center rounded-full border shadow-lift",
+                    tool === "string" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
+                  )}
+                >
+                  <Cable className="size-7" aria-hidden />
+                </button>
+              </div>
               {/* Getting about, on the left edge, out of the way of the work: the hand that moves the picture, the zoom,
                   and undo and redo. One quiet column, the same place every time. */}
               <div
@@ -3309,9 +3420,8 @@ export function RoofDesigner(props: {
                   <Redo2 className="size-[18px]" aria-hidden />
                 </button>
               </div>
-              {/* The dock: one place for the tools, centred along the foot of the picture in the room beside Suggest a layout, clear of the map's own mark and
-                  credit at the very bottom. The three used all the time (the arrow, add a panel, the eraser) come first,
-                  larger and named; the occasional ones follow as icons. */}
+              {/* The dock: the occasional tools, as icons, centred along the foot of the picture in the room beside Suggest a
+                  layout, clear of the map's own mark and credit at the very bottom. */}
               <div className="pointer-events-none absolute inset-x-2 bottom-7 z-10 flex items-end gap-2">
                 <span className="flex-1" aria-hidden />
                 <div
@@ -3319,25 +3429,6 @@ export function RoofDesigner(props: {
                   role="toolbar"
                   aria-label="Design tools"
                 >
-                  {PRIMARY.map((t) => {
-                    const { icon: Icon, name } = TOOLS.find((x) => x.tool === t)!;
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => pickTool(t)}
-                        title={name}
-                        aria-pressed={tool === t}
-                        className={clsx(
-                          "flex h-11 items-center gap-2 whitespace-nowrap rounded-xl px-3.5 text-sm font-medium",
-                          tool === t ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
-                        )}
-                      >
-                        <Icon className="size-5" aria-hidden />
-                        {SHORT[t]}
-                      </button>
-                    );
-                  })}
-                  <span className="mx-1 h-7 w-px shrink-0 bg-line" aria-hidden />
                   {SECONDARY.map((t) => {
                     const { icon: Icon, name } = TOOLS.find((x) => x.tool === t)!;
                     return (
@@ -3578,7 +3669,8 @@ export function RoofDesigner(props: {
             )}
           </aside>
         </div>
-        <div className="xl:sticky xl:top-[4.5rem] xl:max-h-[calc(100dvh-5.5rem)] xl:overflow-y-auto">
+        {/* The quote stays worked out while it is closed (the figures above read its price); it is only out of sight. */}
+        <div className={clsx("xl:sticky xl:top-[4.5rem] xl:max-h-[calc(100dvh-5.5rem)] xl:overflow-y-auto", !quoteOpen && "hidden")}>
           <DesignQuote
             design={`Design ${active + 1}${active === primary ? " (primary)" : ""}`}
             spec={spec}

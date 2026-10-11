@@ -2,7 +2,7 @@ import { inAustralia } from "@/lib/server/google-solar";
 import { allow } from "@/lib/server/rate-limit";
 import { satelliteImage } from "@/lib/server/roof-view";
 
-/** GET ?lat=&lng=: the satellite image the roof designer draws on (640 × 480, the size its geometry is worked out for). */
+/** GET ?lat=&lng=: the satellite image the roof designer draws on (640 × 400, the size its geometry is worked out for). */
 export async function GET(request: Request) {
   const u = new URL(request.url);
   const lat = Number(u.searchParams.get("lat"));

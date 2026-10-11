@@ -219,19 +219,13 @@ export function DesignStudio() {
                 </Link>
               )}
               {/* Another roof, without leaving the designer. */}
-              <div className="w-64 shrink-0 xl:w-80">
+              <div className="w-52 shrink-0 2xl:w-72">
                 <AddressEntry compact placeholder="Search another address" onPick={pick} />
               </div>
             </>
           }
           back={
             <>
-              <Link
-                href="/design/settings"
-                className="tap-area shrink-0 text-[13px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
-              >
-                Prices and settings
-              </Link>
               <DesignAccountLink />
             </>
           }
