@@ -17,6 +17,7 @@ import {
 import { systemDetails, type DealDetail } from "@/lib/domain/design/deal";
 import { addActivity, deleteJob, dollars, loadCustomer, loadDealDesign, loadJob, saveJob, shortDate } from "@/lib/services/crm";
 import { ACTIVITY_WORD, StageTag } from "./design-home";
+import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
 
 type Written = "note" | "call" | "email";
@@ -26,6 +27,7 @@ const FILTERS: { key: "all" | ActivityKind; label: string }[] = [
   { key: "email", label: "Emails" },
   { key: "call", label: "Calls" },
   { key: "stage", label: "Stage moves" },
+  { key: "proposal", label: "Proposal" },
 ];
 
 /** A block of the left-hand column that folds away, with its lines one under the next: a quiet label over its value. */
@@ -242,6 +244,9 @@ export function DealPage({ id }: { id: string }) {
             </p>
           )}
         </div>
+
+        {/* The proposal worked out from this deal's design: whether one is out, and the way to preview and send it. */}
+        <DealProposal jobId={job.id} hasDesign={Boolean(job.projectId)} />
 
         <Block title="Deal details">
           <label className="block text-xs text-muted">

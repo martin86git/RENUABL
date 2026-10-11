@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  Palette,
   CircleUserRound,
   HardHat,
   LayoutDashboard,
@@ -32,6 +33,7 @@ export const PATHS = {
   customers: "/design/customers",
   designer: "/design/roof",
   settings: "/design/settings",
+  brand: "/design/settings/brand",
   account: "/design/account",
   signIn: "/design/sign-in",
 } as const;
@@ -128,7 +130,9 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
     );
   }
 
-  const within = (href: string) => (href === PATHS.home ? path === href : path === href || path.startsWith(`${href}/`));
+  // The overview and the settings have pages beneath them that are their own entries here, so each is lit only on its own page.
+  const within = (href: string) =>
+    href === PATHS.home || href === PATHS.settings ? path === href : path === href || path.startsWith(`${href}/`);
   const active = (href: string, also: string[] = []) => [href, ...also].some(within);
   const item = (href: string, label: string, Icon: LucideIcon, also?: string[], main?: boolean) => (
     <Link
@@ -224,6 +228,7 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
         )}
         <span className="hidden flex-1 lg:block" aria-hidden />
         {item(PATHS.settings, "Prices and settings", SlidersHorizontal)}
+        {account.signedIn && item(PATHS.brand, "Proposal branding", Palette)}
         {item(PATHS.account, account.business?.name ?? "Your account", CircleUserRound)}
         {!compact && (
           <div className="hidden px-3 pt-2 lg:block">

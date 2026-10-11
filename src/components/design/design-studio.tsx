@@ -21,8 +21,10 @@ import {
   saveRoofWork,
   type DesignRoof,
   savedLabel,
+  whereKept,
 } from "@/lib/services/design-store";
 import { loadJob, saveJob } from "@/lib/services/crm";
+import { NEEDS_ACCOUNT, NO_DEAL, proposalScreen, publishFromDesigner } from "@/lib/services/proposals";
 import { DesignKeptNote, DesignRoofList } from "./design-account";
 import { RoofDesigner } from "./roof-designer";
 
@@ -202,6 +204,12 @@ export function DesignStudio() {
             if (!problem && onJob && net !== null) void saveJob(onJob.id, { value: net });
             return problem;
           }}
+          // Publish: the design has just been saved. With a deal, its proposal is worked out again from it on the server.
+          // Without one there is no customer to send a proposal to, and signed out there is no business to send it from.
+          onPublish={async () =>
+            onJob ? publishFromDesigner(onJob.id) : (await whereKept().catch(() => "device")) === "account" ? NO_DEAL : NEEDS_ACCOUNT
+          }
+          proposalHref={onJob ? proposalScreen(onJob.id) : null}
           savedLabel={kept}
           onUnsaved={noteUnsaved}
           bar={
