@@ -149,14 +149,13 @@ const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
 ];
 
 /**
- * The work goes in four steps, left to right, and each shows only its own tools: the roof's faces, then the
- * panels on them, then the wiring and what the panels feed, then the quote. Selecting, moving the picture and
+ * The work goes in three steps, left to right, and each shows only its own tools: the roof (its faces and the
+ * panels on them, which are one job), then the wiring and what the panels feed, then the quote. Selecting, moving the picture and
  * commenting belong to every step. Any step can be opened at any time: the order is a guide, not a gate.
  */
-type Step = "roof" | "panels" | "electrical" | "quote";
+type Step = "roof" | "electrical" | "quote";
 const STEPS: { step: Step; name: string; tools: Tool[] }[] = [
-  { step: "roof", name: "Roof", tools: ["select", "pan", "trace", "rule", "comment"] },
-  { step: "panels", name: "Panels", tools: ["select", "pan", "panel", "comment"] },
+  { step: "roof", name: "Roof", tools: ["select", "pan", "trace", "panel", "rule", "comment"] },
   { step: "electrical", name: "Electrical", tools: ["select", "pan", "string", "label", "comment"] },
   { step: "quote", name: "Quote", tools: ["select", "pan", "comment"] },
 ];
@@ -165,7 +164,7 @@ const STEPS: { step: Step; name: string; tools: Tool[] }[] = [
 const SHORT: Record<Tool, string> = {
   select: "Select",
   pan: "Pan",
-  trace: "Trace face",
+  trace: "Trace",
   rule: "Guide",
   panel: "Add panel",
   string: "String",
@@ -293,8 +292,8 @@ export function RoofDesigner(props: {
   // The battery or the inverter under the pointer: its details show beside it.
   const [kit, setKit] = useState<"battery" | number | null>(null);
   const [tool, setTool] = useState<Tool>("select");
-  // Which of the four steps is open: a roof with nothing on it starts at the roof.
-  const [step, setStep] = useState<Step>(first.faces.length || (first.loose ?? []).length ? "panels" : "roof");
+  // Which of the three steps is open.
+  const [step, setStep] = useState<Step>("roof");
   // "Suggest a layout": how many panels to lay, and what came of asking.
   const [want, setWant] = useState(14);
   const [idea, setIdea] = useState<"idle" | "busy" | { note: string; bad?: boolean }>("idle");
@@ -1431,7 +1430,7 @@ export function RoofDesigner(props: {
   };
   /**
    * A first layout from Google's roof model, set down as panels placed by hand. It replaces what is on the design
-   * (asked first), and opens the panels step with the new panels picked, ready to be nudged.
+   * (asked first), and leaves the new panels picked, ready to be nudged.
    */
   const suggestLayout = async () => {
     if ((faces.length || loose.length) && !window.confirm("Replace the roof faces and panels on this design with a suggested layout?"))
@@ -1454,7 +1453,6 @@ export function RoofDesigner(props: {
       setSelected(null);
       setPicks(made.map((p): Pick => ({ kind: "loose", id: p.id })));
       changed();
-      setStep("panels");
       setTool("select");
       setIdea({
         note: `${made.length} panels suggested from the roof's shape. Check them against the picture, then move, turn or remove any.`,
@@ -1629,12 +1627,11 @@ export function RoofDesigner(props: {
                       onClick={() => void suggestLayout()}
                       disabled={idea === "busy"}
                       title="A first layout from the roof's shape, to check and adjust"
-                      className="flex h-9 items-center gap-1.5 rounded-md border border-sun-line px-2.5 text-[13px] font-medium text-sun-ink hover:bg-sun disabled:border-line disabled:bg-surface-2 disabled:text-muted"
+                      className="flex h-9 items-center gap-1.5 rounded-md border border-sun-line px-2 text-[13px] font-medium text-sun-ink hover:bg-sun disabled:border-line disabled:bg-surface-2 disabled:text-muted"
                     >
                       <WandSparkles className="size-[18px]" aria-hidden /> {idea === "busy" ? "Looking at the roof…" : "Suggest a layout"}
                     </button>
-                    <label className="mr-1 flex items-center gap-1.5 text-xs text-muted">
-                      of
+                    <label className="mr-1 flex items-center" title="How many panels to suggest">
                       <input
                         type="number"
                         min={1}
@@ -1642,43 +1639,40 @@ export function RoofDesigner(props: {
                         value={want}
                         onChange={(e) => setWant(Math.max(1, Math.min(MAX_SUGGESTED, Math.round(Number(e.target.value) || 1))))}
                         aria-label="How many panels to suggest"
-                        className="h-9 w-14 rounded-md border border-line bg-surface px-2 text-sm text-ink outline-none focus:border-forest"
+                        className="h-9 w-12 rounded-md border border-line bg-surface px-2 text-sm text-ink outline-none focus:border-forest"
                       />
-                      panels
                     </label>
+                    <button
+                      onClick={() => {
+                        // The face being worked on gets every place in its rows back; with no face yet, tracing one comes first.
+                        if (face) update(face.id, { off: [] });
+                        else if (faces.length) setSelected(faces[0].id);
+                        else setTool("trace");
+                      }}
+                      title={
+                        face
+                          ? "Put a panel in every place on this roof face"
+                          : faces.length
+                            ? "Pick a roof face to fill"
+                            : "Trace a roof face first"
+                      }
+                      className="flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-ink hover:bg-canvas"
+                    >
+                      <WandSparkles className="size-[18px]" aria-hidden /> Fill face
+                    </button>
                   </>
-                )}
-                {step === "panels" && (
-                  <button
-                    onClick={() => {
-                      // The face being worked on gets every place in its rows back; with no face yet, that starts at the roof.
-                      if (face) update(face.id, { off: [] });
-                      else if (faces.length) setSelected(faces[0].id);
-                      else goStep("roof");
-                    }}
-                    title={
-                      face
-                        ? "Put a panel in every place on this roof face"
-                        : faces.length
-                          ? "Pick a roof face to fill"
-                          : "Trace a roof face first"
-                    }
-                    className="flex h-9 items-center gap-1.5 rounded-md border border-sun-line px-2.5 text-[13px] font-medium text-sun-ink hover:bg-sun"
-                  >
-                    <WandSparkles className="size-[18px]" aria-hidden /> Fill this face
-                  </button>
                 )}
                 {step === "electrical" && (
                   <>
                     <button
                       onClick={() => openMenu("inverters")}
-                      className="flex h-9 items-center gap-1.5 rounded-md border border-sun-line px-2.5 text-[13px] font-medium text-sun-ink hover:bg-sun"
+                      className="flex h-9 items-center gap-1.5 rounded-md border border-sun-line px-2 text-[13px] font-medium text-sun-ink hover:bg-sun"
                     >
                       <Zap className="size-[18px]" aria-hidden /> {fitted.length ? "Inverter" : "Choose inverter"}
                     </button>
                     <button
                       onClick={() => openMenu("batteries")}
-                      className="flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium text-ink hover:bg-canvas"
+                      className="flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-ink hover:bg-canvas"
                     >
                       <BatteryCharging className="size-[18px]" aria-hidden /> {battery ? "Battery" : "Add battery"}
                     </button>
@@ -1687,7 +1681,7 @@ export function RoofDesigner(props: {
                 {step === "quote" && (
                   <button
                     onClick={() => openMenu("bill")}
-                    className="flex h-9 items-center gap-1.5 rounded-md border border-sun-line px-2.5 text-[13px] font-medium text-sun-ink hover:bg-sun"
+                    className="flex h-9 items-center gap-1.5 rounded-md border border-sun-line px-2 text-[13px] font-medium text-sun-ink hover:bg-sun"
                   >
                     <ReceiptText className="size-[18px]" aria-hidden /> Customer&apos;s bill
                   </button>
@@ -1703,20 +1697,23 @@ export function RoofDesigner(props: {
                     aria-pressed={tool === t}
                     title={name}
                     className={clsx(
-                      "flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[13px] font-medium",
+                      "flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium",
                       tool === t ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                     )}
                   >
-                    <Icon className="size-[18px]" aria-hidden /> {SHORT[t]}
+                    <Icon className="size-[18px]" aria-hidden />
+                    {/* The tools every step has are known by their icon; a step's own tools are named. */}
+                    {t === "select" || t === "pan" || t === "comment" ? <span className="sr-only">{SHORT[t]}</span> : SHORT[t]}
                   </button>
                 ))}
                 <span className="flex-1" aria-hidden />
                 {step !== "quote" && (
                   <button
                     onClick={() => goStep(STEPS[STEPS.findIndex((x) => x.step === step) + 1].step)}
-                    className="flex h-9 items-center rounded-md border border-line px-3 text-[13px] font-medium text-ink hover:border-forest"
+                    title={`Next: ${STEPS[STEPS.findIndex((x) => x.step === step) + 1].name}`}
+                    className="flex h-9 shrink-0 items-center rounded-md border border-line px-3 text-[13px] font-medium text-ink hover:border-forest"
                   >
-                    Next: {STEPS[STEPS.findIndex((x) => x.step === step) + 1].name.toLowerCase()}
+                    Next ›
                   </button>
                 )}
               </div>
