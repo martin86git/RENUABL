@@ -32,7 +32,7 @@ export function StageTag({ stage }: { stage: JobStage }) {
 }
 
 /** What someone did, in a word. */
-export const ACTIVITY_WORD = { note: "Note", call: "Call", email: "Email", stage: "Stage" } as const;
+export const ACTIVITY_WORD = { note: "Note", call: "Call", email: "Email", stage: "Stage", proposal: "Proposal" } as const;
 
 const POINTS = [
   { icon: PenTool, title: "Design", body: "See the roof from above, lay out the panels and check the strings against the inverter." },

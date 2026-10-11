@@ -34,7 +34,7 @@ export const WON_STAGES: readonly JobStage[] = ["won", "installed"];
 /** Where a customer came from: the choices offered. Any short text is kept, so a business can type its own. */
 export const LEAD_SOURCES = ["Referral", "Website", "Phone call", "Walk-in", "Advertising", "Other"] as const;
 
-export const ACTIVITY_KINDS = ["note", "call", "email", "stage"] as const;
+export const ACTIVITY_KINDS = ["note", "call", "email", "stage", "proposal"] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 /** The kinds a person writes. "stage" is written by the server when a job moves. */
 export const WRITTEN_KINDS = ["note", "call", "email"] as const;

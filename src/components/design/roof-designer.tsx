@@ -47,6 +47,7 @@ import type { RebateRates } from "@/lib/domain/rebates";
 import { DesignQuote } from "./design-quote";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { MAX_SUGGESTED, suggestPanels } from "@/lib/domain/design/suggest";
+import { systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import {
@@ -58,7 +59,6 @@ import {
   ROOF_IMAGE,
   angleOfLongestEdge,
   applyCommentOp,
-  arrayCount,
   designPanels,
   designSummary,
   faceArea,
@@ -75,7 +75,6 @@ import {
   panelOf,
   panelPlaces,
   stringIsMixed,
-  tiltedPanels,
   type DesignBattery,
   type DesignComment,
   type DesignSet,
@@ -729,9 +728,6 @@ export function RoofDesigner(props: {
   };
   const summary = useMemo(() => designSummary(design, props.yieldPerKwDay), [design, props.yieldPerKwDay]);
   const year = useMemo(() => monthlyProduction(design, props.yieldPerKwDay), [design, props.yieldPerKwDay]);
-  // For the quote: the separate arrays on the roof, and the panels drawn at a tilt.
-  const arrays = useMemo(() => arrayCount(design), [design]);
-  const tilts = useMemo(() => tiltedPanels(design), [design]);
   const centres = useMemo(() => Object.fromEntries(designPanels(design).map((p) => [p.key, middle(p.corners)])), [design]);
   const face = faces.find((f) => f.id === selected) ?? null;
   const isPicked = (pick: Pick) => picks.some((p) => same(p, pick));
@@ -1611,16 +1607,12 @@ export function RoofDesigner(props: {
         )
       : null;
   const dollars = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
-  const panelName = panel?.name ?? chosenPanel?.name ?? "Panels";
-  const spec: SystemSpec = {
-    panels: summary.panels,
-    panel: { sku: chosen, name: panelName, watts: size.watts, short: size.short },
-    inverters: fitted.map((i) => ({ sku: i.sku, name: i.name })),
-    battery: battery ? { sku: battery.sku, name: battery.name, kwh: battery.kwh, qty: battery.qty } : null,
-    arrays,
-    tiltedPanels: tilts.count,
-    tiltDegrees: tilts.steepest,
-  };
+  // The system as the quote reads it. Worked out in the domain (systemSpecOf), so a published proposal reads the design the same way.
+  const firstListed = props.catalogue[0];
+  const spec: SystemSpec = useMemo(
+    () => systemSpecOf({ ...design, inverters: fitted, battery }, firstListed),
+    [design, fitted, battery, firstListed],
+  );
   // Panels beyond 133% of the inverters: a warning over the picture, unless a battery is on the design.
   const oversize = arrayOversize(summary.kw, fittedKw, Boolean(battery));
   // A string that has been started and has no panel yet.

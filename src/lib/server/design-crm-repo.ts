@@ -32,7 +32,7 @@ import {
 } from "@/lib/domain/design/crm";
 import { newId, query, transaction } from "./db";
 
-type Q = Parameters<Parameters<typeof transaction>[0]>[0];
+export type Q = Parameters<Parameters<typeof transaction>[0]>[0];
 
 /** A moment as the text the browser gets: "2026-10-10T03:15:00.000Z". */
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -48,7 +48,8 @@ const ACTIVITY = `a.id, a.customer_id as "customerId", a.job_id as "jobId", a.ki
 const keyOf = (at: { lat: number | null; lng: number | null }) =>
   at.lat === null || at.lng === null ? null : roofKey({ lat: at.lat, lng: at.lng });
 
-async function record(
+/** Writes one line on a customer's record, inside the transaction it is given. Shared with the proposals. */
+export async function record(
   q: Q,
   businessId: string,
   o: { customerId: string; jobId: string | null; kind: ActivityKind; text: string; by: string; minutesAgo?: number },

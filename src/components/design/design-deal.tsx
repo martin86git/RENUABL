@@ -26,6 +26,7 @@ const FILTERS: { key: "all" | ActivityKind; label: string }[] = [
   { key: "email", label: "Emails" },
   { key: "call", label: "Calls" },
   { key: "stage", label: "Stage moves" },
+  { key: "proposal", label: "Proposal" },
 ];
 
 /** A block of the left-hand column that folds away, with its lines one under the next: a quiet label over its value. */

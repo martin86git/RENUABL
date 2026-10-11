@@ -278,6 +278,60 @@ create table if not exists design_pipelines (
   unique (business_id, id)
 );
 create index if not exists design_pipelines_business on design_pipelines(business_id, created_at);
+-- Proposals (server/design-proposal-repo.ts): a business's branding, the pictures it has put up, and what it has sent.
+-- design_brand: one row a business. design_files: its logo, cover and photos, made safe and small before they are kept;
+-- a picture taken out of the brand kit is only marked removed, so a proposal already sent keeps its pictures.
+create table if not exists design_brand (
+  business_id text primary key references businesses(id) on delete cascade,
+  kit jsonb not null,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+create table if not exists design_files (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  kind text not null,
+  content_type text not null,
+  bytes bytea not null,
+  width integer not null,
+  height integer not null,
+  created_by text,
+  created_at timestamptz not null default now(),
+  removed_at timestamptz,
+  unique (business_id, id)
+);
+create index if not exists design_files_business on design_files(business_id, kind, created_at);
+-- design_proposals: one for a job, with the private link's token. design_proposal_versions: each publishing, a fixed copy.
+-- "view" is what the customer may see; "internal" (costs, margin) is the business's record and is never read by the public routes.
+create table if not exists design_proposals (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  customer_id text not null,
+  token text unique not null,
+  withdrawn_at timestamptz,
+  questions integer not null default 0,
+  created_by text,
+  created_at timestamptz not null default now(),
+  unique (business_id, id),
+  unique (business_id, job_id),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create table if not exists design_proposal_versions (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  proposal_id text not null,
+  version integer not null,
+  view jsonb not null,
+  internal jsonb not null,
+  published_by text not null,
+  published_at timestamptz not null default now(),
+  opened_at timestamptz,
+  accepted_at timestamptz,
+  accepted_name text,
+  unique (proposal_id, version),
+  foreign key (business_id, proposal_id) references design_proposals(business_id, id) on delete cascade
+);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,
