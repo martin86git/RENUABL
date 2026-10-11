@@ -7,6 +7,8 @@ import {
   CircleUserRound,
   HardHat,
   LayoutDashboard,
+  ChevronLeft,
+  ChevronRight,
   PenTool,
   SlidersHorizontal,
   SquareKanban,
@@ -64,7 +66,8 @@ const NAV: NavItem[] = [
  * The frame every signed-in screen sits in: the product's sections down the
  * left (Overview, Customers, Sales with its Pipelines, Installations, and the
  * Design tool in orange, as the main tool), with the business's settings
- * and account at its foot. `compact` keeps only the icons, for the design
+ * and account at its foot. The sections can be folded down to icons and opened
+ * out again (kept on the device). `compact` keeps only the icons, for the design
  * tool, where the roof needs the room. On a phone the sections run across the
  * top instead. Signed out, a screen that needs an account (`needsAccount`)
  * asks for one; the others (the design tool, its settings) are shown bare, as
@@ -78,7 +81,30 @@ export function DesignShell(props: { children: React.ReactNode; compact?: boolea
   );
 }
 
-function Shell({ children, compact, needsAccount }: { children: React.ReactNode; compact?: boolean; needsAccount?: boolean }) {
+/** Whether this person keeps the sections folded down to icons, on their device. */
+const FOLDED = "renuabl.design.nav-folded";
+
+function Shell({ children, compact: tool, needsAccount }: { children: React.ReactNode; compact?: boolean; needsAccount?: boolean }) {
+  // The sections can be folded down to their icons, as they always are on the design tool, and opened out again.
+  const [folded, setFolded] = useState(false);
+  useEffect(() => {
+    try {
+      // What was chosen last time is only known once the page is in the browser.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFolded(window.localStorage.getItem(FOLDED) === "1");
+    } catch {
+      // Opened out, then.
+    }
+  }, []);
+  const fold = (to: boolean) => {
+    setFolded(to);
+    try {
+      window.localStorage.setItem(FOLDED, to ? "1" : "0");
+    } catch {
+      // It still holds for this visit.
+    }
+  };
+  const compact = tool || folded;
   const [account] = useDesignAccount();
   const path = usePathname();
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
@@ -149,6 +175,18 @@ function Shell({ children, compact, needsAccount }: { children: React.ReactNode;
           )}
           {compact && <Wordmark className="text-[16px] lg:hidden" />}
         </Link>
+        {/* The little arrow beside the wordmark, on the nav's edge: folds the sections down to icons, and opens them out. */}
+        {!tool && (
+          <button
+            onClick={() => fold(!folded)}
+            title={folded ? "Open out the sections" : "Fold the sections down to icons"}
+            aria-label={folded ? "Open out the sections" : "Fold the sections down to icons"}
+            aria-expanded={!folded}
+            className="absolute -right-3 top-[1.05rem] hidden size-6 items-center justify-center rounded-full bg-surface text-ink-2 shadow-[var(--shadow-soft)] ring-1 ring-line hover:text-ink hover:ring-ink-2 lg:flex"
+          >
+            {folded ? <ChevronRight className="size-3.5" aria-hidden /> : <ChevronLeft className="size-3.5" aria-hidden />}
+          </button>
+        )}
         {NAV.map((n) =>
           // A section with subsections is a heading over them: the subsection carries the mark of where you are.
           n.under && !compact ? (
@@ -195,7 +233,7 @@ function Shell({ children, compact, needsAccount }: { children: React.ReactNode;
         )}
       </nav>
       <div className="relative min-w-0 flex-1">
-        {!compact && <NowWidget />}
+        {!tool && <NowWidget />}
         {children}
       </div>
     </div>
