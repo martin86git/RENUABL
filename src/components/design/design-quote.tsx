@@ -49,7 +49,7 @@ export function DesignQuote(props: {
   const { spec, workspace, rates } = props;
   const empty = spec.panels === 0;
   const costing = costSystem(spec, form, workspace);
-  const stc = stcValue(costing, /^d{4}$/.test(form.postcode) ? form.postcode : null, todayInMarket(), rates, workspace.settings.stcPrice);
+  const stc = stcValue(costing, /^\d{4}$/.test(form.postcode) ? form.postcode : null, todayInMarket(), rates, workspace.settings.stcPrice);
 
   const all = costing.lines;
   const lines = editedLines(all, edits);
