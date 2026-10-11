@@ -17,9 +17,9 @@ import { Document, Image, Page, Polygon, Rect, StyleSheet, Svg, Text, View, rend
 import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
 import { contrast, inkOn, shownAbn, shownBsb, shownWebsite } from "@/lib/domain/design/brand";
 import {
-  ACCEPT_LINE,
-  ACCEPT_WITH_CONDITIONS,
   BANK_NOTE,
+  acceptLine,
+  contractDetails,
   ESTIMATE_NOTE,
   NO_SUNSHINE_NOTE,
   PRODUCTION_NOTE,
@@ -320,7 +320,7 @@ function ProposalDocument({
           <View style={s.card}>
             <Text style={{ fontFamily: "Helvetica-Bold" }}>Accepted by {accepted.name}</Text>
             <Text style={s.small}>
-              on {day(accepted.at)}: &ldquo;{b.conditions ? ACCEPT_WITH_CONDITIONS : ACCEPT_LINE}&rdquo;
+              on {day(accepted.at)}: &ldquo;{acceptLine(view)}&rdquo;
             </Text>
           </View>
         ) : (
@@ -331,6 +331,54 @@ function ProposalDocument({
         {b.address ? <Text style={[s.small, { marginTop: 10 }]}>{b.address}</Text> : null}
       </View>
     ),
+    // The standard terms and conditions, printed in full: the details of this agreement, the consumer information, the terms.
+    terms: () => {
+      const contract = view.contract;
+      if (!contract) return null;
+      const details = contractDetails(view);
+      const small = { fontSize: 8.5, lineHeight: 1.5 };
+      const bold = { fontFamily: "Helvetica-Bold", marginTop: 10, marginBottom: 3 };
+      return (
+        <View>
+          <Text style={bold}>Details</Text>
+          {details.rows.map((row) => (
+            <View key={row.label} style={[s.row, { alignItems: "flex-start" }]}>
+              <Text style={[s.muted, { width: "38%" }]}>{row.label}</Text>
+              <Text style={{ width: "60%", textAlign: "right" }}>{row.value}</Text>
+            </View>
+          ))}
+          <Text style={[small, { marginTop: 8 }]}>The documents that make up this agreement, in the order they apply:</Text>
+          {details.documents.map((document, i) => (
+            <Text key={document} style={small}>
+              {i + 1}. {document}
+            </Text>
+          ))}
+          <Text style={bold}>{contract.netcc.heading}</Text>
+          <Text style={small}>{contract.netcc.intro}</Text>
+          {contract.netcc.guides.map((guide) => (
+            <Text key={guide} style={small}>
+              • {guide}
+            </Text>
+          ))}
+          <Text style={small}>
+            The guides are at {contract.netcc.url}. {contract.netcc.seller}
+          </Text>
+          {contract.terms.map((part) => (
+            <View key={part.heading}>
+              <Text style={bold} minPresenceAhead={30}>
+                {part.heading}
+              </Text>
+              {part.clauses.map((clause) => (
+                <Text key={clause} style={[small, { marginBottom: 4 }]}>
+                  {clause}
+                </Text>
+              ))}
+            </View>
+          ))}
+          <Text style={[s.small, { marginTop: 8 }]}>Terms version {contract.version}.</Text>
+        </View>
+      );
+    },
     conditions: () => (b.conditions ? <Text style={{ fontSize: 8.5, lineHeight: 1.5 }}>{b.conditions}</Text> : null),
   };
 

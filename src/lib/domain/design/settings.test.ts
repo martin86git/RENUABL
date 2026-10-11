@@ -234,7 +234,7 @@ describe("the proposal's blocks", () => {
     expect(own.words).toHaveLength(1500);
     // Anything at all still comes back as the full, usual list.
     for (const junk of [null, "blocks", 5, {}, []]) expect(cleanBlocks(junk)).toEqual(defaultBlocks());
-    expect(BLOCKS.filter((b) => isLocked(b.id)).map((b) => b.id)).toEqual(["cover", "price", "accept", "conditions"]);
+    expect(BLOCKS.filter((b) => isLocked(b.id)).map((b) => b.id)).toEqual(["cover", "price", "accept", "conditions", "terms"]);
   });
   it("move up and down, never above the cover or off the end", () => {
     const blocks = defaultBlocks();
@@ -245,7 +245,10 @@ describe("the proposal's blocks", () => {
     ).toEqual(["cover", "roof", "system", "production"]);
     expect(moveBlock(blocks, "system", -1)).toEqual(blocks);
     expect(moveBlock(blocks, "cover", 1)).toEqual(blocks);
+    // The standard terms close the proposal: they don't move, and nothing moves below them.
+    expect(blocks[blocks.length - 1].id).toBe("terms");
     expect(moveBlock(blocks, "conditions", 1)).toEqual(blocks);
+    expect(moveBlock(blocks, "terms", -1)).toEqual(blocks);
     expect(
       moveBlock(blocks, "system", 1)
         .map((b) => b.id)

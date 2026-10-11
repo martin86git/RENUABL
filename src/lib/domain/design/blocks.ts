@@ -61,15 +61,35 @@ export const BLOCKS = [
     about: "Your special conditions, which the customer accepts when going ahead.",
     locked: true,
   },
-] as const satisfies readonly { id: string; name: string; heading: string; about: string; locked?: boolean; custom?: boolean }[];
+  {
+    id: "terms",
+    name: "Standard terms and conditions",
+    heading: "Terms and conditions",
+    about:
+      "The contract details, the New Energy Tech consumer information and the standard terms. Switched on or off under Standard terms and conditions, and never reworded here.",
+    locked: true,
+    fixed: true,
+  },
+] as const satisfies readonly {
+  id: string;
+  name: string;
+  heading: string;
+  about: string;
+  locked?: boolean;
+  custom?: boolean;
+  fixed?: boolean;
+}[];
 
 export type BlockId = (typeof BLOCKS)[number]["id"];
 
 const known = (id: unknown): id is BlockId => BLOCKS.some((b) => b.id === id);
-const kind = (id: BlockId) => BLOCKS.find((b) => b.id === id) as { id: BlockId; locked?: boolean; custom?: boolean; heading: string };
+const kind = (id: BlockId) =>
+  BLOCKS.find((b) => b.id === id) as { id: BlockId; locked?: boolean; custom?: boolean; fixed?: boolean; heading: string };
 
 /** Whether a block always shows. */
 export const isLocked = (id: BlockId) => Boolean(kind(id).locked);
+/** Whether a block is fixed: always last, and never given a heading, words or a picture of the business's own (the standard terms). */
+export const isFixed = (id: BlockId) => Boolean(kind(id).fixed);
 /** Whether a block is one of the business's own (shown only when it has something in it). */
 export const isCustom = (id: BlockId) => Boolean(kind(id).custom);
 
@@ -88,7 +108,9 @@ export interface BlockSetting {
 
 /** The blocks as every business starts: all the usual ones on, in the usual order, its own three off. */
 export function defaultBlocks(): BlockSetting[] {
-  return BLOCKS.map((b) => ({ id: b.id, on: !("custom" in b), heading: "", words: "", image: null }));
+  const all: BlockSetting[] = BLOCKS.map((b) => ({ id: b.id, on: !("custom" in b), heading: "", words: "", image: null }));
+  // The standard terms close the proposal.
+  return [...all.filter((b) => !isFixed(b.id)), ...all.filter((b) => isFixed(b.id))];
 }
 
 const text = (raw: unknown, max: number, lines: boolean) =>
@@ -108,7 +130,8 @@ const text = (raw: unknown, max: number, lines: boolean) =>
  * The blocks as sent by a browser, made whole: each known block once, in the
  * order sent (any left out go after, in their usual order), the cover always
  * first, the ones that can't be switched off always on, and nothing kept
- * that isn't a block. Whatever is sent, the answer is a full, valid list.
+ * that isn't a block. The standard terms are always last and carry no words
+ * of the business's own. Whatever is sent, the answer is a full, valid list.
  */
 export function cleanBlocks(raw: unknown): BlockSetting[] {
   const seen = new Set<BlockId>();
@@ -120,20 +143,22 @@ export function cleanBlocks(raw: unknown): BlockSetting[] {
     out.push({
       id: e.id,
       on: isLocked(e.id) || (e.on === undefined ? !isCustom(e.id) : e.on === true),
-      heading: text(e.heading, 80, false),
-      words: text(e.words, 1500, true),
-      image: typeof e.image === "string" && /^img_[a-f0-9]{8,64}$/.test(e.image) ? e.image : null,
+      heading: isFixed(e.id) ? "" : text(e.heading, 80, false),
+      words: isFixed(e.id) ? "" : text(e.words, 1500, true),
+      image: !isFixed(e.id) && typeof e.image === "string" && /^img_[a-f0-9]{8,64}$/.test(e.image) ? e.image : null,
     });
   }
   for (const block of defaultBlocks()) if (!seen.has(block.id)) out.push(block);
-  return [...out.filter((b) => b.id === "cover"), ...out.filter((b) => b.id !== "cover")];
+  // The cover opens the proposal and the standard terms close it, whatever order was sent.
+  const middle = out.filter((b) => b.id !== "cover" && !isFixed(b.id));
+  return [...out.filter((b) => b.id === "cover"), ...middle, ...out.filter((b) => isFixed(b.id))];
 }
 
-/** The list with one block moved a place up or down. The cover stays first, and nothing moves above it. */
+/** The list with one block moved a place up or down. The cover stays first and the standard terms last: nothing moves past either. */
 export function moveBlock(blocks: readonly BlockSetting[], id: BlockId, by: -1 | 1): BlockSetting[] {
   const from = blocks.findIndex((b) => b.id === id);
   const to = from + by;
-  if (from < 1 || to < 1 || to >= blocks.length) return [...blocks];
+  if (from < 1 || to < 1 || to >= blocks.length || isFixed(blocks[from].id) || isFixed(blocks[to].id)) return [...blocks];
   const next = [...blocks];
   [next[from], next[to]] = [next[to], next[from]];
   return next;

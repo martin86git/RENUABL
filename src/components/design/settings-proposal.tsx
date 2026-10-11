@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2, Upload } from "lucide-react";
 import clsx from "clsx";
-import { BLOCKS, isCustom, isLocked, moveBlock, type BlockSetting } from "@/lib/domain/design/blocks";
+import { BLOCKS, isCustom, isFixed, isLocked, moveBlock, type BlockSetting } from "@/lib/domain/design/blocks";
 import {
   GST_MODES,
   INSTALL_TIMES,
@@ -14,12 +14,13 @@ import {
   type BrandKit,
   type Milestone,
 } from "@/lib/domain/design/brand";
+import { NETCC_INFORMATION, STANDARD_TERMS_VERSION, fillTerms } from "@/lib/domain/design/standard-terms";
 import { designAccount, type DesignAccount } from "@/lib/services/design-account";
 import { addBrandImage, brandImageUrl, loadBrand, removeBrandImage, saveBrand } from "@/lib/services/proposals";
 import { ui } from "./design-shell";
 import { settingsPath } from "./settings-list";
 
-export type ProposalPart = "payment" | "warranty" | "time" | "conditions" | "emails" | "customiser";
+export type ProposalPart = "payment" | "warranty" | "time" | "conditions" | "terms" | "emails" | "customiser";
 
 const TITLES: Record<ProposalPart, { title: string; intro: string }> = {
   payment: {
@@ -40,6 +41,11 @@ const TITLES: Record<ProposalPart, { title: string; intro: string }> = {
     title: "Special conditions",
     intro:
       "Conditions of your own that go on every proposal. A customer going ahead accepts them, so they can't be switched off in the customiser.",
+  },
+  terms: {
+    title: "Standard terms and conditions",
+    intro:
+      "A ready-made contract for your proposals, with the New Energy Tech consumer information. Your own special conditions stay separate and come first.",
   },
   emails: {
     title: "Signed proposal emails",
@@ -117,6 +123,8 @@ export function ProposalSettings({ part }: { part: ProposalPart }) {
         <Timing brand={brand} save={save} />
       ) : part === "conditions" ? (
         <Conditions brand={brand} save={save} />
+      ) : part === "terms" ? (
+        <StandardTerms brand={brand} save={save} />
       ) : part === "emails" ? (
         <Emails brand={brand} save={save} emailReady={emailReady} />
       ) : (
@@ -441,6 +449,86 @@ function Conditions({ brand, save }: PartProps) {
   );
 }
 
+/** The standard terms: on or off, whether the business says it is an Approved Seller, and the wording as its customers will read it. */
+function StandardTerms({ brand, save }: PartProps) {
+  const terms = fillTerms({ seller: brand.name, customer: "your customer" });
+  return (
+    <>
+      <section className={section}>
+        <div className="rounded-md border border-sun-line bg-sun p-3 text-sm leading-relaxed text-sun-ink" role="note">
+          <p className="font-medium">A draft that has not had legal review</p>
+          <p className="mt-1">
+            This wording (version {STANDARD_TERMS_VERSION}) has not been checked by a lawyer. You are responsible for the terms you send
+            your customers: have them reviewed before you rely on them, or switch them off and use your own under Special conditions.
+          </p>
+        </div>
+        <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 accent-[var(--primary)]"
+            checked={brand.standardTerms}
+            onChange={(e) => void save({ standardTerms: e.target.checked })}
+          />
+          <span>
+            <span className="block font-medium">Put the standard terms and conditions on every proposal</span>
+            <span className="block text-xs text-muted">
+              On the proposal they sit at the end behind &ldquo;Read the terms and conditions&rdquo;, and the box a customer ticks to go
+              ahead says they accept them. The PDF prints them in full. A proposal already sent keeps the terms it was sent with.
+            </span>
+          </span>
+        </label>
+        <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 accent-[var(--primary)]"
+            checked={brand.netccApproved}
+            onChange={(e) => void save({ netccApproved: e.target.checked })}
+          />
+          <span>
+            <span className="block font-medium">We are a New Energy Tech Approved Seller</span>
+            <span className="block text-xs text-muted">
+              Tick it only if you are. We don&apos;t check it: it only changes one line of the consumer information, which otherwise tells
+              the customer to ask you.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      <section className={section} aria-labelledby="terms-preview">
+        <h2 id="terms-preview" className={h2}>
+          As your customer will read them
+        </h2>
+        <p className="text-xs text-muted">
+          With your business&apos;s name in. Each proposal also opens them with its own details (the customer, the property, the system, the
+          price, your installation time and warranty), taken from that proposal. The wording can&apos;t be changed here.
+        </p>
+        <div className="max-h-[32rem] space-y-4 overflow-y-auto rounded-md border border-line bg-surface-2 p-4 text-[13px] leading-relaxed text-ink">
+          <div>
+            <p className="font-semibold">{NETCC_INFORMATION.heading}</p>
+            <p className="mt-1">{NETCC_INFORMATION.intro}</p>
+            <p className="mt-1">
+              {NETCC_INFORMATION.guides.join(" · ")}. {NETCC_INFORMATION.url.replace(/^https?:\/\//, "")}
+            </p>
+            <p className="mt-1">
+              {brand.netccApproved ? NETCC_INFORMATION.approvedSeller.replaceAll("{seller}", brand.name) : NETCC_INFORMATION.notStated}
+            </p>
+          </div>
+          {terms.map((part) => (
+            <div key={part.heading}>
+              <p className="font-semibold">{part.heading}</p>
+              {part.clauses.map((clause) => (
+                <p key={clause} className="mt-1">
+                  {clause}
+                </p>
+              ))}
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
 function Emails({ brand, save, emailReady }: PartProps & { emailReady: boolean }) {
   return (
     <section className={section}>
@@ -562,7 +650,7 @@ function Customiser({
                     type="button"
                     className="flex size-9 items-center justify-center rounded-md text-ink-2 hover:bg-surface-2 disabled:text-line-strong disabled:hover:bg-transparent"
                     aria-label={`Move ${kind.name} up`}
-                    disabled={i <= 1}
+                    disabled={i <= 1 || isFixed(block.id)}
                     onClick={() => void save({ blocks: moveBlock(blocks, block.id, -1) })}
                   >
                     <ArrowUp className="size-4" aria-hidden />
@@ -571,20 +659,27 @@ function Customiser({
                     type="button"
                     className="flex size-9 items-center justify-center rounded-md text-ink-2 hover:bg-surface-2 disabled:text-line-strong disabled:hover:bg-transparent"
                     aria-label={`Move ${kind.name} down`}
-                    disabled={i === 0 || i === blocks.length - 1}
+                    disabled={i === 0 || i === blocks.length - 1 || isFixed(block.id) || isFixed(blocks[i + 1].id)}
                     onClick={() => void save({ blocks: moveBlock(blocks, block.id, 1) })}
                   >
                     <ArrowDown className="size-4" aria-hidden />
                   </button>
                 </div>
-                <button
-                  type="button"
-                  className={clsx(ui.quiet, "h-9 px-3")}
-                  aria-expanded={isOpen}
-                  onClick={() => setOpen(isOpen ? null : block.id)}
-                >
-                  {isOpen ? "Close" : "Edit"}
-                </button>
+                {/* The standard terms are never reworded here: their own page switches them on or off. */}
+                {isFixed(block.id) ? (
+                  <Link href={settingsPath("terms")} className={clsx(ui.quiet, "h-9 px-3")}>
+                    {brand.standardTerms ? "On" : "Off"}
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className={clsx(ui.quiet, "h-9 px-3")}
+                    aria-expanded={isOpen}
+                    onClick={() => setOpen(isOpen ? null : block.id)}
+                  >
+                    {isOpen ? "Close" : "Edit"}
+                  </button>
+                )}
               </div>
               {isOpen && (
                 <div className="mt-4 space-y-3 border-t border-line pt-4">

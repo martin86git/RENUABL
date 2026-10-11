@@ -190,6 +190,10 @@ export interface BrandKit {
   installTime: InstallTime;
   /** Extra addresses of the business's own, told when a customer accepts a proposal. */
   notify: string[];
+  /** Whether every proposal carries RENUABL's standard terms and conditions (`standard-terms.ts`). On until the business says otherwise. */
+  standardTerms: boolean;
+  /** The business says it is a New Energy Tech Approved Seller. We don't check it: it only chooses which line the consumer information carries. */
+  netccApproved: boolean;
   /** The proposal's blocks: which show, in what order, with what heading, words and picture. */
   blocks: BlockSetting[];
   template: TemplateId;
@@ -223,6 +227,8 @@ export function defaultBrand(businessName: string): BrandKit {
     warrantyWords: "",
     installTime: "",
     notify: [],
+    standardTerms: true,
+    netccApproved: false,
     blocks: defaultBlocks(),
     template: "classic",
     palette: "paper",
@@ -423,6 +429,9 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
       warrantyWords: sent("warrantyWords") ? paragraphs(r.warrantyWords, 3000) : current.warrantyWords,
       installTime: INSTALL_TIMES.some((t) => t.id === r.installTime) ? (r.installTime as InstallTime) : current.installTime,
       notify: notify.value,
+      // A switch is only ever moved by an explicit true or false.
+      standardTerms: typeof r.standardTerms === "boolean" ? r.standardTerms : current.standardTerms,
+      netccApproved: typeof r.netccApproved === "boolean" ? r.netccApproved : current.netccApproved,
       blocks: sent("blocks") ? cleanBlocks(r.blocks) : current.blocks,
       template: TEMPLATES.some((t) => t.id === r.template) ? (r.template as TemplateId) : current.template,
       palette: PALETTES.some((p) => p.id === r.palette) ? (r.palette as PaletteId) : current.palette,

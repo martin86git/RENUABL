@@ -24,6 +24,7 @@ const PROPOSAL: Record<string, ProposalPart> = {
   warranty: "warranty",
   "installation-time": "time",
   conditions: "conditions",
+  terms: "terms",
   "signed-emails": "emails",
   customiser: "customiser",
 };

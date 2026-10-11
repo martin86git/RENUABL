@@ -447,6 +447,7 @@ describe("the customer's link", () => {
         "bill",
         "blocks",
         "business",
+        "contract",
         "customer",
         "note",
         "paybackYears",

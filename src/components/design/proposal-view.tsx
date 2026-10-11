@@ -6,9 +6,9 @@ import { Download } from "lucide-react";
 import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
 import { shownAbn, shownBsb, shownWebsite, themeVars } from "@/lib/domain/design/brand";
 import {
-  ACCEPT_LINE,
-  ACCEPT_WITH_CONDITIONS,
   BANK_NOTE,
+  acceptLine,
+  contractDetails,
   ESTIMATE_NOTE,
   NO_SUNSHINE_NOTE,
   PRODUCTION_NOTE,
@@ -155,7 +155,7 @@ function GoAhead({ view, state, accepted, actions }: Pick<ProposalPageProps, "vi
   const [question, setQuestion] = useState("");
   const [asked, setAsked] = useState<{ ok: boolean; text: string } | null>(null);
   const b = view.business;
-  const line = b.conditions ? ACCEPT_WITH_CONDITIONS : ACCEPT_LINE;
+  const line = acceptLine(view);
 
   if (state === "accepted")
     return (
@@ -503,6 +503,56 @@ export function ProposalPage({ view, state, accepted, urls, actions }: ProposalP
     "custom-2": () => null,
     "custom-3": () => null,
     accept: () => <GoAhead view={view} state={state} accepted={accepted} actions={actions} />,
+    // The standard terms and conditions, when the business has them on: the details of this agreement (from the
+    // proposal's own figures), the consumer information, then the terms as they stood when it was published. Closed
+    // until asked for; the tick to go ahead refers to them.
+    terms: () => {
+      const contract = view.contract;
+      if (!contract) return null;
+      const details = contractDetails(view);
+      return (
+        <details className={card}>
+          <summary className="cursor-pointer text-[15px] font-medium text-ink">Read the terms and conditions</summary>
+          <h3 className="mt-5 text-[15px] font-semibold text-ink">Details</h3>
+          <div className="mt-2">
+            {details.rows.map((row) => (
+              <Line key={row.label} label={row.label} value={row.value} />
+            ))}
+          </div>
+          <p className="mt-4 text-[13.5px] font-medium text-ink">The documents that make up this agreement, in the order they apply</p>
+          <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-[13.5px] text-ink">
+            {details.documents.map((document) => (
+              <li key={document}>{document}</li>
+            ))}
+          </ol>
+          <h3 className="mt-6 text-[15px] font-semibold text-ink">{contract.netcc.heading}</h3>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-ink">{contract.netcc.intro}</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-[13.5px] text-ink">
+            {contract.netcc.guides.map((guide) => (
+              <li key={guide}>{guide}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[13.5px] text-ink">
+            The guides are at{" "}
+            <a href={contract.netcc.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">
+              {contract.netcc.url.replace(/^https?:\/\//, "")}
+            </a>
+            . {contract.netcc.seller}
+          </p>
+          {contract.terms.map((part) => (
+            <div key={part.heading} className="mt-5">
+              <h3 className="text-[14.5px] font-semibold text-ink">{part.heading}</h3>
+              {part.clauses.map((clause) => (
+                <p key={clause} className="mt-2 text-[13.5px] leading-relaxed text-ink">
+                  {clause}
+                </p>
+              ))}
+            </div>
+          ))}
+          <p className={clsx(fine, "mt-5")}>Terms version {contract.version}.</p>
+        </details>
+      );
+    },
     conditions: () => (b.conditions ? <p className="whitespace-pre-line text-[13.5px] leading-relaxed text-ink">{b.conditions}</p> : null),
   };
 
