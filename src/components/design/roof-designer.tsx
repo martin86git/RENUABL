@@ -236,12 +236,11 @@ export function RoofDesigner(props: {
   // What is typed to narrow a list on the bar (the inverters, the batteries): emptied whenever a list opens or closes.
   const [seek, setSeek] = useState("");
   const [menu, setMenu] = useState<"designs" | "panels" | "inverters" | "batteries" | "bill" | false>(false);
-  // The bar across the top of the picture: a press anywhere else puts its open list away.
-  const topBar = useRef<HTMLDivElement>(null);
+  // A press anywhere outside a list's own holder puts the open list away.
   useEffect(() => {
     if (!menu) return;
     const away = (e: PointerEvent) => {
-      if (topBar.current && !topBar.current.contains(e.target as Node)) {
+      if (!(e.target as HTMLElement | null)?.closest?.("[data-menu-host]")) {
         setMenu(false);
         setSeek("");
       }
@@ -1427,7 +1426,6 @@ export function RoofDesigner(props: {
   const button =
     "inline-flex min-h-10 items-center rounded-md border border-line bg-surface px-4 text-sm font-medium hover:border-forest disabled:bg-surface-2 disabled:text-muted disabled:hover:border-line";
   const label = "text-[10px] font-medium uppercase tracking-[0.18em] text-muted";
-  const onlyOne = picks.length === 1 && picks[0].kind === "loose" ? loose.find((p) => p.id === (picks[0] as { id: string }).id) : null;
   const stringOf = (key: string) => strings.findIndex((s) => s.panels.includes(key));
   // The picked panels' tilt and direction, when they all share one.
   const pickedPanels = panelPicks.map(standing).filter((p): p is LoosePanel => p !== null);
@@ -1606,6 +1604,108 @@ export function RoofDesigner(props: {
                   ? "Not saved yet"
                   : saved.error}
           </span>
+          {/* Which of the roof's designs is open: here in the bar, off the picture. */}
+          <div className="relative" data-menu-host>
+            <button
+              onClick={() => openMenu(menu === "designs" ? false : "designs")}
+              aria-expanded={menu === "designs"}
+              aria-haspopup="true"
+              title={`Design ${active + 1} of ${designs.length}${active === primary ? " (primary)" : ""}${designLabel.trim() ? `: ${designLabel.trim()}` : ""}`}
+              aria-label={`Designs: design ${active + 1} of ${designs.length}`}
+              className={clsx(
+                "inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-md border px-3 text-sm font-medium tabular-nums",
+                menu === "designs" ? "border-primary bg-surface-2 text-ink" : "border-line bg-surface text-ink hover:border-forest",
+              )}
+            >
+              <Layers className="size-4" aria-hidden />
+              <span>
+                Design {active + 1} of {designs.length}
+              </span>
+              {active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-hidden />}
+            </button>
+            {menu === "designs" && (
+              <div className="absolute right-0 top-full z-40 mt-2 max-h-[70vh] w-[24rem] max-w-[85vw] overflow-y-auto shadow-lift space-y-3 rounded-lg border border-line bg-surface p-3">
+                <ul className="space-y-1.5">
+                  {everyDesign().map((d, i) => {
+                    const sum = designSummary(d);
+                    return (
+                      <li key={i} className={clsx("rounded-md border", i === active ? "border-forest" : "border-line")}>
+                        <div className="flex items-center gap-1 p-1">
+                          <button
+                            onClick={() => (i === active ? openMenu(false) : show(everyDesign(), i))}
+                            className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left hover:bg-canvas"
+                          >
+                            <span className="block truncate text-sm font-semibold">
+                              Design {i + 1}
+                              {d.label ? <span className="font-normal text-ink-2"> · {d.label}</span> : null}
+                            </span>
+                            <span className="block truncate text-xs tabular-nums text-muted">
+                              {sum.panels} panels · {sum.kw.toFixed(2)} kW · {d.panel?.name ?? props.catalogue[0]?.name ?? "Panel"}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPrimary(i);
+                              changed();
+                            }}
+                            disabled={i === primary}
+                            title={i === primary ? "The primary design" : "Make this the primary design"}
+                            aria-label={i === primary ? `Design ${i + 1} is the primary` : `Make design ${i + 1} the primary`}
+                            className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
+                          >
+                            <Star className={clsx("size-4", i === primary ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
+                          </button>
+                          {designs.length > 1 && (
+                            <button
+                              onClick={() => setDoomed(doomed === i ? null : i)}
+                              title="Delete this design"
+                              aria-label={`Delete design ${i + 1}`}
+                              className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-canvas hover:text-danger"
+                            >
+                              <Trash2 className="size-4" aria-hidden />
+                            </button>
+                          )}
+                        </div>
+                        {doomed === i && (
+                          <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2 text-sm">
+                            <span>Delete design {i + 1}? It can&apos;t be undone.</span>
+                            <button className="font-semibold text-danger" onClick={() => removeDesign(i)}>
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                <label className="block text-sm">
+                  A label for design {active + 1}
+                  <input
+                    value={designLabel}
+                    onChange={(e) => {
+                      setDesignLabel(e.target.value);
+                      changed();
+                    }}
+                    maxLength={40}
+                    placeholder="e.g. All on the north face"
+                    className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-3 outline-none focus:border-forest"
+                  />
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(false)}>
+                    <Plus className="mr-1.5 size-4" aria-hidden /> New design
+                  </button>
+                  <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(true)}>
+                    <Copy className="mr-1.5 size-4" aria-hidden /> Copy this one
+                  </button>
+                  <span className="self-center text-xs tabular-nums text-muted">
+                    {designs.length} of {MAX_DESIGNS}
+                  </span>
+                </div>
+                <p className="text-xs text-muted">The starred design is the primary: the one this roof opens on.</p>
+              </div>
+            )}
+          </div>
           <button
             onClick={toggleQuote}
             aria-expanded={quoteOpen}
@@ -1640,7 +1740,7 @@ export function RoofDesigner(props: {
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
                   that does to this home's bill. Each has one large figure in the same place every time, with its detail under it. */}
             <section
-              className="relative mx-auto mb-2 flex flex-wrap items-stretch overflow-hidden rounded-lg bg-ink text-white"
+              className="relative z-30 mx-auto mb-2 flex flex-wrap items-stretch rounded-lg bg-ink text-white"
               style={{ maxWidth: FIT }}
               aria-label="This design in figures"
             >
@@ -1708,38 +1808,136 @@ export function RoofDesigner(props: {
                   )}
                 </div>
               ))}
-              {/* What it does for this home, once the bill is typed in (the bill button on the picture). */}
-              <div className="relative min-w-0 flex-1 px-4 py-2" aria-label="What it does for this home">
-                <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/50">4 · For this home</p>
-                {finance ? (
-                  <dl className="mt-0.5 flex flex-wrap gap-x-5 gap-y-1">
-                    {(
-                      [
-                        ["Home uses", `${finance.dailyKwh} kWh a day`, false],
-                        ["Runs on its own", `${Math.round(finance.selfReliance * 100)}%`, false],
-                        ["Bill", `${dollars(finance.billNow)} → ${dollars(finance.billAfter)}`, false],
-                        ["Saves a year", dollars(finance.saving), true],
-                        ["After STCs", net !== null ? dollars(net) : "–", false],
-                        ["Payback", net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–", false],
-                      ] as const
-                    ).map(([name, value, gold]) => (
-                      <div key={name}>
-                        <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.14em] text-white/55">{name}</dt>
-                        <dd
-                          className={clsx(
-                            "whitespace-nowrap text-base font-semibold tabular-nums leading-tight",
-                            gold && "text-sun-bright",
-                          )}
+              {/* What it does for this home. Until the customer's bill is in, this part asks for it; once it is, the part
+                  shows what the bill works out to, and a press on it opens the bill again. */}
+              <div className="relative min-w-0 flex-1" data-menu-host>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={menu === "bill"}
+                  aria-label={finance ? "What it does for this home: open the customer's bill" : "Add the customer's electricity bill"}
+                  title={finance ? "Open the customer's bill" : "Add the customer's electricity bill"}
+                  onClick={() => openMenu(menu === "bill" ? false : "bill")}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" && e.key !== " ") return;
+                    e.preventDefault();
+                    openMenu(menu === "bill" ? false : "bill");
+                  }}
+                  className="h-full cursor-pointer rounded-r-lg px-4 py-2 hover:bg-white/5"
+                >
+                  <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/50">4 · For this home</p>
+                  {finance ? (
+                    <dl className="mt-0.5 flex flex-wrap gap-x-5 gap-y-1">
+                      {(
+                        [
+                          ["Home uses", `${finance.dailyKwh} kWh a day`, false],
+                          ["Runs on its own", `${Math.round(finance.selfReliance * 100)}%`, false],
+                          ["Bill", `${dollars(finance.billNow)} → ${dollars(finance.billAfter)}`, false],
+                          ["Saves a year", dollars(finance.saving), true],
+                          ["After STCs", net !== null ? dollars(net) : "–", false],
+                          ["Payback", net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–", false],
+                        ] as const
+                      ).map(([name, value, gold]) => (
+                        <div key={name}>
+                          <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.14em] text-white/55">{name}</dt>
+                          <dd
+                            className={clsx(
+                              "whitespace-nowrap text-base font-semibold tabular-nums leading-tight",
+                              gold && "text-sun-bright",
+                            )}
+                          >
+                            {value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : (
+                    <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3 text-[13px] font-medium text-white">
+                        <ReceiptText className="size-4" aria-hidden /> Add bill
+                      </span>
+                      <span className="text-xs text-white/60">
+                        {Number(bill.amount) > 0
+                          ? "That bill is no more than its supply charge: check the figures."
+                          : net !== null
+                            ? `${dollars(net)} after STCs. Saving and payback need the bill.`
+                            : "For the saving and payback."}
+                      </span>
+                    </p>
+                  )}
+                </div>
+                {menu === "bill" && (
+                  <div className="absolute right-0 top-full z-40 mt-2 max-h-[70vh] w-[22rem] max-w-[85vw] overflow-y-auto text-ink shadow-lift rounded-lg border border-line bg-surface p-3">
+                    <p className={label}>The customer&apos;s electricity bill</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium">
+                      <label>
+                        Billed
+                        <select
+                          value={bill.interval}
+                          onChange={(e) => setBill({ ...bill, interval: e.target.value as BillInterval })}
+                          className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest appearance-auto"
                         >
-                          {value}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                ) : (
-                  <p className="mt-1 text-xs text-white/60">
-                    {net !== null ? `${dollars(net)} after STCs. ` : ""}Add the customer&apos;s bill for the saving and payback.
-                  </p>
+                          <option value="annual">Yearly</option>
+                          <option value="quarterly">Quarterly</option>
+                          <option value="bimonthly">Every two months</option>
+                          <option value="monthly">Monthly</option>
+                        </select>
+                      </label>
+                      <label>
+                        A typical bill ($)
+                        <input
+                          autoFocus
+                          type="number"
+                          min="0"
+                          step="10"
+                          value={bill.amount}
+                          onChange={(e) => setBill({ ...bill, amount: e.target.value })}
+                          placeholder="e.g. 350"
+                          className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                        />
+                      </label>
+                      <label>
+                        Daily supply charge ($)
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={bill.supplyPerDay}
+                          onChange={(e) => setBill({ ...bill, supplyPerDay: e.target.value })}
+                          className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                        />
+                      </label>
+                      <label>
+                        Rate ($ a kWh)
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={bill.rate}
+                          onChange={(e) => setBill({ ...bill, rate: e.target.value })}
+                          className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                        />
+                      </label>
+                      <label className="col-span-2">
+                        Feed-in tariff ($ a kWh)
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={bill.feedIn}
+                          onChange={(e) => setBill({ ...bill, feedIn: e.target.value })}
+                          className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                        />
+                      </label>
+                    </div>
+                    <p className="mt-2 text-xs text-muted">
+                      {Number(bill.amount) > 0 && !finance && summary.panels > 0
+                        ? "That bill is no more than its supply charge at these prices: check the figures."
+                        : finance
+                          ? `About ${finance.dailyKwh} kWh a day. The bill, the saving and the payback over the picture are worked out from this.`
+                          : "Typed in from their bill: the bill, the saving and the payback over the picture are worked out from it. One price at all times of day. Saved with the design."}
+                    </p>
+                  </div>
                 )}
               </div>
             </section>
@@ -2325,7 +2523,7 @@ export function RoofDesigner(props: {
                     />
                   )}
                   {/* A scale bar: five metres on the ground, however far in the view is. */}
-                  <g transform={`translate(${view.x + 12 * u} ${view.y + view.h - 30 * u})`}>
+                  <g transform={`translate(${view.x + 100 * u} ${view.y + view.h - 30 * u})`}>
                     <line x1="0" x2={5 / scale} y1="0" y2="0" stroke="#ffffff" strokeWidth={2 * u} />
                     <text x={5 / scale + 5 * u} y={3.5 * u} fill="#ffffff" fontSize={10 * u}>
                       5 m
@@ -2549,7 +2747,7 @@ export function RoofDesigner(props: {
                 </div>
               )}
 
-              {/* On the picture, top right: the controls for whatever is picked. With nothing picked, the turn buttons for the rows of the face being worked on. */}
+              {/* On the picture, half way down its right edge: the controls for whatever is picked, in a half-round. With nothing picked, the turn buttons for the rows of the face being worked on. */}
               {tool === "string" ? (
                 <div
                   className="absolute right-3 top-[8rem] z-10 max-h-[calc(100%-13rem)] w-72 space-y-2 overflow-y-auto rounded-lg border border-line bg-surface p-3 shadow-lift"
@@ -2662,215 +2860,103 @@ export function RoofDesigner(props: {
                 </div>
               ) : picks.length > 0 ? (
                 <div
-                  className="absolute right-3 top-[8rem] z-10 w-64 space-y-2 rounded-lg border border-line bg-surface p-3 shadow-lift"
+                  className="absolute right-0 top-1/2 z-10 flex h-[23rem] w-[10.5rem] -translate-y-1/2 flex-col items-end justify-center gap-1 rounded-l-full border border-r-0 border-line bg-surface/90 py-10 pl-12 pr-3 shadow-lift backdrop-blur-md"
                   role="group"
                   aria-label="What is picked"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className={label}>
-                      {picks.length === 1
-                        ? picks[0].kind === "label"
-                          ? "This label"
-                          : onlyOne
-                            ? "This panel"
-                            : "This panel · in its row"
-                        : `${picks.length} picked`}
-                    </p>
-                    <button
-                      className="-my-1 px-1 text-lg leading-none text-muted hover:text-ink"
-                      onClick={() => setPicks([])}
-                      aria-label="Pick none"
-                      title="Pick none (Esc)"
-                    >
-                      ×
-                    </button>
-                  </div>
-                  {panelPicks.length > 0 && (
-                    <div className="flex items-center justify-between gap-0.5" role="group" aria-label="Turn">
-                      {[-5, -1, 1, 5, 90].map((step) => (
-                        <button
-                          key={step}
-                          className="flex h-9 min-w-9 items-center justify-center rounded-lg px-1.5 text-sm font-semibold tabular-nums text-ink hover:bg-canvas"
-                          onClick={() => turn(step)}
-                          aria-label={`Turn ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
-                        >
-                          {step > 0 ? "+" : "−"}
-                          {Math.abs(step)}°
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {pickedPanels.length > 0 && (
-                    <>
-                      <label className="block text-sm">
-                        <span className="flex justify-between">
-                          Tilt <span className="tabular-nums">{pickedTilt === null ? "mixed" : `${pickedTilt}°`}</span>
-                        </span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={TILT.max}
-                          value={pickedTilt ?? TILT.roof}
-                          onChange={(e) => amend((p) => ({ ...p, tilt: Number(e.target.value) }))}
-                          {...slides}
-                          className="mt-1 w-full"
-                        />
-                      </label>
-                      <p className="text-xs text-ink-2">
-                        {pickedFacing === null ? "Facing different ways." : `Facing ${compass(pickedFacing)} (${pickedFacing}°).`}
-                        {pickedTilt !== null && pickedFacing !== null && (
-                          <>
-                            {" "}
-                            <strong className="font-semibold text-ink">{besideFlat(pickedTilt, pickedFacing)}</strong>.{" "}
-                            {bestTilt(pickedFacing) === 0 ? "Flat is best this way." : `${bestTilt(pickedFacing)}° is best this way.`}
-                          </>
-                        )}
-                      </p>
-                    </>
-                  )}
-                  <button className="text-sm font-medium text-danger hover:underline" onClick={removePicked}>
-                    {picks.length === 1 ? "Take it out" : `Take these ${picks.length} out`}{" "}
-                    <span className="font-normal text-muted">(Delete)</span>
-                  </button>
-                </div>
-              ) : (
-                face && (
-                  <div
-                    className="absolute right-3 top-[8rem] flex items-center gap-1 rounded-lg border border-line bg-surface p-1.5 shadow-lift"
-                    role="group"
-                    aria-label="Turn the rows"
-                  >
-                    <span className="px-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted">Rows {face.angle}°</span>
-                    {[-5, -1, 1, 5].map((step) => (
+                  <p className="text-right text-[10px] font-medium uppercase leading-tight tracking-[0.14em] text-muted">
+                    {picks.length === 1 ? (picks[0].kind === "label" ? "Label" : "Panel") : `${picks.length} picked`}
+                  </p>
+                  {panelPicks.length > 0 &&
+                    [90, 5, 1, -1, -5].map((step) => (
                       <button
                         key={step}
-                        onClick={() => update(face.id, { angle: Math.max(-90, Math.min(90, face.angle + step)), off: [] })}
-                        aria-label={`Turn the rows ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
-                        className="flex h-10 min-w-11 items-center justify-center rounded-md px-2 text-sm font-semibold tabular-nums text-ink hover:bg-canvas"
+                        className="flex h-9 w-[4.5rem] items-center justify-center rounded-full border border-line bg-surface text-sm font-semibold tabular-nums text-ink hover:border-forest"
+                        onClick={() => turn(step)}
+                        aria-label={`Turn ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
                       >
                         {step > 0 ? "+" : "−"}
                         {Math.abs(step)}°
                       </button>
                     ))}
+                  {pickedPanels.length > 0 && (
+                    <label
+                      className="mt-1 block w-[6.5rem] text-right text-xs text-ink-2"
+                      title={
+                        pickedFacing === null
+                          ? "Facing different ways."
+                          : `Facing ${compass(pickedFacing)} (${pickedFacing}°).${
+                              pickedTilt !== null
+                                ? ` ${besideFlat(pickedTilt, pickedFacing)}. ${bestTilt(pickedFacing) === 0 ? "Flat is best this way." : `${bestTilt(pickedFacing)}° is best this way.`}`
+                                : ""
+                            }`
+                      }
+                    >
+                      Tilt <span className="tabular-nums text-ink">{pickedTilt === null ? "mixed" : `${pickedTilt}°`}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={TILT.max}
+                        value={pickedTilt ?? TILT.roof}
+                        onChange={(e) => amend((p) => ({ ...p, tilt: Number(e.target.value) }))}
+                        {...slides}
+                        className="mt-0.5 block w-full"
+                      />
+                    </label>
+                  )}
+                  <div className="mt-1 flex items-center gap-2 text-xs font-medium">
+                    <button className="text-danger hover:underline" onClick={removePicked} title="Take out what is picked (Delete)">
+                      Remove
+                    </button>
+                    <button className="text-muted hover:text-ink" onClick={() => setPicks([])} title="Pick none (Esc)">
+                      Done
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                face && (
+                  <div
+                    className="absolute right-0 top-1/2 z-10 flex h-[23rem] w-[10.5rem] -translate-y-1/2 flex-col items-end justify-center gap-1 rounded-l-full border border-r-0 border-line bg-surface/90 py-10 pl-12 pr-3 shadow-lift backdrop-blur-md"
+                    role="group"
+                    aria-label="Turn the rows"
+                  >
+                    <p className="text-right text-[10px] font-medium uppercase leading-tight tracking-[0.14em] text-muted">
+                      Rows <span className="tabular-nums">{face.angle}°</span>
+                    </p>
+                    {[90, 5, 1, -1, -5].map((step) => (
+                      <button
+                        key={step}
+                        // The rows run the same turned half way round, so their angle stays between a quarter turn either way.
+                        onClick={() => update(face.id, { angle: ((((face.angle + step + 90) % 180) + 180) % 180) - 90, off: [] })}
+                        aria-label={`Turn the rows ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
+                        className="flex h-9 w-[4.5rem] items-center justify-center rounded-full border border-line bg-surface text-sm font-semibold tabular-nums text-ink hover:border-forest"
+                      >
+                        {step > 0 ? "+" : "−"}
+                        {Math.abs(step)}°
+                      </button>
+                    ))}
+                    <button
+                      className="mt-1 text-xs font-medium text-muted hover:text-ink"
+                      onClick={() => setSelected(null)}
+                      title="Leave this roof face"
+                    >
+                      Done
+                    </button>
                   </div>
                 )
               )}
 
-              {/* The system, centred along the top of the picture. The kit is three rounds: the panel, the largest, in the middle,
-                  with the inverter and the battery as half-rounds growing out of it either side. The design and the
-                  customer's bill sit beside them as chips. Each opens its choices beneath it. */}
+              {/* The system, centred along the top of the picture, as three rounds: the panel, the largest, in the middle, with
+                  the inverter and the battery as half-rounds growing out of it either side. Each opens its choices
+                  beneath, centred under the three. (Which design is open is in the bar at the top of the page, and
+                  the customer's bill in the figures above the picture.) */}
               <div
-                className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2"
+                className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center"
                 role="group"
                 aria-label="System"
-                ref={topBar}
+                data-menu-host
               >
-                <div className="relative order-1">
-                  <button
-                    onClick={() => openMenu(menu === "designs" ? false : "designs")}
-                    aria-expanded={menu === "designs"}
-                    aria-haspopup="true"
-                    title={`Design ${active + 1} of ${designs.length}${active === primary ? " (primary)" : ""}${designLabel.trim() ? `: ${designLabel.trim()}` : ""}`}
-                    aria-label={`Designs: design ${active + 1} of ${designs.length}`}
-                    className={clsx(
-                      GLASS,
-                      "flex h-10 items-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-medium tabular-nums",
-                      menu === "designs" ? "text-ink ring-2 ring-primary" : "text-ink hover:bg-surface",
-                    )}
-                  >
-                    <Layers className="size-5" aria-hidden />
-                    <span>
-                      {active + 1} of {designs.length}
-                    </span>
-                    {active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-hidden />}
-                  </button>
-                  {menu === "designs" && (
-                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-3 rounded-lg border border-line bg-surface p-3">
-                      <ul className="space-y-1.5">
-                        {everyDesign().map((d, i) => {
-                          const sum = designSummary(d);
-                          return (
-                            <li key={i} className={clsx("rounded-md border", i === active ? "border-forest" : "border-line")}>
-                              <div className="flex items-center gap-1 p-1">
-                                <button
-                                  onClick={() => (i === active ? openMenu(false) : show(everyDesign(), i))}
-                                  className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left hover:bg-canvas"
-                                >
-                                  <span className="block truncate text-sm font-semibold">
-                                    Design {i + 1}
-                                    {d.label ? <span className="font-normal text-ink-2"> · {d.label}</span> : null}
-                                  </span>
-                                  <span className="block truncate text-xs tabular-nums text-muted">
-                                    {sum.panels} panels · {sum.kw.toFixed(2)} kW · {d.panel?.name ?? props.catalogue[0]?.name ?? "Panel"}
-                                  </span>
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setPrimary(i);
-                                    changed();
-                                  }}
-                                  disabled={i === primary}
-                                  title={i === primary ? "The primary design" : "Make this the primary design"}
-                                  aria-label={i === primary ? `Design ${i + 1} is the primary` : `Make design ${i + 1} the primary`}
-                                  className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
-                                >
-                                  <Star
-                                    className={clsx("size-4", i === primary ? "fill-sun-line text-sun-line" : "text-muted")}
-                                    aria-hidden
-                                  />
-                                </button>
-                                {designs.length > 1 && (
-                                  <button
-                                    onClick={() => setDoomed(doomed === i ? null : i)}
-                                    title="Delete this design"
-                                    aria-label={`Delete design ${i + 1}`}
-                                    className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-canvas hover:text-danger"
-                                  >
-                                    <Trash2 className="size-4" aria-hidden />
-                                  </button>
-                                )}
-                              </div>
-                              {doomed === i && (
-                                <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2 text-sm">
-                                  <span>Delete design {i + 1}? It can&apos;t be undone.</span>
-                                  <button className="font-semibold text-danger" onClick={() => removeDesign(i)}>
-                                    Delete
-                                  </button>
-                                </div>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                      <label className="block text-sm">
-                        A label for design {active + 1}
-                        <input
-                          value={designLabel}
-                          onChange={(e) => {
-                            setDesignLabel(e.target.value);
-                            changed();
-                          }}
-                          maxLength={40}
-                          placeholder="e.g. All on the north face"
-                          className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-3 outline-none focus:border-forest"
-                        />
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(false)}>
-                          <Plus className="mr-1.5 size-4" aria-hidden /> New design
-                        </button>
-                        <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(true)}>
-                          <Copy className="mr-1.5 size-4" aria-hidden /> Copy this one
-                        </button>
-                        <span className="self-center text-xs tabular-nums text-muted">
-                          {designs.length} of {MAX_DESIGNS}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted">The starred design is the primary: the one this roof opens on.</p>
-                    </div>
-                  )}
-                </div>
-                <div className="relative z-10 order-3">
+                <div className="order-3">
                   <button
                     onClick={() => openMenu(menu === "panels" ? false : "panels")}
                     aria-expanded={menu === "panels"}
@@ -2878,14 +2964,14 @@ export function RoofDesigner(props: {
                     title={`Panels: ${summary.panels} × ${panel?.name ?? chosenPanel?.name ?? "panel"}`}
                     aria-label="The panel this design is drawn with"
                     className={clsx(
-                      "flex size-16 flex-col items-center justify-center rounded-full border shadow-lift tabular-nums",
+                      "relative z-10 flex size-[4.75rem] flex-col items-center justify-center rounded-full border shadow-lift tabular-nums",
                       menu === "panels" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
                     )}
                   >
                     {/* A solar panel, leaning as it does on a roof: frame, cells, and a stand. */}
                     <svg
                       viewBox="0 0 24 24"
-                      className="size-6"
+                      className="size-7"
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="1.7"
@@ -2929,7 +3015,7 @@ export function RoofDesigner(props: {
                     </div>
                   )}
                 </div>
-                <div className="relative order-2 -mr-7">
+                <div className="order-2 -mr-8">
                   <button
                     onClick={() => openMenu(menu === "inverters" ? false : "inverters")}
                     aria-expanded={menu === "inverters"}
@@ -2937,7 +3023,7 @@ export function RoofDesigner(props: {
                     title={fitted.length ? `Inverter: ${fitted.map((i) => i.name).join(" + ")}` : "Inverter: choose one"}
                     aria-label="The inverters this design is drawn for"
                     className={clsx(
-                      "flex h-11 w-[4.25rem] items-center justify-start rounded-l-full border border-line pl-3 shadow-lift backdrop-blur-md",
+                      "flex h-[3.25rem] w-[5rem] items-center justify-start rounded-l-full border border-line pl-3.5 shadow-lift backdrop-blur-md",
                       menu === "inverters"
                         ? "bg-primary text-primary-ink"
                         : fitted.length
@@ -2945,7 +3031,7 @@ export function RoofDesigner(props: {
                           : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                     )}
                   >
-                    <Zap className="size-5" aria-hidden />
+                    <Zap className="size-6" aria-hidden />
                   </button>
                   {menu === "inverters" && (
                     <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
@@ -3071,7 +3157,7 @@ export function RoofDesigner(props: {
                     </div>
                   )}
                 </div>
-                <div className="relative order-4 -ml-7">
+                <div className="order-4 -ml-8">
                   <button
                     onClick={() => openMenu(menu === "batteries" ? false : "batteries")}
                     aria-expanded={menu === "batteries"}
@@ -3079,7 +3165,7 @@ export function RoofDesigner(props: {
                     title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Battery: add one"}
                     aria-label="The battery on this design"
                     className={clsx(
-                      "flex h-11 w-[4.25rem] items-center justify-end rounded-r-full border border-line pr-3 shadow-lift backdrop-blur-md",
+                      "flex h-[3.25rem] w-[5rem] items-center justify-end rounded-r-full border border-line pr-3.5 shadow-lift backdrop-blur-md",
                       menu === "batteries"
                         ? "bg-primary text-primary-ink"
                         : battery
@@ -3087,7 +3173,7 @@ export function RoofDesigner(props: {
                           : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                     )}
                   >
-                    <BatteryCharging className="size-5" aria-hidden />
+                    <BatteryCharging className="size-6" aria-hidden />
                   </button>
                   {menu === "batteries" && (
                     <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
@@ -3176,125 +3262,22 @@ export function RoofDesigner(props: {
                     </div>
                   )}
                 </div>
-                <div className="relative order-5">
-                  <button
-                    onClick={() => openMenu(menu === "bill" ? false : "bill")}
-                    aria-expanded={menu === "bill"}
-                    aria-haspopup="true"
-                    title={
-                      Number(bill.amount) > 0
-                        ? "The customer's electricity bill"
-                        : "No electricity bill entered yet: add it for the saving and payback"
-                    }
-                    aria-label={
-                      Number(bill.amount) > 0 ? "The customer's electricity bill" : "The customer's electricity bill: not entered yet"
-                    }
-                    className={clsx(
-                      GLASS,
-                      "flex h-10 items-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-medium tabular-nums",
-                      menu === "bill"
-                        ? "text-ink ring-2 ring-primary"
-                        : Number(bill.amount) > 0
-                          ? "text-ink hover:bg-surface"
-                          : "!border-sun-line !bg-sun text-sun-ink",
-                    )}
-                  >
-                    <ReceiptText className="size-5" aria-hidden />
-                    {Number(bill.amount) > 0 && <span>Bill</span>}
-                    <span>{Number(bill.amount) > 0 ? `$${Number(bill.amount).toLocaleString("en-AU")}` : "Add bill"}</span>
-                    {/* A dot that keeps asking until the bill is in. */}
-                    {!(Number(bill.amount) > 0) && menu !== "bill" && <span className="size-2 rounded-full bg-sun-line" aria-hidden />}
-                  </button>
-                  {menu === "bill" && (
-                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-3">
-                      <p className={label}>The customer&apos;s electricity bill</p>
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium">
-                        <label>
-                          Billed
-                          <select
-                            value={bill.interval}
-                            onChange={(e) => setBill({ ...bill, interval: e.target.value as BillInterval })}
-                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest appearance-auto"
-                          >
-                            <option value="annual">Yearly</option>
-                            <option value="quarterly">Quarterly</option>
-                            <option value="bimonthly">Every two months</option>
-                            <option value="monthly">Monthly</option>
-                          </select>
-                        </label>
-                        <label>
-                          A typical bill ($)
-                          <input
-                            autoFocus
-                            type="number"
-                            min="0"
-                            step="10"
-                            value={bill.amount}
-                            onChange={(e) => setBill({ ...bill, amount: e.target.value })}
-                            placeholder="e.g. 350"
-                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
-                          />
-                        </label>
-                        <label>
-                          Daily supply charge ($)
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={bill.supplyPerDay}
-                            onChange={(e) => setBill({ ...bill, supplyPerDay: e.target.value })}
-                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
-                          />
-                        </label>
-                        <label>
-                          Rate ($ a kWh)
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={bill.rate}
-                            onChange={(e) => setBill({ ...bill, rate: e.target.value })}
-                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
-                          />
-                        </label>
-                        <label className="col-span-2">
-                          Feed-in tariff ($ a kWh)
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={bill.feedIn}
-                            onChange={(e) => setBill({ ...bill, feedIn: e.target.value })}
-                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
-                          />
-                        </label>
-                      </div>
-                      <p className="mt-2 text-xs text-muted">
-                        {Number(bill.amount) > 0 && !finance && summary.panels > 0
-                          ? "That bill is no more than its supply charge at these prices: check the figures."
-                          : finance
-                            ? `About ${finance.dailyKwh} kWh a day. The bill, the saving and the payback over the picture are worked out from this.`
-                            : "Typed in from their bill: the bill, the saving and the payback over the picture are worked out from it. One price at all times of day. Saved with the design."}
-                      </p>
-                    </div>
-                  )}
-                </div>
               </div>
               {/* The pad, in the top left corner: the select arrow in a circle of its own, since it is the tool every other
                   is left for, with two smaller half-rounds growing out of it for the two things done most with it:
                   add a panel (to its right) and erase (beneath it). */}
-              <div className="absolute left-3 top-3 z-20 size-[6.75rem]" role="toolbar" aria-label="Select, add a panel, erase">
+              <div className="absolute left-3 top-3 z-20 size-[7.75rem]" role="toolbar" aria-label="Select, add a panel, erase">
                 <button
                   onClick={() => pickTool("panel")}
                   title="Add a panel"
                   aria-label="Add a panel"
                   aria-pressed={tool === "panel"}
                   className={clsx(
-                    "absolute left-10 top-2.5 flex h-11 w-[4.25rem] items-center justify-end rounded-r-full border border-line pr-3 shadow-lift backdrop-blur-md",
+                    "absolute left-12 top-3 flex h-[3.25rem] w-[4.75rem] items-center justify-end rounded-r-full border border-line pr-3.5 shadow-lift backdrop-blur-md",
                     tool === "panel" ? "bg-primary text-primary-ink" : "bg-surface/90 text-ink hover:bg-surface",
                   )}
                 >
-                  <SquarePlus className="size-5" aria-hidden />
+                  <SquarePlus className="size-6" aria-hidden />
                 </button>
                 <button
                   onClick={() => pickTool("erase")}
@@ -3302,11 +3285,11 @@ export function RoofDesigner(props: {
                   aria-label="Erase"
                   aria-pressed={tool === "erase"}
                   className={clsx(
-                    "absolute left-2.5 top-10 flex h-[4.25rem] w-11 items-end justify-center rounded-b-full border border-line pb-3 shadow-lift backdrop-blur-md",
+                    "absolute left-3 top-12 flex h-[4.75rem] w-[3.25rem] items-end justify-center rounded-b-full border border-line pb-3.5 shadow-lift backdrop-blur-md",
                     tool === "erase" ? "bg-primary text-primary-ink" : "bg-surface/90 text-ink hover:bg-surface",
                   )}
                 >
-                  <Eraser className="size-5" aria-hidden />
+                  <Eraser className="size-6" aria-hidden />
                 </button>
                 <button
                   onClick={() => pickTool("select")}
@@ -3314,17 +3297,18 @@ export function RoofDesigner(props: {
                   aria-label="Select"
                   aria-pressed={tool === "select"}
                   className={clsx(
-                    "absolute left-0 top-0 flex size-16 items-center justify-center rounded-full border shadow-lift",
-                    tool === "select" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
+                    // Orange, always: it is the tool to come back to. Taken up, it is ringed.
+                    "absolute left-0 top-0 flex size-[4.75rem] items-center justify-center rounded-full bg-sun-line text-white shadow-lift hover:brightness-105",
+                    tool === "select" ? "ring-[3px] ring-white" : "ring-1 ring-white/40",
                   )}
                 >
-                  <MousePointer2 className="size-7" aria-hidden />
+                  <MousePointer2 className="size-8" aria-hidden />
                 </button>
               </div>
               {/* The second pad, in the top right corner, the mirror of the first: stringing the panels in its circle, with
                   tracing a roof face (to its left) and the guide line (beneath it) as its half-rounds. */}
               <div
-                className="absolute right-3 top-3 z-20 size-[6.75rem]"
+                className="absolute right-3 top-3 z-20 size-[7.75rem]"
                 role="toolbar"
                 aria-label="String panels, trace a roof face, guide line"
               >
@@ -3334,11 +3318,11 @@ export function RoofDesigner(props: {
                   aria-label="Trace a roof face"
                   aria-pressed={tool === "trace"}
                   className={clsx(
-                    "absolute right-10 top-2.5 flex h-11 w-[4.25rem] items-center justify-start rounded-l-full border border-line pl-3 shadow-lift backdrop-blur-md",
+                    "absolute right-12 top-3 flex h-[3.25rem] w-[4.75rem] items-center justify-start rounded-l-full border border-line pl-3.5 shadow-lift backdrop-blur-md",
                     tool === "trace" ? "bg-primary text-primary-ink" : "bg-surface/90 text-ink hover:bg-surface",
                   )}
                 >
-                  <PenTool className="size-5" aria-hidden />
+                  <PenTool className="size-6" aria-hidden />
                 </button>
                 <button
                   onClick={() => pickTool("rule")}
@@ -3346,11 +3330,11 @@ export function RoofDesigner(props: {
                   aria-label="Guide line"
                   aria-pressed={tool === "rule"}
                   className={clsx(
-                    "absolute right-2.5 top-10 flex h-[4.25rem] w-11 items-end justify-center rounded-b-full border border-line pb-3 shadow-lift backdrop-blur-md",
+                    "absolute right-3 top-12 flex h-[4.75rem] w-[3.25rem] items-end justify-center rounded-b-full border border-line pb-3.5 shadow-lift backdrop-blur-md",
                     tool === "rule" ? "bg-primary text-primary-ink" : "bg-surface/90 text-ink hover:bg-surface",
                   )}
                 >
-                  <Ruler className="size-5" aria-hidden />
+                  <Ruler className="size-6" aria-hidden />
                 </button>
                 <button
                   onClick={() => pickTool("string")}
@@ -3358,70 +3342,47 @@ export function RoofDesigner(props: {
                   aria-label="String panels"
                   aria-pressed={tool === "string"}
                   className={clsx(
-                    "absolute right-0 top-0 flex size-16 items-center justify-center rounded-full border shadow-lift",
+                    "absolute right-0 top-0 flex size-[4.75rem] items-center justify-center rounded-full border shadow-lift",
                     tool === "string" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
                   )}
                 >
-                  <Cable className="size-7" aria-hidden />
+                  <Cable className="size-8" aria-hidden />
                 </button>
               </div>
-              {/* Getting about, on the left edge, out of the way of the work: the hand that moves the picture, the zoom,
-                  and undo and redo. One quiet column, the same place every time. */}
-              <div
-                className={clsx(GLASS, "absolute left-2 top-1/2 z-10 flex -translate-y-1/2 flex-col gap-0.5 p-1")}
-                role="toolbar"
-                aria-label="View and undo"
-                aria-orientation="vertical"
-              >
+              {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its
+                  circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}
+              <div className="absolute bottom-8 left-3 z-10 size-[7.75rem]" role="toolbar" aria-label="Move the picture, zoom in, zoom out">
+                <button
+                  onClick={() => zoom(1 / 1.4)}
+                  title="Zoom in"
+                  aria-label="Zoom in"
+                  className="absolute bottom-3 left-12 flex h-[3.25rem] w-[4.75rem] items-center justify-end rounded-r-full border border-line bg-surface/90 pr-3.5 text-ink shadow-lift backdrop-blur-md hover:bg-surface"
+                >
+                  <ZoomIn className="size-6" aria-hidden />
+                </button>
+                <button
+                  onClick={() => zoom(1.4)}
+                  title="Zoom out"
+                  aria-label="Zoom out"
+                  className="absolute bottom-12 left-3 flex h-[4.75rem] w-[3.25rem] items-start justify-center rounded-t-full border border-line bg-surface/90 pt-3.5 text-ink shadow-lift backdrop-blur-md hover:bg-surface"
+                >
+                  <ZoomOut className="size-6" aria-hidden />
+                </button>
                 <button
                   onClick={() => pickTool("pan")}
                   title="Move the picture"
                   aria-label="Move the picture"
                   aria-pressed={tool === "pan"}
                   className={clsx(
-                    "flex size-9 items-center justify-center rounded-lg",
-                    tool === "pan" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                    "absolute bottom-0 left-0 flex size-[4.75rem] items-center justify-center rounded-full border shadow-lift",
+                    tool === "pan" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
                   )}
                 >
-                  <Hand className="size-[18px]" aria-hidden />
-                </button>
-                {(
-                  [
-                    [ZoomIn, "Zoom in", () => zoom(1 / 1.4)],
-                    [ZoomOut, "Zoom out", () => zoom(1.4)],
-                    [Maximize, "Show the whole picture", () => setView(WHOLE)],
-                  ] as const
-                ).map(([Icon, name, act]) => (
-                  <button
-                    key={name}
-                    onClick={act}
-                    title={name}
-                    aria-label={name}
-                    className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-canvas"
-                  >
-                    <Icon className="size-[18px]" aria-hidden />
-                  </button>
-                ))}
-                <span className="my-0.5 h-px w-5 self-center bg-line" aria-hidden />
-                <button
-                  onClick={undo}
-                  title="Undo (Ctrl+Z)"
-                  aria-label="Undo (Ctrl+Z)"
-                  className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-canvas"
-                >
-                  <Undo2 className="size-[18px]" aria-hidden />
-                </button>
-                <button
-                  onClick={redo}
-                  title="Redo (Ctrl+Shift+Z)"
-                  aria-label="Redo (Ctrl+Shift+Z)"
-                  className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-canvas"
-                >
-                  <Redo2 className="size-[18px]" aria-hidden />
+                  <Hand className="size-8" aria-hidden />
                 </button>
               </div>
-              {/* The dock: the occasional tools, as icons, centred along the foot of the picture in the room beside Suggest a
-                  layout, clear of the map's own mark and credit at the very bottom. */}
+              {/* The dock, centred along the foot of the picture in the room beside Suggest a layout, clear of the map's own
+                  mark and credit at the very bottom: undo, redo and the whole picture, then the two tools that annotate. */}
               <div className="pointer-events-none absolute inset-x-2 bottom-7 z-10 flex items-end gap-2">
                 <span className="flex-1" aria-hidden />
                 <div
@@ -3429,6 +3390,31 @@ export function RoofDesigner(props: {
                   role="toolbar"
                   aria-label="Design tools"
                 >
+                  <button
+                    onClick={undo}
+                    title="Undo (Ctrl+Z)"
+                    aria-label="Undo (Ctrl+Z)"
+                    className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                  >
+                    <Undo2 className="size-5" aria-hidden />
+                  </button>
+                  <button
+                    onClick={redo}
+                    title="Redo (Ctrl+Shift+Z)"
+                    aria-label="Redo (Ctrl+Shift+Z)"
+                    className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                  >
+                    <Redo2 className="size-5" aria-hidden />
+                  </button>
+                  <button
+                    onClick={() => setView(WHOLE)}
+                    title="Show the whole picture"
+                    aria-label="Show the whole picture"
+                    className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                  >
+                    <Maximize className="size-5" aria-hidden />
+                  </button>
+                  <span className="mx-1 h-7 w-px shrink-0 bg-line" aria-hidden />
                   {SECONDARY.map((t) => {
                     const { icon: Icon, name } = TOOLS.find((x) => x.tool === t)!;
                     return (

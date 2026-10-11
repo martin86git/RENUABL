@@ -18,7 +18,9 @@ import { todayInMarket } from "@/lib/domain/market";
 import type { RebateRates } from "@/lib/domain/rebates";
 
 const money = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
-const field = "mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest";
+/** The four things about the home, small, so they take one row. */
+const small =
+  "mt-0.5 block h-8 w-full appearance-auto rounded-md border border-line bg-surface px-1 text-xs tabular-nums outline-none focus:border-forest";
 const label = "text-[10px] font-medium uppercase tracking-[0.14em] text-muted";
 
 /**
@@ -83,39 +85,39 @@ export function DesignQuote(props: {
           Prices and settings
         </Link>
       </div>
-      <div className={checked ? "mt-3 rounded-md border border-line bg-canvas p-3" : "mt-3 rounded-md border border-sun-line bg-sun p-3"}>
+      <div className={checked ? "mt-3 rounded-md border border-line bg-canvas p-2" : "mt-3 rounded-md border border-sun-line bg-sun p-2"}>
         <p className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]">
           <span className={checked ? "text-ink-2" : "text-sun-ink"}>This home</span>
           <span className={checked ? "text-muted" : "text-sun-ink"}>
             {checked ? "Set on this visit" : "Check these: they change the price"}
           </span>
         </p>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium">
+        <div className="mt-1.5 grid grid-cols-4 gap-1.5 text-[11px] font-medium">
           <label>
             Roof
-            <select value={form.roof} onChange={set("roof")} className={`${field} appearance-auto`}>
+            <select value={form.roof} onChange={set("roof")} className={small}>
               <option value="tile">Tile</option>
               <option value="tin">Tin</option>
-              <option value="flat">Flat (Kliplok)</option>
+              <option value="flat">Flat</option>
             </select>
           </label>
           <label>
             Storeys
-            <select value={form.storeys} onChange={set("storeys")} className={`${field} appearance-auto`}>
+            <select value={form.storeys} onChange={set("storeys")} className={small}>
               <option value="single">Single</option>
               <option value="double">Double</option>
             </select>
           </label>
           <label>
             Phase
-            <select value={form.phase} onChange={set("phase")} className={`${field} appearance-auto`}>
-              <option value="single">Single phase</option>
-              <option value="three">Three phase</option>
+            <select value={form.phase} onChange={set("phase")} className={small}>
+              <option value="single">Single</option>
+              <option value="three">Three</option>
             </select>
           </label>
           <label>
-            Postcode (rebate zone)
-            <input inputMode="numeric" maxLength={4} value={form.postcode} onChange={set("postcode")} className={field} />
+            Postcode
+            <input inputMode="numeric" maxLength={4} value={form.postcode} onChange={set("postcode")} className={small} />
           </label>
         </div>
       </div>
