@@ -144,7 +144,8 @@ function ProposalDocument({
   const cover = picture(b.cover?.id);
   const contact = [b.phone, b.email, b.website && shownWebsite(b.website)].filter(Boolean).join("  ·  ");
   const legal = [b.abn && `ABN ${shownAbn(b.abn)}`, ...b.licences].filter(Boolean).join("  ·  ");
-  const Footer = () => (
+  // The same line at the foot of every page.
+  const footer = (
     <View style={s.footer} fixed>
       <Text>
         {b.name}
@@ -200,7 +201,7 @@ function ProposalDocument({
             <Row key={d.label} label={d.label} value={d.value} />
           ))}
         </View>
-        <Footer />
+        {footer}
       </Page>
 
       <Page size="A4" style={s.page}>
@@ -244,7 +245,7 @@ function ProposalDocument({
             </Text>
           </View>
         )}
-        <Footer />
+        {footer}
       </Page>
 
       <Page size="A4" style={s.page}>
@@ -294,14 +295,14 @@ function ProposalDocument({
           )}
           {b.address ? <Text style={[s.small, { marginTop: 10 }]}>{b.address}</Text> : null}
         </View>
-        <Footer />
+        {footer}
       </Page>
 
       {b.conditions ? (
         <Page size="A4" style={s.page}>
           <Text style={s.h2}>Conditions</Text>
           <Text style={{ fontSize: 8.5, lineHeight: 1.5 }}>{b.conditions}</Text>
-          <Footer />
+          {footer}
         </Page>
       ) : null}
     </Document>

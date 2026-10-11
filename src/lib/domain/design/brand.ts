@@ -58,7 +58,7 @@ export function contrast(a: string, b: string): number {
 }
 
 const WHITE = "#ffffff";
-const NEAR_BLACK = "#111318";
+const NEAR_BLACK = "#0b0b0c";
 
 /** The text colour to put on a colour: white or near-black, whichever reads better. So a pale brand colour never gets white text. */
 export function inkOn(hex: string): string {

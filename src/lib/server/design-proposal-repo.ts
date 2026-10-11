@@ -63,7 +63,8 @@ export async function saveBrand(businessId: string, kit: BrandKit, by: string): 
 export async function listImages(businessId: string): Promise<BrandImage[]> {
   return query<BrandImage>(
     `select id, kind, width, height from design_files
-      where business_id = $1 and removed_at is null order by (kind = 'photo'), created_at, id`,
+      where business_id = $1 and removed_at is null
+      order by case kind when 'logo' then 0 when 'cover' then 1 else 2 end, created_at, id`,
     [businessId],
   );
 }
