@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import {
@@ -24,6 +25,8 @@ import {
   TriangleAlert,
   WandSparkles,
   Sparkles,
+  FileText,
+  Send,
   Trash2,
   X,
   Undo2,
@@ -265,7 +268,7 @@ const cm = (n: number) => Math.round(n * 100) / 100;
  * The widest the picture may be and still fit the window with the bar and the figures above it: the picture is
  * given all the room there is, since it is where the work is done.
  */
-const FIT = `calc((100dvh - 10.75rem) * ${ROOF_IMAGE.width / ROOF_IMAGE.height})`;
+const FIT = `calc((100dvh - 14rem) * ${ROOF_IMAGE.width / ROOF_IMAGE.height})`;
 const WHOLE: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: ROOF_IMAGE.width, h: ROOF_IMAGE.height };
 
 /**
@@ -297,11 +300,14 @@ export function RoofDesigner(props: {
   onSave: (set: DesignSet, extras: DesignExtras, net: number | null) => Promise<string | null>;
   /** What to say once saved: where the work is kept ("Saved to your account", "Saved on this device"). */
   savedLabel?: string;
+  /** Makes the proposal from the design just saved. Answers with what went wrong, or null. */
+  onPublish?: () => Promise<string | null>;
+  /** Where this roof's proposal is, once there is one. */
+  proposalHref?: string | null;
   /** Told whenever the design gains or loses unsaved changes, so the page can ask before leaving it. */
   onUnsaved?: (unsaved: boolean) => void;
   /** The start of the bar at the top of the page (the wordmark and the address), and the way out, drawn by the page. */
   bar?: React.ReactNode;
-  back?: React.ReactNode;
 }) {
   // The design being worked on is held in the states below; the others wait in `designs`, whose entry for the
   // one being worked on is out of date until it is put away again (`everyDesign`).
@@ -1573,6 +1579,17 @@ export function RoofDesigner(props: {
     setBand(null);
   };
 
+  const [publishing, setPublishing] = useState(false);
+  /** Publish: the design is saved, then its proposal is made from it (`onPublish`), and any problem with either is said. */
+  const publish = async () => {
+    setPublishing(true);
+    const kept = await save();
+    if (kept && props.onPublish) {
+      const problem = await props.onPublish();
+      if (problem) setSaved({ error: problem });
+    }
+    setPublishing(false);
+  };
   const save = async () => {
     setSaved("saving");
     // The price after STCs goes with it only when the primary design is the one open: that is the one a job is quoted on.
@@ -1582,6 +1599,7 @@ export function RoofDesigner(props: {
       active === primary ? net : null,
     );
     setSaved(problem ? { error: problem } : "saved");
+    return !problem;
   };
 
   const button =
@@ -1744,19 +1762,23 @@ export function RoofDesigner(props: {
 
   return (
     <div>
-      {/* The bar that stays at the top of the page: the wordmark, the address being designed, and saving. */}
-      <header className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center lg:flex-nowrap gap-x-5 gap-y-2 border-b border-line bg-canvas/95 px-4 py-2 text-ink backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        {props.bar}
-        <dl className="flex min-w-0 flex-1 basis-56 items-center gap-x-6 overflow-hidden border-line lg:border-l lg:pl-5">
-          <div className="min-w-0 flex-1">
-            <dt className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">Address</dt>
-            <dd className="truncate text-sm">
-              <h1>{props.address}</h1>
-            </dd>
-          </div>
-        </dl>
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="text-xs text-muted" role="status">
+      {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
+          and the address being designed; then which design this is and its quote on the left, and publishing it and
+          its proposal on the right. A firmer line under it sets it off from the work below. */}
+      <header className="sticky top-0 z-30 -mx-4 border-b border-line-strong bg-canvas/95 px-4 text-ink backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-2.5 lg:flex-nowrap">
+          {props.bar}
+          <dl className="flex min-w-0 flex-1 basis-56 items-center gap-x-6 overflow-hidden border-line lg:border-l lg:pl-5">
+            <div className="min-w-0 flex-1">
+              <dt className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">Address</dt>
+              <dd className="truncate text-sm">
+                <h1>{props.address}</h1>
+              </dd>
+            </div>
+          </dl>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-line py-2">
+          <span className="order-last ml-auto text-xs text-muted lg:order-none lg:ml-0" role="status">
             {saved === "saved"
               ? (props.savedLabel ?? "Saved")
               : saved === "saving"
@@ -1879,14 +1901,32 @@ export function RoofDesigner(props: {
             <ReceiptText className="size-4" aria-hidden />
             Quote{net !== null ? ` · ${dollars(net)}` : ""}
           </button>
+          <span className="hidden flex-1 lg:block" aria-hidden />
+          {/* The design's proposal, once it has been published. */}
+          {props.proposalHref ? (
+            <Link
+              href={props.proposalHref}
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-surface px-4 text-sm font-medium text-ink hover:border-forest"
+            >
+              <FileText className="size-4" aria-hidden /> View proposal
+            </Link>
+          ) : (
+            <button
+              disabled
+              title="Publish the design first: that makes its proposal"
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-surface-2 px-4 text-sm font-medium text-muted"
+            >
+              <FileText className="size-4" aria-hidden /> View proposal
+            </button>
+          )}
+          {/* Publishing saves the design and makes (or brings up to date) its proposal. */}
           <button
-            onClick={save}
-            disabled={saved === "saved" || saved === "saving"}
-            className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+            onClick={publish}
+            disabled={saved === "saving" || publishing}
+            className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
           >
-            Save design
+            <Send className="size-4" aria-hidden /> {publishing ? "Publishing…" : "Publish design"}
           </button>
-          {props.back}
         </div>
       </header>
 

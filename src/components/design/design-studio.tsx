@@ -23,7 +23,7 @@ import {
   savedLabel,
 } from "@/lib/services/design-store";
 import { loadJob, saveJob } from "@/lib/services/crm";
-import { DesignAccountLink, DesignKeptNote, DesignRoofList } from "./design-account";
+import { DesignKeptNote, DesignRoofList } from "./design-account";
 import { RoofDesigner } from "./roof-designer";
 
 /** What a kilowatt of panels makes in a day, from the same sunshine record the designer's months use. */
@@ -219,14 +219,9 @@ export function DesignStudio() {
                 </Link>
               )}
               {/* Another roof, without leaving the designer. */}
-              <div className="w-52 shrink-0 2xl:w-72">
+              <div className="w-72 max-w-full shrink-0 xl:w-96 2xl:w-[30rem]">
                 <AddressEntry compact placeholder="Search another address" onPick={pick} />
               </div>
-            </>
-          }
-          back={
-            <>
-              <DesignAccountLink />
             </>
           }
         />
