@@ -66,6 +66,8 @@ import {
   inverterSpot,
   inside,
   looseCorners,
+  ARRAY_GAP,
+  panelGap,
   metresPerPixel,
   monthlyProduction,
   panelFacing,
@@ -310,10 +312,18 @@ export function RoofDesigner(props: {
     setTool(t);
     setTracing([]);
     setRuling(null);
+    setArrayHint(null);
+    setOnPanel(false);
   };
   const [view, setView] = useState(WHOLE);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
   const [picks, setPicks] = useState<Pick[]>([]);
+  // The pointer is over a panel while adding panels: the arrow takes over there, so the panel can be picked and moved.
+  const [onPanel, setOnPanel] = useState(false);
+  // The array under the pointer, with the spot of the small round that picks all of it.
+  const [arrayHint, setArrayHint] = useState<{ picks: Pick[]; keys: string[]; at: Point; box: [number, number, number, number] } | null>(
+    null,
+  );
   const [wiring, setWiring] = useState<string | null>(first.strings?.[0]?.id ?? null);
   const [labelKind, setLabelKind] = useState<LabelKind>("Inverter");
   const [labelText, setLabelText] = useState("");
@@ -806,20 +816,23 @@ export function RoofDesigner(props: {
     ? {
         panel: gripPanel,
         turn: {
-          x: gripPanel.x + (size.long / 2 + 9 * u * scale) * Math.sin((gripPanel.angle * Math.PI) / 180),
-          y: gripPanel.y - (size.long / 2 + 9 * u * scale) * Math.cos((gripPanel.angle * Math.PI) / 180),
+          x: gripPanel.x + (size.long / 2 + 10 * u * scale) * Math.sin((gripPanel.angle * Math.PI) / 180),
+          y: gripPanel.y - (size.long / 2 + 10 * u * scale) * Math.cos((gripPanel.angle * Math.PI) / 180),
         },
       }
     : null;
 
-  // Several panels picked: one handle to spin the whole group about its middle, standing clear of its furthest panel.
+  // Several panels picked: one large handle to spin the whole group about its middle. It sits just off the group's
+  // edge on the side it points to (not out at the distance of the furthest corner, which left it a long way from a
+  // wide array).
   const spinGroup = (() => {
     if (!handles || panelPicks.length < 2) return null;
     const all = panelPicks.map(standing).filter((p): p is LoosePanel => p !== null);
     if (all.length < 2) return null;
     const centre = middle(all);
-    const reach = Math.max(...all.map((p) => Math.hypot(p.x - centre.x, p.y - centre.y))) + size.long / 2 + 9 * u * scale;
     const a = (spinAt * Math.PI) / 180;
+    const reach =
+      Math.max(...all.map((p) => (p.x - centre.x) * Math.sin(a) - (p.y - centre.y) * Math.cos(a))) + size.long / 2 + 12 * u * scale;
     return { centre, turn: { x: centre.x + reach * Math.sin(a), y: centre.y - reach * Math.cos(a) } };
   })();
   /** The direction of a point from a centre, in degrees clockwise from straight up. */
@@ -1042,6 +1055,46 @@ export function RoofDesigner(props: {
     return null;
   };
 
+  /**
+   * The array a panel belongs to: it and every panel that touches it, or as good as (`ARRAY_GAP`), and so on outwards.
+   * With where the small round that picks them all goes (just off the array's top right corner) and the box they fill.
+   */
+  const arrayOf = (start: Pick): NonNullable<typeof arrayHint> | null => {
+    const all = [
+      ...loose.map((panel) => ({ pick: { kind: "loose", id: panel.id } as Pick, corners: looseCorners(panel, size) })),
+      ...faces.flatMap((f) =>
+        panelPlaces(f, size)
+          .filter((place) => !f.off.includes(place.index))
+          .map((place) => ({ pick: { kind: "grid", face: f.id, index: place.index } as Pick, corners: place.corners })),
+      ),
+    ];
+    const first = all.findIndex((x) => same(x.pick, start));
+    if (first < 0) return null;
+    const inGroup = new Set([first]);
+    const queue = [first];
+    while (queue.length) {
+      const i = queue.pop()!;
+      for (let j = 0; j < all.length; j++)
+        if (!inGroup.has(j) && panelGap(all[i].corners, all[j].corners) <= ARRAY_GAP) {
+          inGroup.add(j);
+          queue.push(j);
+        }
+    }
+    if (inGroup.size < 2) return null;
+    const group = [...inGroup].map((i) => all[i]);
+    const xs = group.flatMap((g) => g.corners.map((c) => c.x));
+    const ys = group.flatMap((g) => g.corners.map((c) => c.y));
+    const box: [number, number, number, number] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+    return {
+      picks: group.map((g) => g.pick),
+      keys: group.map((g) => keyOf(g.pick)),
+      at: { x: box[2] + 7 * u * scale, y: box[1] - 7 * u * scale },
+      box,
+    };
+  };
+  /** Whether a press here is on the small round that picks the whole array. */
+  const onArrayHint = (p: Point) => arrayHint !== null && Math.hypot(p.x - arrayHint.at.x, p.y - arrayHint.at.y) < 8 * u * scale;
+
   const onPointerDown = (e: React.PointerEvent) => {
     // A press puts the string check away: it would sit over what is being dragged.
     setHover(null);
@@ -1070,6 +1123,14 @@ export function RoofDesigner(props: {
       setPicks([]);
       return setThread({ id: bubble.id });
     }
+    if ((tool === "select" || tool === "panel") && arrayHint && onArrayHint(p)) {
+      // The small round beside an array: every panel in it is picked, with the arrow, ready to move or turn together.
+      setPicks(arrayHint.picks);
+      setArrayHint(null);
+      setGhosts([]);
+      setOnPanel(false);
+      return setTool("select");
+    }
     const grabbed = tool === "select" ? kitAt(p) : null;
     if (grabbed !== null) {
       // The battery or an inverter: press it and drag it to the wall it will go on.
@@ -1083,7 +1144,7 @@ export function RoofDesigner(props: {
           : { mode: "inverter", n: grabbed, dx: p.x - at.x, dy: p.y - at.y };
       return;
     }
-    if (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 7 * u * scale) {
+    if (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale) {
       // The group's turn handle: every picked panel swings round the middle of the group as the pointer goes round it.
       // Any that were in a row come out of it first.
       svg.current?.setPointerCapture(e.pointerId);
@@ -1101,7 +1162,7 @@ export function RoofDesigner(props: {
       };
       return;
     }
-    if (tool === "panel" && grip && Math.hypot(p.x - grip.turn.x, p.y - grip.turn.y) < 6 * u * scale) {
+    if (tool === "panel" && grip && Math.hypot(p.x - grip.turn.x, p.y - grip.turn.y) < 8 * u * scale) {
       // The single panel's turn handle, while still adding panels.
       const pick = panelPicks[0];
       if (pick.kind === "loose") {
@@ -1138,7 +1199,9 @@ export function RoofDesigner(props: {
       if (tracing.length >= 3 && Math.hypot(cx - fx, cy - fy) < 8 * u) return finish(tracing);
       return setTracing([...tracing, p]);
     }
-    if (tool === "panel") {
+    // Adding panels, a press on a panel that is there is the arrow's: it picks the panel and drags it, as Select would.
+    const onOne = tool === "panel" ? hitAt(p) : null;
+    if (tool === "panel" && !(onOne && !onOne.empty && onOne.pick.kind !== "label")) {
       // The press starts where the outline was: beside the panel under the pointer, or under the pointer itself. Letting go
       // places it; dragging first pulls it out into a row, and up or down into more rows (see `arrayFrom`).
       const shown = ghostAt(p);
@@ -1190,7 +1253,7 @@ export function RoofDesigner(props: {
     }
     // The select tool.
     svg.current?.setPointerCapture(e.pointerId);
-    if (grip && Math.hypot(p.x - grip.turn.x, p.y - grip.turn.y) < 6 * u * scale) {
+    if (grip && Math.hypot(p.x - grip.turn.x, p.y - grip.turn.y) < 8 * u * scale) {
       // The turn handle: the panel follows the pointer round its middle. One in a row comes out of the row first.
       const pick = panelPicks[0];
       let id = pick.kind === "loose" ? pick.id : null;
@@ -1232,14 +1295,29 @@ export function RoofDesigner(props: {
       const key = under && !under.empty && under.pick.kind !== "label" ? keyOf(under.pick) : null;
       const over = key ? (strings.find((x) => x.panels.includes(key))?.id ?? null) : null;
       if (over !== hover) setHover(over);
+      if (tool === "select" || tool === "panel") {
+        // Over a panel in an array, a small round appears beside the array to pick all of it. It stays while the pointer
+        // is on the array or on its way to the round, and isn't offered for an array that is already all picked.
+        const at = pointer.current;
+        if (key && under && !arrayHint?.keys.includes(key)) {
+          const found = arrayOf(under.pick);
+          setArrayHint(found && !found.picks.every(isPicked) ? found : null);
+        } else if (!key && arrayHint && at) {
+          const reach = 16 * u * scale;
+          const [x1, y1, x2, y2] = arrayHint.box;
+          if (at.x < x1 - reach || at.x > x2 + reach || at.y < y1 - reach || at.y > y2 + reach) setArrayHint(null);
+        }
+        if ((tool === "panel" && key !== null) !== onPanel) setOnPanel(tool === "panel" && key !== null);
+      } else if (arrayHint) setArrayHint(null);
       const on = pointer.current && tool === "select" ? kitAt(pointer.current) : null;
       if (on !== kit) setKit(on);
       // A guide line being drawn reaches to the pointer.
       if (tool === "rule" && ruling && pointer.current) setRuling({ a: ruling.a, b: pointer.current });
       // Placing panels: the outline of the one a click would put down follows the pointer.
       if (tool === "panel") {
+        // Over a panel that is there (or the round beside its array) the arrow has taken over: no outline.
         const p = pointAt(e);
-        const next = p ? ghostAt(p) : null;
+        const next = p && !key && !onArrayHint(p) ? ghostAt(p) : null;
         setGhosts(next ? [next] : []);
       }
       return;
@@ -1385,6 +1463,12 @@ export function RoofDesigner(props: {
         setLoose([...loose, ...placed]);
         setPicks(placed.map((g): Pick => ({ kind: "loose", id: g.id })));
         changed();
+        // An array dragged out is done: the arrow takes over, with the whole array picked. A single panel placed
+        // leaves the tool on, to go on adding.
+        if (placed.length > 1) {
+          setTool("select");
+          setOnPanel(false);
+        }
       }
       return setGhosts([]);
     }
@@ -1965,7 +2049,7 @@ export function RoofDesigner(props: {
                   viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
                   className={clsx(
                     "block w-full touch-none select-none",
-                    tool === "pan" ? "cursor-grab" : tool === "select" ? "cursor-default" : "cursor-crosshair",
+                    tool === "pan" ? "cursor-grab" : tool === "select" || onPanel ? "cursor-default" : "cursor-crosshair",
                   )}
                   onPointerDown={onPointerDown}
                   onPointerMove={onPointerMove}
@@ -2439,6 +2523,36 @@ export function RoofDesigner(props: {
                         {aspect(ghost, panelFacing(ghost), ghost.tilt ?? TILT.roof, "#ffffff")}
                       </g>
                     ))}
+                  {/* The pointer is on an array: a small round beside it picks every panel in it. */}
+                  {arrayHint && (tool === "select" || tool === "panel") && !arrayHint.picks.every(isPicked) && (
+                    <g className="cursor-pointer">
+                      <title>{`Select all ${arrayHint.picks.length} panels in this array`}</title>
+                      <circle
+                        cx={px(arrayHint.at)[0]}
+                        cy={px(arrayHint.at)[1]}
+                        r={6.5 * u}
+                        fill={GOLD}
+                        stroke="#ffffff"
+                        strokeWidth={1.4 * u}
+                      />
+                      {[
+                        [-1, -1],
+                        [1, -1],
+                        [-1, 1],
+                        [1, 1],
+                      ].map(([i, j]) => (
+                        <rect
+                          key={`${i}${j}`}
+                          x={px(arrayHint.at)[0] + i * 1.7 * u - 1.3 * u}
+                          y={px(arrayHint.at)[1] + j * 1.7 * u - 1.3 * u}
+                          width={2.6 * u}
+                          height={2.6 * u}
+                          rx={0.5 * u}
+                          fill="#ffffff"
+                        />
+                      ))}
+                    </g>
+                  )}
                   {/* Several panels picked: one handle to spin them all about the middle of the group. */}
                   {spinGroup && (
                     <g pointerEvents="none">
@@ -2462,16 +2576,17 @@ export function RoofDesigner(props: {
                       <circle
                         cx={px(spinGroup.turn)[0]}
                         cy={px(spinGroup.turn)[1]}
-                        r={5 * u}
+                        r={8.5 * u}
                         fill="#ffffff"
-                        stroke="#0b0c0e"
-                        strokeWidth={u}
+                        stroke={GOLD}
+                        strokeWidth={1.6 * u}
                       />
                       <path
-                        d={`M${px(spinGroup.turn)[0] - 2.5 * u},${px(spinGroup.turn)[1]} a${2.5 * u},${2.5 * u} 0 1 1 ${2.5 * u},${2.5 * u}`}
+                        d={`M${px(spinGroup.turn)[0] - 4.2 * u},${px(spinGroup.turn)[1]} a${4.2 * u},${4.2 * u} 0 1 1 ${4.2 * u},${4.2 * u}`}
                         fill="none"
                         stroke="#0b0c0e"
-                        strokeWidth={u}
+                        strokeWidth={1.5 * u}
+                        strokeLinecap="round"
                       />
                     </g>
                   )}
@@ -2486,12 +2601,13 @@ export function RoofDesigner(props: {
                         stroke="#ffffff"
                         strokeWidth={0.8 * u}
                       />
-                      <circle cx={px(grip.turn)[0]} cy={px(grip.turn)[1]} r={4 * u} fill="#ffffff" stroke="#0b0c0e" strokeWidth={u} />
+                      <circle cx={px(grip.turn)[0]} cy={px(grip.turn)[1]} r={6.5 * u} fill="#ffffff" stroke={GOLD} strokeWidth={1.4 * u} />
                       <path
-                        d={`M${px(grip.turn)[0] - 2 * u},${px(grip.turn)[1]} a${2 * u},${2 * u} 0 1 1 ${2 * u},${2 * u}`}
+                        d={`M${px(grip.turn)[0] - 3.2 * u},${px(grip.turn)[1]} a${3.2 * u},${3.2 * u} 0 1 1 ${3.2 * u},${3.2 * u}`}
                         fill="none"
                         stroke="#0b0c0e"
-                        strokeWidth={0.9 * u}
+                        strokeWidth={1.3 * u}
+                        strokeLinecap="round"
                       />
                       <circle cx={px(grip.panel)[0]} cy={px(grip.panel)[1]} r={3.2 * u} fill={GOLD} stroke="#0b0c0e" strokeWidth={u} />
                       {[0, 90, 180, 270].map((d) => (

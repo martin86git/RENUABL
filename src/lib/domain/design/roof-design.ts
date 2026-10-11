@@ -827,7 +827,7 @@ export function monthlyProduction(design: Layout, yieldPerKwDay: number): number
 }
 
 /** The shortest distance between two panels' outlines, in metres (0 when they overlap). */
-function panelGap(a: readonly Point[], b: readonly Point[]): number {
+export function panelGap(a: readonly Point[], b: readonly Point[]): number {
   if (a.some((p) => inside(p, [...b])) || b.some((p) => inside(p, [...a]))) return 0;
   let least = Infinity;
   for (let i = 0; i < 4; i++)
