@@ -31,6 +31,7 @@ import {
   withdrawProposal,
 } from "@/lib/services/proposals";
 import { PATHS, ui } from "./design-shell";
+import { CustomerChat } from "./chat-panel";
 import { ProposalPage } from "./proposal-view";
 
 const STATE_WORDS: Record<ProposalState, string> = {
@@ -339,6 +340,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                 roof: `/api/design/roof?lat=${view.roof.lat.toFixed(6)}&lng=${view.roof.lng.toFixed(6)}`,
                 pdf: null,
               }}
+              chat={<CustomerChat business={view.business.name} phone={view.business.phone} />}
             />
           </div>
         ) : (

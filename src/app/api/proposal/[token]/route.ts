@@ -1,8 +1,8 @@
 import { after } from "next/server";
 import { todayInMarket } from "@/lib/domain/market";
-import { cleanAcceptance, cleanQuestion } from "@/lib/domain/design/proposal";
+import { cleanAcceptance } from "@/lib/domain/design/proposal";
 import { answer, readBody } from "@/lib/server/design-context";
-import { acceptProposal, askQuestion, markOpened, publicProposal } from "@/lib/server/design-proposal-repo";
+import { acceptProposal, markOpened, publicProposal } from "@/lib/server/design-proposal-repo";
 import { tellAccepted } from "@/lib/server/design-notify";
 import { allow } from "@/lib/server/rate-limit";
 
@@ -27,12 +27,12 @@ export async function GET(request: Request, ctx: RouteContext<"/api/proposal/[to
 }
 
 /**
- * POST { action: "opened" } | { action: "accept", name, agree: true } |
- * { action: "question", text }: what a customer can do from their proposal.
+ * POST { action: "opened" } | { action: "accept", name, agree: true }: what
+ * a customer can do from their proposal (writing to the business is its own
+ * route, /chat).
  * Opening is written on their record once. Going ahead is kept once, with
  * the name typed and the server's time, and only while the proposal is live
- * (not lapsed, withdrawn or already accepted). A question goes on their
- * record for the business to answer.
+ * (not lapsed, withdrawn or already accepted).
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[token]">) {
   return answer(async () => {
@@ -62,16 +62,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[t
       }
       const found = await publicProposal(token, today);
       return Response.json({ ok: true, ...found }, { headers: PRIVATE });
-    }
-    if (read.body.action === "question") {
-      if (!allow(request, "proposal-question", 10)) return slowDown();
-      const input = cleanQuestion(read.body);
-      if (!input.ok) return Response.json({ ok: false, message: input.message }, { status: 422 });
-      const result = await askQuestion(token, input.value.text);
-      if (!result) return notFound();
-      if (result === "full")
-        return Response.json({ ok: false, message: "That's a lot of questions. It's quicker to call or email us now." }, { status: 429 });
-      return Response.json({ ok: true }, { headers: PRIVATE });
     }
     return Response.json({ ok: false, message: "That can't be done here." }, { status: 400 });
   });

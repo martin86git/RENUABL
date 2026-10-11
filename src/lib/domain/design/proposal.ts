@@ -596,24 +596,11 @@ export function cleanAcceptance(raw: unknown): Cleaned<{ name: string }> {
   return { ok: true, value: { name } };
 }
 
-export const QUESTION_MISSING = "Write your question first.";
-
-/** A customer's question, as sent. */
-export function cleanQuestion(raw: unknown): Cleaned<{ text: string }> {
-  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const text = oneLine(r.text, 1000);
-  return text ? { ok: true, value: { text } } : { ok: false, message: QUESTION_MISSING };
-}
-
-/** The most questions kept from one proposal's link. */
-export const MAX_QUESTIONS = 20;
-
 // What goes in the customer's history.
 export const published = (version: number) => `Proposal ${version === 1 ? "" : `(version ${version}) `}sent`;
 export const PROPOSAL_OPENED = "Proposal opened by the customer";
 export const PROPOSAL_WITHDRAWN = "Proposal withdrawn";
 export const accepted = (name: string) => `Proposal accepted by ${name}`;
-export const asked = (text: string) => `Question on the proposal: ${text}`;
 /** Who wrote a history line that came through a proposal's link. */
 export const FROM_CUSTOMER = "Customer";
 

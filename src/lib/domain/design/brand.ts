@@ -190,6 +190,8 @@ export interface BrandKit {
   installTime: InstallTime;
   /** Extra addresses of the business's own, told when a customer accepts a proposal. */
   notify: string[];
+  /** Whether the customer is emailed when someone at the business replies in a job's conversation. On until the business says otherwise. */
+  emailReplies: boolean;
   /** Whether every proposal carries RENUABL's standard terms and conditions (`standard-terms.ts`). On until the business says otherwise. */
   standardTerms: boolean;
   /** The business says it is a New Energy Tech Approved Seller. We don't check it: it only chooses which line the consumer information carries. */
@@ -227,6 +229,7 @@ export function defaultBrand(businessName: string): BrandKit {
     warrantyWords: "",
     installTime: "",
     notify: [],
+    emailReplies: true,
     standardTerms: true,
     netccApproved: false,
     blocks: defaultBlocks(),
@@ -430,6 +433,7 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
       installTime: INSTALL_TIMES.some((t) => t.id === r.installTime) ? (r.installTime as InstallTime) : current.installTime,
       notify: notify.value,
       // A switch is only ever moved by an explicit true or false.
+      emailReplies: typeof r.emailReplies === "boolean" ? r.emailReplies : current.emailReplies,
       standardTerms: typeof r.standardTerms === "boolean" ? r.standardTerms : current.standardTerms,
       netccApproved: typeof r.netccApproved === "boolean" ? r.netccApproved : current.netccApproved,
       blocks: sent("blocks") ? cleanBlocks(r.blocks) : current.blocks,

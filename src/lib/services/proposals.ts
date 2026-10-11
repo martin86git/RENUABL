@@ -137,8 +137,6 @@ const link = (token: string) => `/api/proposal/${encodeURIComponent(token)}`;
 export const tellOpened = (token: string) => void ask<object>(link(token), { method: "POST", body: { action: "opened" } });
 export const acceptProposal = (token: string, name: string, agree: boolean) =>
   ask<OpenedProposal>(link(token), { method: "POST", body: { action: "accept", name, agree } });
-export const askQuestion = (token: string, text: string) =>
-  ask<object>(link(token), { method: "POST", body: { action: "question", text } });
 
 /** Where a proposal's pictures, its roof from above and its PDF are, by its private link. */
 export const proposalUrls = (token: string) => ({

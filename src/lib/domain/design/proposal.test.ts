@@ -30,14 +30,12 @@ import {
   ESTIMATE_NOTE,
   NOTHING_DRAWN,
   PRODUCTION_NOTE,
-  QUESTION_MISSING,
   SAVING_NOTE,
   STC_NOTE,
   addDays,
   buildProposal,
   cleanAcceptance,
   cleanChoice,
-  cleanQuestion,
   inVictoria,
   isProposalToken,
   proposalState,
@@ -425,12 +423,6 @@ describe("choices, links and what a customer sends back", () => {
     for (const agree of [false, "true", 1, undefined])
       expect(cleanAcceptance({ name: "Alex Example", agree })).toEqual({ ok: false, message: ACCEPT_TICK_MISSING });
     expect(cleanAcceptance({ name: "<b>Alex</b> Example", agree: true })).toEqual({ ok: true, value: { name: "b Alex /b Example" } });
-  });
-  it("takes a question as one tidy line", () => {
-    expect(cleanQuestion({ text: " Can it go\non the garage? " })).toEqual({ ok: true, value: { text: "Can it go on the garage?" } });
-    expect(cleanQuestion({ text: "   " })).toEqual({ ok: false, message: QUESTION_MISSING });
-    const long = cleanQuestion({ text: "q".repeat(3000) });
-    expect(long.ok && long.value.text.length).toBe(1000);
   });
 });
 

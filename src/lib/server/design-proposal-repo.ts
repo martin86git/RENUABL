@@ -18,11 +18,9 @@ import { stageMoveText, type Customer, type Job, type JobStage } from "@/lib/dom
 import { DEFAULT_WORKSPACE, cleanWorkspace, type Workspace } from "@/lib/domain/design/pricing";
 import {
   FROM_CUSTOMER,
-  MAX_QUESTIONS,
   PROPOSAL_OPENED,
   PROPOSAL_WITHDRAWN,
   accepted as acceptedText,
-  asked,
   isProposalToken,
   proposalPath,
   proposalState,
@@ -468,20 +466,43 @@ export async function acceptedNotice(
   };
 }
 
-/** A customer's question, written on their record for the business to answer. "full" past the limit for one link. */
-export async function askQuestion(token: string, text: string): Promise<"asked" | "full" | null> {
-  return transaction(async (q) => {
-    const row = await behind(q, token, true);
-    if (!row || row.withdrawn) return null;
-    if (row.questions >= MAX_QUESTIONS) return "full";
-    await q(`update design_proposals set questions = questions + 1 where business_id = $1 and token = $2`, [row.businessId, token]);
-    await record(q, row.businessId, {
-      customerId: row.customerId,
-      jobId: row.jobId,
-      kind: "proposal",
-      text: asked(text),
-      by: FROM_CUSTOMER,
-    });
-    return "asked";
-  });
+/**
+ * The job behind a link, for its conversation: whose it is, what to call each side, and whether the proposal has
+ * been withdrawn. The customer's name is theirs as it stands now; the business's is as it was on the proposal.
+ */
+export async function proposalJob(token: string): Promise<{
+  businessId: string;
+  jobId: string;
+  customerId: string;
+  withdrawn: boolean;
+  businessName: string;
+  customerName: string;
+  title: string;
+} | null> {
+  const row = await behind(query, token);
+  if (!row) return null;
+  const who = await query<{ name: string; title: string }>(
+    `select c.name, j.title from design_jobs j join design_customers c on c.business_id = j.business_id and c.id = j.customer_id
+      where j.business_id = $1 and j.id = $2`,
+    [row.businessId, row.jobId],
+  );
+  if (!who[0]) return null;
+  return {
+    businessId: row.businessId,
+    jobId: row.jobId,
+    customerId: row.customerId,
+    withdrawn: row.withdrawn,
+    businessName: row.view.business.name,
+    customerName: who[0].name,
+    title: who[0].title,
+  };
+}
+
+/** The private link's token for one of the business's jobs, when it has a proposal out (not withdrawn). Null otherwise. */
+export async function tokenForJob(businessId: string, jobId: string): Promise<string | null> {
+  const rows = await query<{ token: string }>(
+    `select token from design_proposals where business_id = $1 and job_id = $2 and withdrawn_at is null`,
+    [businessId, jobId],
+  );
+  return rows[0]?.token ?? null;
 }

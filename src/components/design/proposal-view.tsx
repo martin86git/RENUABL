@@ -55,7 +55,6 @@ export interface ProposalUrls {
 /** What the customer can do from the page. Left out in the business's preview, where the buttons are shown but do nothing. */
 export interface ProposalActions {
   accept: (name: string, agree: boolean) => Promise<string | null>;
-  ask: (text: string) => Promise<string | null>;
 }
 
 /** The roof from above with the panels where they were placed: the same picture and scale the design was drawn on. */
@@ -146,14 +145,12 @@ function Headline({ view }: { view: ProposalView }) {
   );
 }
 
-/** Going ahead, and a question: what a customer can do. In a preview both are shown and neither does anything. */
+/** Going ahead. In a preview it is shown and does nothing. The conversation with the business sits under it (`chat`). */
 function GoAhead({ view, state, accepted, actions }: Pick<ProposalPageProps, "view" | "state" | "accepted" | "actions">) {
   const [name, setName] = useState("");
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [question, setQuestion] = useState("");
-  const [asked, setAsked] = useState<{ ok: boolean; text: string } | null>(null);
   const b = view.business;
   const line = acceptLine(view);
 
@@ -183,15 +180,8 @@ function GoAhead({ view, state, accepted, actions }: Pick<ProposalPageProps, "vi
     setProblem(await actions.accept(name, agree));
     setBusy(false);
   };
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!actions || !question.trim()) return;
-    const failed = await actions.ask(question);
-    setAsked(failed ? { ok: false, text: failed } : { ok: true, text: `Sent. ${b.name} will get back to you.` });
-    if (!failed) setQuestion("");
-  };
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div>
       <form onSubmit={submit} className={card}>
         <h3 className="text-[18px] text-ink">Ready to go ahead?</h3>
         <p className="mt-1 text-sm text-muted">
@@ -226,32 +216,6 @@ function GoAhead({ view, state, accepted, actions }: Pick<ProposalPageProps, "vi
         </button>
         {!actions && <p className={clsx(fine, "mt-2")}>A preview: your customer uses this from their own link.</p>}
       </form>
-      <form onSubmit={send} className={card}>
-        <h3 className="text-[18px] text-ink">A question first?</h3>
-        <p className="mt-1 text-sm text-muted">
-          Ask here{b.phone ? `, or call ${b.phone}` : ""}
-          {b.email ? `${b.phone ? " or" : ", or"} email ${b.email}` : ""}.
-        </p>
-        <textarea
-          className={clsx(field, "mt-4 min-h-28 py-2.5")}
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          maxLength={1000}
-          aria-label="Your question"
-        />
-        {asked && (
-          <p className={clsx("mt-3 text-[13px]", asked.ok ? "text-ink" : "text-danger")} role="status">
-            {asked.text}
-          </p>
-        )}
-        <button
-          type="submit"
-          className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-line bg-surface px-5 text-sm font-medium text-ink disabled:text-muted"
-          disabled={!actions || !question.trim()}
-        >
-          Send my question
-        </button>
-      </form>
     </div>
   );
 }
@@ -263,6 +227,8 @@ export interface ProposalPageProps {
   urls: ProposalUrls;
   /** Left out in the business's own preview. */
   actions?: ProposalActions;
+  /** The conversation with the business, shown under going ahead whatever state the proposal is in. Drawn by the page that knows the link. */
+  chat?: React.ReactNode;
 }
 
 /**
@@ -283,7 +249,7 @@ export interface ProposalPageProps {
  * the design tool's monospace face, and the preview must look as the
  * customer's page does.
  */
-export function ProposalPage({ view, state, accepted, urls, actions }: ProposalPageProps) {
+export function ProposalPage({ view, state, accepted, urls, actions, chat }: ProposalPageProps) {
   const b = view.business;
   const bold = view.template === "bold";
   const compact = view.template === "compact";
@@ -502,7 +468,12 @@ export function ProposalPage({ view, state, accepted, urls, actions }: ProposalP
     "custom-1": () => null,
     "custom-2": () => null,
     "custom-3": () => null,
-    accept: () => <GoAhead view={view} state={state} accepted={accepted} actions={actions} />,
+    accept: () => (
+      <>
+        <GoAhead view={view} state={state} accepted={accepted} actions={actions} />
+        {chat && <div className="mt-4">{chat}</div>}
+      </>
+    ),
     // The standard terms and conditions, when the business has them on: the details of this agreement (from the
     // proposal's own figures), the consumer information, then the terms as they stood when it was published. Closed
     // until asked for; the tick to go ahead refers to them.

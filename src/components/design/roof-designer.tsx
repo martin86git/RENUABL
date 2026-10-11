@@ -304,6 +304,8 @@ export function RoofDesigner(props: {
   onPublish?: () => Promise<string | null>;
   /** Where this roof's proposal is, once there is one. */
   proposalHref?: string | null;
+  /** The conversation with the customer, for a roof opened from a deal: drawn by the page, shown beside View proposal. */
+  chat?: React.ReactNode;
   /**
    * The person may not see costs (the owner's setting, enforced on the server, which sends them no costs at all):
    * no quote and no price are shown, and no price is handed on when saving.
@@ -1957,6 +1959,7 @@ export function RoofDesigner(props: {
             Quote{net !== null ? ` · ${dollars(net)}` : ""}
           </button>
           <span className="hidden flex-1 lg:block" aria-hidden />
+          {props.chat}
           {/* The design's proposal, once it has been published. */}
           {props.proposalHref ? (
             <Link

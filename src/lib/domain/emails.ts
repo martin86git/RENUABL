@@ -343,6 +343,46 @@ export function proposalAcceptedEmail(o: { business: string; customer: string; t
   });
 }
 
+/**
+ * To a business's own addresses, when a customer writes in a job's conversation (the roof designer). From RENUABL,
+ * about the business's own customer: the message, and the way to the deal to answer it. DRAFT wording: review before launch.
+ */
+export function chatMessageEmail(o: { business: string; customer: string; title: string; text: string; link: string }) {
+  const customer = plainText(o.customer, 120) || "A customer";
+  return simpleEmail({
+    subject: `New message from ${customer}`,
+    heading: `${customer} sent a message`,
+    lines: [
+      `About "${plainText(o.title, 80) || "their job"}", for ${plainText(o.business, 80) || "your business"}:`,
+      plainText(o.text, 2000),
+      "Answer it from the deal. Replying to this email doesn't reach them.",
+    ],
+    button: { label: "Open the conversation", href: o.link },
+    footer: "This message was sent by RENUABL for your business. It wasn't sent to the customer.",
+  });
+}
+
+/**
+ * To a business's customer, when the business replies in their job's conversation (the roof designer). Sent by
+ * RENUABL and says so, naming the business plainly: it is not sent in the business's name. It carries the one new
+ * message and the way back to their proposal, and asks them to answer there: a reply by email isn't read.
+ * DRAFT wording: review before launch.
+ */
+export function chatReplyEmail(o: { business: string; customer: string; text: string; link: string }) {
+  const business = plainText(o.business, 80) || "Your solar business";
+  return simpleEmail({
+    subject: `A message from ${business} about your proposal`,
+    heading: `${business} sent you a message`,
+    lines: [
+      `Hi ${plainText(o.customer, 40) || "there"},`,
+      plainText(o.text, 2000),
+      "To answer, open your proposal and write back there. A reply to this email isn't read.",
+    ],
+    button: { label: "Open my proposal", href: o.link },
+    footer: `Sent for ${business} by RENUABL, the software they use for proposals. You are getting this because you were sent a proposal by ${business}.`,
+  });
+}
+
 export function applicationPendingEmail() {
   return simpleEmail({
     subject: "Your RENUABL application is being reviewed",
