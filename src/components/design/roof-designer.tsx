@@ -25,6 +25,7 @@ import {
   WandSparkles,
   Sparkles,
   Trash2,
+  X,
   Undo2,
   Zap,
   ZoomIn,
@@ -175,6 +176,82 @@ const middle = (corners: readonly Point[]): Point => ({
   x: corners.reduce((n, c) => n + c.x, 0) / corners.length,
   y: corners.reduce((n, c) => n + c.y, 0) / corners.length,
 });
+/** Where each of the dial's rounds sits on its arc: degrees from straight left, up (negative) or down. */
+const DIAL_STEPS: [step: number, at: number][] = [
+  [-5, -46],
+  [-1, -23],
+  [90, 0],
+  [1, 23],
+  [5, 46],
+];
+
+/**
+ * The dial for whatever is picked: a half-round on the right edge of the picture, with the turns set round its arc
+ * (a quarter turn in the middle, the fine ones either side), the cross to let go at the top and the bin at the foot,
+ * and what it is about (how many are picked, their tilt and what that tilt makes) set inside it.
+ */
+function Dial(props: {
+  label: string;
+  /** Turns what is picked by so many degrees; null when there is nothing to turn (a label). */
+  onTurn: ((degrees: number) => void) | null;
+  onClose: () => void;
+  closeTitle: string;
+  onRemove?: () => void;
+  children: React.ReactNode;
+}) {
+  // In rem: the dial's radius, and how far out from its centre (the middle of the picture's right edge) the rounds sit.
+  const R = 11.5;
+  const at = (degrees: number, out: number) => {
+    const a = (degrees * Math.PI) / 180;
+    return { left: `${R - out * Math.cos(a)}rem`, top: `${R + out * Math.sin(a)}rem` };
+  };
+  const round =
+    "absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-surface shadow-lift ring-1 ring-line hover:ring-ink-2";
+  return (
+    <div
+      className="absolute right-0 top-[56%] z-10 -translate-y-1/2 rounded-l-full border border-r-0 border-line bg-surface/90 shadow-lift backdrop-blur-md"
+      style={{ width: `${R}rem`, height: `${R * 2}rem` }}
+      role="group"
+      aria-label={props.label}
+    >
+      <button
+        className={clsx(round, "size-11 text-ink-2 hover:text-ink")}
+        style={at(-66, R - 3.2)}
+        onClick={props.onClose}
+        title={props.closeTitle}
+        aria-label={props.closeTitle}
+      >
+        <X className="size-4" aria-hidden />
+      </button>
+      {props.onTurn &&
+        DIAL_STEPS.map(([step, degrees]) => (
+          <button
+            key={step}
+            className={clsx(round, "size-11 text-sm font-semibold tabular-nums text-ink")}
+            style={at(degrees, R - 2.5)}
+            onClick={() => props.onTurn?.(step)}
+            aria-label={`Turn ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
+          >
+            {step === 90 ? "" : step > 0 ? "+" : "−"}
+            {Math.abs(step)}°
+          </button>
+        ))}
+      {props.onRemove && (
+        <button
+          className={clsx(round, "size-11 text-danger")}
+          style={at(66, R - 3.2)}
+          onClick={props.onRemove}
+          title="Take out what is picked (Delete)"
+          aria-label="Take out what is picked"
+        >
+          <Trash2 className="size-[18px]" aria-hidden />
+        </button>
+      )}
+      <div className="absolute right-3 top-1/2 w-[6.5rem] -translate-y-1/2 text-right">{props.children}</div>
+    </div>
+  );
+}
+
 // A panel's angle goes all the way round: turned half way it looks the same, but faces the other way.
 const full = (angle: number) => ((angle % 360) + 360) % 360;
 /** What a tilt and direction make over a year beside lying flat, in words. */
@@ -2091,7 +2168,7 @@ export function RoofDesigner(props: {
                                 fill={wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#0d1219"}
                                 fillOpacity={wired >= 0 ? 0.72 : 0.9}
                                 stroke={lit ? GOLD : wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#93a0b1"}
-                                strokeWidth={(lit ? 1.8 : 0.5) * u}
+                                strokeWidth={(lit ? 0.9 : 0.5) * u}
                               />
                               {aspect(
                                 middle(panel.corners),
@@ -2117,7 +2194,7 @@ export function RoofDesigner(props: {
                           fill={wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#0d1219"}
                           fillOpacity={wired >= 0 ? 0.72 : 0.9}
                           stroke={lit ? GOLD : wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#93a0b1"}
-                          strokeWidth={(lit ? 1.8 : 0.5) * u}
+                          strokeWidth={(lit ? 0.9 : 0.5) * u}
                         />
                         {aspect(panel, panelFacing(panel), panel.tilt ?? TILT.roof, wired >= 0 ? "#0b0c0e" : lit ? GOLD : "#93a0b1")}
                       </g>
@@ -2975,90 +3052,60 @@ export function RoofDesigner(props: {
                   </p>
                 </div>
               ) : picks.length > 0 ? (
-                <div
-                  className="absolute right-0 top-1/2 z-10 flex h-[23rem] w-[10.5rem] -translate-y-1/2 flex-col items-end justify-center gap-1 rounded-l-full border border-r-0 border-line bg-surface/90 py-10 pl-12 pr-3 shadow-lift backdrop-blur-md"
-                  role="group"
-                  aria-label="What is picked"
+                <Dial
+                  label="What is picked"
+                  onTurn={panelPicks.length > 0 ? turn : null}
+                  onClose={() => setPicks([])}
+                  closeTitle="Pick none (Esc)"
+                  onRemove={removePicked}
                 >
-                  <p className="text-right text-[10px] font-medium uppercase leading-tight tracking-[0.14em] text-muted">
-                    {picks.length === 1 ? (picks[0].kind === "label" ? "Label" : "Panel") : `${picks.length} picked`}
+                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
+                    {picks.length === 1 ? (picks[0].kind === "label" ? "Label" : "1 panel") : `${picks.length} picked`}
                   </p>
-                  {panelPicks.length > 0 &&
-                    [90, 5, 1, -1, -5].map((step) => (
-                      <button
-                        key={step}
-                        className="flex h-9 w-[4.5rem] items-center justify-center rounded-full border border-line bg-surface text-sm font-semibold tabular-nums text-ink hover:border-forest"
-                        onClick={() => turn(step)}
-                        aria-label={`Turn ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
-                      >
-                        {step > 0 ? "+" : "−"}
-                        {Math.abs(step)}°
-                      </button>
-                    ))}
                   {pickedPanels.length > 0 && (
-                    <label
-                      className="mt-1 block w-[6.5rem] text-right text-xs text-ink-2"
-                      title={
-                        pickedFacing === null
-                          ? "Facing different ways."
-                          : `Facing ${compass(pickedFacing)} (${pickedFacing}°).${
-                              pickedTilt !== null
-                                ? ` ${besideFlat(pickedTilt, pickedFacing)}. ${bestTilt(pickedFacing) === 0 ? "Flat is best this way." : `${bestTilt(pickedFacing)}° is best this way.`}`
-                                : ""
-                            }`
-                      }
-                    >
-                      Tilt <span className="tabular-nums text-ink">{pickedTilt === null ? "mixed" : `${pickedTilt}°`}</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={TILT.max}
-                        value={pickedTilt ?? TILT.roof}
-                        onChange={(e) => amend((p) => ({ ...p, tilt: Number(e.target.value) }))}
-                        {...slides}
-                        className="mt-0.5 block w-full"
-                      />
-                    </label>
+                    <>
+                      <label className="mt-2 block">
+                        <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Tilt</span>
+                        <span className="block text-[2rem] font-semibold leading-none tabular-nums text-ink">
+                          {pickedTilt === null ? "mixed" : `${pickedTilt}°`}
+                        </span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={TILT.max}
+                          value={pickedTilt ?? TILT.roof}
+                          onChange={(e) => amend((p) => ({ ...p, tilt: Number(e.target.value) }))}
+                          {...slides}
+                          className="mt-2 block w-full"
+                        />
+                      </label>
+                      <p className="mt-3 text-[13px] leading-snug text-ink-2">
+                        {pickedFacing === null ? "Facing different ways" : `Facing ${compass(pickedFacing)} (${pickedFacing}°)`}
+                      </p>
+                      {pickedFacing !== null && pickedTilt !== null && (
+                        <>
+                          <p className="text-[13px] font-semibold leading-snug text-ink">{besideFlat(pickedTilt, pickedFacing)}</p>
+                          <p className="text-[13px] leading-snug text-muted">
+                            {bestTilt(pickedFacing) === 0 ? "Flat is best" : `${bestTilt(pickedFacing)}° is best`}
+                          </p>
+                        </>
+                      )}
+                    </>
                   )}
-                  <div className="mt-1 flex items-center gap-2 text-xs font-medium">
-                    <button className="text-danger hover:underline" onClick={removePicked} title="Take out what is picked (Delete)">
-                      Remove
-                    </button>
-                    <button className="text-muted hover:text-ink" onClick={() => setPicks([])} title="Pick none (Esc)">
-                      Done
-                    </button>
-                  </div>
-                </div>
+                </Dial>
               ) : (
                 face && (
-                  <div
-                    className="absolute right-0 top-1/2 z-10 flex h-[23rem] w-[10.5rem] -translate-y-1/2 flex-col items-end justify-center gap-1 rounded-l-full border border-r-0 border-line bg-surface/90 py-10 pl-12 pr-3 shadow-lift backdrop-blur-md"
-                    role="group"
-                    aria-label="Turn the rows"
+                  <Dial
+                    label="Turn the rows"
+                    // The rows run the same turned half way round, so their angle stays between a quarter turn either way.
+                    onTurn={(step) => update(face.id, { angle: ((((face.angle + step + 90) % 180) + 180) % 180) - 90, off: [] })}
+                    onClose={() => setSelected(null)}
+                    closeTitle="Leave this roof face"
                   >
-                    <p className="text-right text-[10px] font-medium uppercase leading-tight tracking-[0.14em] text-muted">
-                      Rows <span className="tabular-nums">{face.angle}°</span>
-                    </p>
-                    {[90, 5, 1, -1, -5].map((step) => (
-                      <button
-                        key={step}
-                        // The rows run the same turned half way round, so their angle stays between a quarter turn either way.
-                        onClick={() => update(face.id, { angle: ((((face.angle + step + 90) % 180) + 180) % 180) - 90, off: [] })}
-                        aria-label={`Turn the rows ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
-                        className="flex h-9 w-[4.5rem] items-center justify-center rounded-full border border-line bg-surface text-sm font-semibold tabular-nums text-ink hover:border-forest"
-                      >
-                        {step > 0 ? "+" : "−"}
-                        {Math.abs(step)}°
-                      </button>
-                    ))}
-                    <button
-                      className="mt-1 text-xs font-medium text-muted hover:text-ink"
-                      onClick={() => setSelected(null)}
-                      title="Leave this roof face"
-                    >
-                      Done
-                    </button>
-                  </div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Rows</p>
+                    <p className="mt-1 text-[2rem] font-semibold leading-none tabular-nums text-ink">{face.angle}°</p>
+                    <p className="mt-2 text-[13px] leading-snug text-ink-2">Turn the rows on this roof face</p>
+                  </Dial>
                 )
               )}
 
