@@ -7,6 +7,7 @@ import {
   Cable,
   Check,
   Copy,
+  Eraser,
   Hand,
   Layers,
   Maximize,
@@ -101,7 +102,7 @@ const VERDICT: Record<StringCheck["verdict"], { mark: string; tone: string; pad:
   unknown: { mark: "?", tone: "text-muted", pad: "bg-white/10 text-white/80" },
 };
 
-type Tool = "select" | "pan" | "trace" | "rule" | "panel" | "string" | "label" | "comment";
+type Tool = "select" | "pan" | "erase" | "trace" | "rule" | "panel" | "string" | "label" | "comment";
 const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
   {
     tool: "select",
@@ -141,6 +142,12 @@ const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
   },
   { tool: "label", icon: Tag, name: "Add a label", hint: "Click where the inverter, battery, switchboard or a note belongs." },
   {
+    tool: "erase",
+    icon: Eraser,
+    name: "Eraser",
+    hint: "Click a panel, a label or a guide line to take it away, or press and drag across panels to clear them as you go. Undo brings them back.",
+  },
+  {
     tool: "comment",
     icon: MessageCircle,
     name: "Comment",
@@ -150,14 +157,14 @@ const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
 
 /**
  * The work goes in three steps, left to right, and each shows only its own tools: the roof (its faces and the
- * panels on them, which are one job), then the wiring and what the panels feed, then the quote. Selecting, moving the picture and
- * commenting belong to every step. Any step can be opened at any time: the order is a guide, not a gate.
+ * panels on them, which are one job), then the wiring and what the panels feed, then the quote. Commenting belongs
+ * to every step; the select arrow and the hand that moves the picture are always on the picture itself. Any step can be opened at any time: the order is a guide, not a gate.
  */
 type Step = "roof" | "electrical" | "quote";
 const STEPS: { step: Step; name: string; tools: Tool[] }[] = [
-  { step: "roof", name: "Roof", tools: ["select", "pan", "trace", "panel", "rule", "comment"] },
-  { step: "electrical", name: "Electrical", tools: ["select", "pan", "string", "label", "comment"] },
-  { step: "quote", name: "Quote", tools: ["select", "pan", "comment"] },
+  { step: "roof", name: "Roof", tools: ["trace", "panel", "rule", "comment"] },
+  { step: "electrical", name: "Electrical", tools: ["string", "label", "comment"] },
+  { step: "quote", name: "Quote", tools: ["comment"] },
 ];
 
 /** A tool's name as it is written on the step's row of tools: short, so the row stays on one line. */
@@ -170,6 +177,7 @@ const SHORT: Record<Tool, string> = {
   string: "String",
   label: "Label",
   comment: "Comment",
+  erase: "Eraser",
 };
 
 /** Something picked on the drawing: a panel in a row, a panel placed by hand, or a label. */
@@ -197,7 +205,7 @@ const cm = (n: number) => Math.round(n * 100) / 100;
  * The widest the picture may be and still fit the window with the bar and the figures above it: the picture is
  * given all the room there is, since it is where the work is done.
  */
-const FIT = `calc((100dvh - 12.5rem) * ${ROOF_IMAGE.width / ROOF_IMAGE.height})`;
+const FIT = `calc((100dvh - 15.5rem) * ${ROOF_IMAGE.width / ROOF_IMAGE.height})`;
 const WHOLE: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: ROOF_IMAGE.width, h: ROOF_IMAGE.height };
 
 /**
@@ -343,6 +351,7 @@ export function RoofDesigner(props: {
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
     | { mode: "inverter"; n: number; dx: number; dy: number }
+    | { mode: "erase" }
     | { mode: "spin"; centre: Point; from: number; starts: Record<string, LoosePanel> }
     | null
   >(null);
@@ -931,11 +940,12 @@ export function RoofDesigner(props: {
     changed();
   };
 
-  const removePicked = () => {
-    const keys = new Set(picks.map(keyOf));
+  /** Takes panels and labels off the design: a panel in a row leaves its place empty, and comes off any string. */
+  const removePicks = (gone: Pick[]) => {
+    const keys = new Set(gone.map(keyOf));
     setFaces(
       faces.map((f) => {
-        const out = picks.filter((p) => p.kind === "grid" && p.face === f.id).map((p) => (p as { index: number }).index);
+        const out = gone.filter((p) => p.kind === "grid" && p.face === f.id).map((p) => (p as { index: number }).index);
         return out.length ? { ...f, off: [...new Set([...f.off, ...out])] } : f;
       }),
     );
@@ -944,6 +954,22 @@ export function RoofDesigner(props: {
     setStrings(strings.map((s) => ({ ...s, panels: s.panels.filter((k) => !keys.has(k)) })).filter((s) => s.panels.length));
     setPicks([]);
     changed();
+  };
+  const removePicked = () => removePicks(picks);
+  /** The eraser: whatever is under the point goes. A panel or a label first; failing that, a guide line close by. */
+  const eraseAt = (p: Point) => {
+    const hit = hitAt(p);
+    if (hit && !hit.empty) return removePicks([hit.pick]);
+    const line = rules.find((g) => {
+      const dx = g.b.x - g.a.x;
+      const dy = g.b.y - g.a.y;
+      const t = Math.max(0, Math.min(1, ((p.x - g.a.x) * dx + (p.y - g.a.y) * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(p.x - (g.a.x + t * dx), p.y - (g.a.y + t * dy)) < 4 * u * scale;
+    });
+    if (line) {
+      setRules(rules.filter((g) => g !== line));
+      changed();
+    }
   };
 
   // The keyboard: Delete or Backspace takes out whatever is picked, and Escape picks nothing. Not while typing in a box.
@@ -1131,6 +1157,12 @@ export function RoofDesigner(props: {
       setTalking("idle");
       return setThread({ at: p });
     }
+    if (tool === "erase") {
+      // A click erases what is under it; holding and dragging goes on erasing, and the whole drag is one step to undo.
+      svg.current?.setPointerCapture(e.pointerId);
+      press.current = { mode: "erase" };
+      return eraseAt(p);
+    }
     const hit = hitAt(p);
     if (tool === "string") {
       if (!hit || hit.pick.kind === "label" || hit.empty) return;
@@ -1214,6 +1246,10 @@ export function RoofDesigner(props: {
       if (!p) return;
       setBattery((b) => (b ? { ...b, x: cm(p.x - held.dx), y: cm(p.y - held.dy) } : b));
       return changed();
+    }
+    if (held.mode === "erase") {
+      if (pointer.current) eraseAt(pointer.current);
+      return;
     }
     if (held.mode === "inverter") {
       const p = pointAt(e);
@@ -1702,8 +1738,8 @@ export function RoofDesigner(props: {
                     )}
                   >
                     <Icon className="size-[18px]" aria-hidden />
-                    {/* The tools every step has are known by their icon; a step's own tools are named. */}
-                    {t === "select" || t === "pan" || t === "comment" ? <span className="sr-only">{SHORT[t]}</span> : SHORT[t]}
+                    {/* Commenting is in every step and known by its icon; a step's own tools are named. */}
+                    {t === "comment" ? <span className="sr-only">{SHORT[t]}</span> : SHORT[t]}
                   </button>
                 ))}
                 <span className="flex-1" aria-hidden />
@@ -1717,6 +1753,528 @@ export function RoofDesigner(props: {
                   </button>
                 )}
               </div>
+              {/* The system, in a row just above the picture: which design this is, and its panel, inverter, battery and the customer's bill. Each opens its choices beneath it, over the picture. */}
+              <div
+                className="flex flex-wrap items-center gap-1 border-t border-line px-1.5 py-1.5"
+                role="group"
+                aria-label="System"
+                ref={topBar}
+              >
+                <div className="relative">
+                  <button
+                    onClick={() => openMenu(menu === "designs" ? false : "designs")}
+                    aria-expanded={menu === "designs"}
+                    aria-haspopup="true"
+                    title={`Design ${active + 1} of ${designs.length}${active === primary ? " (primary)" : ""}${designLabel.trim() ? `: ${designLabel.trim()}` : ""}`}
+                    aria-label={`Designs: design ${active + 1} of ${designs.length}`}
+                    className={clsx(
+                      "flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium tabular-nums",
+                      menu === "designs" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <Layers className="size-5" aria-hidden />
+                    <span>
+                      {active + 1} of {designs.length}
+                    </span>
+                    {active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-hidden />}
+                  </button>
+                  {menu === "designs" && (
+                    <div className="absolute left-0 top-full z-30 mt-1 w-[24rem] max-w-[85vw] shadow-lift space-y-3 rounded-lg border border-line bg-surface p-3">
+                      <ul className="space-y-1.5">
+                        {everyDesign().map((d, i) => {
+                          const sum = designSummary(d);
+                          return (
+                            <li key={i} className={clsx("rounded-md border", i === active ? "border-forest" : "border-line")}>
+                              <div className="flex items-center gap-1 p-1">
+                                <button
+                                  onClick={() => (i === active ? openMenu(false) : show(everyDesign(), i))}
+                                  className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left hover:bg-canvas"
+                                >
+                                  <span className="block truncate text-sm font-semibold">
+                                    Design {i + 1}
+                                    {d.label ? <span className="font-normal text-ink-2"> · {d.label}</span> : null}
+                                  </span>
+                                  <span className="block truncate text-xs tabular-nums text-muted">
+                                    {sum.panels} panels · {sum.kw.toFixed(2)} kW · {d.panel?.name ?? props.catalogue[0]?.name ?? "Panel"}
+                                  </span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setPrimary(i);
+                                    changed();
+                                  }}
+                                  disabled={i === primary}
+                                  title={i === primary ? "The primary design" : "Make this the primary design"}
+                                  aria-label={i === primary ? `Design ${i + 1} is the primary` : `Make design ${i + 1} the primary`}
+                                  className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
+                                >
+                                  <Star
+                                    className={clsx("size-4", i === primary ? "fill-sun-line text-sun-line" : "text-muted")}
+                                    aria-hidden
+                                  />
+                                </button>
+                                {designs.length > 1 && (
+                                  <button
+                                    onClick={() => setDoomed(doomed === i ? null : i)}
+                                    title="Delete this design"
+                                    aria-label={`Delete design ${i + 1}`}
+                                    className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-canvas hover:text-danger"
+                                  >
+                                    <Trash2 className="size-4" aria-hidden />
+                                  </button>
+                                )}
+                              </div>
+                              {doomed === i && (
+                                <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2 text-sm">
+                                  <span>Delete design {i + 1}? It can&apos;t be undone.</span>
+                                  <button className="font-semibold text-danger" onClick={() => removeDesign(i)}>
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <label className="block text-sm">
+                        A label for design {active + 1}
+                        <input
+                          value={designLabel}
+                          onChange={(e) => {
+                            setDesignLabel(e.target.value);
+                            changed();
+                          }}
+                          maxLength={40}
+                          placeholder="e.g. All on the north face"
+                          className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-3 outline-none focus:border-forest"
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(false)}>
+                          <Plus className="mr-1.5 size-4" aria-hidden /> New design
+                        </button>
+                        <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(true)}>
+                          <Copy className="mr-1.5 size-4" aria-hidden /> Copy this one
+                        </button>
+                        <span className="self-center text-xs tabular-nums text-muted">
+                          {designs.length} of {MAX_DESIGNS}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted">The starred design is the primary: the one this roof opens on.</p>
+                    </div>
+                  )}
+                </div>
+                <div className="relative">
+                  <button
+                    onClick={() => openMenu(menu === "panels" ? false : "panels")}
+                    aria-expanded={menu === "panels"}
+                    aria-haspopup="true"
+                    title={`Panel: ${panel?.name ?? chosenPanel?.name ?? "Panel"}`}
+                    aria-label="The panel this design is drawn with"
+                    className={clsx(
+                      "flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium tabular-nums",
+                      menu === "panels" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    {/* A solar panel, leaning as it does on a roof: frame, cells, and a stand. */}
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="size-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M5.2 4h13.6l2.7 12H2.5z" />
+                      <path d="M3.9 10h16.2M9.4 4 8 16M14.6 4 16 16" strokeWidth="1.2" />
+                      <path d="M12 16v4M8.5 20h7" strokeLinecap="round" />
+                    </svg>
+                    <span>Panels</span>
+                    <span className="text-ink-2">
+                      {summary.panels} × {size.watts} W
+                    </span>
+                  </button>
+                  {menu === "panels" && (
+                    <div className="absolute left-0 top-full z-30 mt-1 w-[24rem] max-w-[85vw] shadow-lift max-h-[50vh] space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2">
+                      <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
+                      {[
+                        ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
+                        ...props.catalogue.map((p) => ({ ...p, gone: false })),
+                      ].map((p) => (
+                        <button
+                          key={p.sku}
+                          onClick={() => {
+                            if (!p.gone) choosePanel(p.sku);
+                            openMenu(false);
+                          }}
+                          className={clsx(
+                            "flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
+                            p.sku === chosen && "bg-canvas",
+                          )}
+                        >
+                          <Check className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")} aria-hidden />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold">{p.name}</span>
+                            <span className="block text-xs tabular-nums text-muted">
+                              {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
+                              {p.gone ? " · no longer in our range" : ""}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="relative">
+                  <button
+                    onClick={() => openMenu(menu === "inverters" ? false : "inverters")}
+                    aria-expanded={menu === "inverters"}
+                    aria-haspopup="true"
+                    title={fitted.length ? `Inverters: ${fitted.map((i) => i.name).join(" + ")}` : "Choose an inverter"}
+                    aria-label="The inverters this design is drawn for"
+                    className={clsx(
+                      "flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium tabular-nums",
+                      menu === "inverters" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <Zap className="size-5" aria-hidden />
+                    <span>Inverter</span>
+                    <span className={fitted.length ? "text-ink-2" : "text-muted"}>
+                      {fitted.length ? `${fitted.length > 1 ? `${fitted.length} × · ` : ""}${fittedKw} kW` : "Choose"}
+                    </span>
+                  </button>
+                  {menu === "inverters" && (
+                    <div className="absolute left-0 top-full z-30 mt-1 w-[24rem] max-w-[85vw] shadow-lift rounded-lg border border-line bg-surface p-2">
+                      <p className={clsx(label, "px-2 py-1")}>On this design</p>
+                      {fitted.length === 0 && (
+                        <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
+                      )}
+                      <ul className="space-y-0.5">
+                        {fitted.map((spec, n) => (
+                          <li key={n} className="flex items-center gap-2 rounded-md bg-canvas px-2 py-1.5">
+                            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-ink">
+                              {n + 1}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold">{spec.name}</span>
+                              <span className="block text-xs tabular-nums text-muted">
+                                {spec.kw} kW ·{" "}
+                                {fittedItems[n]
+                                  ? fittedItems[n]?.electrical
+                                    ? `${inputsOf(n)} inputs · strings can be checked`
+                                    : "limits not on file"
+                                  : "no longer in our range"}
+                              </span>
+                            </span>
+                            <button
+                              onClick={() => removeInverter(n)}
+                              className="px-1 text-lg leading-none text-muted hover:text-danger"
+                              aria-label={`Take inverter ${n + 1} off the design`}
+                              title="Take it off the design"
+                            >
+                              ×
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        onClick={() => setSuggesting(!suggesting)}
+                        aria-expanded={suggesting}
+                        className={clsx(button, "mt-2 w-full justify-center", suggesting && "!border-forest")}
+                      >
+                        <Sparkles className="mr-1.5 size-4 text-sun-ink" aria-hidden /> Suggest one for these panels
+                      </button>
+                      {suggesting && (
+                        <div className="mt-1 space-y-1 rounded-md border border-sun-line bg-sun p-2">
+                          {summary.panels === 0 && (
+                            <p className="px-1 text-sm text-ink-2">Put panels on the roof first: the suggestion is sized to them.</p>
+                          )}
+                          {summary.panels > 0 && suggestions.length === 0 && (
+                            <p className="px-1 text-sm text-ink-2">
+                              Nothing in our range suits {summary.kw.toFixed(2)} kW of panels by the usual sizing. Pick one from the list
+                              below.
+                            </p>
+                          )}
+                          {suggestions.map((sug) => (
+                            <div key={sug.inverter.sku + sug.kind} className="rounded-lg bg-surface p-2">
+                              <p className={label}>{sug.kind}</p>
+                              <p className="mt-0.5 text-sm font-semibold">
+                                {sug.count > 1 ? `${sug.count} × ` : ""}
+                                {sug.inverter.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-ink-2">{sug.why}</p>
+                              <button
+                                className="mt-1.5 text-sm font-semibold underline underline-offset-4"
+                                onClick={() => takeSuggestion(sug)}
+                              >
+                                Use {sug.count > 1 ? "these" : "this one"}
+                              </button>
+                            </div>
+                          ))}
+                          {suggestions.length > 0 && (
+                            <p className="px-1 text-[11px] text-muted">
+                              One for each kind in our range: choose by the home&apos;s supply and whether a battery is wanted. Sized by
+                              rule from the panels, not a design check.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      <p className={clsx(label, "mt-2 px-2 py-1")}>
+                        {fitted.length >= MAX_INVERTERS
+                          ? `That is the most a design takes (${MAX_INVERTERS})`
+                          : fitted.length
+                            ? "Add another"
+                            : "Add one"}
+                      </p>
+                      {fitted.length < MAX_INVERTERS && (
+                        <>
+                          <input
+                            autoFocus
+                            value={seek}
+                            onChange={(e) => setSeek(e.target.value)}
+                            placeholder="Search inverters"
+                            className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                          />
+                          <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                            {props.inverters
+                              .filter((i) =>
+                                seek
+                                  .toLowerCase()
+                                  .split(/\s+/)
+                                  .every((word) => `${i.name} ${i.sku}`.toLowerCase().includes(word)),
+                              )
+                              .map((i) => (
+                                <button
+                                  key={i.sku}
+                                  onClick={() => addInverter(i)}
+                                  className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas"
+                                >
+                                  <Plus className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
+                                  <span className="min-w-0">
+                                    <span className="block text-sm font-semibold">{i.name}</span>
+                                    <span className="block text-xs tabular-nums text-muted">
+                                      {i.kw} kW ·{" "}
+                                      {i.electrical
+                                        ? `${i.electrical.mppts.length} inputs, up to ${i.electrical.maxVoltage} V · strings can be checked`
+                                        : "limits not on file: strings can't be checked"}
+                                    </span>
+                                  </span>
+                                </button>
+                              ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="relative">
+                  <button
+                    onClick={() => openMenu(menu === "batteries" ? false : "batteries")}
+                    aria-expanded={menu === "batteries"}
+                    aria-haspopup="true"
+                    title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Choose a battery"}
+                    aria-label="The battery on this design"
+                    className={clsx(
+                      "flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium tabular-nums",
+                      menu === "batteries" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <BatteryCharging className="size-5" aria-hidden />
+                    <span>Battery</span>
+                    <span className={battery ? "text-ink-2" : "text-muted"}>{battery ? `${batteryKwh} kWh` : "None"}</span>
+                  </button>
+                  {menu === "batteries" && (
+                    <div className="absolute left-0 top-full z-30 mt-1 w-[24rem] max-w-[85vw] shadow-lift rounded-lg border border-line bg-surface p-2">
+                      <p className={clsx(label, "px-2 py-1")}>On this design</p>
+                      {battery ? (
+                        <div className="rounded-md bg-canvas px-2 py-2">
+                          <p className="truncate text-sm font-semibold">{battery.name}</p>
+                          <div className="mt-1.5 flex items-center gap-2 text-sm">
+                            <button
+                              className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface font-semibold disabled:bg-surface-2 disabled:text-muted"
+                              disabled={battery.qty <= 1}
+                              onClick={() => {
+                                setBattery({ ...battery, qty: battery.qty - 1 });
+                                changed();
+                              }}
+                              aria-label="One fewer"
+                            >
+                              −
+                            </button>
+                            <span className="min-w-28 text-center tabular-nums">
+                              {battery.qty} × {battery.kwh} kWh = <strong>{batteryKwh} kWh</strong>
+                            </span>
+                            <button
+                              className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface font-semibold disabled:bg-surface-2 disabled:text-muted"
+                              disabled={battery.qty >= MAX_BATTERY_QTY}
+                              onClick={() => {
+                                setBattery({ ...battery, qty: battery.qty + 1 });
+                                changed();
+                              }}
+                              aria-label="One more"
+                            >
+                              +
+                            </button>
+                            <button
+                              className="ml-auto text-sm font-medium text-danger hover:underline"
+                              onClick={() => {
+                                setBattery(undefined);
+                                changed();
+                              }}
+                            >
+                              Take it off
+                            </button>
+                          </div>
+                          <p className="mt-1.5 text-xs text-muted">It is on the picture: drag it to the wall it will stand against.</p>
+                        </div>
+                      ) : (
+                        <p className="px-2 pb-1 text-sm text-muted">None: this design is solar only. Choose one below.</p>
+                      )}
+                      <p className={clsx(label, "mt-2 px-2 py-1")}>
+                        {battery ? "Change it" : "Batteries to choose from"} · {props.batteries.length} to choose from
+                      </p>
+                      <input
+                        value={seek}
+                        onChange={(e) => setSeek(e.target.value)}
+                        placeholder="Search batteries"
+                        className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                      />
+                      <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                        {props.batteries
+                          .filter((b) =>
+                            seek
+                              .toLowerCase()
+                              .split(/\s+/)
+                              .every((word) => `${b.name} ${b.sku}`.toLowerCase().includes(word)),
+                          )
+                          .map((b) => (
+                            <button
+                              key={b.sku}
+                              onClick={() => chooseBattery(b)}
+                              className={clsx(
+                                "flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
+                                b.sku === battery?.sku && "bg-canvas",
+                              )}
+                            >
+                              <Check
+                                className={clsx("mt-0.5 size-4 shrink-0", b.sku === battery?.sku ? "text-ink" : "invisible")}
+                                aria-hidden
+                              />
+                              <span className="min-w-0">
+                                <span className="block text-sm font-semibold">{b.name}</span>
+                                <span className="block text-xs tabular-nums text-muted">{b.kwh} kWh each</span>
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="relative">
+                  <button
+                    onClick={() => openMenu(menu === "bill" ? false : "bill")}
+                    aria-expanded={menu === "bill"}
+                    aria-haspopup="true"
+                    title={
+                      Number(bill.amount) > 0
+                        ? "The customer's electricity bill"
+                        : "No electricity bill entered yet: add it for the saving and payback"
+                    }
+                    aria-label={
+                      Number(bill.amount) > 0 ? "The customer's electricity bill" : "The customer's electricity bill: not entered yet"
+                    }
+                    className={clsx(
+                      "relative flex h-9 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium tabular-nums",
+                      menu === "bill"
+                        ? "bg-surface-2 text-ink"
+                        : Number(bill.amount) > 0
+                          ? "text-ink hover:bg-canvas"
+                          : "bg-sun text-sun-ink ring-1 ring-sun-line",
+                    )}
+                  >
+                    <ReceiptText className="size-5" aria-hidden />
+                    {Number(bill.amount) > 0 && <span>Bill</span>}
+                    <span>{Number(bill.amount) > 0 ? `$${Number(bill.amount).toLocaleString("en-AU")}` : "Add bill"}</span>
+                    {/* A dot that keeps asking until the bill is in. */}
+                    {!(Number(bill.amount) > 0) && menu !== "bill" && <span className="size-2 rounded-full bg-sun-line" aria-hidden />}
+                  </button>
+                  {menu === "bill" && (
+                    <div className="absolute left-0 top-full z-30 mt-1 w-[24rem] max-w-[85vw] shadow-lift rounded-lg border border-line bg-surface p-3">
+                      <p className={label}>The customer&apos;s electricity bill</p>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium">
+                        <label>
+                          Billed
+                          <select
+                            value={bill.interval}
+                            onChange={(e) => setBill({ ...bill, interval: e.target.value as BillInterval })}
+                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest appearance-auto"
+                          >
+                            <option value="annual">Yearly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="bimonthly">Every two months</option>
+                            <option value="monthly">Monthly</option>
+                          </select>
+                        </label>
+                        <label>
+                          A typical bill ($)
+                          <input
+                            autoFocus
+                            type="number"
+                            min="0"
+                            step="10"
+                            value={bill.amount}
+                            onChange={(e) => setBill({ ...bill, amount: e.target.value })}
+                            placeholder="e.g. 350"
+                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                          />
+                        </label>
+                        <label>
+                          Daily supply charge ($)
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={bill.supplyPerDay}
+                            onChange={(e) => setBill({ ...bill, supplyPerDay: e.target.value })}
+                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                          />
+                        </label>
+                        <label>
+                          Rate ($ a kWh)
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={bill.rate}
+                            onChange={(e) => setBill({ ...bill, rate: e.target.value })}
+                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                          />
+                        </label>
+                        <label className="col-span-2">
+                          Feed-in tariff ($ a kWh)
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={bill.feedIn}
+                            onChange={(e) => setBill({ ...bill, feedIn: e.target.value })}
+                            className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                          />
+                        </label>
+                      </div>
+                      <p className="mt-2 text-xs text-muted">
+                        {Number(bill.amount) > 0 && !finance && summary.panels > 0
+                          ? "That bill is no more than its supply charge at these prices: check the figures."
+                          : finance
+                            ? `About ${finance.dailyKwh} kWh a day. The bill, the saving and the payback over the picture are worked out from this.`
+                            : "Typed in from their bill: the bill, the saving and the payback over the picture are worked out from it. One price at all times of day. Saved with the design."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {typeof idea === "object" && (
                 <p className={clsx("border-t border-line px-3 py-2 text-[13px]", idea.bad ? "text-warning" : "text-ink-2")} role="status">
                   {idea.note}
@@ -2736,6 +3294,34 @@ export function RoofDesigner(props: {
                 )
               )}
 
+              {/* The select arrow, the hand and the eraser, always on the picture, top left, whichever step is open: the
+                  arrow is what every other tool is left for, so it is never somewhere to be looked for. */}
+              <div
+                className="absolute left-2 top-2 flex flex-col gap-0.5 rounded-lg border border-line bg-surface p-1 shadow-lift"
+                role="toolbar"
+                aria-label="Select, move and erase"
+                aria-orientation="vertical"
+              >
+                {TOOLS.filter((t) => t.tool === "select" || t.tool === "pan" || t.tool === "erase").map(({ tool: t, icon: Icon, name }) => (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      setTool(t);
+                      setTracing([]);
+                      setRuling(null);
+                    }}
+                    title={name}
+                    aria-label={name}
+                    aria-pressed={tool === t}
+                    className={clsx(
+                      "flex size-9 items-center justify-center rounded-md",
+                      tool === t ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <Icon className="size-5" aria-hidden />
+                  </button>
+                ))}
+              </div>
               {/* Undo, redo and the zoom, in a row along the foot of the picture, clear of the map's own mark in the corner. */}
               <div
                 className="absolute bottom-8 left-2 flex items-center gap-0.5 rounded-lg border border-line bg-surface p-1 shadow-lift"
@@ -2950,519 +3536,6 @@ export function RoofDesigner(props: {
           </aside>
         </div>
         <div className="space-y-3 xl:sticky xl:top-[4.5rem] xl:max-h-[calc(100dvh-5.5rem)] xl:overflow-y-auto">
-          {/* The system, beside the picture: which design this is, and its panel, inverter, battery and the customer's bill. Each row opens its choices beneath it. */}
-          <div
-            className="flex flex-col gap-0.5 rounded-lg border border-line bg-surface p-1.5"
-            role="group"
-            aria-label="System"
-            ref={topBar}
-          >
-            <div className="relative">
-              <button
-                onClick={() => openMenu(menu === "designs" ? false : "designs")}
-                aria-expanded={menu === "designs"}
-                aria-haspopup="true"
-                title={`Design ${active + 1} of ${designs.length}${active === primary ? " (primary)" : ""}${designLabel.trim() ? `: ${designLabel.trim()}` : ""}`}
-                aria-label={`Designs: design ${active + 1} of ${designs.length}`}
-                className={clsx(
-                  "flex h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-sm font-medium tabular-nums",
-                  menu === "designs" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
-                )}
-              >
-                <Layers className="size-5" aria-hidden />
-                <span className="flex-1 text-left">
-                  Design {active + 1} of {designs.length}
-                </span>
-                {active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-hidden />}
-              </button>
-              {menu === "designs" && (
-                <div className="mb-2 mt-1 space-y-3 rounded-lg border border-line bg-surface p-3">
-                  <ul className="space-y-1.5">
-                    {everyDesign().map((d, i) => {
-                      const sum = designSummary(d);
-                      return (
-                        <li key={i} className={clsx("rounded-md border", i === active ? "border-forest" : "border-line")}>
-                          <div className="flex items-center gap-1 p-1">
-                            <button
-                              onClick={() => (i === active ? openMenu(false) : show(everyDesign(), i))}
-                              className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left hover:bg-canvas"
-                            >
-                              <span className="block truncate text-sm font-semibold">
-                                Design {i + 1}
-                                {d.label ? <span className="font-normal text-ink-2"> · {d.label}</span> : null}
-                              </span>
-                              <span className="block truncate text-xs tabular-nums text-muted">
-                                {sum.panels} panels · {sum.kw.toFixed(2)} kW · {d.panel?.name ?? props.catalogue[0]?.name ?? "Panel"}
-                              </span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                setPrimary(i);
-                                changed();
-                              }}
-                              disabled={i === primary}
-                              title={i === primary ? "The primary design" : "Make this the primary design"}
-                              aria-label={i === primary ? `Design ${i + 1} is the primary` : `Make design ${i + 1} the primary`}
-                              className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
-                            >
-                              <Star className={clsx("size-4", i === primary ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
-                            </button>
-                            {designs.length > 1 && (
-                              <button
-                                onClick={() => setDoomed(doomed === i ? null : i)}
-                                title="Delete this design"
-                                aria-label={`Delete design ${i + 1}`}
-                                className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-canvas hover:text-danger"
-                              >
-                                <Trash2 className="size-4" aria-hidden />
-                              </button>
-                            )}
-                          </div>
-                          {doomed === i && (
-                            <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2 text-sm">
-                              <span>Delete design {i + 1}? It can&apos;t be undone.</span>
-                              <button className="font-semibold text-danger" onClick={() => removeDesign(i)}>
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <label className="block text-sm">
-                    A label for design {active + 1}
-                    <input
-                      value={designLabel}
-                      onChange={(e) => {
-                        setDesignLabel(e.target.value);
-                        changed();
-                      }}
-                      maxLength={40}
-                      placeholder="e.g. All on the north face"
-                      className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-3 outline-none focus:border-forest"
-                    />
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(false)}>
-                      <Plus className="mr-1.5 size-4" aria-hidden /> New design
-                    </button>
-                    <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(true)}>
-                      <Copy className="mr-1.5 size-4" aria-hidden /> Copy this one
-                    </button>
-                    <span className="self-center text-xs tabular-nums text-muted">
-                      {designs.length} of {MAX_DESIGNS}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted">The starred design is the primary: the one this roof opens on.</p>
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => openMenu(menu === "panels" ? false : "panels")}
-                aria-expanded={menu === "panels"}
-                aria-haspopup="true"
-                title={`Panel: ${panel?.name ?? chosenPanel?.name ?? "Panel"}`}
-                aria-label="The panel this design is drawn with"
-                className={clsx(
-                  "flex h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-sm font-medium tabular-nums",
-                  menu === "panels" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
-                )}
-              >
-                {/* A solar panel, leaning as it does on a roof: frame, cells, and a stand. */}
-                <svg
-                  viewBox="0 0 24 24"
-                  className="size-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  <path d="M5.2 4h13.6l2.7 12H2.5z" />
-                  <path d="M3.9 10h16.2M9.4 4 8 16M14.6 4 16 16" strokeWidth="1.2" />
-                  <path d="M12 16v4M8.5 20h7" strokeLinecap="round" />
-                </svg>
-                <span className="flex-1 text-left">Panels</span>
-                <span className="text-ink-2">
-                  {summary.panels} × {size.watts} W
-                </span>
-              </button>
-              {menu === "panels" && (
-                <div className="mb-2 mt-1 max-h-[50vh] space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2">
-                  <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
-                  {[
-                    ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
-                    ...props.catalogue.map((p) => ({ ...p, gone: false })),
-                  ].map((p) => (
-                    <button
-                      key={p.sku}
-                      onClick={() => {
-                        if (!p.gone) choosePanel(p.sku);
-                        openMenu(false);
-                      }}
-                      className={clsx(
-                        "flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
-                        p.sku === chosen && "bg-canvas",
-                      )}
-                    >
-                      <Check className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")} aria-hidden />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold">{p.name}</span>
-                        <span className="block text-xs tabular-nums text-muted">
-                          {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
-                          {p.gone ? " · no longer in our range" : ""}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => openMenu(menu === "inverters" ? false : "inverters")}
-                aria-expanded={menu === "inverters"}
-                aria-haspopup="true"
-                title={fitted.length ? `Inverters: ${fitted.map((i) => i.name).join(" + ")}` : "Choose an inverter"}
-                aria-label="The inverters this design is drawn for"
-                className={clsx(
-                  "flex h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-sm font-medium tabular-nums",
-                  menu === "inverters" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
-                )}
-              >
-                <Zap className="size-5" aria-hidden />
-                <span className="flex-1 text-left">Inverter</span>
-                <span className={fitted.length ? "text-ink-2" : "text-muted"}>
-                  {fitted.length ? `${fitted.length > 1 ? `${fitted.length} × · ` : ""}${fittedKw} kW` : "Choose"}
-                </span>
-              </button>
-              {menu === "inverters" && (
-                <div className="mb-2 mt-1 rounded-lg border border-line bg-surface p-2">
-                  <p className={clsx(label, "px-2 py-1")}>On this design</p>
-                  {fitted.length === 0 && <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>}
-                  <ul className="space-y-0.5">
-                    {fitted.map((spec, n) => (
-                      <li key={n} className="flex items-center gap-2 rounded-md bg-canvas px-2 py-1.5">
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-ink">
-                          {n + 1}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold">{spec.name}</span>
-                          <span className="block text-xs tabular-nums text-muted">
-                            {spec.kw} kW ·{" "}
-                            {fittedItems[n]
-                              ? fittedItems[n]?.electrical
-                                ? `${inputsOf(n)} inputs · strings can be checked`
-                                : "limits not on file"
-                              : "no longer in our range"}
-                          </span>
-                        </span>
-                        <button
-                          onClick={() => removeInverter(n)}
-                          className="px-1 text-lg leading-none text-muted hover:text-danger"
-                          aria-label={`Take inverter ${n + 1} off the design`}
-                          title="Take it off the design"
-                        >
-                          ×
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    onClick={() => setSuggesting(!suggesting)}
-                    aria-expanded={suggesting}
-                    className={clsx(button, "mt-2 w-full justify-center", suggesting && "!border-forest")}
-                  >
-                    <Sparkles className="mr-1.5 size-4 text-sun-ink" aria-hidden /> Suggest one for these panels
-                  </button>
-                  {suggesting && (
-                    <div className="mt-1 space-y-1 rounded-md border border-sun-line bg-sun p-2">
-                      {summary.panels === 0 && (
-                        <p className="px-1 text-sm text-ink-2">Put panels on the roof first: the suggestion is sized to them.</p>
-                      )}
-                      {summary.panels > 0 && suggestions.length === 0 && (
-                        <p className="px-1 text-sm text-ink-2">
-                          Nothing in our range suits {summary.kw.toFixed(2)} kW of panels by the usual sizing. Pick one from the list below.
-                        </p>
-                      )}
-                      {suggestions.map((sug) => (
-                        <div key={sug.inverter.sku + sug.kind} className="rounded-lg bg-surface p-2">
-                          <p className={label}>{sug.kind}</p>
-                          <p className="mt-0.5 text-sm font-semibold">
-                            {sug.count > 1 ? `${sug.count} × ` : ""}
-                            {sug.inverter.name}
-                          </p>
-                          <p className="mt-0.5 text-xs text-ink-2">{sug.why}</p>
-                          <button className="mt-1.5 text-sm font-semibold underline underline-offset-4" onClick={() => takeSuggestion(sug)}>
-                            Use {sug.count > 1 ? "these" : "this one"}
-                          </button>
-                        </div>
-                      ))}
-                      {suggestions.length > 0 && (
-                        <p className="px-1 text-[11px] text-muted">
-                          One for each kind in our range: choose by the home&apos;s supply and whether a battery is wanted. Sized by rule
-                          from the panels, not a design check.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  <p className={clsx(label, "mt-2 px-2 py-1")}>
-                    {fitted.length >= MAX_INVERTERS
-                      ? `That is the most a design takes (${MAX_INVERTERS})`
-                      : fitted.length
-                        ? "Add another"
-                        : "Add one"}
-                  </p>
-                  {fitted.length < MAX_INVERTERS && (
-                    <>
-                      <input
-                        autoFocus
-                        value={seek}
-                        onChange={(e) => setSeek(e.target.value)}
-                        placeholder="Search inverters"
-                        className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                      />
-                      <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
-                        {props.inverters
-                          .filter((i) =>
-                            seek
-                              .toLowerCase()
-                              .split(/\s+/)
-                              .every((word) => `${i.name} ${i.sku}`.toLowerCase().includes(word)),
-                          )
-                          .map((i) => (
-                            <button
-                              key={i.sku}
-                              onClick={() => addInverter(i)}
-                              className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas"
-                            >
-                              <Plus className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
-                              <span className="min-w-0">
-                                <span className="block text-sm font-semibold">{i.name}</span>
-                                <span className="block text-xs tabular-nums text-muted">
-                                  {i.kw} kW ·{" "}
-                                  {i.electrical
-                                    ? `${i.electrical.mppts.length} inputs, up to ${i.electrical.maxVoltage} V · strings can be checked`
-                                    : "limits not on file: strings can't be checked"}
-                                </span>
-                              </span>
-                            </button>
-                          ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => openMenu(menu === "batteries" ? false : "batteries")}
-                aria-expanded={menu === "batteries"}
-                aria-haspopup="true"
-                title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Choose a battery"}
-                aria-label="The battery on this design"
-                className={clsx(
-                  "flex h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-sm font-medium tabular-nums",
-                  menu === "batteries" ? "bg-surface-2 text-ink" : "text-ink hover:bg-canvas",
-                )}
-              >
-                <BatteryCharging className="size-5" aria-hidden />
-                <span className="flex-1 text-left">Battery</span>
-                <span className={battery ? "text-ink-2" : "text-muted"}>{battery ? `${batteryKwh} kWh` : "None"}</span>
-              </button>
-              {menu === "batteries" && (
-                <div className="mb-2 mt-1 rounded-lg border border-line bg-surface p-2">
-                  <p className={clsx(label, "px-2 py-1")}>On this design</p>
-                  {battery ? (
-                    <div className="rounded-md bg-canvas px-2 py-2">
-                      <p className="truncate text-sm font-semibold">{battery.name}</p>
-                      <div className="mt-1.5 flex items-center gap-2 text-sm">
-                        <button
-                          className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface font-semibold disabled:bg-surface-2 disabled:text-muted"
-                          disabled={battery.qty <= 1}
-                          onClick={() => {
-                            setBattery({ ...battery, qty: battery.qty - 1 });
-                            changed();
-                          }}
-                          aria-label="One fewer"
-                        >
-                          −
-                        </button>
-                        <span className="min-w-28 text-center tabular-nums">
-                          {battery.qty} × {battery.kwh} kWh = <strong>{batteryKwh} kWh</strong>
-                        </span>
-                        <button
-                          className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface font-semibold disabled:bg-surface-2 disabled:text-muted"
-                          disabled={battery.qty >= MAX_BATTERY_QTY}
-                          onClick={() => {
-                            setBattery({ ...battery, qty: battery.qty + 1 });
-                            changed();
-                          }}
-                          aria-label="One more"
-                        >
-                          +
-                        </button>
-                        <button
-                          className="ml-auto text-sm font-medium text-danger hover:underline"
-                          onClick={() => {
-                            setBattery(undefined);
-                            changed();
-                          }}
-                        >
-                          Take it off
-                        </button>
-                      </div>
-                      <p className="mt-1.5 text-xs text-muted">It is on the picture: drag it to the wall it will stand against.</p>
-                    </div>
-                  ) : (
-                    <p className="px-2 pb-1 text-sm text-muted">None: this design is solar only. Choose one below.</p>
-                  )}
-                  <p className={clsx(label, "mt-2 px-2 py-1")}>
-                    {battery ? "Change it" : "Batteries to choose from"} · {props.batteries.length} to choose from
-                  </p>
-                  <input
-                    value={seek}
-                    onChange={(e) => setSeek(e.target.value)}
-                    placeholder="Search batteries"
-                    className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                  />
-                  <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
-                    {props.batteries
-                      .filter((b) =>
-                        seek
-                          .toLowerCase()
-                          .split(/\s+/)
-                          .every((word) => `${b.name} ${b.sku}`.toLowerCase().includes(word)),
-                      )
-                      .map((b) => (
-                        <button
-                          key={b.sku}
-                          onClick={() => chooseBattery(b)}
-                          className={clsx(
-                            "flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
-                            b.sku === battery?.sku && "bg-canvas",
-                          )}
-                        >
-                          <Check
-                            className={clsx("mt-0.5 size-4 shrink-0", b.sku === battery?.sku ? "text-ink" : "invisible")}
-                            aria-hidden
-                          />
-                          <span className="min-w-0">
-                            <span className="block text-sm font-semibold">{b.name}</span>
-                            <span className="block text-xs tabular-nums text-muted">{b.kwh} kWh each</span>
-                          </span>
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => openMenu(menu === "bill" ? false : "bill")}
-                aria-expanded={menu === "bill"}
-                aria-haspopup="true"
-                title={
-                  Number(bill.amount) > 0
-                    ? "The customer's electricity bill"
-                    : "No electricity bill entered yet: add it for the saving and payback"
-                }
-                aria-label={
-                  Number(bill.amount) > 0 ? "The customer's electricity bill" : "The customer's electricity bill: not entered yet"
-                }
-                className={clsx(
-                  "relative flex h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-sm font-medium tabular-nums",
-                  menu === "bill"
-                    ? "bg-surface-2 text-ink"
-                    : Number(bill.amount) > 0
-                      ? "text-ink hover:bg-canvas"
-                      : "bg-sun text-sun-ink ring-1 ring-sun-line",
-                )}
-              >
-                <ReceiptText className="size-5" aria-hidden />
-                <span className="flex-1 text-left">Bill</span>
-                <span>{Number(bill.amount) > 0 ? `$${Number(bill.amount).toLocaleString("en-AU")}` : "Add bill"}</span>
-                {/* A dot that keeps asking until the bill is in. */}
-                {!(Number(bill.amount) > 0) && menu !== "bill" && <span className="size-2 rounded-full bg-sun-line" aria-hidden />}
-              </button>
-              {menu === "bill" && (
-                <div className="mb-2 mt-1 rounded-lg border border-line bg-surface p-3">
-                  <p className={label}>The customer&apos;s electricity bill</p>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium">
-                    <label>
-                      Billed
-                      <select
-                        value={bill.interval}
-                        onChange={(e) => setBill({ ...bill, interval: e.target.value as BillInterval })}
-                        className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest appearance-auto"
-                      >
-                        <option value="annual">Yearly</option>
-                        <option value="quarterly">Quarterly</option>
-                        <option value="bimonthly">Every two months</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </label>
-                    <label>
-                      A typical bill ($)
-                      <input
-                        autoFocus
-                        type="number"
-                        min="0"
-                        step="10"
-                        value={bill.amount}
-                        onChange={(e) => setBill({ ...bill, amount: e.target.value })}
-                        placeholder="e.g. 350"
-                        className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
-                      />
-                    </label>
-                    <label>
-                      Daily supply charge ($)
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={bill.supplyPerDay}
-                        onChange={(e) => setBill({ ...bill, supplyPerDay: e.target.value })}
-                        className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
-                      />
-                    </label>
-                    <label>
-                      Rate ($ a kWh)
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={bill.rate}
-                        onChange={(e) => setBill({ ...bill, rate: e.target.value })}
-                        className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
-                      />
-                    </label>
-                    <label className="col-span-2">
-                      Feed-in tariff ($ a kWh)
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={bill.feedIn}
-                        onChange={(e) => setBill({ ...bill, feedIn: e.target.value })}
-                        className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
-                      />
-                    </label>
-                  </div>
-                  <p className="mt-2 text-xs text-muted">
-                    {Number(bill.amount) > 0 && !finance && summary.panels > 0
-                      ? "That bill is no more than its supply charge at these prices: check the figures."
-                      : finance
-                        ? `About ${finance.dailyKwh} kWh a day. The bill, the saving and the payback over the picture are worked out from this.`
-                        : "Typed in from their bill: the bill, the saving and the payback over the picture are worked out from it. One price at all times of day. Saved with the design."}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* The figures, beside the picture, read top to bottom as one chain: what is on the roof, what it makes, what stores and runs it, and what
                 that does to this home's bill. Each has one large figure in the same place every time, with its detail under it. */}
           <section
