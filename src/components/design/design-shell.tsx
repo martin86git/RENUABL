@@ -4,8 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  Palette,
-  CircleUserRound,
   HardHat,
   LayoutDashboard,
   ChevronLeft,
@@ -33,7 +31,7 @@ export const PATHS = {
   customers: "/design/customers",
   designer: "/design/roof",
   settings: "/design/settings",
-  brand: "/design/settings/brand",
+  brand: "/design/settings/company",
   account: "/design/account",
   signIn: "/design/sign-in",
 } as const;
@@ -131,8 +129,7 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
   }
 
   // The overview and the settings have pages beneath them that are their own entries here, so each is lit only on its own page.
-  const within = (href: string) =>
-    href === PATHS.home || href === PATHS.settings ? path === href : path === href || path.startsWith(`${href}/`);
+  const within = (href: string) => (href === PATHS.home ? path === href : path === href || path.startsWith(`${href}/`));
   const active = (href: string, also: string[] = []) => [href, ...also].some(within);
   const item = (href: string, label: string, Icon: LucideIcon, also?: string[], main?: boolean) => (
     <Link
@@ -162,7 +159,7 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
       <nav
         aria-label="Sections"
         className={clsx(
-          "z-40 flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2",
+          "z-40 flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2 print:hidden",
           "lg:sticky lg:top-0 lg:h-dvh lg:flex-col lg:items-stretch lg:overflow-visible lg:border-b-0 lg:border-r lg:px-2.5 lg:py-4",
           compact ? "lg:w-[3.75rem]" : "lg:w-56",
         )}
@@ -227,9 +224,7 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
           ),
         )}
         <span className="hidden flex-1 lg:block" aria-hidden />
-        {item(PATHS.settings, "Prices and settings", SlidersHorizontal)}
-        {account.signedIn && item(PATHS.brand, "Proposal branding", Palette)}
-        {item(PATHS.account, account.business?.name ?? "Your account", CircleUserRound)}
+        {item(PATHS.settings, "Settings", SlidersHorizontal, [PATHS.account])}
         {!compact && (
           <div className="hidden px-3 pt-2 lg:block">
             <p className="truncate text-[11px] text-muted">{account.email}</p>
@@ -278,7 +273,7 @@ function NowWidget() {
   const time = now.toLocaleTimeString("en-AU", { ...zone, hour: "numeric", minute: "2-digit" });
   const date = now.toLocaleDateString("en-AU", { ...zone, weekday: "short", day: "numeric", month: "short" });
   return (
-    <div className="flex justify-end px-5 pt-4 lg:px-10" aria-label="Now">
+    <div className="flex justify-end px-5 pt-4 print:hidden lg:px-10" aria-label="Now">
       <div className="inline-flex h-10 items-center gap-3 rounded-full bg-surface px-4 text-[13px] shadow-[var(--shadow-soft)] ring-1 ring-line">
         {weather && weather.degrees !== null && (
           <>

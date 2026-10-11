@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { JOB_STAGES } from "./crm";
-import { PIPELINES, cleanPipelineChoice, daysUntil, inTheWorks, installOrder, pipelineOf, systemDetails } from "./deal";
+import {
+  PIPELINES,
+  cleanPipelineChoice,
+  daysUntil,
+  inTheWorks,
+  installOrder,
+  materialsCsv,
+  materialsOrder,
+  pipelineOf,
+  systemDetails,
+} from "./deal";
+import { lineKey } from "./quote";
 import type { RoofDesign } from "./roof-design";
 
 const line = (lines: { label: string; value: string | null }[], label: string) => lines.find((l) => l.label === label)?.value;
@@ -76,6 +87,36 @@ describe("system details", () => {
     expect([qty.value, qty.designed, qty.typed]).toEqual(["12", "10", true]);
     expect(typed.find((l) => l.key === "propertyType")).toMatchObject({ value: "Factory", designed: null, typed: true });
     expect(typed.find((l) => l.key === "panel")).toMatchObject({ value: "Panel 440", typed: false });
+  });
+});
+
+describe("the materials to order", () => {
+  const lines = [
+    { group: "Panels", label: "16 × Panel 475", amount: 1976, qty: 16, sku: "P475" },
+    { group: "Racking", label: "Rails (9 lengths for 16 panels)", amount: 223, qty: 9, sku: "RAIL" },
+    { group: "Electrical", label: 'Sundries, 2" conduit', amount: 150 },
+    { group: "Installation", label: "Solar installation", amount: 2280 },
+    { group: "Commission", label: "Sales commission", amount: 300 },
+  ] as const;
+
+  it("is the quote's hardware, with no prices and none of the business's own costs", () => {
+    const order = materialsOrder(lines);
+    expect(order).toEqual([
+      { group: "Panels", item: "Panel 475", sku: "P475", qty: 16 },
+      { group: "Racking", item: "Rails (9 lengths for 16 panels)", sku: "RAIL", qty: 9 },
+      { group: "Electrical", item: 'Sundries, 2" conduit', sku: "", qty: 1 },
+    ]);
+    expect(JSON.stringify(order)).not.toMatch(/amount|1976|2280/);
+  });
+
+  it("leaves out a line taken out of the quote by hand", () => {
+    expect(materialsOrder(lines, { [lineKey(lines[1])]: { removed: true } }).map((l) => l.group)).toEqual(["Panels", "Electrical"]);
+  });
+
+  it("writes a spreadsheet file that keeps commas and quote marks", () => {
+    const csv = materialsCsv(materialsOrder(lines));
+    expect(csv.split("\r\n")[0]).toBe('"Group","Item","Code","Qty"');
+    expect(csv).toContain('"Sundries, 2"" conduit"');
   });
 });
 

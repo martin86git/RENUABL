@@ -1,14 +1,6 @@
-import type { Metadata } from "next";
-import { BrandSettings } from "@/components/design/design-proposal";
-import { DesignShell } from "@/components/design/design-shell";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Proposal branding", robots: { index: false, follow: false } };
-
-/** A business's own name, logo, colours, pictures and words for the proposals it sends its customers. */
+/** Proposal branding now lives across Settings: it opens on the company's own page. */
 export default function DesignBrandPage() {
-  return (
-    <DesignShell needsAccount>
-      <BrandSettings />
-    </DesignShell>
-  );
+  redirect("/design/settings/company");
 }

@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { DesignSettingsKeptNote } from "./design-account";
 import { useEffect, useRef, useState } from "react";
 import { Trash2, Upload } from "lucide-react";
-import { Wordmark } from "@/components/ui/primitives";
 import {
   COMPONENTS,
   DEFAULT_WORKSPACE,
@@ -19,7 +18,6 @@ import {
   type Workspace,
 } from "@/lib/domain/design/pricing";
 import { loadWorkspace, saveWorkspace, savedLabel } from "@/lib/services/design-store";
-import { DesignAccountLink, DesignSettingsKeptNote } from "./design-account";
 
 const input =
   "block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm tabular-nums outline-none focus:border-forest disabled:bg-surface-2 disabled:text-muted";
@@ -72,7 +70,36 @@ const stored = (f: SettingField, value: number) => (f.unit === "%" ? value / 100
  * job needs, installation rates, margin, fixed costs and the bill a new job starts with. Kept for the signed-in
  * business, or on this device when nobody is signed in (`design-store.ts`), saved as each thing is changed.
  */
-export function DesignSettings() {
+/** The parts of the prices page, each shown on its own under Settings. */
+export type PricePart = "lists" | "parts" | "install" | "commission" | "margin" | "electricity";
+const PART_TITLES: Record<PricePart, string> = {
+  lists: "Price lists",
+  parts: "Parts on every job",
+  install: "Installation rates",
+  commission: "Sales commission",
+  margin: "Margin and fixed costs",
+  electricity: "Electricity rates",
+};
+/** Which of the settings' groups, and which of their figures, a part shows. */
+const groupsFor = (part: PricePart) =>
+  SETTING_GROUPS.flatMap((group) => {
+    const commission = (path: string) => path.startsWith("commission.");
+    if (part === "commission" && group.title === "Fixed costs")
+      return [
+        {
+          ...group,
+          title: "Sales commission",
+          intro: "What a sale pays, counted on every job before margin.",
+          fields: group.fields.filter((f) => commission(f.path)),
+        },
+      ];
+    if (part === "margin" && group.title === "Margin") return [group];
+    if (part === "margin" && group.title === "Fixed costs") return [{ ...group, fields: group.fields.filter((f) => !commission(f.path)) }];
+    if (part === "electricity" && group.title === "Electricity bill") return [group];
+    return [];
+  });
+
+export function DesignSettings({ part }: { part: PricePart }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [status, setStatus] = useState<string>("");
   const [upload, setUpload] = useState<{ busy?: boolean; message?: string; error?: boolean }>({});
@@ -123,36 +150,26 @@ export function DesignSettings() {
 
   return (
     <div className="theme-studio min-h-dvh pb-24">
-      <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line bg-canvas/95 px-5 py-3 backdrop-blur lg:px-10">
-        <Link href="/design" aria-label="RENUABL">
-          <Wordmark className="text-[17px]" />
-        </Link>
-        <span className="text-sm text-ink-2">Prices and settings</span>
-        <span className="ml-auto text-xs text-muted" role="status">
-          {status}
-        </span>
-        <DesignAccountLink />
-        <Link
-          href="/design/roof"
-          className="inline-flex h-10 items-center rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest"
-        >
-          Back to the designer
-        </Link>
-      </header>
-
-      <main className="mx-auto w-full max-w-4xl space-y-6 px-5 pt-8">
+      <main className="mx-auto w-full max-w-4xl space-y-6 px-5 pt-8 lg:px-10">
         <div>
-          <p className={eyebrow}>Roof designer</p>
-          <h1 className="mt-2 text-[30px] leading-tight tracking-tight text-ink sm:text-[36px]">Your prices and settings.</h1>
-          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ink-2">
+          <p className={eyebrow}>Settings</p>
+          <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">{PART_TITLES[part]}</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">
             The quote beside a design is worked out from what you set here. Every figure is ex GST, and each change is saved as you make it.
-            The figures you start with are placeholders: replace them with your own.
+            The figures you start with are placeholders: replace them with your own.{" "}
+            <span className="text-muted" role="status">
+              {status}
+            </span>
           </p>
         </div>
 
         {!workspace ? null : (
           <>
-            <section className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6" aria-labelledby="lists">
+            <section
+              hidden={part !== "lists"}
+              className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6"
+              aria-labelledby="lists"
+            >
               <h2 id="lists" className="text-[19px] tracking-tight text-ink">
                 Supplier price lists
               </h2>
@@ -216,7 +233,11 @@ export function DesignSettings() {
               )}
             </section>
 
-            <section className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6" aria-labelledby="parts">
+            <section
+              hidden={part !== "parts"}
+              className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6"
+              aria-labelledby="parts"
+            >
               <h2 id="parts" className="text-[19px] tracking-tight text-ink">
                 Parts on every job
               </h2>
@@ -282,7 +303,11 @@ export function DesignSettings() {
               </div>
             </section>
 
-            <section className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6" aria-labelledby="install">
+            <section
+              hidden={part !== "install"}
+              className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6"
+              aria-labelledby="install"
+            >
               <h2 id="install" className="text-[19px] tracking-tight text-ink">
                 Installation rates
               </h2>
@@ -311,7 +336,7 @@ export function DesignSettings() {
               </div>
             </section>
 
-            {SETTING_GROUPS.map((group) => (
+            {groupsFor(part).map((group) => (
               <section
                 key={group.title}
                 className="rounded-lg bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-6"
@@ -344,7 +369,7 @@ export function DesignSettings() {
               </section>
             ))}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2 p-5">
+            <div hidden={part !== "lists"} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2 p-5">
               <p className="max-w-xl text-sm text-ink-2">
                 <DesignSettingsKeptNote />
               </p>

@@ -1,0 +1,44 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { DesignAccountPage } from "@/components/design/design-account";
+import { BrandSettings } from "@/components/design/design-proposal";
+import { DesignSettings, type PricePart } from "@/components/design/design-settings";
+import { DesignShell } from "@/components/design/design-shell";
+import { settingBySlug } from "@/components/design/settings-list";
+import { SettingSoon, SettingsFrame } from "@/components/design/settings-nav";
+
+export const metadata: Metadata = { title: "Settings", robots: { index: false, follow: false } };
+
+const PRICES: Record<string, PricePart> = {
+  "price-lists": "lists",
+  parts: "parts",
+  "installation-rates": "install",
+  commission: "commission",
+  margin: "margin",
+  electricity: "electricity",
+};
+const BRAND: Record<string, "who" | "look" | "words"> = { company: "who", theme: "look", conditions: "words" };
+
+/** One page of a business's settings, beside the settings' own nav. */
+export default async function DesignSettingPage({ params }: PageProps<"/design/settings/[section]">) {
+  const { section } = await params;
+  const setting = settingBySlug(section);
+  if (!setting) notFound();
+  // The prices work on the device without an account (so the designer can be tried first); the rest needs a business.
+  const needsAccount = !(section in PRICES);
+  return (
+    <DesignShell needsAccount={needsAccount}>
+      <SettingsFrame>
+        {setting.soon ? (
+          <SettingSoon label={setting.label} soon={setting.soon} />
+        ) : section in PRICES ? (
+          <DesignSettings part={PRICES[section]} />
+        ) : section in BRAND ? (
+          <BrandSettings part={BRAND[section]} />
+        ) : (
+          <DesignAccountPage />
+        )}
+      </SettingsFrame>
+    </DesignShell>
+  );
+}

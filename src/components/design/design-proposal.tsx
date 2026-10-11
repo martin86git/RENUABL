@@ -439,7 +439,7 @@ function Pictures(props: {
  * template and colours its proposals use. Each field saves as it is left;
  * the swatch beside the colours shows how they will read together.
  */
-export function BrandSettings() {
+export function BrandSettings({ part }: { part: "who" | "look" | "words" }) {
   const [brand, setBrand] = useState<BrandKit | null>(null);
   const [images, setImages] = useState<BrandImage[]>([]);
   const [status, setStatus] = useState<{ text: string; error?: boolean } | null>(null);
@@ -525,7 +525,9 @@ export function BrandSettings() {
     <div className={clsx(ui.page, "max-w-3xl space-y-6")}>
       <div>
         <p className={ui.eyebrow}>Settings</p>
-        <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">Proposal branding</h1>
+        <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">
+          {part === "who" ? "Company details" : part === "look" ? "Logo, theme and colours" : "Special conditions"}
+        </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">
           Your proposals go to your customers under your name, logo and colours. What you set here is used by the next proposal you publish;
           proposals already sent stay as they were sent.
@@ -537,7 +539,7 @@ export function BrandSettings() {
         )}
       </div>
 
-      <section className={section} aria-labelledby="brand-who">
+      <section hidden={part !== "who"} className={section} aria-labelledby="brand-who">
         <h2 id="brand-who" className="text-[17px] text-ink">
           Your business
         </h2>
@@ -557,7 +559,7 @@ export function BrandSettings() {
         )}
       </section>
 
-      <section className={section} aria-labelledby="brand-look">
+      <section hidden={part !== "look"} className={section} aria-labelledby="brand-look">
         <h2 id="brand-look" className="text-[17px] text-ink">
           Look
         </h2>
@@ -644,7 +646,7 @@ export function BrandSettings() {
         </div>
       </section>
 
-      <section className={section} aria-labelledby="brand-words">
+      <section hidden={part !== "words"} className={section} aria-labelledby="brand-words">
         <h2 id="brand-words" className="text-[17px] text-ink">
           Your words
         </h2>

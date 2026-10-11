@@ -6,7 +6,7 @@
  * was asked for, or a plain message to show.
  */
 import type { Activity, Customer, Job, JobStage, SavedPipeline } from "@/lib/domain/design/crm";
-import { cleanExtras, defaultBill, defaultQuote, postcodeIn, type QuoteForm } from "@/lib/domain/design/quote";
+import { cleanExtras, defaultBill, defaultQuote, postcodeIn, type QuoteFields, type QuoteForm } from "@/lib/domain/design/quote";
 import { cleanDesignSet, type RoofDesign } from "@/lib/domain/design/roof-design";
 
 export type Answer<T> = ({ ok: true } & T) | { ok: false; message: string; signedOut?: boolean };
@@ -102,7 +102,9 @@ export const shortDate = (iso: string) => {
  * design and that design's quote settings (roof, storeys, phase). Null when
  * it can't be fetched or read: the deal then shows its details as not yet known.
  */
-export async function loadDealDesign(projectId: string): Promise<{ design: RoofDesign; form: QuoteForm } | null> {
+export async function loadDealDesign(
+  projectId: string,
+): Promise<{ design: RoofDesign; form: QuoteForm; edits: QuoteFields["edits"] } | null> {
   const res = await ask<{ project: { design: unknown; extras: unknown; address: string } }>(
     `/api/design/projects/${encodeURIComponent(projectId)}`,
   );
@@ -113,5 +115,6 @@ export async function loadDealDesign(projectId: string): Promise<{ design: RoofD
     bill: defaultBill({ rate: 0, feedIn: 0, supplyPerDay: 0 }),
     postcode: postcodeIn(res.project.address),
   });
-  return { design: set.designs[set.primary], form: (extras.quotes[set.primary] ?? defaultQuote("")).form };
+  const quote = extras.quotes[set.primary] ?? defaultQuote("");
+  return { design: set.designs[set.primary], form: quote.form, edits: quote.edits };
 }

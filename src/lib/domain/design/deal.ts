@@ -4,7 +4,7 @@
  * needs, and which jobs are installations in the works.
  */
 import { DETAIL_KEYS, JOB_STAGES, type DetailKey, type Job, type JobStage } from "./crm";
-import type { QuoteForm } from "./quote";
+import { lineKey, type CostGroup, type CostLine, type QuoteForm } from "./quote";
 import { arrayCount, designSummary, tiltedPanels, type RoofDesign } from "./roof-design";
 
 // ---------------------------------------------------------------------------
@@ -172,6 +172,44 @@ export function systemDetails(design: RoofDesign | null, form: QuoteForm | null,
     designed: designed[key] ?? null,
     typed: Boolean(typed[key]),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// The materials to order
+// ---------------------------------------------------------------------------
+
+/** One line of a job's materials order: a product, its code and how many. Never a price: the sheet goes to suppliers. */
+export interface MaterialLine {
+  group: CostGroup;
+  item: string;
+  sku: string;
+  qty: number;
+}
+
+/** What is ordered: the hardware. Installation and commission are the business's own costs, not things to buy. */
+const ORDERED: readonly CostGroup[] = ["Panels", "Inverters", "Battery", "Racking", "Electrical"];
+
+/**
+ * A job's bill of materials, as the sheet sent to suppliers: every hardware
+ * line of its quote (the same lines, so the order matches what was sold),
+ * with the lines taken out of the quote by hand left out. A line that isn't
+ * a count of one product (an allowance) is one of itself with no code.
+ */
+export function materialsOrder(lines: readonly CostLine[], edits: Record<string, { removed?: boolean }> = {}): MaterialLine[] {
+  return lines
+    .filter((l) => ORDERED.includes(l.group) && !edits[lineKey(l)]?.removed)
+    .map((l) => ({
+      group: l.group,
+      item: l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label,
+      sku: l.sku ?? "",
+      qty: l.qty ?? 1,
+    }));
+}
+
+/** The order as a spreadsheet file (CSV): a row a line, quoted so commas and quote marks in a name survive. */
+export function materialsCsv(lines: readonly MaterialLine[]): string {
+  const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  return [["Group", "Item", "Code", "Qty"], ...lines.map((l) => [l.group, l.item, l.sku, l.qty])].map((row) => row.map(cell).join(",")).join("\r\n");
 }
 
 // ---------------------------------------------------------------------------

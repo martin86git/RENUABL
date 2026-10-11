@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, ClipboardList } from "lucide-react";
 import clsx from "clsx";
 import { daysUntil, inTheWorks, installOrder } from "@/lib/domain/design/deal";
 import { todayInMarket } from "@/lib/domain/market";
@@ -83,7 +83,12 @@ export function InstallationsPage() {
           )}
         </td>
         <td className="px-3 py-3 text-right tabular-nums text-ink">{dollars(job.value)}</td>
-        <td className="px-5 py-3 text-right">
+        <td className="whitespace-nowrap px-5 py-3 text-right">
+          {job.projectId && (
+            <Link href={`${PATHS.deals}/${job.id}/materials`} className={clsx(ui.quiet, "mr-2 h-9 px-3 text-[13px]")}>
+              <ClipboardList className="size-4" aria-hidden /> Materials
+            </Link>
+          )}
           <button
             className={clsx(ui.quiet, "h-9 px-3 text-[13px]")}
             onClick={() => window.confirm(`Mark ${job.customerName}'s installation as done?`) && void patch(job.id, { stage: "installed" })}

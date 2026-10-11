@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, ChevronLeft, PenTool, Search, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ClipboardList, PenTool, Search, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import {
   JOB_STAGES,
@@ -242,6 +242,11 @@ export function DealPage({ id }: { id: string }) {
             <p className="mt-3 text-xs text-muted">
               Give this deal an address found on the map (on the customer&apos;s page) to design it.
             </p>
+          )}
+          {job.projectId && (
+            <Link href={`${PATHS.deals}/${job.id}/materials`} className={clsx(ui.quiet, "mt-2 w-full")}>
+              <ClipboardList className="size-4" aria-hidden /> Materials order
+            </Link>
           )}
         </div>
 
