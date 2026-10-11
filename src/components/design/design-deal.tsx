@@ -14,7 +14,7 @@ import {
   type Job,
   type JobStage,
 } from "@/lib/domain/design/crm";
-import { systemDetails, type DetailLine } from "@/lib/domain/design/deal";
+import { systemDetails, type DealDetail } from "@/lib/domain/design/deal";
 import { addActivity, deleteJob, dollars, loadCustomer, loadDealDesign, loadJob, saveJob, shortDate } from "@/lib/services/crm";
 import { ACTIVITY_WORD, StageTag } from "./design-home";
 import { PATHS, ui } from "./design-shell";
@@ -49,7 +49,7 @@ function Block({ title, children, action }: { title: string; children: React.Rea
   );
 }
 
-function Line({ label, value }: DetailLine) {
+function Line({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
       <p className="text-xs text-muted">{label}</p>
@@ -59,11 +59,54 @@ function Line({ label, value }: DetailLine) {
 }
 
 /**
+ * One of the system's details, which can be typed over: click it (or tab to
+ * it) and type; leaving the box saves it. What is typed in by hand stands in
+ * place of what the design says and is marked so, with the way back to the
+ * design's own. Emptying the box goes back to the design's too.
+ */
+function DetailField({ line, onSave }: { line: DealDetail; onSave: (text: string) => void }) {
+  const [text, setText] = useState<string | null>(null);
+  const done = () => {
+    if (text !== null && text.trim() !== (line.value ?? "")) onSave(text.trim());
+    setText(null);
+  };
+  return (
+    <div>
+      <label className="block text-xs text-muted">
+        {line.label}
+        <input
+          className={clsx(
+            "mt-0.5 block h-8 w-full rounded-md border bg-transparent px-2 text-sm text-ink outline-none placeholder:text-muted focus:border-forest focus:bg-surface",
+            "-mx-2 w-[calc(100%+1rem)]",
+            line.typed ? "border-sun-line" : "border-transparent hover:border-line",
+          )}
+          value={text ?? line.value ?? ""}
+          placeholder="--"
+          maxLength={120}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={done}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") setText(null);
+          }}
+        />
+      </label>
+      {line.typed && (
+        <button className="mt-1 text-[11px] text-sun-ink underline underline-offset-2" onClick={() => onSave("")}>
+          Typed in by hand: {line.designed ? `use the design's (${line.designed})` : "clear"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
  * /design/deals/[id]: one deal. Down the left, everything the installation
  * needs: the deal itself (stage, price, install date, who and where) and the
  * system's details, read from its design (system type and size, the panel,
  * inverter and battery and how many, the roof, storeys and phases). A detail
- * the design doesn't say yet shows as "--". Beside it, an overview and the
+ * the design doesn't say yet shows as "--", and any detail can be typed in by
+ * hand (kept on the job; it then stands in place of the design's). Beside it, an overview and the
  * activities: notes, emails, calls and stage moves, by month, that can be
  * searched and added to.
  */
@@ -72,7 +115,8 @@ export function DealPage({ id }: { id: string }) {
   const [job, setJob] = useState<Job | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [activity, setActivity] = useState<Activity[]>([]);
-  const [details, setDetails] = useState<DetailLine[]>(() => systemDetails(null, null));
+  // What the deal's design says, once fetched: the details are worked out from it and what was typed in by hand.
+  const [designed, setDesigned] = useState<Awaited<ReturnType<typeof loadDealDesign>>>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [tab, setTab] = useState<"overview" | "activities">("activities");
@@ -94,7 +138,7 @@ export function DealPage({ id }: { id: string }) {
     ]);
     // What was said about this deal, and what was said about the customer in general.
     if (history.ok) setActivity(history.activity.filter((a) => a.jobId === id || a.jobId === null));
-    setDetails(systemDetails(design?.design ?? null, design?.form ?? null));
+    setDesigned(design);
   }, [id]);
   useEffect(() => {
     // The page's data comes from the server once it is in the browser.
@@ -142,7 +186,14 @@ export function DealPage({ id }: { id: string }) {
     if (months[months.length - 1]?.month === month) months[months.length - 1].items.push(a);
     else months.push({ month, items: [a] });
   }
+  const details = systemDetails(designed?.design ?? null, designed?.form ?? null, job.details);
   const known = details.filter((d) => d.value).length;
+  const setDetail = (key: string, text: string) => {
+    const next = { ...job.details };
+    if (text) next[key] = text;
+    else delete next[key];
+    void patch({ details: next });
+  };
   const pill = (on: boolean) =>
     clsx(
       "h-11 flex-1 border-b-2 text-sm font-medium",
@@ -253,13 +304,13 @@ export function DealPage({ id }: { id: string }) {
             </span>
           }
         >
-          {!job.projectId && (
-            <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
-              These fill in from the design once the roof has been drawn and saved.
-            </p>
-          )}
+          <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
+            {job.projectId
+              ? "Filled in from the design. Click any line to type over it."
+              : "These fill in from the design once the roof has been drawn and saved. Click any line to type it in now."}
+          </p>
           {details.map((d) => (
-            <Line key={d.label} {...d} />
+            <DetailField key={d.key} line={d} onSave={(text) => setDetail(d.key, text)} />
           ))}
         </Block>
       </aside>
@@ -287,7 +338,7 @@ export function DealPage({ id }: { id: string }) {
                 ["Stage", STAGE_LABELS[job.stage]],
                 ["Quoted, inc. GST", dollars(job.value)],
                 ["Install date", job.installDate ? shortDate(job.installDate) : "Not booked"],
-                ["System", details.find((d) => d.label === "System size")?.value ?? "Not designed"],
+                ["System", details.find((d) => d.key === "systemSize")?.value ?? "Not designed"],
               ].map(([k, v]) => (
                 <div key={k} className={clsx(ui.card, "px-4 py-3.5")}>
                   <dt className={ui.eyebrow}>{k}</dt>

@@ -9,11 +9,14 @@ import {
   JOB_STAGE_WRONG,
   JOB_VALUE_WRONG,
   LEAD_SOURCES,
+  PIPELINE_NAME_MISSING,
+  PIPELINE_STAGES_MISSING,
   SAMPLE_CUSTOMERS,
   STAGE_LABELS,
   cleanActivityInput,
   cleanCustomerInput,
   cleanJobInput,
+  cleanPipelineInput,
   customerStage,
   stageMoveText,
   type CustomerInput,
@@ -131,6 +134,17 @@ describe("a customer as sent by a browser", () => {
   });
 });
 
+describe("a pipeline as sent by a browser", () => {
+  it("needs a name and at least one real stage, kept in the stages' own order", () => {
+    expect(value(cleanPipelineInput({ name: "  Commercial  ", stages: ["won", "bogus", "lead"] }))).toEqual({
+      name: "Commercial",
+      stages: ["lead", "won"],
+    });
+    expect(message(cleanPipelineInput({ name: "", stages: ["lead"] }))).toBe(PIPELINE_NAME_MISSING);
+    expect(message(cleanPipelineInput({ name: "Empty", stages: ["bogus"] }))).toBe(PIPELINE_STAGES_MISSING);
+  });
+});
+
 describe("a job as sent by a browser", () => {
   it("starts as a lead called Solar with no price or date", () => {
     expect(value(cleanJobInput({}))).toEqual({
@@ -141,6 +155,7 @@ describe("a job as sent by a browser", () => {
       stage: "lead",
       value: null,
       installDate: null,
+      details: {},
     });
     expect(value(cleanJobInput({ title: "  " })).title).toBe("Solar");
     expect(value(cleanJobInput({ title: "t".repeat(200) })).title).toHaveLength(80);
@@ -178,7 +193,12 @@ describe("a job as sent by a browser", () => {
       stage: "proposal",
       value: 18400,
       installDate: "2026-11-03",
+      details: { propertyType: "Factory" },
     };
+    // Details are sent whole: known keys only, tidied, and an emptied one dropped.
+    expect(value(cleanJobInput({ details: { nmi: " 6305 0027 690 ", propertyType: "", made: "up" } }, current)).details).toEqual({
+      nmi: "6305 0027 690",
+    });
     expect(value(cleanJobInput({ stage: "won" }, current))).toEqual({ ...current, stage: "won" });
     expect(value(cleanJobInput({ value: null, installDate: "" }, current))).toEqual({ ...current, value: null, installDate: null });
     expect(value(cleanJobInput({}, current))).toEqual(current);

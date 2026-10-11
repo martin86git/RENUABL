@@ -5,7 +5,7 @@
  * version, so these need a signed-in business. Each call answers with what
  * was asked for, or a plain message to show.
  */
-import type { Activity, Customer, Job, JobStage } from "@/lib/domain/design/crm";
+import type { Activity, Customer, Job, JobStage, SavedPipeline } from "@/lib/domain/design/crm";
 import { cleanExtras, defaultBill, defaultQuote, postcodeIn, type QuoteForm } from "@/lib/domain/design/quote";
 import { cleanDesignSet, type RoofDesign } from "@/lib/domain/design/roof-design";
 
@@ -66,9 +66,22 @@ export const listJobs = () => ask<{ jobs: JobLine[] }>("/api/design/jobs");
 export const createJob = (input: { customerId: string; title: string; address: string; lat: number | null; lng: number | null }) =>
   ask<{ job: Job }>("/api/design/jobs", { method: "POST", body: input });
 export const loadJob = (id: string) => ask<{ job: Job; customer: Customer }>(`/api/design/jobs/${encodeURIComponent(id)}`);
-export const saveJob = (id: string, patch: Partial<Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "value" | "installDate">>) =>
-  ask<{ job: Job }>(`/api/design/jobs/${encodeURIComponent(id)}`, { method: "PUT", body: patch });
+export const saveJob = (
+  id: string,
+  patch: Partial<Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "value" | "installDate" | "details">>,
+) => ask<{ job: Job }>(`/api/design/jobs/${encodeURIComponent(id)}`, { method: "PUT", body: patch });
 export const deleteJob = (id: string) => ask<object>(`/api/design/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+/** The pipelines the business has saved: shared by everyone in it. */
+export const listPipelines = () => ask<{ pipelines: SavedPipeline[] }>("/api/design/pipelines");
+export const createPipeline = (input: { name: string; stages: JobStage[] }) =>
+  ask<{ pipeline: SavedPipeline }>("/api/design/pipelines", { method: "POST", body: input });
+export const savePipeline = (id: string, input: { name: string; stages: JobStage[] }) =>
+  ask<{ pipeline: SavedPipeline }>(`/api/design/pipelines/${encodeURIComponent(id)}`, { method: "PUT", body: input });
+export const deletePipeline = (id: string) => ask<object>(`/api/design/pipelines/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+/** The temperature now, and where it is for. `degrees` is null when it can't be had. */
+export const loadWeather = () => ask<{ place: string; degrees: number | null }>("/api/design/weather");
 
 export const loadOverview = () => ask<Overview>("/api/design/overview");
 

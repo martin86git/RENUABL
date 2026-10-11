@@ -12,7 +12,11 @@ describe("pipelines", () => {
   });
 
   it("read a choice back with only real stages, in order, and never none", () => {
-    expect(cleanPipelineChoice({ view: "list", stages: ["won", "nonsense", "lead"] })).toEqual({ view: "list", stages: ["lead", "won"] });
+    expect(cleanPipelineChoice({ view: "list", stages: ["won", "nonsense", "lead"], pipeline: "pipe_ab12" })).toEqual({
+      view: "list",
+      stages: ["lead", "won"],
+      pipeline: "pipe_ab12",
+    });
     expect(cleanPipelineChoice({ stages: [] }).stages).toEqual(["lead", "designed", "proposal"]);
     expect(cleanPipelineChoice(null).view).toBe("cards");
   });
@@ -20,6 +24,11 @@ describe("pipelines", () => {
   it("name a set of stages that is exactly one of them", () => {
     expect(pipelineOf(["installed", "won"])?.id).toBe("delivery");
     expect(pipelineOf(["lead", "won"])).toBeNull();
+    // A business's own pipeline is found too, and the one picked wins over another with the same stages.
+    const own = [{ id: "pipe_1", name: "Commercial", stages: ["won", "installed"] as const }];
+    expect(pipelineOf(["lead", "won"], null, [{ id: "pipe_2", name: "Mine", stages: ["lead", "won"] }])?.name).toBe("Mine");
+    expect(pipelineOf(["won", "installed"], "pipe_1", own)?.name).toBe("Commercial");
+    expect(pipelineOf(["won", "installed"], null, own)?.id).toBe("delivery");
   });
 });
 
@@ -57,6 +66,16 @@ describe("system details", () => {
     expect(line(lines, "Phases")).toBe("3");
     expect(line(lines, "Roof type")).toBe("Tin");
     expect(line(lines, "Property storeys")).toBe("Double");
+    // Only a person knows these.
+    expect(line(lines, "Property type")).toBeNull();
+    expect(line(lines, "NMI")).toBeNull();
+
+    // What is typed in by hand stands in place of what the design says, and is marked so.
+    const typed = systemDetails(design, null, { panelQty: "12", propertyType: "Factory" });
+    const qty = typed.find((l) => l.key === "panelQty")!;
+    expect([qty.value, qty.designed, qty.typed]).toEqual(["12", "10", true]);
+    expect(typed.find((l) => l.key === "propertyType")).toMatchObject({ value: "Factory", designed: null, typed: true });
+    expect(typed.find((l) => l.key === "panel")).toMatchObject({ value: "Panel 440", typed: false });
   });
 });
 

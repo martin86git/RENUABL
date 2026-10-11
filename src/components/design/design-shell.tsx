@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   CircleUserRound,
   HardHat,
@@ -15,6 +16,8 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
+import { LAUNCH_MARKET } from "@/lib/domain/market";
+import { loadWeather } from "@/lib/services/crm";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 
 /** Where everything in the product lives. */
@@ -37,12 +40,15 @@ interface NavItem {
   icon: LucideIcon;
   /** Other places that belong to this section: a deal's own page is part of Sales. */
   also?: string[];
+  /** The main tool: marked in the signal colour so it stands out from the sections. */
+  main?: boolean;
   /** Its subsections, listed under it. */
   under?: { href: string; label: string; icon: LucideIcon; also?: string[] }[];
 }
 
 const NAV: NavItem[] = [
   { href: PATHS.home, label: "Overview", icon: LayoutDashboard },
+  { href: PATHS.customers, label: "Customers", icon: Users },
   {
     href: PATHS.pipelines,
     label: "Sales",
@@ -51,14 +57,13 @@ const NAV: NavItem[] = [
     under: [{ href: PATHS.pipelines, label: "Pipelines", icon: SquareKanban, also: [PATHS.deals] }],
   },
   { href: PATHS.installations, label: "Installations", icon: HardHat },
-  { href: PATHS.customers, label: "Customers", icon: Users },
-  { href: PATHS.designer, label: "Design tool", icon: PenTool },
+  { href: PATHS.designer, label: "Design tool", icon: PenTool, main: true },
 ];
 
 /**
  * The frame every signed-in screen sits in: the product's sections down the
- * left (Overview, Sales with its Pipelines, Installations, Customers, Design
- * tool), with the business's settings
+ * left (Overview, Customers, Sales with its Pipelines, Installations, and the
+ * Design tool in orange, as the main tool), with the business's settings
  * and account at its foot. `compact` keeps only the icons, for the design
  * tool, where the roof needs the room. On a phone the sections run across the
  * top instead. Signed out, a screen that needs an account (`needsAccount`)
@@ -99,7 +104,7 @@ function Shell({ children, compact, needsAccount }: { children: React.ReactNode;
 
   const within = (href: string) => (href === PATHS.home ? path === href : path === href || path.startsWith(`${href}/`));
   const active = (href: string, also: string[] = []) => [href, ...also].some(within);
-  const item = (href: string, label: string, Icon: LucideIcon, also?: string[]) => (
+  const item = (href: string, label: string, Icon: LucideIcon, also?: string[], main?: boolean) => (
     <Link
       key={href}
       href={href}
@@ -109,7 +114,12 @@ function Shell({ children, compact, needsAccount }: { children: React.ReactNode;
       className={clsx(
         "flex h-10 shrink-0 items-center gap-3 rounded-md text-sm font-medium",
         compact ? "w-10 justify-center lg:w-10" : "px-3",
-        active(href, also) ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+        main
+          ? // The main tool keeps its orange whether or not it is where you are; there it is ringed too.
+            clsx("bg-sun-line text-white hover:brightness-95", active(href, also) && "ring-2 ring-ink ring-offset-2 ring-offset-surface")
+          : active(href, also)
+            ? "bg-primary text-primary-ink"
+            : "text-ink-2 hover:bg-surface-2 hover:text-ink",
       )}
     >
       <Icon className="size-[18px] shrink-0" aria-hidden />
@@ -171,7 +181,7 @@ function Shell({ children, compact, needsAccount }: { children: React.ReactNode;
               </div>
             </div>
           ) : (
-            item(n.href, n.label, n.icon, n.also)
+            item(n.href, n.label, n.icon, n.also, n.main)
           ),
         )}
         <span className="hidden flex-1 lg:block" aria-hidden />
@@ -184,7 +194,63 @@ function Shell({ children, compact, needsAccount }: { children: React.ReactNode;
           </div>
         )}
       </nav>
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="relative min-w-0 flex-1">
+        {!compact && <NowWidget />}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The time, the date and the temperature, in the top right corner of every
+ * main screen (never the design tool, where the roof has the room). The clock
+ * is the market's own time whatever the device is set to. The temperature is
+ * the market capital's for now, named beside it, and simply isn't shown when
+ * it can't be had.
+ */
+function NowWidget() {
+  const [now, setNow] = useState<Date | null>(null);
+  const [weather, setWeather] = useState<{ place: string; degrees: number | null } | null>(null);
+  useEffect(() => {
+    // The time is only known once the page is in the browser.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNow(new Date());
+    const tick = window.setInterval(() => setNow(new Date()), 15_000);
+    let gone = false;
+    const read = () =>
+      void loadWeather().then((res) => {
+        if (!gone && res.ok) setWeather({ place: res.place, degrees: res.degrees });
+      });
+    read();
+    const again = window.setInterval(read, 900_000);
+    return () => {
+      gone = true;
+      window.clearInterval(tick);
+      window.clearInterval(again);
+    };
+  }, []);
+  if (!now) return null;
+  const zone = { timeZone: LAUNCH_MARKET.timeZone } as const;
+  const time = now.toLocaleTimeString("en-AU", { ...zone, hour: "numeric", minute: "2-digit" });
+  const date = now.toLocaleDateString("en-AU", { ...zone, weekday: "short", day: "numeric", month: "short" });
+  return (
+    <div className="flex justify-end px-5 pt-4 lg:px-10" aria-label="Now">
+      <div className="inline-flex h-10 items-center gap-3 rounded-full bg-surface px-4 text-[13px] shadow-[var(--shadow-soft)] ring-1 ring-line">
+        {weather && weather.degrees !== null && (
+          <>
+            <span className="tabular-nums text-ink" title={`Temperature in ${weather.place} now`}>
+              {weather.degrees}°C <span className="text-muted">{weather.place}</span>
+            </span>
+            <span className="h-4 w-px bg-line" aria-hidden />
+          </>
+        )}
+        <time className="tabular-nums font-medium text-ink" dateTime={now.toISOString()}>
+          {time}
+        </time>
+        <span className="h-4 w-px bg-line" aria-hidden />
+        <span className="text-ink-2">{date}</span>
+      </div>
     </div>
   );
 }

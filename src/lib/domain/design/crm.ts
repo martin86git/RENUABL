@@ -73,6 +73,8 @@ export interface Job {
   value: number | null;
   /** YYYY-MM-DD. */
   installDate: string | null;
+  /** System details typed in by hand, by their key (`DETAIL_KEYS`): each stands in place of what the design says. */
+  details: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 }
@@ -192,7 +194,49 @@ export function cleanCustomerInput(raw: unknown, current?: CustomerInput): Clean
   };
 }
 
-export type JobInput = Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "value" | "installDate">;
+export type JobInput = Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "value" | "installDate" | "details">;
+
+/**
+ * The system details a deal can carry, in the order they are shown. Most can
+ * be read from the design; the rest only a person knows.
+ */
+export const DETAIL_KEYS = [
+  "systemType",
+  "systemSize",
+  "propertyType",
+  "storeys",
+  "roofType",
+  "phases",
+  "panel",
+  "panelQty",
+  "inverter",
+  "inverterQty",
+  "additionalInverter",
+  "inverterCapacity",
+  "optimisers",
+  "battery",
+  "batteryQty",
+  "batteryStorage",
+  "arrays",
+  "strings",
+  "tiltFrames",
+  "switchboard",
+  "distributor",
+  "nmi",
+  "siteAccess",
+] as const;
+export type DetailKey = (typeof DETAIL_KEYS)[number];
+
+/** System details as typed: known keys only, each one tidy line of up to 120 characters; an empty one is dropped. */
+export function cleanJobDetails(raw: unknown): Record<string, string> {
+  const r = bag(raw);
+  const kept: Record<string, string> = {};
+  for (const key of DETAIL_KEYS) {
+    const text = line(r[key], 120);
+    if (text) kept[key] = text;
+  }
+  return kept;
+}
 
 /** What a job is called when nothing was typed. */
 export const DEFAULT_JOB_TITLE = "Solar";
@@ -224,6 +268,7 @@ export function cleanJobInput(raw: unknown, current?: JobInput): Cleaned<JobInpu
     stage: "lead",
     value: null,
     installDate: null,
+    details: {},
   };
 
   const at = sent("lat") || sent("lng") ? place(r.lat, r.lng) : { lat: start.lat, lng: start.lng };
@@ -261,8 +306,37 @@ export function cleanJobInput(raw: unknown, current?: JobInput): Cleaned<JobInpu
       stage,
       value,
       installDate,
+      // The details are sent whole: the ones typed in by hand, as they now stand.
+      details: sent("details") ? cleanJobDetails(r.details) : start.details,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Saved pipelines
+// ---------------------------------------------------------------------------
+
+/** A pipeline a business has saved: a name for a run of stages, shared by everyone in the business. */
+export interface SavedPipeline {
+  id: string;
+  name: string;
+  stages: JobStage[];
+}
+
+export const MAX_PIPELINES = 20;
+export const PIPELINES_FULL = `A business can save up to ${MAX_PIPELINES} pipelines for now.`;
+export const PIPELINE_NAME_MISSING = "Give the pipeline a name (up to 40 characters).";
+export const PIPELINE_STAGES_MISSING = "A pipeline shows at least one stage.";
+
+/** A pipeline as sent: a name, and its stages in their own order with anything unknown left out. */
+export function cleanPipelineInput(raw: unknown): Cleaned<Pick<SavedPipeline, "name" | "stages">> {
+  const r = bag(raw);
+  const name = line(r.name, 40);
+  if (!name) return { ok: false, message: PIPELINE_NAME_MISSING };
+  const sent = Array.isArray(r.stages) ? r.stages : [];
+  const stages = JOB_STAGES.filter((s) => sent.includes(s));
+  if (!stages.length) return { ok: false, message: PIPELINE_STAGES_MISSING };
+  return { ok: true, value: { name, stages } };
 }
 
 export interface ActivityInput {

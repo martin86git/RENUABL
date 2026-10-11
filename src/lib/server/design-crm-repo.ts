@@ -12,6 +12,7 @@ import {
   JOB_STAGES,
   MAX_CUSTOMERS,
   MAX_JOBS_PER_CUSTOMER,
+  MAX_PIPELINES,
   OPEN_STAGES,
   SAMPLE_AUTHOR,
   SAMPLE_CUSTOMERS,
@@ -27,6 +28,7 @@ import {
   type Job,
   type JobInput,
   type JobStage,
+  type SavedPipeline,
 } from "@/lib/domain/design/crm";
 import { newId, query, transaction } from "./db";
 
@@ -38,7 +40,7 @@ const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-
 const CUSTOMER = `c.id, c.name, c.phone, c.email, c.address, c.lat, c.lng, c.source, c.notes, c.sample,
   ${moment("c.created_at")} as "createdAt", ${moment("c.updated_at")} as "updatedAt"`;
 const JOB = `j.id, j.customer_id as "customerId", j.title, j.address, j.lat, j.lng, j.stage, j.project_id as "projectId",
-  j.value::float8 as value, to_char(j.install_date, 'YYYY-MM-DD') as "installDate",
+  j.value::float8 as value, to_char(j.install_date, 'YYYY-MM-DD') as "installDate", j.details,
   ${moment("j.created_at")} as "createdAt", ${moment("j.updated_at")} as "updatedAt"`;
 const ACTIVITY = `a.id, a.customer_id as "customerId", a.job_id as "jobId", a.kind, a.text, a.by_email as by, ${moment("a.at")} as at`;
 
@@ -186,9 +188,23 @@ async function customerRow(q: Q | typeof query, businessId: string, id: string):
 async function insertJob(q: Q, businessId: string, customerId: string, job: JobInput, by: string): Promise<Job> {
   const id = newId("job");
   await q(
-    `insert into design_jobs (id, business_id, customer_id, title, address, lat, lng, roof_key, stage, value, install_date, created_by)
-     values ($2,$1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-    [businessId, id, customerId, job.title, job.address, job.lat, job.lng, keyOf(job), job.stage, job.value, job.installDate, by],
+    `insert into design_jobs (id, business_id, customer_id, title, address, lat, lng, roof_key, stage, value, install_date, created_by, details)
+     values ($2,$1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)`,
+    [
+      businessId,
+      id,
+      customerId,
+      job.title,
+      job.address,
+      job.lat,
+      job.lng,
+      keyOf(job),
+      job.stage,
+      job.value,
+      job.installDate,
+      by,
+      JSON.stringify(job.details ?? {}),
+    ],
   );
   // If the business has already drawn this roof, the new job is for that design.
   await link(q, businessId, { jobId: id }, by);
@@ -345,9 +361,22 @@ export async function updateJob(
     const moved = keyOf(next) !== keyOf(before);
     await q(
       `update design_jobs set title = $3, address = $4, lat = $5, lng = $6, roof_key = $7, stage = $8, value = $9, install_date = $10,
-              project_id = case when $11::boolean then null else project_id end, updated_at = now()
+              project_id = case when $11::boolean then null else project_id end, details = $12::jsonb, updated_at = now()
         where business_id = $1 and id = $2`,
-      [businessId, id, next.title, next.address, next.lat, next.lng, keyOf(next), next.stage, next.value, next.installDate, moved],
+      [
+        businessId,
+        id,
+        next.title,
+        next.address,
+        next.lat,
+        next.lng,
+        keyOf(next),
+        next.stage,
+        next.value,
+        next.installDate,
+        moved,
+        JSON.stringify(next.details ?? {}),
+      ],
     );
     if (next.stage !== before.stage)
       await record(q, businessId, { customerId: before.customerId, jobId: id, kind: "stage", text: stageMoveText(next.stage), by: who });
@@ -359,6 +388,52 @@ export async function updateJob(
 
 export async function deleteJob(businessId: string, id: string): Promise<boolean> {
   const rows = await query(`delete from design_jobs where business_id = $1 and id = $2 returning id`, [businessId, id]);
+  return rows.length > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Saved pipelines
+// ---------------------------------------------------------------------------
+
+const PIPELINE = `id, name, stages`;
+
+/** The pipelines the business has saved, in the order they were made. */
+export async function listPipelines(businessId: string): Promise<SavedPipeline[]> {
+  return query(`select ${PIPELINE} from design_pipelines where business_id = $1 order by created_at, id`, [businessId]);
+}
+
+/** Saves a new pipeline for the business. "full" at the limit. */
+export async function createPipeline(
+  businessId: string,
+  input: Pick<SavedPipeline, "name" | "stages">,
+  by: string,
+): Promise<SavedPipeline | "full"> {
+  return transaction(async (q) => {
+    const count = await q<{ n: string }>(`select count(*) as n from design_pipelines where business_id = $1`, [businessId]);
+    if (Number(count[0]?.n ?? 0) >= MAX_PIPELINES) return "full";
+    const rows = await q<SavedPipeline>(
+      `insert into design_pipelines (id, business_id, name, stages, created_by) values ($2,$1,$3,$4::jsonb,$5) returning ${PIPELINE}`,
+      [businessId, newId("pipe"), input.name, JSON.stringify(input.stages), by.toLowerCase()],
+    );
+    return rows[0];
+  });
+}
+
+/** Renames one of the business's pipelines or changes its stages. Null when it has no such pipeline. */
+export async function updatePipeline(
+  businessId: string,
+  id: string,
+  input: Pick<SavedPipeline, "name" | "stages">,
+): Promise<SavedPipeline | null> {
+  const rows = await query<SavedPipeline>(
+    `update design_pipelines set name = $3, stages = $4::jsonb where business_id = $1 and id = $2 returning ${PIPELINE}`,
+    [businessId, id, input.name, JSON.stringify(input.stages)],
+  );
+  return rows[0] ?? null;
+}
+
+export async function deletePipeline(businessId: string, id: string): Promise<boolean> {
+  const rows = await query(`delete from design_pipelines where business_id = $1 and id = $2 returning id`, [businessId, id]);
   return rows.length > 0;
 }
 

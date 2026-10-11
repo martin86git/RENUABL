@@ -265,6 +265,19 @@ create table if not exists design_activity (
 );
 create index if not exists design_activity_customer on design_activity(business_id, customer_id, at desc);
 create index if not exists design_activity_recent on design_activity(business_id, at desc);
+-- System details typed in by hand on a deal, by key (domain/design/crm.ts DETAIL_KEYS).
+alter table design_jobs add column if not exists details jsonb not null default '{}'::jsonb;
+-- The pipelines a business has saved: a name for a run of stages, shared by its members.
+create table if not exists design_pipelines (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  name text not null,
+  stages jsonb not null,
+  created_by text,
+  created_at timestamptz not null default now(),
+  unique (business_id, id)
+);
+create index if not exists design_pipelines_business on design_pipelines(business_id, created_at);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

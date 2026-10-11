@@ -11,6 +11,8 @@ export const LAUNCH_MARKET = {
   capital: "Melbourne",
   capitalPostcode: "3000",
   timeZone: "Australia/Melbourne",
+  /** The capital's centre: where "the weather here" is read until a business has a place of its own. */
+  capitalPlace: { lat: -37.8136, lng: 144.9631 },
 } as const;
 
 /** Today's date in the market, independent of the server's own time zone (Vercel runs in UTC). */

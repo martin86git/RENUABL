@@ -160,8 +160,6 @@ const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
  * so they read as one family resting on the roof rather than as boxes stuck to it.
  */
 const GLASS = "rounded-2xl border border-line bg-surface/90 shadow-lift backdrop-blur-md";
-/** The dock's tools: the two that only annotate. The rest have pads of their own in the picture's top corners. */
-const SECONDARY: Tool[] = ["label", "comment"];
 
 /** Something picked on the drawing: a panel in a row, a panel placed by hand, or a label. */
 type Pick = { kind: "grid"; face: string; index: number } | { kind: "loose"; id: string } | { kind: "label"; id: string };
@@ -3383,12 +3381,12 @@ export function RoofDesigner(props: {
                   <Hand className="size-8" aria-hidden />
                 </button>
               </div>
-              {/* The dock, centred along the foot of the picture in the room beside Suggest a layout, clear of the map's own
-                  mark and credit at the very bottom: undo, redo and the whole picture, then the two tools that annotate. */}
+              {/* The dock, centred on the foot of the picture, clear of the map's own mark and credit at the very bottom. The
+                  comment bubble is its centre: a round larger than the rest, standing proud of the plate, with undo and
+                  redo to its left and the whole picture and the label to its right, two a side so it sits dead centre. */}
               <div className="pointer-events-none absolute inset-x-2 bottom-7 z-10 flex items-end gap-2">
-                <span className="flex-1" aria-hidden />
                 <div
-                  className={clsx(GLASS, "pointer-events-auto flex shrink-0 items-center gap-1 p-1.5")}
+                  className={clsx(GLASS, "pointer-events-auto absolute bottom-0 left-1/2 flex -translate-x-1/2 items-center gap-1 p-1.5")}
                   role="toolbar"
                   aria-label="Design tools"
                 >
@@ -3409,6 +3407,18 @@ export function RoofDesigner(props: {
                     <Redo2 className="size-5" aria-hidden />
                   </button>
                   <button
+                    onClick={() => pickTool("comment")}
+                    title="Comment"
+                    aria-label="Comment"
+                    aria-pressed={tool === "comment"}
+                    className={clsx(
+                      "-my-4 mx-1 flex size-16 shrink-0 items-center justify-center rounded-full border shadow-lift",
+                      tool === "comment" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <MessageCircle className="size-7" aria-hidden />
+                  </button>
+                  <button
                     onClick={() => setView(WHOLE)}
                     title="Show the whole picture"
                     aria-label="Show the whole picture"
@@ -3416,25 +3426,23 @@ export function RoofDesigner(props: {
                   >
                     <Maximize className="size-5" aria-hidden />
                   </button>
-                  <span className="mx-1 h-7 w-px shrink-0 bg-line" aria-hidden />
-                  {SECONDARY.map((t) => {
-                    const { icon: Icon, name } = TOOLS.find((x) => x.tool === t)!;
+                  {(() => {
+                    const { icon: Icon, name } = TOOLS.find((x) => x.tool === "label")!;
                     return (
                       <button
-                        key={t}
-                        onClick={() => pickTool(t)}
+                        onClick={() => pickTool("label")}
                         title={name}
                         aria-label={name}
-                        aria-pressed={tool === t}
+                        aria-pressed={tool === "label"}
                         className={clsx(
                           "flex size-10 items-center justify-center rounded-xl",
-                          tool === t ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                          tool === "label" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                         )}
                       >
                         <Icon className="size-5" aria-hidden />
                       </button>
                     );
-                  })}
+                  })()}
                 </div>
                 <span className="flex-1" aria-hidden />
                 {/* Suggest a layout, in the corner: one button, which asks how many panels before it lays them. */}

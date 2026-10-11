@@ -3,11 +3,21 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutGrid, List, PenTool, UserPlus } from "lucide-react";
+import { LayoutGrid, List, PenTool, Trash2, UserPlus } from "lucide-react";
 import clsx from "clsx";
-import { JOB_STAGES, STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
+import { JOB_STAGES, STAGE_LABELS, type JobStage, type SavedPipeline } from "@/lib/domain/design/crm";
 import { DEFAULT_PIPELINE, PIPELINES, cleanPipelineChoice, pipelineOf, type PipelineChoice } from "@/lib/domain/design/deal";
-import { dollars, listJobs, saveJob, shortDate, type JobLine } from "@/lib/services/crm";
+import {
+  createPipeline,
+  deletePipeline,
+  dollars,
+  listJobs,
+  listPipelines,
+  saveJob,
+  savePipeline,
+  shortDate,
+  type JobLine,
+} from "@/lib/services/crm";
 import { StageTag } from "./design-home";
 import { PATHS, PageHead, ui } from "./design-shell";
 
@@ -19,18 +29,26 @@ const stageSelect =
 
 /**
  * /design/sales/pipelines: the business's deals (its jobs), seen through a
- * pipeline: a run of stages. One of the named pipelines can be picked, or any
+ * pipeline: a run of stages. One of the set pipelines or one the business has
+ * saved (kept on the server, shared by everyone in it) can be picked, or any
  * stages ticked on and off, and the deals at those stages show as cards in a
  * column for each stage, or as one list. A deal moves by choosing its stage
  * (or, as a card, by being dragged to another column); the move is saved at
- * once and written to the customer's history. The pipeline and the view last
- * used are remembered on the device.
+ * once and written to the customer's history. A set of ticked stages can be
+ * saved as a pipeline of the business's own, and its own can be renamed,
+ * given the stages now ticked, or deleted. Which pipeline and view this
+ * person last used are remembered on their device.
  */
 export function PipelinesPage() {
   const router = useRouter();
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [choice, setChoice] = useState<PipelineChoice>(DEFAULT_PIPELINE);
+  // The pipelines the business has saved, and the name being typed for a new one or a renamed one.
+  const [saved, setSaved] = useState<SavedPipeline[]>([]);
+  const [naming, setNaming] = useState<{ id: string | null; name: string } | null>(null);
+  // The business's own pipeline last picked: ticking stages away from it offers to keep them on it.
+  const [from, setFrom] = useState<string | null>(null);
   // The deal being dragged, and the column it is over.
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<JobStage | null>(null);
@@ -49,6 +67,9 @@ export function PipelinesPage() {
       if (res.ok) setJobs(res.jobs);
       else setProblem(res.message);
     });
+    void listPipelines().then((res) => {
+      if (!gone && res.ok) setSaved(res.pipelines);
+    });
     return () => {
       gone = true;
     };
@@ -65,7 +86,39 @@ export function PipelinesPage() {
   const toggle = (stage: JobStage) => {
     const stages = JOB_STAGES.filter((s) => (s === stage ? !choice.stages.includes(s) : choice.stages.includes(s)));
     // A pipeline always shows at least one stage.
-    if (stages.length) choose({ ...choice, stages });
+    if (stages.length) choose({ ...choice, stages, pipeline: null });
+  };
+  const pick = (p: { id: string; stages: readonly JobStage[] }) => {
+    choose({ ...choice, stages: [...p.stages], pipeline: p.id });
+    setFrom(saved.some((s) => s.id === p.id) ? p.id : null);
+    setNaming(null);
+  };
+  /** Saves the name being typed: a new pipeline of the stages ticked, or a new name for one of the business's own. */
+  const keep = async () => {
+    if (!naming?.name.trim()) return;
+    const old = saved.find((s) => s.id === naming.id);
+    const res = old
+      ? await savePipeline(old.id, { name: naming.name, stages: old.stages })
+      : await createPipeline({ name: naming.name, stages: choice.stages });
+    if (!res.ok) return setProblem(res.message);
+    setProblem(null);
+    setSaved(old ? saved.map((s) => (s.id === old.id ? res.pipeline : s)) : [...saved, res.pipeline]);
+    setNaming(null);
+    if (!old) pick(res.pipeline);
+  };
+  /** Gives one of the business's own pipelines the stages now ticked. */
+  const restage = async (p: SavedPipeline) => {
+    const res = await savePipeline(p.id, { name: p.name, stages: choice.stages });
+    if (!res.ok) return setProblem(res.message);
+    setSaved(saved.map((s) => (s.id === p.id ? res.pipeline : s)));
+    choose({ ...choice, pipeline: p.id });
+  };
+  const remove = async (p: SavedPipeline) => {
+    if (!window.confirm(`Delete the pipeline "${p.name}" for everyone in the business? Its deals are untouched.`)) return;
+    const res = await deletePipeline(p.id);
+    if (!res.ok) return setProblem(res.message);
+    setSaved(saved.filter((s) => s.id !== p.id));
+    setFrom(null);
   };
 
   const move = async (id: string, stage: JobStage) => {
@@ -80,7 +133,9 @@ export function PipelinesPage() {
     } else setProblem(null);
   };
 
-  const named = pipelineOf(choice.stages);
+  const named = pipelineOf(choice.stages, choice.pipeline, saved);
+  const own = saved.find((s) => s.id === named?.id) ?? null;
+  const was = named ? null : (saved.find((s) => s.id === from) ?? null);
   const shown = (jobs ?? []).filter((j) => choice.stages.includes(j.stage));
   const worth = shown.reduce((n, j) => n + (j.value ?? 0), 0);
   const deal = (id: string) => `${PATHS.deals}/${id}`;
@@ -100,17 +155,58 @@ export function PipelinesPage() {
 
       <div className={clsx(ui.card, "mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3")}>
         <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Pipeline">
-          {PIPELINES.map((p) => (
-            <button
-              key={p.id}
-              className={tab(named?.id === p.id)}
-              aria-pressed={named?.id === p.id}
-              onClick={() => choose({ ...choice, stages: [...p.stages] })}
-            >
+          {[...PIPELINES, ...saved].map((p) => (
+            <button key={p.id} className={tab(named?.id === p.id)} aria-pressed={named?.id === p.id} onClick={() => pick(p)}>
               {p.name}
             </button>
           ))}
           {!named && <span className={tab(true)}>Custom</span>}
+          {naming ? (
+            <span className="ml-1 inline-flex items-center gap-1.5">
+              <input
+                autoFocus
+                aria-label="Pipeline name"
+                className={clsx(ui.input, "h-9 min-h-9 w-44")}
+                value={naming.name}
+                maxLength={40}
+                placeholder="Pipeline name"
+                onChange={(e) => setNaming({ ...naming, name: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void keep();
+                  if (e.key === "Escape") setNaming(null);
+                }}
+              />
+              <button className={clsx(ui.primary, "h-9 px-3 text-[13px]")} onClick={keep} disabled={!naming.name.trim()}>
+                Save
+              </button>
+              <button className={clsx(ui.quiet, "h-9 px-3 text-[13px]")} onClick={() => setNaming(null)}>
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <span className="ml-1 inline-flex items-center gap-3 text-[13px] font-medium">
+              {!named && (
+                <button className={ui.link} onClick={() => setNaming({ id: null, name: "" })}>
+                  Save as a pipeline
+                </button>
+              )}
+              {was && (
+                <button className={ui.link} onClick={() => void restage(was)}>
+                  Save to “{was.name}”
+                </button>
+              )}
+              {own && (
+                <>
+                  <button className={ui.link} onClick={() => setNaming({ id: own.id, name: own.name })}>
+                    Rename
+                  </button>
+                  <button className="inline-flex items-center gap-1 text-muted hover:text-danger" onClick={() => void remove(own)}>
+                    <Trash2 className="size-3.5" aria-hidden /> Delete
+                  </button>
+                </>
+              )}
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Stages shown">
           <span className={clsx(ui.eyebrow, "mr-1")}>Stages</span>
@@ -325,7 +421,7 @@ export function PipelinesPage() {
       )}
       {!named && (
         <p className="mt-3 text-xs text-muted">
-          Showing the stages you ticked: <StageList stages={choice.stages} />. Pick a pipeline above to go back to one of the set ones.
+          Showing the stages you ticked: <StageList stages={choice.stages} />. Save them as a pipeline for the business, or pick one above.
         </p>
       )}
     </div>
