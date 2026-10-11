@@ -18,7 +18,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import type { RebateRates } from "@/lib/domain/rebates";
 
 const money = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
-/** The four things about the home, small, so they take one row. */
+/** The three things about the home, small, so they take one row. */
 const small =
   "mt-0.5 block h-8 w-full appearance-auto rounded-md border border-line bg-surface px-1 text-xs tabular-nums outline-none focus:border-forest";
 const label = "text-[10px] font-medium uppercase tracking-[0.14em] text-muted";
@@ -63,7 +63,7 @@ export function DesignQuote(props: {
   const { onNet } = props;
   useEffect(() => onNet(net), [onNet, net]);
 
-  // The four things about the home that change the price are easy to pass over: they sit in a pad that asks to be
+  // The three things about the home that change the price are easy to pass over: they sit in a pad that asks to be
   // checked, and it settles once one of them has been set on this visit.
   const [checked, setChecked] = useState(false);
   const set = (name: keyof typeof form) => (e: { target: { value: string } }) => {
@@ -92,7 +92,7 @@ export function DesignQuote(props: {
             {checked ? "Set on this visit" : "Check these: they change the price"}
           </span>
         </p>
-        <div className="mt-1.5 grid grid-cols-4 gap-1.5 text-[11px] font-medium">
+        <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-[11px] font-medium">
           <label>
             Roof
             <select value={form.roof} onChange={set("roof")} className={small}>
@@ -114,10 +114,6 @@ export function DesignQuote(props: {
               <option value="single">Single</option>
               <option value="three">Three</option>
             </select>
-          </label>
-          <label>
-            Postcode
-            <input inputMode="numeric" maxLength={4} value={form.postcode} onChange={set("postcode")} className={small} />
           </label>
         </div>
       </div>
@@ -253,7 +249,8 @@ export function DesignQuote(props: {
             {costing.panels} panels, {costing.pvKw} kW
             {costing.batteryKwh ? `, ${costing.batteryKwh} kWh battery` : ""}. Costs are ex GST: type over one to change it, or take a line
             out with its cross. An inverter or a battery is costed only when one is chosen on the design. STCs use the rules as at{" "}
-            {rates.asOf} and your price per certificate.
+            {rates.asOf}
+            {form.postcode ? `, postcode ${form.postcode} (from the address)` : ""} and your price per certificate.
             {workspace.lists.length ? ` Prices from: ${workspace.lists.map((l) => l.name).join(", ")}.` : " No price list uploaded yet."}
           </p>
         </div>

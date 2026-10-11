@@ -296,7 +296,9 @@ function JobCard({ job, onChange, onDelete }: { job: Job; onChange: (job: Job) =
     <li className="rounded-md border border-line p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[15px] font-medium text-ink">{job.title}</p>
+          <Link href={`${PATHS.deals}/${job.id}`} className="text-[15px] font-medium text-ink hover:underline">
+            {job.title}
+          </Link>
           <p className="mt-0.5 truncate text-sm text-ink-2">{job.address || "No address yet"}</p>
         </div>
         {job.lat !== null ? (

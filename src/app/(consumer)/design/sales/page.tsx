@@ -1,14 +1,6 @@
-import type { Metadata } from "next";
-import { DesignShell } from "@/components/design/design-shell";
-import { SalesPage } from "@/components/design/design-sales";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Sales", robots: { index: false, follow: false } };
-
-/** A business's jobs by stage. */
+/** Sales opens on its pipelines. */
 export default function DesignSalesPage() {
-  return (
-    <DesignShell needsAccount>
-      <SalesPage />
-    </DesignShell>
-  );
+  redirect("/design/sales/pipelines");
 }

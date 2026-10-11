@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleUserRound, LayoutDashboard, PenTool, SlidersHorizontal, TrendingUp, Users, type LucideIcon } from "lucide-react";
+import {
+  CircleUserRound,
+  HardHat,
+  LayoutDashboard,
+  PenTool,
+  SlidersHorizontal,
+  SquareKanban,
+  TrendingUp,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
@@ -11,6 +21,9 @@ import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 export const PATHS = {
   home: "/design",
   sales: "/design/sales",
+  pipelines: "/design/sales/pipelines",
+  deals: "/design/deals",
+  installations: "/design/installations",
   customers: "/design/customers",
   designer: "/design/roof",
   settings: "/design/settings",
@@ -18,16 +31,34 @@ export const PATHS = {
   signIn: "/design/sign-in",
 } as const;
 
-const NAV: { href: string; label: string; icon: LucideIcon }[] = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  /** Other places that belong to this section: a deal's own page is part of Sales. */
+  also?: string[];
+  /** Its subsections, listed under it. */
+  under?: { href: string; label: string; icon: LucideIcon; also?: string[] }[];
+}
+
+const NAV: NavItem[] = [
   { href: PATHS.home, label: "Overview", icon: LayoutDashboard },
-  { href: PATHS.sales, label: "Sales", icon: TrendingUp },
+  {
+    href: PATHS.pipelines,
+    label: "Sales",
+    icon: TrendingUp,
+    also: [PATHS.sales, PATHS.deals],
+    under: [{ href: PATHS.pipelines, label: "Pipelines", icon: SquareKanban, also: [PATHS.deals] }],
+  },
+  { href: PATHS.installations, label: "Installations", icon: HardHat },
   { href: PATHS.customers, label: "Customers", icon: Users },
   { href: PATHS.designer, label: "Design tool", icon: PenTool },
 ];
 
 /**
  * The frame every signed-in screen sits in: the product's sections down the
- * left (Overview, Sales, Customers, Design tool), with the business's settings
+ * left (Overview, Sales with its Pipelines, Installations, Customers, Design
+ * tool), with the business's settings
  * and account at its foot. `compact` keeps only the icons, for the design
  * tool, where the roof needs the room. On a phone the sections run across the
  * top instead. Signed out, a screen that needs an account (`needsAccount`)
@@ -66,18 +97,19 @@ function Shell({ children, compact, needsAccount }: { children: React.ReactNode;
     );
   }
 
-  const active = (href: string) => (href === PATHS.home ? path === href : path === href || path.startsWith(`${href}/`));
-  const item = (href: string, label: string, Icon: LucideIcon) => (
+  const within = (href: string) => (href === PATHS.home ? path === href : path === href || path.startsWith(`${href}/`));
+  const active = (href: string, also: string[] = []) => [href, ...also].some(within);
+  const item = (href: string, label: string, Icon: LucideIcon, also?: string[]) => (
     <Link
       key={href}
       href={href}
       title={compact ? label : undefined}
       aria-label={compact ? label : undefined}
-      aria-current={active(href) ? "page" : undefined}
+      aria-current={active(href, also) ? "page" : undefined}
       className={clsx(
         "flex h-10 shrink-0 items-center gap-3 rounded-md text-sm font-medium",
         compact ? "w-10 justify-center lg:w-10" : "px-3",
-        active(href) ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+        active(href, also) ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
       )}
     >
       <Icon className="size-[18px] shrink-0" aria-hidden />
@@ -107,7 +139,41 @@ function Shell({ children, compact, needsAccount }: { children: React.ReactNode;
           )}
           {compact && <Wordmark className="text-[16px] lg:hidden" />}
         </Link>
-        {NAV.map((n) => item(n.href, n.label, n.icon))}
+        {NAV.map((n) =>
+          // A section with subsections is a heading over them: the subsection carries the mark of where you are.
+          n.under && !compact ? (
+            <div key={n.label} className="contents lg:block">
+              <Link
+                href={n.href}
+                className={clsx(
+                  "hidden h-10 shrink-0 items-center gap-3 rounded-md px-3 text-sm font-medium lg:flex",
+                  active(n.href, n.also) ? "text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+                )}
+              >
+                <n.icon className="size-[18px] shrink-0" aria-hidden />
+                <span className="truncate">{n.label}</span>
+              </Link>
+              <div className="contents lg:ml-[1.3rem] lg:block lg:border-l lg:border-line lg:pl-2">
+                {n.under.map((u) => (
+                  <Link
+                    key={u.label}
+                    href={u.href}
+                    aria-current={active(u.href, u.also) ? "page" : undefined}
+                    className={clsx(
+                      "flex h-10 shrink-0 items-center gap-3 rounded-md px-3 text-sm font-medium lg:h-9 lg:gap-2.5 lg:text-[13px]",
+                      active(u.href, u.also) ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+                    )}
+                  >
+                    <u.icon className="size-[18px] shrink-0 lg:size-4" aria-hidden />
+                    <span className="truncate">{u.label}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : (
+            item(n.href, n.label, n.icon, n.also)
+          ),
+        )}
         <span className="hidden flex-1 lg:block" aria-hidden />
         {item(PATHS.settings, "Prices and settings", SlidersHorizontal)}
         {item(PATHS.account, account.business?.name ?? "Your account", CircleUserRound)}

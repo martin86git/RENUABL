@@ -493,7 +493,9 @@ export function RoofDesigner(props: {
     setBillFields(next);
     setSaved("changed");
   };
-  const quoteNow = quotes[active] ?? defaultQuote(props.postcode);
+  // The quote's postcode is the roof's own: the one in the address searched for. One typed before that rule stays only where the address has none.
+  const stored = quotes[active] ?? defaultQuote(props.postcode);
+  const quoteNow = props.postcode ? { ...stored, form: { ...stored.form, postcode: props.postcode } } : stored;
   const everyQuote = () => designs.map((_, i) => quotes[i] ?? defaultQuote(props.postcode));
   const setQuote = (next: QuoteFields) => {
     setQuotes(designs.map((_, i) => (i === active ? next : (quotes[i] ?? defaultQuote(props.postcode)))));

@@ -6,6 +6,8 @@
  * was asked for, or a plain message to show.
  */
 import type { Activity, Customer, Job, JobStage } from "@/lib/domain/design/crm";
+import { cleanExtras, defaultBill, defaultQuote, postcodeIn, type QuoteForm } from "@/lib/domain/design/quote";
+import { cleanDesignSet, type RoofDesign } from "@/lib/domain/design/roof-design";
 
 export type Answer<T> = ({ ok: true } & T) | { ok: false; message: string; signedOut?: boolean };
 
@@ -78,3 +80,22 @@ export const shortDate = (iso: string) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
 };
+
+/**
+ * The design a job is for, as its deal page reads it: the roof's primary
+ * design and that design's quote settings (roof, storeys, phase). Null when
+ * it can't be fetched or read: the deal then shows its details as not yet known.
+ */
+export async function loadDealDesign(projectId: string): Promise<{ design: RoofDesign; form: QuoteForm } | null> {
+  const res = await ask<{ project: { design: unknown; extras: unknown; address: string } }>(
+    `/api/design/projects/${encodeURIComponent(projectId)}`,
+  );
+  if (!res.ok) return null;
+  const set = cleanDesignSet(res.project.design);
+  if (!set) return null;
+  const extras = cleanExtras(res.project.extras, set.designs.length, {
+    bill: defaultBill({ rate: 0, feedIn: 0, supplyPerDay: 0 }),
+    postcode: postcodeIn(res.project.address),
+  });
+  return { design: set.designs[set.primary], form: (extras.quotes[set.primary] ?? defaultQuote("")).form };
+}
