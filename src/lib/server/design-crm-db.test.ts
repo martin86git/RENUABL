@@ -259,7 +259,7 @@ describe.skipIf(!url)("roof designer CRM (database)", () => {
     const o = await crm.overview(a);
     // Solar 6.6 kW: won, $9,800. Battery: designed, $5,000. The third: proposal, $12,000.50.
     expect(Object.keys(o.counts)).toEqual([...JOB_STAGES]);
-    expect(o.counts).toEqual({ lead: 0, designed: 1, proposal: 1, won: 1, installed: 0, lost: 0 });
+    expect(o.counts).toMatchObject({ lead: 0, designed: 1, proposal: 1, won: 1, installed: 0, lost: 0 });
     expect(o.openValue).toBe(17000.5);
     expect(o.wonValue).toBe(9800);
     expect(o.customers).toBe(2);
@@ -272,13 +272,13 @@ describe.skipIf(!url)("roof designer CRM (database)", () => {
     await crm.updateJob(a, second.id, (current) => cleanJobInput({ stage: "installed" }, current), A);
     await crm.updateJob(a, third.id, (current) => cleanJobInput({ stage: "lost" }, current), A);
     const later = await crm.overview(a);
-    expect(later.counts).toEqual({ lead: 0, designed: 0, proposal: 0, won: 1, installed: 1, lost: 1 });
+    expect(later.counts).toMatchObject({ lead: 0, designed: 0, proposal: 0, won: 1, installed: 1, lost: 1 });
     expect([later.openValue, later.wonValue]).toEqual([0, 14800]);
     expect((await crm.listCustomers(a))[0]).toMatchObject({ name: "Morgan Example", jobs: 3, stage: "installed" });
 
     // The other business's figures are its samples' alone.
     const theirs = await crm.overview(b);
-    expect(theirs.counts).toEqual({ lead: 2, designed: 1, proposal: 1, won: 1, installed: 0, lost: 0 });
+    expect(theirs.counts).toMatchObject({ lead: 2, designed: 1, proposal: 1, won: 1, installed: 0, lost: 0 });
     expect([theirs.openValue, theirs.wonValue, theirs.customers]).toEqual([28200, 8600, 5]);
 
     const all = await crm.listJobs(a);

@@ -71,7 +71,7 @@ export const createJob = (input: { customerId: string; title: string; address: s
 export const loadJob = (id: string) => ask<{ job: Job; customer: Customer }>(`/api/design/jobs/${encodeURIComponent(id)}`);
 export const saveJob = (
   id: string,
-  patch: Partial<Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "value" | "installDate" | "details">>,
+  patch: Partial<Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "value" | "installDate" | "details" | "kw">>,
 ) => ask<{ job: Job }>(`/api/design/jobs/${encodeURIComponent(id)}`, { method: "PUT", body: patch });
 export const deleteJob = (id: string) => ask<object>(`/api/design/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
 

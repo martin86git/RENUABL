@@ -12,7 +12,7 @@ import { systemSpecOf } from "@/lib/domain/design/system";
 import { loadDealDesign, loadJob, shortDate } from "@/lib/services/crm";
 import { loadWorkspace } from "@/lib/services/design-store";
 import { useDesignAccount } from "./design-account";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { STAGE_LABELS, WON_STAGES } from "@/lib/domain/design/crm";
 import { PATHS, ui } from "./design-shell";
 
 /**
@@ -70,7 +70,7 @@ export function DealMaterials({ id }: { id: string }) {
       .replace(/^-|-$/g, "") || "order"
   }.csv`;
   const groups = [...new Set(lines.map((l) => l.group))];
-  const sold = job.stage === "won" || job.stage === "installed";
+  const sold = WON_STAGES.includes(job.stage);
 
   return (
     <div className={clsx(ui.page, "max-w-4xl")}>

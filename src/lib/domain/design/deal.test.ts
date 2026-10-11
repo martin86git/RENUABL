@@ -3,7 +3,10 @@ import { JOB_STAGES } from "./crm";
 import {
   PIPELINES,
   cleanPipelineChoice,
+  dashboard,
   daysUntil,
+  power,
+  type DashJob,
   inTheWorks,
   installOrder,
   materialsCsv,
@@ -28,18 +31,24 @@ describe("pipelines", () => {
       stages: ["lead", "won"],
       pipeline: "pipe_ab12",
     });
-    expect(cleanPipelineChoice({ stages: [] }).stages).toEqual(["lead", "designed", "proposal"]);
+    expect(cleanPipelineChoice({ stages: [] }).stages).toEqual(["lead", "designed", "proposal", "won"]);
     expect(cleanPipelineChoice(null).view).toBe("cards");
   });
 
   it("name a set of stages that is exactly one of them", () => {
-    expect(pipelineOf(["installed", "won"])?.id).toBe("delivery");
-    expect(pipelineOf(["lead", "won"])).toBeNull();
+    expect(pipelineOf(["installed", "won", "ordered", "scheduled"])?.id).toBe("post-sale");
+    expect(pipelineOf(["lead", "claimed"])).toBeNull();
     // A business's own pipeline is found too, and the one picked wins over another with the same stages.
-    const own = [{ id: "pipe_1", name: "Commercial", stages: ["won", "installed"] as const }];
-    expect(pipelineOf(["lead", "won"], null, [{ id: "pipe_2", name: "Mine", stages: ["lead", "won"] }])?.name).toBe("Mine");
-    expect(pipelineOf(["won", "installed"], "pipe_1", own)?.name).toBe("Commercial");
-    expect(pipelineOf(["won", "installed"], null, own)?.id).toBe("delivery");
+    const own = [{ id: "pipe_1", name: "Commercial", stages: ["lost"] as const }];
+    expect(pipelineOf(["lead", "claimed"], null, [{ id: "pipe_2", name: "Mine", stages: ["lead", "claimed"] }])?.name).toBe("Mine");
+    expect(pipelineOf(["lost"], "pipe_1", own)?.name).toBe("Commercial");
+    expect(pipelineOf(["lost"], null, own)?.id).toBe("lost");
+  });
+
+  it("hand a deal on from one to the next: each starts at the stage the last one ends on", () => {
+    const [sales, postSale, postInstall] = PIPELINES;
+    expect(sales.stages[sales.stages.length - 1]).toBe(postSale.stages[0]);
+    expect(postSale.stages[postSale.stages.length - 1]).toBe(postInstall.stages[0]);
   });
 });
 
@@ -90,6 +99,66 @@ describe("system details", () => {
   });
 });
 
+describe("the overview's figures", () => {
+  const at = (date: string) => `${date}T02:00:00.000Z`; // midday-ish in Melbourne: the same day there
+  const job = (o: Partial<DashJob>): DashJob => ({
+    stage: "lead",
+    value: null,
+    kw: null,
+    createdAt: at("2026-01-01"),
+    wonAt: null,
+    installedAt: null,
+    installDate: null,
+    ...o,
+  });
+  const jobs: DashJob[] = [
+    job({ stage: "won", value: 10000, kw: 6.6, createdAt: at("2026-10-02"), wonAt: at("2026-10-05") }),
+    job({ stage: "grid", value: 20000, kw: 13.2, wonAt: at("2026-08-10"), installedAt: at("2026-10-03") }),
+    job({ stage: "scheduled", value: 8000, wonAt: at("2026-09-04"), installDate: "2026-10-20" }),
+    job({ stage: "installed", value: 5000, wonAt: at("2025-10-06"), installedAt: at("2025-11-01") }),
+    job({ stage: "won", value: 9000, wonAt: at("2026-10-28") }), // later this month than today: not yet
+    job({ stage: "lost", value: 7000, wonAt: at("2026-10-03") }), // lost: counts for nothing
+    job({ stage: "proposal", value: 12000, createdAt: at("2026-10-08") }),
+    job({ stage: "lead", createdAt: at("2026-10-09") }),
+    job({ stage: "lead", createdAt: at("2026-06-30") }),
+  ];
+  const d = dashboard(jobs, "2026-10-11");
+
+  it("add up sales for the month to date and the financial year, from when each job was sold", () => {
+    expect(d.salesMonth).toBe(10000);
+    expect(d.salesYear).toBe(10000 + 20000 + 8000);
+    expect(d.soldYear).toBe(3);
+    expect(d.yearLabel).toBe("FY 2026-27");
+    expect(dashboard(jobs, "2026-03-11").yearLabel).toBe("FY 2025-26");
+  });
+
+  it("compare like with like: the same days last month and this month last year", () => {
+    // 4 Sep falls within 1 to 11 Sep: $8,000 then, $10,000 now.
+    expect(d.vsLastMonth).toBe(25);
+    // 6 Oct 2025 falls within 1 to 11 Oct 2025: $5,000 then.
+    expect(d.vsLastYear).toBe(100);
+    expect(dashboard([], "2026-10-11").vsLastMonth).toBeNull();
+  });
+
+  it("count new deals, deals sold and the conversion between them", () => {
+    expect(d.newDeals).toBe(3);
+    expect(d.sold).toBe(1);
+    expect(d.conversion).toBeCloseTo(1 / 3);
+    expect(dashboard([], "2026-10-11").conversion).toBeNull();
+  });
+
+  it("count the kilowatts sold, installations and the open pipeline", () => {
+    expect(d.kwMonth).toBe(6.6);
+    expect(d.kwYear).toBe(19.8);
+    expect(d.installsBooked).toBe(1);
+    expect(d.installsDone).toBe(1);
+    expect(d.inGrid).toBe(1);
+    expect([d.openDeals, d.openValue]).toEqual([3, 12000]);
+    expect(power(19.8)).toBe("19.8 kW");
+    expect(power(1250)).toBe("1.25 MW");
+  });
+});
+
 describe("the materials to order", () => {
   const lines = [
     { group: "Panels", label: "16 × Panel 475", amount: 1976, qty: 16, sku: "P475" },
@@ -132,6 +201,7 @@ describe("installations", () => {
 
   it("are the won jobs not yet installed", () => {
     expect(inTheWorks(jobs).map((j) => j.id)).toEqual(["a", "b", "d", "e"]);
+    expect(inTheWorks([{ stage: "ordered" }, { stage: "scheduled" }, { stage: "inspection" }, { stage: "lead" }] as const)).toHaveLength(2);
   });
 
   it("come soonest first, then those to book, longest waiting first", () => {

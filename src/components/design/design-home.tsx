@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 import { ArrowRight, PenTool, ReceiptText, UserPlus, Users } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
-import { JOB_STAGES, STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
-import { dollars, loadOverview, shortDate, type Overview } from "@/lib/services/crm";
+import { STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
+import { PIPELINES, dashboard, power } from "@/lib/domain/design/deal";
+import { todayInMarket } from "@/lib/domain/market";
+import { dollars, listJobs, loadOverview, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
 import { requestSignInLink } from "@/lib/services/design-account";
 import { useDesignAccount } from "./design-account";
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
@@ -17,7 +19,7 @@ export function StageTag({ stage }: { stage: JobStage }) {
     <span
       className={clsx(
         "inline-flex h-6 items-center whitespace-nowrap rounded px-2 text-[11px] font-medium uppercase tracking-[0.08em]",
-        stage === "won" || stage === "installed"
+        WON_STAGES.includes(stage)
           ? "bg-positive-soft text-positive"
           : stage === "lost"
             ? "bg-surface-2 text-muted"
@@ -148,9 +150,42 @@ function FrontPage({ unreachable }: { unreachable: boolean }) {
   );
 }
 
-/** The business at a glance: where its jobs stand, what they are worth, and what happened last. */
+/** A change against an earlier period, as a small signed percentage: green up, red down, quiet when there is nothing to compare. */
+function Delta({ value, against, dark }: { value: number | null; against: string; dark?: boolean }) {
+  if (value === null) return <span className={clsx("text-xs", dark ? "text-white/45" : "text-muted")}>No sales {against} to compare</span>;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs">
+      <span
+        className={clsx(
+          "rounded px-1.5 py-0.5 font-medium tabular-nums",
+          value > 0
+            ? "bg-positive-soft text-positive"
+            : value < 0
+              ? "bg-warning-soft text-danger"
+              : dark
+                ? "bg-white/10 text-white"
+                : "bg-surface-2 text-ink-2",
+        )}
+      >
+        {value > 0 ? "+" : value < 0 ? "−" : ""}
+        {Math.abs(value)}%
+      </span>
+      <span className={dark ? "text-white/60" : "text-muted"}>{against}</span>
+    </span>
+  );
+}
+
+/**
+ * The business at a glance: what it has sold this financial year and this
+ * month (against the same days last month and last year), new deals and how
+ * many were sold, the kilowatts, installations booked and done, what is in
+ * the grid connection stage and what is still open; then where its deals
+ * stand in each pipeline, and what happened last. Every figure is worked out
+ * from the deals as they stand (`dashboard` in `deal.ts`).
+ */
 function OverviewPage({ business }: { business: string }) {
   const [data, setData] = useState<Overview | null>(null);
+  const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
     let gone = false;
@@ -159,10 +194,34 @@ function OverviewPage({ business }: { business: string }) {
       if (res.ok) setData(res);
       else setProblem(res.message);
     });
+    void listJobs().then((res) => {
+      if (!gone && res.ok) setJobs(res.jobs);
+    });
     return () => {
       gone = true;
     };
   }, []);
+
+  const today = todayInMarket();
+  const d = jobs ? dashboard(jobs, today) : null;
+  const monthName = new Date(`${today}T00:00:00Z`).toLocaleDateString("en-AU", { month: "long", timeZone: "UTC" });
+  const show = (value: string | number | undefined) => (d && value !== undefined ? String(value) : "–");
+  const tiles: [name: string, value: string, under: string][] = [
+    ["New deals", show(d?.newDeals), `Leads started in ${monthName}`],
+    [
+      "Deals sold",
+      show(d?.sold),
+      d && d.conversion !== null
+        ? `${Math.round(d.conversion * 100)}% of ${monthName}'s new deals`
+        : `No new deals in ${monthName} to convert`,
+    ],
+    ["Solar sold", d ? power(d.kwMonth) : "–", d ? `${power(d.kwYear)} this financial year` : ""],
+    ["Installs booked", show(d?.installsBooked), `With a date in ${monthName}, not yet done`],
+    ["Installs completed", show(d?.installsDone), `Finished in ${monthName}`],
+    ["In grid connection", show(d?.inGrid), "Deals at the grid connection stage"],
+    ["Open pipeline", d ? dollars(d.openValue) : "–", d ? `${d.openDeals} ${d.openDeals === 1 ? "deal" : "deals"} still being sold` : ""],
+    ["Customers", data ? String(data.customers) : "–", "Everyone in your list"],
+  ];
 
   return (
     <div className={ui.page}>
@@ -181,17 +240,36 @@ function OverviewPage({ business }: { business: string }) {
         </p>
       )}
 
-      <section className="mt-8 grid gap-3 sm:grid-cols-3" aria-label="Totals">
-        {(
-          [
-            ["Open pipeline", data ? dollars(data.openValue) : "–", "Quoted value of jobs not yet won or lost"],
-            ["Won", data ? dollars(data.wonValue) : "–", "Quoted value of jobs won and installed"],
-            ["Customers", data ? String(data.customers) : "–", "Everyone in your list"],
-          ] as const
-        ).map(([name, value, under]) => (
+      {/* Sales, first and largest: the financial year, and the month so far with how it compares. */}
+      <section className="mt-8 grid overflow-hidden rounded-lg bg-ink text-white sm:grid-cols-2" aria-label="Sales">
+        <div className="p-6">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/60">Sales · {d?.yearLabel ?? "financial year"}</p>
+          <p className="mt-3 text-[40px] font-medium leading-none tabular-nums tracking-tight">{d ? dollars(d.salesYear) : "–"}</p>
+          <p className="mt-3 text-xs text-white/60">
+            {d ? `${d.soldYear} ${d.soldYear === 1 ? "deal" : "deals"} sold since 1 July, at their quoted prices` : ""}
+          </p>
+        </div>
+        <div className="border-t border-white/15 p-6 sm:border-l sm:border-t-0">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/60">Sales · {monthName} to date</p>
+          <p className="mt-3 text-[40px] font-medium leading-none tabular-nums tracking-tight text-sun-line">
+            {d ? dollars(d.salesMonth) : "–"}
+          </p>
+          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
+            {d && (
+              <>
+                <Delta value={d.vsLastMonth} against="on the same days last month" dark />
+                <Delta value={d.vsLastYear} against="on the same days last year" dark />
+              </>
+            )}
+          </p>
+        </div>
+      </section>
+
+      <section className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="This month">
+        {tiles.map(([name, value, under]) => (
           <div key={name} className={clsx(ui.card, "p-5")}>
             <p className={ui.eyebrow}>{name}</p>
-            <p className="mt-2 text-[30px] font-medium leading-none tabular-nums tracking-tight text-ink">{value}</p>
+            <p className="mt-2 text-[28px] font-medium leading-none tabular-nums tracking-tight text-ink">{value}</p>
             <p className="mt-2 text-[12.5px] text-muted">{under}</p>
           </div>
         ))}
@@ -200,20 +278,34 @@ function OverviewPage({ business }: { business: string }) {
       <section className="mt-8" aria-labelledby="stages">
         <div className="flex items-baseline justify-between">
           <h2 id="stages" className="text-[17px] tracking-tight text-ink">
-            Jobs by stage
+            Deals by pipeline
           </h2>
           <Link href={PATHS.sales} className={clsx(ui.link, "text-[13px]")}>
-            Open sales <ArrowRight className="inline size-3.5" aria-hidden />
+            Open pipelines <ArrowRight className="inline size-3.5" aria-hidden />
           </Link>
         </div>
-        <ol className={clsx(ui.card, "mt-3 grid grid-cols-2 divide-line sm:grid-cols-3 lg:grid-cols-6 lg:divide-x")}>
-          {JOB_STAGES.map((stage) => (
-            <li key={stage} className="p-4">
-              <p className="text-[26px] font-medium leading-none tabular-nums text-ink">{data ? data.counts[stage] : "–"}</p>
-              <p className="mt-2 text-[12.5px] text-ink-2">{STAGE_LABELS[stage]}</p>
-            </li>
+        <div className="mt-3 space-y-3">
+          {PIPELINES.slice(0, 3).map((p) => (
+            <div key={p.id} className={clsx(ui.card, "p-4")}>
+              <p className={ui.eyebrow}>{p.name}</p>
+              <ol className="mt-3 flex flex-wrap gap-x-2 gap-y-3">
+                {p.stages.map((stage, i) => (
+                  <li key={stage} className="flex min-w-[7.5rem] flex-1 items-center gap-2">
+                    <div className="min-w-0 flex-1 rounded-md bg-surface-2 px-3 py-2.5">
+                      <p className="text-[22px] font-medium leading-none tabular-nums text-ink">{data ? (data.counts[stage] ?? 0) : "–"}</p>
+                      <p className="mt-1.5 truncate text-xs text-ink-2">{STAGE_LABELS[stage]}</p>
+                    </div>
+                    {i < p.stages.length - 1 && <ArrowRight className="size-3.5 shrink-0 text-muted" aria-hidden />}
+                  </li>
+                ))}
+              </ol>
+            </div>
           ))}
-        </ol>
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          Sales count from when a deal is moved to Won, at its quoted price. Kilowatts count for deals whose design has been saved since
+          this was added.{data ? ` Lost: ${data.counts.lost ?? 0}.` : ""}
+        </p>
       </section>
 
       <section className="mt-8" aria-labelledby="recent">

@@ -9,6 +9,7 @@
  */
 import { roofKey } from "@/lib/domain/design/account";
 import {
+  INSTALLED_STAGES,
   JOB_STAGES,
   MAX_CUSTOMERS,
   MAX_JOBS_PER_CUSTOMER,
@@ -38,6 +39,9 @@ export type Q = Parameters<Parameters<typeof transaction>[0]>[0];
 /** A moment as the text the browser gets: "2026-10-10T03:15:00.000Z". */
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
+/** Stages as a list for SQL. They are our own constants, never anything sent. */
+const inList = (stages: readonly JobStage[]) => stages.map((s) => `'${s}'`).join(",");
+
 const CUSTOMER = `c.id, c.name,
   case when c.first_name = '' and c.last_name = '' then split_part(c.name, ' ', 1) else c.first_name end as "firstName",
   case when c.first_name = '' and c.last_name = '' then btrim(substr(c.name, length(split_part(c.name, ' ', 1)) + 1)) else c.last_name end as "lastName",
@@ -45,6 +49,9 @@ const CUSTOMER = `c.id, c.name,
   ${moment("c.created_at")} as "createdAt", ${moment("c.updated_at")} as "updatedAt"`;
 const JOB = `j.id, j.customer_id as "customerId", j.title, j.address, j.lat, j.lng, j.stage, j.project_id as "projectId",
   j.value::float8 as value, to_char(j.install_date, 'YYYY-MM-DD') as "installDate", j.details,
+  j.kw::float8 as kw,
+  ${moment(`coalesce(j.won_at, case when j.stage in (${inList(WON_STAGES)}) then j.updated_at end)`)} as "wonAt",
+  ${moment(`coalesce(j.installed_at, case when j.stage in (${inList(INSTALLED_STAGES)}) then j.updated_at end)`)} as "installedAt",
   ${moment("j.created_at")} as "createdAt", ${moment("j.updated_at")} as "updatedAt"`;
 const ACTIVITY = `a.id, a.customer_id as "customerId", a.job_id as "jobId", a.kind, a.text, a.by_email as by, ${moment("a.at")} as at`;
 
@@ -399,7 +406,12 @@ export async function updateJob(
     const moved = keyOf(next) !== keyOf(before);
     await q(
       `update design_jobs set title = $3, address = $4, lat = $5, lng = $6, roof_key = $7, stage = $8, value = $9, install_date = $10,
-              project_id = case when $11::boolean then null else project_id end, details = $12::jsonb, updated_at = now()
+              project_id = case when $11::boolean then null else project_id end, details = $12::jsonb,
+              kw = case when $13::boolean then $14::numeric else kw end,
+              -- Sold and installed are dated when a job first reaches those stages, and undated if it goes back.
+              won_at = case when $15::boolean then coalesce(won_at, now()) else null end,
+              installed_at = case when $16::boolean then coalesce(installed_at, now()) else null end,
+              updated_at = now()
         where business_id = $1 and id = $2`,
       [
         businessId,
@@ -414,6 +426,10 @@ export async function updateJob(
         next.installDate,
         moved,
         JSON.stringify(next.details ?? {}),
+        next.kw !== undefined,
+        next.kw ?? null,
+        WON_STAGES.includes(next.stage),
+        INSTALLED_STAGES.includes(next.stage),
       ],
     );
     if (next.stage !== before.stage)

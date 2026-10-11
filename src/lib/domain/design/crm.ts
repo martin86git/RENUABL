@@ -13,8 +13,28 @@
 // Stages and sources
 // ---------------------------------------------------------------------------
 
-/** The stages a job moves through, in order, with "lost" to one side. The same for every business for now. */
-export const JOB_STAGES = ["lead", "designed", "proposal", "won", "installed", "lost"] as const;
+/**
+ * The stages a job moves through, in order, with "lost" to one side: being
+ * sold (lead to proposal), sold and being got ready (won, stock ordered,
+ * installation scheduled), then installed and being finished off
+ * (inspection, the certificate of electrical safety, the grid connection,
+ * and the STCs and rebates claimed). The same for every business for now;
+ * the pipelines (`deal.ts`) are runs of them.
+ */
+export const JOB_STAGES = [
+  "lead",
+  "designed",
+  "proposal",
+  "won",
+  "ordered",
+  "scheduled",
+  "installed",
+  "inspection",
+  "coes",
+  "grid",
+  "claimed",
+  "lost",
+] as const;
 export type JobStage = (typeof JOB_STAGES)[number];
 
 export const STAGE_LABELS: Record<JobStage, string> = {
@@ -22,14 +42,24 @@ export const STAGE_LABELS: Record<JobStage, string> = {
   designed: "Designed",
   proposal: "Proposal sent",
   won: "Won",
+  ordered: "Stock ordered",
+  scheduled: "Installation scheduled",
   installed: "Installed",
+  inspection: "Inspection booked",
+  coes: "CoES received",
+  grid: "Grid connection",
+  claimed: "STCs and rebates claimed",
   lost: "Lost",
 };
 
 /** Still being sold: what the "open" value on the overview adds up. */
 export const OPEN_STAGES: readonly JobStage[] = ["lead", "designed", "proposal"];
 /** Sold: what the "won" value on the overview adds up (an installed job was won first). */
-export const WON_STAGES: readonly JobStage[] = ["won", "installed"];
+export const WON_STAGES: readonly JobStage[] = ["won", "ordered", "scheduled", "installed", "inspection", "coes", "grid", "claimed"];
+/** Sold and not yet on the roof: the installations in the works. */
+export const PRE_INSTALL_STAGES: readonly JobStage[] = ["won", "ordered", "scheduled"];
+/** On the roof: installed, and whatever is still being finished off after. */
+export const INSTALLED_STAGES: readonly JobStage[] = ["installed", "inspection", "coes", "grid", "claimed"];
 
 /** Where a customer came from: the choices offered. Any short text is kept, so a business can type its own. */
 export const LEAD_SOURCES = ["Referral", "Website", "Phone call", "Walk-in", "Advertising", "Other"] as const;
@@ -76,6 +106,12 @@ export interface Job {
   value: number | null;
   /** YYYY-MM-DD. */
   installDate: string | null;
+  /** The size of the solar on the job's design, in kW, as last saved from the designer. Null until it is designed. */
+  kw: number | null;
+  /** When it was sold: when it first reached a won stage. Null while it is still being sold, or lost. */
+  wonAt: string | null;
+  /** When it was installed: when it first reached an installed stage. */
+  installedAt: string | null;
   /** System details typed in by hand, by their key (`DETAIL_KEYS`): each stands in place of what the design says. */
   details: Record<string, string>;
   createdAt: string;
@@ -210,7 +246,10 @@ export function cleanCustomerInput(raw: unknown, current?: CustomerInput): Clean
   };
 }
 
-export type JobInput = Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "value" | "installDate" | "details">;
+export type JobInput = Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "value" | "installDate" | "details"> & {
+  /** Sent by the designer with the price when a design is saved. */
+  kw?: number | null;
+};
 
 /**
  * The system details a deal can carry, in the order they are shown. Most can
@@ -322,6 +361,9 @@ export function cleanJobInput(raw: unknown, current?: JobInput): Cleaned<JobInpu
       stage,
       value,
       installDate,
+      ...(sent("kw")
+        ? { kw: typeof r.kw === "number" && Number.isFinite(r.kw) && r.kw >= 0 && r.kw <= 10_000 ? Math.round(r.kw * 1000) / 1000 : null }
+        : {}),
       // The details are sent whole: the ones typed in by hand, as they now stand.
       details: sent("details") ? cleanJobDetails(r.details) : start.details,
     },

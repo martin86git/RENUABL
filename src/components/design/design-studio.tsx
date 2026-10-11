@@ -9,7 +9,7 @@ import { batteryCatalogue, inverterCatalogue, panelCatalogue } from "@/lib/domai
 import { MONTHLY_SUN } from "@/lib/domain/design/tilt";
 import { DEFAULT_WORKSPACE, workspaceCatalogue, type Workspace } from "@/lib/domain/design/pricing";
 import { postcodeIn, type DesignExtras } from "@/lib/domain/design/quote";
-import { ROOF_IMAGE, type DesignSet } from "@/lib/domain/design/roof-design";
+import { ROOF_IMAGE, designSummary, type DesignSet } from "@/lib/domain/design/roof-design";
 import { VERIFIED_RATES, type RebateRates } from "@/lib/domain/rebates";
 import { yieldPerKw } from "@/lib/domain/sunshine";
 import type { Address } from "@/lib/domain/types";
@@ -201,7 +201,8 @@ export function DesignStudio() {
           onSave={async (next, extras, net) => {
             const problem = await saveRoofWork(roof, next, extras);
             // Designed for a customer's job: the job carries the quote's price, so the pipeline shows what it is worth.
-            if (!problem && onJob && net !== null) void saveJob(onJob.id, { value: net });
+            if (!problem && onJob && net !== null)
+              void saveJob(onJob.id, { value: net, kw: designSummary(next.designs[next.primary] ?? next.designs[0]).kw });
             return problem;
           }}
           // Publish: the design has just been saved. With a deal, its proposal is worked out again from it on the server.

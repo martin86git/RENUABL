@@ -3,7 +3,19 @@
  * looks at its deals through, what a deal's design says the installation
  * needs, and which jobs are installations in the works.
  */
-import { DETAIL_KEYS, JOB_STAGES, type DetailKey, type Job, type JobStage } from "./crm";
+import {
+  DETAIL_KEYS,
+  INSTALLED_STAGES,
+  JOB_STAGES,
+  OPEN_STAGES,
+  PRE_INSTALL_STAGES,
+  WON_STAGES,
+  type DetailKey,
+  type Job,
+  type JobStage,
+} from "./crm";
+import { todayInMarket } from "../market";
+import type { ISODate } from "../types";
 import { lineKey, type CostGroup, type CostLine, type QuoteForm } from "./quote";
 import { arrayCount, designSummary, tiltedPanels, type RoofDesign } from "./roof-design";
 
@@ -24,8 +36,12 @@ export interface Pipeline {
  * "Custom" is whichever stages the person has ticked without saving.
  */
 export const PIPELINES: readonly Pipeline[] = [
-  { id: "sales", name: "Sales", stages: ["lead", "designed", "proposal"] },
-  { id: "delivery", name: "Won to installed", stages: ["won", "installed"] },
+  // Selling: from a new lead to the deal signed.
+  { id: "sales", name: "Sales pipeline", stages: ["lead", "designed", "proposal", "won"] },
+  // Sold, and being got ready: the stock and the date.
+  { id: "post-sale", name: "Post sale pipeline", stages: ["won", "ordered", "scheduled", "installed"] },
+  // On the roof, and being finished off: inspection, the certificate, the grid connection, the rebates.
+  { id: "post-installation", name: "Post installation pipeline", stages: ["installed", "inspection", "coes", "grid", "claimed"] },
   { id: "all", name: "Every stage", stages: JOB_STAGES },
   { id: "lost", name: "Lost", stages: ["lost"] },
 ];
@@ -209,16 +225,18 @@ export function materialsOrder(lines: readonly CostLine[], edits: Record<string,
 /** The order as a spreadsheet file (CSV): a row a line, quoted so commas and quote marks in a name survive. */
 export function materialsCsv(lines: readonly MaterialLine[]): string {
   const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-  return [["Group", "Item", "Code", "Qty"], ...lines.map((l) => [l.group, l.item, l.sku, l.qty])].map((row) => row.map(cell).join(",")).join("\r\n");
+  return [["Group", "Item", "Code", "Qty"], ...lines.map((l) => [l.group, l.item, l.sku, l.qty])]
+    .map((row) => row.map(cell).join(","))
+    .join("\r\n");
 }
 
 // ---------------------------------------------------------------------------
 // Installations
 // ---------------------------------------------------------------------------
 
-/** Installations in the works: jobs that are won and not yet installed. */
+/** Installations in the works: jobs that are sold and not yet installed (won, stock ordered, installation scheduled). */
 export function inTheWorks<T extends Pick<Job, "stage">>(jobs: readonly T[]): T[] {
-  return jobs.filter((j) => j.stage === "won");
+  return jobs.filter((j) => PRE_INSTALL_STAGES.includes(j.stage));
 }
 
 /**
@@ -235,4 +253,98 @@ export function installOrder<T extends Pick<Job, "installDate" | "updatedAt">>(j
 /** Whole days from `today` to a date (both YYYY-MM-DD): negative once it has passed. */
 export function daysUntil(date: string, today: string): number {
   return Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+}
+
+// ---------------------------------------------------------------------------
+// The overview's figures
+// ---------------------------------------------------------------------------
+
+export type DashJob = Pick<Job, "stage" | "value" | "kw" | "createdAt" | "wonAt" | "installedAt" | "installDate">;
+
+export interface Dashboard {
+  /** The financial year so far (1 July to today): the prices of the jobs sold in it, and how many. */
+  salesYear: number;
+  soldYear: number;
+  /** "FY 2026-27". */
+  yearLabel: string;
+  /** This month to date. */
+  salesMonth: number;
+  /** Against the same days of last month, and of this month last year, as a whole percentage. Null with nothing to compare with. */
+  vsLastMonth: number | null;
+  vsLastYear: number | null;
+  /** New deals (jobs started) this month. */
+  newDeals: number;
+  /** Deals sold this month, and that as a share of the new deals this month (0 to 1; null with no new deals). */
+  sold: number;
+  conversion: number | null;
+  /** Solar sold, in kW, this month and this financial year. Only jobs whose design has been saved count. */
+  kwMonth: number;
+  kwYear: number;
+  /** Installations with a date in this calendar month that aren't done yet, and installations completed this month. */
+  installsBooked: number;
+  installsDone: number;
+  /** Deals at the grid connection stage. */
+  inGrid: number;
+  /** Deals still being sold, and what they are quoted at. */
+  openDeals: number;
+  openValue: number;
+}
+
+/** A change from `before` to `now` as a whole percentage; null when there was nothing before. */
+function change(now: number, before: number): number | null {
+  return before > 0 ? Math.round(((now - before) / before) * 100) : null;
+}
+
+/**
+ * The overview's figures, from the business's jobs as they stand. Every
+ * date is taken in the market's own time zone. A sale counts in the month it
+ * was sold (when the job first reached a won stage), at the job's quoted
+ * price; a job later lost counts for nothing. The comparisons are like for
+ * like: the same days of last month, and of this month last year.
+ */
+export function dashboard(jobs: readonly DashJob[], today: ISODate): Dashboard {
+  const day = (iso: string | null) => (iso ? todayInMarket(new Date(iso)) : null);
+  const [y, m] = [Number(today.slice(0, 4)), Number(today.slice(5, 7))];
+  const dd = today.slice(8, 10);
+  const two = (n: number) => String(n).padStart(2, "0");
+  const month = `${y}-${two(m)}`;
+  const lastMonth = m === 1 ? `${y - 1}-12` : `${y}-${two(m - 1)}`;
+  const lastYear = `${y - 1}-${two(m)}`;
+  const yearFrom = m >= 7 ? y : y - 1;
+  const yearStart = `${yearFrom}-07-01`;
+  /** Whether a day falls in a month, up to the same day of the month as today. */
+  const toDate = (d: string | null, ofMonth: string) => d !== null && d >= `${ofMonth}-01` && d <= `${ofMonth}-${dd}`;
+
+  const sold = jobs.filter((j) => WON_STAGES.includes(j.stage)).map((j) => ({ ...j, on: day(j.wonAt) }));
+  const sum = (list: typeof sold) => list.reduce((n, j) => n + (j.value ?? 0), 0);
+  const kw = (list: typeof sold) => Math.round(list.reduce((n, j) => n + (j.kw ?? 0), 0) * 100) / 100;
+  const thisMonth = sold.filter((j) => toDate(j.on, month));
+  const thisYear = sold.filter((j) => j.on !== null && j.on >= yearStart && j.on <= today);
+  const salesMonth = sum(thisMonth);
+  const newDeals = jobs.filter((j) => toDate(day(j.createdAt), month)).length;
+  const open = jobs.filter((j) => OPEN_STAGES.includes(j.stage));
+
+  return {
+    salesYear: sum(thisYear),
+    soldYear: thisYear.length,
+    yearLabel: `FY ${yearFrom}-${two((yearFrom + 1) % 100)}`,
+    salesMonth,
+    vsLastMonth: change(salesMonth, sum(sold.filter((j) => toDate(j.on, lastMonth)))),
+    vsLastYear: change(salesMonth, sum(sold.filter((j) => toDate(j.on, lastYear)))),
+    newDeals,
+    sold: thisMonth.length,
+    conversion: newDeals > 0 ? thisMonth.length / newDeals : null,
+    kwMonth: kw(thisMonth),
+    kwYear: kw(thisYear),
+    installsBooked: jobs.filter((j) => PRE_INSTALL_STAGES.includes(j.stage) && j.installDate?.startsWith(month)).length,
+    installsDone: jobs.filter((j) => INSTALLED_STAGES.includes(j.stage) && day(j.installedAt)?.startsWith(month)).length,
+    inGrid: jobs.filter((j) => j.stage === "grid").length,
+    openDeals: open.length,
+    openValue: open.reduce((n, j) => n + (j.value ?? 0), 0),
+  };
+}
+
+/** Kilowatts as they are said: "24.2 kW", or "1.25 MW" from a megawatt up. */
+export function power(kw: number): string {
+  return kw >= 1000 ? `${Math.round(kw / 10) / 100} MW` : `${Math.round(kw * 10) / 10} kW`;
 }

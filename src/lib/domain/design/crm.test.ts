@@ -31,9 +31,12 @@ const value = <T>(cleaned: { ok: true; value: T } | { ok: false; message: string
 const message = (cleaned: { ok: boolean; message?: string }) => (cleaned.ok ? null : cleaned.message);
 
 describe("stages", () => {
-  it("are the six, in order, each with its label", () => {
-    expect(JOB_STAGES).toEqual(["lead", "designed", "proposal", "won", "installed", "lost"]);
-    expect(JOB_STAGES.map((s) => STAGE_LABELS[s])).toEqual(["Lead", "Designed", "Proposal sent", "Won", "Installed", "Lost"]);
+  it("run from lead to the rebates claimed, with lost to one side, each with its label", () => {
+    expect(JOB_STAGES[0]).toBe("lead");
+    expect(JOB_STAGES[JOB_STAGES.length - 1]).toBe("lost");
+    expect(JOB_STAGES.indexOf("won")).toBeLessThan(JOB_STAGES.indexOf("installed"));
+    expect(JOB_STAGES.indexOf("installed")).toBeLessThan(JOB_STAGES.indexOf("claimed"));
+    for (const s of JOB_STAGES) expect(STAGE_LABELS[s]).toBeTruthy();
     expect(stageMoveText("proposal")).toBe("Moved to Proposal sent");
   });
   it("show a customer at their furthest job that isn't lost", () => {

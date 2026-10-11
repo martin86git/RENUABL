@@ -139,15 +139,10 @@ export function PipelinesPage() {
   const shown = (jobs ?? []).filter((j) => choice.stages.includes(j.stage));
   const worth = shown.reduce((n, j) => n + (j.value ?? 0), 0);
   const deal = (id: string) => `${PATHS.deals}/${id}`;
-  const tab = (on: boolean) =>
-    clsx(
-      "inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium",
-      on ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
-    );
 
   return (
     <div className="px-5 py-8 lg:px-10">
-      <PageHead eyebrow="Sales · Pipelines" title={named ? `${named.name} pipeline` : "Your own pipeline"}>
+      <PageHead eyebrow="Sales · Pipelines" title={named ? named.name : "Your own pipeline"}>
         <Link href={`${PATHS.customers}?new=1`} className={ui.primary}>
           <UserPlus className="size-4" aria-hidden /> New customer
         </Link>
@@ -155,12 +150,33 @@ export function PipelinesPage() {
 
       <div className={clsx(ui.card, "mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3")}>
         <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Pipeline">
-          {[...PIPELINES, ...saved].map((p) => (
-            <button key={p.id} className={tab(named?.id === p.id)} aria-pressed={named?.id === p.id} onClick={() => pick(p)}>
-              {p.name}
-            </button>
-          ))}
-          {!named && <span className={tab(true)}>Custom</span>}
+          <label className="inline-flex items-center gap-2">
+            <span className="sr-only">Pipeline</span>
+            <select
+              className={clsx(ui.input, "h-9 min-h-9 w-64 appearance-auto font-medium")}
+              value={named?.id ?? "custom"}
+              onChange={(e) => {
+                const p = [...PIPELINES, ...saved].find((x) => x.id === e.target.value);
+                if (p) pick(p);
+              }}
+            >
+              {PIPELINES.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+              {saved.length > 0 && (
+                <optgroup label="Your own">
+                  {saved.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {!named && <option value="custom">Custom (the stages ticked)</option>}
+            </select>
+          </label>
           {naming ? (
             <span className="ml-1 inline-flex items-center gap-1.5">
               <input
