@@ -26,6 +26,7 @@ import {
 } from "@/lib/services/design-store";
 import { loadJob, saveJob } from "@/lib/services/crm";
 import { NEEDS_ACCOUNT, NO_DEAL, proposalScreen, publishFromDesigner } from "@/lib/services/proposals";
+import { ChatButton } from "./chat-panel";
 import { DesignKeptNote, DesignRoofList } from "./design-account";
 import { RoofDesigner } from "./roof-designer";
 
@@ -212,6 +213,7 @@ export function DesignStudio() {
             onJob ? publishFromDesigner(onJob.id) : (await whereKept().catch(() => "device")) === "account" ? NO_DEAL : NEEDS_ACCOUNT
           }
           proposalHref={onJob ? proposalScreen(onJob.id) : null}
+          chat={onJob ? <ChatButton jobId={onJob.id} /> : null}
           costsHidden={costsHidden()}
           savedLabel={kept}
           onUnsaved={noteUnsaved}

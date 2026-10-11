@@ -16,6 +16,7 @@
 import { Document, Image, Page, Polygon, Rect, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
 import { contrast, inkOn, shownAbn, shownBsb, shownWebsite } from "@/lib/domain/design/brand";
+import { money } from "@/lib/domain/design/deposit";
 import {
   BANK_NOTE,
   acceptLine,
@@ -263,9 +264,9 @@ function ProposalDocument({
     payment: () =>
       terms && (terms.deposit !== null || terms.milestones.length > 0 || terms.bank) ? (
         <View wrap={false}>
-          {terms.deposit !== null && <Row label="Deposit to go ahead" value={dollars(terms.deposit)} bold />}
+          {terms.deposit !== null && <Row label="Deposit to go ahead" value={money(terms.deposit)} bold />}
           {terms.milestones.map((m) => (
-            <Row key={m.name} label={`${m.name} (${m.percent}%)`} value={dollars(m.amount)} />
+            <Row key={m.name} label={`${m.name} (${m.percent}%)`} value={money(m.amount)} />
           ))}
           {terms.bank ? (
             <View style={[s.card, { marginTop: 10 }]}>

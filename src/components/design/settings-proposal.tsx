@@ -48,8 +48,8 @@ const TITLES: Record<ProposalPart, { title: string; intro: string }> = {
       "A ready-made contract for your proposals, with the New Energy Tech consumer information. Your own special conditions stay separate and come first.",
   },
   emails: {
-    title: "Signed proposal emails",
-    intro: "Extra addresses of your own to tell when a customer accepts a proposal.",
+    title: "Emails",
+    intro: "What is emailed when a customer accepts a proposal or writes to you, and when you reply to them.",
   },
   customiser: {
     title: "Proposal customiser",
@@ -152,6 +152,7 @@ function Payment({ brand, save }: PartProps) {
     brand.milestones.map((m) => ({ percent: String(m.percent), name: m.name })),
   );
   const [bank, setBank] = useState(brand.bank);
+  const [payLink, setPayLink] = useState(brand.payLink);
   const total = Math.round(rows.reduce((sum, r) => sum + (Number(r.percent) || 0), 0) * 10) / 10;
   const filled = rows.filter((r) => r.name.trim() || Number(r.percent) > 0).length;
   const row = (i: number, patch: Partial<{ percent: string; name: string }>) =>
@@ -232,7 +233,9 @@ function Payment({ brand, save }: PartProps) {
           )}
         </div>
         <p className="text-xs text-muted">
-          Worked out from what the customer pays, after the federal rebate. Nothing is charged through the proposal.
+          Worked out from what the customer pays, after the federal rebate and without any Solar Victoria rebate. Once they accept, their
+          proposal asks them to pay it to you, by bank transfer or on your card payment page (below). Nothing is charged through the
+          proposal.
         </p>
       </section>
 
@@ -352,6 +355,35 @@ function Payment({ brand, save }: PartProps) {
         </div>
         <button type="button" className={ui.primary} onClick={() => void save({ bank }).then((kept) => kept && setBank((b) => ({ ...b })))}>
           Save bank details
+        </button>
+      </section>
+
+      <section className={section} aria-labelledby="pay-card">
+        <h2 id="pay-card" className={h2}>
+          Card payment link
+        </h2>
+        <p className="text-sm text-ink-2">
+          If you take cards, paste the address of your own payment page here (a payment link from your own provider). Once a customer has
+          accepted a proposal, &ldquo;Pay by card&rdquo; opens it in a new tab and they pay you there. We don&apos;t take card payments or
+          hold money for you, and we can&apos;t see whether a payment was made: you mark a deposit received on the deal. Leave it empty to
+          offer bank transfer only.
+        </p>
+        <label className={ui.label}>
+          Your payment page
+          <span className={help}>A full https address. It is added to proposals you publish from now on.</span>
+          <input
+            type="url"
+            inputMode="url"
+            className={clsx(ui.input, "mt-1.5")}
+            value={payLink}
+            maxLength={300}
+            placeholder="https://"
+            autoComplete="off"
+            onChange={(e) => setPayLink(e.target.value)}
+          />
+        </label>
+        <button type="button" className={ui.primary} onClick={() => void save({ payLink })}>
+          Save payment link
         </button>
       </section>
     </>
@@ -531,38 +563,61 @@ function StandardTerms({ brand, save }: PartProps) {
 
 function Emails({ brand, save, emailReady }: PartProps & { emailReady: boolean }) {
   return (
-    <section className={section}>
-      <label className={ui.label}>
-        Also tell these addresses
-        <span className={help}>One a line, up to {MAX_NOTIFY}. Your own people: an office inbox, whoever books installations.</span>
-        <textarea
-          key={`notify:${brand.notify.join("|")}`}
-          rows={5}
-          className={clsx(ui.input, "mt-1.5 py-2")}
-          defaultValue={brand.notify.join("\n")}
-          onBlur={(e) => {
-            const lines = e.target.value
-              .split(/[\n,;]+/)
-              .map((l) => l.trim())
-              .filter(Boolean);
-            if (lines.join("\n") !== brand.notify.join("\n")) void save({ notify: lines });
-          }}
-        />
-      </label>
-      <div className="rounded-md border border-line bg-surface-2 p-3 text-xs leading-relaxed text-ink-2">
-        <p className="font-medium text-ink">What is sent</p>
-        <p className="mt-1">
-          A short message from RENUABL, the moment a customer accepts: who accepted, which job, and a link to the deal. It doesn&apos;t
-          carry the price, your bank details or a copy of the proposal, and it is never sent to the customer. We don&apos;t send email in
-          your business&apos;s name. Acceptance is also written on the customer&apos;s record either way.
-        </p>
-        {!emailReady && (
-          <p className="mt-2 font-medium text-sun-ink" role="status">
-            Email isn&apos;t set up on this server, so nothing is sent from here yet. The addresses are kept for when it is.
+    <>
+      <section className={section}>
+        <h2 className={h2}>When you reply to a customer</h2>
+        <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 accent-[var(--primary)]"
+            checked={brand.emailReplies}
+            onChange={(e) => void save({ emailReplies: e.target.checked })}
+          />
+          <span>
+            <span className="block font-medium">Email the customer each reply in a deal&apos;s chat</span>
+            <span className="block text-xs text-muted">
+              Sent by RENUABL and says so, naming your business: it carries your message and a button back to their proposal, where they
+              answer. It is not sent from your own address, and a reply to it isn&apos;t read. Off, your reply waits on their proposal until
+              they next open it.
+            </span>
+          </span>
+        </label>
+      </section>
+      <section className={section}>
+        <h2 className={h2}>When a customer accepts or writes to you</h2>
+        <label className={ui.label}>
+          Also tell these addresses
+          <span className={help}>One a line, up to {MAX_NOTIFY}. Your own people: an office inbox, whoever books installations.</span>
+          <textarea
+            key={`notify:${brand.notify.join("|")}`}
+            rows={5}
+            className={clsx(ui.input, "mt-1.5 py-2")}
+            defaultValue={brand.notify.join("\n")}
+            onBlur={(e) => {
+              const lines = e.target.value
+                .split(/[\n,;]+/)
+                .map((l) => l.trim())
+                .filter(Boolean);
+              if (lines.join("\n") !== brand.notify.join("\n")) void save({ notify: lines });
+            }}
+          />
+        </label>
+        <div className="rounded-md border border-line bg-surface-2 p-3 text-xs leading-relaxed text-ink-2">
+          <p className="font-medium text-ink">What is sent</p>
+          <p className="mt-1">
+            A short message from RENUABL when a customer accepts (who accepted, which job, a link to the deal) and when a customer writes in
+            a deal&apos;s chat (their message and a link to the deal; with no addresses here, that one goes to the owner). It doesn&apos;t
+            carry the price, your bank details or a copy of the proposal, and it is never sent to the customer. We don&apos;t send email in
+            your business&apos;s name. Acceptance is also written on the customer&apos;s record either way.
           </p>
-        )}
-      </div>
-    </section>
+          {!emailReady && (
+            <p className="mt-2 font-medium text-sun-ink" role="status">
+              Email isn&apos;t set up on this server, so nothing is sent from here yet. The addresses are kept for when it is.
+            </p>
+          )}
+        </div>
+      </section>
+    </>
   );
 }
 

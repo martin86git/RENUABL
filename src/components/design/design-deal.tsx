@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronLeft, ClipboardList, PenTool, Search, Trash2 } from "lucide-react";
 import clsx from "clsx";
@@ -17,6 +17,7 @@ import {
 import { systemDetails, type DealDetail } from "@/lib/domain/design/deal";
 import { addActivity, deleteJob, dollars, loadCustomer, loadDealDesign, loadJob, saveJob, shortDate } from "@/lib/services/crm";
 import { ACTIVITY_WORD, StageTag } from "./design-home";
+import { DealChat } from "./chat-panel";
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
 
@@ -28,6 +29,7 @@ const FILTERS: { key: "all" | ActivityKind; label: string }[] = [
   { key: "call", label: "Calls" },
   { key: "stage", label: "Stage moves" },
   { key: "proposal", label: "Proposal" },
+  { key: "message", label: "Messages" },
 ];
 
 /** A block of the left-hand column that folds away, with its lines one under the next: a quiet label over its value. */
@@ -121,7 +123,9 @@ export function DealPage({ id }: { id: string }) {
   const [designed, setDesigned] = useState<Awaited<ReturnType<typeof loadDealDesign>>>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [status, setStatus] = useState("");
-  const [tab, setTab] = useState<"overview" | "activities">("activities");
+  // "?tab=chat" (from Messages, and from the email about a new message) opens the deal on its conversation.
+  const asked = useSearchParams().get("tab");
+  const [tab, setTab] = useState<"overview" | "activities" | "chat">(asked === "chat" ? "chat" : "activities");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
   const [find, setFind] = useState("");
   const [kind, setKind] = useState<Written>("note");
@@ -339,9 +343,16 @@ export function DealPage({ id }: { id: string }) {
           >
             Activities
           </button>
+          <button role="tab" aria-selected={tab === "chat"} className={pill(tab === "chat")} onClick={() => setTab("chat")}>
+            Chat
+          </button>
         </div>
 
-        {tab === "overview" ? (
+        {tab === "chat" ? (
+          <div className="mt-5">
+            <DealChat jobId={id} />
+          </div>
+        ) : tab === "overview" ? (
           <div className="mt-5 space-y-5">
             <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {[

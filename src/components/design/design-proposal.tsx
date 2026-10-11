@@ -31,6 +31,9 @@ import {
   withdrawProposal,
 } from "@/lib/services/proposals";
 import { PATHS, ui } from "./design-shell";
+import { CustomerChat } from "./chat-panel";
+import { useDesignAccount } from "./design-account";
+import { DepositLine } from "./deposit-panel";
 import { ProposalPage } from "./proposal-view";
 
 const STATE_WORDS: Record<ProposalState, string> = {
@@ -73,6 +76,9 @@ function CopyLink({ path, className }: { path: string; className?: string }) {
  */
 export function DealProposal({ jobId, hasDesign }: { jobId: string; hasDesign: boolean }) {
   const [versions, setVersions] = useState<ProposalStatus[] | null>(null);
+  const [account] = useDesignAccount();
+  // Marking a deposit is for whoever may publish proposals; the server checks it again.
+  const mayMark = Boolean(account?.signedIn && (account.may?.publish ?? true));
   useEffect(() => {
     let gone = false;
     void loadProposal(jobId).then((res) => !gone && setVersions(res.ok ? res.versions : []));
@@ -90,6 +96,7 @@ export function DealProposal({ jobId, hasDesign }: { jobId: string; hasDesign: b
             {STATE_WORDS[latest.state]} <span className="tabular-nums text-ink-2">· {dollars(latest.youPay)}</span>
           </p>
           <p className="mt-0.5 text-xs text-muted">{standing(latest)}</p>
+          {latest.deposit && <DepositLine jobId={jobId} deposit={latest.deposit} mayMark={mayMark} onChange={setVersions} />}
         </>
       ) : (
         <p className="mt-1.5 text-xs text-muted">
@@ -126,6 +133,8 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const latest = versions[0];
+  const [account] = useDesignAccount();
+  const mayMark = Boolean(account?.signedIn && (account.may?.publish ?? true));
 
   // The preview follows the choices, a moment after the last change (the note is typed a letter at a time).
   const asked = useRef(0);
@@ -297,6 +306,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                 {latest.version > 1 ? `Version ${latest.version}, published` : "Published"} {shortDate(latest.publishedAt)}.{" "}
                 {standing(latest)}.{latest.state === "live" ? ` The price stands until ${shortDate(latest.validUntil)}.` : ""}
               </p>
+              {latest.deposit && <DepositLine jobId={jobId} deposit={latest.deposit} mayMark={mayMark} onChange={setVersions} />}
               {out && (
                 <>
                   <CopyLink path={latest.path} className={clsx(ui.quiet, "w-full")} />
@@ -339,6 +349,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                 roof: `/api/design/roof?lat=${view.roof.lat.toFixed(6)}&lng=${view.roof.lng.toFixed(6)}`,
                 pdf: null,
               }}
+              chat={<CustomerChat business={view.business.name} phone={view.business.phone} />}
             />
           </div>
         ) : (

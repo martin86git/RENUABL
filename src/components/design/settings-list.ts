@@ -27,7 +27,7 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
       { slug: "conditions", label: "Special conditions" },
       { slug: "terms", label: "Standard terms and conditions" },
       { slug: "installation-time", label: "Installation time" },
-      { slug: "signed-emails", label: "Signed proposal emails" },
+      { slug: "signed-emails", label: "Emails for proposals and chat" },
     ],
   },
   {

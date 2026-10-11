@@ -341,6 +341,33 @@ create table if not exists design_proposal_versions (
   unique (proposal_id, version),
   foreign key (business_id, proposal_id) references design_proposals(business_id, id) on delete cascade
 );
+-- The deposit on an accepted version (domain/design/deposit.ts): the reference the customer pays with, what the
+-- customer has said about paying (said, never seen: no payment passes through us), and the business marking it
+-- received. Kept beside the fixed copy, which it never changes.
+alter table design_proposal_versions add column if not exists deposit_ref text;
+alter table design_proposal_versions add column if not exists deposit_said_way text;
+alter table design_proposal_versions add column if not exists deposit_said_at timestamptz;
+alter table design_proposal_versions add column if not exists deposit_received_at timestamptz;
+alter table design_proposal_versions add column if not exists deposit_received_by text;
+create unique index if not exists design_proposal_versions_deposit_ref
+  on design_proposal_versions (business_id, deposit_ref) where deposit_ref is not null;
+-- The conversation between a business and its customer about a job (server/design-chat-repo.ts): one a job, so it
+-- carries on when a design is deleted or the proposal is published again. by_email (the member who replied) is never
+-- sent to the customer; read_at is when someone at the business saw a line the customer wrote.
+create table if not exists design_messages (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  customer_id text not null,
+  from_customer boolean not null,
+  text text not null,
+  by_email text,
+  at timestamptz not null default now(),
+  read_at timestamptz,
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create index if not exists design_messages_job on design_messages(business_id, job_id, at);
+create index if not exists design_messages_unread on design_messages(business_id) where from_customer and read_at is null;
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

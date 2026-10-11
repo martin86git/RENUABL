@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BUSINESS_TERMS_VERSION } from "@/lib/domain/design/account";
 import { IMAGE_LIMITS } from "@/lib/domain/design/brand";
 import { cleanCustomerInput, cleanJobInput } from "@/lib/domain/design/crm";
-import { COST_WORDS, MAX_QUESTIONS, buildProposal, type ProposalInputs, type ProposalView } from "@/lib/domain/design/proposal";
+import { COST_WORDS, buildProposal, type ProposalInputs, type ProposalView } from "@/lib/domain/design/proposal";
 import { ADDRESS, PLACE, sampleBrand, sampleInputs } from "@/lib/domain/design/proposal-fixture";
 import { packDesignSet } from "@/lib/domain/design/roof-design";
 import { VERIFIED_RATES } from "@/lib/domain/rebates";
@@ -240,14 +240,6 @@ describe.skipIf(!url)("roof designer proposals (database)", () => {
     expect((await history())[0]).toBe(`proposal: Proposal (version 2) sent (${A})`);
   });
 
-  it("takes a question, and stops taking them past the limit", async () => {
-    expect(await proposals.askQuestion(token, "Can it go on the garage?")).toBe("asked");
-    expect((await history())[0]).toBe("proposal: Question on the proposal: Can it go on the garage? (Customer)");
-    expect(await proposals.askQuestion("f".repeat(48), "Hello?")).toBeNull();
-    await db.query(`update design_proposals set questions = $2 where business_id = $1`, [a, MAX_QUESTIONS]);
-    expect(await proposals.askQuestion(token, "One more")).toBe("full");
-  });
-
   it("lets the customer go ahead once, while the price stands, and moves the job to won", async () => {
     // Past its last day the price has lapsed: it can be read, not accepted.
     expect((await proposals.publicProposal(token, "2026-10-27"))?.state).toBe("lapsed");
@@ -300,7 +292,6 @@ describe.skipIf(!url)("roof designer proposals (database)", () => {
     const logo = (await proposals.listImages(a)).find((i) => i.kind === "logo")!;
     expect(await proposals.publicImage(token, logo.id)).toBeNull();
     expect(await proposals.acceptProposal(token, "Alex Example", TODAY)).toBe("withdrawn");
-    expect(await proposals.askQuestion(token, "Still there?")).toBeNull();
     expect((await history())[0]).toBe(`proposal: Proposal withdrawn (${A})`);
 
     const next = await build(a, "Alpha Solar", jobId);

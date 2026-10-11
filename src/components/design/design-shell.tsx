@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  MessageSquare,
   HardHat,
   LayoutDashboard,
   ChevronLeft,
@@ -19,6 +20,7 @@ import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { loadWeather } from "@/lib/services/crm";
+import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 
 /** Where everything in the product lives. */
@@ -30,6 +32,7 @@ export const PATHS = {
   installations: "/design/installations",
   customers: "/design/customers",
   designer: "/design/roof",
+  messages: "/design/messages",
   settings: "/design/settings",
   brand: "/design/settings/company",
   account: "/design/account",
@@ -59,6 +62,7 @@ const NAV: NavItem[] = [
     under: [{ href: PATHS.pipelines, label: "Pipelines", icon: SquareKanban, also: [PATHS.deals] }],
   },
   { href: PATHS.installations, label: "Installations", icon: HardHat },
+  { href: PATHS.messages, label: "Messages", icon: MessageSquare },
   { href: PATHS.designer, label: "Design tool", icon: PenTool, main: true },
 ];
 
@@ -106,6 +110,8 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
   };
   const compact = tool || folded;
   const [account] = useDesignAccount();
+  // How many of the customers' messages nobody has seen: the number on Messages. Asked only for a signed-in business.
+  const unread = useUnreadMessages(Boolean(account?.signedIn && account.business));
   const path = usePathname();
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (!account.signedIn) {
@@ -149,8 +155,24 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
             : "text-ink-2 hover:bg-surface-2 hover:text-ink",
       )}
     >
-      <Icon className="size-[18px] shrink-0" aria-hidden />
+      <span className="relative shrink-0">
+        <Icon className="size-[18px]" aria-hidden />
+        {/* Folded down to icons, the count rides on the icon. */}
+        {compact && href === PATHS.messages && unread > 0 && (
+          <span className="absolute -right-2 -top-2 rounded-full bg-sun-line px-1 text-[10px] font-semibold leading-4 text-white">
+            {unread}
+          </span>
+        )}
+      </span>
       {!compact && <span className="truncate">{label}</span>}
+      {!compact && href === PATHS.messages && unread > 0 && (
+        <span
+          className="ml-auto rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white"
+          aria-label={`${unread} unread`}
+        >
+          {unread}
+        </span>
+      )}
     </Link>
   );
 
