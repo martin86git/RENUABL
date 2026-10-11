@@ -178,11 +178,11 @@ const middle = (corners: readonly Point[]): Point => ({
 });
 /** Where each of the dial's rounds sits on its arc: degrees from straight left, up (negative) or down. */
 const DIAL_STEPS: [step: number, at: number][] = [
-  [-5, -46],
-  [-1, -23],
+  [-5, -34],
+  [-1, -17],
   [90, 0],
-  [1, 23],
-  [5, 46],
+  [1, 17],
+  [5, 34],
 ];
 
 /**
@@ -200,7 +200,7 @@ function Dial(props: {
   children: React.ReactNode;
 }) {
   // In rem: the dial's radius, and how far out from its centre (the middle of the picture's right edge) the rounds sit.
-  const R = 11.5;
+  const R = 12.5;
   const at = (degrees: number, out: number) => {
     const a = (degrees * Math.PI) / 180;
     return { left: `${R - out * Math.cos(a)}rem`, top: `${R + out * Math.sin(a)}rem` };
@@ -216,7 +216,7 @@ function Dial(props: {
     >
       <button
         className={clsx(round, "size-11 text-ink-2 hover:text-ink")}
-        style={at(-66, R - 3.2)}
+        style={at(-50, R - 3)}
         onClick={props.onClose}
         title={props.closeTitle}
         aria-label={props.closeTitle}
@@ -228,7 +228,7 @@ function Dial(props: {
           <button
             key={step}
             className={clsx(round, "size-11 text-sm font-semibold tabular-nums text-ink")}
-            style={at(degrees, R - 2.5)}
+            style={at(degrees, R - 2.1)}
             onClick={() => props.onTurn?.(step)}
             aria-label={`Turn ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
           >
@@ -239,7 +239,7 @@ function Dial(props: {
       {props.onRemove && (
         <button
           className={clsx(round, "size-11 text-danger")}
-          style={at(66, R - 3.2)}
+          style={at(50, R - 3)}
           onClick={props.onRemove}
           title="Take out what is picked (Delete)"
           aria-label="Take out what is picked"
@@ -247,7 +247,7 @@ function Dial(props: {
           <Trash2 className="size-[18px]" aria-hidden />
         </button>
       )}
-      <div className="absolute right-3 top-1/2 w-[6.5rem] -translate-y-1/2 text-right">{props.children}</div>
+      <div className="absolute right-3 top-1/2 w-[6rem] -translate-y-1/2 text-right">{props.children}</div>
     </div>
   );
 }
@@ -3059,14 +3059,14 @@ export function RoofDesigner(props: {
                   closeTitle="Pick none (Esc)"
                   onRemove={removePicked}
                 >
-                  <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
+                  <p className="whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.12em] text-muted">
                     {picks.length === 1 ? (picks[0].kind === "label" ? "Label" : "1 panel") : `${picks.length} picked`}
                   </p>
                   {pickedPanels.length > 0 && (
                     <>
                       <label className="mt-2 block">
-                        <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Tilt</span>
-                        <span className="block text-[2rem] font-semibold leading-none tabular-nums text-ink">
+                        <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-muted">Tilt</span>
+                        <span className="block text-[1.75rem] font-semibold leading-none tabular-nums text-ink">
                           {pickedTilt === null ? "mixed" : `${pickedTilt}°`}
                         </span>
                         <input
@@ -3079,13 +3079,13 @@ export function RoofDesigner(props: {
                           className="mt-2 block w-full"
                         />
                       </label>
-                      <p className="mt-3 text-[13px] leading-snug text-ink-2">
+                      <p className="mt-2.5 text-xs leading-snug text-ink-2">
                         {pickedFacing === null ? "Facing different ways" : `Facing ${compass(pickedFacing)} (${pickedFacing}°)`}
                       </p>
                       {pickedFacing !== null && pickedTilt !== null && (
                         <>
-                          <p className="text-[13px] font-semibold leading-snug text-ink">{besideFlat(pickedTilt, pickedFacing)}</p>
-                          <p className="text-[13px] leading-snug text-muted">
+                          <p className="text-xs font-semibold leading-snug text-ink">{besideFlat(pickedTilt, pickedFacing)}</p>
+                          <p className="text-xs leading-snug text-muted">
                             {bestTilt(pickedFacing) === 0 ? "Flat is best" : `${bestTilt(pickedFacing)}° is best`}
                           </p>
                         </>
@@ -3103,8 +3103,8 @@ export function RoofDesigner(props: {
                     closeTitle="Leave this roof face"
                   >
                     <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Rows</p>
-                    <p className="mt-1 text-[2rem] font-semibold leading-none tabular-nums text-ink">{face.angle}°</p>
-                    <p className="mt-2 text-[13px] leading-snug text-ink-2">Turn the rows on this roof face</p>
+                    <p className="mt-1 text-[1.75rem] font-semibold leading-none tabular-nums text-ink">{face.angle}°</p>
+                    <p className="mt-2 text-xs leading-snug text-ink-2">Turn the rows on this roof face</p>
                   </Dial>
                 )
               )}
