@@ -6,6 +6,7 @@ import {
   dashboard,
   daysUntil,
   power,
+  weekOf,
   type DashJob,
   inTheWorks,
   installOrder,
@@ -156,6 +157,30 @@ describe("the overview's figures", () => {
     expect([d.openDeals, d.openValue]).toEqual([3, 12000]);
     expect(power(19.8)).toBe("19.8 kW");
     expect(power(1250)).toBe("1.25 MW");
+  });
+});
+
+describe("the week", () => {
+  it("runs Monday to Sunday around a day, across a month's end", () => {
+    expect(weekOf("2026-10-11")).toEqual([
+      "2026-10-05",
+      "2026-10-06",
+      "2026-10-07",
+      "2026-10-08",
+      "2026-10-09",
+      "2026-10-10",
+      "2026-10-11",
+    ]);
+    expect(weekOf("2026-10-12")[0]).toBe("2026-10-12");
+    expect(weekOf("2026-09-30")).toEqual([
+      "2026-09-28",
+      "2026-09-29",
+      "2026-09-30",
+      "2026-10-01",
+      "2026-10-02",
+      "2026-10-03",
+      "2026-10-04",
+    ]);
   });
 });
 

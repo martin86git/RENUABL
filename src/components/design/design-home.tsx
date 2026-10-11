@@ -6,7 +6,7 @@ import { ArrowRight, PenTool, ReceiptText, UserPlus, Users } from "lucide-react"
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 import { STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
-import { PIPELINES, dashboard, power } from "@/lib/domain/design/deal";
+import { PIPELINES, dashboard, power, weekOf } from "@/lib/domain/design/deal";
 import { todayInMarket } from "@/lib/domain/market";
 import { dollars, listJobs, loadOverview, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
 import { requestSignInLink } from "@/lib/services/design-account";
@@ -293,6 +293,62 @@ function OverviewPage({ business }: { business: string }) {
             <p className="mt-2 text-[12.5px] text-muted">{under}</p>
           </div>
         ))}
+      </section>
+
+      {/* This week's installations: Monday to Sunday, each day with what is booked on it. */}
+      <section className="mt-8" aria-labelledby="week">
+        <div className="flex items-baseline justify-between">
+          <h2 id="week" className="text-[17px] tracking-tight text-ink">
+            Installs this week
+          </h2>
+          <Link href={PATHS.installations} className={clsx(ui.link, "text-[13px]")}>
+            All installations <ArrowRight className="inline size-3.5" aria-hidden />
+          </Link>
+        </div>
+        <ol className={clsx(ui.card, "mt-3 grid grid-cols-1 divide-y divide-line sm:grid-cols-7 sm:divide-x sm:divide-y-0")}>
+          {weekOf(today).map((date) => {
+            const booked = (jobs ?? []).filter((j) => j.installDate === date && j.stage !== "lost");
+            const day = new Date(`${date}T00:00:00Z`);
+            return (
+              <li key={date} className={clsx("flex min-h-32 flex-col p-3", date === today && "bg-sun")}>
+                <p className="flex items-baseline justify-between gap-2 sm:block">
+                  <span
+                    className={clsx("text-[11px] font-medium uppercase tracking-[0.14em]", date === today ? "text-sun-ink" : "text-muted")}
+                  >
+                    {day.toLocaleDateString("en-AU", { weekday: "short", timeZone: "UTC" })}
+                  </span>
+                  <span className="block text-[20px] font-medium leading-tight tabular-nums text-ink sm:mt-0.5">
+                    {day.toLocaleDateString("en-AU", { day: "numeric", timeZone: "UTC" })}
+                    <span className="ml-1 text-xs font-normal text-muted">
+                      {day.toLocaleDateString("en-AU", { month: "short", timeZone: "UTC" })}
+                    </span>
+                  </span>
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {booked.map((j) => (
+                    <li key={j.id}>
+                      <Link
+                        href={`${PATHS.deals}/${j.id}`}
+                        className={clsx(
+                          "block rounded-md px-2 py-1.5 text-xs leading-snug ring-1 hover:ring-ink-2",
+                          WON_STAGES.includes(j.stage) ? "bg-surface text-ink ring-line" : "bg-surface-2 text-ink-2 ring-line",
+                        )}
+                      >
+                        <span className="block truncate font-medium">{j.customerName}</span>
+                        <span className="block truncate text-muted">
+                          {j.kw ? `${power(j.kw)} · ` : ""}
+                          {j.address ? j.address.split(",")[0] : j.title}
+                        </span>
+                        <span className="block truncate text-[10px] uppercase tracking-[0.08em] text-muted">{STAGE_LABELS[j.stage]}</span>
+                      </Link>
+                    </li>
+                  ))}
+                  {jobs && booked.length === 0 && <li className="text-xs text-muted">–</li>}
+                </ul>
+              </li>
+            );
+          })}
+        </ol>
       </section>
 
       <section className="mt-8" aria-labelledby="stages">

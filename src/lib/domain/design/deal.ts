@@ -344,6 +344,14 @@ export function dashboard(jobs: readonly DashJob[], today: ISODate): Dashboard {
   };
 }
 
+/** The seven days of the week a day falls in, Monday first (all YYYY-MM-DD). */
+export function weekOf(today: ISODate): ISODate[] {
+  const at = Date.parse(`${today}T00:00:00Z`);
+  // Monday is 0, Sunday 6.
+  const fromMonday = (new Date(at).getUTCDay() + 6) % 7;
+  return Array.from({ length: 7 }, (_, i) => new Date(at + (i - fromMonday) * 86_400_000).toISOString().slice(0, 10) as ISODate);
+}
+
 /** Kilowatts as they are said: "24.2 kW", or "1.25 MW" from a megawatt up. */
 export function power(kw: number): string {
   return kw >= 1000 ? `${Math.round(kw / 10) / 100} MW` : `${Math.round(kw * 10) / 10} kW`;
