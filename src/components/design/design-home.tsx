@@ -11,6 +11,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import { dollars, listJobs, loadOverview, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
 import { requestSignInLink } from "@/lib/services/design-account";
 import { useDesignAccount } from "./design-account";
+import { DesignerDemo } from "./designer-demo";
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
 
 /** A stage as a small tag. Won and installed are the good news; lost is quiet. */
@@ -146,6 +147,25 @@ function FrontPage({ unreachable }: { unreachable: boolean }) {
           </p>
         </section>
       </main>
+      {/* The second screen: the design tool at work. */}
+      <section className="border-t border-line bg-surface px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="demo">
+        <div className="mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-14">
+          <div>
+            <p className={ui.eyebrow}>The design tool</p>
+            <h2 id="demo" className="mt-3 text-[30px] leading-[1.1] tracking-tight text-ink sm:text-[38px]">
+              From a bare roof to a strung array.
+            </h2>
+            <p className="mt-4 text-[15px] leading-relaxed text-ink-2">
+              Drag out an array, add the inverter, and run the strings through the panels. The system&apos;s size and its quote keep up with
+              every panel you place.
+            </p>
+            <Link href={PATHS.designer} className={clsx(ui.primary, "mt-6 h-11 px-5")}>
+              <PenTool className="size-4" aria-hidden /> Try it on a real roof
+            </Link>
+          </div>
+          <DesignerDemo />
+        </div>
+      </section>
     </div>
   );
 }
