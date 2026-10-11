@@ -7,8 +7,8 @@ import {
   CircleUserRound,
   HardHat,
   LayoutDashboard,
-  PanelLeftClose,
-  PanelLeftOpen,
+  ChevronLeft,
+  ChevronRight,
   PenTool,
   SlidersHorizontal,
   SquareKanban,
@@ -175,6 +175,18 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
           )}
           {compact && <Wordmark className="text-[16px] lg:hidden" />}
         </Link>
+        {/* The little arrow beside the wordmark, on the nav's edge: folds the sections down to icons, and opens them out. */}
+        {!tool && (
+          <button
+            onClick={() => fold(!folded)}
+            title={folded ? "Open out the sections" : "Fold the sections down to icons"}
+            aria-label={folded ? "Open out the sections" : "Fold the sections down to icons"}
+            aria-expanded={!folded}
+            className="absolute -right-3 top-[1.05rem] hidden size-6 items-center justify-center rounded-full bg-surface text-ink-2 shadow-[var(--shadow-soft)] ring-1 ring-line hover:text-ink hover:ring-ink-2 lg:flex"
+          >
+            {folded ? <ChevronRight className="size-3.5" aria-hidden /> : <ChevronLeft className="size-3.5" aria-hidden />}
+          </button>
+        )}
         {NAV.map((n) =>
           // A section with subsections is a heading over them: the subsection carries the mark of where you are.
           n.under && !compact ? (
@@ -211,21 +223,6 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
           ),
         )}
         <span className="hidden flex-1 lg:block" aria-hidden />
-        {!tool && (
-          <button
-            onClick={() => fold(!folded)}
-            title={folded ? "Open out the sections" : "Fold the sections down to icons"}
-            aria-label={folded ? "Open out the sections" : "Fold the sections down to icons"}
-            aria-expanded={!folded}
-            className={clsx(
-              "hidden h-10 shrink-0 items-center gap-3 rounded-md text-sm font-medium text-ink-2 hover:bg-surface-2 hover:text-ink lg:flex",
-              folded ? "w-10 justify-center" : "px-3",
-            )}
-          >
-            {folded ? <PanelLeftOpen className="size-[18px]" aria-hidden /> : <PanelLeftClose className="size-[18px]" aria-hidden />}
-            {!folded && <span>Collapse</span>}
-          </button>
-        )}
         {item(PATHS.settings, "Prices and settings", SlidersHorizontal)}
         {item(PATHS.account, account.business?.name ?? "Your account", CircleUserRound)}
         {!compact && (
