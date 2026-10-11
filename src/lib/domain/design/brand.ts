@@ -183,6 +183,11 @@ export interface BrandKit {
   /** Empty, or shares that add up to 100. */
   milestones: Milestone[];
   bank: BankDetails;
+  /**
+   * The business's own page for paying by card (a payment link from its own provider), as a full https address. Empty
+   * when it has none. We only ever open it: no card is taken, and no money is held, by RENUABL.
+   */
+  payLink: string;
   /** The business's own workmanship warranty, in years. Null when it doesn't state one. */
   warrantyYears: number | null;
   /** Its own words about that warranty. */
@@ -225,6 +230,7 @@ export function defaultBrand(businessName: string): BrandKit {
     deposit: { kind: "none", amount: 0 },
     milestones: [],
     bank: { ...NO_BANK },
+    payLink: "",
     warrantyYears: null,
     warrantyWords: "",
     installTime: "",
@@ -301,6 +307,31 @@ export function cleanWebsite(raw: unknown): string | null {
   }
 }
 
+/**
+ * A business's card payment link as typed: kept only as a full https
+ * address on a real host, with nobody's name or password in it. Empty when
+ * left empty. Null for anything else: http, another kind of link
+ * (`javascript:`, `data:`), a bare word, an address on this computer.
+ */
+export function cleanPayLink(raw: unknown): string | null {
+  if (raw !== undefined && raw !== null && typeof raw !== "string") return null;
+  const typed = (raw ?? "").trim();
+  if (!typed) return "";
+  if (typed.length > 300 || /\s/.test(typed) || typed.startsWith("/")) return null;
+  // Typed without "https://" it is given one; typed with anything else in front (http://, javascript:) it is refused.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(typed) && !/^https:\/\//i.test(typed)) return null;
+  try {
+    const url = new URL(/^https:\/\//i.test(typed) ? typed : `https://${typed}`);
+    const host = url.hostname.toLowerCase();
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) || /^[\d.]+$/.test(host) || host.endsWith(".localhost") || host.endsWith(".local"))
+      return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
 /** A web address as it is shown: without the "https://". */
 export function shownWebsite(website: string): string {
   return website.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
@@ -317,6 +348,8 @@ export const milestonesWrong = (total: number) =>
   `The payment milestones add up to ${total}%. They need to add up to 100%: change them, or take them all out.`;
 export const BANK_INCOMPLETE =
   "For bank details, give the account name, a BSB of 6 digits and an account number of 4 to 10 digits. Or leave all three empty.";
+export const PAY_LINK_WRONG =
+  "That card payment link doesn't look right. It is the full https address of your own payment page, or left empty.";
 export const WARRANTY_WRONG = "The workmanship warranty is a whole number of years from 1 to 30, or left empty.";
 export const notifyWrong = (address: string) => `"${address}" doesn't look like an email address.`;
 
@@ -399,6 +432,8 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
   if (!milestones.ok) return milestones;
   const bank = sent("bank") ? cleanBank(r.bank) : current.bank;
   if (!bank) return { ok: false, message: BANK_INCOMPLETE };
+  const payLink = sent("payLink") ? cleanPayLink(r.payLink) : current.payLink;
+  if (payLink === null) return { ok: false, message: PAY_LINK_WRONG };
   let warrantyYears = current.warrantyYears;
   if (sent("warrantyYears")) {
     const years = r.warrantyYears === null || r.warrantyYears === "" ? null : num(r.warrantyYears);
@@ -428,6 +463,7 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
       deposit,
       milestones: milestones.value,
       bank,
+      payLink,
       warrantyYears,
       warrantyWords: sent("warrantyWords") ? paragraphs(r.warrantyWords, 3000) : current.warrantyWords,
       installTime: INSTALL_TIMES.some((t) => t.id === r.installTime) ? (r.installTime as InstallTime) : current.installTime,

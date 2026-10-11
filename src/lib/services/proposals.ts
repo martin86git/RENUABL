@@ -9,6 +9,7 @@
  */
 import type { BrandImage, BrandKit, ImageKind } from "@/lib/domain/design/brand";
 import type { Job } from "@/lib/domain/design/crm";
+import type { PaidWay, PublicDeposit } from "@/lib/domain/design/deposit";
 import type { ProposalChoice, ProposalState, ProposalStatus, ProposalView } from "@/lib/domain/design/proposal";
 
 export type Answer<T> = ({ ok: true } & T) | { ok: false; message: string; problems?: string[]; signedOut?: boolean };
@@ -83,6 +84,10 @@ export const publishProposal = (jobId: string, choice: Partial<ProposalChoice> &
 
 export const withdrawProposal = (jobId: string) => ask<{ versions: ProposalStatus[] }>(jobProposal(jobId), { method: "DELETE" });
 
+/** Marks a job's deposit received, or not received (which makes it due again). The business's own record: no payment is taken here. */
+export const markDeposit = (jobId: string, received: boolean) =>
+  ask<{ versions: ProposalStatus[] }>(`/api/design/jobs/${encodeURIComponent(jobId)}/deposit`, { method: "PUT", body: { received } });
+
 /** Where the business previews and sends a job's proposal. */
 export const proposalScreen = (jobId: string) => `/design/deals/${encodeURIComponent(jobId)}/proposal`;
 
@@ -129,6 +134,8 @@ export interface OpenedProposal {
   view: ProposalView | null;
   business: Pick<ProposalView["business"], "name" | "phone" | "email" | "website">;
   accepted: { name: string; at: string } | null;
+  /** The deposit, once the proposal is accepted and asks for one. */
+  deposit: PublicDeposit | null;
 }
 
 const link = (token: string) => `/api/proposal/${encodeURIComponent(token)}`;
@@ -137,6 +144,9 @@ const link = (token: string) => `/api/proposal/${encodeURIComponent(token)}`;
 export const tellOpened = (token: string) => void ask<object>(link(token), { method: "POST", body: { action: "opened" } });
 export const acceptProposal = (token: string, name: string, agree: boolean) =>
   ask<OpenedProposal>(link(token), { method: "POST", body: { action: "accept", name, agree } });
+
+/** The customer saying they have paid the deposit, and how. Kept as what they said: it is not a payment. */
+export const sayPaid = (token: string, way: PaidWay) => ask<OpenedProposal>(link(token), { method: "POST", body: { action: "paid", way } });
 
 /** Where a proposal's pictures, its roof from above and its PDF are, by its private link. */
 export const proposalUrls = (token: string) => ({

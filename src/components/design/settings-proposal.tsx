@@ -152,6 +152,7 @@ function Payment({ brand, save }: PartProps) {
     brand.milestones.map((m) => ({ percent: String(m.percent), name: m.name })),
   );
   const [bank, setBank] = useState(brand.bank);
+  const [payLink, setPayLink] = useState(brand.payLink);
   const total = Math.round(rows.reduce((sum, r) => sum + (Number(r.percent) || 0), 0) * 10) / 10;
   const filled = rows.filter((r) => r.name.trim() || Number(r.percent) > 0).length;
   const row = (i: number, patch: Partial<{ percent: string; name: string }>) =>
@@ -232,7 +233,9 @@ function Payment({ brand, save }: PartProps) {
           )}
         </div>
         <p className="text-xs text-muted">
-          Worked out from what the customer pays, after the federal rebate. Nothing is charged through the proposal.
+          Worked out from what the customer pays, after the federal rebate and without any Solar Victoria rebate. Once they accept, their
+          proposal asks them to pay it to you, by bank transfer or on your card payment page (below). Nothing is charged through the
+          proposal.
         </p>
       </section>
 
@@ -352,6 +355,35 @@ function Payment({ brand, save }: PartProps) {
         </div>
         <button type="button" className={ui.primary} onClick={() => void save({ bank }).then((kept) => kept && setBank((b) => ({ ...b })))}>
           Save bank details
+        </button>
+      </section>
+
+      <section className={section} aria-labelledby="pay-card">
+        <h2 id="pay-card" className={h2}>
+          Card payment link
+        </h2>
+        <p className="text-sm text-ink-2">
+          If you take cards, paste the address of your own payment page here (a payment link from your own provider). Once a customer has
+          accepted a proposal, &ldquo;Pay by card&rdquo; opens it in a new tab and they pay you there. We don&apos;t take card payments or
+          hold money for you, and we can&apos;t see whether a payment was made: you mark a deposit received on the deal. Leave it empty to
+          offer bank transfer only.
+        </p>
+        <label className={ui.label}>
+          Your payment page
+          <span className={help}>A full https address. It is added to proposals you publish from now on.</span>
+          <input
+            type="url"
+            inputMode="url"
+            className={clsx(ui.input, "mt-1.5")}
+            value={payLink}
+            maxLength={300}
+            placeholder="https://"
+            autoComplete="off"
+            onChange={(e) => setPayLink(e.target.value)}
+          />
+        </label>
+        <button type="button" className={ui.primary} onClick={() => void save({ payLink })}>
+          Save payment link
         </button>
       </section>
     </>

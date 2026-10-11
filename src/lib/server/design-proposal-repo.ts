@@ -15,6 +15,19 @@
 import { randomBytes } from "node:crypto";
 import { IMAGE_LIMITS, readBrandKit, type BrandImage, type BrandKit, type ImageKind } from "@/lib/domain/design/brand";
 import { stageMoveText, type Customer, type Job, type JobStage } from "@/lib/domain/design/crm";
+import {
+  depositAsked,
+  depositStatus,
+  markedNotReceived,
+  markedReceived,
+  newReference,
+  publicDeposit,
+  saidPaid,
+  waysToPay,
+  type DepositRecord,
+  type PaidWay,
+  type PublicDeposit,
+} from "@/lib/domain/design/deposit";
 import { DEFAULT_WORKSPACE, cleanWorkspace, type Workspace } from "@/lib/domain/design/pricing";
 import {
   FROM_CUSTOMER,
@@ -192,10 +205,27 @@ interface VersionRow {
   acceptedName: string | null;
   token: string;
   withdrawn: boolean;
+  depositRef: string | null;
+  saidWay: PaidWay | null;
+  saidAt: string | null;
+  receivedAt: string | null;
+  receivedBy: string | null;
 }
 
 const VERSION = `v.version, v.view, ${moment("v.published_at")} as "publishedAt", ${moment("v.opened_at")} as "openedAt",
-  ${moment("v.accepted_at")} as "acceptedAt", v.accepted_name as "acceptedName", p.token, p.withdrawn_at is not null as withdrawn`;
+  ${moment("v.accepted_at")} as "acceptedAt", v.accepted_name as "acceptedName", p.token, p.withdrawn_at is not null as withdrawn,
+  v.deposit_ref as "depositRef", v.deposit_said_way as "saidWay", ${moment("v.deposit_said_at")} as "saidAt",
+  ${moment("v.deposit_received_at")} as "receivedAt", v.deposit_received_by as "receivedBy"`;
+
+/** What is kept about a version's deposit, as the domain reads it. */
+const depositRecord = (row: VersionRow): DepositRecord => ({
+  reference: row.depositRef,
+  saidWay: row.saidWay,
+  saidAt: row.saidAt,
+  receivedAt: row.receivedAt,
+  receivedBy: row.receivedBy,
+});
+const depositOn = (row: VersionRow) => depositStatus(row.view, Boolean(row.acceptedAt), depositRecord(row));
 
 const statusOf = (row: VersionRow, today: ISODate): ProposalStatus => ({
   state: proposalState({ withdrawn: row.withdrawn, accepted: Boolean(row.acceptedAt), validUntil: row.view.validUntil }, today),
@@ -208,6 +238,7 @@ const statusOf = (row: VersionRow, today: ISODate): ProposalStatus => ({
   openedAt: row.openedAt,
   acceptedAt: row.acceptedAt,
   acceptedName: row.acceptedName,
+  deposit: depositOn(row),
 });
 
 /** A job's proposal as its deal page shows it: every version sent, newest first. Empty when none has been. */
@@ -326,6 +357,8 @@ export interface PublicProposal {
   /** Who to contact, always: the business's name and how to reach it, as it was when the proposal was sent. */
   business: Pick<ProposalView["business"], "name" | "phone" | "email" | "website">;
   accepted: { name: string; at: string } | null;
+  /** The deposit, once the proposal is accepted and it asks for one: the amount, the reference to pay with, where it stands. */
+  deposit: PublicDeposit | null;
 }
 
 interface Found extends VersionRow {
@@ -357,12 +390,34 @@ export async function publicProposal(token: string, today: ISODate): Promise<Pub
   if (!row) return null;
   const state = stateOf(row, today);
   const { name, phone, email, website } = row.view.business;
+  // A proposal accepted before deposits had references is given one the first time it is opened after.
+  if (state === "accepted" && depositAsked(row.view) !== null && !row.depositRef)
+    row.depositRef = await giveReference(query, row.businessId, row.versionId);
   return {
     state,
     view: state === "withdrawn" ? null : row.view,
     business: { name, phone, email, website },
     accepted: row.acceptedAt && row.acceptedName ? { name: row.acceptedName, at: row.acceptedAt } : null,
+    deposit: state === "accepted" ? publicDeposit(depositOn(row)) : null,
   };
+}
+
+/**
+ * Gives a version its payment reference, once: short, random, and the only one like it in the business, so a
+ * payment can be matched to its deal. It says nothing of the private link. Kept if one is already there.
+ */
+async function giveReference(q: Q | typeof query, businessId: string, versionId: string): Promise<string | null> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const rows = await q<{ ref: string }>(
+      `update design_proposal_versions v set deposit_ref = coalesce(v.deposit_ref, $3)
+        where v.business_id = $1 and v.id = $2
+          and not exists (select 1 from design_proposal_versions o where o.business_id = $1 and o.deposit_ref = $3)
+        returning v.deposit_ref as ref`,
+      [businessId, versionId, newReference(randomBytes(16))],
+    );
+    if (rows[0]) return rows[0].ref;
+  }
+  return null;
 }
 
 /** A picture on the proposal behind a link: only one that proposal was sent with, and none once it is withdrawn. */
@@ -433,6 +488,8 @@ export async function acceptProposal(token: string, name: string, today: ISODate
       row.businessId,
       row.jobId,
     ]);
+    // The reference a deposit is paid with is made now, with the acceptance it belongs to.
+    if (depositAsked(row.view) !== null) await giveReference(q, row.businessId, row.versionId);
     const line = { customerId: row.customerId, jobId: row.jobId, by: FROM_CUSTOMER };
     await record(q, row.businessId, { ...line, kind: "proposal", text: acceptedText(name) });
     if (jobs[0] && BEFORE_WON.includes(jobs[0].stage)) {
@@ -441,6 +498,112 @@ export async function acceptProposal(token: string, name: string, today: ISODate
     }
     return "accepted-now";
   });
+}
+
+/**
+ * A customer saying they have paid the deposit, from their link. Kept as exactly that: what they said, how, and
+ * when. It is never a payment we have seen, and it never marks the deposit received (only the business does that).
+ * Taken once, and only on an accepted proposal that asks for a deposit, by a way that proposal offers. "said-now"
+ * when this call kept it; otherwise why not.
+ */
+export async function sayPaid(
+  token: string,
+  way: PaidWay,
+  today: ISODate,
+): Promise<"said-now" | "said-before" | "received" | "not-accepted" | "no-deposit" | "no-such-way" | null> {
+  return transaction(async (q) => {
+    const row = await behind(q, token, true);
+    if (!row) return null;
+    if (stateOf(row, today) !== "accepted") return "not-accepted";
+    const deposit = depositOn(row);
+    if (!deposit) return "no-deposit";
+    if (!waysToPay(row.view).includes(way)) return "no-such-way";
+    if (deposit.standing === "received") return "received";
+    if (deposit.standing === "said") return "said-before";
+    await q(`update design_proposal_versions set deposit_said_way = $3, deposit_said_at = now() where business_id = $1 and id = $2`, [
+      row.businessId,
+      row.versionId,
+      way,
+    ]);
+    await record(q, row.businessId, {
+      customerId: row.customerId,
+      jobId: row.jobId,
+      kind: "proposal",
+      text: saidPaid(way, deposit.amount, deposit.reference),
+      by: FROM_CUSTOMER,
+    });
+    return "said-now";
+  });
+}
+
+/**
+ * The business marking a job's deposit received, or not received (which also sets aside what the customer said, so
+ * the deposit is due again and they can be asked again). On the newest version, once accepted. Each is written on
+ * the customer's record with who did it. False when there is no accepted proposal with a deposit; doing it twice
+ * changes nothing the second time.
+ */
+export async function markDeposit(businessId: string, jobId: string, received: boolean, by: string): Promise<boolean> {
+  const who = by.toLowerCase();
+  return transaction(async (q) => {
+    const rows = await q<Found>(
+      `select ${VERSION}, v.id as "versionId", p.business_id as "businessId", p.job_id as "jobId", p.customer_id as "customerId", p.questions
+         from design_proposals p join design_proposal_versions v on v.business_id = p.business_id and v.proposal_id = p.id
+        where p.business_id = $1 and p.job_id = $2 order by v.version desc limit 1 for update of p, v`,
+      [businessId, jobId],
+    );
+    const row = rows[0];
+    const deposit = row ? depositOn(row) : null;
+    if (!row || !deposit) return false;
+    if (received ? deposit.standing === "received" : deposit.standing === "due") return true;
+    if (received)
+      await q(
+        `update design_proposal_versions set deposit_received_at = now(), deposit_received_by = $3 where business_id = $1 and id = $2`,
+        [businessId, row.versionId, who],
+      );
+    else
+      await q(
+        `update design_proposal_versions set deposit_received_at = null, deposit_received_by = null, deposit_said_way = null,
+           deposit_said_at = null where business_id = $1 and id = $2`,
+        [businessId, row.versionId],
+      );
+    await record(q, businessId, {
+      customerId: row.customerId,
+      jobId,
+      kind: "proposal",
+      text: received ? markedReceived(deposit.amount) : markedNotReceived(deposit.amount),
+      by: who,
+    });
+    return true;
+  });
+}
+
+/**
+ * Who to tell that a customer says they have paid their deposit, and what to say: the same addresses as an
+ * acceptance, the customer, the job, how they say they paid and the reference to look for. Never the bank details,
+ * the price or the amount. Null when nothing has been said or nobody is listed.
+ */
+export async function paidNotice(token: string): Promise<{
+  to: string[];
+  business: string;
+  customer: string;
+  title: string;
+  jobId: string;
+  way: PaidWay;
+  reference: string | null;
+} | null> {
+  const row = await behind(query, token);
+  if (!row || !row.acceptedAt || !row.saidWay || row.receivedAt) return null;
+  const brand = await loadBrand(row.businessId, row.view.business.name);
+  if (!brand.notify.length) return null;
+  return {
+    to: brand.notify,
+    business: brand.name,
+    customer: row.view.customer.name,
+    title: row.view.title,
+    jobId: row.jobId,
+    way: row.saidWay,
+    reference: row.depositRef,
+  };
 }
 
 /**

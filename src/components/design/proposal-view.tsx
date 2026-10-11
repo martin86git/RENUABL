@@ -20,6 +20,7 @@ import {
   type ProposalState,
   type ProposalView,
 } from "@/lib/domain/design/proposal";
+import { money } from "@/lib/domain/design/deposit";
 import { ROOF_IMAGE, metresPerPixel } from "@/lib/domain/design/roof-design";
 
 const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
@@ -229,6 +230,8 @@ export interface ProposalPageProps {
   actions?: ProposalActions;
   /** The conversation with the business, shown under going ahead whatever state the proposal is in. Drawn by the page that knows the link. */
   chat?: React.ReactNode;
+  /** "Pay your deposit", once the proposal is accepted and asks for one: shown straight under the acceptance. Drawn by the page that knows the link. */
+  deposit?: React.ReactNode;
 }
 
 /**
@@ -249,7 +252,7 @@ export interface ProposalPageProps {
  * the design tool's monospace face, and the preview must look as the
  * customer's page does.
  */
-export function ProposalPage({ view, state, accepted, urls, actions, chat }: ProposalPageProps) {
+export function ProposalPage({ view, state, accepted, urls, actions, chat, deposit }: ProposalPageProps) {
   const b = view.business;
   const bold = view.template === "bold";
   const compact = view.template === "compact";
@@ -389,9 +392,9 @@ export function ProposalPage({ view, state, accepted, urls, actions, chat }: Pro
     payment: () =>
       terms && (terms.deposit !== null || terms.milestones.length > 0 || terms.bank) ? (
         <div className={card}>
-          {terms.deposit !== null && <Line label="Deposit to go ahead" value={dollars(terms.deposit)} strong />}
+          {terms.deposit !== null && <Line label="Deposit to go ahead" value={money(terms.deposit)} strong />}
           {terms.milestones.map((m) => (
-            <Line key={m.name} label={`${m.name} (${m.percent}%)`} value={dollars(m.amount)} />
+            <Line key={m.name} label={`${m.name} (${m.percent}%)`} value={money(m.amount)} />
           ))}
           {(terms.deposit !== null || terms.milestones.length > 0) && (
             <p className={clsx(fine, "mt-3")}>
@@ -471,6 +474,7 @@ export function ProposalPage({ view, state, accepted, urls, actions, chat }: Pro
     accept: () => (
       <>
         <GoAhead view={view} state={state} accepted={accepted} actions={actions} />
+        {deposit && <div className="mt-4">{deposit}</div>}
         {chat && <div className="mt-4">{chat}</div>}
       </>
     ),

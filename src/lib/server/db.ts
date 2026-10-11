@@ -341,6 +341,16 @@ create table if not exists design_proposal_versions (
   unique (proposal_id, version),
   foreign key (business_id, proposal_id) references design_proposals(business_id, id) on delete cascade
 );
+-- The deposit on an accepted version (domain/design/deposit.ts): the reference the customer pays with, what the
+-- customer has said about paying (said, never seen: no payment passes through us), and the business marking it
+-- received. Kept beside the fixed copy, which it never changes.
+alter table design_proposal_versions add column if not exists deposit_ref text;
+alter table design_proposal_versions add column if not exists deposit_said_way text;
+alter table design_proposal_versions add column if not exists deposit_said_at timestamptz;
+alter table design_proposal_versions add column if not exists deposit_received_at timestamptz;
+alter table design_proposal_versions add column if not exists deposit_received_by text;
+create unique index if not exists design_proposal_versions_deposit_ref
+  on design_proposal_versions (business_id, deposit_ref) where deposit_ref is not null;
 -- The conversation between a business and its customer about a job (server/design-chat-repo.ts): one a job, so it
 -- carries on when a design is deleted or the proposal is published again. by_email (the member who replied) is never
 -- sent to the customer; read_at is when someone at the business saw a line the customer wrote.

@@ -11,9 +11,9 @@
  * computer) nothing is sent, and the settings page says so. It never holds
  * up, or fails, the customer's acceptance.
  */
-import { proposalAcceptedEmail } from "@/lib/domain/emails";
+import { depositSaidEmail, proposalAcceptedEmail } from "@/lib/domain/emails";
 import { siteUrl } from "@/lib/domain/sms";
-import { acceptedNotice } from "./design-proposal-repo";
+import { acceptedNotice, paidNotice } from "./design-proposal-repo";
 import { emailProvider, sendEmail } from "./email";
 
 /** Whether an acceptance can be emailed at all here: an email service, and the site's own address for the link. */
@@ -40,5 +40,33 @@ export async function tellAccepted(token: string): Promise<void> {
     }
   } catch {
     console.error("acceptance notices couldn't be worked out");
+  }
+}
+
+/**
+ * Tells a business that a customer says they have paid their deposit: the
+ * same addresses as an acceptance, the same sender, and the same limits. It
+ * says what the customer said and that it is not confirmation of a payment;
+ * never the bank details or an amount. It never holds the customer up.
+ */
+export async function tellPaid(token: string): Promise<void> {
+  try {
+    const site = siteUrl();
+    if (!emailProvider() || !site) return;
+    const notice = await paidNotice(token);
+    if (!notice) return;
+    const email = depositSaidEmail({
+      business: notice.business,
+      customer: notice.customer,
+      title: notice.title,
+      way: notice.way,
+      reference: notice.reference,
+      link: `${site}/design/deals/${notice.jobId}`,
+    });
+    for (const to of notice.to) {
+      await sendEmail({ to, ...email }).catch(() => console.error("a deposit notice couldn't be sent"));
+    }
+  } catch {
+    console.error("deposit notices couldn't be worked out");
   }
 }

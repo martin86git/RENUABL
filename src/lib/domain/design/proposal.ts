@@ -35,6 +35,7 @@ import {
 } from "./brand";
 import type { Cleaned, Customer, DetailKey, Job } from "./crm";
 import { systemDetails } from "./deal";
+import type { DepositStatus } from "./deposit";
 import { workspaceCatalogue, type Workspace } from "./pricing";
 import { panelCatalogue } from "./catalogue";
 import {
@@ -144,12 +145,14 @@ export interface ProposalView {
    * particular is the business's own workmanship warranty, in its own words.
    */
   terms?: {
-    /** Dollars asked up front, worked out from what the customer pays. Null with no deposit. */
+    /** Dollars asked up front, to the cent, worked out from what the customer pays (`price.youPay`). Null with no deposit. */
     deposit: number | null;
     /** Each share of what the customer pays, with what it comes to. They add up to `price.youPay`. */
     milestones: { name: string; percent: number; amount: number }[];
     /** The account to pay into. Shown only on this business's own proposals. */
     bank: BankDetails | null;
+    /** The business's own card payment page, when it has given one. Left out on a proposal published before it could. */
+    payLink?: string | null;
     warranty: { years: number | null; words: string } | null;
     /** How long installation usually takes from going ahead ("3 to 4 weeks"): an estimate. */
     installTime: string | null;
@@ -231,23 +234,30 @@ export function splitGst(incGst: number): { beforeGst: number; gst: number } {
   return { beforeGst, gst: incGst - beforeGst };
 }
 
-/** The deposit in dollars: a share of what the customer pays, or the set amount, and never more than the whole. Null with none. */
+/**
+ * The deposit in dollars, to the cent: a share of what the customer pays, or
+ * the set amount, and never more than the whole. `youPay` is the price after
+ * the federal rebate and without any Solar Victoria rebate (what stands if
+ * that isn't approved). Null with none.
+ */
 export function depositOf(deposit: BrandKit["deposit"], youPay: number): number | null {
   if (deposit.kind === "none") return null;
-  const amount = deposit.kind === "percent" ? Math.round((youPay * deposit.amount) / 100) : deposit.amount;
-  return Math.min(Math.max(0, amount), youPay);
+  // Worked in cents, so 12.5% of $11,455 is $1,431.88 and never a figure with a long tail.
+  const cents = deposit.kind === "percent" ? Math.round(youPay * deposit.amount) : Math.round(deposit.amount * 100);
+  return Math.min(Math.max(0, cents), Math.round(youPay * 100)) / 100;
 }
 
 /**
- * Each payment milestone with what it comes to, in whole dollars. The last
- * takes up the rounding, so they add up to exactly what the customer pays.
+ * Each payment milestone with what it comes to, to the cent (as the deposit
+ * is, so a 20% deposit and a 20% first milestone are the same figure). The
+ * last takes up the rounding, so they add up to exactly what the customer pays.
  */
 export function milestoneAmounts(milestones: BrandKit["milestones"], youPay: number): { name: string; percent: number; amount: number }[] {
-  let left = youPay;
+  let left = Math.round(youPay * 100);
   return milestones.map((m, i) => {
-    const amount = i === milestones.length - 1 ? left : Math.round((youPay * m.percent) / 100);
-    left -= amount;
-    return { name: m.name, percent: m.percent, amount };
+    const cents = i === milestones.length - 1 ? left : Math.round(youPay * m.percent);
+    left -= cents;
+    return { name: m.name, percent: m.percent, amount: cents / 100 };
   });
 }
 
@@ -491,6 +501,7 @@ export function buildProposal(input: ProposalInputs): Built {
       deposit: depositOf(brand.deposit, youPay),
       milestones: milestoneAmounts(brand.milestones, youPay),
       bank: brand.bank.number ? { ...brand.bank } : null,
+      payLink: brand.payLink || null,
       warranty: brand.warrantyYears !== null || brand.warrantyWords ? { years: brand.warrantyYears, words: brand.warrantyWords } : null,
       installTime: brand.installTime ? (INSTALL_TIMES.find((t) => t.id === brand.installTime)?.label ?? null) : null,
     },
@@ -620,4 +631,6 @@ export interface ProposalStatus {
   openedAt: string | null;
   acceptedAt: string | null;
   acceptedName: string | null;
+  /** The deposit on this version, once it is accepted: what is asked and where it stands. Null with no deposit, or not accepted. */
+  deposit: DepositStatus | null;
 }

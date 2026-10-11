@@ -128,7 +128,7 @@ describe("payment terms", () => {
   });
   it("work out what each comes to from what the customer pays", () => {
     expect(depositOf({ kind: "none", amount: 0 }, 11454)).toBeNull();
-    expect(depositOf({ kind: "percent", amount: 20 }, 11454)).toBe(2291);
+    expect(depositOf({ kind: "percent", amount: 20 }, 11454)).toBe(2290.8);
     expect(depositOf({ kind: "fixed", amount: 500 }, 11454)).toBe(500);
     // Never more than the whole price.
     expect(depositOf({ kind: "fixed", amount: 50_000 }, 11454)).toBe(11454);
@@ -140,8 +140,9 @@ describe("payment terms", () => {
       ],
       10_001,
     );
-    expect(parts.map((p) => p.amount)).toEqual([3330, 3330, 3341]);
-    expect(parts.reduce((sum, p) => sum + p.amount, 0)).toBe(10_001);
+    // To the cent, the last taking up the rounding.
+    expect(parts.map((p) => p.amount)).toEqual([3330.33, 3330.33, 3340.34]);
+    expect(parts.reduce((sum, p) => sum + Math.round(p.amount * 100), 0)).toBe(1_000_100);
     expect(milestoneAmounts([], 5000)).toEqual([]);
     expect(splitGst(17078)).toEqual({ beforeGst: 15525, gst: 1553 });
   });
@@ -291,19 +292,21 @@ describe("a proposal with the business's terms and blocks", () => {
     expect(view.price).toMatchObject({ gstShown: "excluded", ...splitGst(view.price.incGst) });
     expect(view.price.beforeGst! + view.price.gst!).toBe(view.price.incGst);
     expect(view.terms).toEqual({
-      deposit: Math.round(youPay * 0.2),
+      // To the cent, and the deposit and a first milestone of the same share are the same figure.
+      deposit: Math.round(youPay * 20) / 100,
       milestones: [
-        { name: "Deposit", percent: 20, amount: Math.round(youPay * 0.2) },
-        { name: "Installation completion", percent: 80, amount: youPay - Math.round(youPay * 0.2) },
+        { name: "Deposit", percent: 20, amount: Math.round(youPay * 20) / 100 },
+        { name: "Installation completion", percent: 80, amount: (youPay * 100 - Math.round(youPay * 20)) / 100 },
       ],
       bank: terms.bank,
+      payLink: null,
       warranty: { years: 10, words: "Covers our workmanship." },
       installTime: "3 to 4 weeks",
     });
   });
   it("carries none where none are set, and the price as one figure", () => {
     const { view } = built({});
-    expect(view.terms).toEqual({ deposit: null, milestones: [], bank: null, warranty: null, installTime: null });
+    expect(view.terms).toEqual({ deposit: null, milestones: [], bank: null, payLink: null, warranty: null, installTime: null });
     expect(view.price.gstShown).toBe("included");
     expect(view.price).not.toHaveProperty("beforeGst");
     expect(view.price).not.toHaveProperty("gst");

@@ -344,6 +344,33 @@ export function proposalAcceptedEmail(o: { business: string; customer: string; t
 }
 
 /**
+ * To a business's own addresses, when a customer says on their proposal that they have paid the deposit (the roof
+ * designer). It reports what the customer said, and says plainly that it isn't confirmation of a payment: no payment
+ * passes through RENUABL. Never the bank details, the price or the amount. DRAFT wording: review before launch.
+ */
+export function depositSaidEmail(o: {
+  business: string;
+  customer: string;
+  title: string;
+  way: "bank" | "card";
+  reference: string | null;
+  link: string;
+}) {
+  const customer = plainText(o.customer, 120) || "A customer";
+  const reference = plainText(o.reference ?? "", 20);
+  return simpleEmail({
+    subject: `${customer} says they've paid their deposit`,
+    heading: "A customer says they've paid their deposit",
+    lines: [
+      `${customer} says they have paid the deposit for "${plainText(o.title, 80) || "their job"}" by ${o.way === "card" ? "card, on your payment page" : "bank transfer"}.${reference ? ` The reference they were given is ${reference}.` : ""}`,
+      `This is what the customer told us, not confirmation of a payment: ${plainText(o.business, 80) || "your business"} is paid directly, and nothing passes through RENUABL. Check your account, then mark the deposit received on the deal.`,
+    ],
+    button: { label: "Open the deal", href: o.link },
+    footer: "This message was sent by RENUABL for your business. It wasn't sent to the customer.",
+  });
+}
+
+/**
  * To a business's own addresses, when a customer writes in a job's conversation (the roof designer). From RENUABL,
  * about the business's own customer: the message, and the way to the deal to answer it. DRAFT wording: review before launch.
  */
