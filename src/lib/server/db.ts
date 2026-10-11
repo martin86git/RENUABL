@@ -178,6 +178,8 @@ create table if not exists business_members (
   created_at timestamptz not null default now()
 );
 create index if not exists business_members_business on business_members(business_id);
+-- What the owner lets a member do (the can function in domain/design/account.ts). Null is everything, as it was before this could be set.
+alter table business_members add column if not exists permissions jsonb;
 create table if not exists design_settings (
   business_id text primary key references businesses(id) on delete cascade,
   settings jsonb not null,

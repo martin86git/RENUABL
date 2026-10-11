@@ -255,7 +255,9 @@ describe.skipIf(!url)("roof designer proposals (database)", () => {
     expect(await proposals.acceptProposal("f".repeat(48), "Alex Example", TODAY)).toBeNull();
     expect((await crm.jobById(a, jobId))?.job.stage).toBe("proposal");
 
-    expect(await proposals.acceptProposal(token, "Alex Example", TODAY)).toBe("accepted");
+    // Nobody is listed to be told, so there is no notice to send.
+    expect(await proposals.acceptedNotice(token)).toBeNull();
+    expect(await proposals.acceptProposal(token, "Alex Example", TODAY)).toBe("accepted-now");
     const found = await proposals.publicProposal(token, TODAY);
     expect(found).toMatchObject({ state: "accepted", accepted: { name: "Alex Example" } });
     expect((await crm.jobById(a, jobId))?.job.stage).toBe("won");
@@ -266,6 +268,19 @@ describe.skipIf(!url)("roof designer proposals (database)", () => {
     const [latest, first] = await proposals.proposalVersions(a, jobId, TODAY);
     expect(latest).toMatchObject({ version: 2, state: "accepted", acceptedName: "Alex Example" });
     expect(first.acceptedAt).toBeNull();
+    // Who is told, once the business lists someone: its own addresses, the customer and the job, and nothing of the proposal.
+    expect(await proposals.acceptedNotice(token)).toBeNull();
+    await proposals.saveBrand(a, { ...(await proposals.loadBrand(a, "Alpha Solar")), notify: ["office@alpha-proposals.test"] }, A);
+    const notice = await proposals.acceptedNotice(token);
+    expect(notice).toEqual({
+      to: ["office@alpha-proposals.test"],
+      business: "Alpha Solar",
+      customer: "Alex Example",
+      title: "Solar",
+      jobId,
+      acceptedBy: "Alex Example",
+    });
+    expect(await proposals.acceptedNotice("f".repeat(48))).toBeNull();
     // It stays accepted: a second go changes nothing, even after its last day.
     expect(await proposals.acceptProposal(token, "Someone Else", TODAY)).toBe("accepted");
     expect((await proposals.publicProposal(token, "2027-01-01"))?.accepted?.name).toBe("Alex Example");

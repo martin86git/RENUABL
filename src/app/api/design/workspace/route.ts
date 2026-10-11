@@ -1,17 +1,22 @@
-import { cleanWorkspaceSettings } from "@/lib/domain/design/account";
+import { can, cleanWorkspaceSettings } from "@/lib/domain/design/account";
+import { withoutCosts } from "@/lib/domain/design/permissions";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { loadLists, loadSettings, saveSettings } from "@/lib/server/design-repo";
 
 /**
  * GET: the business's settings and its supplier price lists. `settings` is
  * null until the business has saved some (the designer then starts from its
- * placeholder figures).
+ * placeholder figures). Every member needs the products to design with; one
+ * who may not see costs is sent them with every cost taken out here, on the
+ * server (`withoutCosts`), and `costsHidden` so the screens show no quote.
  */
 export async function GET() {
   return answer(async () => {
-    const who = await requireMember("prices");
+    const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const [settings, lists] = await Promise.all([loadSettings(who.member.businessId), loadLists(who.member.businessId)]);
+    if (!can(who.member.role, "costs", who.member.permissions))
+      return Response.json({ ok: true, ...withoutCosts(settings, lists), costsHidden: true });
     return Response.json({ ok: true, settings, lists });
   });
 }

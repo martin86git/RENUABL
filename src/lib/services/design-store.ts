@@ -200,11 +200,25 @@ function deviceWorkspace(): Workspace | null {
   }
 }
 
+/** Whether the server sent this person the business's products with the costs taken out (the owner's setting for them). */
+let hidden = false;
+
+/**
+ * True for someone who may not see costs, once the workspace has loaded: the
+ * screens then show no quote and no price, and never save the settings (what
+ * they hold isn't the business's real figures). The server enforces all of
+ * it; this only keeps the screens honest about what they have.
+ */
+export function costsHidden(): boolean {
+  return hidden;
+}
+
 /** The business's settings: price lists, parts, installation rates, margin. The starting figures until something is saved. */
 export async function loadWorkspace(): Promise<Workspace> {
   if ((await whereKept()) === "device") return deviceWorkspace() ?? DEFAULT_WORKSPACE;
-  const res = await call<ServerAnswer & { settings: unknown; lists: unknown }>("/api/design/workspace");
+  const res = await call<ServerAnswer & { settings: unknown; lists: unknown; costsHidden?: boolean }>("/api/design/workspace");
   if (!res.ok) throw new DesignStoreError(res.message);
+  hidden = res.costsHidden === true;
   const workspace = cleanWorkspace({
     ...(res.settings && typeof res.settings === "object" ? res.settings : DEFAULT_WORKSPACE),
     lists: res.lists,
@@ -252,6 +266,7 @@ export async function saveWorkspace(workspace: Workspace): Promise<string | null
   } catch (e) {
     return e instanceof Error ? e.message : CANT_REACH;
   }
+  if (where === "account" && hidden) return "You don't have access to change prices and settings.";
   if (where === "account") return inTurn(() => saveToAccountSettings(workspace));
   try {
     window.localStorage.setItem(WORKSPACE, JSON.stringify(workspace));

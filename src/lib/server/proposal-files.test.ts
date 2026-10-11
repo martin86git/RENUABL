@@ -1,8 +1,9 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
+import { cleanBlocks } from "@/lib/domain/design/blocks";
 import { IMAGE_TOO_BIG, IMAGE_WRONG } from "@/lib/domain/design/brand";
 import { buildProposal } from "@/lib/domain/design/proposal";
-import { sampleInputs } from "@/lib/domain/design/proposal-fixture";
+import { sampleBrand, sampleInputs } from "@/lib/domain/design/proposal-fixture";
 import { imageResponse, safeImage } from "./design-images";
 import { pdfName, proposalPdf } from "./proposal-pdf";
 
@@ -75,6 +76,47 @@ describe("the proposal as a PDF", () => {
     expect(signed.subarray(0, 5).toString()).toBe("%PDF-");
     // The function takes the customer's copy and nothing else: there is no way to hand it the business's record.
     expect(proposalPdf.length).toBe(3);
+  }, 30_000);
+  it("follows the business's blocks and terms, and reads a proposal published before there were any", async () => {
+    const picture = { id: "img_0000000000000000000000dd", kind: "block" as const, width: 800, height: 500 };
+    const sample = sampleInputs({ withBattery: true });
+    const built = buildProposal({
+      ...sample,
+      images: [...sample.images, picture],
+      brand: {
+        ...sampleBrand(),
+        font: "editorial",
+        gst: "excluded",
+        deposit: { kind: "percent", amount: 20 },
+        milestones: [
+          { percent: 20, name: "Deposit" },
+          { percent: 80, name: "Installation completion" },
+        ],
+        bank: { name: "Example Solar Pty Ltd", bsb: "063000", number: "12345678", reference: "Your surname" },
+        warrantyYears: 10,
+        warrantyWords: "Covers our workmanship.",
+        installTime: "3-4",
+        blocks: cleanBlocks([
+          { id: "price", heading: "The investment" },
+          { id: "custom-1", on: true, heading: "Our team", words: "Ten years on roofs.", image: picture.id },
+          { id: "roof", on: false },
+        ]),
+      },
+    });
+    if (!built.ok) throw new Error(built.problems.join(" "));
+    const block = await safeImage(await photo(800, 500).jpeg().toBuffer(), "block");
+    if ("problem" in block) throw new Error(block.problem);
+    const pdf = await proposalPdf(built.view, { [picture.id]: block }, null);
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+    // One published before blocks, terms and fonts existed has none of them, and still makes a file.
+    const old = {
+      ...built.view,
+      blocks: undefined,
+      terms: undefined,
+      theme: { palette: "paper" as const, primary: "#0f4c81", accent: "#c2410c" },
+    };
+    const before = await proposalPdf(old, {}, null);
+    expect(before.subarray(0, 5).toString()).toBe("%PDF-");
   }, 30_000);
   it("is named for the customer, with nothing a file name can't hold", () => {
     expect(pdfName({ customer: { name: "Alex Example", address: "" } })).toBe("Proposal - Alex Example.pdf");

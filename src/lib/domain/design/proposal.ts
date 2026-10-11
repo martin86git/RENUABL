@@ -20,7 +20,19 @@
  */
 import type { ISODate } from "../types";
 import type { RebateRates } from "../rebates";
-import { type BrandImage, type BrandKit, type PaletteId, type TemplateId, TEMPLATES, VALID_DAYS } from "./brand";
+import type { ViewBlock } from "./blocks";
+import {
+  INSTALL_TIMES,
+  TEMPLATES,
+  VALID_DAYS,
+  type BankDetails,
+  type BrandImage,
+  type BrandKit,
+  type FontId,
+  type GstMode,
+  type PaletteId,
+  type TemplateId,
+} from "./brand";
 import type { Cleaned, Customer, DetailKey, Job } from "./crm";
 import { systemDetails } from "./deal";
 import { workspaceCatalogue, type Workspace } from "./pricing";
@@ -39,6 +51,7 @@ import {
   type SolarVic,
 } from "./quote";
 import { designPanels, designSummary, monthlyProduction, type DesignSet } from "./roof-design";
+import { NETCC_INFORMATION, STANDARD_TERMS_VERSION, fillTerms, type TermsSection } from "./standard-terms";
 import { YIELD_PER_KW_DAY, batteryKwhOf, systemSpecOf } from "./system";
 
 // ---------------------------------------------------------------------------
@@ -51,7 +64,7 @@ export interface ProposalView {
   /** The last day the price stands. */
   validUntil: ISODate;
   template: TemplateId;
-  theme: { palette: PaletteId; primary: string; accent: string };
+  theme: { palette: PaletteId; primary: string; accent: string; font?: FontId };
   business: {
     name: string;
     tagline: string;
@@ -115,9 +128,44 @@ export interface ProposalView {
     solarVic: (SolarVic & { note: string }) | null;
     /** What the price covers, in plain words. Never an amount. */
     includes: string[];
+    /**
+     * How the business writes its prices: as one figure with GST in it, or broken out. Broken out, `beforeGst` and
+     * `gst` are the two parts of `incGst`; otherwise they are left out. (A proposal published before this could be
+     * chosen has neither.)
+     */
+    gstShown?: GstMode;
+    beforeGst?: number;
+    gst?: number;
   };
   /** Years for the estimated saving to add up to the price, to one decimal. Null without a saving. */
   paybackYears: number | null;
+  /**
+   * The business's own terms, as it has set them. Its statements to its customer, not RENUABL's: the warranty in
+   * particular is the business's own workmanship warranty, in its own words.
+   */
+  terms?: {
+    /** Dollars asked up front, worked out from what the customer pays. Null with no deposit. */
+    deposit: number | null;
+    /** Each share of what the customer pays, with what it comes to. They add up to `price.youPay`. */
+    milestones: { name: string; percent: number; amount: number }[];
+    /** The account to pay into. Shown only on this business's own proposals. */
+    bank: BankDetails | null;
+    warranty: { years: number | null; words: string } | null;
+    /** How long installation usually takes from going ahead ("3 to 4 weeks"): an estimate. */
+    installTime: string | null;
+  };
+  /**
+   * The standard terms and conditions this proposal was sent with, when the business has them switched on: the
+   * wording as it stood (so a proposal already sent keeps its own), its version, and the consumer information.
+   * Null when they were off. Left out on a proposal published before there were any.
+   */
+  contract?: {
+    version: string;
+    netcc: { heading: string; intro: string; guides: string[]; url: string; seller: string };
+    terms: TermsSection[];
+  } | null;
+  /** The blocks to show, in order. Left out on a proposal published before they could be arranged (`USUAL_BLOCKS`). */
+  blocks?: ViewBlock[];
 }
 
 /** The business's own record of a published proposal. Never sent to the customer. */
@@ -163,6 +211,7 @@ export const STC_NOTE =
 export const NO_SUNSHINE_NOTE = "We don't yet estimate output or savings for homes outside Victoria.";
 export const ROOF_NOTE = "The layout is a design. It is checked on site before anything is installed.";
 export const ACCEPT_LINE = "I'd like to go ahead with this proposal.";
+export const ACCEPT_WITH_TERMS = "I'd like to go ahead with this proposal, and I accept the terms and conditions set out with it.";
 export const ACCEPT_WITH_CONDITIONS = "I'd like to go ahead with this proposal, and I accept the conditions set out with it.";
 
 /** Victorian postcodes: the only state the designer's sunshine record covers so far. */
@@ -174,6 +223,88 @@ export function inVictoria(postcode: string): boolean {
 /** A day so many days after another, both YYYY-MM-DD. */
 export function addDays(day: ISODate, days: number): ISODate {
   return new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** A price with GST in it, as its two parts: what it is before GST, and the GST. They add back up to it exactly. */
+export function splitGst(incGst: number): { beforeGst: number; gst: number } {
+  const beforeGst = Math.round(incGst / 1.1);
+  return { beforeGst, gst: incGst - beforeGst };
+}
+
+/** The deposit in dollars: a share of what the customer pays, or the set amount, and never more than the whole. Null with none. */
+export function depositOf(deposit: BrandKit["deposit"], youPay: number): number | null {
+  if (deposit.kind === "none") return null;
+  const amount = deposit.kind === "percent" ? Math.round((youPay * deposit.amount) / 100) : deposit.amount;
+  return Math.min(Math.max(0, amount), youPay);
+}
+
+/**
+ * Each payment milestone with what it comes to, in whole dollars. The last
+ * takes up the rounding, so they add up to exactly what the customer pays.
+ */
+export function milestoneAmounts(milestones: BrandKit["milestones"], youPay: number): { name: string; percent: number; amount: number }[] {
+  let left = youPay;
+  return milestones.map((m, i) => {
+    const amount = i === milestones.length - 1 ? left : Math.round((youPay * m.percent) / 100);
+    left -= amount;
+    return { name: m.name, percent: m.percent, amount };
+  });
+}
+
+// What the templates say beside the business's own terms. The business's words are its own; these keep them honest.
+export const TIMING_NOTE = "An estimate of how long installation usually takes from the day you go ahead. Your date is confirmed with you.";
+/** Beside a business's workmanship warranty: whose it is. It is the business's own promise to its own customer, in its own words. */
+export const warrantyNote = (business: string) =>
+  `This is ${business}'s own warranty on its workmanship. The products carry their manufacturers' warranties.`;
+export const BANK_NOTE = "Check these details with us by phone before you pay, if you have any doubt about a message asking for payment.";
+
+/** The line a customer ticks to go ahead: it names what they accept with the proposal, when there is anything. */
+export function acceptLine(view: Pick<ProposalView, "contract" | "business">): string {
+  if (view.contract) return ACCEPT_WITH_TERMS;
+  return view.business.conditions ? ACCEPT_WITH_CONDITIONS : ACCEPT_LINE;
+}
+
+/**
+ * The "Details" at the head of the terms and conditions: who the agreement
+ * is between, the property, the system, the price and what was promised
+ * about time and warranty, and which document comes first if they disagree
+ * (as clause 1 of the terms says). Built from the proposal's own figures,
+ * never typed: it can't say something the proposal doesn't.
+ */
+export function contractDetails(view: ProposalView): { rows: { label: string; value: string }[]; documents: string[] } {
+  const b = view.business;
+  const money = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
+  const seller = [b.name, b.abn && `ABN ${b.abn}`, b.address, b.phone, b.email].filter(Boolean).join(", ");
+  const rows = [
+    { label: "Customer", value: view.customer.name },
+    { label: "Seller", value: seller },
+    { label: "Property", value: view.customer.address },
+    { label: "System", value: view.system.details.map((d) => `${d.label}: ${d.value}`).join("; ") },
+    { label: "System price, including GST", value: money(view.price.incGst) },
+    { label: "Less the federal rebate (STCs), an estimate until installation", value: money(view.price.stc) },
+    { label: "Price payable", value: money(view.price.youPay) },
+    ...(view.terms?.installTime ? [{ label: "Installation time (an estimate)", value: view.terms.installTime }] : []),
+    ...(view.terms?.warranty?.years
+      ? [{ label: "Workmanship warranty", value: `${view.terms.warranty.years} ${view.terms.warranty.years === 1 ? "year" : "years"}` }]
+      : []),
+    {
+      label: "The price stands until",
+      value: new Date(`${view.validUntil}T00:00:00Z`).toLocaleDateString("en-AU", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      }),
+    },
+  ].filter((row) => row.value);
+  return {
+    rows,
+    documents: [
+      ...(b.conditions ? ["The special conditions in this proposal"] : []),
+      "This proposal (the system, the price and the payment terms)",
+      "These terms and conditions",
+    ],
+  };
 }
 
 /** A saving as it is shown: rounded down to ten dollars, never up, never below nothing. */
@@ -301,7 +432,7 @@ export function buildProposal(input: ProposalInputs): Built {
     publishedAt: input.now,
     validUntil: addDays(input.today, input.choice.validDays),
     template: input.choice.template,
-    theme: { palette: brand.palette, primary: brand.primary, accent: brand.accent },
+    theme: { palette: brand.palette, primary: brand.primary, accent: brand.accent, font: brand.font },
     business: {
       name: brand.name,
       tagline: brand.tagline,
@@ -352,8 +483,39 @@ export function buildProposal(input: ProposalInputs): Built {
       youPay,
       solarVic: solarVic ? { ...solarVic, note: solarVicNote(solarVic) } : null,
       includes: [...Object.entries(INCLUDED).flatMap(([group, words]) => (groups.has(group as CostGroup) ? [words] : [])), "GST"],
+      gstShown: brand.gst,
+      ...(brand.gst === "excluded" ? splitGst(totals.priceIncGst) : {}),
     },
     paybackYears: saving > 0 ? Math.round((youPay / saving) * 10) / 10 : null,
+    terms: {
+      deposit: depositOf(brand.deposit, youPay),
+      milestones: milestoneAmounts(brand.milestones, youPay),
+      bank: brand.bank.number ? { ...brand.bank } : null,
+      warranty: brand.warrantyYears !== null || brand.warrantyWords ? { years: brand.warrantyYears, words: brand.warrantyWords } : null,
+      installTime: brand.installTime ? (INSTALL_TIMES.find((t) => t.id === brand.installTime)?.label ?? null) : null,
+    },
+    contract: brand.standardTerms
+      ? {
+          version: STANDARD_TERMS_VERSION,
+          netcc: {
+            heading: NETCC_INFORMATION.heading,
+            intro: NETCC_INFORMATION.intro,
+            guides: [...NETCC_INFORMATION.guides],
+            url: NETCC_INFORMATION.url,
+            // Only a business that says it is an Approved Seller is described as one.
+            seller: brand.netccApproved ? NETCC_INFORMATION.approvedSeller.replaceAll("{seller}", brand.name) : NETCC_INFORMATION.notStated,
+          },
+          terms: fillTerms({ seller: brand.name, customer: input.customer.name }),
+        }
+      : null,
+    blocks: brand.blocks
+      .filter((block) => block.on)
+      .map((block) => ({
+        id: block.id,
+        heading: block.heading,
+        words: block.words,
+        image: (block.image && input.images.find((i) => i.id === block.image && i.kind === "block")) || null,
+      })),
   };
   const internal: ProposalInternal = {
     cost: totals.cost,

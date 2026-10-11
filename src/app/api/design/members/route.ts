@@ -1,7 +1,7 @@
 import { normaliseEmail } from "@/lib/domain/accounts";
-import { MAX_MEMBERS } from "@/lib/domain/design/account";
+import { MAX_MEMBERS, cleanPermissions } from "@/lib/domain/design/account";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
-import { addMember, listMembers, removeMember } from "@/lib/server/design-repo";
+import { addMember, listMembers, removeMember, setPermissions } from "@/lib/server/design-repo";
 import { allow } from "@/lib/server/rate-limit";
 
 /** GET: the people in the signed-in member's business. */
@@ -34,6 +34,23 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, message: `A business can have up to ${MAX_MEMBERS} people for now.` }, { status: 422 });
     if (result === "taken")
       return Response.json({ ok: false, message: "That email can't be added. It may already be in a business." }, { status: 422 });
+    return Response.json({ ok: true, members: await listMembers(who.member.businessId) });
+  });
+}
+
+/**
+ * PUT { email, permissions: { costs, prices, publish } }: the owner sets what a member may do. Enforced on every
+ * request by `requireMember`, so it takes effect with their next one. The owner's own can't be changed.
+ */
+export async function PUT(request: Request) {
+  return answer(async () => {
+    const who = await requireMember("members");
+    if ("refuse" in who) return who.refuse;
+    const read = await readBody(request, 2_000);
+    if ("refuse" in read) return read.refuse;
+    const email = normaliseEmail(read.body.email);
+    if (!email || !(await setPermissions(who.member.businessId, email, cleanPermissions(read.body.permissions))))
+      return Response.json({ ok: false, message: "That person isn't in your business." }, { status: 404 });
     return Response.json({ ok: true, members: await listMembers(who.member.businessId) });
   });
 }

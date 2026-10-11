@@ -22,6 +22,7 @@ import {
   type DesignRoof,
   savedLabel,
   whereKept,
+  costsHidden,
 } from "@/lib/services/design-store";
 import { loadJob, saveJob } from "@/lib/services/crm";
 import { NEEDS_ACCOUNT, NO_DEAL, proposalScreen, publishFromDesigner } from "@/lib/services/proposals";
@@ -211,6 +212,7 @@ export function DesignStudio() {
             onJob ? publishFromDesigner(onJob.id) : (await whereKept().catch(() => "device")) === "account" ? NO_DEAL : NEEDS_ACCOUNT
           }
           proposalHref={onJob ? proposalScreen(onJob.id) : null}
+          costsHidden={costsHidden()}
           savedLabel={kept}
           onUnsaved={noteUnsaved}
           bar={

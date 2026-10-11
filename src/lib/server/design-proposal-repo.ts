@@ -81,12 +81,12 @@ export async function addImage(
   by: string,
 ): Promise<BrandImage | "full"> {
   return transaction(async (q) => {
-    if (kind === "photo") {
+    if (kind === "photo" || kind === "block") {
       const count = await q<{ n: string }>(
-        `select count(*) as n from design_files where business_id = $1 and kind = 'photo' and removed_at is null`,
-        [businessId],
+        `select count(*) as n from design_files where business_id = $1 and kind = $2 and removed_at is null`,
+        [businessId, kind],
       );
-      if (Number(count[0]?.n ?? 0) >= IMAGE_LIMITS.photos) return "full";
+      if (Number(count[0]?.n ?? 0) >= (kind === "photo" ? IMAGE_LIMITS.photos : IMAGE_LIMITS.blocks)) return "full";
     } else {
       await q(`update design_files set removed_at = now() where business_id = $1 and kind = $2 and removed_at is null`, [businessId, kind]);
     }
@@ -372,7 +372,7 @@ export async function publicImage(token: string, id: string): Promise<ImageFile 
   const row = await behind(query, token);
   if (!row || row.withdrawn) return null;
   const { logo, cover, photos } = row.view.business;
-  if (![logo, cover, ...photos].some((image) => image?.id === id)) return null;
+  if (![logo, cover, ...photos, ...(row.view.blocks ?? []).map((b) => b.image)].some((image) => image?.id === id)) return null;
   return imageFile(row.businessId, id);
 }
 
@@ -384,7 +384,7 @@ export async function publicPdfParts(
   if (!row || row.withdrawn) return null;
   const { logo, cover } = row.view.business;
   const images: Record<string, ImageFile> = {};
-  for (const image of [logo, cover]) {
+  for (const image of [logo, cover, ...(row.view.blocks ?? []).map((b) => b.image)]) {
     const file = image ? await imageFile(row.businessId, image.id) : null;
     if (image && file) images[image.id] = file;
   }
@@ -417,9 +417,10 @@ export async function markOpened(token: string): Promise<void> {
  * A customer going ahead. Kept once, against the version they were looking
  * at, with the name they typed and the server's time; the job moves to "won"
  * (never backwards), and both are written on their record. Anything but a
- * live proposal is refused with its state.
+ * live proposal is refused with its state ("accepted" for one accepted
+ * before: only "accepted-now" means this call did it).
  */
-export async function acceptProposal(token: string, name: string, today: ISODate): Promise<"accepted" | ProposalState | null> {
+export async function acceptProposal(token: string, name: string, today: ISODate): Promise<"accepted-now" | ProposalState | null> {
   return transaction(async (q) => {
     const row = await behind(q, token, true);
     if (!row) return null;
@@ -440,8 +441,31 @@ export async function acceptProposal(token: string, name: string, today: ISODate
       await q(`update design_jobs set stage = 'won', updated_at = now() where business_id = $1 and id = $2`, [row.businessId, row.jobId]);
       await record(q, row.businessId, { ...line, kind: "stage", text: stageMoveText("won") });
     }
-    return "accepted";
+    return "accepted-now";
   });
+}
+
+/**
+ * Who to tell that the proposal behind a link has been accepted, and what to
+ * say: the business's own extra addresses as they stand now, the customer's
+ * name and the job. Never the price, the bank details or anything else of
+ * the proposal. Null when it isn't accepted or nobody is listed.
+ */
+export async function acceptedNotice(
+  token: string,
+): Promise<{ to: string[]; business: string; customer: string; title: string; jobId: string; acceptedBy: string } | null> {
+  const row = await behind(query, token);
+  if (!row || !row.acceptedAt || !row.acceptedName) return null;
+  const brand = await loadBrand(row.businessId, row.view.business.name);
+  if (!brand.notify.length) return null;
+  return {
+    to: brand.notify,
+    business: brand.name,
+    customer: row.view.customer.name,
+    title: row.view.title,
+    jobId: row.jobId,
+    acceptedBy: row.acceptedName,
+  };
 }
 
 /** A customer's question, written on their record for the business to answer. "full" past the limit for one link. */

@@ -3,16 +3,20 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Download } from "lucide-react";
-import { shownAbn, shownWebsite, themeVars } from "@/lib/domain/design/brand";
+import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
+import { shownAbn, shownBsb, shownWebsite, themeVars } from "@/lib/domain/design/brand";
 import {
-  ACCEPT_LINE,
-  ACCEPT_WITH_CONDITIONS,
+  BANK_NOTE,
+  acceptLine,
+  contractDetails,
   ESTIMATE_NOTE,
   NO_SUNSHINE_NOTE,
   PRODUCTION_NOTE,
   ROOF_NOTE,
   SAVING_NOTE,
   STC_NOTE,
+  TIMING_NOTE,
+  warrantyNote,
   type ProposalState,
   type ProposalView,
 } from "@/lib/domain/design/proposal";
@@ -31,7 +35,8 @@ const day = (iso: string) =>
 
 const card = "rounded-xl border border-line bg-surface p-5 sm:p-7";
 const eyebrow = "text-[11px] font-medium uppercase tracking-[0.16em] text-muted";
-const h2 = "text-[22px] leading-tight tracking-tight text-ink sm:text-[26px]";
+// Headings are set in the face the business chose (`--proposal-heading`, from `themeVars`).
+const h2 = "text-[22px] leading-tight tracking-tight text-ink [font-family:var(--proposal-heading)] sm:text-[26px]";
 const fine = "text-[12.5px] leading-relaxed text-muted";
 const field =
   "block min-h-11 w-full rounded-md border border-line bg-surface px-3 text-[16px] text-ink outline-none focus:border-[var(--primary)] sm:text-sm";
@@ -150,7 +155,7 @@ function GoAhead({ view, state, accepted, actions }: Pick<ProposalPageProps, "vi
   const [question, setQuestion] = useState("");
   const [asked, setAsked] = useState<{ ok: boolean; text: string } | null>(null);
   const b = view.business;
-  const line = b.conditions ? ACCEPT_WITH_CONDITIONS : ACCEPT_LINE;
+  const line = acceptLine(view);
 
   if (state === "accepted")
     return (
@@ -265,8 +270,10 @@ export interface ProposalPageProps {
  * and colours: never RENUABL's. One renderer for the customer's link and for
  * the business's preview, so what is previewed is what is sent.
  *
- * The three templates show the same sections in the same order and differ in
- * how they open: Classic under a photo, Compact with the three figures
+ * After the cover, the blocks come in the order the business has put them
+ * in, each under its heading with the business's own words and picture
+ * (`view.blocks`, from the customiser); the PDF follows the same list. The
+ * three templates differ only in how the cover opens: Classic under a photo, Compact with the three figures
  * first, Bold on a full block of the business's colour. Colours come in as
  * the site's usual tokens (`themeVars`), so everything below uses tokens.
  * It is given the customer's copy only: there is no cost here to show.
@@ -286,7 +293,7 @@ export function ProposalPage({ view, state, accepted, urls, actions }: ProposalP
       <p className={clsx(eyebrow, bold && "text-[color:var(--primary-ink)] opacity-80")}>Proposal · {day(view.publishedAt)}</p>
       <h1
         className={clsx(
-          "mt-3 text-[32px] leading-[1.1] tracking-tight sm:text-[44px]",
+          "mt-3 text-[32px] leading-[1.1] tracking-tight [font-family:var(--proposal-heading)] sm:text-[44px]",
           bold ? "text-[color:var(--primary-ink)]" : "text-ink",
         )}
       >
@@ -295,6 +302,270 @@ export function ProposalPage({ view, state, accepted, urls, actions }: ProposalP
       <p className={clsx("mt-3 text-[15px]", bold ? "text-[color:var(--primary-ink)] opacity-90" : "text-muted")}>
         {view.customer.address}
       </p>
+    </>
+  );
+
+  // Each block's own content, by its id. Null when there is nothing to show for it on this proposal (no bill was
+  // entered, no terms are set): the block is then left out, unless the business gave it words or a picture of its own.
+  const terms = view.terms;
+  const content: Record<BlockId, () => React.ReactNode> = {
+    cover: () => null,
+    system: () => (
+      <div className={card}>
+        {view.system.details.map((d) => (
+          <Line key={d.label} label={d.label} value={d.value} />
+        ))}
+      </div>
+    ),
+    roof: () =>
+      view.roof.panels.length > 0 ? (
+        <>
+          <Roof view={view} src={urls.roof} />
+          <p className={clsx(fine, "mt-3")}>
+            The {view.system.panels} panels as designed, seen from above. {ROOF_NOTE}
+          </p>
+        </>
+      ) : null,
+    production: () =>
+      view.production ? (
+        <div className={card}>
+          <p className="text-[15px] text-ink">
+            About{" "}
+            <strong className="font-semibold [font-variant-numeric:tabular-nums]">
+              {view.production.yearKwh.toLocaleString("en-AU")} kWh
+            </strong>{" "}
+            a year.
+          </p>
+          <div className="mt-5">
+            <Months kwh={view.production.monthlyKwh} />
+          </div>
+          <p className={clsx(fine, "mt-4")}>{PRODUCTION_NOTE}</p>
+        </div>
+      ) : (
+        <p className="text-[15px] text-muted">{NO_SUNSHINE_NOTE}</p>
+      ),
+    bill: () =>
+      view.bill ? (
+        <div className={card}>
+          <Line label="A year's bill now (estimate)" value={dollars(view.bill.now)} />
+          <Line label="A year's bill with this system (estimate)" value={dollars(view.bill.after)} />
+          <Line label="Estimated saving a year" value={`about ${dollars(view.bill.saving)}`} strong />
+          {view.paybackYears !== null && <Line label="Years for the saving to add up to the price" value={`about ${view.paybackYears}`} />}
+          <p className={clsx(fine, "mt-4")}>
+            {SAVING_NOTE} {ESTIMATE_NOTE}
+          </p>
+          <details className="mt-3">
+            <summary className="cursor-pointer text-[13px] font-medium text-ink">What these figures assume</summary>
+            <ul className={clsx(fine, "mt-2 list-disc space-y-1 pl-5")}>
+              <li>
+                A {view.bill.assumed.interval} bill of {dollars(view.bill.assumed.amount)}, which is about {view.bill.dailyKwh} kWh a day.
+              </li>
+              <li>
+                ${view.bill.assumed.supplyPerDay.toFixed(2)} a day supply charge, ${view.bill.assumed.rate.toFixed(2)} a kWh, and $
+                {view.bill.assumed.feedIn.toFixed(2)} a kWh for power sent to the grid.
+              </li>
+              <li>About {Math.round(view.bill.assumed.selfUseShare * 100)}% of the solar used in the home as it is made.</li>
+              <li>The same use every day, one price all day, today&apos;s prices, and no shade.</li>
+            </ul>
+          </details>
+        </div>
+      ) : null,
+    price: () => (
+      <>
+        <div className={card}>
+          {/* The price as the business writes its prices: one figure with GST in it, or the two parts and the total. */}
+          {view.price.gstShown === "excluded" && view.price.beforeGst !== undefined && view.price.gst !== undefined ? (
+            <>
+              <Line label="Price before GST" value={dollars(view.price.beforeGst)} />
+              <Line label="GST" value={dollars(view.price.gst)} />
+              <Line label="Price with GST" value={dollars(view.price.incGst)} />
+            </>
+          ) : (
+            <Line label="Price, GST included" value={dollars(view.price.incGst)} />
+          )}
+          <Line label="Less the federal rebate (estimate)" value={`− ${dollars(view.price.stc)}`} />
+          <div className="mt-3 flex items-baseline justify-between gap-4 rounded-lg bg-primary px-4 py-4 text-primary-ink">
+            <span className="text-[15px] font-medium">You pay</span>
+            <span className="text-[28px] leading-none tracking-tight [font-variant-numeric:tabular-nums]">
+              {dollars(view.price.youPay)}
+            </span>
+          </div>
+          {/* Solar Victoria, when it is on the quote: what it would come to if approved, never as the price itself. */}
+          {view.price.solarVic && (
+            <div className="mt-4 rounded-lg border border-line p-4">
+              <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-ink">
+                With Solar Victoria, if you are eligible and approved
+              </p>
+              <div className="mt-2">
+                <Line label="Solar Victoria rebate" value={`− ${dollars(view.price.solarVic.rebate)}`} />
+                <Line label="You would pay" value={dollars(view.price.solarVic.afterRebate)} />
+                {view.price.solarVic.loan > 0 && (
+                  <>
+                    <Line label="Solar Victoria interest-free loan" value={`− ${dollars(view.price.solarVic.loan)}`} />
+                    <Line label="To pay up front" value={dollars(view.price.solarVic.upfront)} />
+                    <Line
+                      label={`Then, for ${view.price.solarVic.loanMonths} months, with no interest`}
+                      value={`$${view.price.solarVic.monthly.toFixed(2)} a month`}
+                    />
+                  </>
+                )}
+              </div>
+              <p className={clsx(fine, "mt-3")}>{view.price.solarVic.note}</p>
+            </div>
+          )}
+          <p className="mt-4 text-[14px] text-ink">Covers: {view.price.includes.join(", ")}.</p>
+          <p className={clsx(fine, "mt-2")}>{STC_NOTE}</p>
+        </div>
+        {b.extra && <p className="mt-5 max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-ink">{b.extra}</p>}
+      </>
+    ),
+    // The business's own payment terms: what it asks up front, when the rest falls due, and where to pay.
+    payment: () =>
+      terms && (terms.deposit !== null || terms.milestones.length > 0 || terms.bank) ? (
+        <div className={card}>
+          {terms.deposit !== null && <Line label="Deposit to go ahead" value={dollars(terms.deposit)} strong />}
+          {terms.milestones.map((m) => (
+            <Line key={m.name} label={`${m.name} (${m.percent}%)`} value={dollars(m.amount)} />
+          ))}
+          {(terms.deposit !== null || terms.milestones.length > 0) && (
+            <p className={clsx(fine, "mt-3")}>
+              Worked out from what you pay, {dollars(view.price.youPay)}. Nothing is charged through this page.
+            </p>
+          )}
+          {terms.bank && (
+            <div className="mt-4 rounded-lg border border-line p-4">
+              <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-ink">Pay by bank transfer to</p>
+              <div className="mt-2">
+                <Line label="Account name" value={terms.bank.name} />
+                <Line label="BSB" value={shownBsb(terms.bank.bsb)} />
+                <Line label="Account number" value={terms.bank.number} />
+                {terms.bank.reference && <Line label="Reference" value={terms.bank.reference} />}
+              </div>
+              <p className={clsx(fine, "mt-3")}>{BANK_NOTE}</p>
+            </div>
+          )}
+        </div>
+      ) : null,
+    timing: () =>
+      terms?.installTime ? (
+        <div className={card}>
+          <Line label="Usual time from going ahead to installation" value={terms.installTime} strong />
+          <p className={clsx(fine, "mt-3")}>{TIMING_NOTE}</p>
+        </div>
+      ) : null,
+    // The business's own workmanship warranty, in its own words: its statement to its customer, and labelled as such.
+    warranty: () =>
+      terms?.warranty ? (
+        <div className={card}>
+          {terms.warranty.years !== null && (
+            <Line
+              label={`${b.name}'s workmanship warranty`}
+              value={`${terms.warranty.years} ${terms.warranty.years === 1 ? "year" : "years"}`}
+              strong
+            />
+          )}
+          {terms.warranty.words && (
+            <p className="mt-3 whitespace-pre-line text-[14.5px] leading-relaxed text-ink">{terms.warranty.words}</p>
+          )}
+          <p className={clsx(fine, "mt-3")}>{warrantyNote(b.name)}</p>
+        </div>
+      ) : null,
+    about: () =>
+      b.about || b.points.length > 0 || b.photos.length > 0 ? (
+        <>
+          {b.about && <p className="max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-ink">{b.about}</p>}
+          {b.points.length > 0 && (
+            <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
+              {b.points.map((point) => (
+                <li key={point} className="rounded-lg border border-line bg-surface px-4 py-3 text-[14.5px] text-ink">
+                  {point}
+                </li>
+              ))}
+            </ul>
+          )}
+          {b.photos.length > 0 && (
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {b.photos.map((photo) => (
+                // eslint-disable-next-line @next/next/no-img-element -- as above
+                <img
+                  key={photo.id}
+                  src={urls.image(photo.id)}
+                  alt=""
+                  loading="lazy"
+                  className="aspect-[4/3] w-full rounded-lg object-cover"
+                />
+              ))}
+            </div>
+          )}
+        </>
+      ) : null,
+    "custom-1": () => null,
+    "custom-2": () => null,
+    "custom-3": () => null,
+    accept: () => <GoAhead view={view} state={state} accepted={accepted} actions={actions} />,
+    // The standard terms and conditions, when the business has them on: the details of this agreement (from the
+    // proposal's own figures), the consumer information, then the terms as they stood when it was published. Closed
+    // until asked for; the tick to go ahead refers to them.
+    terms: () => {
+      const contract = view.contract;
+      if (!contract) return null;
+      const details = contractDetails(view);
+      return (
+        <details className={card}>
+          <summary className="cursor-pointer text-[15px] font-medium text-ink">Read the terms and conditions</summary>
+          <h3 className="mt-5 text-[15px] font-semibold text-ink">Details</h3>
+          <div className="mt-2">
+            {details.rows.map((row) => (
+              <Line key={row.label} label={row.label} value={row.value} />
+            ))}
+          </div>
+          <p className="mt-4 text-[13.5px] font-medium text-ink">The documents that make up this agreement, in the order they apply</p>
+          <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-[13.5px] text-ink">
+            {details.documents.map((document) => (
+              <li key={document}>{document}</li>
+            ))}
+          </ol>
+          <h3 className="mt-6 text-[15px] font-semibold text-ink">{contract.netcc.heading}</h3>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-ink">{contract.netcc.intro}</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-[13.5px] text-ink">
+            {contract.netcc.guides.map((guide) => (
+              <li key={guide}>{guide}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[13.5px] text-ink">
+            The guides are at{" "}
+            <a href={contract.netcc.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">
+              {contract.netcc.url.replace(/^https?:\/\//, "")}
+            </a>
+            . {contract.netcc.seller}
+          </p>
+          {contract.terms.map((part) => (
+            <div key={part.heading} className="mt-5">
+              <h3 className="text-[14.5px] font-semibold text-ink">{part.heading}</h3>
+              {part.clauses.map((clause) => (
+                <p key={clause} className="mt-2 text-[13.5px] leading-relaxed text-ink">
+                  {clause}
+                </p>
+              ))}
+            </div>
+          ))}
+          <p className={clsx(fine, "mt-5")}>Terms version {contract.version}.</p>
+        </details>
+      );
+    },
+    conditions: () => (b.conditions ? <p className="whitespace-pre-line text-[13.5px] leading-relaxed text-ink">{b.conditions}</p> : null),
+  };
+
+  const blocks = viewBlocks(view);
+  const cover = blocks.find((block) => block.id === "cover");
+  /** A block's own words and picture, as the business set them in the customiser. */
+  const own = (block: ViewBlock) => (
+    <>
+      {block.words && <p className="max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-ink">{block.words}</p>}
+      {block.image && (
+        // eslint-disable-next-line @next/next/no-img-element -- as above
+        <img src={urls.image(block.image.id)} alt="" loading="lazy" className="mt-4 max-h-[26rem] w-full rounded-xl object-cover" />
+      )}
     </>
   );
 
@@ -311,7 +582,7 @@ export function ProposalPage({ view, state, accepted, urls, actions }: ProposalP
       </header>
 
       <main className="mx-auto w-full max-w-4xl space-y-12 px-5 pb-20 sm:px-8">
-        {/* How it opens: the one place the templates differ. */}
+        {/* How it opens: the one place the templates differ. Always first, whatever order the rest is in. */}
         <section aria-label="Proposal">
           {bold ? (
             <div className="rounded-2xl bg-primary px-6 py-12 sm:px-10 sm:py-16">{title}</div>
@@ -326,6 +597,7 @@ export function ProposalPage({ view, state, accepted, urls, actions }: ProposalP
           )}
           {b.tagline && !bold && <p className="mt-2 text-[15px] text-ink">{b.tagline}</p>}
           {view.note && <p className="mt-6 max-w-2xl whitespace-pre-line text-[16px] leading-relaxed text-ink">{view.note}</p>}
+          {cover && (cover.words || cover.image) && <div className="mt-6">{own(cover)}</div>}
           <div className="mt-8">
             <Headline view={view} />
           </div>
@@ -342,172 +614,22 @@ export function ProposalPage({ view, state, accepted, urls, actions }: ProposalP
           </div>
         </section>
 
-        <section aria-labelledby="p-system">
-          <h2 id="p-system" className={h2}>
-            Your system
-          </h2>
-          <div className={clsx(card, "mt-4")}>
-            {view.system.details.map((d) => (
-              <Line key={d.label} label={d.label} value={d.value} />
-            ))}
-          </div>
-        </section>
-
-        {view.roof.panels.length > 0 && (
-          <section aria-labelledby="p-roof">
-            <h2 id="p-roof" className={h2}>
-              Your roof
-            </h2>
-            <div className="mt-4">
-              <Roof view={view} src={urls.roof} />
-            </div>
-            <p className={clsx(fine, "mt-3")}>
-              The {view.system.panels} panels as designed, seen from above. {ROOF_NOTE}
-            </p>
-          </section>
-        )}
-
-        <section aria-labelledby="p-makes">
-          <h2 id="p-makes" className={h2}>
-            What it makes
-          </h2>
-          {view.production ? (
-            <div className={clsx(card, "mt-4")}>
-              <p className="text-[15px] text-ink">
-                About{" "}
-                <strong className="font-semibold [font-variant-numeric:tabular-nums]">
-                  {view.production.yearKwh.toLocaleString("en-AU")} kWh
-                </strong>{" "}
-                a year.
-              </p>
-              <div className="mt-5">
-                <Months kwh={view.production.monthlyKwh} />
-              </div>
-              <p className={clsx(fine, "mt-4")}>{PRODUCTION_NOTE}</p>
-            </div>
-          ) : (
-            <p className="mt-3 text-[15px] text-muted">{NO_SUNSHINE_NOTE}</p>
-          )}
-        </section>
-
-        {view.bill && (
-          <section aria-labelledby="p-bill">
-            <h2 id="p-bill" className={h2}>
-              Your power bill
-            </h2>
-            <div className={clsx(card, "mt-4")}>
-              <Line label="A year's bill now (estimate)" value={dollars(view.bill.now)} />
-              <Line label="A year's bill with this system (estimate)" value={dollars(view.bill.after)} />
-              <Line label="Estimated saving a year" value={`about ${dollars(view.bill.saving)}`} strong />
-              {view.paybackYears !== null && (
-                <Line label="Years for the saving to add up to the price" value={`about ${view.paybackYears}`} />
-              )}
-              <p className={clsx(fine, "mt-4")}>
-                {SAVING_NOTE} {ESTIMATE_NOTE}
-              </p>
-              <details className="mt-3">
-                <summary className="cursor-pointer text-[13px] font-medium text-ink">What these figures assume</summary>
-                <ul className={clsx(fine, "mt-2 list-disc space-y-1 pl-5")}>
-                  <li>
-                    A {view.bill.assumed.interval} bill of {dollars(view.bill.assumed.amount)}, which is about {view.bill.dailyKwh} kWh a
-                    day.
-                  </li>
-                  <li>
-                    ${view.bill.assumed.supplyPerDay.toFixed(2)} a day supply charge, ${view.bill.assumed.rate.toFixed(2)} a kWh, and $
-                    {view.bill.assumed.feedIn.toFixed(2)} a kWh for power sent to the grid.
-                  </li>
-                  <li>About {Math.round(view.bill.assumed.selfUseShare * 100)}% of the solar used in the home as it is made.</li>
-                  <li>The same use every day, one price all day, today&apos;s prices, and no shade.</li>
-                </ul>
-              </details>
-            </div>
-          </section>
-        )}
-
-        <section aria-labelledby="p-price">
-          <h2 id="p-price" className={h2}>
-            Your price
-          </h2>
-          <div className={clsx(card, "mt-4")}>
-            <Line label="Price, GST included" value={dollars(view.price.incGst)} />
-            <Line label="Less the federal rebate (estimate)" value={`− ${dollars(view.price.stc)}`} />
-            <div className="mt-3 flex items-baseline justify-between gap-4 rounded-lg bg-primary px-4 py-4 text-primary-ink">
-              <span className="text-[15px] font-medium">You pay</span>
-              <span className="text-[28px] leading-none tracking-tight [font-variant-numeric:tabular-nums]">
-                {dollars(view.price.youPay)}
-              </span>
-            </div>
-            {/* Solar Victoria, when it is on the quote: what it would come to if approved, never as the price itself. */}
-            {view.price.solarVic && (
-              <div className="mt-4 rounded-lg border border-line p-4">
-                <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-ink">
-                  With Solar Victoria, if you are eligible and approved
-                </p>
-                <div className="mt-2">
-                  <Line label="Solar Victoria rebate" value={`− ${dollars(view.price.solarVic.rebate)}`} />
-                  <Line label="You would pay" value={dollars(view.price.solarVic.afterRebate)} />
-                  {view.price.solarVic.loan > 0 && (
-                    <>
-                      <Line label="Solar Victoria interest-free loan" value={`− ${dollars(view.price.solarVic.loan)}`} />
-                      <Line label="To pay up front" value={dollars(view.price.solarVic.upfront)} />
-                      <Line
-                        label={`Then, for ${view.price.solarVic.loanMonths} months, with no interest`}
-                        value={`$${view.price.solarVic.monthly.toFixed(2)} a month`}
-                      />
-                    </>
-                  )}
-                </div>
-                <p className={clsx(fine, "mt-3")}>{view.price.solarVic.note}</p>
-              </div>
-            )}
-            <p className="mt-4 text-[14px] text-ink">Covers: {view.price.includes.join(", ")}.</p>
-            <p className={clsx(fine, "mt-2")}>{STC_NOTE}</p>
-          </div>
-          {b.extra && <p className="mt-5 max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-ink">{b.extra}</p>}
-        </section>
-
-        {(b.about || b.points.length > 0 || b.photos.length > 0) && (
-          <section aria-labelledby="p-about">
-            <h2 id="p-about" className={h2}>
-              About {b.name}
-            </h2>
-            {b.about && <p className="mt-4 max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-ink">{b.about}</p>}
-            {b.points.length > 0 && (
-              <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
-                {b.points.map((point) => (
-                  <li key={point} className="rounded-lg border border-line bg-surface px-4 py-3 text-[14.5px] text-ink">
-                    {point}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {b.photos.length > 0 && (
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {b.photos.map((photo) => (
-                  // eslint-disable-next-line @next/next/no-img-element -- as above
-                  <img
-                    key={photo.id}
-                    src={urls.image(photo.id)}
-                    alt=""
-                    loading="lazy"
-                    className="aspect-[4/3] w-full rounded-lg object-cover"
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        <section aria-label="Going ahead">
-          <GoAhead view={view} state={state} accepted={accepted} actions={actions} />
-        </section>
-
-        {b.conditions && (
-          <details className={card}>
-            <summary className="cursor-pointer text-[15px] font-medium text-ink">Conditions</summary>
-            <p className="mt-4 whitespace-pre-line text-[13px] leading-relaxed text-muted">{b.conditions}</p>
-          </details>
-        )}
+        {/* The rest, in the business's own order: each block under its heading, with the business's own words and picture first. */}
+        {blocks
+          .filter((block) => block.id !== "cover")
+          .map((block) => {
+            const inner = content[block.id]();
+            const hasOwn = Boolean(block.words || block.image);
+            if (!inner && !hasOwn) return null;
+            const heading = blockHeading(block, block.id === "about" ? `About ${b.name}` : "");
+            return (
+              <section key={block.id} aria-label={heading || undefined}>
+                {heading && <h2 className={h2}>{heading}</h2>}
+                {hasOwn && <div className={heading ? "mt-4" : undefined}>{own(block)}</div>}
+                {inner && <div className={heading || hasOwn ? "mt-4" : undefined}>{inner}</div>}
+              </section>
+            );
+          })}
       </main>
 
       <footer className="border-t border-line">

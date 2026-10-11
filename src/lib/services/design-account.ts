@@ -4,7 +4,7 @@
  * terms, and the people in it. All of it is asked of the server
  * (/api/design/…): the browser never decides which business it is.
  */
-import type { MemberRole } from "@/lib/domain/design/account";
+import type { MemberPermissions, MemberRole } from "@/lib/domain/design/account";
 
 export interface DesignBusiness {
   id: string;
@@ -16,7 +16,14 @@ export type DesignAccount =
   /** Nobody is signed in: the designer keeps its work on this device. */
   | { signedIn: false; unreachable?: boolean }
   /** Signed in. "no-business": they still have to name their business; "needs-terms": to accept the terms. */
-  | { signedIn: true; state: "no-business" | "needs-terms" | "ready"; email: string; business: DesignBusiness | null };
+  | {
+      signedIn: true;
+      state: "no-business" | "needs-terms" | "ready";
+      email: string;
+      business: DesignBusiness | null;
+      /** What this person may do, as the server enforces it. The screens use it only to show or hide. */
+      may?: { costs: boolean; prices: boolean; publish: boolean; members: boolean } | null;
+    };
 
 /**
  * Remembered on the device once someone has signed in on it, and forgotten
@@ -108,6 +115,7 @@ export interface MemberLine {
   role: MemberRole;
   /** Whether they have signed in and accepted the terms yet. */
   joined: boolean;
+  permissions: MemberPermissions;
 }
 
 type MembersAnswer = Answer & { members?: MemberLine[] };
@@ -118,6 +126,15 @@ export async function loadMembers(): Promise<MemberLine[] | null> {
 
 export async function addMember(email: string): Promise<{ members?: MemberLine[]; problem?: string }> {
   const res = await send<MembersAnswer>("/api/design/members", "POST", { email });
+  return res.ok ? { members: res.members } : { problem: res.message ?? UNREACHABLE };
+}
+
+/** The owner sets what a member may do. It takes effect with that person's next request. */
+export async function setMemberPermissions(
+  email: string,
+  permissions: MemberPermissions,
+): Promise<{ members?: MemberLine[]; problem?: string }> {
+  const res = await send<MembersAnswer>("/api/design/members", "PUT", { email, permissions });
   return res.ok ? { members: res.members } : { problem: res.message ?? UNREACHABLE };
 }
 

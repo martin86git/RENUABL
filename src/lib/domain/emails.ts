@@ -323,6 +323,26 @@ export function designSignInEmail(o: { link: string; minutes: number }) {
   });
 }
 
+/**
+ * To a business's own listed addresses, when a customer accepts one of its proposals (the roof designer). From
+ * RENUABL, about the business's own customer: who accepted and which job, and the way to the deal. Never the price,
+ * the bank details or anything else of the proposal. DRAFT wording: review before launch.
+ */
+export function proposalAcceptedEmail(o: { business: string; customer: string; title: string; acceptedBy: string; link: string }) {
+  const customer = plainText(o.customer, 120) || "A customer";
+  return simpleEmail({
+    subject: `${customer} accepted your proposal`,
+    heading: "A proposal was accepted",
+    lines: [
+      `${customer} has accepted the proposal from ${plainText(o.business, 80) || "your business"} for "${plainText(o.title, 80) || "their job"}". It was accepted in the name ${plainText(o.acceptedBy, 80) || customer}.`,
+      "The deal has moved to Won. Sign in to see it and to get in touch with them.",
+      "You are getting this because your business listed this address under Signed proposal emails in the roof designer's settings.",
+    ],
+    button: { label: "Open the deal", href: o.link },
+    footer: "This message was sent by RENUABL for your business. It wasn't sent to the customer.",
+  });
+}
+
 export function applicationPendingEmail() {
   return simpleEmail({
     subject: "Your RENUABL application is being reviewed",

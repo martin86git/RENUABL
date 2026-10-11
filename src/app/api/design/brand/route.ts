@@ -1,5 +1,6 @@
 import { cleanBrandKit } from "@/lib/domain/design/brand";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
+import { canNotify } from "@/lib/server/design-notify";
 import { listImages, loadBrand, saveBrand } from "@/lib/server/design-proposal-repo";
 
 /** GET: the business's branding for its proposals (what it starts with until it saves its own) and its pictures. */
@@ -9,7 +10,8 @@ export async function GET() {
     if ("refuse" in who) return who.refuse;
     const { businessId, businessName } = who.member;
     const [brand, images] = await Promise.all([loadBrand(businessId, businessName), listImages(businessId)]);
-    return Response.json({ ok: true, brand, images });
+    // `emailReady`: whether an acceptance can be emailed from here at all, so the settings page can say when it can't.
+    return Response.json({ ok: true, brand, images, emailReady: canNotify() });
   });
 }
 

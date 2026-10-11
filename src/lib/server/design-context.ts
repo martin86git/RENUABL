@@ -5,7 +5,7 @@
  * loses access at once, and nothing a browser sends can name another business.
  * It is also the one place a member's role is checked (`can`).
  */
-import { BUSINESS_TERMS_VERSION, can, type MemberAction } from "@/lib/domain/design/account";
+import { BUSINESS_TERMS_VERSION, can, refusal, type MemberAction } from "@/lib/domain/design/account";
 import { currentSession } from "./accounts";
 import { dbConfigured } from "./db";
 import { memberByEmail, type Member } from "./design-repo";
@@ -33,12 +33,12 @@ const refused = (status: number, message: string) => Response.json({ ok: false, 
 /**
  * The member a request is from, allowed to do this. Otherwise the answer to
  * send back: 401 when nobody is signed in to a business, 403 when their role
- * doesn't allow it.
+ * or the permissions the owner has given them don't allow it.
  */
 export async function requireMember(action: MemberAction): Promise<{ member: Member } | { refuse: Response }> {
   const access = await designAccess();
   if (access.state !== "ready") return { refuse: refused(401, "Sign in to your business to do this.") };
-  if (!can(access.member.role, action)) return { refuse: refused(403, "Only the owner of the business can do this.") };
+  if (!can(access.member.role, action, access.member.permissions)) return { refuse: refused(403, refusal(action)) };
   return { member: access.member };
 }
 

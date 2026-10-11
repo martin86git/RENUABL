@@ -41,7 +41,8 @@ async function ask<T>(path: string, init?: { method: string; body?: unknown; for
 // Branding
 // ---------------------------------------------------------------------------
 
-export const loadBrand = () => ask<{ brand: BrandKit; images: BrandImage[] }>("/api/design/brand");
+/** `emailReady`: whether the server can email at all (it can't on a developer's own computer), for the page that lists who is told. */
+export const loadBrand = () => ask<{ brand: BrandKit; images: BrandImage[]; emailReady?: boolean }>("/api/design/brand");
 export const saveBrand = (patch: Partial<BrandKit>) => ask<{ brand: BrandKit }>("/api/design/brand", { method: "PUT", body: patch });
 
 /** Sends a picture for the brand kit. The server checks it, makes it smaller and keeps only the picture itself. */

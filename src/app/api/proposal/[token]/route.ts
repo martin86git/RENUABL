@@ -1,7 +1,9 @@
+import { after } from "next/server";
 import { todayInMarket } from "@/lib/domain/market";
 import { cleanAcceptance, cleanQuestion } from "@/lib/domain/design/proposal";
 import { answer, readBody } from "@/lib/server/design-context";
 import { acceptProposal, askQuestion, markOpened, publicProposal } from "@/lib/server/design-proposal-repo";
+import { tellAccepted } from "@/lib/server/design-notify";
 import { allow } from "@/lib/server/rate-limit";
 
 /** A link we never made and one that doesn't exist answer the same. */
@@ -49,11 +51,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[t
       if (!input.ok) return Response.json({ ok: false, message: input.message }, { status: 422 });
       const result = await acceptProposal(token, input.value.name, today);
       if (!result) return notFound();
-      if (result !== "accepted" && result !== "live") {
+      // Told once, when it is first accepted, and not waited for: an email that can't be sent never holds the customer up.
+      if (result === "accepted-now") after(() => tellAccepted(token));
+      if (result !== "accepted-now" && result !== "accepted" && result !== "live") {
         const why = {
           lapsed: "This price has lapsed. Ask for an up-to-date proposal.",
           withdrawn: "This proposal isn't available any more.",
-          accepted: "This proposal has already been accepted.",
         }[result];
         return Response.json({ ok: false, message: why }, { status: 409 });
       }

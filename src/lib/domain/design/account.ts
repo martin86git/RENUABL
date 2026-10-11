@@ -16,20 +16,73 @@ import { cleanDesignSet, packDesignSet } from "./roof-design";
 export type MemberRole = "owner" | "member";
 
 /** The things a member's role is checked for. */
-export type MemberAction = "design" | "prices" | "members";
+export type MemberAction = "design" | "costs" | "prices" | "publish" | "members";
 
 /**
- * Who may do what, in one place. Today every member designs and sees and sets
- * prices and margin, and only the owner adds or removes people. A role that
- * can't see costs is one more line here.
+ * What the owner can switch on or off for each other person in the business.
+ * Everything else a member does (customers, deals, designing roofs) is open
+ * to every member.
  */
-const ALLOWED: Record<MemberRole, readonly MemberAction[]> = {
-  owner: ["design", "prices", "members"],
-  member: ["design", "prices"],
-};
+export interface MemberPermissions {
+  /** Sees what things cost the business: price lists, cost lines, margin, commission. */
+  costs: boolean;
+  /** Changes prices and settings: price lists, rates, margin, and the proposal's branding and terms. Needs `costs`. */
+  prices: boolean;
+  /** Publishes and withdraws proposals. */
+  publish: boolean;
+}
 
-export function can(role: MemberRole, action: MemberAction): boolean {
-  return ALLOWED[role]?.includes(action) ?? false;
+export const PERMISSIONS: { key: keyof MemberPermissions; label: string; about: string }[] = [
+  {
+    key: "costs",
+    label: "Sees costs and margin",
+    about: "Price lists, the quote's cost lines, margin and commission. Without it they design and see the customer's price only.",
+  },
+  {
+    key: "prices",
+    label: "Changes prices and settings",
+    about: 'Price lists, rates and margin, and the proposal\'s branding, terms and blocks. Needs "Sees costs and margin".',
+  },
+  { key: "publish", label: "Publishes proposals", about: "Publishes a proposal to its private link, and takes one back." },
+];
+
+/** What a member starts with: everything, as it was before permissions could be set. */
+export const ALL_PERMISSIONS: MemberPermissions = { costs: true, prices: true, publish: true };
+
+/**
+ * A member's permissions as sent or as saved: only an explicit false switches
+ * one off, and someone who can't see costs can't change prices either (they
+ * would be saving over figures they were never shown).
+ */
+export function cleanPermissions(raw: unknown): MemberPermissions {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const costs = r.costs !== false;
+  return { costs, prices: costs && r.prices !== false, publish: r.publish !== false };
+}
+
+/**
+ * Who may do what, in one place, and the only place it is decided. The owner
+ * may do everything, and only the owner adds or removes people or sets what
+ * they may do. A member designs, and does the rest as their permissions say.
+ */
+export function can(role: MemberRole, action: MemberAction, permissions: MemberPermissions = ALL_PERMISSIONS): boolean {
+  if (role === "owner") return true;
+  if (role !== "member") return false;
+  if (action === "design") return true;
+  if (action === "members") return false;
+  return cleanPermissions(permissions)[action];
+}
+
+/** What someone is told when they may not do something. */
+export function refusal(action: MemberAction): string {
+  if (action === "members") return "Only the owner of the business can do this.";
+  if (action === "costs")
+    return "You don't have access to costs and margin. The owner of the business can change that under Users and permissions.";
+  if (action === "prices")
+    return "You don't have access to change prices and settings. The owner of the business can change that under Users and permissions.";
+  if (action === "publish")
+    return "You don't have access to publish proposals. The owner of the business can change that under Users and permissions.";
+  return "You can't do this.";
 }
 
 /** The most people in one business, for now. */

@@ -182,7 +182,12 @@ describe("a business's branding", () => {
   it("turns a theme into the site's own colour tokens, and never lets an unreadable accent through", () => {
     const vars = themeVars({ palette: "paper", primary: "#0f4c81", accent: "#c2410c" });
     expect(vars).toMatchObject({ "--canvas": "#f6f6f4", "--primary": "#0f4c81", "--primary-ink": "#ffffff", "--accent": "#c2410c" });
-    for (const value of Object.values(vars)) expect(value).toMatch(/^#[0-9a-f]{6}$/);
+    // Every colour is six hex digits; the one thing that isn't a colour is the headings' face, which is one of two fixed values.
+    for (const [name, value] of Object.entries(vars)) if (name !== "--proposal-heading") expect(value).toMatch(/^#[0-9a-f]{6}$/);
+    expect(vars["--proposal-heading"]).toBe("inherit");
+    expect(themeVars({ palette: "paper", primary: "#0f4c81", accent: "#c2410c", font: "editorial" })["--proposal-heading"]).toMatch(
+      /^var\(--font-serif\)/,
+    );
     // A pale accent on a pale page gives way to the page's text colour.
     expect(themeVars({ palette: "paper", primary: "#0f4c81", accent: "#fff7cc" })["--accent"]).toBe("#16181d");
     expect(themeVars({ palette: "night", primary: "#0f4c81", accent: "#fff7cc" })["--accent"]).toBe("#fff7cc");
@@ -440,7 +445,9 @@ describe("the customer's link", () => {
     expect(Object.keys(view).sort()).toEqual(
       [
         "bill",
+        "blocks",
         "business",
+        "contract",
         "customer",
         "note",
         "paybackYears",
@@ -450,6 +457,7 @@ describe("the customer's link", () => {
         "roof",
         "system",
         "template",
+        "terms",
         "theme",
         "title",
         "validUntil",
