@@ -26,6 +26,7 @@ import {
   WandSparkles,
   Sparkles,
   FileText,
+  LayoutGrid,
   Send,
   Trash2,
   X,
@@ -400,6 +401,8 @@ export function RoofDesigner(props: {
   const [view, setView] = useState(WHOLE);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
   const [picks, setPicks] = useState<Pick[]>([]);
+  // The arrays on the design, listed (and each marked with its size on the picture) while this is open.
+  const [arraysOpen, setArraysOpen] = useState(false);
   // The pointer is over a panel while adding panels: the arrow takes over there, so the panel can be picked and moved.
   const [onPanel, setOnPanel] = useState(false);
   // The array under the pointer, with the spot of the small round that picks all of it.
@@ -1602,6 +1605,58 @@ export function RoofDesigner(props: {
     "inline-flex min-h-10 items-center rounded-md border border-line bg-surface px-4 text-sm font-medium hover:border-forest disabled:bg-surface-2 disabled:text-muted disabled:hover:border-line";
   const label = "text-[10px] font-medium uppercase tracking-[0.18em] text-muted";
   const stringOf = (key: string) => strings.findIndex((s) => s.panels.includes(key));
+  /**
+   * The design's arrays, largest first, for the list that the arrays button opens: groups of panels that touch, or as
+   * good as (`ARRAY_GAP`, the same rule the quote counts arrays by), each with the way most of its panels face, their
+   * tilt, how many, their kilowatts, the strings that run through it, and where its size is written on the picture.
+   */
+  const arrayList = (() => {
+    if (!arraysOpen) return [];
+    const all = [
+      ...loose.map((panel) => ({
+        key: keyOf({ kind: "loose", id: panel.id }),
+        corners: looseCorners(panel, size),
+        facing: panelFacing(panel),
+        tilt: panel.tilt ?? TILT.roof,
+      })),
+      ...faces.flatMap((face) =>
+        panelPlaces(face, size)
+          .filter((place) => !face.off.includes(place.index))
+          .map((place) => ({
+            key: keyOf({ kind: "grid", face: face.id, index: place.index }),
+            corners: place.corners,
+            facing: faceFacing(face),
+            tilt: face.tilt ?? TILT.roof,
+          })),
+      ),
+    ];
+    const group = all.map((_, i) => i);
+    const find = (i: number): number => (group[i] === i ? i : (group[i] = find(group[i])));
+    for (let i = 0; i < all.length; i++)
+      for (let j = i + 1; j < all.length; j++) if (panelGap(all[i].corners, all[j].corners) <= ARRAY_GAP) group[find(i)] = find(j);
+    const sets = new Map<number, typeof all>();
+    all.forEach((panel, i) => sets.set(find(i), [...(sets.get(find(i)) ?? []), panel]));
+    /** The value most of them share. */
+    const most = (values: number[]) => {
+      const counts = new Map<number, number>();
+      for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
+      return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    };
+    return [...sets.values()]
+      .map((panels) => {
+        const xs = panels.flatMap((p) => p.corners.map((c) => c.x));
+        const ys = panels.flatMap((p) => p.corners.map((c) => c.y));
+        return {
+          panels: panels.length,
+          kw: Math.round(panels.length * size.watts) / 1000,
+          facing: most(panels.map((p) => Math.round(p.facing))),
+          tilt: most(panels.map((p) => p.tilt)),
+          strings: [...new Set(panels.map((p) => stringOf(p.key)).filter((n) => n >= 0))].sort((a, b) => a - b),
+          at: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: Math.min(...ys) },
+        };
+      })
+      .sort((a, b) => b.panels - a.panels);
+  })();
   // The picked panels' tilt and direction, when they all share one.
   const pickedPanels = panelPicks.map(standing).filter((p): p is LoosePanel => p !== null);
   const shared = (of: (p: LoosePanel) => number) =>
@@ -2632,6 +2687,29 @@ export function RoofDesigner(props: {
                         {aspect(ghost, panelFacing(ghost), ghost.tilt ?? TILT.roof, "#ffffff")}
                       </g>
                     ))}
+                  {/* The arrays list is open: each array carries its number and its size. */}
+                  {arrayList.map((a, i) => {
+                    const [x, y] = px(a.at);
+                    const words = `${i + 1} · ${a.kw.toFixed(2)} kW`;
+                    const w = (words.length * 4.6 + 10) * u;
+                    return (
+                      <g key={i} pointerEvents="none">
+                        <rect
+                          x={x - w / 2}
+                          y={y - 17 * u}
+                          width={w}
+                          height={13 * u}
+                          rx={6.5 * u}
+                          fill="#0b0c0e"
+                          stroke={GOLD}
+                          strokeWidth={u}
+                        />
+                        <text x={x} y={y - 7.8 * u} fontSize={7.5 * u} fontWeight="600" fill="#ffffff" textAnchor="middle">
+                          {words}
+                        </text>
+                      </g>
+                    );
+                  })}
                   {/* The pointer is on an array: a small round beside it picks every panel in it. */}
                   {arrayHint && (tool === "select" || tool === "panel") && !arrayHint.picks.every(isPicked) && (
                     <g className="cursor-pointer">
@@ -3499,7 +3577,84 @@ export function RoofDesigner(props: {
                 >
                   <MousePointer2 className="size-8" aria-hidden />
                 </button>
+                {/* The arrays: a round under the eraser that lists them, and writes each one's size on the picture. */}
+                <button
+                  onClick={() => setArraysOpen(!arraysOpen)}
+                  title="Arrays: what each one is"
+                  aria-label="Arrays"
+                  aria-expanded={arraysOpen}
+                  className={clsx(
+                    "absolute left-3 top-[8.1rem] flex size-[3.25rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
+                    arraysOpen ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface/90 text-ink hover:bg-surface",
+                  )}
+                >
+                  <LayoutGrid className="size-6" aria-hidden />
+                </button>
               </div>
+              {arraysOpen && (
+                <div
+                  className="absolute left-[5.25rem] top-[8.5rem] z-20 max-h-[calc(100%-13rem)] w-[28rem] max-w-[calc(100%-6.5rem)] overflow-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
+                  role="region"
+                  aria-label="Arrays"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
+                      Arrays · <span className="tabular-nums">{arrayList.length}</span> ·{" "}
+                      <span className="tabular-nums">{summary.kw.toFixed(2)} kW</span>
+                    </p>
+                    <button className="text-muted hover:text-ink" onClick={() => setArraysOpen(false)} aria-label="Close the arrays list">
+                      <X className="size-4" aria-hidden />
+                    </button>
+                  </div>
+                  {arrayList.length === 0 ? (
+                    <p className="mt-3 text-sm text-ink-2">No panels on this design yet.</p>
+                  ) : (
+                    <table className="mt-2 w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-line text-[10px] font-medium uppercase tracking-[0.12em] text-muted">
+                          <th className="py-2 pr-2 font-medium">Array</th>
+                          <th className="px-2 py-2 font-medium">Faces</th>
+                          <th className="px-2 py-2 font-medium">Tilt</th>
+                          <th className="px-2 py-2 text-right font-medium">Panels</th>
+                          <th className="px-2 py-2 text-right font-medium">kW</th>
+                          <th className="py-2 pl-2 font-medium">Strings</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {arrayList.map((a, i) => (
+                          <tr key={i} className="border-b border-line last:border-0">
+                            <td className="py-2.5 pr-2 font-semibold tabular-nums text-ink">{i + 1}</td>
+                            <td className="whitespace-nowrap px-2 py-2.5 text-ink">
+                              {compass(a.facing)} <span className="tabular-nums">({a.facing}°)</span>
+                            </td>
+                            <td className="px-2 py-2.5 tabular-nums text-ink">{a.tilt}°</td>
+                            <td className="px-2 py-2.5 text-right tabular-nums text-ink">{a.panels}</td>
+                            <td className="px-2 py-2.5 text-right font-semibold tabular-nums text-ink">{a.kw.toFixed(2)}</td>
+                            <td className="py-2.5 pl-2">
+                              {a.strings.length ? (
+                                <span className="flex flex-wrap gap-1">
+                                  {a.strings.map((n) => (
+                                    <span
+                                      key={n}
+                                      className="inline-flex size-6 items-center justify-center rounded text-[11px] font-semibold text-[#0b0c0e]"
+                                      style={{ background: STRING_COLOURS[n % STRING_COLOURS.length] }}
+                                    >
+                                      {letter(n)}
+                                    </span>
+                                  ))}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted">Not strung</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  <p className="mt-2 text-xs text-muted">Numbered largest first. Direction and tilt are as set on the design.</p>
+                </div>
+              )}
               {/* The second pad, in the top right corner, the mirror of the first: stringing the panels in its circle, with
                   tracing a roof face (to its left) and the guide line (beneath it) as its half-rounds. */}
               <div
