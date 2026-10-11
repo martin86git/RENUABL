@@ -37,6 +37,10 @@ export interface QuoteForm {
   roof: "tile" | "tin" | "flat";
   storeys: "single" | "double";
   postcode: string;
+  /** The Solar Victoria rebate is put on this quote (and so on its proposal): always subject to eligibility and approval. */
+  solarVicRebate?: boolean;
+  /** The Solar Victoria interest-free loan too. It goes with the rebate, never without it. */
+  solarVicLoan?: boolean;
 }
 
 /** The system on the drawing. */
@@ -246,6 +250,74 @@ export function stcValue(
 }
 
 // ---------------------------------------------------------------------------
+// Solar Victoria: the rebate and the interest-free loan, when the business puts them on a quote
+// ---------------------------------------------------------------------------
+
+export interface SolarVic {
+  /** Taken off the price, if Solar Victoria approves it. */
+  rebate: number;
+  /** Paid back over `loanMonths` with no interest, if approved. It lowers what is paid up front, not the price. 0 without the loan. */
+  loan: number;
+  loanMonths: number;
+  /** A month, while the loan is paid back. 0 without the loan. */
+  monthly: number;
+  /** The price after STCs and the rebate. */
+  afterRebate: number;
+  /** What is paid up front: after the rebate, less the loan. */
+  upfront: number;
+}
+
+/** Victorian postcodes: 3000 to 3999, and the 8000s. */
+const inVictoria = (postcode: string) => /^[38]\d{3}$/.test(postcode);
+
+/**
+ * The Solar Victoria rebate (and loan) on a quote, when the business has
+ * switched it on: for a Victorian home getting solar panels, the rebate is
+ * the lesser of the most Solar Victoria gives and its share of the price
+ * after STCs, and the loan is up to the same again. Null when it is switched
+ * off, the home isn't in Victoria, there are no panels, or Solar Victoria
+ * isn't offering one. Only ever an "if approved" figure: see `solarVicNote`.
+ */
+export function solarVicFor(form: QuoteForm, panels: number, priceIncGst: number, stc: number, rates: RebateRates): SolarVic | null {
+  const sv = rates.solarVictoria;
+  if (!form.solarVicRebate || !inVictoria(form.postcode) || panels <= 0 || sv.pvRebateMax <= 0) return null;
+  const afterStc = priceIncGst - stc;
+  const rebate = Math.round(Math.min(sv.pvRebateMax, Math.max(0, afterStc * sv.pvRebateShare)));
+  if (rebate <= 0) return null;
+  const loan = form.solarVicLoan ? Math.min(sv.pvLoanMax, rebate) : 0;
+  const afterRebate = afterStc - rebate;
+  return {
+    rebate,
+    loan,
+    loanMonths: sv.loanMonths,
+    monthly: loan ? Math.round((loan / sv.loanMonths) * 100) / 100 : 0,
+    afterRebate,
+    upfront: afterRebate - loan,
+  };
+}
+
+/** Whether the Solar Victoria toggles can do anything for this quote, and if not, why, in words for the screen. */
+export function solarVicBar(form: QuoteForm, panels: number, rates: RebateRates): string | null {
+  if (!inVictoria(form.postcode)) return "Solar Victoria is for homes in Victoria: this address isn't one.";
+  if (rates.solarVictoria.pvRebateMax <= 0) return "Solar Victoria isn't offering a solar panel rebate at the moment.";
+  if (panels <= 0) return "The rebate is for solar panels: put panels on the roof first.";
+  return null;
+}
+
+/**
+ * What must always be said beside a Solar Victoria figure, on the quote and
+ * on the proposal: it depends on eligibility and approval, and what the
+ * price is without it.
+ */
+export function solarVicNote(sv: Pick<SolarVic, "loan" | "rebate" | "afterRebate">): string {
+  const both = sv.loan > 0;
+  const without = "$" + Math.round(sv.afterRebate + sv.rebate).toLocaleString("en-AU");
+  return `The Solar Victoria rebate${both ? " and interest-free loan are" : " is"} subject to eligibility and to Solar Victoria's approval. If you are not eligible, or are not approved, ${
+    both ? "they do" : "it does"
+  } not apply, and the price is ${without}${both ? " with nothing to pay back by the month" : ""}.`;
+}
+
+// ---------------------------------------------------------------------------
 // The customer's electricity bill, and what the design does to it
 // ---------------------------------------------------------------------------
 
@@ -400,6 +472,8 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
         storeys: oneOf(f.storeys, ["single", "double"] as const, start.form.storeys),
         // The postcode is the address's own whenever the address has one; only an address without one leaves what was typed.
         postcode: start.form.postcode || (typeof f.postcode === "string" && /^\d{0,4}$/.test(f.postcode) ? f.postcode : ""),
+        // The loan goes with the rebate, never without it.
+        ...(f.solarVicRebate === true ? { solarVicRebate: true, ...(f.solarVicLoan === true ? { solarVicLoan: true } : {}) } : {}),
       },
       edits,
     });

@@ -26,6 +26,9 @@ import {
   lineKey,
   postcodeIn,
   repriced,
+  solarVicBar,
+  solarVicFor,
+  solarVicNote,
   stcValue,
   type SystemSpec,
 } from "./quote";
@@ -228,5 +231,48 @@ describe("the customer's electricity bill", () => {
     });
     // A house number can be four digits too: the postcode is the one at the end.
     expect(postcodeIn("1250 High Street, Malvern VIC 3144")).toBe("3144");
+  });
+});
+
+describe("Solar Victoria on a quote", () => {
+  const rates = VERIFIED_RATES;
+  const form = { phase: "single", roof: "tile", storeys: "single", postcode: "3150" } as const;
+
+  it("is nothing until it is switched on, and only for Victorian homes with panels", () => {
+    expect(solarVicFor(form, 20, 12000, 3000, rates)).toBeNull();
+    expect(solarVicFor({ ...form, solarVicRebate: true, postcode: "2000" }, 20, 12000, 3000, rates)).toBeNull();
+    expect(solarVicFor({ ...form, solarVicRebate: true }, 0, 12000, 3000, rates)).toBeNull();
+    expect(solarVicBar({ ...form, postcode: "2000" }, 20, rates)).toMatch(/Victoria/);
+    expect(solarVicBar(form, 20, rates)).toBeNull();
+  });
+
+  it("takes the rebate off the price after STCs, and the loan off what is paid up front", () => {
+    const max = rates.solarVictoria.pvRebateMax;
+    const rebate = solarVicFor({ ...form, solarVicRebate: true }, 20, 12000, 3000, rates)!;
+    expect(rebate).toMatchObject({ rebate: max, loan: 0, monthly: 0, afterRebate: 9000 - max, upfront: 9000 - max });
+    const both = solarVicFor({ ...form, solarVicRebate: true, solarVicLoan: true }, 20, 12000, 3000, rates)!;
+    expect(both.loan).toBe(Math.min(rates.solarVictoria.pvLoanMax, max));
+    expect(both.upfront).toBe(9000 - max - both.loan);
+    expect(both.monthly).toBeCloseTo(both.loan / rates.solarVictoria.loanMonths, 2);
+    // Never more than its share of a small price.
+    expect(solarVicFor({ ...form, solarVicRebate: true }, 4, 2000, 1000, rates)!.rebate).toBe(
+      Math.round(1000 * rates.solarVictoria.pvRebateShare),
+    );
+  });
+
+  it("always says it depends on eligibility and approval, and what the price is without it", () => {
+    const both = solarVicFor({ ...form, solarVicRebate: true, solarVicLoan: true }, 20, 12000, 3000, rates)!;
+    const note = solarVicNote(both);
+    expect(note).toMatch(/subject to eligibility/);
+    expect(note).toMatch(/approval/);
+    expect(note).toContain("$9,000");
+  });
+
+  it("keeps the loan only with the rebate when read back", () => {
+    const read = (form: Record<string, unknown>) =>
+      cleanExtras({ quotes: [{ form }] }, 1, { bill: defaultBill({ rate: 0.3, feedIn: 0.05, supplyPerDay: 1 }), postcode: "3150" })
+        .quotes[0].form;
+    expect(read({ solarVicLoan: true }).solarVicLoan).toBeUndefined();
+    expect(read({ solarVicRebate: true, solarVicLoan: true })).toMatchObject({ solarVicRebate: true, solarVicLoan: true });
   });
 });

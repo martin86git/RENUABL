@@ -437,6 +437,29 @@ export function ProposalPage({ view, state, accepted, urls, actions }: ProposalP
                 {dollars(view.price.youPay)}
               </span>
             </div>
+            {/* Solar Victoria, when it is on the quote: what it would come to if approved, never as the price itself. */}
+            {view.price.solarVic && (
+              <div className="mt-4 rounded-lg border border-line p-4">
+                <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-ink">
+                  With Solar Victoria, if you are eligible and approved
+                </p>
+                <div className="mt-2">
+                  <Line label="Solar Victoria rebate" value={`− ${dollars(view.price.solarVic.rebate)}`} />
+                  <Line label="You would pay" value={dollars(view.price.solarVic.afterRebate)} />
+                  {view.price.solarVic.loan > 0 && (
+                    <>
+                      <Line label="Solar Victoria interest-free loan" value={`− ${dollars(view.price.solarVic.loan)}`} />
+                      <Line label="To pay up front" value={dollars(view.price.solarVic.upfront)} />
+                      <Line
+                        label={`Then, for ${view.price.solarVic.loanMonths} months, with no interest`}
+                        value={`$${view.price.solarVic.monthly.toFixed(2)} a month`}
+                      />
+                    </>
+                  )}
+                </div>
+                <p className={clsx(fine, "mt-3")}>{view.price.solarVic.note}</p>
+              </div>
+            )}
             <p className="mt-4 text-[14px] text-ink">Covers: {view.price.includes.join(", ")}.</p>
             <p className={clsx(fine, "mt-2")}>{STC_NOTE}</p>
           </div>

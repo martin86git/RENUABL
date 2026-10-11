@@ -9,6 +9,9 @@ import {
   editedLines,
   lineKey,
   repriced,
+  solarVicBar,
+  solarVicFor,
+  solarVicNote,
   stcValue,
   type CostLine,
   type QuoteFields,
@@ -60,6 +63,12 @@ export function DesignQuote(props: {
   const totals = changed ? repriced(costing, lines) : costing;
   const missing = lines.filter((l) => l.missing).length;
   const net = empty ? null : totals.priceIncGst - stc;
+  // Solar Victoria, when it has been put on this quote: always "if approved".
+  const solarVic = empty ? null : solarVicFor(form, costing.panels, totals.priceIncGst, stc, rates);
+  const solarVicOff = solarVicBar(form, costing.panels, rates);
+  const setSolarVic = (rebate: boolean, loan: boolean) =>
+    // The loan goes with the rebate: switching the loan on switches the rebate on, and switching the rebate off takes the loan too.
+    props.onChange({ form: { ...form, solarVicRebate: rebate || loan, solarVicLoan: loan && (rebate || loan) }, edits });
   const { onNet } = props;
   useEffect(() => onNet(net), [onNet, net]);
 
@@ -116,6 +125,31 @@ export function DesignQuote(props: {
             </select>
           </label>
         </div>
+      </div>
+
+      {/* Solar Victoria: switched on, the rebate (and loan) go on the quote and on its proposal, always as "if approved". */}
+      <div className="mt-3 rounded-md border border-sun-line bg-sun p-2.5" role="group" aria-label="Solar Victoria">
+        <p className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sun-ink">
+          <span>Solar Victoria</span>
+          <span>Subject to eligibility and approval</span>
+        </p>
+        {(
+          [
+            ["Solar Victoria rebate", Boolean(form.solarVicRebate), (on: boolean) => setSolarVic(on, on && Boolean(form.solarVicLoan))],
+            ["Solar Victoria loan", Boolean(form.solarVicLoan), (on: boolean) => setSolarVic(Boolean(form.solarVicRebate) || on, on)],
+          ] as const
+        ).map(([name, on, set]) => (
+          <label key={name} className="mt-2 flex cursor-pointer items-center justify-between gap-3 text-[13px] font-medium text-ink">
+            {name}
+            <span className="relative inline-flex shrink-0">
+              <input type="checkbox" role="switch" className="peer sr-only" checked={on} onChange={(e) => set(e.target.checked)} />
+              <span className="h-6 w-11 rounded-full bg-line-strong peer-checked:bg-sun-line peer-focus-visible:ring-2 peer-focus-visible:ring-ink" />
+              <span className="absolute left-0.5 top-0.5 size-5 rounded-full bg-surface shadow-[var(--shadow-soft)] peer-checked:translate-x-5" />
+            </span>
+          </label>
+        ))}
+        {form.solarVicRebate && solarVicOff && <p className="mt-2 text-xs text-sun-ink">{solarVicOff} Nothing is added to this quote.</p>}
+        {!form.solarVicRebate && <p className="mt-2 text-xs text-ink-2">Off: neither appears on the quote or its proposal.</p>}
       </div>
 
       {empty ? (
@@ -245,6 +279,37 @@ export function DesignQuote(props: {
               </div>
             ))}
           </dl>
+          {solarVic && (
+            <div className="mt-2 rounded-md border border-sun-line bg-sun p-3 text-sm">
+              <dl className="space-y-1">
+                <div className="flex justify-between">
+                  <dt className="text-sun-ink">Solar Victoria rebate, if approved</dt>
+                  <dd className="tabular-nums text-sun-ink">-{money(solarVic.rebate)}</dd>
+                </div>
+                <div className="flex justify-between font-semibold">
+                  <dt>After the rebate</dt>
+                  <dd className="tabular-nums">{money(solarVic.afterRebate)}</dd>
+                </div>
+                {solarVic.loan > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <dt className="text-sun-ink">Interest-free loan, if approved</dt>
+                      <dd className="tabular-nums text-sun-ink">-{money(solarVic.loan)}</dd>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                      <dt>To pay up front</dt>
+                      <dd className="tabular-nums">{money(solarVic.upfront)}</dd>
+                    </div>
+                    <div className="flex justify-between text-ink-2">
+                      <dt>Then, for {solarVic.loanMonths} months</dt>
+                      <dd className="tabular-nums">${solarVic.monthly.toFixed(2)} a month</dd>
+                    </div>
+                  </>
+                )}
+              </dl>
+              <p className="mt-2 text-xs leading-snug text-sun-ink">{solarVicNote(solarVic)}</p>
+            </div>
+          )}
           <p className="mt-2 text-xs text-muted">
             {costing.panels} panels, {costing.pvKw} kW
             {costing.batteryKwh ? `, ${costing.batteryKwh} kWh battery` : ""}. Costs are ex GST: type over one to change it, or take a line

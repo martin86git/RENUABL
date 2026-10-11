@@ -25,7 +25,19 @@ import type { Cleaned, Customer, DetailKey, Job } from "./crm";
 import { systemDetails } from "./deal";
 import { workspaceCatalogue, type Workspace } from "./pricing";
 import { panelCatalogue } from "./catalogue";
-import { costSystem, designFinance, editedLines, lineKey, repriced, stcValue, type CostGroup, type DesignExtras } from "./quote";
+import {
+  costSystem,
+  designFinance,
+  editedLines,
+  lineKey,
+  repriced,
+  solarVicFor,
+  solarVicNote,
+  stcValue,
+  type CostGroup,
+  type DesignExtras,
+  type SolarVic,
+} from "./quote";
 import { designPanels, designSummary, monthlyProduction, type DesignSet } from "./roof-design";
 import { YIELD_PER_KW_DAY, batteryKwhOf, systemSpecOf } from "./system";
 
@@ -95,6 +107,12 @@ export interface ProposalView {
     /** The federal rebate (STCs) taken off the price. An estimate until the system is installed. */
     stc: number;
     youPay: number;
+    /**
+     * The Solar Victoria rebate (and interest-free loan), when the business put them on the quote: what the customer
+     * pays if Solar Victoria approves them, with the words that must go beside it. `youPay` stays the price without
+     * them, which is what stands if they are not approved.
+     */
+    solarVic: (SolarVic & { note: string }) | null;
     /** What the price covers, in plain words. Never an amount. */
     includes: string[];
   };
@@ -251,6 +269,7 @@ export function buildProposal(input: ProposalInputs): Built {
   const postcode = /^\d{4}$/.test(form.postcode) ? form.postcode : null;
   const stc = stcValue(costing, postcode, input.today, input.rates, workspace.settings.stcPrice);
   const youPay = totals.priceIncGst - stc;
+  const solarVic = solarVicFor(form, spec.panels, totals.priceIncGst, stc, input.rates);
 
   const problems: string[] = [];
   if (spec.panels === 0 && !spec.battery) problems.push(NOTHING_DRAWN);
@@ -331,6 +350,7 @@ export function buildProposal(input: ProposalInputs): Built {
       incGst: totals.priceIncGst,
       stc,
       youPay,
+      solarVic: solarVic ? { ...solarVic, note: solarVicNote(solarVic) } : null,
       includes: [...Object.entries(INCLUDED).flatMap(([group, words]) => (groups.has(group as CostGroup) ? [words] : [])), "GST"],
     },
     paybackYears: saving > 0 ? Math.round((youPay / saving) * 10) / 10 : null,

@@ -264,6 +264,24 @@ function ProposalDocument({
         <Text style={[s.small, { marginTop: 8 }]}>
           Covers: {view.price.includes.join(", ")}. {STC_NOTE} The price stands until {day(view.validUntil)}.
         </Text>
+        {view.price.solarVic ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ fontFamily: "Helvetica-Bold", marginBottom: 4 }}>With Solar Victoria, if you are eligible and approved</Text>
+            <Row label="Solar Victoria rebate" value={`- ${dollars(view.price.solarVic.rebate)}`} />
+            <Row label="You would pay" value={dollars(view.price.solarVic.afterRebate)} />
+            {view.price.solarVic.loan > 0 ? (
+              <>
+                <Row label="Solar Victoria interest-free loan" value={`- ${dollars(view.price.solarVic.loan)}`} />
+                <Row label="To pay up front" value={dollars(view.price.solarVic.upfront)} />
+                <Row
+                  label={`Then, for ${view.price.solarVic.loanMonths} months, with no interest`}
+                  value={`$${view.price.solarVic.monthly.toFixed(2)} a month`}
+                />
+              </>
+            ) : null}
+            <Text style={[s.small, { marginTop: 6 }]}>{view.price.solarVic.note}</Text>
+          </View>
+        ) : null}
         {b.extra ? <Text style={{ marginTop: 14 }}>{b.extra}</Text> : null}
 
         {(b.about || b.points.length > 0) && (
