@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { faceShade, facesFromModel, type DrawnFace } from "@/lib/domain/design/drawing";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import {
@@ -10,7 +11,6 @@ import {
   Copy,
   Eraser,
   Hand,
-  Layers,
   Maximize,
   MessageCircle,
   MousePointer2,
@@ -26,6 +26,7 @@ import {
   WandSparkles,
   Sparkles,
   FileText,
+  Layers,
   LayoutGrid,
   Send,
   Trash2,
@@ -410,6 +411,46 @@ export function RoofDesigner(props: {
   const [view, setView] = useState(WHOLE);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
   const [picks, setPicks] = useState<Pick[]>([]);
+  // Drawing mode: the photo put away and the roof drawn plainly in its place. Kept on the device.
+  const [drawn, setDrawn] = useState(false);
+  // The roof's faces from Google's roof model, for the drawing: null until asked for, "none" when there is no data.
+  const [modelFaces, setModelFaces] = useState<DrawnFace[] | "none" | null>(null);
+  useEffect(() => {
+    try {
+      // What was chosen last time is only known once the page is in the browser.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (window.localStorage.getItem("renuabl.design.drawn") === "1") setDrawn(true);
+    } catch {
+      // The photo, then.
+    }
+  }, []);
+  useEffect(() => {
+    // The first time the drawing is asked for on a roof, Google's roof model is fetched once (the server keeps it).
+    if (!drawn || modelFaces !== null) return;
+    let gone = false;
+    void fetch(`/api/roof?lat=${spot.lat}&lng=${spot.lng}`)
+      .then((res) => res.json() as Promise<{ ok?: boolean; model?: RoofModel | null }>)
+      .then((json) => {
+        if (gone) return;
+        const found = json.ok && json.model?.slots?.length ? facesFromModel(json.model, spot) : [];
+        setModelFaces(found.length ? found : "none");
+      })
+      .catch(() => !gone && setModelFaces("none"));
+    return () => {
+      gone = true;
+    };
+    // The roof is the same for the life of this designer: its place never changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawn, modelFaces]);
+  const toggleDrawn = () => {
+    const next = !drawn;
+    setDrawn(next);
+    try {
+      window.localStorage.setItem("renuabl.design.drawn", next ? "1" : "0");
+    } catch {
+      // It still holds for this visit.
+    }
+  };
   // The arrays on the design, listed (and each marked with its size on the picture) while this is open.
   const [arraysOpen, setArraysOpen] = useState(false);
   // The pointer is over a panel while adding panels: the arrow takes over there, so the panel can be picked and moved.
@@ -2239,7 +2280,36 @@ export function RoofDesigner(props: {
                   role="img"
                   aria-label={`The roof at ${props.address} from above, with ${summary.panels} panels placed`}
                 >
-                  {props.image && <image href={props.image} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} />}
+                  {props.image && !drawn && <image href={props.image} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} />}
+                  {/* Drawing mode: plain ground, and the roof's faces drawn on it, each a grey of its own by the way it
+                      faces. Google's faces (where there is roof data) go underneath; the faces traced here, which are
+                      exact, go over them. */}
+                  {drawn && (
+                    <g pointerEvents="none">
+                      <rect width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} fill="#4c6b45" />
+                      {Array.isArray(modelFaces) &&
+                        modelFaces.map((face, i) => (
+                          <polygon
+                            key={i}
+                            points={path(face.points)}
+                            fill={faceShade(face.azimuth, face.pitch)}
+                            stroke="#565b62"
+                            strokeWidth={0.8 * u}
+                            strokeLinejoin="round"
+                          />
+                        ))}
+                      {faces.map((face) => (
+                        <polygon
+                          key={face.id}
+                          points={path(face.points)}
+                          fill={faceShade(faceFacing(face), face.tilt ?? TILT.roof)}
+                          stroke="#565b62"
+                          strokeWidth={0.8 * u}
+                          strokeLinejoin="round"
+                        />
+                      ))}
+                    </g>
+                  )}
                   {faces.map((f) => {
                     const on = f.id === selected;
                     const off = new Set(f.off);
@@ -3742,6 +3812,11 @@ export function RoofDesigner(props: {
                   <Hand className="size-8" aria-hidden />
                 </button>
               </div>
+              {drawn && faces.length === 0 && modelFaces !== null && !Array.isArray(modelFaces) && (
+                <p className="absolute left-1/2 top-[7.5rem] z-10 w-[22rem] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-lg border border-line bg-surface/95 px-3 py-2 text-center text-[13px] text-ink-2 shadow-lift">
+                  There&apos;s no roof data for this address to draw from. Trace the roof faces (top right) and they are drawn here.
+                </p>
+              )}
               {/* The dock, centred on the foot of the picture, clear of the map's own mark and credit at the very bottom. The
                   comment bubble is its centre: a round larger than the rest, standing proud of the plate, with undo and
                   redo to its left and the whole picture and the label to its right, two a side so it sits dead centre. */}
@@ -3804,6 +3879,18 @@ export function RoofDesigner(props: {
                       </button>
                     );
                   })()}
+                  <button
+                    onClick={toggleDrawn}
+                    title={drawn ? "Show the photo of the roof" : "Show the roof as a drawing"}
+                    aria-label="Show the roof as a drawing"
+                    aria-pressed={drawn}
+                    className={clsx(
+                      "flex size-10 items-center justify-center rounded-xl",
+                      drawn ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <Layers className="size-5" aria-hidden />
+                  </button>
                 </div>
                 <span className="flex-1" aria-hidden />
                 {/* Suggest a layout, in the corner: one button, which asks how many panels before it lays them. */}
