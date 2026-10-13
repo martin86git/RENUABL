@@ -89,9 +89,10 @@ export function facesFromModel(model: RoofModel, centre: { lat: number; lng: num
  * different ways read as different planes, as on a hipped roof seen from
  * above. A flat face takes the middle grey.
  */
-export function faceShade(azimuth: number, pitch: number): string {
+export function faceShade(azimuth: number, pitch: number, lift = 0): string {
   const lit = pitch < 2 ? 0 : Math.cos(((azimuth - 315) * Math.PI) / 180);
-  const level = Math.round(132 + lit * 16);
+  // `lift` brightens it: the roof being designed is drawn lighter than the buildings around it, so it is never lost among them.
+  const level = Math.round(132 + lift + lit * 16);
   const hex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0");
   return `#${hex(level - 4)}${hex(level)}${hex(level + 7)}`;
 }

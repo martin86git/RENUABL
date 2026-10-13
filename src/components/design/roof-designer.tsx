@@ -97,6 +97,8 @@ import {
 } from "@/lib/domain/design/roof-design";
 
 const GOLD = "var(--sun-line)";
+/** How much lighter the roof being designed is drawn than the buildings around it, in drawing mode. */
+const OWN_ROOF_LIFT = 62;
 /** One colour a string, so they can be told apart on the roof. */
 const STRING_COLOURS = ["#86efac", "#f9a8d4", "#fdba74", "#fde047", "#7dd3fc", "#c4b5fd", "#fca5a5", "#5eead4"];
 /** Strings are lettered: A, B, C. */
@@ -2354,15 +2356,17 @@ export function RoofDesigner(props: {
                           <image href={ground} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} style={{ filter: "blur(1.2px)" }} />
                         )
                       )}
-                      {measured !== "there" &&
+                      {/* The roof being designed, always lighter than everything around it and edged in white, so it stands
+                          out: the faces traced here (exact); or, until some are traced, Google's faces for the home. */}
+                      {faces.length === 0 &&
                         Array.isArray(modelFaces) &&
                         modelFaces.map((face, i) => (
                           <polygon
                             key={i}
                             points={path(face.points)}
-                            fill={faceShade(face.azimuth, face.pitch)}
-                            stroke="#565b62"
-                            strokeWidth={0.8 * u}
+                            fill={faceShade(face.azimuth, face.pitch, OWN_ROOF_LIFT)}
+                            stroke="#ffffff"
+                            strokeWidth={1.2 * u}
                             strokeLinejoin="round"
                           />
                         ))}
@@ -2370,9 +2374,9 @@ export function RoofDesigner(props: {
                         <polygon
                           key={face.id}
                           points={path(face.points)}
-                          fill={faceShade(faceFacing(face), face.tilt ?? TILT.roof)}
-                          stroke="#565b62"
-                          strokeWidth={0.8 * u}
+                          fill={faceShade(faceFacing(face), face.tilt ?? TILT.roof, OWN_ROOF_LIFT)}
+                          stroke="#ffffff"
+                          strokeWidth={1.4 * u}
                           strokeLinejoin="round"
                         />
                       ))}
