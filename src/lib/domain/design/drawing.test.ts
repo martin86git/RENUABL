@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoofModel } from "../roof-layout";
-import { faceShade, facesFromModel, hull } from "./drawing";
+import { faceShade, facesFromModel, groundOf, hull, tidyGround, type Ground } from "./drawing";
 
 describe("the outline round points", () => {
   it("keeps the corners and drops what is inside or along an edge", () => {
@@ -72,5 +72,27 @@ describe("the grey a face is drawn in", () => {
     expect(faceShade(315, 20)).not.toBe(faceShade(135, 20));
     expect(faceShade(0, 0)).toBe(faceShade(180, 0));
     expect(faceShade(90, 22)).toMatch(/^#[0-9a-f]{6}$/);
+  });
+});
+
+describe("the ground read from the photo", () => {
+  it("tells lawn, trees, paving and the built from their colours", () => {
+    expect(groundOf(110, 140, 90)).toBe("lawn");
+    expect(groundOf(50, 70, 45)).toBe("tree");
+    expect(groundOf(25, 28, 30)).toBe("tree");
+    expect(groundOf(170, 168, 165)).toBe("paved");
+    expect(groundOf(150, 95, 80)).toBe("built");
+  });
+
+  it("is tidied into plain shapes: a stray cell takes its neighbours' kind", () => {
+    const w = 7;
+    const cells = new Array<Ground>(w * w).fill("lawn");
+    cells[3 * w + 3] = "paved";
+    expect(tidyGround(cells, w, w).every((c) => c === "lawn")).toBe(true);
+    // A real block of paving survives.
+    const half = cells.map((_, i) => (i % w < 4 ? "paved" : "lawn")) as Ground[];
+    const tidied = tidyGround(half, w, w);
+    expect(tidied[3 * w]).toBe("paved");
+    expect(tidied[3 * w + 6]).toBe("lawn");
   });
 });

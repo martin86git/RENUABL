@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { faceShade, facesFromModel, type DrawnFace } from "@/lib/domain/design/drawing";
+import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import {
@@ -442,6 +442,48 @@ export function RoofDesigner(props: {
     // The roof is the same for the life of this designer: its place never changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawn, modelFaces]);
+  // The ground around the roof for the drawing (lawn, trees, paving), painted from the photo's own colours: a small
+  // picture made in the browser from the photo already loaded, so it costs nothing and is there at once.
+  const [ground, setGround] = useState<string | null>(null);
+  const photo = props.image;
+  useEffect(() => {
+    if (!drawn || !photo) return;
+    let gone = false;
+    const img = new window.Image();
+    img.onload = () => {
+      if (gone) return;
+      try {
+        // A third of the picture's size is plenty: the result is plain shapes, and it is tidied in a blink.
+        const w = Math.round(ROOF_IMAGE.width / 3);
+        const h = Math.round(ROOF_IMAGE.height / 3);
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h);
+        const cells = new Array<Ground>(w * h);
+        for (let i = 0; i < w * h; i++) cells[i] = groundOf(data.data[i * 4], data.data[i * 4 + 1], data.data[i * 4 + 2]);
+        const tidy = tidyGround(cells, w, h);
+        for (let i = 0; i < w * h; i++) {
+          const [r, g, b] = GROUND_COLOURS[tidy[i]];
+          data.data[i * 4] = r;
+          data.data[i * 4 + 1] = g;
+          data.data[i * 4 + 2] = b;
+          data.data[i * 4 + 3] = 255;
+        }
+        ctx.putImageData(data, 0, 0);
+        setGround(canvas.toDataURL("image/png"));
+      } catch {
+        // The photo can't be read here: the drawing keeps its plain ground.
+      }
+    };
+    img.src = photo;
+    return () => {
+      gone = true;
+    };
+  }, [drawn, photo]);
   const toggleDrawn = () => {
     const next = !drawn;
     setDrawn(next);
@@ -2287,6 +2329,11 @@ export function RoofDesigner(props: {
                   {drawn && (
                     <g pointerEvents="none">
                       <rect width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} fill="#4c6b45" />
+                      {/* The ground as read from the photo: lawn, the darker green of trees, and paving (drives, paths, the
+                          road), softened so it reads as plain shapes. */}
+                      {ground && (
+                        <image href={ground} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} style={{ filter: "blur(1.2px)" }} />
+                      )}
                       {Array.isArray(modelFaces) &&
                         modelFaces.map((face, i) => (
                           <polygon

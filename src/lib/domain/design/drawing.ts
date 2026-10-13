@@ -95,3 +95,64 @@ export function faceShade(azimuth: number, pitch: number): string {
   const hex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, "0");
   return `#${hex(level - 4)}${hex(level)}${hex(level + 7)}`;
 }
+
+// ---------------------------------------------------------------------------
+// The ground around the roof: lawn, trees and paving, read from the photo's colours
+// ---------------------------------------------------------------------------
+
+/** What a patch of ground is drawn as. */
+export type Ground = "lawn" | "tree" | "paved" | "built";
+
+/** The flat colour each is drawn in. */
+export const GROUND_COLOURS: Record<Ground, [number, number, number]> = {
+  lawn: [76, 107, 69],
+  tree: [52, 80, 49],
+  paved: [169, 167, 161],
+  built: [112, 117, 124],
+};
+
+/**
+ * What one pixel of the photo from above most likely is, by its colour
+ * alone: green is growing (dark green a tree's canopy, lighter green lawn),
+ * pale and colourless is paving (a drive, a path, the road), and the rest is
+ * taken to be built (roofs, sheds, cars). A reading of colour, not a survey:
+ * a shadow reads as whatever is darkest near it, and a grey roof next door
+ * reads as paving.
+ */
+export function groundOf(r: number, g: number, b: number): Ground {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const green = g >= r * 1.04 && g >= b * 1.04;
+  if (green) return max < 92 ? "tree" : "lawn";
+  // Deep shade with no colour of its own: under and beside trees far more often than not.
+  if (max < 58) return "tree";
+  if (max - min < 30 && max > 118) return "paved";
+  return "built";
+}
+
+const KINDS: Ground[] = ["lawn", "tree", "paved", "built"];
+
+/**
+ * A grid of ground, tidied: each cell takes what most of the cells around
+ * it are, so the picture is a few plain shapes rather than speckle. Done
+ * `passes` times over a square `reach` cells out each way.
+ */
+export function tidyGround(cells: Ground[], width: number, height: number, reach = 3, passes = 3): Ground[] {
+  let now = cells;
+  for (let pass = 0; pass < passes; pass++) {
+    const next = new Array<Ground>(now.length);
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const count = [0, 0, 0, 0];
+        for (let dy = -reach; dy <= reach; dy++)
+          for (let dx = -reach; dx <= reach; dx++) {
+            const yy = Math.min(height - 1, Math.max(0, y + dy));
+            const xx = Math.min(width - 1, Math.max(0, x + dx));
+            count[KINDS.indexOf(now[yy * width + xx])] += 1;
+          }
+        next[y * width + x] = KINDS[count.indexOf(Math.max(...count))];
+      }
+    now = next;
+  }
+  return now;
+}
