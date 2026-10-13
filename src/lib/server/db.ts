@@ -91,12 +91,14 @@ create table if not exists roof_cache (
   data jsonb,
   fetched_at timestamptz not null default now()
 );
--- The ground around a roof as a drawing (server/ground-map.ts): one Google lookup a place, then kept. A null png is a place with no data.
+-- The ground around a roof from Google's data layers (server/ground-map.ts): the drawing, the heights and the aerial photo, from one lookup a place, then kept. Nulls are a place with no data.
 create table if not exists ground_cache (
   key text primary key,
   png bytea,
   fetched_at timestamptz not null default now()
 );
+alter table ground_cache add column if not exists terrain bytea;
+alter table ground_cache add column if not exists aerial bytea;
 create table if not exists price_uploads (
   id text primary key,
   supplier text not null,

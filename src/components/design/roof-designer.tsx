@@ -1,6 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
+import { groundPictures, loadTerrain } from "@/lib/services/terrain";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
@@ -25,8 +28,10 @@ import {
   TriangleAlert,
   WandSparkles,
   Sparkles,
+  Box,
   FileText,
   Layers,
+  SunMedium,
   LayoutGrid,
   Send,
   Trash2,
@@ -97,6 +102,8 @@ import {
 } from "@/lib/domain/design/roof-design";
 
 const GOLD = "var(--sun-line)";
+/** The 3D view brings a large drawing library with it: it is fetched only when the view is opened. */
+const Roof3d = dynamic(() => import("./roof-3d").then((m) => m.Roof3d), { ssr: false });
 /** How much lighter the roof being designed is drawn than the buildings around it, in drawing mode. */
 const OWN_ROOF_LIFT = 62;
 /** One colour a string, so they can be told apart on the roof. */
@@ -510,6 +517,26 @@ export function RoofDesigner(props: {
     } catch {
       // It still holds for this visit.
     }
+  };
+  // The heights of everything around the roof (Google's): asked for the first time the shade or the 3D view is wanted.
+  const [terrain, setTerrain] = useState<Terrain | "none" | null>(null);
+  const [shadeOn, setShadeOn] = useState(false);
+  const [view3d, setView3d] = useState(false);
+  // The shade on the design as it stands: each panel's access to the sun by its key, and the design's as a whole.
+  const [shade, setShade] = useState<{ report: ShadeReport; keys: string[] } | null>(null);
+  useEffect(() => {
+    if ((!shadeOn && !view3d) || terrain !== null) return;
+    let gone = false;
+    void loadTerrain(spot.lat, spot.lng).then((found) => !gone && setTerrain(found ?? "none"));
+    return () => {
+      gone = true;
+    };
+    // The roof's place never changes for the life of this designer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shadeOn, view3d, terrain]);
+  const toggleShade = () => {
+    setShadeOn(!shadeOn);
+    setArraysOpen(false);
   };
   // The arrays on the design, listed (and each marked with its size on the picture) while this is open.
   const [arraysOpen, setArraysOpen] = useState(false);
@@ -1715,6 +1742,45 @@ export function RoofDesigner(props: {
     "inline-flex min-h-10 items-center rounded-md border border-line bg-surface px-4 text-sm font-medium hover:border-forest disabled:bg-surface-2 disabled:text-muted disabled:hover:border-line";
   const label = "text-[10px] font-medium uppercase tracking-[0.18em] text-muted";
   const stringOf = (key: string) => strings.findIndex((s) => s.panels.includes(key));
+  /** Every panel on the design as it stands on the roof: where, its tilt and the way it faces. For the shade analysis and the 3D view. */
+  const standingPanels =
+    shadeOn || view3d
+      ? [
+          ...loose.map((panel) => ({
+            key: keyOf({ kind: "loose", id: panel.id }),
+            x: panel.x,
+            y: panel.y,
+            tilt: panel.tilt ?? TILT.roof,
+            facing: panelFacing(panel),
+            corners: looseCorners(panel, size),
+          })),
+          ...faces.flatMap((face) =>
+            panelPlaces(face, size)
+              .filter((place) => !face.off.includes(place.index))
+              .map((place) => ({
+                key: keyOf({ kind: "grid", face: face.id, index: place.index }),
+                ...middle(place.corners),
+                tilt: face.tilt ?? TILT.roof,
+                facing: faceFacing(face),
+                corners: place.corners,
+              })),
+          ),
+        ]
+      : [];
+  // The shade is worked out again a moment after the panels stop changing, not on every movement of a drag.
+  const shadeKey =
+    shadeOn && terrain && terrain !== "none" ? standingPanels.map((p) => `${p.key}:${p.x},${p.y},${p.tilt},${p.facing}`).join("|") : null;
+  useEffect(() => {
+    if (shadeKey === null || !terrain || terrain === "none") return;
+    const timer = window.setTimeout(
+      () => setShade({ report: shadeReport(terrain, standingPanels, spot.lat), keys: standingPanels.map((p) => p.key) }),
+      150,
+    );
+    return () => window.clearTimeout(timer);
+    // `shadeKey` stands for the panels: it changes exactly when any of them does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shadeKey, terrain]);
+  const shadeNow = shadeOn && shadeKey !== null ? shade : null;
   /**
    * The design's arrays, largest first, for the list that the arrays button opens: groups of panels that touch, or as
    * good as (`ARRAY_GAP`, the same rule the quote counts arrays by), each with the way most of its panels face, their
@@ -2840,6 +2906,28 @@ export function RoofDesigner(props: {
                         {aspect(ghost, panelFacing(ghost), ghost.tilt ?? TILT.roof, "#ffffff")}
                       </g>
                     ))}
+                  {/* Shade analysis: each panel tinted by how open it is to the sun over a year, with the figure on it. */}
+                  {shadeNow &&
+                    standingPanels.map((p) => {
+                      const at = shadeNow.keys.indexOf(p.key);
+                      const access = at < 0 ? null : shadeNow.report.panels[at]?.access;
+                      if (access === null || access === undefined) return null;
+                      const [cx, cy] = px(p);
+                      return (
+                        <g key={p.key} pointerEvents="none">
+                          <polygon
+                            points={path(p.corners)}
+                            fill={accessColour(access)}
+                            fillOpacity="0.62"
+                            stroke={accessColour(access)}
+                            strokeWidth={0.8 * u}
+                          />
+                          <text x={cx} y={cy + 2.4 * u} fontSize={6.5 * u} fontWeight="700" fill="#0b0c0e" textAnchor="middle">
+                            {Math.round(access * 100)}
+                          </text>
+                        </g>
+                      );
+                    })}
                   {/* The arrays list is open: each array carries its number and its size. */}
                   {arrayList.map((a, i) => {
                     const [x, y] = px(a.at);
@@ -3732,7 +3820,10 @@ export function RoofDesigner(props: {
                 </button>
                 {/* The arrays: a round under the eraser that lists them, and writes each one's size on the picture. */}
                 <button
-                  onClick={() => setArraysOpen(!arraysOpen)}
+                  onClick={() => {
+                    setArraysOpen(!arraysOpen);
+                    setShadeOn(false);
+                  }}
                   title="Arrays: what each one is"
                   aria-label="Arrays"
                   aria-expanded={arraysOpen}
@@ -3744,6 +3835,109 @@ export function RoofDesigner(props: {
                   <LayoutGrid className="size-6" aria-hidden />
                 </button>
               </div>
+              {shadeOn && (
+                <div
+                  className="absolute right-3 top-[9.25rem] z-20 max-h-[calc(100%-14rem)] w-[19rem] max-w-[calc(100%-1.5rem)] overflow-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
+                  role="region"
+                  aria-label="Shade analysis"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Shade analysis · estimate</p>
+                    <button
+                      className="text-muted hover:text-ink"
+                      onClick={() => setShadeOn(false)}
+                      aria-label="Put the shade analysis away"
+                    >
+                      <X className="size-4" aria-hidden />
+                    </button>
+                  </div>
+                  {terrain === null ? (
+                    <p className="mt-3 text-sm text-ink-2">Measuring what stands around the roof…</p>
+                  ) : terrain === "none" ? (
+                    <p className="mt-3 text-sm text-ink-2">
+                      There&apos;s no height data for this address, so shade can&apos;t be worked out here. Check it on site.
+                    </p>
+                  ) : summary.panels === 0 ? (
+                    <p className="mt-3 text-sm text-ink-2">Put panels on the roof and each is checked for shade through the year.</p>
+                  ) : !shadeNow ? (
+                    <p className="mt-3 text-sm text-ink-2">Working it out…</p>
+                  ) : (
+                    <>
+                      <p className="mt-2 flex items-baseline gap-2">
+                        <span className="text-[2rem] font-semibold leading-none tabular-nums text-ink">
+                          {Math.round(shadeNow.report.access * 100)}%
+                        </span>
+                        <span className="text-sm text-ink-2">of the year&apos;s direct sun reaches the panels</span>
+                      </p>
+                      <p className="mt-2 text-[13px] leading-snug text-ink-2">
+                        {shadeNow.report.shaded === 0
+                          ? "No panel loses more than a tenth of its direct sun to shade."
+                          : `${shadeNow.report.shaded} of ${shadeNow.report.panels.length} panels lose more than a tenth. The least open gets ${Math.round(shadeNow.report.worst * 100)}%.`}
+                      </p>
+                      <div className="mt-3 flex h-14 items-end gap-1" role="img" aria-label="Sun reaching the panels, month by month">
+                        {shadeNow.report.byMonth.map((share, m) => (
+                          <div key={m} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${Math.round(share * 100)}%`}>
+                            <div className="flex h-10 w-full items-end rounded-sm bg-surface-2">
+                              <div
+                                className="w-full rounded-sm"
+                                style={{ height: `${Math.round(share * 100)}%`, background: accessColour(share) }}
+                              />
+                            </div>
+                            <span className="text-[9px] uppercase text-muted">{"JFMAMJJASOND"[m]}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-2">
+                        {(
+                          [
+                            [1, "Open"],
+                            [0.8, "Some shade"],
+                            [0.5, "Mostly shaded"],
+                          ] as const
+                        ).map(([level, name]) => (
+                          <span key={name} className="inline-flex items-center gap-1.5">
+                            <span className="size-2.5 rounded-sm" style={{ background: accessColour(level) }} /> {name}
+                          </span>
+                        ))}
+                      </p>
+                    </>
+                  )}
+                  <p className="mt-3 border-t border-line pt-2 text-[11px] leading-snug text-muted">
+                    Worked out from Google&apos;s height data for this address: where the sun is each half hour through the year, and what
+                    stands in its way. That data can be older than the roof and the trees. It is a guide for design, not a shade assessment
+                    on site, and the quote&apos;s output figures don&apos;t take it off.
+                  </p>
+                </div>
+              )}
+              {view3d &&
+                (terrain && terrain !== "none" ? (
+                  <Roof3d
+                    terrain={terrain}
+                    latitude={spot.lat}
+                    panels={standingPanels.map((p) => ({
+                      x: p.x,
+                      y: p.y,
+                      tilt: p.tilt,
+                      facing: p.facing,
+                      long: size.long,
+                      short: size.short,
+                    }))}
+                    drawing={groundPictures(spot.lat, spot.lng).drawing}
+                    aerial={groundPictures(spot.lat, spot.lng).aerial}
+                    onClose={() => setView3d(false)}
+                  />
+                ) : (
+                  <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 rounded-lg bg-surface/95 p-6 text-center">
+                    <p className="max-w-sm text-sm text-ink-2">
+                      {terrain === null
+                        ? "Building the model of this roof and what stands around it…"
+                        : "There's no height data for this address, so it can't be shown in 3D."}
+                    </p>
+                    <button className="text-sm font-medium text-ink underline underline-offset-4" onClick={() => setView3d(false)}>
+                      Back to the design
+                    </button>
+                  </div>
+                ))}
               {arraysOpen && (
                 <div
                   className="absolute left-[5.25rem] top-[8.5rem] z-20 max-h-[calc(100%-13rem)] w-[28rem] max-w-[calc(100%-6.5rem)] overflow-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
@@ -3891,29 +4085,58 @@ export function RoofDesigner(props: {
               )}
               {/* The dock, centred on the foot of the picture, clear of the map's own mark and credit at the very bottom. The
                   comment bubble is its centre: a round larger than the rest, standing proud of the plate, with undo and
-                  redo to its left and the whole picture and the label to its right, two a side so it sits dead centre. */}
+                  redo, the whole picture and the label to its left, and the three ways of looking to its right (the roof
+                  as a drawing, the shade analysis, and the roof in 3D). */}
               <div className="pointer-events-none absolute inset-x-2 bottom-7 z-10 flex items-end gap-2">
                 <div
                   className={clsx(GLASS, "pointer-events-auto absolute bottom-0 left-1/2 flex -translate-x-1/2 items-center gap-1 p-1.5")}
                   role="toolbar"
                   aria-label="Design tools"
                 >
-                  <button
-                    onClick={undo}
-                    title="Undo (Ctrl+Z)"
-                    aria-label="Undo (Ctrl+Z)"
-                    className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
-                  >
-                    <Undo2 className="size-5" aria-hidden />
-                  </button>
-                  <button
-                    onClick={redo}
-                    title="Redo (Ctrl+Shift+Z)"
-                    aria-label="Redo (Ctrl+Shift+Z)"
-                    className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
-                  >
-                    <Redo2 className="size-5" aria-hidden />
-                  </button>
+                  {/* Either side of the comment round the same width, so it sits dead centre whatever stands beside it. */}
+                  <div className="flex w-[10.75rem] items-center justify-end gap-1">
+                    <button
+                      onClick={undo}
+                      title="Undo (Ctrl+Z)"
+                      aria-label="Undo (Ctrl+Z)"
+                      className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                    >
+                      <Undo2 className="size-5" aria-hidden />
+                    </button>
+                    <button
+                      onClick={redo}
+                      title="Redo (Ctrl+Shift+Z)"
+                      aria-label="Redo (Ctrl+Shift+Z)"
+                      className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                    >
+                      <Redo2 className="size-5" aria-hidden />
+                    </button>
+                    <button
+                      onClick={() => setView(WHOLE)}
+                      title="Show the whole picture"
+                      aria-label="Show the whole picture"
+                      className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                    >
+                      <Maximize className="size-5" aria-hidden />
+                    </button>
+                    {(() => {
+                      const { icon: Icon, name } = TOOLS.find((x) => x.tool === "label")!;
+                      return (
+                        <button
+                          onClick={() => pickTool("label")}
+                          title={name}
+                          aria-label={name}
+                          aria-pressed={tool === "label"}
+                          className={clsx(
+                            "flex size-10 items-center justify-center rounded-xl",
+                            tool === "label" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                          )}
+                        >
+                          <Icon className="size-5" aria-hidden />
+                        </button>
+                      );
+                    })()}
+                  </div>
                   <button
                     onClick={() => pickTool("comment")}
                     title="Comment"
@@ -3926,43 +4149,40 @@ export function RoofDesigner(props: {
                   >
                     <MessageCircle className="size-7" aria-hidden />
                   </button>
-                  <button
-                    onClick={() => setView(WHOLE)}
-                    title="Show the whole picture"
-                    aria-label="Show the whole picture"
-                    className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
-                  >
-                    <Maximize className="size-5" aria-hidden />
-                  </button>
-                  {(() => {
-                    const { icon: Icon, name } = TOOLS.find((x) => x.tool === "label")!;
-                    return (
-                      <button
-                        onClick={() => pickTool("label")}
-                        title={name}
-                        aria-label={name}
-                        aria-pressed={tool === "label"}
-                        className={clsx(
-                          "flex size-10 items-center justify-center rounded-xl",
-                          tool === "label" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
-                        )}
-                      >
-                        <Icon className="size-5" aria-hidden />
-                      </button>
-                    );
-                  })()}
-                  <button
-                    onClick={toggleDrawn}
-                    title={drawn ? "Show the photo of the roof" : "Show the roof as a drawing"}
-                    aria-label="Show the roof as a drawing"
-                    aria-pressed={drawn}
-                    className={clsx(
-                      "flex size-10 items-center justify-center rounded-xl",
-                      drawn ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
-                    )}
-                  >
-                    <Layers className="size-5" aria-hidden />
-                  </button>
+                  <div className="flex w-[10.75rem] items-center justify-start gap-1">
+                    <button
+                      onClick={toggleDrawn}
+                      title={drawn ? "Show the photo of the roof" : "Show the roof as a drawing"}
+                      aria-label="Show the roof as a drawing"
+                      aria-pressed={drawn}
+                      className={clsx(
+                        "flex size-10 items-center justify-center rounded-xl",
+                        drawn ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                      )}
+                    >
+                      <Layers className="size-5" aria-hidden />
+                    </button>
+                    <button
+                      onClick={toggleShade}
+                      title={shadeOn ? "Put the shade analysis away" : "Shade analysis: how open each panel is to the sun"}
+                      aria-label="Shade analysis"
+                      aria-pressed={shadeOn}
+                      className={clsx(
+                        "flex size-10 items-center justify-center rounded-xl",
+                        shadeOn ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                      )}
+                    >
+                      <SunMedium className="size-5" aria-hidden />
+                    </button>
+                    <button
+                      onClick={() => setView3d(true)}
+                      title="See the roof in 3D, with the sun and its shadows"
+                      aria-label="See the roof in 3D"
+                      className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
+                    >
+                      <Box className="size-5" aria-hidden />
+                    </button>
+                  </div>
                 </div>
                 <span className="flex-1" aria-hidden />
                 {/* Suggest a layout, in the corner: one button, which asks how many panels before it lays them. */}

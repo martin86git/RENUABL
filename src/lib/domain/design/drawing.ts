@@ -183,7 +183,7 @@ export function groundAt(r: number, g: number, b: number, heightM: number, build
   }
   if (green) return "lawn";
   // Paving is pale and has no colour of its own; anything duller or browner on the ground is bare earth, mulch or dry grass.
-  if (max - min < 20 && max > 78) return "paved";
+  if (max - min < 22 && max > 60) return "paved";
   return "earth";
 }
 
