@@ -101,7 +101,7 @@ export function faceShade(azimuth: number, pitch: number): string {
 // ---------------------------------------------------------------------------
 
 /** What a patch of ground is drawn as. */
-export type Ground = "lawn" | "tree" | "paved" | "built";
+export type Ground = "lawn" | "tree" | "paved" | "built" | "earth";
 
 /** The flat colour each is drawn in. */
 export const GROUND_COLOURS: Record<Ground, [number, number, number]> = {
@@ -109,6 +109,7 @@ export const GROUND_COLOURS: Record<Ground, [number, number, number]> = {
   tree: [52, 80, 49],
   paved: [169, 167, 161],
   built: [112, 117, 124],
+  earth: [90, 112, 76],
 };
 
 /**
@@ -130,7 +131,7 @@ export function groundOf(r: number, g: number, b: number): Ground {
   return "built";
 }
 
-const KINDS: Ground[] = ["lawn", "tree", "paved", "built"];
+const KINDS: Ground[] = ["lawn", "tree", "paved", "built", "earth"];
 
 /**
  * A grid of ground, tidied: each cell takes what most of the cells around
@@ -143,7 +144,7 @@ export function tidyGround(cells: Ground[], width: number, height: number, reach
     const next = new Array<Ground>(now.length);
     for (let y = 0; y < height; y++)
       for (let x = 0; x < width; x++) {
-        const count = [0, 0, 0, 0];
+        const count = KINDS.map(() => 0);
         for (let dy = -reach; dy <= reach; dy++)
           for (let dx = -reach; dx <= reach; dx++) {
             const yy = Math.min(height - 1, Math.max(0, y + dy));
@@ -155,4 +156,86 @@ export function tidyGround(cells: Ground[], width: number, height: number, reach
     now = next;
   }
   return now;
+}
+
+// ---------------------------------------------------------------------------
+// The ground from Google's own measurements: heights, the building outline and the photo together
+// ---------------------------------------------------------------------------
+
+/** Anything standing this far above the ground around it is a tree or a building, not a lawn, a drive or a car. */
+export const TALL_METRES = 2.2;
+
+/**
+ * What a spot is, from its colour, how far it stands above the ground around
+ * it, and whether Google's building outline covers it. Height is what colour
+ * alone can't tell: a grey roof is built and a grey drive is paving; a tree
+ * stands tall and a lawn lies flat.
+ */
+export function groundAt(r: number, g: number, b: number, heightM: number, building: boolean): Ground {
+  if (building) return "built";
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const green = g >= r * 1.03 && g >= b * 1.03;
+  if (heightM >= TALL_METRES) {
+    // Tall and not in the building outline: a tree, unless it is plainly pale and colourless (a carport, a shed, an awning).
+    return !green && max - min < 26 && max > 125 ? "built" : "tree";
+  }
+  if (green) return "lawn";
+  // Paving is pale and has no colour of its own; anything duller or browner on the ground is bare earth, mulch or dry grass.
+  if (max - min < 20 && max > 78) return "paved";
+  return "earth";
+}
+
+/**
+ * The level of the ground itself under a grid of surface heights (which run
+ * over roofs and treetops): the lowest height in each coarse cell, then
+ * "opened" (the lowest within `reach` cells, then the highest of those), so
+ * anything narrower than the reach either way (a house, a tree) is taken off
+ * and a slope is kept. Heights that aren't numbers (no data) are skipped.
+ * Returns a grid `cols` × `rows` of ground levels.
+ */
+export function groundLevel(
+  heights: ArrayLike<number>,
+  width: number,
+  height: number,
+  cell: number,
+  reach: number,
+): { level: Float32Array; cols: number; rows: number } {
+  const cols = Math.ceil(width / cell);
+  const rows = Math.ceil(height / cell);
+  const low = new Float32Array(cols * rows).fill(Infinity);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const v = heights[y * width + x];
+      if (!Number.isFinite(v) || v < -1000) continue;
+      const i = Math.floor(y / cell) * cols + Math.floor(x / cell);
+      if (v < low[i]) low[i] = v;
+    }
+  /** The lowest (or highest) within `reach` cells along rows, then along columns. */
+  const sweep = (from: Float32Array, pick: (a: number, b: number) => number, start: number) => {
+    const across = new Float32Array(from.length);
+    for (let y = 0; y < rows; y++)
+      for (let x = 0; x < cols; x++) {
+        let best = start;
+        for (let d = -reach; d <= reach; d++) {
+          const v = from[y * cols + Math.min(cols - 1, Math.max(0, x + d))];
+          if (Number.isFinite(v)) best = pick(best, v);
+        }
+        across[y * cols + x] = best;
+      }
+    const out = new Float32Array(from.length);
+    for (let y = 0; y < rows; y++)
+      for (let x = 0; x < cols; x++) {
+        let best = start;
+        for (let d = -reach; d <= reach; d++) {
+          const v = across[Math.min(rows - 1, Math.max(0, y + d)) * cols + x];
+          if (Number.isFinite(v)) best = pick(best, v);
+        }
+        out[y * cols + x] = best;
+      }
+    return out;
+  };
+  const eroded = sweep(low, Math.min, Infinity);
+  const level = sweep(eroded, Math.max, -Infinity);
+  return { level, cols, rows };
 }

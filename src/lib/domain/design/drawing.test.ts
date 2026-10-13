@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoofModel } from "../roof-layout";
-import { faceShade, facesFromModel, groundOf, hull, tidyGround, type Ground } from "./drawing";
+import { faceShade, facesFromModel, groundAt, groundLevel, groundOf, hull, tidyGround, type Ground } from "./drawing";
 
 describe("the outline round points", () => {
   it("keeps the corners and drops what is inside or along an edge", () => {
@@ -94,5 +94,37 @@ describe("the ground read from the photo", () => {
     const tidied = tidyGround(half, w, w);
     expect(tidied[3 * w]).toBe("paved");
     expect(tidied[3 * w + 6]).toBe("lawn");
+  });
+});
+
+describe("the ground from heights, the building outline and colour", () => {
+  it("lets height tell what colour can't", () => {
+    // The same grey: a roof inside the outline, a drive on the ground.
+    expect(groundAt(160, 158, 155, 4, true)).toBe("built");
+    expect(groundAt(160, 158, 155, 0.1, false)).toBe("paved");
+    // The same green: a canopy standing tall, a lawn lying flat.
+    expect(groundAt(70, 100, 60, 6, false)).toBe("tree");
+    expect(groundAt(70, 100, 60, 0.2, false)).toBe("lawn");
+    // Tall, pale and colourless outside the outline: a carport or shed. Tall and dark: a tree in shade.
+    expect(groundAt(190, 188, 186, 3, false)).toBe("built");
+    expect(groundAt(40, 42, 44, 5, false)).toBe("tree");
+    expect(groundAt(150, 110, 80, 0.1, false)).toBe("earth");
+  });
+
+  it("finds the ground under a house on a slope", () => {
+    // 40 × 40 at 1 m: ground rising 1 m in 10 to the east, with a house 8 m square and 5 m tall in the middle, and a gap of no data.
+    const w = 40;
+    const heights = new Float32Array(w * w);
+    for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) heights[y * w + x] = x / 10 + (x >= 16 && x < 24 && y >= 16 && y < 24 ? 5 : 0);
+    heights[5] = -9999;
+    const { level, cols } = groundLevel(heights, w, w, 2, 6);
+    const at = (x: number, y: number) => level[Math.floor(y / 2) * cols + Math.floor(x / 2)];
+    // Under the house the level is the slope's, not the roof's.
+    expect(at(20, 20)).toBeGreaterThan(1.2);
+    expect(at(20, 20)).toBeLessThan(2.6);
+    expect(heights[20 * w + 20] - at(20, 20)).toBeGreaterThan(4);
+    // Open ground stands close to its own level.
+    expect(Math.abs(heights[30 * w + 34] - at(34, 30))).toBeLessThan(1.5);
+    expect(Number.isFinite(at(5, 0))).toBe(true);
   });
 });

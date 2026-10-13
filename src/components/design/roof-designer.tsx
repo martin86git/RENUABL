@@ -484,6 +484,22 @@ export function RoofDesigner(props: {
       gone = true;
     };
   }, [drawn, photo]);
+  // The better ground, from Google's heights, building outline and photo together (the server makes it once for a
+  // roof and keeps it): buildings, trees, lawn and paving told apart properly. Until it arrives, or where there is
+  // no data for the place, the ground read from the photo's colours stands in.
+  const measuredUrl = `/api/design/roof/ground?lat=${spot.lat}&lng=${spot.lng}`;
+  const [measured, setMeasured] = useState<"asking" | "there" | "none">("asking");
+  useEffect(() => {
+    if (!drawn || measured !== "asking") return;
+    let gone = false;
+    const img = new window.Image();
+    img.onload = () => !gone && setMeasured("there");
+    img.onerror = () => !gone && setMeasured("none");
+    img.src = measuredUrl;
+    return () => {
+      gone = true;
+    };
+  }, [drawn, measured, measuredUrl]);
   const toggleDrawn = () => {
     const next = !drawn;
     setDrawn(next);
@@ -2331,10 +2347,15 @@ export function RoofDesigner(props: {
                       <rect width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} fill="#4c6b45" />
                       {/* The ground as read from the photo: lawn, the darker green of trees, and paving (drives, paths, the
                           road), softened so it reads as plain shapes. */}
-                      {ground && (
-                        <image href={ground} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} style={{ filter: "blur(1.2px)" }} />
+                      {measured === "there" ? (
+                        <image href={measuredUrl} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} />
+                      ) : (
+                        ground && (
+                          <image href={ground} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} style={{ filter: "blur(1.2px)" }} />
+                        )
                       )}
-                      {Array.isArray(modelFaces) &&
+                      {measured !== "there" &&
+                        Array.isArray(modelFaces) &&
                         modelFaces.map((face, i) => (
                           <polygon
                             key={i}
