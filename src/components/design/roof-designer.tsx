@@ -1,10 +1,8 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
-import { groundPictures, loadScene, loadTerrain } from "@/lib/services/terrain";
-import { eaveFor, type Scene } from "@/lib/domain/design/scene";
+import { loadTerrain } from "@/lib/services/terrain";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
@@ -29,7 +27,6 @@ import {
   TriangleAlert,
   WandSparkles,
   Sparkles,
-  Box,
   FileText,
   Layers,
   SunMedium,
@@ -103,8 +100,7 @@ import {
 } from "@/lib/domain/design/roof-design";
 
 const GOLD = "var(--sun-line)";
-/** The 3D view brings a large drawing library with it: it is fetched only when the view is opened. */
-const Roof3d = dynamic(() => import("./roof-3d").then((m) => m.Roof3d), { ssr: false });
+
 /** How much lighter the roof being designed is drawn than the buildings around it, in drawing mode. */
 const OWN_ROOF_LIFT = 62;
 /** One colour a string, so they can be told apart on the roof. */
@@ -421,8 +417,6 @@ export function RoofDesigner(props: {
   const [view, setView] = useState(WHOLE);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
   const [picks, setPicks] = useState<Pick[]>([]);
-  // The roof in 3D, shown over the picture while it is open.
-  const [view3d, setView3d] = useState(false);
   // Drawing mode: the photo put away and the roof drawn plainly in its place. Kept on the device.
   const [drawn, setDrawn] = useState(false);
   // The roof's faces from Google's roof model, for the drawing: null until asked for, "none" when there is no data.
@@ -437,8 +431,8 @@ export function RoofDesigner(props: {
     }
   }, []);
   useEffect(() => {
-    // The first time the drawing (or the 3D view) is asked for on a roof, Google's roof model is fetched once (the server keeps it).
-    if ((!drawn && !view3d) || modelFaces !== null) return;
+    // The first time the drawing is asked for on a roof, Google's roof model is fetched once (the server keeps it).
+    if (!drawn || modelFaces !== null) return;
     let gone = false;
     void fetch(`/api/roof?lat=${spot.lat}&lng=${spot.lng}`)
       .then((res) => res.json() as Promise<{ ok?: boolean; model?: RoofModel | null }>)
@@ -453,7 +447,7 @@ export function RoofDesigner(props: {
     };
     // The roof is the same for the life of this designer: its place never changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawn, view3d, modelFaces]);
+  }, [drawn, modelFaces]);
   // The ground around the roof for the drawing (lawn, trees, paving), painted from the photo's own colours: a small
   // picture made in the browser from the photo already loaded, so it costs nothing and is there at once.
   const [ground, setGround] = useState<string | null>(null);
@@ -521,25 +515,13 @@ export function RoofDesigner(props: {
       // It still holds for this visit.
     }
   };
-  // The heights of everything around the roof (Google's): asked for the first time the shade or the 3D view is wanted.
+  // The heights of everything around the roof (Google's): asked for the first time the shade analysis is wanted.
   const [terrain, setTerrain] = useState<Terrain | "none" | null>(null);
   const [shadeOn, setShadeOn] = useState(false);
-  // The buildings and trees around the roof as clean shapes, for the 3D view: asked for the first time it is opened.
-  const [scene3d, setScene3d] = useState<Scene | "none" | null>(null);
-  useEffect(() => {
-    if (!view3d || scene3d !== null) return;
-    let gone = false;
-    void loadScene(spot.lat, spot.lng).then((found) => !gone && setScene3d(found ?? "none"));
-    return () => {
-      gone = true;
-    };
-    // The roof's place never changes for the life of this designer.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view3d, scene3d]);
   // The shade on the design as it stands: each panel's access to the sun by its key, and the design's as a whole.
   const [shade, setShade] = useState<{ report: ShadeReport; keys: string[] } | null>(null);
   useEffect(() => {
-    if ((!shadeOn && !view3d) || terrain !== null) return;
+    if (!shadeOn || terrain !== null) return;
     let gone = false;
     void loadTerrain(spot.lat, spot.lng).then((found) => !gone && setTerrain(found ?? "none"));
     return () => {
@@ -547,7 +529,7 @@ export function RoofDesigner(props: {
     };
     // The roof's place never changes for the life of this designer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shadeOn, view3d, terrain]);
+  }, [shadeOn, terrain]);
   const toggleShade = () => {
     setShadeOn(!shadeOn);
     setArraysOpen(false);
@@ -1756,31 +1738,30 @@ export function RoofDesigner(props: {
     "inline-flex min-h-10 items-center rounded-md border border-line bg-surface px-4 text-sm font-medium hover:border-forest disabled:bg-surface-2 disabled:text-muted disabled:hover:border-line";
   const label = "text-[10px] font-medium uppercase tracking-[0.18em] text-muted";
   const stringOf = (key: string) => strings.findIndex((s) => s.panels.includes(key));
-  /** Every panel on the design as it stands on the roof: where, its tilt and the way it faces. For the shade analysis and the 3D view. */
-  const standingPanels =
-    shadeOn || view3d
-      ? [
-          ...loose.map((panel) => ({
-            key: keyOf({ kind: "loose", id: panel.id }),
-            x: panel.x,
-            y: panel.y,
-            tilt: panel.tilt ?? TILT.roof,
-            facing: panelFacing(panel),
-            corners: looseCorners(panel, size),
-          })),
-          ...faces.flatMap((face) =>
-            panelPlaces(face, size)
-              .filter((place) => !face.off.includes(place.index))
-              .map((place) => ({
-                key: keyOf({ kind: "grid", face: face.id, index: place.index }),
-                ...middle(place.corners),
-                tilt: face.tilt ?? TILT.roof,
-                facing: faceFacing(face),
-                corners: place.corners,
-              })),
-          ),
-        ]
-      : [];
+  /** Every panel on the design as it stands on the roof: where, its tilt and the way it faces. For the shade analysis. */
+  const standingPanels = shadeOn
+    ? [
+        ...loose.map((panel) => ({
+          key: keyOf({ kind: "loose", id: panel.id }),
+          x: panel.x,
+          y: panel.y,
+          tilt: panel.tilt ?? TILT.roof,
+          facing: panelFacing(panel),
+          corners: looseCorners(panel, size),
+        })),
+        ...faces.flatMap((face) =>
+          panelPlaces(face, size)
+            .filter((place) => !face.off.includes(place.index))
+            .map((place) => ({
+              key: keyOf({ kind: "grid", face: face.id, index: place.index }),
+              ...middle(place.corners),
+              tilt: face.tilt ?? TILT.roof,
+              facing: faceFacing(face),
+              corners: place.corners,
+            })),
+        ),
+      ]
+    : [];
   // The shade is worked out again a moment after the panels stop changing, not on every movement of a drag.
   const shadeKey =
     shadeOn && terrain && terrain !== "none" ? standingPanels.map((p) => `${p.key}:${p.x},${p.y},${p.tilt},${p.facing}`).join("|") : null;
@@ -3923,47 +3904,6 @@ export function RoofDesigner(props: {
                   </p>
                 </div>
               )}
-              {view3d &&
-                (scene3d && scene3d !== "none" && (faces.length || Array.isArray(modelFaces)) ? (
-                  <Roof3d
-                    scene={scene3d}
-                    faces={
-                      faces.length
-                        ? faces.map((f) => ({ points: f.points, facing: faceFacing(f), tilt: f.tilt ?? TILT.roof }))
-                        : Array.isArray(modelFaces)
-                          ? modelFaces.map((f) => ({ points: f.points, facing: f.azimuth, tilt: f.pitch }))
-                          : []
-                    }
-                    eave={eaveFor(quoteNow.form.storeys)}
-                    photo={props.image}
-                    widthM={ROOF_IMAGE.width * scale}
-                    heightM={ROOF_IMAGE.height * scale}
-                    latitude={spot.lat}
-                    panels={standingPanels.map((p) => ({
-                      x: p.x,
-                      y: p.y,
-                      tilt: p.tilt,
-                      facing: p.facing,
-                      long: size.long,
-                      short: size.short,
-                    }))}
-                    drawing={groundPictures(spot.lat, spot.lng).drawing}
-                    onClose={() => setView3d(false)}
-                  />
-                ) : (
-                  <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 rounded-lg bg-surface/95 p-6 text-center">
-                    <p className="max-w-sm text-sm text-ink-2">
-                      {scene3d === "none"
-                        ? "There's no height data for this address, so it can't be shown in 3D."
-                        : scene3d && !faces.length && modelFaces === "none"
-                          ? "Trace the roof faces (top right) and the home is built from them in 3D."
-                          : "Building the model of this roof and what stands around it…"}
-                    </p>
-                    <button className="text-sm font-medium text-ink underline underline-offset-4" onClick={() => setView3d(false)}>
-                      Back to the design
-                    </button>
-                  </div>
-                ))}
               {arraysOpen && (
                 <div
                   className="absolute left-[5.25rem] top-[8.5rem] z-20 max-h-[calc(100%-13rem)] w-[28rem] max-w-[calc(100%-6.5rem)] overflow-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
@@ -4111,8 +4051,8 @@ export function RoofDesigner(props: {
               )}
               {/* The dock, centred on the foot of the picture, clear of the map's own mark and credit at the very bottom. The
                   comment bubble is its centre: a round larger than the rest, standing proud of the plate, with undo and
-                  redo, the whole picture and the label to its left, and the three ways of looking to its right (the roof
-                  as a drawing, the shade analysis, and the roof in 3D). */}
+                  redo, the whole picture and the label to its left, and the two ways of looking to its right (the roof
+                  as a drawing, and the shade analysis). */}
               <div className="pointer-events-none absolute inset-x-2 bottom-7 z-10 flex items-end gap-2">
                 <div
                   className={clsx(GLASS, "pointer-events-auto absolute bottom-0 left-1/2 flex -translate-x-1/2 items-center gap-1 p-1.5")}
@@ -4199,14 +4139,6 @@ export function RoofDesigner(props: {
                       )}
                     >
                       <SunMedium className="size-5" aria-hidden />
-                    </button>
-                    <button
-                      onClick={() => setView3d(true)}
-                      title="See the roof in 3D, with the sun and its shadows"
-                      aria-label="See the roof in 3D"
-                      className="flex size-10 items-center justify-center rounded-xl text-ink hover:bg-canvas"
-                    >
-                      <Box className="size-5" aria-hidden />
                     </button>
                   </div>
                 </div>
