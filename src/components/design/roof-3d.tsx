@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, X } from "lucide-react";
 import clsx from "clsx";
-import { MONTH_MID_DAYS, heightAt, sunPosition, type Terrain } from "@/lib/domain/design/shade";
+import { faceUnder, roofHeightAt, type Scene, type SceneFace } from "@/lib/domain/design/scene";
+import { MONTH_MID_DAYS, sunPosition } from "@/lib/domain/design/shade";
 
 /** A panel as the 3D view stands it on the roof: where (the designer's metres), its size, its tilt and the way it faces. */
 export interface Panel3d {
@@ -27,33 +28,64 @@ const clock = (hour: number) => {
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
 };
 
+/** The model's colours: a calm architectural palette, the panels the only dark glass in it. */
+const COLOUR = {
+  lawn: "#8fae78",
+  wall: "#f3f0ea",
+  roof: "#8a9099",
+  ownRoof: "#a3a9b1",
+  neighbourWall: "#e7e3dc",
+  neighbourRoof: "#b5b9bf",
+  trunk: "#6e5643",
+  crowns: ["#5f8a4c", "#55804a", "#6b9354", "#4e7744", "#62874f"],
+  table: "#2f3338",
+  edge: "#20242a",
+};
+
+/** Whether a point is inside a building's turned rectangle, grown by a margin. */
+const inRect = (b: Scene["buildings"][number], p: { x: number; y: number }, margin = 0.5) => {
+  const t = (b.angle * Math.PI) / 180;
+  const dx = p.x - b.cx;
+  const dy = p.y - b.cy;
+  const u = dx * Math.cos(t) + dy * Math.sin(t);
+  const v = -dx * Math.sin(t) + dy * Math.cos(t);
+  return Math.abs(u) <= b.long / 2 + margin && Math.abs(v) <= b.wide / 2 + margin;
+};
+
 /**
- * The roof and everything around it in three dimensions, to show a design
- * off: the ground, the buildings and the trees as Google's height data has
- * them, with the design's panels standing on the roof, lit by the sun where
- * it really is at the time and season chosen, so the shadows fall where they
- * would. It can be turned and tilted by dragging, zoomed, and the day played
- * through. A way of looking, not of editing: closing it goes back to the
- * design. The model is Google's, and can be older than the roof; it says so.
+ * The roof and its street as a clean model, to show a design off: the home
+ * built from its own roof faces (each a plane rising from the walls at its
+ * pitch, the walls at the height of its storeys), the buildings next door as
+ * walls under hipped roofs, and the trees as trunks under round crowns, all
+ * where Google's measurements put them and as tall. The design's panels
+ * stand on the home's roof at its pitch. The sun is where it really is at the
+ * hour and season chosen, and casts real shadows. It turns and zooms and the
+ * day can be played through; it is a way of looking, never of editing.
  */
 export function Roof3d(props: {
-  terrain: Terrain;
+  scene: Scene;
+  /** The home's roof faces: the ones traced, or Google's until some are. */
+  faces: SceneFace[];
+  /** How high the home's walls stand, metres. */
+  eave: number;
   latitude: number;
   panels: Panel3d[];
-  /** The plain drawing of the ground, and Google's own aerial photo: the model wears one or the other. */
+  /** The ground's two looks: the plain drawing of it, and the satellite photo. Both cover the designer's picture. */
   drawing: string;
-  aerial: string;
+  photo: string;
+  /** The designer's picture on the ground, metres. */
+  widthM: number;
+  heightM: number;
   onClose: () => void;
 }) {
   const holder = useRef<HTMLDivElement>(null);
   const [hour, setHour] = useState(10);
   const [season, setSeason] = useState(0);
   const [playing, setPlaying] = useState(true);
-  const [skin, setSkin] = useState<"drawing" | "aerial">("drawing");
+  const [skin, setSkin] = useState<"drawing" | "photo">("drawing");
   const [failed, setFailed] = useState(false);
-  // What the scene needs told when a control changes: set once it is built.
-  const api = useRef<{ sun: (hour: number, day: number) => void; skin: (which: "drawing" | "aerial") => void } | null>(null);
-  const { terrain, latitude, panels, drawing, aerial } = props;
+  const api = useRef<{ sun: (hour: number, day: number) => void; skin: (which: "drawing" | "photo") => void } | null>(null);
+  const { scene, faces, eave, latitude, panels, drawing, photo, widthM, heightM } = props;
 
   useEffect(() => {
     const el = holder.current;
@@ -65,159 +97,263 @@ export function Roof3d(props: {
         const THREE = await import("three");
         const { OrbitControls } = await import("three/examples/jsm/controls/OrbitControls.js");
         if (gone) return;
+        const disposables: { dispose: () => void }[] = [];
+        const keep = <T extends { dispose: () => void }>(thing: T) => {
+          disposables.push(thing);
+          return thing;
+        };
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
         renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.2;
+        renderer.toneMappingExposure = 1.15;
         renderer.outputColorSpace = THREE.SRGBColorSpace;
-        el.appendChild(renderer.domElement);
         renderer.domElement.style.display = "block";
+        el.appendChild(renderer.domElement);
+        const scene3 = new THREE.Scene();
+        scene3.fog = new THREE.Fog("#e7eef5", 150, 340);
 
-        const scene = new THREE.Scene();
-        // The sky is the page's own (a soft gradient behind the picture): the scene itself has no backdrop.
-        scene.fog = new THREE.Fog("#dfeaf4", 170, 380);
-
-        // --- the ground, the buildings and the trees: one surface from the grid of heights
-        const { cols, rows, cell, widthM, heightM } = terrain;
-        // The heights as measured are rough (a treetop is a scatter of spikes): each takes the middle of the nine round it,
-        // which drops the spikes and keeps a roof's edge, and is then eased a little so slopes read as slopes.
-        const tidy = (from: Float32Array, pick: (nine: number[]) => number) => {
-          const out = new Float32Array(from.length);
-          const nine = new Array<number>(9);
-          for (let r = 0; r < rows; r++)
-            for (let c = 0; c < cols; c++) {
-              let n = 0;
-              for (let dr = -1; dr <= 1; dr++)
-                for (let dc = -1; dc <= 1; dc++)
-                  nine[n++] = from[Math.min(rows - 1, Math.max(0, r + dr)) * cols + Math.min(cols - 1, Math.max(0, c + dc))];
-              out[r * cols + c] = pick(nine);
-            }
-          return out;
+        // Three's axes: x east, y up, z south (the designer's y). A point on the ground at height h:
+        const v3 = (x: number, y: number, h: number) => new THREE.Vector3(x, h, y);
+        const solid = (colour: string, rough = 0.85) =>
+          keep(new THREE.MeshStandardMaterial({ color: colour, roughness: rough, metalness: 0 }));
+        const edges = keep(new THREE.LineBasicMaterial({ color: COLOUR.edge, transparent: true, opacity: 0.22 }));
+        const outline = (geometry: ConstructorParameters<typeof THREE.EdgesGeometry>[0], at?: InstanceType<typeof THREE.Object3D>) => {
+          const lines = new THREE.LineSegments(keep(new THREE.EdgesGeometry(geometry, 20)), edges);
+          if (at) {
+            lines.position.copy(at.position);
+            lines.rotation.copy(at.rotation);
+          }
+          scene3.add(lines);
         };
-        const middle = (nine: number[]) => [...nine].sort((a, b) => a - b)[4];
-        const eased = (nine: number[]) => (nine[4] * 4 + nine[1] + nine[3] + nine[5] + nine[7]) / 8;
-        const heights = tidy(tidy(terrain.heights, middle), eased);
-        const shown = { ...terrain, heights };
-        const geometry = new THREE.BufferGeometry();
-        const position = new Float32Array(cols * rows * 3);
-        const uv = new Float32Array(cols * rows * 2);
-        for (let r = 0; r < rows; r++)
-          for (let c = 0; c < cols; c++) {
-            const i = r * cols + c;
-            position[i * 3] = (c + 0.5) * cell - widthM / 2;
-            position[i * 3 + 1] = heights[i];
-            position[i * 3 + 2] = (r + 0.5) * cell - heightM / 2;
-            uv[i * 2] = (c + 0.5) / cols;
-            uv[i * 2 + 1] = 1 - (r + 0.5) / rows;
-          }
-        const index = new Uint32Array((cols - 1) * (rows - 1) * 6);
-        let k = 0;
-        for (let r = 0; r < rows - 1; r++)
-          for (let c = 0; c < cols - 1; c++) {
-            const a = r * cols + c;
-            index.set([a, a + cols, a + 1, a + 1, a + cols, a + cols + 1], k);
-            k += 6;
-          }
-        geometry.setAttribute("position", new THREE.BufferAttribute(position, 3));
-        geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
-        geometry.setIndex(new THREE.BufferAttribute(index, 1));
-        geometry.computeVertexNormals();
 
+        // --- the ground: the designer's picture laid flat, on a block like a model on a table
         const loader = new THREE.TextureLoader();
         const wear = (url: string) => {
-          const texture = loader.load(url);
+          const texture = keep(loader.load(url));
           texture.colorSpace = THREE.SRGBColorSpace;
           texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
           return texture;
         };
-        const skins = { drawing: wear(drawing), aerial: wear(aerial) };
-        const ground = new THREE.MeshStandardMaterial({ map: skins.drawing, roughness: 0.96, metalness: 0 });
-        const land = new THREE.Mesh(geometry, ground);
-        land.castShadow = true;
-        land.receiveShadow = true;
-        scene.add(land);
+        const looks = { drawing: wear(drawing), photo: wear(photo) };
+        const groundMaterial = keep(new THREE.MeshStandardMaterial({ map: looks.drawing, roughness: 1 }));
+        const ground = new THREE.Mesh(keep(new THREE.PlaneGeometry(widthM, heightM)), groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene3.add(ground);
+        const table = new THREE.Mesh(keep(new THREE.BoxGeometry(widthM + 0.02, 2.4, heightM + 0.02)), solid(COLOUR.table, 1));
+        table.position.y = -1.21;
+        table.receiveShadow = true;
+        scene3.add(table);
 
-        // The block it stands on: sides down to a base, so it reads as a model on a table rather than a sheet.
-        let low = Infinity;
-        for (const h of heights) if (h < low) low = h;
-        const base = new THREE.Mesh(
-          new THREE.BoxGeometry(widthM - cell, 3, heightM - cell),
-          new THREE.MeshStandardMaterial({ color: "#3b3f45", roughness: 1 }),
-        );
-        base.position.set(0, low - 1.52, 0);
-        base.receiveShadow = true;
-        scene.add(base);
+        // --- the buildings next door: walls under a hipped roof, turned to fit their outline
+        const own = faces.flatMap((f) => f.points);
+        const ownMiddle = own.length
+          ? { x: own.reduce((n, p) => n + p.x, 0) / own.length, y: own.reduce((n, p) => n + p.y, 0) / own.length }
+          : { x: 0, y: 0 };
+        const wallMaterial = solid(COLOUR.neighbourWall, 0.9);
+        const neighbourRoof = solid(COLOUR.neighbourRoof, 0.75);
+        for (const b of scene.buildings) {
+          // The home is drawn from its own faces: Google's outline of it (which can be of an older house) is left out.
+          if (own.length && (own.some((p) => inRect(b, p, 0.3)) || inRect(b, ownMiddle, 1))) continue;
+          const turn = (-b.angle * Math.PI) / 180;
+          const walls = new THREE.Mesh(keep(new THREE.BoxGeometry(b.long, b.eave, b.wide)), wallMaterial);
+          walls.position.set(b.cx, b.eave / 2, b.cy);
+          walls.rotation.y = turn;
+          walls.castShadow = walls.receiveShadow = true;
+          scene3.add(walls);
+          outline(walls.geometry, walls);
+          // The hip: the ridge runs along the length, a half-width in from each end, at the ridge's height.
+          const over = 0.35;
+          const L = b.long / 2 + over;
+          const W = b.wide / 2 + over;
+          const rise = Math.max(0.6, Math.min(b.ridge - b.eave, b.wide * 0.45));
+          const r = Math.max(0, L - W);
+          const roof = new THREE.BufferGeometry();
+          const corners = [
+            [-L, 0, -W],
+            [L, 0, -W],
+            [L, 0, W],
+            [-L, 0, W],
+            [-r, rise, 0],
+            [r, rise, 0],
+          ].flat();
+          roof.setAttribute("position", new THREE.Float32BufferAttribute(corners, 3));
+          roof.setIndex([0, 4, 1, 1, 4, 5, 1, 5, 2, 2, 5, 3, 3, 5, 4, 3, 4, 0]);
+          roof.computeVertexNormals();
+          const hip = new THREE.Mesh(keep(roof), neighbourRoof);
+          hip.position.set(b.cx, b.eave, b.cy);
+          hip.rotation.y = turn;
+          hip.castShadow = hip.receiveShadow = true;
+          scene3.add(hip);
+          outline(roof, hip);
+        }
 
-        // --- the design's panels, standing on the roof
-        if (panels.length) {
-          const glass = new THREE.MeshPhysicalMaterial({
-            color: "#0b1424",
-            roughness: 0.22,
-            metalness: 0.55,
-            clearcoat: 1,
-            clearcoatRoughness: 0.12,
-          });
-          const sized = new Map<string, Panel3d[]>();
-          for (const p of panels) sized.set(`${p.long}x${p.short}`, [...(sized.get(`${p.long}x${p.short}`) ?? []), p]);
+        // --- the trees: trunks under round crowns, each its own size and a green of its own
+        if (scene.trees.length) {
+          const crownGeometry = keep(new THREE.IcosahedronGeometry(1, 2));
+          const trunkGeometry = keep(new THREE.CylinderGeometry(0.75, 1, 1, 7));
+          const crownMaterial = keep(new THREE.MeshStandardMaterial({ roughness: 0.95, flatShading: true }));
+          const crowns = new THREE.InstancedMesh(crownGeometry, crownMaterial, scene.trees.length);
+          const trunks = new THREE.InstancedMesh(trunkGeometry, solid(COLOUR.trunk, 1), scene.trees.length);
           const place = new THREE.Object3D();
-          place.rotation.order = "YXZ";
-          for (const group of sized.values()) {
-            const { long, short } = group[0];
-            const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(short - 0.02, 0.045, long - 0.02), glass, group.length);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            group.forEach((p, i) => {
-              // The roof under it: the highest reading close by, so a panel never sinks into a rough patch of the model.
-              let top = heightAt(shown, p.x, p.y);
-              for (const [dx, dy] of [
-                [0.4, 0],
-                [-0.4, 0],
-                [0, 0.4],
-                [0, -0.4],
-              ])
-                top = Math.max(top, heightAt(shown, p.x + dx, p.y + dy));
-              place.position.set(p.x, top + 0.12, p.y);
-              // Facing north by default (its low edge to -z); tilted, then turned to the way it faces.
-              place.rotation.set((-p.tilt * Math.PI) / 180, (-p.facing * Math.PI) / 180, 0);
-              place.updateMatrix();
-              mesh.setMatrixAt(i, place.matrix);
-            });
-            mesh.instanceMatrix.needsUpdate = true;
-            scene.add(mesh);
+          const tint = new THREE.Color();
+          scene.trees.forEach((t, i) => {
+            const crownDepth = Math.min(t.height * 0.72, Math.max(t.radius * 1.6, 2));
+            const base = Math.max(0.6, t.height - crownDepth);
+            place.position.set(t.x, base + crownDepth / 2, t.y);
+            place.scale.set(t.radius, crownDepth / 2, t.radius);
+            place.rotation.set(0, (i * 1.7) % Math.PI, 0);
+            place.updateMatrix();
+            crowns.setMatrixAt(i, place.matrix);
+            crowns.setColorAt(i, tint.set(COLOUR.crowns[i % COLOUR.crowns.length]));
+            const girth = Math.min(0.45, 0.12 + t.height * 0.02);
+            place.position.set(t.x, (base + crownDepth * 0.25) / 2, t.y);
+            place.scale.set(girth, base + crownDepth * 0.25, girth);
+            place.rotation.set(0, 0, 0);
+            place.updateMatrix();
+            trunks.setMatrixAt(i, place.matrix);
+          });
+          crowns.castShadow = crowns.receiveShadow = true;
+          trunks.castShadow = true;
+          scene3.add(crowns, trunks);
+        }
+
+        // --- the home: walls round its roof, and each roof face a plane rising from the walls at its pitch
+        if (faces.length) {
+          const roofMaterial = keep(new THREE.MeshStandardMaterial({ color: COLOUR.ownRoof, roughness: 0.7, side: THREE.DoubleSide }));
+          const flatOutline = (() => {
+            // The walls follow the outline round every face's corners.
+            const pts = [...own].sort((a, b) => a.x - b.x || a.y - b.y);
+            const cross = (o: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) =>
+              (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+            const half = (list: typeof pts) => {
+              const out: typeof pts = [];
+              for (const p of list) {
+                while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], p) <= 0) out.pop();
+                out.push(p);
+              }
+              out.pop();
+              return out;
+            };
+            return [...half(pts), ...half([...pts].reverse())];
+          })();
+          // Walls: a band from the ground to the eaves along the outline.
+          const wallPositions: number[] = [];
+          for (let i = 0; i < flatOutline.length; i++) {
+            const a = flatOutline[i];
+            const b = flatOutline[(i + 1) % flatOutline.length];
+            const [a0, b0, a1, b1] = [v3(a.x, a.y, 0), v3(b.x, b.y, 0), v3(a.x, a.y, eave), v3(b.x, b.y, eave)];
+            wallPositions.push(...a0.toArray(), ...b0.toArray(), ...b1.toArray(), ...a0.toArray(), ...b1.toArray(), ...a1.toArray());
+          }
+          const wallGeometry = keep(new THREE.BufferGeometry());
+          wallGeometry.setAttribute("position", new THREE.Float32BufferAttribute(wallPositions, 3));
+          wallGeometry.computeVertexNormals();
+          const walls = new THREE.Mesh(
+            wallGeometry,
+            keep(new THREE.MeshStandardMaterial({ color: COLOUR.wall, roughness: 0.9, side: THREE.DoubleSide })),
+          );
+          walls.castShadow = walls.receiveShadow = true;
+          scene3.add(walls);
+          // Each face: its outline lifted onto its own plane, and its edges closed down to the eaves (the gables).
+          for (const face of faces) {
+            if (face.points.length < 3) continue;
+            const lift = (p: { x: number; y: number }) => roofHeightAt(face, eave, p);
+            const flat = face.points.map((p) => new THREE.Vector2(p.x, p.y));
+            const triangles = THREE.ShapeUtils.triangulateShape(flat, []);
+            const positions = face.points.flatMap((p) => v3(p.x, p.y, lift(p)).toArray());
+            const geometry = keep(new THREE.BufferGeometry());
+            geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setIndex(triangles.flat());
+            geometry.computeVertexNormals();
+            const plane = new THREE.Mesh(geometry, roofMaterial);
+            plane.castShadow = plane.receiveShadow = true;
+            scene3.add(plane);
+            outline(geometry);
+            const skirt: number[] = [];
+            for (let i = 0; i < face.points.length; i++) {
+              const a = face.points[i];
+              const b = face.points[(i + 1) % face.points.length];
+              const [ha, hb] = [lift(a), lift(b)];
+              if (ha - eave < 0.05 && hb - eave < 0.05) continue;
+              skirt.push(...v3(a.x, a.y, eave).toArray(), ...v3(b.x, b.y, eave).toArray(), ...v3(b.x, b.y, hb).toArray());
+              skirt.push(...v3(a.x, a.y, eave).toArray(), ...v3(b.x, b.y, hb).toArray(), ...v3(a.x, a.y, ha).toArray());
+            }
+            if (skirt.length) {
+              const gable = keep(new THREE.BufferGeometry());
+              gable.setAttribute("position", new THREE.Float32BufferAttribute(skirt, 3));
+              gable.computeVertexNormals();
+              const g = new THREE.Mesh(
+                gable,
+                keep(new THREE.MeshStandardMaterial({ color: COLOUR.wall, roughness: 0.9, side: THREE.DoubleSide })),
+              );
+              g.castShadow = true;
+              scene3.add(g);
+            }
           }
         }
 
-        // --- the light: the sky, and the sun where it really is
-        const sky = new THREE.HemisphereLight("#e6f0fb", "#5c6b4e", 0.95);
-        scene.add(sky);
-        const sun = new THREE.DirectionalLight("#fff4e0", 2.6);
-        sun.castShadow = true;
-        sun.shadow.mapSize.set(2048, 2048);
-        const span = Math.hypot(widthM, heightM) / 2 + 6;
-        Object.assign(sun.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 1, far: 400 });
-        sun.shadow.bias = -0.0006;
-        sun.shadow.normalBias = 0.06;
-        scene.add(sun, sun.target);
-        const centreHeight = heightAt(shown, 0, 0);
-        sun.target.position.set(0, centreHeight, 0);
+        // --- the design's panels, on the home's roof at its pitch
+        if (panels.length) {
+          const glass = keep(
+            new THREE.MeshPhysicalMaterial({ color: "#0c1626", roughness: 0.18, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.08 }),
+          );
+          const frame = keep(new THREE.MeshStandardMaterial({ color: "#c9ced6", roughness: 0.4, metalness: 0.6 }));
+          const { long, short } = panels[0];
+          const cells = new THREE.InstancedMesh(keep(new THREE.BoxGeometry(short - 0.06, 0.035, long - 0.06)), glass, panels.length);
+          const rims = new THREE.InstancedMesh(keep(new THREE.BoxGeometry(short - 0.01, 0.03, long - 0.01)), frame, panels.length);
+          const place = new THREE.Object3D();
+          place.rotation.order = "YXZ";
+          panels.forEach((p, i) => {
+            const face = faceUnder(faces, p);
+            const h = face ? roofHeightAt(face, eave, p) : eave + 0.2;
+            // On a pitched face a panel lies flush with it, as it is mounted; on a flat one (tilt frames) it keeps its own tilt.
+            const flush = face && face.tilt >= 3;
+            const tilt = flush ? face.tilt : p.tilt;
+            const facing = flush ? face.facing : p.facing;
+            // Lifted clear of the roof by its own frame, plus what its tilt raises its far edge on a flat roof.
+            const lift = 0.09 + (flush ? 0 : (Math.sin((tilt * Math.PI) / 180) * p.long) / 2);
+            place.position.set(p.x, h + lift, p.y);
+            place.rotation.set((-tilt * Math.PI) / 180, (-facing * Math.PI) / 180, 0);
+            place.updateMatrix();
+            cells.setMatrixAt(i, place.matrix);
+            place.position.y -= 0.012;
+            place.updateMatrix();
+            rims.setMatrixAt(i, place.matrix);
+          });
+          cells.castShadow = rims.castShadow = true;
+          cells.receiveShadow = true;
+          scene3.add(cells, rims);
+        }
 
-        const camera = new THREE.PerspectiveCamera(34, 1, 0.5, 600);
-        // From the north-east and above: the sunny side of a roof in the southern half of the world.
-        const north = latitude < 0 ? -1 : 1;
-        camera.position.set(46, centreHeight + 74, north * 66);
+        // --- the light: the sky, and the sun where it really is
+        scene3.add(new THREE.HemisphereLight("#eef4fb", "#7d8f6a", 1.05));
+        const sun = new THREE.DirectionalLight("#fff6e8", 2.4);
+        sun.castShadow = true;
+        sun.shadow.mapSize.set(4096, 4096);
+        const span = Math.hypot(widthM, heightM) / 2 + 4;
+        Object.assign(sun.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 1, far: 420 });
+        sun.shadow.bias = -0.0004;
+        sun.shadow.normalBias = 0.04;
+        sun.shadow.radius = 3;
+        scene3.add(sun, sun.target);
+
+        const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 700);
+        // From the sunny side and above: north-east in the southern half of the world.
+        const sunny = latitude < 0 ? -1 : 1;
+        const look = v3(ownMiddle.x, ownMiddle.y, eave);
+        camera.position.set(look.x + 34, 40, look.z + sunny * 44);
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.target.set(0, centreHeight + 1, 0);
+        controls.target.copy(look);
         controls.enableDamping = true;
         controls.dampingFactor = 0.08;
-        controls.maxPolarAngle = Math.PI * 0.47;
-        controls.minDistance = 14;
-        controls.maxDistance = 170;
+        controls.maxPolarAngle = Math.PI * 0.46;
+        controls.minDistance = 12;
+        controls.maxDistance = 150;
         controls.autoRotate = true;
-        controls.autoRotateSpeed = 0.55;
-        // Once it has been taken hold of, it stops turning by itself.
+        controls.autoRotateSpeed = 0.45;
         controls.addEventListener("start", () => (controls.autoRotate = false));
 
         const size = () => {
@@ -239,26 +375,22 @@ export function Roof3d(props: {
             const el2 = (Math.max(1, at.elevation) * Math.PI) / 180;
             const az = (at.azimuth * Math.PI) / 180;
             // East is +x, north is -z, up is +y.
-            sun.position.set(Math.sin(az) * Math.cos(el2) * 160, centreHeight + Math.sin(el2) * 160, -Math.cos(az) * Math.cos(el2) * 160);
-            // Low sun is weaker and warmer; below the horizon there is only the sky's light.
-            const strength = at.elevation <= 0 ? 0 : Math.min(1, at.elevation / 28);
-            sun.intensity = 0.6 + 2.5 * strength;
-            sun.color.set(at.elevation < 14 ? "#ffd2a1" : "#fff4e0");
+            sun.position.set(look.x + Math.sin(az) * Math.cos(el2) * 180, Math.sin(el2) * 180, look.z - Math.cos(az) * Math.cos(el2) * 180);
+            sun.target.position.copy(look);
+            const strength = at.elevation <= 0 ? 0 : Math.min(1, at.elevation / 25);
+            sun.intensity = 0.4 + 2.4 * strength;
+            sun.color.set(at.elevation < 12 ? "#ffcf9a" : "#fff6e8");
           },
           skin: (which) => {
-            ground.map = skins[which];
-            // Google's aerial photo is dark, with its own shadows in it: it is lifted so the model doesn't read as dusk.
-            ground.emissiveMap = which === "aerial" ? skins.aerial : null;
-            ground.emissive.set(which === "aerial" ? "#ffffff" : "#000000");
-            ground.emissiveIntensity = which === "aerial" ? 0.55 : 0;
-            ground.needsUpdate = true;
+            groundMaterial.map = looks[which];
+            groundMaterial.needsUpdate = true;
           },
         };
 
         let frame = 0;
         const draw = () => {
           controls.update();
-          renderer.render(scene, camera);
+          renderer.render(scene3, camera);
           frame = requestAnimationFrame(draw);
         };
         draw();
@@ -266,10 +398,7 @@ export function Roof3d(props: {
           cancelAnimationFrame(frame);
           watching.disconnect();
           controls.dispose();
-          geometry.dispose();
-          ground.dispose();
-          skins.drawing.dispose();
-          skins.aerial.dispose();
+          for (const thing of disposables) thing.dispose();
           renderer.dispose();
           renderer.domElement.remove();
           api.current = null;
@@ -283,7 +412,7 @@ export function Roof3d(props: {
       gone = true;
       stop();
     };
-  }, [terrain, latitude, panels, drawing, aerial]);
+  }, [scene, faces, eave, latitude, panels, drawing, photo, widthM, heightM]);
 
   // The controls, told to the scene as they change (and once it is built: it may arrive after the first of these).
   useEffect(() => {
@@ -306,9 +435,14 @@ export function Roof3d(props: {
   }, [playing]);
 
   const plate = "rounded-2xl border border-line bg-surface/90 shadow-lift backdrop-blur-md";
+  const pill = (on: boolean) =>
+    clsx(
+      "h-8 rounded px-2.5 text-[13px] font-medium",
+      on ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-ink-2 hover:text-ink",
+    );
   return (
     <div
-      className="absolute inset-0 z-30 overflow-hidden rounded-lg bg-[linear-gradient(180deg,#b9d3ea_0%,#dfeaf4_55%,#f3f5f7_100%)]"
+      className="absolute inset-0 z-30 overflow-hidden rounded-lg bg-[linear-gradient(180deg,#bcd5ec_0%,#e3edf6_55%,#f4f6f8_100%)]"
       role="region"
       aria-label="The roof in 3D"
     >
@@ -325,8 +459,8 @@ export function Roof3d(props: {
         <X className="size-4" aria-hidden /> Back to the design
       </button>
       <p className={clsx(plate, "absolute left-3 top-3 max-w-[19rem] px-3 py-2 text-xs leading-snug text-ink-2")}>
-        <span className="block text-[13px] font-medium text-ink">Drag to turn it. Scroll to zoom.</span>
-        The model is Google&apos;s height data for this address, and can be older than the roof. Shadows are where the sun would cast them.
+        <span className="block text-[13px] font-medium text-ink">Drag to turn it. Scroll to zoom.</span>A model of the home from its traced
+        roof, with the buildings and trees around it where Google&apos;s measurements put them. Shadows fall where the sun would cast them.
       </p>
       <div
         className={clsx(
@@ -359,35 +493,19 @@ export function Roof3d(props: {
         </label>
         <div className="flex items-center gap-1 rounded-md bg-surface-2 p-0.5" role="group" aria-label="Season">
           {SEASONS.map((s, i) => (
-            <button
-              key={s.name}
-              aria-pressed={season === i}
-              onClick={() => setSeason(i)}
-              className={clsx(
-                "h-8 rounded px-2.5 text-[13px] font-medium",
-                season === i ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-ink-2 hover:text-ink",
-              )}
-            >
+            <button key={s.name} aria-pressed={season === i} onClick={() => setSeason(i)} className={pill(season === i)}>
               {s.name}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1 rounded-md bg-surface-2 p-0.5" role="group" aria-label="What the model wears">
+        <div className="flex items-center gap-1 rounded-md bg-surface-2 p-0.5" role="group" aria-label="The ground">
           {(
             [
-              ["drawing", "Model"],
-              ["aerial", "Photo"],
+              ["drawing", "Drawn"],
+              ["photo", "Photo"],
             ] as const
           ).map(([which, name]) => (
-            <button
-              key={which}
-              aria-pressed={skin === which}
-              onClick={() => setSkin(which)}
-              className={clsx(
-                "h-8 rounded px-2.5 text-[13px] font-medium",
-                skin === which ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-ink-2 hover:text-ink",
-              )}
-            >
+            <button key={which} aria-pressed={skin === which} onClick={() => setSkin(which)} className={pill(skin === which)}>
               {name}
             </button>
           ))}

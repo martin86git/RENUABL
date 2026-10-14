@@ -10,7 +10,8 @@ export const maxDuration = 60;
  * (lawn, trees, paving and buildings; PNG). With &part=terrain, the heights
  * of everything there as a grid (bytes: `unpackTerrain`), for the shade
  * analysis and the 3D view; with &part=aerial, Google Solar's own aerial
- * photo (JPEG), for the 3D view. One lookup serves all three and is kept.
+ * photo (JPEG), for the 3D view; with &part=scene, the buildings and trees
+ * around the roof as clean shapes (JSON: `Scene`), for the 3D view. One lookup serves all three and is kept.
  * 404 when there is no data for the place.
  */
 export async function GET(request: Request) {
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
   try {
     const data = await groundData(lat, lng);
     if (!data) return new Response(null, { status: 404 });
+    if (part === "scene") return Response.json(data.scene, { headers: { "cache-control": "private, max-age=86400" } });
     const [body, type] =
       part === "terrain"
         ? [data.terrain, "application/octet-stream"]

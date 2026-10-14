@@ -3,7 +3,8 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
-import { groundPictures, loadTerrain } from "@/lib/services/terrain";
+import { groundPictures, loadScene, loadTerrain } from "@/lib/services/terrain";
+import { eaveFor, type Scene } from "@/lib/domain/design/scene";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
@@ -420,6 +421,8 @@ export function RoofDesigner(props: {
   const [view, setView] = useState(WHOLE);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
   const [picks, setPicks] = useState<Pick[]>([]);
+  // The roof in 3D, shown over the picture while it is open.
+  const [view3d, setView3d] = useState(false);
   // Drawing mode: the photo put away and the roof drawn plainly in its place. Kept on the device.
   const [drawn, setDrawn] = useState(false);
   // The roof's faces from Google's roof model, for the drawing: null until asked for, "none" when there is no data.
@@ -434,8 +437,8 @@ export function RoofDesigner(props: {
     }
   }, []);
   useEffect(() => {
-    // The first time the drawing is asked for on a roof, Google's roof model is fetched once (the server keeps it).
-    if (!drawn || modelFaces !== null) return;
+    // The first time the drawing (or the 3D view) is asked for on a roof, Google's roof model is fetched once (the server keeps it).
+    if ((!drawn && !view3d) || modelFaces !== null) return;
     let gone = false;
     void fetch(`/api/roof?lat=${spot.lat}&lng=${spot.lng}`)
       .then((res) => res.json() as Promise<{ ok?: boolean; model?: RoofModel | null }>)
@@ -450,7 +453,7 @@ export function RoofDesigner(props: {
     };
     // The roof is the same for the life of this designer: its place never changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawn, modelFaces]);
+  }, [drawn, view3d, modelFaces]);
   // The ground around the roof for the drawing (lawn, trees, paving), painted from the photo's own colours: a small
   // picture made in the browser from the photo already loaded, so it costs nothing and is there at once.
   const [ground, setGround] = useState<string | null>(null);
@@ -521,7 +524,18 @@ export function RoofDesigner(props: {
   // The heights of everything around the roof (Google's): asked for the first time the shade or the 3D view is wanted.
   const [terrain, setTerrain] = useState<Terrain | "none" | null>(null);
   const [shadeOn, setShadeOn] = useState(false);
-  const [view3d, setView3d] = useState(false);
+  // The buildings and trees around the roof as clean shapes, for the 3D view: asked for the first time it is opened.
+  const [scene3d, setScene3d] = useState<Scene | "none" | null>(null);
+  useEffect(() => {
+    if (!view3d || scene3d !== null) return;
+    let gone = false;
+    void loadScene(spot.lat, spot.lng).then((found) => !gone && setScene3d(found ?? "none"));
+    return () => {
+      gone = true;
+    };
+    // The roof's place never changes for the life of this designer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view3d, scene3d]);
   // The shade on the design as it stands: each panel's access to the sun by its key, and the design's as a whole.
   const [shade, setShade] = useState<{ report: ShadeReport; keys: string[] } | null>(null);
   useEffect(() => {
@@ -3910,9 +3924,20 @@ export function RoofDesigner(props: {
                 </div>
               )}
               {view3d &&
-                (terrain && terrain !== "none" ? (
+                (scene3d && scene3d !== "none" && (faces.length || Array.isArray(modelFaces)) ? (
                   <Roof3d
-                    terrain={terrain}
+                    scene={scene3d}
+                    faces={
+                      faces.length
+                        ? faces.map((f) => ({ points: f.points, facing: faceFacing(f), tilt: f.tilt ?? TILT.roof }))
+                        : Array.isArray(modelFaces)
+                          ? modelFaces.map((f) => ({ points: f.points, facing: f.azimuth, tilt: f.pitch }))
+                          : []
+                    }
+                    eave={eaveFor(quoteNow.form.storeys)}
+                    photo={props.image}
+                    widthM={ROOF_IMAGE.width * scale}
+                    heightM={ROOF_IMAGE.height * scale}
                     latitude={spot.lat}
                     panels={standingPanels.map((p) => ({
                       x: p.x,
@@ -3923,15 +3948,16 @@ export function RoofDesigner(props: {
                       short: size.short,
                     }))}
                     drawing={groundPictures(spot.lat, spot.lng).drawing}
-                    aerial={groundPictures(spot.lat, spot.lng).aerial}
                     onClose={() => setView3d(false)}
                   />
                 ) : (
                   <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 rounded-lg bg-surface/95 p-6 text-center">
                     <p className="max-w-sm text-sm text-ink-2">
-                      {terrain === null
-                        ? "Building the model of this roof and what stands around it…"
-                        : "There's no height data for this address, so it can't be shown in 3D."}
+                      {scene3d === "none"
+                        ? "There's no height data for this address, so it can't be shown in 3D."
+                        : scene3d && !faces.length && modelFaces === "none"
+                          ? "Trace the roof faces (top right) and the home is built from them in 3D."
+                          : "Building the model of this roof and what stands around it…"}
                     </p>
                     <button className="text-sm font-medium text-ink underline underline-offset-4" onClick={() => setView3d(false)}>
                       Back to the design

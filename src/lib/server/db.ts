@@ -99,6 +99,7 @@ create table if not exists ground_cache (
 );
 alter table ground_cache add column if not exists terrain bytea;
 alter table ground_cache add column if not exists aerial bytea;
+alter table ground_cache add column if not exists scene jsonb;
 create table if not exists price_uploads (
   id text primary key,
   supplier text not null,

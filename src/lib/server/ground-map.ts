@@ -19,6 +19,7 @@ import { fromArrayBuffer } from "geotiff";
 import sharp from "sharp";
 import { GROUND_COLOURS, groundAt, groundLevel, tidyGround, type Ground } from "@/lib/domain/design/drawing";
 import { ROOF_IMAGE, metresPerPixel } from "@/lib/domain/design/roof-design";
+import { buildingsFrom, cleanScene, treesFrom, type Scene } from "@/lib/domain/design/scene";
 import { TERRAIN_CELL, packTerrain, type Terrain } from "@/lib/domain/design/shade";
 import { cleanGeoFrame, project, type GeoFrame } from "@/lib/domain/roof-layout";
 import { dbConfigured, query } from "./db";
@@ -32,10 +33,12 @@ export interface GroundData {
   terrain: Buffer;
   /** Google Solar's aerial photo on the same picture, JPEG. */
   aerial: Buffer;
+  /** The buildings and trees around the roof as clean shapes, for the 3D view (`Scene`). */
+  scene: Scene;
 }
 
 // v7: the ground's colours are read from the designer's own (sharper, newer) satellite photo.
-const cacheKey = (lat: number, lng: number) => `ground/v7/${lat.toFixed(5)},${lng.toFixed(5)}`;
+const cacheKey = (lat: number, lng: number) => `ground/v8/${lat.toFixed(5)},${lng.toFixed(5)}`;
 const memory = new Map<string, GroundData | null>();
 /** Lookups under way, so two asks at once for one roof make one lookup. */
 const pending = new Map<string, Promise<GroundData | null>>();
@@ -195,15 +198,24 @@ async function fromGoogle(lat: number, lng: number, apiKey: string): Promise<Gro
   const cols = Math.ceil(widthM / TERRAIN_CELL);
   const rows = Math.ceil(heightM / TERRAIN_CELL);
   const heights = new Float32Array(cols * rows);
+  // For the scene: the building outline, and how far each cell stands above the ground, on the same grid.
+  const outline = new Uint8Array(cols * rows);
+  const above = new Float32Array(cols * rows);
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++) {
       const d = toDsm(((c + 0.5) * TERRAIN_CELL) / mpp, ((r + 0.5) * TERRAIN_CELL) / mpp);
       const top = surface(d);
       const ground = groundUnder(d);
+      const m = toMask(((c + 0.5) * TERRAIN_CELL) / mpp, ((r + 0.5) * TERRAIN_CELL) / mpp);
+      outline[r * cols + c] = inside(m, mask.frame) && mask.bands[0][m.y * mask.frame.width + m.x] ? 1 : 0;
+      above[r * cols + c] = Number.isFinite(top) && Number.isFinite(ground) ? Math.max(0, top - ground) : 0;
       // Where the surface has no reading, the ground's own level stands in; where neither has, the last one read.
       heights[r * cols + c] = Number.isFinite(top) ? top : Number.isFinite(ground) ? ground : c > 0 ? heights[r * cols + c - 1] : 0;
     }
   const terrain: Terrain = { cols, rows, cell: TERRAIN_CELL, widthM, heightM, heights };
+  const outlineGrid = { cols, rows, cell: TERRAIN_CELL, values: outline };
+  const aboveGrid = { cols, rows, cell: TERRAIN_CELL, values: above };
+  const scene: Scene = { buildings: buildingsFrom(outlineGrid, aboveGrid), trees: treesFrom(outlineGrid, aboveGrid) };
 
   // --- Google Solar's own aerial photo, on the same picture at twice its size
   const AW = W * 2;
@@ -222,18 +234,18 @@ async function fromGoogle(lat: number, lng: number, apiKey: string): Promise<Gro
     .jpeg({ quality: 82 })
     .toBuffer();
 
-  return { png, terrain: Buffer.from(packTerrain(terrain)), aerial };
+  return { png, terrain: Buffer.from(packTerrain(terrain)), aerial, scene };
 }
 
 async function fromDb(key: string): Promise<GroundData | null | undefined> {
   if (!dbConfigured()) return undefined;
-  const rows = await query<{ png: Buffer | null; terrain: Buffer | null; aerial: Buffer | null }>(
-    `select png, terrain, aerial from ground_cache where key = $1`,
+  const rows = await query<{ png: Buffer | null; terrain: Buffer | null; aerial: Buffer | null; scene: unknown }>(
+    `select png, terrain, aerial, scene from ground_cache where key = $1`,
     [key],
   );
   if (!rows.length) return undefined;
-  const { png, terrain, aerial } = rows[0];
-  return png && terrain && aerial ? { png, terrain, aerial } : null;
+  const { png, terrain, aerial, scene } = rows[0];
+  return png && terrain && aerial ? { png, terrain, aerial, scene: cleanScene(scene) } : null;
 }
 
 /** What Google's data layers give for the roof at this place, or null (no key, no coverage, or Google refused). */
@@ -262,9 +274,10 @@ export async function groundData(lat: number, lng: number): Promise<GroundData |
       if (memory.size > 30) memory.delete(memory.keys().next().value!);
       if (dbConfigured())
         await query(
-          `insert into ground_cache (key, png, terrain, aerial) values ($1, $2, $3, $4)
-           on conflict (key) do update set png = excluded.png, terrain = excluded.terrain, aerial = excluded.aerial, fetched_at = now()`,
-          [key, data?.png ?? null, data?.terrain ?? null, data?.aerial ?? null],
+          `insert into ground_cache (key, png, terrain, aerial, scene) values ($1, $2, $3, $4, $5)
+           on conflict (key) do update set png = excluded.png, terrain = excluded.terrain, aerial = excluded.aerial,
+             scene = excluded.scene, fetched_at = now()`,
+          [key, data?.png ?? null, data?.terrain ?? null, data?.aerial ?? null, data ? JSON.stringify(data.scene) : null],
         ).catch(() => undefined);
     }
     return data;
