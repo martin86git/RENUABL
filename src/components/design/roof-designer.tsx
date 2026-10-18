@@ -1519,7 +1519,11 @@ export function RoofDesigner(props: {
     return {
       picks: group.map((g) => g.pick),
       keys: group.map((g) => keyOf(g.pick)),
-      at: { x: box[2] + 7 * u * scale, y: box[1] - 7 * u * scale },
+      // Just off the array's own top right panel corner (Martin: off the box round a turned array, it sat well away from it).
+      at: (() => {
+        const corner = group.flatMap((g) => g.corners).reduce((best, c) => (c.x - c.y > best.x - best.y ? c : best));
+        return { x: corner.x + 4 * u * scale, y: corner.y - 4 * u * scale };
+      })(),
       box,
     };
   };
@@ -3592,6 +3596,44 @@ export function RoofDesigner(props: {
                   );
                 })()}
 
+              {/* The turn buttons, small, right by the panels picked (Martin: close to the panel just laid, not at the edge). Under
+                  them, or over them when they are low on the picture. */}
+              {tool === "select" &&
+                pickedPanels.length > 0 &&
+                (() => {
+                  const corners = pickedPanels.flatMap((p) => looseCorners(p, size));
+                  const xs = corners.map((c) => ((ROOF_IMAGE.width / 2 + c.x / scale - view.x) / view.w) * 100);
+                  const ys = corners.map((c) => ((ROOF_IMAGE.height / 2 + c.y / scale - view.y) / view.h) * 100);
+                  const middle = (Math.min(...xs) + Math.max(...xs)) / 2;
+                  const low = Math.max(...ys) > 78;
+                  return (
+                    <div
+                      className={clsx(GLASS, "absolute z-20 flex items-center gap-0.5 p-0.5")}
+                      style={{
+                        left: `clamp(0.5rem, calc(${middle}% - 7.5rem), calc(100% - 15.5rem))`,
+                        top: low ? `calc(${Math.min(...ys)}% - 2.6rem)` : `calc(${Math.max(...ys)}% + 0.6rem)`,
+                      }}
+                      role="toolbar"
+                      aria-label="Turn what is picked"
+                    >
+                      {([-5, -1, 90, 1, 5] as const).map((step) => (
+                        <button
+                          key={step}
+                          onClick={() => turn(step)}
+                          title={`Turn ${Math.abs(step)}° ${step < 0 ? "anticlockwise" : "clockwise"}`}
+                          aria-label={`Turn ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
+                          className={clsx(
+                            "flex h-7 items-center justify-center rounded-full px-2 text-[11px] font-medium tabular-nums hover:bg-surface",
+                            step === 90 ? "bg-surface text-ink" : "text-ink-2",
+                          )}
+                        >
+                          {step === 90 ? "90°" : `${step > 0 ? "+" : "−"}${Math.abs(step)}°`}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+
               {/* The string asked about, checked against the inverter input it is on. */}
               {tool === "string" &&
                 (() => {
@@ -3896,7 +3938,7 @@ export function RoofDesigner(props: {
               ) : picks.length > 0 ? (
                 <Dial
                   label="What is picked"
-                  onTurn={panelPicks.length > 0 ? turn : null}
+                  onTurn={null}
                   onClose={() => setPicks([])}
                   closeTitle="Pick none (Esc)"
                   onRemove={removePicked}
@@ -4868,9 +4910,9 @@ export function RoofDesigner(props: {
                         ))}
                       </ul>
                       <p>
-                        Each is laid by the installer&apos;s rules (rows from the gutter up, portrait unless only landscape fits, clear of
-                        every edge) {faces.length ? "on the roof faces you traced" : "from Google's roof data"}, with an inverter and
-                        strings.
+                        Each is laid by the installer&apos;s rules (rows from the gutter up, portrait and landscape mixed to fit the most,
+                        clear of every edge) {faces.length ? "on the roof faces you traced" : "from Google's roof data"}, with an inverter
+                        and strings.
                       </p>
                       {!finance && Number(bill.amount) <= 0 && (
                         <p className="text-sun-ink">

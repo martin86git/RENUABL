@@ -79,10 +79,19 @@ describe("rows from the gutter up, in a pyramid", () => {
       { x: -3, y: 3 },
     ];
     const panels = packArea(northFace(hip), 40, PANEL, id);
-    const rows = rowsOf(panels);
-    expect(rows.length).toBeGreaterThan(1);
-    rows.forEach((n, i) => i > 0 && expect(n).toBeLessThanOrEqual(rows[i - 1]));
-    expect(rows[0]).toBe(Math.max(...rows));
+    // Each row's length in metres, as drawn, gutter first (north face: the smallest y first). Portrait and landscape
+    // rows may mix, so it is the length that never grows going up, not the count.
+    const byRow = new Map<number, LoosePanel[]>();
+    for (const p of panels) byRow.set(Math.round(p.y * 10), [...(byRow.get(Math.round(p.y * 10)) ?? []), p]);
+    const lengths = [...byRow.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, row]) => {
+        const xs = row.flatMap((p) => looseCorners(p, PANEL).map((c) => c.x));
+        return Math.max(...xs) - Math.min(...xs);
+      });
+    expect(lengths.length).toBeGreaterThan(1);
+    lengths.forEach((l, i) => i > 0 && expect(l).toBeLessThanOrEqual(lengths[i - 1] + 0.01));
+    expect(lengths[0]).toBe(Math.max(...lengths));
   });
 
   it("centres each row over the one below", () => {

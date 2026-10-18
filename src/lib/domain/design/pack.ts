@@ -80,8 +80,9 @@ export interface Area {
 }
 
 /**
- * Up to `n` panels on one face: rows from the gutter up, each no longer than the one below and centred over it,
- * portrait unless only landscape fits there, every panel at least the clearance inside the face.
+ * Up to `n` panels on one face: rows from the gutter up, each no longer than the one below and centred over it, each
+ * portrait or on its side as fits the most panels on the face (portrait when it fits as many), every panel at least
+ * the clearance inside the face.
  */
 export function packArea(area: Area, n: number, size: PanelSize, newId: () => string): LoosePanel[] {
   const want = Math.max(0, Math.floor(n));
@@ -124,40 +125,73 @@ export function packArea(area: Area, n: number, size: PanelSize, newId: () => st
     return out;
   };
 
-  // First the rows the face holds, from the gutter up, each as long as it can be and no longer than the one below.
+  // First the rows the face holds, from the gutter up. Each row is tried portrait and on its side, and the mix that
+  // holds the most panels on the face is kept (Martin, 3 Bill Place: a portrait row along the gutter, then shallower
+  // landscape rows where the hip narrows towards the ridge). Ties go to fewer panels on their side (landscape takes
+  // more brackets and rail on tile), then fewer rows. Each row is no longer, in metres, than the one below it.
   type Row = { landscape: boolean; along: number; across: number; v: number; run: { a: number; b: number }; room: number };
-  const rows: Row[] = [];
-  let lowerEdge = v1;
-  let below: { room: number; lo: number; hi: number } | null = null;
-  while (lowerEdge > v0 && rows.length < 40) {
-    const tryWay = (landscape: boolean) => {
-      // Down the slope, as seen from above: shorter by the cosine of the pitch, as the designer draws it (`planSize`).
-      const along = (landscape ? size.short : size.long) * Math.cos((tilt * Math.PI) / 180);
-      const across = landscape ? size.long : size.short;
-      const v = lowerEdge - along / 2;
-      const found = runs(v, across, along);
-      const overlap = (r: { a: number; b: number }) => (below ? Math.min(r.b, below.hi) - Math.max(r.a, below.lo) : 0);
-      const run = found.reduce<(typeof found)[number] | null>((best, r) => {
-        if (!best) return r;
-        if (below) return overlap(r) > overlap(best) ? r : best;
-        return r.count > best.count ? r : best;
-      }, null);
-      return { landscape, along, across, v, run, room: run ? Math.min(run.count, below?.room ?? Infinity) : 0 };
-    };
-    const upright = tryWay(false);
-    const onSide = tryWay(true);
-    // Portrait unless it fits fewer than two here and landscape fits more.
-    const row = upright.room >= MIN_ROW || upright.room >= onSide.room ? upright : onSide;
-    if (!row.run || row.room < MIN_ROW) {
-      // Nothing yet: the gutter edge may be ragged, so look a little further up. Once rows have begun, the pyramid ends.
-      if (below) break;
-      lowerEdge -= STEP;
-      continue;
+  type Below = { width: number; lo: number; hi: number } | null;
+  const found = new Map<string, ReturnType<typeof runs>>();
+  const tryWay = (lowerEdge: number, below: Below, landscape: boolean): Row | null => {
+    // Down the slope, as seen from above: shorter by the cosine of the pitch, as the designer draws it (`planSize`).
+    const along = (landscape ? size.short : size.long) * Math.cos((tilt * Math.PI) / 180);
+    const across = landscape ? size.long : size.short;
+    const v = lowerEdge - along / 2;
+    const key = `${landscape ? 1 : 0}|${v.toFixed(3)}`;
+    if (!found.has(key)) found.set(key, runs(v, across, along));
+    const options = found.get(key)!;
+    const overlap = (r: { a: number; b: number }) => (below ? Math.min(r.b, below.hi) - Math.max(r.a, below.lo) : 0);
+    const run = options.reduce<(typeof options)[number] | null>((best, r) => {
+      if (!best) return r;
+      if (below) return overlap(r) > overlap(best) ? r : best;
+      return r.count > best.count ? r : best;
+    }, null);
+    if (!run) return null;
+    // No longer than the row below: as many of this shape as fit in its width.
+    const fitBelow = below ? Math.floor((below.width + size.gap) / (across + size.gap) + 1e-9) : Infinity;
+    const room = Math.min(run.count, fitBelow);
+    return room >= MIN_ROW ? { landscape, along, across, v, run, room } : null;
+  };
+  const score = (plan: Row[]) => {
+    let left = want;
+    let total = 0;
+    let onSide = 0;
+    for (const row of plan) {
+      const take = Math.min(row.room, left);
+      total += take;
+      if (row.landscape) onSide += take;
+      left -= take;
     }
-    rows.push({ landscape: row.landscape, along: row.along, across: row.across, v: row.v, run: row.run, room: row.room });
-    below = { room: row.room, lo: row.run.a - row.across / 2, hi: row.run.b + row.across / 2 };
-    lowerEdge = row.v - row.along / 2 - size.gap;
-  }
+    return { total, onSide, rows: plan.length };
+  };
+  const better = (a: Row[], b: Row[]) => {
+    const [x, y] = [score(a), score(b)];
+    if (x.total !== y.total) return x.total > y.total;
+    if (x.onSide !== y.onSide) return x.onSide < y.onSide;
+    return x.rows < y.rows;
+  };
+  const planned = new Map<string, Row[]>();
+  const plan = (lowerEdge: number, below: Below, depth: number): Row[] => {
+    if (lowerEdge <= v0 || depth >= 40) return [];
+    const key = `${lowerEdge.toFixed(3)}|${below ? `${below.width.toFixed(2)}|${below.lo.toFixed(2)}|${below.hi.toFixed(2)}` : "-"}`;
+    const known = planned.get(key);
+    if (known) return known;
+    let best: Row[] = [];
+    for (const landscape of [false, true]) {
+      const row = tryWay(lowerEdge, below, landscape);
+      if (!row) continue;
+      const width = row.room * (row.across + size.gap) - size.gap;
+      const middle = (row.run.a + row.run.b) / 2;
+      const next: Below = { width, lo: middle - width / 2, hi: middle + width / 2 };
+      const candidate = [row, ...plan(row.v - row.along / 2 - size.gap, next, depth + 1)];
+      if (!best.length || better(candidate, best)) best = candidate;
+    }
+    planned.set(key, best);
+    return best;
+  };
+  // The gutter edge may be ragged: look a little further up until a first row fits.
+  let rows: Row[] = [];
+  for (let lowerEdge = v1; lowerEdge > v0 && !rows.length; lowerEdge -= STEP) rows = plan(lowerEdge, null, 0);
 
   // Then the panels shared out: the gutter row first and fullest. A top row that would be a lone panel takes one
   // from the row below instead, when that row stays at least as long; otherwise the lone panel is left off.

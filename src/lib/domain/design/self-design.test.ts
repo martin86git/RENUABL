@@ -89,9 +89,10 @@ describe("the roof designing itself, for three outcomes", () => {
 
   it("fills the whole roof for the most independence, with a module more than the evenings need, held for blackouts", () => {
     const most = by("independence");
-    // Every panel the traced faces take, laid by the installer's rules.
+    // As much of what the traced faces take (laid by the installer's rules) as an inverter takes, and no fewer than the best return.
     const all = packFaces([smallNorth, smallEast], PANEL, 60, () => "x").loose.length;
-    expect(most.figures.panels).toBe(all);
+    expect(most.figures.panels).toBeLessThanOrEqual(all);
+    expect(most.figures.panels).toBeGreaterThanOrEqual(by("return").figures.panels);
     const b = most.design.battery!;
     expect(b.backup).toBe(true);
     // About 45 kWh a day, 60% after dark, over what a battery gives back: the modules that hold it, and one more.

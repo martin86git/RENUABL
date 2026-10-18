@@ -46,8 +46,23 @@ function within(model: RoofModel, p: { x: number; y: number }, offset = { x: 0, 
 }
 const allWithin = (model: RoofModel, panels: LoosePanel[], offset = { x: 0, y: 0 }) =>
   panels.every((p) => looseCorners(p, PANEL).every((c) => within(model, c, offset)));
+/** Whether any two panels overlap, as drawn from above (`planSize`), measured in the first one's own frame. */
 const overlapping = (panels: LoosePanel[]) =>
-  panels.some((a, i) => panels.some((b, j) => j > i && Math.hypot(a.x - b.x, a.y - b.y) < PANEL.short - 0.01));
+  panels.some((a, i) =>
+    panels.some((b, j) => {
+      if (j <= i) return false;
+      const t = (a.angle * Math.PI) / 180;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const lx = Math.abs(dx * Math.cos(t) + dy * Math.sin(t));
+      const ly = Math.abs(-dx * Math.sin(t) + dy * Math.cos(t));
+      const pa = planSize(a, PANEL);
+      const pb = planSize(b, PANEL);
+      const quarter = Math.round(((((b.angle - a.angle) % 180) + 180) % 180) / 90) % 2 === 1;
+      const [bw, bh] = quarter ? [pb.h, pb.w] : [pb.w, pb.h];
+      return lx < (pa.w + bw) / 2 - 0.01 && ly < (pa.h + bh) / 2 - 0.01;
+    }),
+  );
 /** The panels' rows: how many panels at each distance down the slope. */
 const rowsOf = (panels: LoosePanel[], facing: number) => {
   const t = (facing * Math.PI) / 180;
@@ -172,10 +187,14 @@ describe("a hip roof cut into many small faces (3 Bill Place)", () => {
     expect(overlapping(panels)).toBe(false);
   });
 
-  it("lays the best face in portrait rows, every panel clear of the face's edge", () => {
+  it("lays 10 on the best face alone: a portrait row along the gutter, landscape rows above as the hip narrows", () => {
+    // Martin's own layout at Bill Place: portrait where the face is wide, shallower landscape rows towards the ridge.
     const panels = lay(10);
     expect(panels).toHaveLength(10);
-    expect(panels.every((p) => !p.across)).toBe(true);
+    expect(arrays(panels)).toHaveLength(1);
+    expect(panels.filter((p) => !p.across).length).toBeGreaterThanOrEqual(5);
+    expect(panels.some((p) => p.across)).toBe(true);
+    expect(overlapping(panels)).toBe(false);
     expect(allWithin(hip, panels, offset)).toBe(true);
   });
 });

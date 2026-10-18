@@ -166,8 +166,8 @@ interface Source {
 }
 
 /**
- * The traced faces, laid by the installer's rules (`packFaces`: rows from the gutter up, portrait unless only
- * landscape fits, clear of every edge, the fewest arrays), as panels placed by hand on the faces.
+ * The traced faces, laid by the installer's rules (`packFaces`: rows from the gutter up, portrait and
+ * landscape mixed to fit the most, clear of every edge, the fewest arrays), as panels placed by hand on the faces.
  */
 function tracedSource(faces: Face[], panel: PanelSpec | undefined, newId: (prefix: string) => string): Source | null {
   const size = panelOf({ panel });

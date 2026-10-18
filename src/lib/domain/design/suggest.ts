@@ -6,7 +6,7 @@
  * each on a roof face with that face's direction and pitch). Those spots are
  * used only as the area each face offers: the panels are laid afresh by the
  * installer's rules in `pack.ts` (rows from the gutter up in a pyramid,
- * portrait unless only landscape fits, clear of every edge for wind, one face
+ * portrait and landscape mixed to fit the most, clear of every edge for wind, one face
  * per array, the fewest arrays). Google's own spots are often landscape and
  * laid at odd angles on flat roofs; copying them gave blocks stacked at angles
  * and panels hanging off the roof. Faces flatter than `FLAT_FACE` are taken
