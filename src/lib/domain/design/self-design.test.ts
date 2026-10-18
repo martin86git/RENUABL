@@ -199,3 +199,19 @@ describe("where the panels come from", () => {
     expect(result.notes[0]).toMatch(/Trace the roof faces/);
   });
 });
+
+describe("choosing inverters that can be strung", () => {
+  it("takes a slightly bigger inverter whose limits are on file over one that can't be strung", () => {
+    // A 3 kW string inverter with no limits on file, smaller than any on file.
+    const unknown = { sku: "NOFILE3", name: "Brand 3kW Single Phase String Inverter", kw: 3, phase: "single" as const, hybrid: false };
+    const result = selfDesign(
+      base({
+        inverters: [unknown, ...inverterCatalogue()],
+        bill: { interval: "quarterly", amount: 330, supplyPerDay: 1.1, rate: 0.31, feedIn: 0.05 },
+      }),
+    );
+    const fast = result.options.find((o) => o.key === "payback")!;
+    expect(fast.design.inverters?.some((i) => i.sku === "NOFILE3")).toBe(false);
+    expect(fast.design.inverters?.every((i) => inverterCatalogue().find((c) => c.sku === i.sku)?.electrical)).toBe(true);
+  });
+});

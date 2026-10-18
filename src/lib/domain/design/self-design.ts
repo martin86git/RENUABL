@@ -227,10 +227,18 @@ function inverterFor(input: SelfDesignInput, arrayKw: number, battery: boolean):
   const phase = (s: InverterSuggestion) => phaseOf(s.inverter) === input.form.phase;
   const hybrid = (s: InverterSuggestion) => /hybrid/i.test(s.kind);
   const onSupply = all.filter(phase);
-  const pick = onSupply.find((s) => hybrid(s) === battery);
-  if (pick) return pick;
   // A home without a battery can still have a hybrid, when the lists hold no other kind.
-  return battery ? null : (onSupply.find(hybrid) ?? null);
+  const pick = onSupply.find((s) => hybrid(s) === battery) ?? (battery ? null : (onSupply.find(hybrid) ?? null));
+  if (!pick || pick.inverter.electrical || pick.count > 1) return pick;
+  // Its input limits aren't on file, so the design couldn't be strung: a bigger one of the same kind that is on file,
+  // when one is near enough the size (up to a step or so up), is the better choice.
+  const sameKind = (i: CatalogueInverter) =>
+    phaseOf(i) === phaseOf(pick.inverter) &&
+    (i.hybrid ?? /hybrid/i.test(i.name)) === (pick.inverter.hybrid ?? /hybrid/i.test(pick.inverter.name));
+  const onFile = input.inverters
+    .filter((i) => i.electrical && sameKind(i) && i.kw >= pick.inverter.kw && i.kw <= Math.max(pick.inverter.kw * 1.7, arrayKw * 1.4))
+    .sort((a, b) => a.kw - b.kw)[0];
+  return onFile ? { ...pick, inverter: onFile, why: `${pick.why} Its limits are on file, so the strings can be checked.` } : pick;
 }
 
 /** Where a battery stands on the drawing until it is moved: low on the right of the picture. */
@@ -416,9 +424,9 @@ export function selfDesign(input: SelfDesignInput): SelfDesignResult {
 
   // 3. Most independence: the whole roof (as much of it as an inverter takes), a battery for the whole of the evenings
   // and one module more held back for blackouts, with the backup wiring.
-  // The faces traced are the ones the business means to use, so all of them; Google's roof model also has faces no one
-  // would put panels on (south, shaded), so of it the well-sunned spots.
-  const whole = source.from === "traced" ? source.most : Math.max(low, source.good);
+  // The faces traced are the ones the business means to use; of Google's roof model, `suggestPanels` already lays only
+  // the sunny faces. So all of either.
+  const whole = source.most;
   let independence: Built | null = null;
   for (let n = whole; n >= low && !independence; n--) independence = build(input, source, n, "blackout");
 

@@ -1,0 +1,395 @@
+{
+  "note": "A hip roof as Google Solar's roof model describes it, moved to sit around (0, 0): metres east and south of the middle of the picture. Its shape is a real Melbourne roof (rows of 3, 4, 5 and 4 spots on the north-east hip); no address or place is kept.",
+  "faces": [
+    {
+      "azimuth": 133.5,
+      "pitch": 26.67
+    },
+    {
+      "azimuth": 223.28,
+      "pitch": 17.05
+    },
+    {
+      "azimuth": 133.28,
+      "pitch": 31.34
+    },
+    {
+      "azimuth": 279.34,
+      "pitch": 7.66
+    },
+    {
+      "azimuth": 53.09,
+      "pitch": 24.86
+    },
+    {
+      "azimuth": 229.45,
+      "pitch": 17
+    },
+    {
+      "azimuth": 323.99,
+      "pitch": 16.06
+    },
+    {
+      "azimuth": 146.78,
+      "pitch": 68.6
+    },
+    {
+      "azimuth": 123.65,
+      "pitch": 68.91
+    }
+  ],
+  "panel": {
+    "heightM": 1.879,
+    "widthM": 1.045,
+    "watts": 400
+  },
+  "slots": [
+    {
+      "east": 4.8,
+      "south": 0.64,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 624
+    },
+    {
+      "east": 3.7,
+      "south": -0.88,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 623
+    },
+    {
+      "east": 2.6,
+      "south": -2.41,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 623
+    },
+    {
+      "east": 1.83,
+      "south": -1.85,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 622
+    },
+    {
+      "east": 0.73,
+      "south": -3.37,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 624
+    },
+    {
+      "east": 2.93,
+      "south": -0.32,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 622
+    },
+    {
+      "east": 1.5,
+      "south": -3.93,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 622
+    },
+    {
+      "east": 4.47,
+      "south": -1.43,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 621
+    },
+    {
+      "east": 5.56,
+      "south": 0.09,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 621
+    },
+    {
+      "east": 3.37,
+      "south": -2.96,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 620
+    },
+    {
+      "east": 2.26,
+      "south": -4.48,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 618
+    },
+    {
+      "east": 1.17,
+      "south": -6.01,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 620
+    },
+    {
+      "east": 4.13,
+      "south": -3.52,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 613
+    },
+    {
+      "east": 6.34,
+      "south": -0.47,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 613
+    },
+    {
+      "east": 7.43,
+      "south": 1.05,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 621
+    },
+    {
+      "east": 5.24,
+      "south": -1.99,
+      "orientation": "LANDSCAPE",
+      "segment": 4,
+      "kwh": 608
+    },
+    {
+      "east": -3.44,
+      "south": -4.77,
+      "orientation": "PORTRAIT",
+      "segment": 6,
+      "kwh": 601
+    },
+    {
+      "east": -2.76,
+      "south": 0.58,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 595
+    },
+    {
+      "east": -3.78,
+      "south": 0.39,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 593
+    },
+    {
+      "east": -4.8,
+      "south": 0.21,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 585
+    },
+    {
+      "east": -4.46,
+      "south": -1.64,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 584
+    },
+    {
+      "east": -5.48,
+      "south": -1.83,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 589
+    },
+    {
+      "east": -6.49,
+      "south": -2.02,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 589
+    },
+    {
+      "east": -5.13,
+      "south": -3.67,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 584
+    },
+    {
+      "east": -6.15,
+      "south": -3.86,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 583
+    },
+    {
+      "east": -7.17,
+      "south": -4.05,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 584
+    },
+    {
+      "east": -8.19,
+      "south": -4.24,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 584
+    },
+    {
+      "east": -2.59,
+      "south": -5.37,
+      "orientation": "PORTRAIT",
+      "segment": 6,
+      "kwh": 580
+    },
+    {
+      "east": -1.73,
+      "south": -5.97,
+      "orientation": "PORTRAIT",
+      "segment": 6,
+      "kwh": 576
+    },
+    {
+      "east": -0.87,
+      "south": -6.56,
+      "orientation": "PORTRAIT",
+      "segment": 6,
+      "kwh": 579
+    },
+    {
+      "east": -1.74,
+      "south": 0.77,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 574
+    },
+    {
+      "east": -7.51,
+      "south": -2.2,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 570
+    },
+    {
+      "east": -5.82,
+      "south": 0.02,
+      "orientation": "LANDSCAPE",
+      "segment": 3,
+      "kwh": 536
+    },
+    {
+      "east": -2.85,
+      "south": -2.11,
+      "orientation": "LANDSCAPE",
+      "segment": 5,
+      "kwh": 519
+    },
+    {
+      "east": 1.32,
+      "south": 3.33,
+      "orientation": "PORTRAIT",
+      "segment": 0,
+      "kwh": 508
+    },
+    {
+      "east": -3.54,
+      "south": 2.76,
+      "orientation": "LANDSCAPE",
+      "segment": 1,
+      "kwh": 508
+    },
+    {
+      "east": 2.52,
+      "south": 4.51,
+      "orientation": "PORTRAIT",
+      "segment": 0,
+      "kwh": 505
+    },
+    {
+      "east": -2.08,
+      "south": -2.74,
+      "orientation": "LANDSCAPE",
+      "segment": 5,
+      "kwh": 504
+    },
+    {
+      "east": -2.2,
+      "south": 4.07,
+      "orientation": "LANDSCAPE",
+      "segment": 1,
+      "kwh": 503
+    },
+    {
+      "east": -0.86,
+      "south": 5.39,
+      "orientation": "LANDSCAPE",
+      "segment": 1,
+      "kwh": 505
+    },
+    {
+      "east": 2.05,
+      "south": 2.59,
+      "orientation": "PORTRAIT",
+      "segment": 0,
+      "kwh": 502
+    },
+    {
+      "east": 2.79,
+      "south": 1.84,
+      "orientation": "PORTRAIT",
+      "segment": 0,
+      "kwh": 505
+    },
+    {
+      "east": 4.83,
+      "south": 2.97,
+      "orientation": "PORTRAIT",
+      "segment": 2,
+      "kwh": 497
+    },
+    {
+      "east": -1.5,
+      "south": 3.36,
+      "orientation": "LANDSCAPE",
+      "segment": 1,
+      "kwh": 497
+    },
+    {
+      "east": 1.79,
+      "south": 5.25,
+      "orientation": "PORTRAIT",
+      "segment": 0,
+      "kwh": 494
+    },
+    {
+      "east": 1.05,
+      "south": 5.99,
+      "orientation": "PORTRAIT",
+      "segment": 0,
+      "kwh": 481
+    },
+    {
+      "east": 5.98,
+      "south": 4.1,
+      "orientation": "PORTRAIT",
+      "segment": 2,
+      "kwh": 440
+    },
+    {
+      "east": 6.7,
+      "south": 3.34,
+      "orientation": "PORTRAIT",
+      "segment": 2,
+      "kwh": 439
+    },
+    {
+      "east": 5.25,
+      "south": 4.84,
+      "orientation": "PORTRAIT",
+      "segment": 2,
+      "kwh": 430
+    }
+  ],
+  "offset": {
+    "x": -8.1,
+    "y": 4.7
+  }
+}

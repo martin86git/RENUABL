@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { RoofModel } from "../roof-layout";
 import { PANEL, facePanels, looseCorners, panelFacing, type Face, type LoosePanel } from "./roof-design";
@@ -157,7 +158,7 @@ describe("suggesting a layout from Google's roof model", () => {
       ],
       slots: [
         ...face(0, 20, 2, 5, "PORTRAIT", 0).map((s) => ({ ...s, kwh: 600 })),
-        ...face(90, 20, 3, 6, "PORTRAIT", 1, 20).map((s) => ({ ...s, kwh: 450 })),
+        ...face(90, 20, 3, 6, "PORTRAIT", 1, 20).map((s) => ({ ...s, kwh: 520 })),
       ],
     };
     const panels = suggestPanels(model, centre, 12, PANEL, id);
@@ -239,5 +240,78 @@ describe("Google's model against today's photo", () => {
     expect(imageryWhen(null)).toBeNull();
     expect(mismatchNote("2018-12")).toMatch(/photographed December 2018.*Trace the roof faces/);
     expect(mismatchNote(null)).not.toMatch(/photographed/);
+  });
+});
+
+describe("a hip roof cut into many small faces", () => {
+  // A real Melbourne hip roof's model, kept as metres from the middle (no address): its best face is a hip whose
+  // rows hold 3, 4, 5 and 4 of Google's spots, each row shifted along from the last.
+  const fixture = JSON.parse(readFileSync("src/lib/domain/__fixtures__/hip-roof-model.json", "utf8")) as {
+    faces: { azimuth: number; pitch: number }[];
+    panel: RoofModel["panel"];
+    slots: { east: number; south: number; orientation: "PORTRAIT" | "LANDSCAPE"; segment: number; kwh: number }[];
+    offset: { x: number; y: number };
+  };
+  const hip: RoofModel = {
+    faces: fixture.faces,
+    panel: fixture.panel,
+    slots: fixture.slots.map((s) => ({
+      lat: centre.lat - s.south / mLat,
+      lng: centre.lng + s.east / mLng,
+      orientation: s.orientation,
+      segment: s.segment,
+      kwh: s.kwh,
+    })),
+  };
+  const arrays = (panels: LoosePanel[]) => {
+    const by = new Map<number, number>();
+    for (const p of panels) by.set(panelFacing(p), (by.get(panelFacing(p)) ?? 0) + 1);
+    return [...by.values()];
+  };
+
+  it.each([6, 10, 12, 14, 24])("lays %i panels as at most two arrays, none of fewer than four", (want) => {
+    const panels = suggestPanels(hip, centre, want, PANEL, id, modelOffset(fixture.offset, centre.lat));
+    expect(panels.length).toBeGreaterThanOrEqual(Math.min(want, 10));
+    expect(panels.length).toBeLessThanOrEqual(want);
+    expect(arrays(panels).length).toBeLessThanOrEqual(2);
+    expect(Math.min(...arrays(panels))).toBeGreaterThanOrEqual(4);
+    expect(overlapping(panels)).toBe(false);
+  });
+
+  it("reaches the count asked for across two faces rather than dropping a remainder", () => {
+    expect(suggestPanels(hip, centre, 12, PANEL, id, modelOffset(fixture.offset, centre.lat))).toHaveLength(12);
+  });
+
+  it("lays panels on their side where that is what the face holds", () => {
+    const panels = suggestPanels(hip, centre, 10, PANEL, id, modelOffset(fixture.offset, centre.lat));
+    expect(panels.every((p) => p.across)).toBe(true);
+  });
+});
+
+describe("stepped rows on a face that isn't a rectangle", () => {
+  it("lays rows that shorten under the ridge, each straight, the fewest that hold them", () => {
+    // Rows of 3, 4, 5 and 4 places, each shifted along by one.
+    const row = [
+      { from: 1, length: 3 },
+      { from: 1, length: 4 },
+      { from: 0, length: 5 },
+      { from: 2, length: 4 },
+    ];
+    const fits = (r: number, c: number) => c >= row[r].from && c < row[r].from + row[r].length;
+    const block = bestBlock(fits, 4, 7, 12);
+    expect(block.rows).toBe(3);
+    expect(block.cells).toHaveLength(12);
+    expect(block.cells.every((c) => fits(c.row, c.col))).toBe(true);
+    // Each row is one straight run.
+    for (const r of new Set(block.cells.map((c) => c.row))) {
+      const cols = block.cells.filter((c) => c.row === r).map((c) => c.col);
+      expect(Math.max(...cols) - Math.min(...cols) + 1).toBe(cols.length);
+    }
+  });
+
+  it("still prefers a straight-sided block when one holds them", () => {
+    const block = bestBlock((r, c) => c < 6 || r === 0, 3, 8, 12);
+    const cols = (r: number) => block.cells.filter((c) => c.row === r).map((c) => c.col);
+    expect(cols(block.cells[0].row)).toEqual(cols(block.cells[block.cells.length - 1].row));
   });
 });

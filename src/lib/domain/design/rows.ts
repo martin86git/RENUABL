@@ -86,8 +86,61 @@ export function bestBlock(
     if (best) return { cells: best.cells, rows: k };
   }
 
-  // Nothing holds them all: the biggest block there is.
+  // No straight-sided block holds them: stepped rows, as a hip face's rows shorten under the ridge. Each row its own
+  // longest run, the rows side by side and each overlapping the next by at least half the shorter, the fewest rows
+  // that hold them; any to spare come off the shortest row, which stays centred in its run.
+  const line = Array.from({ length: rows }, (_, r) =>
+    runs(r, 1).reduce<{ from: number; length: number } | null>((a, b) => (!a || b.length > a.length ? b : a), null),
+  );
+  const overlapping = (a: { from: number; length: number }, b: { from: number; length: number }) =>
+    Math.min(a.from + a.length, b.from + b.length) - Math.max(a.from, b.from) >= Math.ceil(Math.min(a.length, b.length) / 2);
+  const windows = (each: (r0: number, k: number, lines: { from: number; length: number }[]) => void) => {
+    for (let k = 1; k <= rows; k++)
+      for (let r0 = 0; r0 + k <= rows; r0++) {
+        const lines = line.slice(r0, r0 + k);
+        if (lines.some((l) => !l) || lines.some((l, i) => i > 0 && !overlapping(lines[i - 1]!, l!))) continue;
+        each(r0, k, lines as { from: number; length: number }[]);
+      }
+  };
+  const stepCells = (r0: number, lines: { from: number; length: number }[], count: number) => {
+    const keep = lines.map((l) => l.length);
+    let spare = keep.reduce((t, x) => t + x, 0) - count;
+    while (spare > 0) {
+      const i = keep.reduce((m, x, j) => (x > 0 && (keep[m] === 0 || x < keep[m]) ? j : m), 0);
+      const off = Math.min(spare, keep[i]);
+      keep[i] -= off;
+      spare -= off;
+    }
+    return lines.flatMap((l, i) => {
+      const from = l.from + Math.floor((l.length - keep[i]) / 2);
+      return Array.from({ length: keep[i] }, (_, j) => ({ row: r0 + i, col: from + j }));
+    });
+  };
+  let stepped: { cells: GridCell[]; rows: number; spare: number; value: number } | null = null;
+  windows((r0, k, lines) => {
+    if (stepped && k > stepped.rows) return;
+    const sum = lines.reduce((t, l) => t + l.length, 0);
+    if (sum < want) return;
+    const cells = stepCells(r0, lines, want);
+    const spare = sum - want;
+    const value = total(cells);
+    if (!stepped || k < stepped.rows || spare < stepped.spare || (spare === stepped.spare && value > stepped.value + 1e-9))
+      stepped = { cells, rows: k, spare, value };
+  });
+  if (stepped) return { cells: (stepped as { cells: GridCell[] }).cells, rows: (stepped as { rows: number }).rows };
+
+  // Nothing holds them all: the biggest block there is, straight-sided or stepped.
   let biggest: { cells: GridCell[]; rows: number; value: number } | null = null;
+  windows((r0, k, lines) => {
+    const cells = stepCells(
+      r0,
+      lines,
+      lines.reduce((t, l) => t + l.length, 0),
+    );
+    const value = total(cells);
+    if (!biggest || cells.length > biggest.cells.length || (cells.length === biggest.cells.length && value > biggest.value))
+      biggest = { cells, rows: k, value };
+  });
   for (let k = 1; k <= rows; k++)
     for (let r0 = 0; r0 + k <= rows; r0++)
       for (const run of runs(r0, k)) {
