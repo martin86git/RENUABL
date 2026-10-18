@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, ChevronLeft, ClipboardList, PenTool, Search, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ClipboardList, PanelLeftClose, PanelLeftOpen, PenTool, Search, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import {
   JOB_STAGES,
@@ -18,10 +18,15 @@ import { systemDetails, type DealDetail } from "@/lib/domain/design/deal";
 import { addActivity, deleteJob, dollars, loadCustomer, loadDealDesign, loadJob, saveJob, shortDate } from "@/lib/services/crm";
 import { ACTIVITY_WORD, StageTag } from "./design-home";
 import { DealChat } from "./chat-panel";
+import { useDesignAccount } from "./design-account";
+import { ContactActions, DealEmail, DesignDrawer } from "./deal-tools";
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
 
 type Written = "note" | "call" | "email";
+type Tab = "overview" | "activities" | "email" | "chat";
+/** Whether this person keeps the deal's left column folded away, on their device. */
+const ABOUT_FOLDED = "renuabl.design.deal-about";
 const FILTERS: { key: "all" | ActivityKind; label: string }[] = [
   { key: "all", label: "All activities" },
   { key: "note", label: "Notes" },
@@ -125,7 +130,29 @@ export function DealPage({ id }: { id: string }) {
   const [status, setStatus] = useState("");
   // "?tab=chat" (from Messages, and from the email about a new message) opens the deal on its conversation.
   const asked = useSearchParams().get("tab");
-  const [tab, setTab] = useState<"overview" | "activities" | "chat">(asked === "chat" ? "chat" : "activities");
+  const [tab, setTab] = useState<Tab>(asked === "chat" ? "chat" : "activities");
+  // The design tool as a drawer over the deal (?design=1 opens it), and the left column folded away.
+  const [drawer, setDrawer] = useState(useSearchParams().get("design") === "1");
+  const [folded, setFolded] = useState(false);
+  const [account] = useDesignAccount();
+  const business = account?.signedIn ? (account.business?.name ?? "") : "";
+  useEffect(() => {
+    try {
+      // What was chosen last time is only known once the page is in the browser.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFolded(window.localStorage.getItem(ABOUT_FOLDED) === "1");
+    } catch {
+      // Open, then.
+    }
+  }, []);
+  const fold = (to: boolean) => {
+    setFolded(to);
+    try {
+      window.localStorage.setItem(ABOUT_FOLDED, to ? "1" : "0");
+    } catch {
+      // Kept for this visit only.
+    }
+  };
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
   const [find, setFind] = useState("");
   const [kind, setKind] = useState<Written>("note");
@@ -207,16 +234,54 @@ export function DealPage({ id }: { id: string }) {
     );
 
   return (
-    <div className="grid items-start gap-5 px-5 py-6 lg:grid-cols-[21rem_minmax(0,1fr)] lg:px-8">
+    <div
+      className={clsx(
+        "grid items-start gap-5 px-5 py-6 lg:px-8",
+        folded ? "lg:grid-cols-[2.75rem_minmax(0,1fr)]" : "lg:grid-cols-[21rem_minmax(0,1fr)]",
+      )}
+    >
+      {job.lat !== null && (
+        <DesignDrawer
+          jobId={job.id}
+          open={drawer}
+          onOpen={() => setDrawer(true)}
+          onFold={() => setDrawer(false)}
+          onSaved={() => void load()}
+        />
+      )}
+      {/* Folded: a tab down the left that brings the deal's column back. */}
+      {folded && (
+        <button
+          type="button"
+          onClick={() => fold(false)}
+          className={clsx(
+            ui.card,
+            "hidden h-56 flex-col items-center gap-2 py-3 text-[13px] font-medium text-ink hover:bg-surface-2 lg:sticky lg:top-6 lg:flex",
+          )}
+          aria-label="Show the deal's details"
+        >
+          <PanelLeftOpen className="size-4 text-muted" aria-hidden />
+          <span className="[writing-mode:vertical-rl]">About this deal</span>
+        </button>
+      )}
       {/* Down the left: the deal, and everything the installation needs. */}
       <aside
-        className={clsx(ui.card, "lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto")}
+        className={clsx(ui.card, "lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto", folded && "lg:hidden")}
         aria-label="The deal and its system"
       >
         <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-3.5">
           <Link href={PATHS.pipelines} className="inline-flex items-center gap-1.5 text-sm font-medium text-ink hover:underline">
             <ChevronLeft className="size-4 text-muted" aria-hidden /> Deals
           </Link>
+          <button
+            type="button"
+            onClick={() => fold(true)}
+            className="ml-auto hidden size-7 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-ink lg:inline-flex"
+            aria-label="Fold the deal's details away"
+            title="Fold away"
+          >
+            <PanelLeftClose className="size-4" aria-hidden />
+          </button>
           <button
             className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-danger"
             onClick={async () => {
@@ -238,10 +303,11 @@ export function DealPage({ id }: { id: string }) {
             <StageTag stage={job.stage} />
             <span className="text-sm tabular-nums text-ink">{dollars(job.value)}</span>
           </div>
+          <ContactActions customer={customer} onEmail={() => setTab("email")} />
           {job.lat !== null ? (
-            <Link href={`${PATHS.designer}?job=${job.id}`} className={clsx(ui.primary, "mt-4 w-full")}>
+            <button type="button" onClick={() => setDrawer(true)} className={clsx(ui.primary, "mt-4 w-full")}>
               <PenTool className="size-4" aria-hidden /> {job.projectId ? "Open design" : "Design this roof"}
-            </Link>
+            </button>
           ) : (
             <p className="mt-3 text-xs text-muted">
               Give this deal an address found on the map (on the customer&apos;s page) to design it.
@@ -343,12 +409,19 @@ export function DealPage({ id }: { id: string }) {
           >
             Activities
           </button>
+          <button role="tab" aria-selected={tab === "email"} className={pill(tab === "email")} onClick={() => setTab("email")}>
+            Email
+          </button>
           <button role="tab" aria-selected={tab === "chat"} className={pill(tab === "chat")} onClick={() => setTab("chat")}>
             Chat
           </button>
         </div>
 
-        {tab === "chat" ? (
+        {tab === "email" ? (
+          <div className="mt-5">
+            <DealEmail job={job} customer={customer} business={business} onSent={(a) => a && setActivity((all) => [a, ...all])} />
+          </div>
+        ) : tab === "chat" ? (
           <div className="mt-5">
             <DealChat jobId={id} />
           </div>

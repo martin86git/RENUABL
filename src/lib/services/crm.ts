@@ -118,3 +118,13 @@ export async function loadDealDesign(
   const quote = extras.quotes[set.primary] ?? defaultQuote("");
   return { design: set.designs[set.primary], form: quote.form, edits: quote.edits };
 }
+
+/** Whether a deal's customer can be emailed from here (an email service is set up), and where replies go. */
+export const dealEmailStatus = (jobId: string) =>
+  ask<{ canSend: boolean; replyTo: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/email`);
+/** Emails a deal's customer: sent in the business's name, replies to the member, written on the deal's record. */
+export const emailDeal = (jobId: string, email: { to: string; subject: string; body: string }) =>
+  ask<{ message: string; activity: Activity | null }>(`/api/design/jobs/${encodeURIComponent(jobId)}/email`, {
+    method: "POST",
+    body: email,
+  });

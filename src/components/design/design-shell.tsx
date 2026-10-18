@@ -124,7 +124,7 @@ const NAV: NavItem[] = [
  * asks for one; the others (the design tool, its settings) are shown bare, as
  * they work on the device without one.
  */
-export function DesignShell(props: { children: React.ReactNode; compact?: boolean; needsAccount?: boolean }) {
+export function DesignShell(props: { children: React.ReactNode; compact?: boolean; needsAccount?: boolean; bare?: boolean }) {
   return (
     <DesignAccountGate>
       <Shell {...props} />
@@ -135,7 +135,18 @@ export function DesignShell(props: { children: React.ReactNode; compact?: boolea
 /** Whether this person keeps the sections folded down to icons, on their device. */
 const FOLDED = "renuabl.design.nav-folded";
 
-function Shell({ children, compact: tool, needsAccount }: { children: React.ReactNode; compact?: boolean; needsAccount?: boolean }) {
+function Shell({
+  children,
+  compact: tool,
+  needsAccount,
+  bare,
+}: {
+  children: React.ReactNode;
+  compact?: boolean;
+  needsAccount?: boolean;
+  /** Without the sections: the page shown inside another, as the design tool is in a deal's drawer. */
+  bare?: boolean;
+}) {
   // The sections can be folded down to their icons, as they always are on the design tool, and opened out again.
   const [folded, setFolded] = useState(false);
   useEffect(() => {
@@ -226,6 +237,7 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
     </Link>
   );
 
+  if (bare) return <div className="theme-studio min-h-dvh">{children}</div>;
   return (
     <div className="theme-studio flex min-h-dvh flex-col lg:flex-row">
       <nav

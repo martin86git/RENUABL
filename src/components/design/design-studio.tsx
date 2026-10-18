@@ -47,6 +47,15 @@ const STEPS = [
  * designer on that roof. Designs are kept for the signed-in business, or on this device when nobody is signed in
  * (`design-store.ts`).
  */
+/**
+ * Opened inside a deal's design drawer (an iframe of this page), the deal is told when the design is saved or published,
+ * so its system details fill in from it there and then, and whether there is work not yet saved. Same site only.
+ */
+function tellDeal(news: { saved?: boolean; unsaved?: boolean }) {
+  if (typeof window === "undefined" || window.parent === window) return;
+  window.parent.postMessage({ renuablDesign: news }, window.location.origin);
+}
+
 export function DesignStudio() {
   // Null until this device's last roof has been looked up, so the address box doesn't flash before a saved roof.
   const [ready, setReady] = useState(false);
@@ -164,6 +173,7 @@ export function DesignStudio() {
   const unsaved = useRef(false);
   const noteUnsaved = useCallback((value: boolean) => {
     unsaved.current = value;
+    tellDeal({ unsaved: value });
   }, []);
 
   const pick = (address: Address) => {
@@ -203,6 +213,7 @@ export function DesignStudio() {
           yieldPerKwDay={YIELD_PER_KW_DAY}
           onSave={async (next, extras, net) => {
             const problem = await saveRoofWork(roof, next, extras);
+            if (!problem) tellDeal({ saved: true });
             // Designed for a customer's job: the job carries the quote's price, so the pipeline shows what it is worth.
             if (!problem && onJob && net !== null)
               void saveJob(onJob.id, { value: net, kw: designSummary(next.designs[next.primary] ?? next.designs[0]).kw });
@@ -210,9 +221,15 @@ export function DesignStudio() {
           }}
           // Publish: the design has just been saved. With a deal, its proposal is worked out again from it on the server.
           // Without one there is no customer to send a proposal to, and signed out there is no business to send it from.
-          onPublish={async () =>
-            onJob ? publishFromDesigner(onJob.id) : (await whereKept().catch(() => "device")) === "account" ? NO_DEAL : NEEDS_ACCOUNT
-          }
+          onPublish={async () => {
+            const res = onJob
+              ? await publishFromDesigner(onJob.id)
+              : (await whereKept().catch(() => "device")) === "account"
+                ? NO_DEAL
+                : NEEDS_ACCOUNT;
+            tellDeal({ saved: true });
+            return res;
+          }}
           proposalHref={onJob ? proposalScreen(onJob.id) : null}
           chat={onJob ? <ChatButton jobId={onJob.id} /> : null}
           customerName={onJob?.customerName.split(" ")[0]}
