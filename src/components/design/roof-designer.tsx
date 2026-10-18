@@ -475,6 +475,8 @@ export function RoofDesigner(props: {
   const [checking, setChecking] = useState<string | null>(null);
   // Which way Add a panel lays new panels: chosen from the two bubbles beside the tool (Martin).
   const [addLandscape, setAddLandscape] = useState(false);
+  // The two bubbles fanned out of Add a panel, like a hand of cards: open from a press on the tool, gone once one is chosen.
+  const [fanOpen, setFanOpen] = useState(false);
   // The battery or the inverter under the pointer: its details show beside it.
   const [kit, setKit] = useState<"battery" | number | null>(null);
   const [tool, setTool] = useState<Tool>("select");
@@ -512,6 +514,7 @@ export function RoofDesigner(props: {
   /** Takes up a tool, leaving behind anything half-drawn with the last one. */
   const pickTool = (t: Tool) => {
     setTool(t);
+    setFanOpen(false);
     setTracing([]);
     setRuling(null);
     setArrayHint(null);
@@ -1416,6 +1419,7 @@ export function RoofDesigner(props: {
         openMenu(false);
         setRuling(null);
         setChecking(null);
+        setFanOpen(false);
         if (tool === "string") setTool("select");
       }
     };
@@ -2532,7 +2536,7 @@ export function RoofDesigner(props: {
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
                   that does to this home's bill. Each has one large figure in the same place every time, with its detail under it. */}
             <section
-              className="relative z-30 mx-auto mb-2 flex flex-wrap items-stretch rounded-lg border border-line bg-surface text-ink shadow-soft"
+              className="relative z-30 mx-auto mb-2 flex flex-wrap items-stretch rounded-lg bg-primary text-white"
               style={{ maxWidth: FIT }}
               aria-label="This design in figures"
             >
@@ -2563,16 +2567,16 @@ export function RoofDesigner(props: {
                   },
                 ] as { step: string; value: string; unit: string; under: string; gold?: boolean; chart?: boolean; warn?: boolean }[]
               ).map((g) => (
-                <div key={g.step} className="relative flex items-center gap-3 border-r border-line px-3.5 py-1.5">
+                <div key={g.step} className="relative flex items-center gap-3 border-r border-white/15 px-3.5 py-1.5">
                   <div>
-                    <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-muted">{g.step}</p>
+                    <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/60">{g.step}</p>
                     <p className="whitespace-nowrap leading-tight">
-                      <span className={clsx("text-xl font-medium tabular-nums tracking-[-0.02em]", g.gold && "text-sun-line-ink")}>
+                      <span className={clsx("text-xl font-medium tabular-nums tracking-[-0.02em]", g.gold && "text-sun-bright")}>
                         {g.value}
                       </span>
-                      <span className="ml-1.5 text-xs text-muted">{g.unit}</span>
+                      <span className="ml-1.5 text-xs text-white/60">{g.unit}</span>
                     </p>
-                    <p className={clsx("whitespace-nowrap text-xs tabular-nums", g.warn ? "font-medium text-sun-line-ink" : "text-muted")}>
+                    <p className={clsx("whitespace-nowrap text-xs tabular-nums", g.warn ? "font-medium text-sun-bright" : "text-white/60")}>
                       {g.under}
                     </p>
                   </div>
@@ -2584,16 +2588,16 @@ export function RoofDesigner(props: {
                     >
                       {year.map((kwh, m) => (
                         <div key={m} className="flex min-w-0 flex-1 flex-col items-center" title={`${kwh.toLocaleString("en-AU")} kWh`}>
-                          <div className="flex h-6 w-full items-end justify-center gap-[2px] border-b border-line-strong">
+                          <div className="flex h-6 w-full items-end justify-center gap-[2px] border-b border-white/40">
                             {[0.6, 1].map((strength, n) => (
                               <span
                                 key={n}
-                                className="w-px bg-sun-line"
+                                className="w-px bg-sun-bright"
                                 style={{ height: `${Math.max(6, (kwh / top) * 100)}%`, opacity: strength }}
                               />
                             ))}
                           </div>
-                          <span className="mt-0.5 text-[8px] leading-none text-muted">{"JFMAMJJASOND"[m]}</span>
+                          <span className="mt-0.5 text-[8px] leading-none text-white/60">{"JFMAMJJASOND"[m]}</span>
                         </div>
                       ))}
                     </div>
@@ -2615,9 +2619,9 @@ export function RoofDesigner(props: {
                     e.preventDefault();
                     openMenu(menu === "bill" ? false : "bill");
                   }}
-                  className="h-full cursor-pointer rounded-r-lg px-3.5 py-1.5 hover:bg-canvas"
+                  className="h-full cursor-pointer rounded-r-lg px-3.5 py-1.5 hover:bg-white/5"
                 >
-                  <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-muted">4 · For this home</p>
+                  <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/60">4 · For this home</p>
                   {finance ? (
                     <dl className="mt-0.5 flex gap-x-4">
                       {(
@@ -2629,11 +2633,11 @@ export function RoofDesigner(props: {
                         ] as const
                       ).map(([name, value, gold]) => (
                         <div key={name}>
-                          <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.14em] text-muted">{name}</dt>
+                          <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.14em] text-white/60">{name}</dt>
                           <dd
                             className={clsx(
                               "whitespace-nowrap text-lg font-semibold tabular-nums leading-tight",
-                              gold && "text-sun-line-ink",
+                              gold && "text-sun-bright",
                             )}
                           >
                             {value}
@@ -2646,7 +2650,7 @@ export function RoofDesigner(props: {
                       <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3 text-[13px] font-medium text-white">
                         <ReceiptText className="size-4" aria-hidden /> Add bill
                       </span>
-                      <span className="text-xs text-muted">
+                      <span className="text-xs text-white/60">
                         {Number(bill.amount) > 0
                           ? "That bill is no more than its supply charge: check the figures."
                           : net !== null
@@ -4249,7 +4253,11 @@ export function RoofDesigner(props: {
                   add a panel (to its right) and erase (beneath it). */}
               <div className="absolute left-3 top-3 z-20 size-[6.25rem]" role="toolbar" aria-label="Select, add a panel, landscape, erase">
                 <button
-                  onClick={() => pickTool("panel")}
+                  onClick={() => {
+                    const wasOpen = fanOpen;
+                    pickTool("panel");
+                    setFanOpen(!wasOpen);
+                  }}
                   title="Add a panel"
                   aria-label="Add a panel"
                   aria-pressed={tool === "panel"}
@@ -4260,30 +4268,50 @@ export function RoofDesigner(props: {
                 >
                   <SquarePlus className="size-5" aria-hidden />
                 </button>
-                {/* Portrait or landscape (Martin): two bubbles beside Add a panel while it is on, choosing the way new panels are
-                    laid; with panels picked, the same two turn those panels and lay them again tidily (`turnLandscape`). */}
-                {(tool === "panel" || pickedPanels.length > 0) &&
-                  ([false, true] as const).map((landscape, n) => {
-                    const turning = tool !== "panel";
-                    const on = turning ? pickedPanels.every((p) => Boolean(p.across) === landscape) : addLandscape === landscape;
-                    const name = landscape ? "Landscape" : "Portrait";
-                    return (
-                      <button
-                        key={name}
-                        onClick={() => (turning ? turnLandscape(landscape) : setAddLandscape(landscape))}
-                        title={turning ? `${name}: lay the picked panels this way` : `${name}: add panels this way`}
-                        aria-label={turning ? `Lay the picked panels ${name.toLowerCase()}` : `Add panels ${name.toLowerCase()}`}
-                        aria-pressed={on}
-                        style={{ left: `${6.375 + n * 2.875}rem` }}
-                        className={clsx(
-                          "absolute top-[0.5625rem] flex size-[2.625rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
-                          on ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface/90 text-ink hover:bg-surface",
-                        )}
-                      >
-                        <PanelGlyph across={landscape} />
-                      </button>
-                    );
-                  })}
+                {/* Portrait or landscape (Martin): pressing Add a panel fans two bubbles out of it in an arc, like a hand of cards
+                    spread out; choosing one sets the way new panels are laid (and lays any picked panels that way, `turnLandscape`),
+                    and the fan folds away. Each starts at the tool's icon and swings out to its place. */}
+                {([false, true] as const).map((landscape, n) => {
+                  const name = landscape ? "Landscape" : "Portrait";
+                  const on = addLandscape === landscape;
+                  // The icon of Add a panel, and each bubble's place on an arc around it (degrees clockwise from east).
+                  const icon = { x: 4.8, y: 1.875 };
+                  const angle = (n === 0 ? -8 : 48) * (Math.PI / 180);
+                  const reach = 3.5;
+                  const dx = Math.cos(angle) * reach;
+                  const dy = Math.sin(angle) * reach;
+                  return (
+                    <button
+                      key={name}
+                      onClick={() => {
+                        setAddLandscape(landscape);
+                        if (pickedPanels.length) turnLandscape(landscape);
+                        setFanOpen(false);
+                      }}
+                      tabIndex={fanOpen ? 0 : -1}
+                      aria-hidden={!fanOpen}
+                      title={`${name}: add panels this way${pickedPanels.length ? ", and lay the picked panels this way" : ""}`}
+                      aria-label={`Add panels ${name.toLowerCase()}`}
+                      aria-pressed={on}
+                      style={{
+                        left: `${icon.x - 1.3125}rem`,
+                        top: `${icon.y - 1.3125}rem`,
+                        transform: fanOpen
+                          ? `translate(${dx}rem, ${dy}rem) rotate(0deg) scale(1)`
+                          : `translate(0, 0) rotate(${n === 0 ? -40 : -80}deg) scale(0.4)`,
+                        opacity: fanOpen ? 1 : 0,
+                        transitionDelay: fanOpen ? `${n * 60}ms` : "0ms",
+                      }}
+                      className={clsx(
+                        "absolute flex size-[2.625rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none",
+                        fanOpen ? "pointer-events-auto" : "pointer-events-none",
+                        on ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface/95 text-ink hover:bg-surface",
+                      )}
+                    >
+                      <PanelGlyph across={landscape} />
+                    </button>
+                  );
+                })}
                 <button
                   onClick={() => pickTool("erase")}
                   title="Erase"
