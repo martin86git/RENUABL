@@ -5,6 +5,7 @@ import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib
 import { loadTerrain } from "@/lib/services/terrain";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
 import { packFaces, reorient } from "@/lib/domain/design/pack";
+import { snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
 import { selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
 import { todayInMarket } from "@/lib/domain/market";
@@ -625,7 +626,7 @@ export function RoofDesigner(props: {
   const svg = useRef<SVGSVGElement>(null);
   // A press that may turn into a drag: of what is picked, of a box to pick with, or of the picture itself.
   const press = useRef<
-    | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point> | null }
+    | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point> | null; others?: LoosePanel[] }
     | { mode: "band"; at: Point; face: string | null; add: boolean; moved: boolean }
     | { mode: "pan"; x: number; y: number; from: typeof WHOLE }
     | { mode: "turn"; id: string; centre: Point }
@@ -1190,6 +1191,16 @@ export function RoofDesigner(props: {
     return { faces: nextFaces, loose: nextLoose, strings: nextStrings, ids };
   };
 
+  /** Every panel standing on the roof as one placed by hand (a face's own ones freed where they stand), for snapping to. */
+  const standingAll = (onFaces: Face[], placed: LoosePanel[]): LoosePanel[] => [
+    ...placed,
+    ...onFaces.flatMap((f) =>
+      panelPlaces(f, size)
+        .filter((place) => !f.off.includes(place.index))
+        .map((place) => freed(f, place, `g${f.id}${place.index}`)),
+    ),
+  ];
+
   /** Turns the picked panels together, about the middle of the group. */
   const turn = (degrees: number) => {
     if (!panelPicks.length) return;
@@ -1637,7 +1648,11 @@ export function RoofDesigner(props: {
     }
     if (held.mode === "array") {
       const p = pointAt(e);
-      if (p) setGhosts(arrayFrom(held.anchor, p));
+      if (!p) return;
+      // The row being drawn clicks flush against the panels near it (`snapShift`); Alt places it freely.
+      const drawn = arrayFrom(held.anchor, p);
+      const shift = e.altKey ? null : snapShift(drawn, standingAll(faces, loose), size);
+      setGhosts(shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn);
       return;
     }
     if (held.mode === "battery") {
@@ -1739,10 +1754,24 @@ export function RoofDesigner(props: {
       setLoose(next.loose);
       setStrings(next.strings);
       setPicks([...next.ids.map((id): Pick => ({ kind: "loose", id })), ...labelIds.map((id): Pick => ({ kind: "label", id }))]);
+      // What stays put, for the moved panels to click against.
+      held.others = standingAll(
+        next.faces,
+        next.loose.filter((x) => !next.ids.includes(x.id)),
+      );
     }
     const starts = held.starts ?? {};
-    const dx = p.x - held.at.x;
-    const dy = p.y - held.at.y;
+    let dx = p.x - held.at.x;
+    let dy = p.y - held.at.y;
+    // Moved panels click flush against the panels they come near (`snapShift`); Alt moves them freely.
+    const going = loose
+      .filter((panel) => starts[`l:${panel.id}`])
+      .map((panel) => ({ ...panel, x: starts[`l:${panel.id}`].x + dx, y: starts[`l:${panel.id}`].y + dy }));
+    const shift = e.altKey || !going.length ? null : snapShift(going, held.others ?? [], size);
+    if (shift) {
+      dx += shift.x;
+      dy += shift.y;
+    }
     const moved = <T extends { id: string; x: number; y: number }>(prefix: string, item: T): T => {
       const start = starts[`${prefix}:${item.id}`];
       return start ? { ...item, x: cm(start.x + dx), y: cm(start.y + dy) } : item;
