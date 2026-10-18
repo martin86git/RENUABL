@@ -38,6 +38,8 @@ export interface OrderState {
   ticked: string[];
   /** The supplier (price list name) chosen by hand, by item key. */
   supplier: Record<string, string>;
+  /** Each supplier's own sales order number for this job ("SO"), by price list name: what the installer collects against. */
+  salesOrders: Record<string, string>;
   orderedAt: string | null;
   orderedBy: string | null;
   deliveredAt: string | null;
@@ -53,6 +55,7 @@ export const EMPTY_ORDER: OrderState = {
   added: [],
   ticked: [],
   supplier: {},
+  salesOrders: {},
   orderedAt: null,
   orderedBy: null,
   deliveredAt: null,
@@ -245,6 +248,12 @@ export function cleanOrder(raw: unknown, before: OrderState, by: string, now: st
       const name = line(v, 120);
       if (name && k.length <= 160) supplier[k] = name;
     }
+  const salesOrders: Record<string, string> = {};
+  if (r.salesOrders && typeof r.salesOrders === "object")
+    for (const [k, v] of Object.entries(r.salesOrders as Record<string, unknown>).slice(0, 20)) {
+      const so = line(v, 40);
+      if (so && k.length <= 120) salesOrders[k] = so;
+    }
   const wanted = line(r.wanted, 10);
   const moved = status !== "open" && before.status === "open";
   return {
@@ -257,6 +266,7 @@ export function cleanOrder(raw: unknown, before: OrderState, by: string, now: st
     added,
     ticked,
     supplier,
+    salesOrders,
     orderedAt: status === "open" ? null : moved || !before.orderedAt ? now : before.orderedAt,
     orderedBy: status === "open" ? null : moved || !before.orderedBy ? by : before.orderedBy,
     deliveredAt: status === "delivered" ? (before.deliveredAt ?? now) : null,

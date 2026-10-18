@@ -1,11 +1,18 @@
 /**
- * A booked installation as a calendar event: the card the Install Scheduler
- * opens (laid out like a Google Calendar event), and the same event to put
- * in the business's own calendar, by a pre-filled Google Calendar link or an
- * .ics file. The job sheet is the description: the materials, the customer,
- * the system and the site. The Google link carries only what isn't private
- * (links are kept in browser history): the customer's phone and email go in
- * the .ics file and on the card, never in a link. Pure, tested.
+ * A booked installation as a calendar event for the installer: the card the
+ * Install Scheduler opens (laid out like a Google Calendar event), and the
+ * same event for the business's own calendar, by a pre-filled Google
+ * Calendar link or an .ics file. The description is the job sheet: what to
+ * collect from which wholesaler (against which SO number), the system to be
+ * installed, who to see on site, and the site's notes, each broken down
+ * under its own headings.
+ *
+ * It is never for the customer: it lists the parts and where to collect them.
+ * No one is invited by it, and the customer's email is never in it; the
+ * installer gets their name, phone and address to reach them on the day.
+ * The Google link carries only what isn't private (links are kept in browser
+ * history): the customer's phone goes in the .ics file and on the card. Pure,
+ * tested.
  */
 import type { ISODate } from "../types";
 
@@ -13,24 +20,39 @@ import type { ISODate } from "../types";
 export const INSTALL_DAY = { start: "08:00", end: "16:00" } as const;
 export const MARKET_ZONE = "Australia/Melbourne";
 
+/** What to collect from one wholesaler: its name, the SO number to collect against, and the parts under their headings. */
+export interface Pickup {
+  supplier: string | null;
+  so: string;
+  groups: { title: string; items: { qty: number; item: string; sku: string }[] }[];
+}
+
 export interface InstallEventInput {
   business: string;
   jobId: string;
   date: ISODate;
-  customer: { name: string; email: string; phone: string };
+  customer: { name: string; phone: string };
   address: string;
   kw: number | null;
   batteryKwh: number;
   storeys: string | null;
   installer: string | null;
-  /** The system, as the deal shows it: "PV panel", "Inverter", "Roof type", … */
-  system: { label: string; value: string }[];
-  /** What is being installed, from the order: how many of what. */
-  materials: { qty: number; item: string; sku: string }[];
+  pickups: Pickup[];
+  /** The system to be installed, under its headings: Solar, Inverter, Battery, EV charger, Roof. */
+  system: { title: string; lines: { label: string; value: string }[] }[];
   /** The deal's site notes: distributor, NMI, site access, switchboard. */
   site: { label: string; value: string }[];
   /** The deal's own page, for the link in the event. */
   link: string;
+}
+
+export interface EventGroup {
+  title: string;
+  /** A line under the title: "SO OSW923342". */
+  note?: string;
+  lines: string[];
+  /** A wholesaler to collect from: the heading the parts under it belong to. */
+  supplier?: boolean;
 }
 
 export interface InstallEvent {
@@ -39,8 +61,8 @@ export interface InstallEvent {
   start: string;
   end: string;
   location: string;
-  /** The job sheet, in sections, for the card. */
-  sections: { heading: string; lines: string[] }[];
+  /** The job sheet, in sections, each broken down under headings, for the card. */
+  sections: { heading: string; groups: EventGroup[] }[];
   /** The whole job sheet as text, for the .ics file. */
   description: string;
   googleUrl: string;
@@ -56,33 +78,62 @@ export function installEvent(input: InstallEventInput): InstallEvent {
   const title = [`${kind}: ${input.business}`, [kwText(input.kw), storeys, input.customer.name].filter(Boolean).join(" ")]
     .filter(Boolean)
     .join(" | ");
-  const sections = [
-    { heading: "Materials", lines: input.materials.map((m) => `${m.qty} x ${m.item}${m.sku ? ` (${m.sku})` : ""}`) },
+
+  const sections: InstallEvent["sections"] = [
     {
-      heading: "Customer",
-      lines: [
-        `Name: ${input.customer.name}`,
-        ...(input.customer.email ? [`Email: ${input.customer.email}`] : []),
-        ...(input.customer.phone ? [`Phone: ${input.customer.phone}`] : []),
-        `Address: ${input.address}`,
+      heading: "Materials",
+      groups: input.pickups.flatMap((p) => [
+        // Where to go, and the number to collect against; then what to pick up there, under its headings.
+        {
+          title: p.supplier ? `Collect from ${p.supplier}` : "Supplier not set",
+          note: p.so ? `SO ${p.so}` : "SO number not entered yet",
+          lines: [],
+          supplier: true,
+        },
+        ...p.groups.map((g) => ({ title: g.title, lines: g.items.map((m) => `${m.qty} x ${m.item}${m.sku ? ` (${m.sku})` : ""}`) })),
+      ]),
+    },
+    {
+      heading: "System to be installed",
+      groups: input.system
+        .filter((g) => g.lines.length)
+        .map((g) => ({ title: g.title, lines: g.lines.map((d) => `${d.label}: ${d.value}`) })),
+    },
+    {
+      heading: "On site",
+      groups: [
+        {
+          title: "Customer",
+          lines: [
+            `Name: ${input.customer.name}`,
+            ...(input.customer.phone ? [`Phone: ${input.customer.phone}`] : []),
+            `Address: ${input.address}`,
+          ],
+        },
+        ...(input.site.length ? [{ title: "Site", lines: input.site.map((d) => `${d.label}: ${d.value}`) }] : []),
+        ...(input.installer ? [{ title: "Installer", lines: [input.installer] }] : []),
       ],
     },
-    { heading: "System", lines: input.system.map((d) => `${d.label}: ${d.value}`) },
-    { heading: "Site", lines: input.site.map((d) => `${d.label}: ${d.value}`) },
-  ].filter((s) => s.lines.length);
+  ].filter((s) => s.groups.length);
+
   const description = [
-    ...sections.flatMap((s) => [s.heading, ...s.lines, ""]),
-    ...(input.installer ? [`Installer: ${input.installer}`, ""] : []),
+    ...sections.flatMap((s) => [
+      s.heading.toUpperCase(),
+      ...s.groups.flatMap((g) => [g.title, ...(g.note ? [g.note] : []), ...g.lines, ""]),
+    ]),
     `The job in full: ${input.link}`,
   ].join("\n");
 
   // The Google link: what isn't private, and the way back to the job for the rest.
   const stamp = (date: ISODate, time: string) => `${date.replaceAll("-", "")}T${time.replace(":", "")}00`;
   const shortDetails = [
-    ...input.system.filter((d) => /system size|panel|inverter|battery|roof/i.test(d.label)).map((d) => `${d.label}: ${d.value}`),
+    ...input.pickups.map((p) => `Collect from ${p.supplier ?? "supplier not set"}${p.so ? ` · SO ${p.so}` : ""}`),
+    ...input.system.flatMap((g) =>
+      g.lines.filter((d) => /size|panel$|inverter$|battery$/i.test(d.label)).map((d) => `${d.label}: ${d.value}`),
+    ),
     ...(input.installer ? [`Installer: ${input.installer}`] : []),
     "",
-    `The job in full, with the customer's details and materials: ${input.link}`,
+    `The job sheet in full: ${input.link}`,
   ].join("\n");
   const googleUrl = `https://calendar.google.com/calendar/render?${new URLSearchParams({
     action: "TEMPLATE",
@@ -113,17 +164,16 @@ export function installEvent(input: InstallEventInput): InstallEvent {
   };
 }
 
-/** Text as an .ics value: commas, semicolons, backslashes and new lines escaped, long lines folded. */
-function icsText(s: string): string {
-  const escaped = s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
-  return escaped;
-}
+/** Text as an .ics value: commas, semicolons, backslashes and new lines escaped. */
+const icsText = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+/** A long .ics line folded at 73 characters, each fold starting with a space. */
 function fold(line: string): string {
   const out: string[] = [];
   for (let i = 0; i < line.length; i += 73) out.push((i ? " " : "") + line.slice(i, i + 73));
   return out.join("\r\n");
 }
 
+/** The event as an .ics file. It has no attendees: no one, the customer least of all, is invited by it. */
 function icsFile(e: { uid: string; title: string; start: string; end: string; location: string; description: string }): string {
   return [
     "BEGIN:VCALENDAR",

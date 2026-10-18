@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AlignLeft, CalendarPlus, Download, ExternalLink, MapPin, Phone, Mail, User, X } from "lucide-react";
+import { AlignLeft, CalendarPlus, Download, ExternalLink, MapPin, X } from "lucide-react";
 import clsx from "clsx";
 import { loadInstallEvent, type InstallEvent } from "@/lib/services/after-sale";
 import { PATHS, ui } from "./design-shell";
@@ -15,13 +15,14 @@ const time = (hhmm: string) => {
 };
 
 /**
- * A booked installation's event card, laid out like a Google Calendar event: the title, the day and hours, where it
- * is, who is installing, the customer, and the job sheet (materials, system, site). From it the business puts the
+ * A booked installation's event card for the installer, laid out like a Google Calendar event: the title, the day and
+ * hours, where it is, and the job sheet under its headings (what to collect from which wholesaler and its SO number,
+ * the system to be installed, who to see on site). Never for the customer, and it invites no one. From it the business puts the
  * event in its own calendar: a pre-filled Google Calendar event, or an .ics file for Outlook or Apple Calendar.
  * RENUABL can't see the business's Google Calendar, so the button is always offered.
  */
 export function EventCard({ jobId, onClose }: { jobId: string; onClose: () => void }) {
-  const [data, setData] = useState<{ event: InstallEvent; customer: { name: string; email: string; phone: string } } | null>(null);
+  const [data, setData] = useState<{ event: InstallEvent; customer: { name: string; phone: string } } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
     let gone = false;
@@ -115,40 +116,31 @@ export function EventCard({ jobId, onClose }: { jobId: string; onClose: () => vo
                 </a>
               </div>
               <div className={row}>
-                <User className={icon} aria-hidden />
-                <div className="text-[13.5px] text-ink">
-                  <p>{data.customer.name}</p>
-                  {data.customer.phone && (
-                    <a
-                      href={`tel:${data.customer.phone.replace(/\s/g, "")}`}
-                      className="flex items-center gap-1.5 text-ink-2 hover:text-ink"
-                    >
-                      <Phone className="size-3.5" aria-hidden /> {data.customer.phone}
-                    </a>
-                  )}
-                  {data.customer.email && (
-                    <a href={`mailto:${data.customer.email}`} className="flex items-center gap-1.5 text-ink-2 hover:text-ink">
-                      <Mail className="size-3.5" aria-hidden /> {data.customer.email}
-                    </a>
-                  )}
-                </div>
-              </div>
-              <div className={row}>
                 <AlignLeft className={icon} aria-hidden />
-                <div className="min-w-0 flex-1 space-y-4 text-[13px] leading-relaxed text-ink">
-                  {data.event.sections
-                    .filter((s) => s.heading !== "Customer")
-                    .map((s) => (
-                      <div key={s.heading}>
-                        <p className="font-semibold">{s.heading}</p>
-                        {s.lines.map((l) => (
-                          <p key={l} className={s.heading === "Materials" ? "font-medium" : undefined}>
-                            {l}
-                          </p>
+                <div className="min-w-0 flex-1 space-y-5 text-[13px] leading-relaxed text-ink">
+                  {data.event.sections.map((s) => (
+                    <div key={s.heading}>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">{s.heading}</p>
+                      <div className="mt-1.5 space-y-3">
+                        {s.groups.map((g, i) => (
+                          <div key={i} className={clsx(g.supplier && "border-t border-line pt-3 first:border-0 first:pt-0")}>
+                            <p className={g.supplier ? "text-[14px] font-semibold text-ink" : "font-medium text-ink-2"}>{g.title}</p>
+                            {g.note && (
+                              <p className={clsx("text-[12px]", g.note.startsWith("SO ") ? "font-mono text-ink" : "text-sun-ink")}>
+                                {g.note}
+                              </p>
+                            )}
+                            {g.lines.map((l) => (
+                              <p key={l}>{l}</p>
+                            ))}
+                          </div>
                         ))}
                       </div>
-                    ))}
-                  {data.event.sections.length === 1 && <p className="text-muted">No materials or system details on this job yet.</p>}
+                    </div>
+                  ))}
+                  {!data.event.sections.some((s) => s.heading === "Materials") && (
+                    <p className="text-muted">No order yet: the materials appear here once the customer has signed.</p>
+                  )}
                 </div>
               </div>
             </div>

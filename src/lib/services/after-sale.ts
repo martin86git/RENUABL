@@ -59,6 +59,6 @@ export const loadInstallExtras = () =>
 export type { InstallEvent } from "@/lib/domain/design/install-event";
 /** One booked installation as a calendar event, with its job sheet. */
 export const loadInstallEvent = (jobId: string) =>
-  ask<{ event: import("@/lib/domain/design/install-event").InstallEvent; customer: { name: string; email: string; phone: string } }>(
+  ask<{ event: import("@/lib/domain/design/install-event").InstallEvent; customer: { name: string; phone: string } }>(
     `/api/design/schedule/${encodeURIComponent(jobId)}`,
   );

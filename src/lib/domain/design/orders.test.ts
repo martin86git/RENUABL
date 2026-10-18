@@ -142,3 +142,12 @@ describe("a business's after-sale settings", () => {
     expect(rankedLists({ ...DEFAULT_PREFS, supplierRank: ["B", "gone"] }, ["A", "B", "C"])).toEqual(["B", "A", "C"]);
   });
 });
+
+describe("a supplier's name from its price list", () => {
+  it("reads a clean name from the file name", async () => {
+    const { nameFromList } = await import("./prefs");
+    expect(nameFromList("AWM CLAYTON OCTOBER SOLAR PRICE LIST (1).xlsx")).toBe("AWM Clayton");
+    expect(nameFromList("Solar_Juice_Pricelist_Q4_2026.csv")).toBe("Juice");
+    expect(nameFromList("Rexel.xlsx")).toBe("Rexel");
+  });
+});

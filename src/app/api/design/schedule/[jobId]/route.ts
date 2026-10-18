@@ -9,24 +9,17 @@ import { NO_DESIGN, savedFor } from "@/lib/server/design-proposal-repo";
 
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
 const SITE_KEYS = ["distributor", "nmi", "siteAccess", "switchboard"];
-const SHOWN = [
-  "systemType",
-  "systemSize",
-  "panel",
-  "panelQty",
-  "optimisers",
-  "inverter",
-  "inverterQty",
-  "additionalInverter",
-  "battery",
-  "batteryQty",
-  "batteryStorage",
-  "evCharger",
-  "roofType",
-  "storeys",
-  "phases",
-  "tiltFrames",
+/** The system to be installed, under its headings. */
+const SYSTEM_GROUPS: { title: string; keys: string[] }[] = [
+  { title: "Solar", keys: ["systemType", "systemSize", "panel", "panelQty", "optimisers", "tiltFrames"] },
+  { title: "Inverter", keys: ["inverter", "inverterQty", "additionalInverter", "inverterCapacity", "phases"] },
+  { title: "Battery", keys: ["battery", "batteryQty", "batteryStorage"] },
+  { title: "EV charger", keys: ["evCharger"] },
+  { title: "Roof", keys: ["roofType", "storeys", "propertyType"] },
 ];
+/** The order's parts under their headings, in the order they go on. */
+const PART_GROUPS = ["Panels", "Inverters", "Battery", "Racking", "Electrical", "Added"] as const;
+const PART_TITLES: Record<string, string> = { Added: "Other" };
 
 /**
  * GET: one booked installation as a calendar event: its title, day and hours, address, and the job sheet (the order's
@@ -57,17 +50,31 @@ export async function GET(request: Request, ctx: RouteContext<"/api/design/sched
       business: saved === NO_DESIGN ? who.member.businessName : saved.brand.name || who.member.businessName,
       jobId,
       date: job.installDate as ISODate,
-      customer: { name: customer.name, email: customer.email, phone: customer.phone },
+      customer: { name: customer.name, phone: customer.phone },
       address: job.address || customer.address,
       kw: job.kw,
       batteryKwh: extra?.batteryKwh ?? 0,
       storeys: details.find((d) => d.key === "storeys")?.value ?? null,
       installer: job.details?.installer ?? null,
-      system: details.filter((d) => SHOWN.includes(d.key)).map((d) => ({ label: d.label, value: d.value! })),
-      materials: typeof order === "string" ? [] : order.items.filter((i) => !i.off).map((i) => ({ qty: i.qty, item: i.item, sku: i.sku })),
+      system: SYSTEM_GROUPS.map((g) => ({
+        title: g.title,
+        lines: details.filter((d) => g.keys.includes(d.key)).map((d) => ({ label: d.label, value: d.value! })),
+      })),
+      pickups:
+        typeof order === "string"
+          ? []
+          : order.groups.map((g) => ({
+              supplier: g.supplier,
+              so: (g.list && order.order.salesOrders?.[g.list]) || "",
+              groups: PART_GROUPS.map((part) => ({
+                title: PART_TITLES[part] ?? part,
+                items: g.items.filter((i) => i.group === part).map((i) => ({ qty: i.qty, item: i.item, sku: i.sku })),
+              })).filter((p) => p.items.length),
+            })),
       site: details.filter((d) => SITE_KEYS.includes(d.key)).map((d) => ({ label: d.label, value: d.value! })),
       link: `${site}/design/deals/${jobId}`,
     });
-    return Response.json({ ok: true, event, customer: { name: customer.name, email: customer.email, phone: customer.phone } });
+    // Never the customer's email: this is the installer's sheet, and no one is invited by it.
+    return Response.json({ ok: true, event, customer: { name: customer.name, phone: customer.phone } });
   });
 }

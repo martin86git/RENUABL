@@ -246,6 +246,7 @@ export function OrderPage({ jobId }: { jobId: string }) {
           onQty={setQty}
           onTick={tick}
           onSupplier={(item, list) => set({ supplier: { ...order.supplier, [item.key]: list } })}
+          onSo={(list, so) => set({ salesOrders: { ...(order.salesOrders ?? {}), [list]: so } })}
         />
       ))}
 
@@ -351,12 +352,15 @@ function SupplierCard({
   onQty,
   onTick,
   onSupplier,
+  onSo,
 }: {
   data: JobOrder;
   group: JobOrder["groups"][number];
   onQty: (item: OrderItem, qty: number | null) => void;
   onTick: (item: OrderItem) => void;
   onSupplier: (item: OrderItem, list: string) => void;
+  /** The supplier's sales order number for this job, as they gave it. */
+  onSo: (list: string, so: string) => void;
 }) {
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -373,6 +377,20 @@ function SupplierCard({
           <p className="text-xs text-muted tabular-nums">
             {group.items.length} products · {dollars(cost)} ex GST
           </p>
+          {group.list && (
+            <label className="mt-1.5 flex items-center gap-2 text-xs text-ink-2">
+              SO number
+              <input
+                key={data.order.salesOrders?.[group.list] ?? ""}
+                defaultValue={data.order.salesOrders?.[group.list] ?? ""}
+                onBlur={(e) =>
+                  e.target.value.trim() !== (data.order.salesOrders?.[group.list!] ?? "") && onSo(group.list!, e.target.value.trim())
+                }
+                placeholder="From the supplier"
+                className="w-36 rounded border border-line bg-surface px-2 py-1 font-mono text-xs text-ink"
+              />
+            </label>
+          )}
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
           {group.list && (

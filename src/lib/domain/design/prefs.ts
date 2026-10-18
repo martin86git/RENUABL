@@ -78,9 +78,29 @@ export function cleanPrefs(raw: unknown): BusinessPrefs {
   };
 }
 
-/** A supplier's name as it reads on an order. */
+/** A supplier's name as it reads on an order: the name the business gave it, else one read from its price list's file name. */
 export function supplierLabel(prefs: BusinessPrefs, list: string): string {
-  return prefs.suppliers[list]?.label || list;
+  return prefs.suppliers[list]?.label || nameFromList(list);
+}
+
+const MONTHS =
+  /\b(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?)\b/gi;
+/**
+ * A supplier's name from its price list's file name: "AWM CLAYTON OCTOBER SOLAR PRICE LIST (1).xlsx" reads as "AWM
+ * Clayton". The file's extension, copy numbers, months, years and the words "solar" and "price list" go; short words in
+ * capitals (AWM) stay as they are.
+ */
+export function nameFromList(list: string): string {
+  const words = list
+    .replace(/\.(xlsx|xls|csv)$/i, "")
+    .replace(/\(\d+\)/g, " ")
+    .replace(/[_-]+/g, " ")
+    .replace(/\bprice ?lists?\b|\bpricelist\b|\bsolar\b|\bq[1-4]\b|\b20\d\d\b|\b\d{1,2}\b/gi, " ")
+    .replace(MONTHS, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => (w.length <= 3 && w === w.toUpperCase() ? w : w[0].toUpperCase() + w.slice(1).toLowerCase()));
+  return words.join(" ") || list;
 }
 
 /** Price list names in the business's order of preference: the ranked ones first, then the rest as uploaded (newest first). */
