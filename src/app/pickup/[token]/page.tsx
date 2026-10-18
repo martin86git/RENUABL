@@ -29,9 +29,9 @@ export default async function PickupSlipPage({ params }: PageProps<"/pickup/[tok
   const { token } = await params;
   const slip = await slipByToken(token).catch(() => null);
   if (!slip) notFound();
-  const fact = (label: string, value: string | null) =>
+  const fact = (label: string, value: string | null, wide = false) =>
     value ? (
-      <div>
+      <div className={wide ? "col-span-full" : undefined}>
         <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
         <dd className="mt-0.5 text-[15px] font-medium text-ink">{value}</dd>
       </div>
@@ -72,7 +72,7 @@ export default async function PickupSlipPage({ params }: PageProps<"/pickup/[tok
                 <dd className="mt-0.5 text-[15px] font-medium text-ink">{p.so || <span className="text-muted">Not entered</span>}</dd>
               </div>
               {fact("Collecting for", slip.installDate ? formatDate(slip.installDate, LONG) : null)}
-              {fact("Job in", slip.suburb || null)}
+              {fact("Job in", slip.suburb || null, true)}
               {fact("Collected by", slip.installer)}
               {fact("Ordered", slip.orderedOn ? formatDate(slip.orderedOn, LONG) : null)}
             </dl>
