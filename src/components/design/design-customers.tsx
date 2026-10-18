@@ -212,7 +212,7 @@ export function CustomersPage() {
 
   return (
     <div className={ui.page}>
-      <PageHead eyebrow="Customers" title="Everyone you're working with.">
+      <PageHead eyebrow="CRM · Customers" title="Everyone you're working with.">
         <button className={ui.primary} onClick={() => setAdding(true)} disabled={adding}>
           <UserPlus className="size-4" aria-hidden /> New customer
         </button>

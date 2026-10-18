@@ -37,9 +37,9 @@ export function ProposalsPage({ signed }: { signed: boolean }) {
 
   return (
     <div className={ui.page}>
-      <PageHead eyebrow="Sales" title={signed ? "Signed proposals" : "Proposals sent"}>
+      <PageHead eyebrow="Sales" title={signed ? "Proposals Signed" : "Proposals Sent"}>
         <Link href={signed ? PATHS.proposalsSent : PATHS.proposalsSigned} className={ui.quiet}>
-          {signed ? "Proposals sent" : "Signed proposals"}
+          {signed ? "Proposals Sent" : "Proposals Signed"}
         </Link>
       </PageHead>
       <p className="mt-2 max-w-2xl text-sm text-ink-2">

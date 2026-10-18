@@ -126,7 +126,7 @@ export function PipelinesPage() {
 
   return (
     <div className="px-5 py-8 lg:px-10">
-      <PageHead eyebrow="Sales · Pipelines" title={named.name}>
+      <PageHead eyebrow="CRM · Deals" title={named.name}>
         <Link href={`${PATHS.customers}?new=1`} className={ui.primary}>
           <UserPlus className="size-4" aria-hidden /> New customer
         </Link>

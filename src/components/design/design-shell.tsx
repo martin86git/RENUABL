@@ -63,16 +63,24 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: PATHS.home, label: "Overview", icon: LayoutDashboard },
-  { href: PATHS.customers, label: "Customers", icon: Users },
   {
-    href: PATHS.pipelines,
+    href: PATHS.customers,
+    label: "CRM",
+    icon: Users,
+    also: [PATHS.deals, PATHS.pipelines],
+    under: [
+      { href: PATHS.customers, label: "Customers", icon: Users },
+      { href: PATHS.pipelines, label: "Deals", icon: SquareKanban, also: [PATHS.deals] },
+    ],
+  },
+  {
+    href: PATHS.proposalsSent,
     label: "Sales",
     icon: TrendingUp,
-    also: [PATHS.sales, PATHS.deals],
+    also: [PATHS.proposalsSigned],
     under: [
-      { href: PATHS.pipelines, label: "Pipelines", icon: SquareKanban, also: [PATHS.deals] },
-      { href: PATHS.proposalsSent, label: "Proposals sent", icon: Send },
-      { href: PATHS.proposalsSigned, label: "Signed proposals", icon: FileSignature },
+      { href: PATHS.proposalsSent, label: "Proposals Sent", icon: Send },
+      { href: PATHS.proposalsSigned, label: "Proposals Signed", icon: FileSignature },
     ],
   },
   {
@@ -92,7 +100,7 @@ const NAV: NavItem[] = [
 
 /**
  * The frame every signed-in screen sits in: the product's sections down the
- * left (Overview, Customers, Sales with its Pipelines, Installations, and the
+ * left (Overview, CRM (Customers, Deals), Sales (the proposals), Installations, and the
  * Design tool in orange, as the main tool), with the business's settings
  * and account at its foot. The sections can be folded down to icons and opened
  * out again (kept on the device). `compact` keeps only the icons, for the design
