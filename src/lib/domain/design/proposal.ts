@@ -532,7 +532,13 @@ export function buildProposal(input: ProposalInputs): Built {
     cost: totals.cost,
     margin: costing.margin,
     priceExGst: totals.priceExGst,
-    lines: lines.map((l) => ({ group: l.group, label: l.label, amount: l.amount })),
+    lines: lines.map((l) => ({
+      group: l.group,
+      label: l.label,
+      amount: l.amount,
+      ...(l.qty !== undefined ? { qty: l.qty } : {}),
+      ...(l.sku ? { sku: l.sku } : {}),
+    })),
     projectVersion: project.version,
     design: index,
   };

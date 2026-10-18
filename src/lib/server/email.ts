@@ -11,6 +11,8 @@ export interface Email {
   html: string;
   text: string;
   attachments?: { filename: string; content: string; contentType?: string }[];
+  /** Where a reply goes, when not the site's own reply address: e.g. the member who sent a purchase order. */
+  replyTo?: string;
 }
 
 /** "RENUABL <hello@renuabl.com.au>" → name and address. */
@@ -27,7 +29,7 @@ export function emailProvider(): "sendgrid" | "resend" | null {
 }
 
 async function viaSendGrid(email: Email, key: string, from: string) {
-  const replyTo = process.env.EMAIL_REPLY_TO?.trim();
+  const replyTo = email.replyTo?.trim() || process.env.EMAIL_REPLY_TO?.trim();
   const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
@@ -63,7 +65,7 @@ async function viaResend(email: Email, key: string, from: string) {
     body: JSON.stringify({
       from,
       to: [email.to],
-      reply_to: process.env.EMAIL_REPLY_TO?.trim() || undefined,
+      reply_to: email.replyTo?.trim() || process.env.EMAIL_REPLY_TO?.trim() || undefined,
       subject: email.subject,
       html: email.html,
       text: email.text,

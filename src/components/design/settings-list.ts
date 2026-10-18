@@ -31,6 +31,14 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
     ],
   },
   {
+    title: "After the sale",
+    items: [
+      { slug: "suppliers", label: "Suppliers and ordering" },
+      { slug: "installer-invoices", label: "Installer invoices" },
+      { slug: "automations", label: "Customer reminders" },
+    ],
+  },
+  {
     title: "Business",
     items: [
       { slug: "users", label: "Users and permissions" },

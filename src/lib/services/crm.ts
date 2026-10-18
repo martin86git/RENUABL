@@ -13,7 +13,7 @@ export type Answer<T> = ({ ok: true } & T) | { ok: false; message: string; signe
 
 const UNREACHABLE = "We couldn't reach your account just now. Try again in a moment.";
 
-async function ask<T>(path: string, init?: { method: string; body?: unknown }): Promise<Answer<T>> {
+export async function ask<T>(path: string, init?: { method: string; body?: unknown }): Promise<Answer<T>> {
   try {
     const res = await fetch(path, {
       method: init?.method ?? "GET",

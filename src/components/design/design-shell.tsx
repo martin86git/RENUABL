@@ -4,7 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  CalendarDays,
+  FileSignature,
   MessageSquare,
+  ReceiptText,
+  Send,
+  Truck,
   HardHat,
   LayoutDashboard,
   ChevronLeft,
@@ -33,6 +38,11 @@ export const PATHS = {
   customers: "/design/customers",
   designer: "/design/roof",
   messages: "/design/messages",
+  proposalsSent: "/design/sales/proposals",
+  proposalsSigned: "/design/sales/signed",
+  scheduler: "/design/installations/scheduler",
+  orders: "/design/installations/orders",
+  invoices: "/design/installations/invoices",
   settings: "/design/settings",
   brand: "/design/settings/company",
   account: "/design/account",
@@ -59,9 +69,23 @@ const NAV: NavItem[] = [
     label: "Sales",
     icon: TrendingUp,
     also: [PATHS.sales, PATHS.deals],
-    under: [{ href: PATHS.pipelines, label: "Pipelines", icon: SquareKanban, also: [PATHS.deals] }],
+    under: [
+      { href: PATHS.pipelines, label: "Pipelines", icon: SquareKanban, also: [PATHS.deals] },
+      { href: PATHS.proposalsSent, label: "Proposals sent", icon: Send },
+      { href: PATHS.proposalsSigned, label: "Signed proposals", icon: FileSignature },
+    ],
   },
-  { href: PATHS.installations, label: "Installations", icon: HardHat },
+  {
+    href: PATHS.installations,
+    label: "Installations",
+    icon: HardHat,
+    under: [
+      { href: PATHS.installations, label: "In the works", icon: HardHat },
+      { href: PATHS.scheduler, label: "Install Scheduler", icon: CalendarDays },
+      { href: PATHS.orders, label: "Ordering Station", icon: Truck },
+      { href: PATHS.invoices, label: "Installer Invoices", icon: ReceiptText },
+    ],
+  },
   { href: PATHS.messages, label: "Messages", icon: MessageSquare },
   { href: PATHS.designer, label: "Design tool", icon: PenTool, main: true },
 ];
@@ -137,6 +161,9 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
   // The overview and the settings have pages beneath them that are their own entries here, so each is lit only on its own page.
   const within = (href: string) => (href === PATHS.home ? path === href : path === href || path.startsWith(`${href}/`));
   const active = (href: string, also: string[] = []) => [href, ...also].some(within);
+  /** The one subsection you are in: the most particular of those that hold this page (Installations' own list holds its others). */
+  const here = (under: NonNullable<NavItem["under"]>) =>
+    under.filter((u) => active(u.href, u.also)).sort((a, b) => b.href.length - a.href.length)[0];
   const item = (href: string, label: string, Icon: LucideIcon, also?: string[], main?: boolean) => (
     <Link
       key={href}
@@ -229,10 +256,10 @@ function Shell({ children, compact: tool, needsAccount }: { children: React.Reac
                   <Link
                     key={u.label}
                     href={u.href}
-                    aria-current={active(u.href, u.also) ? "page" : undefined}
+                    aria-current={u === here(n.under!) ? "page" : undefined}
                     className={clsx(
                       "flex h-10 shrink-0 items-center gap-3 rounded-md px-3 text-sm font-medium lg:h-9 lg:gap-2.5 lg:text-[13px]",
-                      active(u.href, u.also) ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+                      u === here(n.under!) ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
                     )}
                   >
                     <u.icon className="size-[18px] shrink-0 lg:size-4" aria-hidden />

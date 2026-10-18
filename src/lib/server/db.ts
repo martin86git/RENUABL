@@ -375,6 +375,58 @@ create table if not exists design_messages (
 );
 create index if not exists design_messages_job on design_messages(business_id, job_id, at);
 create index if not exists design_messages_unread on design_messages(business_id) where from_customer and read_at is null;
+-- A business's after-sale settings (domain/design/prefs.ts): suppliers' order addresses, the invoice tolerance, and
+-- the automations that reach its customers (each off until turned on).
+create table if not exists design_prefs (
+  business_id text primary key references businesses(id) on delete cascade,
+  prefs jsonb not null,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+-- A signed job's order for its hardware (domain/design/orders.ts): only the hand changes are kept; the worked-out
+-- quantities always come from the version the customer accepted. Made when a proposal is accepted.
+create table if not exists design_orders (
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  status text not null default 'open',
+  data jsonb not null,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_by text,
+  updated_at timestamptz not null default now(),
+  primary key (business_id, job_id),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+-- What a signed job's installation was allowed for in its quote (domain/design/installer-invoices.ts), fixed at signing.
+create table if not exists design_install_costs (
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  cost jsonb not null,
+  at timestamptz not null default now(),
+  primary key (business_id, job_id),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+-- Installers' invoices, read from their file or typed in; job_id is null while one waits to be put against a job.
+-- The file itself is never kept: only the figures the business checked.
+create table if not exists design_installer_invoices (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text,
+  invoice jsonb not null,
+  uploaded_by text not null,
+  at timestamptz not null default now(),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete set null (job_id)
+);
+create index if not exists design_installer_invoices_job on design_installer_invoices(business_id, job_id);
+-- Reminders sent to a business's customers, so each is sent once (server/design-reminders.ts).
+create table if not exists design_reminders_sent (
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  kind text not null,
+  install_date date not null,
+  at timestamptz not null default now(),
+  primary key (business_id, job_id, kind, install_date)
+);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

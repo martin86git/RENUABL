@@ -43,6 +43,9 @@ export const ACTIVITY_WORD = {
   stage: "Stage",
   proposal: "Proposal",
   message: "Message",
+  order: "Order",
+  invoice: "Invoice",
+  reminder: "Reminder",
 } as const;
 
 const POINTS = [

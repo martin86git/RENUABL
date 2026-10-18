@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DesignAccountPage } from "@/components/design/design-account";
 import { BrandSettings } from "@/components/design/design-proposal";
+import { AfterSaleSettings, type AfterSalePart } from "@/components/design/settings-after-sale";
 import { DesignSettings, type PricePart } from "@/components/design/design-settings";
 import { DesignShell } from "@/components/design/design-shell";
 import { settingBySlug } from "@/components/design/settings-list";
@@ -29,6 +30,8 @@ const PROPOSAL: Record<string, ProposalPart> = {
   customiser: "customiser",
 };
 
+const AFTER_SALE: Record<string, AfterSalePart> = { suppliers: "suppliers", "installer-invoices": "invoices", automations: "automations" };
+
 /** One page of a business's settings, beside the settings' own nav. */
 export default async function DesignSettingPage({ params }: PageProps<"/design/settings/[section]">) {
   const { section } = await params;
@@ -50,6 +53,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <BrandSettings part={BRAND[section]} />
         ) : section in PROPOSAL ? (
           <ProposalSettings part={PROPOSAL[section]} />
+        ) : section in AFTER_SALE ? (
+          <AfterSaleSettings part={AFTER_SALE[section]} />
         ) : section === "billing" ? (
           <BillingPage />
         ) : (

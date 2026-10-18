@@ -3,7 +3,8 @@ import { todayInMarket } from "@/lib/domain/market";
 import { NO_DEPOSIT, NOT_ACCEPTED, PAID_WAY_WRONG, PAID_WAYS, type PaidWay } from "@/lib/domain/design/deposit";
 import { cleanAcceptance } from "@/lib/domain/design/proposal";
 import { answer, readBody } from "@/lib/server/design-context";
-import { acceptProposal, markOpened, publicProposal, sayPaid } from "@/lib/server/design-proposal-repo";
+import { acceptProposal, markOpened, proposalJob, publicProposal, sayPaid } from "@/lib/server/design-proposal-repo";
+import { afterSigning } from "@/lib/server/design-after-sale-repo";
 import { tellAccepted, tellPaid } from "@/lib/server/design-notify";
 import { allow } from "@/lib/server/rate-limit";
 
@@ -56,7 +57,13 @@ export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[t
       const result = await acceptProposal(token, input.value.name, today);
       if (!result) return notFound();
       // Told once, when it is first accepted, and not waited for: an email that can't be sent never holds the customer up.
-      if (result === "accepted-now") after(() => tellAccepted(token));
+      if (result === "accepted-now")
+        after(async () => {
+          await tellAccepted(token);
+          // The order opens in the Ordering Station and the installation allowance is kept for Installer Invoices.
+          const job = await proposalJob(token).catch(() => null);
+          if (job) await afterSigning(job.businessId, job.jobId);
+        });
       if (result !== "accepted-now" && result !== "accepted" && result !== "live") {
         const why = {
           lapsed: "This price has lapsed. Ask for an up-to-date proposal.",
