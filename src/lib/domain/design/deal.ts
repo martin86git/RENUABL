@@ -522,6 +522,12 @@ export interface JobExtra {
   youPay: number;
   depositReceived: number;
   ordered: boolean;
+  /** The signed system's price with GST, the STCs taken off, the deposit asked, and the Solar Victoria rebate and loan on it. */
+  incGst?: number;
+  stc?: number;
+  depositAsked?: number | null;
+  solarVicRebate?: number | null;
+  solarVicLoan?: number | null;
 }
 
 /**

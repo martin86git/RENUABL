@@ -5,6 +5,7 @@ import { ExternalLink, Mail, PenTool, Send, X } from "lucide-react";
 import clsx from "clsx";
 import type { Activity, Customer, Job } from "@/lib/domain/design/crm";
 import { DEAL_EMAIL_TEMPLATES, MAX_BODY, MAX_SUBJECT, fillTemplate, senderName } from "@/lib/domain/design/deal-email";
+import type { SectionLine } from "@/lib/domain/design/deal-sections";
 import { dealEmailStatus, emailDeal } from "@/lib/services/crm";
 import { PATHS, ui } from "./design-shell";
 
@@ -229,6 +230,77 @@ export function ContactActions({ customer, onEmail }: { customer: Customer; onEm
         <a href={`tel:${customer.phone.replace(/\s/g, "")}`} className={clsx(ui.quiet, "h-8 text-xs")}>
           Call {customer.phone}
         </a>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One line of the Installation, Network or Financials tab. A line known elsewhere (the install date, the signed
+ * proposal's price) is shown as it is; a field is typed into in place, as its kind asks (words, notes, a date, a choice
+ * or dollars), and leaving it saves it. Typed over a figure from the proposal, it is marked so, with the way back.
+ */
+export function SectionFieldLine({ line, onSave }: { line: SectionLine; onSave: (value: string) => void }) {
+  const [text, setText] = useState<string | null>(null);
+  const field = line.field;
+  if (!field)
+    return (
+      <div>
+        <p className="text-xs text-muted">{line.label}</p>
+        <p className={clsx("mt-0.5 text-sm", line.value ? "text-ink" : "text-muted")}>{line.value ?? "--"}</p>
+      </div>
+    );
+  // What the box holds: dollars without their sign, as typed.
+  const stored = line.typed ? (line.value ?? "").replace(/[$,]/g, "") : "";
+  const done = () => {
+    if (text !== null && text.trim() !== stored) onSave(text.trim());
+    setText(null);
+  };
+  const box = clsx(
+    "mt-0.5 block w-[calc(100%+1rem)] -mx-2 rounded-md border bg-transparent px-2 text-sm text-ink outline-none placeholder:text-muted focus:border-forest focus:bg-surface",
+    line.typed && line.filled ? "border-sun-line" : "border-transparent hover:border-line",
+  );
+  return (
+    <div>
+      <label className="block text-xs text-muted">
+        {line.label}
+        {field.kind === "select" ? (
+          <select className={clsx(box, "h-8 appearance-auto")} value={stored} onChange={(e) => onSave(e.target.value)}>
+            <option value="">--</option>
+            {field.options!.map((o) => (
+              <option key={o}>{o}</option>
+            ))}
+          </select>
+        ) : field.kind === "long" ? (
+          <textarea
+            className={clsx(box, "min-h-16 py-1.5 leading-relaxed")}
+            value={text ?? stored}
+            placeholder="--"
+            maxLength={2000}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={done}
+          />
+        ) : (
+          <input
+            className={clsx(box, "h-8", field.kind === "money" && "tabular-nums")}
+            type={field.kind === "date" ? "date" : "text"}
+            inputMode={field.kind === "money" ? "decimal" : undefined}
+            value={text ?? (field.kind === "money" && !line.typed ? "" : stored)}
+            placeholder={field.kind === "money" ? (line.filled ?? "$") : "--"}
+            maxLength={120}
+            onChange={(e) => (field.kind === "date" ? onSave(e.target.value) : setText(e.target.value))}
+            onBlur={field.kind === "date" ? undefined : done}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") setText(null);
+            }}
+          />
+        )}
+      </label>
+      {line.typed && line.filled && (
+        <button className="mt-1 text-[11px] text-sun-ink underline underline-offset-2" onClick={() => onSave("")}>
+          Typed in by hand: use the proposal&apos;s ({line.filled})
+        </button>
       )}
     </div>
   );

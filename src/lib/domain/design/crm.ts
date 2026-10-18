@@ -8,6 +8,7 @@
  * These are a solar business's own customers. They have nothing to do with
  * RENUABL's homeowners, reservations or installation partners.
  */
+import { cleanSectionDetails } from "./deal-sections";
 
 // ---------------------------------------------------------------------------
 // Stages and sources
@@ -314,7 +315,8 @@ export function cleanJobDetails(raw: unknown): Record<string, string> {
   if (installer) kept[INSTALLER_KEY] = installer;
   for (const key of Object.keys(PROGRESS) as ProgressKey[])
     if ((PROGRESS[key] as readonly string[]).includes(r[key] as string)) kept[key] = r[key] as string;
-  return kept;
+  // The Installation, Network and Financials tabs' fields, each in range for its kind.
+  return { ...kept, ...cleanSectionDetails(r) };
 }
 
 /** What a job is called when nothing was typed. */

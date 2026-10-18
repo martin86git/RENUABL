@@ -14,12 +14,15 @@ import {
   type Job,
   type JobStage,
 } from "@/lib/domain/design/crm";
-import { systemDetails, type DealDetail } from "@/lib/domain/design/deal";
+import { systemDetails, type DealDetail, type JobExtra } from "@/lib/domain/design/deal";
+import { DEAL_SECTIONS, MOVED_FROM_SYSTEM, sectionLines, type DealSection } from "@/lib/domain/design/deal-sections";
+import { INSTALLER_KEY } from "@/lib/domain/design/crm";
+import { loadInstallExtras } from "@/lib/services/after-sale";
 import { addActivity, deleteJob, dollars, loadCustomer, loadDealDesign, loadJob, saveJob, shortDate } from "@/lib/services/crm";
 import { ACTIVITY_WORD, StageTag } from "./design-home";
 import { DealChat } from "./chat-panel";
 import { useDesignAccount } from "./design-account";
-import { ContactActions, DealEmail, DesignDrawer } from "./deal-tools";
+import { ContactActions, DealEmail, DesignDrawer, SectionFieldLine } from "./deal-tools";
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
 
@@ -135,6 +138,12 @@ export function DealPage({ id }: { id: string }) {
   const [drawer, setDrawer] = useState(useSearchParams().get("design") === "1");
   const [folded, setFolded] = useState(false);
   const [account] = useDesignAccount();
+  // Which of the deal's tabs of fields is showing, and the signed proposal's figures for Financials.
+  const [section, setSection] = useState<DealSection["id"]>("system");
+  const [extra, setExtra] = useState<JobExtra | null>(null);
+  useEffect(() => {
+    void loadInstallExtras().then((res) => res.ok && setExtra(res.extras.find((e) => e.jobId === id) ?? null));
+  }, [id]);
   const business = account?.signedIn ? (account.business?.name ?? "") : "";
   useEffect(() => {
     try {
@@ -221,6 +230,27 @@ export function DealPage({ id }: { id: string }) {
   }
   const details = systemDetails(designed?.design ?? null, designed?.form ?? null, job.details);
   const known = details.filter((d) => d.value).length;
+  const systemLines = details.filter((d) => !(MOVED_FROM_SYSTEM as readonly string[]).includes(d.key));
+  const sectionTab =
+    section === "system"
+      ? []
+      : sectionLines(section, job.details, {
+          installDate: job.installDate ? shortDate(job.installDate) : null,
+          installer: job.details?.[INSTALLER_KEY] ?? null,
+          signed: extra
+            ? {
+                incGst: extra.incGst ?? null,
+                stc: extra.stc ?? null,
+                youPay: extra.youPay,
+                depositAsked: extra.depositAsked ?? null,
+                depositReceived: extra.depositReceived,
+                solarVicRebate: extra.solarVicRebate ?? null,
+                solarVicLoan: extra.solarVicLoan ?? null,
+              }
+            : null,
+        });
+  const tabLines = section === "system" ? systemLines : sectionTab;
+  const tabFilled = tabLines.filter((l) => l.value).length;
   const setDetail = (key: string, text: string) => {
     const next = { ...job.details };
     if (text) next[key] = text;
@@ -377,21 +407,53 @@ export function DealPage({ id }: { id: string }) {
         </Block>
 
         <Block
-          title="System details"
+          title="Deal properties"
           action={
             <span className="text-xs tabular-nums text-muted">
-              {known} of {details.length}
+              {tabFilled} of {tabLines.length} filled
             </span>
           }
         >
-          <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
-            {job.projectId
-              ? "Filled in from the design. Click any line to type over it."
-              : "These fill in from the design once the roof has been drawn and saved. Click any line to type it in now."}
-          </p>
-          {details.map((d) => (
-            <DetailField key={d.key} line={d} onSave={(text) => setDetail(d.key, text)} />
-          ))}
+          {/* System, Installation, Network and Financials, as tabs. */}
+          <div className="-mx-1 flex gap-1 rounded-md bg-surface-2 p-1" role="tablist" aria-label="Deal properties">
+            {DEAL_SECTIONS.map((sec) => (
+              <button
+                key={sec.id}
+                role="tab"
+                aria-selected={section === sec.id}
+                onClick={() => setSection(sec.id)}
+                className={clsx(
+                  "h-7 flex-1 rounded px-1 text-[11.5px] font-medium",
+                  section === sec.id ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-2 hover:text-ink",
+                )}
+              >
+                {sec.label}
+              </button>
+            ))}
+          </div>
+          {section === "system" ? (
+            <>
+              <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
+                {job.projectId
+                  ? "Filled in from the design. Click any line to type over it."
+                  : "These fill in from the design once the roof has been drawn and saved. Click any line to type it in now."}
+              </p>
+              {systemLines.map((d) => (
+                <DetailField key={d.key} line={d} onSave={(text) => setDetail(d.key, text)} />
+              ))}
+            </>
+          ) : (
+            <>
+              {section === "financials" && !extra && (
+                <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
+                  The price, STCs and deposit fill in once the customer signs a proposal.
+                </p>
+              )}
+              {sectionTab.map((l) => (
+                <SectionFieldLine key={l.key} line={l} onSave={(text) => setDetail(l.key, text)} />
+              ))}
+            </>
+          )}
         </Block>
       </aside>
 

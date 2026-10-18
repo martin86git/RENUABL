@@ -688,6 +688,12 @@ export interface InstallExtra {
   depositReceived: number;
   /** Whether its order has gone to the suppliers (ordered or delivered). */
   ordered: boolean;
+  /** The signed system's price with GST, the STCs taken off, the deposit asked, and the Solar Victoria rebate and loan on it. */
+  incGst?: number;
+  stc?: number;
+  depositAsked?: number | null;
+  solarVicRebate?: number | null;
+  solarVicLoan?: number | null;
 }
 
 /** For each signed job: its battery, what is payable, the deposit received and whether its parts are ordered. */
@@ -709,6 +715,11 @@ export async function installExtras(businessId: string): Promise<InstallExtra[]>
       youPay: agreed.price.youPay,
       depositReceived: r.received ? (agreed.terms?.deposit ?? 0) : 0,
       ordered: r.status === "ordered" || r.status === "delivered",
+      incGst: agreed.price.incGst,
+      stc: agreed.price.stc,
+      depositAsked: agreed.terms?.deposit ?? null,
+      solarVicRebate: agreed.price.solarVic?.rebate ?? null,
+      solarVicLoan: agreed.price.solarVic?.loan ?? null,
     };
   });
 }
