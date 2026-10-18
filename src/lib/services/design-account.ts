@@ -142,3 +142,23 @@ export async function removeMember(email: string): Promise<{ members?: MemberLin
   const res = await send<MembersAnswer>("/api/design/members", "DELETE", { email });
   return res.ok ? { members: res.members } : { problem: res.message ?? "They couldn't be removed. Try again in a moment." };
 }
+
+/** Signs in with a password. `noPassword` when the email has none (it signs in by link or Google instead). */
+export async function signInWithPassword(email: string, password: string, next?: string) {
+  return send<Answer & { next?: string; noPassword?: boolean }>("/api/design/sign-in", "POST", { email, password, next });
+}
+
+/** Whether the signed-in person has a password yet. */
+export async function passwordState(): Promise<boolean | null> {
+  const res = await send<Answer & { hasPassword?: boolean }>("/api/design/password", "GET");
+  return res.ok ? Boolean(res.hasPassword) : null;
+}
+
+/** Sets or changes the signed-in person's password. Null when done, else why not. */
+export async function savePassword(password: string): Promise<string | null> {
+  const res = await send<Answer>("/api/design/password", "PUT", { password });
+  return res.ok ? null : (res.message ?? UNREACHABLE);
+}
+
+/** Where "Continue with Google" goes. */
+export const GOOGLE_SIGN_IN = "/api/auth/google";

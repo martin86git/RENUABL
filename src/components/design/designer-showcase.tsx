@@ -113,6 +113,46 @@ const STEPS: { at: number; text: string; status: FeatureStatus; icon: typeof Spa
 ];
 const AUTO_TOTAL = 31500;
 
+/** What each step shows, said plainly beneath the demo. Every line is something the designer does today. */
+const NARRATION: { title: string; body: string }[] = [
+  {
+    title: "Open a lead and the roof is already there.",
+    body: "The site is created from the lead's address: the roof from above, to scale, ready to design. No typing the address in again.",
+  },
+  {
+    title: "Lay your first panels.",
+    body: "The racking is worked out by panel as you go: rails, splices and roof brackets are counted and priced in the quote.",
+  },
+  {
+    title: "Add another array.",
+    body: "Every panel you add updates the quote: more rails, more brackets, and the installation cost for the bigger system.",
+  },
+  {
+    title: "A third array, on the flat garage roof.",
+    body: "The split array is picked up and its installation cost added at your rate. The flat roof gets its tin kit and Kliplok interfaces.",
+  },
+  {
+    title: "Tilt the panels on the flat roof.",
+    body: "Panels on a flat roof tilted more than 5° automatically add tilt kits and the tilt frame installation cost.",
+  },
+  {
+    title: "The inverter is suggested for you.",
+    body: "From the kW of panels on the roof, the designer suggests the inverter that suits, with the reason. No working out which one to add.",
+  },
+  {
+    title: "Three-phase is costed on its own.",
+    body: "Choose a three-phase inverter and the three-phase installation fee and three-phase smart meter join the quote.",
+  },
+  {
+    title: "The battery is recommended.",
+    body: "From what the panels make and the customer's bill, the designer recommends how much storage the home needs.",
+  },
+  {
+    title: "The panels are strung.",
+    body: "Strings are drawn automatically and checked against the inverter's voltage and current limits.",
+  },
+];
+
 /** Where the eye goes at each step: the part of the picture lit (x, y, width, height), the quote lines and the overlays that go with it. */
 type Overlay = "lead" | "stats" | "kit" | "supply" | "bill";
 const FOCUS: { area: [number, number, number, number] | null; keys: string[]; overlays: Overlay[] }[] = [
@@ -524,6 +564,25 @@ export function AutomationDemo() {
           <span className="text-[12px] text-muted">With your margin and GST</span>
           <span className="text-[20px] font-medium tabular-nums text-ink">{lines.length ? money(price) : "–"}</span>
         </div>
+      </div>
+      {/* The narration: what just happened, in plain words, with where the demo is up to. */}
+      <div className="rounded-xl border border-line bg-surface px-5 py-4 lg:col-span-2">
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted tabular-nums">
+            {step + 1} of {STEPS.length}
+          </span>
+          <span className="flex flex-1 gap-1" aria-hidden>
+            {STEPS.map((_, i) => (
+              <span key={i} className={clsx("h-1 flex-1 rounded-full transition-colors", i <= step ? "bg-sun-line" : "bg-surface-2")} />
+            ))}
+          </span>
+        </div>
+        <p key={`t${step}`} className="mt-3 animate-[fade-up_300ms_ease-out] text-[17px] font-medium tracking-tight text-ink">
+          {NARRATION[step].title}
+        </p>
+        <p key={`b${step}`} className="mt-1 animate-[fade-up_300ms_ease-out] text-[15px] leading-relaxed text-ink-2">
+          {NARRATION[step].body}
+        </p>
       </div>
       <figcaption className="text-xs text-muted lg:col-span-2">
         An example on a drawn roof, with example prices. In the tool, the prices are your own and the roof is the real one from above.

@@ -854,15 +854,15 @@ export function arrayCount(design: Layout): number {
 }
 
 /**
- * On a flat roof a panel only sits at a tilt on a tilt frame. Panels at this many degrees or more are taken to
- * need one when the quote's roof is flat. VERIFY.
+ * On a flat roof a panel only sits at a tilt on a tilt frame. Panels at more than this many degrees are taken to
+ * need one when the quote's roof is flat (Martin, 18 Oct 2026: over 5°; it was 10° or more).
  */
-export const TILT_FRAME_FROM = 10;
+export const TILT_FRAME_ABOVE = 5;
 
 /** The panels sitting at a tilt that would need a frame on a flat roof, and the steepest of them. */
 export function tiltedPanels(design: Layout): { count: number; steepest: number } {
   const tilts = panelAspects(design)
     .map((p) => p.tilt)
-    .filter((tilt) => tilt >= TILT_FRAME_FROM);
+    .filter((tilt) => tilt > TILT_FRAME_ABOVE);
   return { count: tilts.length, steepest: tilts.length ? Math.max(...tilts) : 0 };
 }

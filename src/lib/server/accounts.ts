@@ -40,12 +40,20 @@ export async function redeemLoginToken(token: string): Promise<{ sessionId: stri
     partnerId = p.id;
   }
   if (t.role === "staff" && !isStaff(t.email)) return null;
+  return { sessionId: await openSession(t.email, t.role, partnerId), role: t.role, next: t.next };
+}
+
+/**
+ * Starts a session for an email whose owner has just proven it (a link, a password set while signed in, or Google).
+ * Answers the session id for the cookie; only its hash is kept.
+ */
+export async function openSession(email: string, role: AccountRole, partnerId: string | null = null): Promise<string> {
   const sessionId = randomToken(32);
   await query(
     `insert into sessions (id_hash, email, role, partner_id, expires_at) values ($1,$2,$3,$4, now() + ($5 || ' days')::interval)`,
-    [hash(sessionId), t.email, t.role, partnerId, String(SESSION_DAYS)],
+    [hash(sessionId), email.toLowerCase(), role, partnerId, String(SESSION_DAYS)],
   );
-  return { sessionId, role: t.role, next: t.next };
+  return sessionId;
 }
 
 export interface Session {

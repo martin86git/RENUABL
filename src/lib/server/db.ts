@@ -418,6 +418,12 @@ create table if not exists design_installer_invoices (
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete set null (job_id)
 );
 create index if not exists design_installer_invoices_job on design_installer_invoices(business_id, job_id);
+-- Passwords for the roof designer's sign-in (server/design-passwords.ts): scrypt hashes, set only by someone signed in.
+create table if not exists design_passwords (
+  email text primary key,
+  hash text not null,
+  updated_at timestamptz not null default now()
+);
 -- Reminders sent to a business's customers, so each is sent once (server/design-reminders.ts).
 create table if not exists design_reminders_sent (
   business_id text not null references businesses(id) on delete cascade,

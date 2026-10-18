@@ -1,5 +1,7 @@
 "use client";
 
+import { SignInForm, signInNote } from "./sign-in-form";
+import { PASSWORD_MIN } from "@/lib/domain/design/password";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
@@ -10,10 +12,11 @@ import {
   designAccount,
   forgetDesignAccount,
   loadMembers,
+  passwordState,
+  savePassword,
   removeMember,
   setMemberPermissions,
   renameBusiness,
-  requestSignInLink,
   setUpBusiness,
   type DesignAccount,
   type MemberLine,
@@ -284,73 +287,28 @@ export function DesignRoofList({ onOpen }: { onOpen: (roof: DesignRoof) => void 
   );
 }
 
-/** /design/sign-in: an email, and a one-time link sent to it. The same form whether it's someone's first time or not. */
-export function DesignSignIn({ expired }: { expired?: boolean }) {
+/** /design/sign-in: Google, an email and password, or an email alone (a link is sent). */
+export function DesignSignIn({ error }: { error?: string }) {
   const [account] = useDesignAccount();
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [answer, setAnswer] = useState<{ ok: boolean; message: string } | null>(null);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    const res = await requestSignInLink(email.trim(), "/design");
-    setBusy(false);
-    setAnswer({ ok: res.ok, message: res.message ?? (res.ok ? "Check your email for the link." : "That didn't work. Try again.") });
-  };
   return (
     <Frame>
-      <p className={eyebrow}>Roof designer</p>
-      <h1 className="mt-3 text-[30px] leading-tight tracking-tight text-ink">Sign in to keep your work.</h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
-        Enter your email and we&apos;ll send a link that signs you in. No password. If it&apos;s your first time, you&apos;ll name your
-        business next, and the roofs and prices on this device come with you.
-      </p>
-      {expired && !answer && (
-        <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-[13.5px] text-warning" role="alert">
-          That sign-in link has expired or was already used. Enter your email for a new one.
-        </p>
-      )}
-      {account?.signedIn ? (
-        <p className="mt-6 text-[15px] text-ink-2">
-          You&apos;re signed in as {account.email}.{" "}
-          <Link href="/design" className="font-medium text-ink underline underline-offset-4">
-            Open the designer
-          </Link>
-        </p>
-      ) : answer?.ok ? (
-        <p className="mt-6 rounded-md bg-surface-2 px-4 py-3 text-[14px] leading-relaxed text-ink" role="status">
-          {answer.message}
-        </p>
-      ) : (
-        <form onSubmit={submit} className="mt-6 space-y-4">
-          <label className="block text-sm font-medium text-ink">
-            Email
-            <input
-              type="email"
-              required
-              className={`${input} mt-1.5`}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              placeholder="you@yourbusiness.com.au"
-            />
-          </label>
-          {answer && (
-            <p className="text-[13px] text-danger" role="alert">
-              {answer.message}
-            </p>
-          )}
-          <button type="submit" className={primary} disabled={busy}>
-            {busy ? "Sending…" : "Email me a sign-in link"}
-          </button>
-        </form>
-      )}
-      <p className="mt-8 text-[13px] leading-relaxed text-muted">
-        Just trying it out?{" "}
+      <h1 className="text-[28px] leading-tight tracking-tight text-ink">Sign in</h1>
+      <div className="mt-6">
+        {account?.signedIn ? (
+          <p className="text-[15px] text-ink-2">
+            You&apos;re signed in as {account.email}.{" "}
+            <Link href="/design" className="font-medium text-ink underline underline-offset-4">
+              Open the designer
+            </Link>
+          </p>
+        ) : (
+          <SignInForm note={signInNote(error)} />
+        )}
+      </div>
+      <p className="mt-8 text-[13px] text-muted">
         <Link href="/design/roof" className="font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
-          Use the designer without signing in
+          Try the designer without an account
         </Link>
-        : your work stays on this device.
       </p>
     </Frame>
   );
@@ -465,6 +423,8 @@ export function DesignAccountPage() {
           </section>
         )}
 
+        <PasswordSection />
+
         <section className={card} aria-labelledby="people">
           <h2 id="people" className="text-[19px] tracking-tight text-ink">
             People
@@ -545,5 +505,53 @@ export function DesignAccountPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+/** Your own password: set one to sign in with your email and password as well as by link or Google. */
+function PasswordSection() {
+  const [has, setHas] = useState<boolean | null>(null);
+  const [value, setValue] = useState("");
+  const [state, setState] = useState<{ ok: boolean; message: string } | null>(null);
+  useEffect(() => {
+    void passwordState().then(setHas);
+  }, []);
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const problem = await savePassword(value);
+    if (problem) return setState({ ok: false, message: problem });
+    setHas(true);
+    setValue("");
+    setState({ ok: true, message: "Saved. You can sign in with your email and this password." });
+  };
+  return (
+    <section className={card} aria-labelledby="password">
+      <h2 id="password" className="text-[19px] tracking-tight text-ink">
+        Password
+      </h2>
+      <p className="mt-1 text-sm text-ink-2">
+        {has ? "You have a password. Change it here." : "Set one to sign in with your email and a password."}
+      </p>
+      <form onSubmit={save} className="mt-3 flex flex-wrap items-center gap-3">
+        <input
+          type="password"
+          className={`${input} max-w-sm`}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          autoComplete="new-password"
+          minLength={PASSWORD_MIN}
+          aria-label={has ? "New password" : "Password"}
+          placeholder={`At least ${PASSWORD_MIN} characters`}
+        />
+        <button type="submit" className={primary} disabled={value.length < PASSWORD_MIN}>
+          {has ? "Change password" : "Set password"}
+        </button>
+      </form>
+      {state && (
+        <p className={state.ok ? "mt-2 text-sm text-positive" : "mt-2 text-sm text-danger"} role="status">
+          {state.message}
+        </p>
+      )}
+    </section>
   );
 }

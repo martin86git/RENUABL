@@ -9,11 +9,11 @@ import { STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm
 import { PIPELINES, dashboard, power, weekOf } from "@/lib/domain/design/deal";
 import { todayInMarket } from "@/lib/domain/market";
 import { dollars, listJobs, loadOverview, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
-import { requestSignInLink } from "@/lib/services/design-account";
 import { useDesignAccount } from "./design-account";
 import { AFTER_SIGNING, AUTOMATION, COMPARISON, CONVERSATION, LANDING_HERO } from "@/lib/domain/design/landing";
 import { AfterSigningDemo, AutomationDemo, AutomationList, ConversationDemo } from "./designer-showcase";
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
+import { SignInForm } from "./sign-in-form";
 
 /** A stage as a small tag. Won and installed are the good news; lost is quiet. */
 export function StageTag({ stage }: { stage: JobStage }) {
@@ -72,16 +72,6 @@ export function DesignHome() {
 }
 
 function FrontPage({ unreachable }: { unreachable: boolean }) {
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [answer, setAnswer] = useState<{ ok: boolean; message: string } | null>(null);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    const res = await requestSignInLink(email.trim(), PATHS.home);
-    setBusy(false);
-    setAnswer({ ok: res.ok, message: res.message ?? (res.ok ? "Check your email for the link." : "That didn't work. Try again.") });
-  };
   return (
     <div className="theme-studio flex min-h-dvh flex-col">
       <header className="flex h-16 items-center justify-between px-5 lg:px-10">
@@ -106,53 +96,11 @@ function FrontPage({ unreachable }: { unreachable: boolean }) {
           </ul>
         </div>
 
-        <section className={clsx(ui.card, "p-6 sm:p-7")} aria-labelledby="sign-in">
-          <h2 id="sign-in" className="text-[20px] tracking-tight text-ink">
+        <section id="sign-in" className={clsx(ui.card, "p-6 sm:p-7")} aria-labelledby="sign-in-title">
+          <h2 id="sign-in-title" className="mb-5 text-[20px] tracking-tight text-ink">
             Sign in
           </h2>
-          <p className="mt-2 text-[14px] leading-relaxed text-ink-2">
-            Enter your email and we&apos;ll send a link that signs you in. No password. New here? The same link sets up your business.
-          </p>
-          {unreachable && (
-            <p className="mt-4 rounded-md bg-warning-soft px-3 py-2.5 text-[13px] text-warning" role="alert">
-              We couldn&apos;t reach your account just now. Try again in a moment.
-            </p>
-          )}
-          {answer?.ok ? (
-            <p className="mt-5 rounded-md bg-surface-2 px-4 py-3 text-[14px] leading-relaxed text-ink" role="status">
-              {answer.message}
-            </p>
-          ) : (
-            <form onSubmit={submit} className="mt-5 space-y-3">
-              <label className={ui.label}>
-                Email
-                <input
-                  type="email"
-                  required
-                  className={clsx(ui.input, "mt-1.5 min-h-11")}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  placeholder="you@yourbusiness.com.au"
-                />
-              </label>
-              {answer && (
-                <p className="text-[13px] text-danger" role="alert">
-                  {answer.message}
-                </p>
-              )}
-              <button type="submit" className={clsx(ui.primary, "h-11 w-full")} disabled={busy}>
-                {busy ? "Sending…" : "Email me a sign-in link"}
-              </button>
-            </form>
-          )}
-          <p className="mt-5 border-t border-line pt-4 text-[13px] leading-relaxed text-muted">
-            Just looking?{" "}
-            <Link href={PATHS.designer} className="font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
-              Use the design tool without an account
-            </Link>
-            : your work stays on this device.
-          </p>
+          <SignInForm next={PATHS.home} note={unreachable ? "We couldn't reach your account just now. Try again in a moment." : null} />
         </section>
       </main>
       {/* The second screen: the quote building itself as the roof is designed. */}
