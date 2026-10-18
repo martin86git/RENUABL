@@ -2,17 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, PenTool, ReceiptText, UserPlus, Users } from "lucide-react";
+import { ArrowRight, PenTool, UserPlus } from "lucide-react";
 import clsx from "clsx";
-import { Wordmark } from "@/components/ui/primitives";
 import { STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import { PIPELINES, dashboard, power, weekOf } from "@/lib/domain/design/deal";
 import { todayInMarket } from "@/lib/domain/market";
 import { dollars, listJobs, loadOverview, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
 import { useDesignAccount } from "./design-account";
-import { AFTER_SIGNING, AUTOMATION, COMPARISON, CONVERSATION, LANDING_HERO } from "@/lib/domain/design/landing";
+import { AFTER_SIGNING, AUTOMATION, COMPARISON, CONVERSATION } from "@/lib/domain/design/landing";
 import { AfterSigningDemo, AutomationDemo, AutomationList, ConversationDemo } from "./designer-showcase";
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
+import { FrontHero } from "./front-hero";
 import { SignInForm } from "./sign-in-form";
 
 /** A stage as a small tag. Won and installed are the good news; lost is quiet. */
@@ -48,12 +48,6 @@ export const ACTIVITY_WORD = {
   reminder: "Reminder",
 } as const;
 
-const POINTS = [
-  { icon: PenTool, title: "Design", body: "See the roof from above, lay out the panels and check the strings against the inverter." },
-  { icon: ReceiptText, title: "Quote", body: "The quote builds as you draw, from your own price lists, installation rates and margin." },
-  { icon: Users, title: "Customers", body: "Keep each customer, their jobs and what was said in one place, from lead to installed." },
-] as const;
-
 /**
  * /design. Signed out, the product's front page: what it is, and the way in
  * (a one-time link by email, the same whether it is someone's first time or
@@ -74,35 +68,7 @@ export function DesignHome() {
 function FrontPage({ unreachable }: { unreachable: boolean }) {
   return (
     <div className="theme-studio flex min-h-dvh flex-col">
-      <header className="flex h-16 items-center justify-between px-5 lg:px-10">
-        <Wordmark />
-        <Link href={PATHS.designer} className="text-[13px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
-          Try the design tool
-        </Link>
-      </header>
-      <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-5 pb-20 pt-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-16 lg:px-10">
-        <div>
-          <p className={ui.eyebrow}>{LANDING_HERO.eyebrow}</p>
-          <h1 className="mt-4 text-[38px] leading-[1.05] tracking-tight text-ink sm:text-[54px]">{LANDING_HERO.headline}</h1>
-          <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-ink-2">{LANDING_HERO.body}</p>
-          <ul className="mt-10 grid gap-4 sm:grid-cols-3">
-            {POINTS.map(({ icon: Icon, title, body }) => (
-              <li key={title} className="border-t border-line-strong pt-4">
-                <Icon className="size-5 text-sun-line" aria-hidden />
-                <p className="mt-3 text-[15px] font-medium text-ink">{title}</p>
-                <p className="mt-1 text-[13.5px] leading-snug text-ink-2">{body}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <section id="sign-in" className={clsx(ui.card, "p-6 sm:p-7")} aria-labelledby="sign-in-title">
-          <h2 id="sign-in-title" className="mb-5 text-[20px] tracking-tight text-ink">
-            Sign in
-          </h2>
-          <SignInForm next={PATHS.home} note={unreachable ? "We couldn't reach your account just now. Try again in a moment." : null} />
-        </section>
-      </main>
+      <FrontHero signInHref="#sign-in" tryHref={PATHS.designer} />
       {/* The second screen: the quote building itself as the roof is designed. */}
       <section className="border-t border-line bg-surface px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="automation">
         <div className="mx-auto w-full max-w-6xl">
@@ -167,9 +133,17 @@ function FrontPage({ unreachable }: { unreachable: boolean }) {
               </li>
             ))}
           </ul>
-          <a href="#sign-in" className={clsx(ui.primary, "mt-10 h-11 px-5")}>
+        </div>
+      </section>
+      {/* The way in. */}
+      <section id="sign-in" className="border-t border-line bg-surface px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="sign-in-title">
+        <div className="mx-auto w-full max-w-sm">
+          <h2 id="sign-in-title" className="text-center text-[30px] tracking-tight text-ink">
             Get started
-          </a>
+          </h2>
+          <div className={clsx(ui.card, "mt-8 p-6 sm:p-7")}>
+            <SignInForm next={PATHS.home} note={unreachable ? "We couldn't reach your account just now. Try again in a moment." : null} />
+          </div>
         </div>
       </section>
     </div>

@@ -9,9 +9,11 @@
 export type FeatureStatus = "live" | "soon";
 
 export const LANDING_HERO = {
-  eyebrow: "For solar installers and retailers",
-  headline: "Design it. Quote it. Win the job.",
-  body: "One place for your solar business: the roof opens from your lead's address, the quote builds itself as you draw, and the proposal, the order and the install follow on their own.",
+  eyebrow: "Solar design to install",
+  headline: ["Draw the roof.", "We do the rest."],
+  body: "Quote, proposal, order and install. All from the design. Automatically.",
+  /** What follows from one design, in the order it happens: the hero's sequence. */
+  sequence: ["Lead", "Roof", "Quote", "Proposal", "Signed", "Order", "Install", "Invoice checked"],
 } as const;
 
 /** The second screen: the quote that builds itself as the roof is designed. */
@@ -148,7 +150,10 @@ export const COMING_SOON_LABEL = "Coming soon";
 /** Every line of copy on the page, for the test that checks it. */
 export function landingCopy(): string[] {
   return [
-    ...Object.values(LANDING_HERO),
+    LANDING_HERO.eyebrow,
+    ...LANDING_HERO.headline,
+    LANDING_HERO.body,
+    ...LANDING_HERO.sequence,
     ...Object.values(AUTOMATION),
     ...AUTOMATIONS.flatMap((a) => [a.title, a.body]),
     CONVERSATION.eyebrow,

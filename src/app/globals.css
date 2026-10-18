@@ -220,6 +220,16 @@ body {
   }
 }
 
+/* The front page hero's roof, drifting slowly behind the headline. */
+@keyframes hero-drift {
+  from {
+    transform: scale(1.04) translate(0, 0);
+  }
+  to {
+    transform: scale(1.14) translate(-2%, -1.5%);
+  }
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
