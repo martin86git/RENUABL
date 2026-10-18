@@ -146,7 +146,7 @@ function Headline({ view }: { view: ProposalView }) {
   );
 }
 
-/** Going ahead. In a preview it is shown and does nothing. The conversation with the business sits under it (`chat`). */
+/** Going ahead. In a preview it is shown and does nothing. */
 function GoAhead({ view, state, accepted, actions }: Pick<ProposalPageProps, "view" | "state" | "accepted" | "actions">) {
   const [name, setName] = useState("");
   const [agree, setAgree] = useState(false);
@@ -228,7 +228,12 @@ export interface ProposalPageProps {
   urls: ProposalUrls;
   /** Left out in the business's own preview. */
   actions?: ProposalActions;
-  /** The conversation with the business, shown under going ahead whatever state the proposal is in. Drawn by the page that knows the link. */
+  /**
+   * The conversation with the business, whatever state the proposal is in: `greeting` (the business's latest
+   * message) under the title, and `chat` (the dock that stays at the foot of the screen) at the end of the page.
+   * Drawn by the page that knows the link.
+   */
+  greeting?: React.ReactNode;
   chat?: React.ReactNode;
   /** "Pay your deposit", once the proposal is accepted and asks for one: shown straight under the acceptance. Drawn by the page that knows the link. */
   deposit?: React.ReactNode;
@@ -252,7 +257,7 @@ export interface ProposalPageProps {
  * the design tool's monospace face, and the preview must look as the
  * customer's page does.
  */
-export function ProposalPage({ view, state, accepted, urls, actions, chat, deposit }: ProposalPageProps) {
+export function ProposalPage({ view, state, accepted, urls, actions, greeting, chat, deposit }: ProposalPageProps) {
   const b = view.business;
   const bold = view.template === "bold";
   const compact = view.template === "compact";
@@ -475,7 +480,6 @@ export function ProposalPage({ view, state, accepted, urls, actions, chat, depos
       <>
         <GoAhead view={view} state={state} accepted={accepted} actions={actions} />
         {deposit && <div className="mt-4">{deposit}</div>}
-        {chat && <div className="mt-4">{chat}</div>}
       </>
     ),
     // The standard terms and conditions, when the business has them on: the details of this agreement (from the
@@ -571,6 +575,7 @@ export function ProposalPage({ view, state, accepted, urls, actions, chat, depos
             </>
           )}
           {b.tagline && !bold && <p className="mt-2 text-[15px] text-ink">{b.tagline}</p>}
+          {greeting && <div className="mt-6">{greeting}</div>}
           {view.note && <p className="mt-6 max-w-2xl whitespace-pre-line text-[16px] leading-relaxed text-ink">{view.note}</p>}
           {cover && (cover.words || cover.image) && <div className="mt-6">{own(cover)}</div>}
           <div className="mt-8">
@@ -615,6 +620,8 @@ export function ProposalPage({ view, state, accepted, urls, actions, chat, depos
           <p>{contact.join(" · ")}</p>
         </div>
       </footer>
+      {/* Last, so it stays at the foot of the screen all the way down the page, footer included. */}
+      {chat}
     </div>
   );
 }

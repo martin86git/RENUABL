@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, Copy, ExternalLink, FileText, Trash2, Upload } from "lucide-react";
+import { ChevronLeft, Copy, ExternalLink, FileText, Send, Trash2, Upload, X } from "lucide-react";
 import clsx from "clsx";
 import {
   FONTS,
@@ -16,6 +16,7 @@ import {
   type ImageKind,
 } from "@/lib/domain/design/brand";
 import type { ProposalChoice, ProposalState, ProposalStatus, ProposalView } from "@/lib/domain/design/proposal";
+import { firstTemplate } from "@/lib/domain/design/send-message";
 import { dollars, shortDate } from "@/lib/services/crm";
 import {
   addBrandImage,
@@ -31,7 +32,7 @@ import {
   withdrawProposal,
 } from "@/lib/services/proposals";
 import { PATHS, ui } from "./design-shell";
-import { CustomerChat } from "./chat-panel";
+import { ChatDock, ChatGreeting, DealChat, useCustomerChat } from "./chat-panel";
 import { useDesignAccount } from "./design-account";
 import { DepositLine } from "./deposit-panel";
 import { ProposalPage } from "./proposal-view";
@@ -67,6 +68,71 @@ function CopyLink({ path, className }: { path: string; className?: string }) {
     >
       <Copy className="size-4" aria-hidden /> {copied ? "Copied" : "Copy the customer's link"}
     </button>
+  );
+}
+
+/**
+ * "Send to customer": the job's conversation in a panel over the screen,
+ * with a ready-written message in the box to start from (a choice of
+ * drafts, filled in for this customer), which can be changed before it goes.
+ * Sent, it is the business's latest message: at the top of the customer's
+ * proposal, in their chat, and emailed to them with the link when the
+ * business has that on. The panel stays open on the conversation, saying
+ * whether the email went.
+ */
+function SendToCustomer(props: { jobId: string; view: ProposalView; latest: ProposalStatus; sentBefore: boolean; onClose: () => void }) {
+  const { view, latest } = props;
+  const first = view.customer.name.trim().split(/\s+/)[0] ?? "";
+  useEffect(() => {
+    const close = (e: KeyboardEvent) => e.key === "Escape" && props.onClose();
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [props]);
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-ink/30" onClick={props.onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Send the proposal to ${view.customer.name}`}
+        className="flex h-full w-full max-w-lg flex-col overflow-y-auto bg-surface shadow-[var(--shadow-lift)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
+          <div>
+            <p className={ui.eyebrow}>Send to customer</p>
+            <h2 className="mt-1 text-[18px] leading-snug text-ink">A message to {view.customer.name}</h2>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              It goes into your conversation with them: at the top of their proposal, in its chat, and by email with the link when emailing
+              replies is on.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={props.onClose}
+            aria-label="Close"
+            className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted hover:bg-surface-2"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+        </div>
+        <div className="flex-1 px-5 py-4">
+          <DealChat
+            jobId={props.jobId}
+            compact
+            drafts={{
+              fill: { first, business: view.business.name, until: shortDate(latest.validUntil) },
+              start: firstTemplate(props.sentBefore),
+            }}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2 border-t border-line px-5 py-4">
+          <CopyLink path={latest.path} className={ui.quiet} />
+          <Link href={`${PATHS.settings}/signed-emails`} className={clsx(ui.link, "self-center text-xs")}>
+            Emailing replies
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -135,6 +201,9 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   const latest = versions[0];
   const [account] = useDesignAccount();
   const mayMark = Boolean(account?.signedIn && (account.may?.publish ?? true));
+  const [sending, setSending] = useState(false);
+  // The preview's conversation: empty, taking nothing, so the business sees where its message will show.
+  const previewChat = useCustomerChat({ business: view?.business.name ?? "", phone: view?.business.phone });
 
   // The preview follows the choices, a moment after the last change (the note is typed a letter at a time).
   const asked = useRef(0);
@@ -177,7 +246,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
     setBusy(false);
     if (!res.ok) return setStatus({ text: res.message, error: true });
     setVersions(res.versions);
-    setStatus({ text: "Published. Copy the link and send it to your customer: we don't email it for you." });
+    setStatus({ text: "Published. Now send it to your customer, with a message." });
   };
   const withdraw = async () => {
     if (!window.confirm("Take this proposal back? Its link will then show only how to reach you.")) return;
@@ -289,7 +358,8 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                 : "Publish"}
           </button>
           <p className="text-xs leading-relaxed text-muted">
-            Publishing keeps a fixed copy at a private link. Nobody is emailed: you send the link. Colours, logo and wording come from{" "}
+            Publishing keeps a fixed copy at a private link. Nothing goes to the customer until you press Send to customer. Colours, logo
+            and wording come from{" "}
             <Link href={PATHS.brand} className={ui.link}>
               your proposal branding
             </Link>
@@ -309,6 +379,9 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
               {latest.deposit && <DepositLine jobId={jobId} deposit={latest.deposit} mayMark={mayMark} onChange={setVersions} />}
               {out && (
                 <>
+                  <button type="button" className={clsx(ui.primary, "w-full")} onClick={() => setSending(true)}>
+                    <Send className="size-4" aria-hidden /> Send to customer
+                  </button>
                   <CopyLink path={latest.path} className={clsx(ui.quiet, "w-full")} />
                   <a href={latest.path} target="_blank" rel="noreferrer" className={clsx(ui.quiet, "w-full")}>
                     <ExternalLink className="size-4" aria-hidden /> Open it as the customer sees it
@@ -349,7 +422,8 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                 roof: `/api/design/roof?lat=${view.roof.lat.toFixed(6)}&lng=${view.roof.lng.toFixed(6)}`,
                 pdf: null,
               }}
-              chat={<CustomerChat business={view.business.name} phone={view.business.phone} />}
+              greeting={<ChatGreeting chat={previewChat} />}
+              chat={<ChatDock chat={previewChat} />}
             />
           </div>
         ) : (
@@ -358,6 +432,9 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
           </p>
         )}
       </div>
+      {sending && view && latest && out && (
+        <SendToCustomer jobId={jobId} view={view} latest={latest} sentBefore={versions.length > 1} onClose={() => setSending(false)} />
+      )}
     </div>
   );
 }

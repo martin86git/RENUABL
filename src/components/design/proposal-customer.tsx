@@ -4,14 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import type { PublicDeposit } from "@/lib/domain/design/deposit";
 import type { ProposalState, ProposalView } from "@/lib/domain/design/proposal";
 import { acceptProposal, proposalUrls, sayPaid, tellOpened } from "@/lib/services/proposals";
-import { CustomerChat } from "./chat-panel";
+import { ChatDock, ChatGreeting, useCustomerChat } from "./chat-panel";
 import { PayDeposit } from "./deposit-panel";
 import { ProposalPage } from "./proposal-view";
 
 /**
  * The customer's own proposal, at their private link: the page itself, with
  * going ahead wired to the server, the deposit to pay once they have gone
- * ahead, and the conversation with the business. Opening it is told
+ * ahead, and the conversation with the business (its latest message at the
+ * top, the chat at the foot of the screen). Opening it is told
  * to the server once the page is really in a browser (so a link preview in a
  * messaging app doesn't count as the customer having read it).
  */
@@ -28,6 +29,7 @@ export function CustomerProposal(props: {
   const [deposit, setDeposit] = useState(props.deposit);
   const urls = useMemo(() => proposalUrls(token), [token]);
   useEffect(() => tellOpened(token), [token]);
+  const chat = useCustomerChat({ token, business: view.business.name, phone: view.business.phone });
 
   return (
     <ProposalPage
@@ -50,7 +52,8 @@ export function CustomerProposal(props: {
           />
         ) : null
       }
-      chat={<CustomerChat token={token} business={view.business.name} phone={view.business.phone} />}
+      greeting={<ChatGreeting chat={chat} />}
+      chat={<ChatDock chat={chat} />}
       actions={{
         accept: async (name, agree) => {
           const res = await acceptProposal(token, name, agree);
