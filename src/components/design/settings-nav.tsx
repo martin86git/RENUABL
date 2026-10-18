@@ -17,38 +17,43 @@ export function SettingsFrame({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-dvh flex-col lg:flex-row">
       <nav
         aria-label="Settings"
-        className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2 lg:sticky lg:top-0 lg:h-dvh lg:w-60 lg:flex-col lg:gap-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-3 lg:py-5"
+        className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2 lg:sticky lg:top-0 lg:h-dvh lg:w-64 lg:flex-col lg:gap-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-3 lg:py-5"
       >
         <p className="hidden px-3 text-[17px] tracking-tight text-ink lg:block">Settings</p>
         {SETTINGS.map((group) => (
-          <div key={group.title} className="contents lg:mt-5 lg:block">
-            <p className={clsx(ui.eyebrow, "hidden px-3 pb-1.5 lg:block")}>{group.title}</p>
-            {group.items.map((item) => {
-              const on = path === settingsPath(item.slug);
-              return (
-                <Link
-                  key={item.slug}
-                  href={settingsPath(item.slug)}
-                  aria-current={on ? "page" : undefined}
-                  className={clsx(
-                    "flex h-9 shrink-0 items-center justify-between gap-2 whitespace-nowrap rounded-md px-3 text-[13px] font-medium lg:whitespace-normal",
-                    on ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
-                  )}
-                >
-                  <span className="truncate">{item.label}</span>
-                  {item.soon && (
-                    <span
-                      className={clsx(
-                        "rounded px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em]",
-                        on ? "bg-white/15" : "bg-surface-2 text-muted",
-                      )}
-                    >
-                      Soon
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
+          <div key={group.title} className="contents lg:mt-6 lg:block lg:first-of-type:mt-4">
+            {/* Each section's name on a light band, its pages indented under a rule, so one section reads apart from the next. */}
+            <p className="hidden rounded-md bg-surface-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink lg:block">
+              {group.title}
+            </p>
+            <div className="contents lg:ml-4 lg:mt-1.5 lg:block lg:border-l lg:border-line lg:pl-2">
+              {group.items.map((item) => {
+                const on = path === settingsPath(item.slug);
+                return (
+                  <Link
+                    key={item.slug}
+                    href={settingsPath(item.slug)}
+                    aria-current={on ? "page" : undefined}
+                    className={clsx(
+                      "flex h-9 shrink-0 items-center justify-between gap-2 whitespace-nowrap rounded-md px-3 text-[13px] font-medium lg:h-8 lg:px-2.5 lg:text-[12px] lg:whitespace-normal",
+                      on ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+                    )}
+                  >
+                    <span className="truncate">{item.label}</span>
+                    {item.soon && (
+                      <span
+                        className={clsx(
+                          "rounded px-1.5 py-0.5 text-[9px] uppercase tracking-[0.1em]",
+                          on ? "bg-white/15" : "bg-surface-2 text-muted",
+                        )}
+                      >
+                        Soon
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         ))}
       </nav>
