@@ -68,7 +68,7 @@ export default async function PickupSlipPage({ params }: PageProps<"/pickup/[tok
             <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
               {fact("Our order (PO)", slip.reference ? poText(slip.reference) : null)}
               <div>
-                <dt className="text-[11px] uppercase tracking-wide text-muted">Your sales order (SO)</dt>
+                <dt className="text-[11px] uppercase tracking-wide text-muted">Wholesaler Sales Order (SO)</dt>
                 <dd className="mt-0.5 text-[15px] font-medium text-ink">{p.so || <span className="text-muted">Not entered</span>}</dd>
               </div>
               {fact("Collecting for", slip.installDate ? formatDate(slip.installDate, LONG) : null)}
