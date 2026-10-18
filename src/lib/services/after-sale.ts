@@ -55,3 +55,10 @@ export const loadSchedule = (from: string, to: string) =>
 export type { InstallExtra } from "@/lib/server/design-after-sale-repo";
 export const loadInstallExtras = () =>
   ask<{ extras: import("@/lib/server/design-after-sale-repo").InstallExtra[] }>("/api/design/installs");
+
+export type { InstallEvent } from "@/lib/domain/design/install-event";
+/** One booked installation as a calendar event, with its job sheet. */
+export const loadInstallEvent = (jobId: string) =>
+  ask<{ event: import("@/lib/domain/design/install-event").InstallEvent; customer: { name: string; email: string; phone: string } }>(
+    `/api/design/schedule/${encodeURIComponent(jobId)}`,
+  );

@@ -8,6 +8,7 @@ import { calendarDays, holidayOn, isWeekend, type CalendarView } from "@/lib/dom
 import { todayInMarket } from "@/lib/domain/market";
 import { loadPrefs, loadSchedule, type BookedJob } from "@/lib/services/after-sale";
 import { PATHS, PageHead, ui } from "./design-shell";
+import { EventCard } from "./event-card";
 
 const ARROW = "inline-flex size-9 items-center justify-center rounded-md border border-line bg-surface text-ink hover:border-forest";
 const TONE = { ready: "border-positive bg-positive-soft", partly: "border-sun-line bg-sun", not: "border-line bg-surface-2" } as const;
@@ -26,6 +27,8 @@ export function SchedulerPage() {
   const [jobs, setJobs] = useState<BookedJob[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [reminders, setReminders] = useState<{ on: boolean; days: number } | null>(null);
+  /** The job whose event card is open. */
+  const [open, setOpen] = useState<string | null>(null);
   const cal = calendarDays(view, date);
   const first = cal.days[0];
   const last = cal.days.at(-1)!;
@@ -137,10 +140,14 @@ export function SchedulerPage() {
                   {holiday && <span className="ml-1 text-[10px] text-muted">{holiday}</span>}
                 </p>
                 {on(d).map((j) => (
-                  <Link
+                  <button
+                    type="button"
                     key={j.jobId}
-                    href={`${PATHS.deals}/${j.jobId}`}
-                    className={clsx("rounded border-l-[3px] px-1.5 py-1 text-[12px] leading-tight hover:brightness-95", TONE[j.state])}
+                    onClick={() => setOpen(j.jobId)}
+                    className={clsx(
+                      "rounded border-l-[3px] px-1.5 py-1 text-left text-[12px] leading-tight hover:brightness-95",
+                      TONE[j.state],
+                    )}
                     title={j.checks.map((c) => `${c.label}: ${c.value}`).join(" · ")}
                   >
                     <span className="block truncate font-medium text-ink">{j.customer}</span>
@@ -153,7 +160,7 @@ export function SchedulerPage() {
                         <span className="ml-1 text-[10.5px] text-muted">{j.checks.map((c) => `${c.label}: ${c.value}`).join(" · ")}</span>
                       )}
                     </span>
-                  </Link>
+                  </button>
                 ))}
               </div>
             );
@@ -178,6 +185,7 @@ export function SchedulerPage() {
           .
         </span>
       </p>
+      {open && <EventCard jobId={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }
