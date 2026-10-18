@@ -34,7 +34,9 @@ export function systemSpecOf(design: SystemSource, firstListed?: { sku: string; 
       short: size.short,
     },
     inverters: (design.inverters ?? []).map((i) => ({ sku: i.sku, name: i.name })),
-    battery: battery ? { sku: battery.sku, name: battery.name, kwh: battery.kwh, qty: battery.qty } : null,
+    battery: battery
+      ? { sku: battery.sku, name: battery.name, kwh: battery.kwh, qty: battery.qty, ...(battery.backup ? { backup: true } : {}) }
+      : null,
     arrays: arrayCount(design),
     tiltedPanels: tilts.count,
     tiltDegrees: tilts.steepest,
@@ -44,4 +46,11 @@ export function systemSpecOf(design: SystemSource, firstListed?: { sku: string; 
 /** What a design's battery holds in all, kWh, to one decimal: 0 with none. */
 export function batteryKwhOf(design: Pick<RoofDesign, "battery">): number {
   return design.battery ? Math.round(design.battery.kwh * design.battery.qty * 10) / 10 : 0;
+}
+
+/** What a design's battery has for the evenings, kWh: all of it, less the module held back for blackouts when it is wired for them. */
+export function shiftingKwhOf(design: Pick<RoofDesign, "battery">): number {
+  const b = design.battery;
+  if (!b) return 0;
+  return Math.round(b.kwh * Math.max(0, b.qty - (b.backup ? 1 : 0)) * 10) / 10;
 }

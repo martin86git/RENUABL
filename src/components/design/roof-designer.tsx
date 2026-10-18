@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
 import { loadTerrain } from "@/lib/services/terrain";
+import { loadRoofModel } from "@/lib/services/roof-model";
+import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
+import { selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
+import { todayInMarket } from "@/lib/domain/market";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
@@ -56,7 +60,7 @@ import type { RebateRates } from "@/lib/domain/rebates";
 import { DesignQuote } from "./design-quote";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { MAX_SUGGESTED, suggestPanels } from "@/lib/domain/design/suggest";
-import { systemSpecOf } from "@/lib/domain/design/system";
+import { shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
 import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { suggestBatteries } from "@/lib/domain/design/battery-suggest";
@@ -197,6 +201,34 @@ const DIAL_STEPS: [step: number, at: number][] = [
   [1, 17],
   [5, 34],
 ];
+
+/** What was read of a face's slope from Google's data, with the way to read it again. */
+function SlopeNote(props: { slope: AspectReading | "busy" | "none" | undefined; onRead: () => void }) {
+  const { slope } = props;
+  if (slope === "busy") return <p className="text-sm text-muted">Reading this face&apos;s slope from Google&apos;s height data…</p>;
+  const again = (
+    <button className="tap-area font-medium text-ink underline underline-offset-2" onClick={props.onRead}>
+      {slope ? "Read it again" : "Read the slope from Google's data"}
+    </button>
+  );
+  if (!slope) return <p className="text-sm text-ink-2">{again}</p>;
+  if (slope === "none")
+    return (
+      <p className="text-sm text-ink-2">
+        Google&apos;s data couldn&apos;t tell which way this face slopes. Set the direction and pitch below. {again}
+      </p>
+    );
+  const { aspect, disagrees } = slope;
+  return (
+    <p className="text-sm text-ink-2">
+      {aspect.flat
+        ? `Read as flat (about ${Math.round(aspect.pitch)}°) from Google's ${aspect.from === "heights" ? "height data" : "roof model"}.`
+        : `Slope read from Google's ${aspect.from === "heights" ? "height data" : "roof model"}: down towards ${compass(aspect.azimuth)} at about ${Math.round(aspect.pitch)}°.`}{" "}
+      {disagrees && <strong className="font-semibold text-ink">Google&apos;s roof model points another way. </strong>}
+      Google&apos;s data can be older than the roof: check it against the photo. {again}
+    </p>
+  );
+}
 
 /**
  * The dial for whatever is picked: a half-round on the right edge of the picture, with the turns set round its arc
@@ -371,6 +403,8 @@ export function RoofDesigner(props: {
   // The design someone has asked to delete, until they say they mean it.
   const [doomed, setDoomed] = useState<number | null>(null);
   const [faces, setFaces] = useState<Face[]>(first.faces);
+  // What was read of each face's slope from Google's data this visit (`readSlope`), by face.
+  const [slopes, setSlopes] = useState<Record<string, AspectReading | "busy" | "none">>({});
   const [loose, setLoose] = useState<LoosePanel[]>(first.loose ?? []);
   const [strings, setStrings] = useState<PanelString[]>(first.strings ?? []);
   /** What String automatically did, in plain words, until the strings are next changed by hand. */
@@ -415,6 +449,8 @@ export function RoofDesigner(props: {
   };
   // Whether "Suggest a layout" is asking how many panels.
   const [asking, setAsking] = useState(false);
+  // "Design it for me": working, or the three designs it made and what to know about them.
+  const [mine, setMine] = useState<"idle" | "busy" | SelfDesignResult>("idle");
   /** Takes up a tool, leaving behind anything half-drawn with the last one. */
   const pickTool = (t: Tool) => {
     setTool(t);
@@ -443,14 +479,11 @@ export function RoofDesigner(props: {
     // The first time the drawing is asked for on a roof, Google's roof model is fetched once (the server keeps it).
     if (!drawn || modelFaces !== null) return;
     let gone = false;
-    void fetch(`/api/roof?lat=${spot.lat}&lng=${spot.lng}`)
-      .then((res) => res.json() as Promise<{ ok?: boolean; model?: RoofModel | null }>)
-      .then((json) => {
-        if (gone) return;
-        const found = json.ok && json.model?.slots?.length ? facesFromModel(json.model, spot) : [];
-        setModelFaces(found.length ? found : "none");
-      })
-      .catch(() => !gone && setModelFaces("none"));
+    void loadRoofModel(spot.lat, spot.lng).then((model) => {
+      if (gone) return;
+      const found = model ? facesFromModel(model, spot) : [];
+      setModelFaces(found.length ? found : "none");
+    });
     return () => {
       gone = true;
     };
@@ -812,6 +845,7 @@ export function RoofDesigner(props: {
       name: to.name,
       kwh: to.kwh,
       qty: battery?.qty ?? 1,
+      ...(battery?.backup ? { backup: true } : {}),
       // A new battery stands low on the right of what is in view, clear of the roof as a rule, to be dragged to its wall.
       x: battery?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
       y: battery?.y ?? cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
@@ -1085,6 +1119,31 @@ export function RoofDesigner(props: {
     setSelected(id);
     setPicks([]);
     setTool("select");
+    void readSlope(id, points, false);
+  };
+
+  /**
+   * Which way a face slopes and how steeply, read from Google's heights (else its roof model), and the face's rows
+   * laid to it: along the gutter, looking down the slope, at the roof's pitch (`face-aspect.ts`). A face just
+   * traced takes it only while nobody has turned its rows, picked a direction or set a pitch in the meantime;
+   * asked for again (`again`), it always does.
+   */
+  const readSlope = async (id: string, points: Point[], again: boolean) => {
+    setSlopes((s) => ({ ...s, [id]: "busy" }));
+    const [heights, model] = await Promise.all([loadTerrain(spot.lat, spot.lng), loadRoofModel(spot.lat, spot.lng)]);
+    if (heights) setTerrain((t) => (t && t !== "none" ? t : heights));
+    const read = readAspect({ points, terrain: heights, model, centre: spot });
+    setSlopes((s) => ({ ...s, [id]: read ?? "none" }));
+    if (!read) return;
+    const sits = faceFromAspect({ points }, read.aspect);
+    setFaces((list) =>
+      list.map((f) => {
+        if (f.id !== id) return f;
+        const untouched = f.angle === angleOfLongestEdge(f) && f.facing === "N" && (f.tilt ?? TILT.roof) === TILT.roof;
+        return again || untouched ? { ...f, ...sits, off: [] } : f;
+      }),
+    );
+    changed();
   };
 
   /**
@@ -1872,7 +1931,8 @@ export function RoofDesigner(props: {
             feedIn: Number(bill.feedIn) || 0,
           },
           year,
-          batteryKwh,
+          // A module held back for blackouts doesn't carry the evenings.
+          shiftingKwhOf({ battery }),
           props.workspace.settings.bill.selfUseShare,
         )
       : null;
@@ -1919,6 +1979,56 @@ export function RoofDesigner(props: {
     } catch {
       setIdea({ bad: true, note: "We couldn't reach the roof data just now. Try again in a moment, or trace the roof faces." });
     }
+  };
+  /**
+   * "Design it for me": the roof designs itself for three outcomes, the fastest payback, the best return and the most
+   * independence (`self-design.ts`), from the traced faces (else Google's roof model), the customer's bill and the
+   * business's prices. They replace the roof's designs (asked first), each with its goal, the best return the primary.
+   */
+  const designForMe = async () => {
+    const drawnSoFar = everyDesign().some((d) => d.faces.length || d.loose?.length);
+    if (drawnSoFar && !window.confirm("Replace this roof's designs with three made for it? The roof faces traced are kept and used."))
+      return;
+    setMine("busy");
+    const model = faces.length ? null : await loadRoofModel(spot.lat, spot.lng);
+    const amount = Number(bill.amount) || 0;
+    const rate = Number(bill.rate) || 0;
+    const result = selfDesign({
+      centre: spot,
+      faces,
+      model,
+      panel:
+        panel ??
+        (chosenPanel
+          ? { sku: chosenPanel.sku, name: chosenPanel.name, watts: chosenPanel.watts, long: chosenPanel.long, short: chosenPanel.short }
+          : undefined),
+      panelElectrical: chosenPanel?.electrical,
+      firstListed,
+      inverters: props.inverters,
+      batteries: props.batteries,
+      bill:
+        amount > 0 && rate > 0
+          ? { interval: bill.interval, amount, rate, supplyPerDay: Number(bill.supplyPerDay) || 0, feedIn: Number(bill.feedIn) || 0 }
+          : null,
+      selfUseShare: props.workspace.settings.bill.selfUseShare,
+      yieldPerKwDay: props.yieldPerKwDay,
+      form: quoteNow.form,
+      workspace: props.workspace,
+      rates: props.rates,
+      date: todayInMarket(),
+      newId,
+    });
+    setMine(result);
+    if (!result.options.length) return;
+    const list = result.options.map((o) => o.design);
+    const lead = Math.max(
+      0,
+      result.options.findIndex((o) => o.key === "return"),
+    );
+    setQuotes(list.map(() => ({ form: quoteNow.form, edits: {} })));
+    setPrimary(lead);
+    show(list, lead);
+    setSaved("changed");
   };
   const suggestions = suggesting
     ? suggestInverters({
@@ -3846,6 +3956,21 @@ export function RoofDesigner(props: {
                               Take it off
                             </button>
                           </div>
+                          <label className="mt-2 flex items-start gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 size-4"
+                              checked={Boolean(battery.backup)}
+                              onChange={(e) => {
+                                setBattery({ ...battery, backup: e.target.checked || undefined });
+                                changed();
+                              }}
+                            />
+                            <span>
+                              Blackout backup: wire chosen circuits to it, one module held back for outages. Adds the backup circuits to the
+                              quote; the held module isn&apos;t counted in the savings.
+                            </span>
+                          </label>
                           <p className="mt-1.5 text-xs text-muted">It is on the picture: drag it to the wall it will stand against.</p>
                         </div>
                       ) : (
@@ -4290,8 +4415,61 @@ export function RoofDesigner(props: {
                   </div>
                 </div>
                 <span className="flex-1" aria-hidden />
-                {/* Suggest a layout, in the corner: one button, which asks how many panels before it lays them. */}
-                <div className="pointer-events-auto flex max-w-64 shrink-0 flex-col items-end gap-1.5">
+                {/* Design it for me, and Suggest a layout, in the corner: the roof designs itself three ways, or just lays panels. */}
+                <div className="pointer-events-auto flex max-w-80 shrink-0 flex-col items-end gap-1.5">
+                  {typeof mine === "object" && (
+                    <div className={clsx(GLASS, "max-h-[22rem] w-80 space-y-2 overflow-y-auto p-3 text-[13px]")} role="status">
+                      {mine.options.map((o, i) => (
+                        <button
+                          key={o.key}
+                          onClick={() => show(everyDesign(), i)}
+                          className={clsx(
+                            "block w-full rounded-lg border p-2.5 text-left hover:border-ink",
+                            active === i ? "border-sun-line bg-surface" : "border-line bg-surface/70",
+                          )}
+                        >
+                          <span className="flex items-baseline justify-between gap-2">
+                            <span className="font-semibold text-ink">{o.label}</span>
+                            <span className="tabular-nums text-ink-2">
+                              {o.figures.kw} kW{o.figures.batteryKwh ? ` · ${o.figures.batteryKwh} kWh` : ""}
+                            </span>
+                          </span>
+                          {!costsHidden && (
+                            <span className="mt-1 block tabular-nums text-ink-2">
+                              {dollars(o.figures.youPay)} after STCs
+                              {o.figures.saving !== null && ` · saves ${dollars(o.figures.saving)} a year`}
+                              {o.figures.payback !== null && ` · pays back in ${o.figures.payback} yrs`}
+                            </span>
+                          )}
+                          <span className="mt-1 block text-muted">{o.why}</span>
+                        </button>
+                      ))}
+                      {mine.notes.map((n) => (
+                        <p key={n} className="text-ink-2">
+                          {n}
+                        </p>
+                      ))}
+                      <p className="text-muted">
+                        Estimates from the bill and the price lists: one price at all times, no price rises. Check every design against the
+                        picture before it goes to the customer.{" "}
+                        <button className="font-medium text-ink underline underline-offset-2" onClick={() => setMine("idle")}>
+                          Close
+                        </button>
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => void designForMe()}
+                    disabled={mine === "busy" || costsHidden}
+                    title={
+                      costsHidden
+                        ? "It designs against prices, which your account can't see. Ask the owner."
+                        : "Three designs for this home: the fastest payback, the best return and the most independence"
+                    }
+                    className="flex h-11 items-center gap-2 whitespace-nowrap rounded-full bg-primary px-4 text-sm font-medium text-primary-ink shadow-sm hover:bg-forest disabled:bg-line disabled:text-muted"
+                  >
+                    <WandSparkles className="size-5" aria-hidden /> {mine === "busy" ? "Designing…" : "Design it for me"}
+                  </button>
                   {typeof idea === "object" && (
                     <p className={clsx(GLASS, "px-3 py-2 text-[13px]", idea.bad ? "text-warning" : "text-ink-2")} role="status">
                       {idea.note}{" "}
@@ -4397,6 +4575,7 @@ export function RoofDesigner(props: {
                 <p className={label}>
                   This face · {summary.faces.find((f) => f.id === face.id)?.panels ?? 0} panels · {faceArea(face).toFixed(0)} m² from above
                 </p>
+                <SlopeNote slope={slopes[face.id]} onRead={() => void readSlope(face.id, face.points, true)} />
                 <label className="block text-sm">
                   <span className="flex justify-between">
                     Rows run at <span className="tabular-nums">{face.angle}°</span>

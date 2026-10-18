@@ -48,7 +48,8 @@ export interface SystemSpec {
   panels: number;
   panel: { sku: string; name: string; watts: number; short: number };
   inverters: { sku: string; name: string }[];
-  battery: { sku: string; name: string; kwh: number; qty: number } | null;
+  /** `backup`: wired for blackouts, which adds the backup wiring to the installation. */
+  battery: { sku: string; name: string; kwh: number; qty: number; backup?: boolean } | null;
   /** Separate arrays on the roof, counted from the drawing. */
   arrays: number;
   /** Panels drawn at a tilt, and the steepest of them: on a flat roof they are taken to be on tilt frames. */
@@ -154,6 +155,7 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
     if (spec.inverters.length > 1)
       install(`Additional inverter installation (${spec.inverters.length - 1})`, (spec.inverters.length - 1) * r.extraInverter);
     if (spec.battery) install("Battery installation", r.battery);
+    if (spec.battery?.backup) install("Backup circuits for blackouts", r.backup);
     if (r.inspection) install("Electrical inspection", r.inspection);
     if (r.smartMeter) install("Smart meter installation", r.smartMeter);
     if (r.fallProtection) install("Fall protection", r.fallProtection);

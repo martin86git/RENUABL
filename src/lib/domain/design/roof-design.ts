@@ -146,9 +146,15 @@ export interface RoofDesign {
   battery?: DesignBattery;
   /** A few words to tell this design from the roof's others ("All on the north face"). */
   label?: string;
+  /** What "Design it for me" made it for (`self-design.ts`): kept even when the label is changed. */
+  goal?: DesignGoal;
   /** Guide lines drawn along roof edges, to line panels up with and measure from. Never shown to the customer. */
   guides?: GuideLine[];
 }
+
+/** The outcomes "Design it for me" designs for: the quickest payback, the best return, the most independence. */
+export const DESIGN_GOALS = ["payback", "return", "independence"] as const;
+export type DesignGoal = (typeof DESIGN_GOALS)[number];
 
 /** A straight line between two points on the roof: a reference to lay panels out against. */
 export interface GuideLine {
@@ -247,6 +253,11 @@ export interface DesignBattery {
   qty: number;
   x: number;
   y: number;
+  /**
+   * Wired to keep chosen circuits on in a blackout, with one of its modules held back for it: that module isn't
+   * counted in the evenings it covers (`shiftingKwhOf`), and the quote adds the backup wiring.
+   */
+  backup?: boolean;
 }
 export const MAX_BATTERY_QTY = 16;
 
@@ -310,7 +321,8 @@ function distanceToEdge(p: Point, a: Point, b: Point): number {
   return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
-const clearOf = (p: Point, polygon: Point[], margin: number) =>
+/** Whether a point is inside an outline and at least `margin` metres from each of its edges. */
+export const clearOf = (p: Point, polygon: Point[], margin: number) =>
   inside(p, polygon) && polygon.every((a, i) => distanceToEdge(p, a, polygon[(i + 1) % polygon.length]) >= margin - 1e-9);
 
 /** The four corners of a panel placed by hand. */
@@ -490,6 +502,7 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
     inverters?: unknown;
     battery?: unknown;
     label?: unknown;
+    goal?: unknown;
   };
   const battery = cleanBattery(r.battery);
   const panel = cleanPanel(r.panel);
@@ -666,6 +679,7 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
     ...(inverters.length ? { inverters } : {}),
     ...(battery ? { battery } : {}),
     ...(label ? { label } : {}),
+    ...(DESIGN_GOALS.includes(r.goal as DesignGoal) ? { goal: r.goal as DesignGoal } : {}),
   };
 }
 
@@ -686,7 +700,15 @@ function cleanBattery(raw: unknown): DesignBattery | undefined {
           .trim()
           .slice(0, 100)
       : "";
-  return { sku: p.sku, name: name || p.sku, kwh, qty: Math.round(qty), x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
+  return {
+    sku: p.sku,
+    name: name || p.sku,
+    kwh,
+    qty: Math.round(qty),
+    x: Math.round(x * 100) / 100,
+    y: Math.round(y * 100) / 100,
+    ...(p.backup === true ? { backup: true } : {}),
+  };
 }
 
 function cleanInverter(raw: unknown): InverterSpec | undefined {
