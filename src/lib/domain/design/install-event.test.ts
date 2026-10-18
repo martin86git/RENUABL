@@ -25,7 +25,8 @@ const input: InstallEventInput = {
     { key: "roofType", label: "Roof type", value: "Tile" },
   ],
   site: [{ label: "NMI", value: "63052732619" }],
-  link: "https://example.com/design/deals/job_abc",
+  reference: "PO-ABC123",
+  slip: "https://example.com/pickup/abc",
 };
 
 describe("an installation as a calendar event", () => {
@@ -39,7 +40,7 @@ describe("an installation as a calendar event", () => {
 
   it("says where to collect, against which SO number, and flags what has no supplier", () => {
     expect(section("Collect from").groups.map((g) => [g.title, g.note ?? null, g.lines[0]])).toEqual([
-      ["AWM Clayton", "SO OSW923342", "2 items: solar, roof and racking"],
+      ["AWM Clayton", "PO-ABC123 · SO OSW923342", "2 items: solar, roof and racking"],
       ["No supplier set", null, "1 to source: roof and racking"],
     ]);
   });
@@ -66,9 +67,13 @@ describe("an installation as a calendar event", () => {
     const url = new URL(e.googleUrl);
     expect(url.searchParams.get("dates")).toBe("20261019T080000/20261019T160000");
     expect(url.searchParams.get("details")).toContain("<b>COLLECT FROM</b>");
-    expect(url.searchParams.get("details")).toContain("<b>AWM Clayton</b><br>SO OSW923342");
+    expect(url.searchParams.get("details")).toContain("<b>AWM Clayton</b><br>PO-ABC123 · SO OSW923342");
     expect(url.searchParams.get("details")).toContain("13 x Jinko 475 W panel (JKM475) · AWM Clayton");
     expect(url.searchParams.get("details")).toContain("Phone: 0400 000 000");
+    // The pickup slip, not the deal: the installer has no sign-in to it.
+    expect(url.searchParams.get("details")).toContain("https://example.com/pickup/abc");
+    expect(url.searchParams.get("details")).not.toContain("/design/deals/");
+    expect(e.description).toContain("Pickup slip, to show at the counter: https://example.com/pickup/abc");
   });
 
   it("makes an .ics file in the market's time zone, with text escaped and lines folded", () => {

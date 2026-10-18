@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { AlignLeft, CalendarPlus, Download, ExternalLink, MapPin, X } from "lucide-react";
+import { AlignLeft, CalendarPlus, ClipboardList, Download, ExternalLink, MapPin, X } from "lucide-react";
 import clsx from "clsx";
 import { loadInstallEvent, type InstallEvent } from "@/lib/services/after-sale";
 import { PATHS, ui } from "./design-shell";
@@ -101,6 +101,12 @@ export function EventCard({ jobId, onClose }: { jobId: string; onClose: () => vo
               <button type="button" onClick={download} className={clsx(ui.quiet, "h-9")}>
                 <Download className="size-4" aria-hidden /> .ics file
               </button>
+              {/* What the installer shows at each wholesaler's counter: our PO, their SO and what was ordered. */}
+              {data.event.slip && (
+                <a href={data.event.slip} target="_blank" rel="noreferrer" className={clsx(ui.quiet, "h-9")}>
+                  <ClipboardList className="size-4" aria-hidden /> Pickup slip
+                </a>
+              )}
             </div>
 
             <div className="border-t border-line py-2">

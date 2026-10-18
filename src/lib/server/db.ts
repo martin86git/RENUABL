@@ -399,6 +399,16 @@ create table if not exists design_orders (
   primary key (business_id, job_id),
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
+-- The private link to a job's pickup slip (domain/design/pickup-slip.ts): what the installer shows at the wholesaler's
+-- counter. One a job, for good; no sign-in, the token is the key.
+create table if not exists design_pickup_links (
+  token text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  created_at timestamptz not null default now(),
+  unique (business_id, job_id),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
 -- What a signed job's installation was allowed for in its quote (domain/design/installer-invoices.ts), fixed at signing.
 create table if not exists design_install_costs (
   business_id text not null references businesses(id) on delete cascade,

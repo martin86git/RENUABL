@@ -5,6 +5,7 @@ import type { ISODate } from "@/lib/domain/types";
 import { answer, requireMember } from "@/lib/server/design-context";
 import { installExtras, jobOrder } from "@/lib/server/design-after-sale-repo";
 import { jobById } from "@/lib/server/design-crm-repo";
+import { pickupToken } from "@/lib/server/design-pickup-repo";
 import { NO_DESIGN, savedFor } from "@/lib/server/design-proposal-repo";
 
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
@@ -35,6 +36,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/design/sched
     const order = await jobOrder(who.member.businessId, jobId);
     const extra = (await installExtras(who.member.businessId)).find((e) => e.jobId === jobId);
     const site = siteUrl() ?? new URL(request.url).origin;
+    // The pickup slip's private link, made once: the installer opens it at the counter with no sign-in.
+    const slip = typeof order === "string" ? null : `${site}/pickup/${await pickupToken(who.member.businessId, jobId)}`;
     const event = installEvent({
       business: saved === NO_DESIGN ? who.member.businessName : saved.brand.name || who.member.businessName,
       jobId,
@@ -58,7 +61,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/design/sched
           : order.items.filter((i) => !i.off).map((i) => ({ part: i.group, qty: i.qty, item: i.item, sku: i.sku, supplier: i.supplier })),
       details: details.map((d) => ({ key: d.key, label: d.label, value: d.value! })),
       site: details.filter((d) => SITE_KEYS.includes(d.key)).map((d) => ({ label: d.label, value: d.value! })),
-      link: `${site}/design/deals/${jobId}`,
+      reference: typeof order === "string" ? "" : order.order.reference,
+      slip,
     });
     // Never the customer's email: this is the installer's sheet, and no one is invited by it.
     return Response.json({ ok: true, event, customer: { name: customer.name, phone: customer.phone } });

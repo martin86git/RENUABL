@@ -3,7 +3,8 @@
  * Install Scheduler opens (laid out like a Google Calendar event), and the
  * same event for the business's own calendar, by a pre-filled Google
  * Calendar link or an .ics file. The description is the job sheet, in three
- * parts: where to collect (each wholesaler and its SO number), the system to
+ * parts: where to collect (each wholesaler with our PO and its SO number, and
+ * the pickup slip to show at the counter), the system to
  * be installed (each part's facts and the exact items for it, each tagged
  * with the wholesaler it comes from: the system and the pick-up list are one),
  * and who to see on site.
@@ -15,6 +16,7 @@
  * business's own bookings do; never the customer's email. Pure, tested.
  */
 import type { ISODate } from "../types";
+import { referenceLine } from "./pickup-slip";
 
 /** The installation day's hours, as installers usually work them. */
 export const INSTALL_DAY = { start: "08:00", end: "16:00" } as const;
@@ -46,13 +48,15 @@ export interface InstallEventInput {
   details: { key: string; label: string; value: string }[];
   /** The deal's site notes: distributor, NMI, site access, switchboard. */
   site: { label: string; value: string }[];
-  /** The deal's own page, for the link in the event. */
-  link: string;
+  /** Our purchase order reference for the job, which every wholesaler's SO is raised against. */
+  reference: string;
+  /** The pickup slip's private link: what the installer shows at the counter. Null when there is no order. */
+  slip: string | null;
 }
 
 export interface EventGroup {
   title: string;
-  /** A line under the title: "SO OSW923342". */
+  /** A line under the title: "PO-ABC123 · SO OSW923342". */
   note?: string;
   /** Facts, as "Label: value". */
   lines: string[];
@@ -70,6 +74,8 @@ export interface InstallEvent {
   sections: { heading: string; groups: EventGroup[] }[];
   /** The whole job sheet as text, for the .ics file. */
   description: string;
+  /** The pickup slip's link, for the card's button. */
+  slip: string | null;
   googleUrl: string;
   ics: string;
 }
@@ -118,7 +124,7 @@ export function installEvent(input: InstallEventInput): InstallEvent {
       const there = input.items.filter((i) => i.supplier === p.supplier);
       return {
         title: p.supplier,
-        note: p.so ? `SO ${p.so}` : "SO number not entered yet",
+        note: referenceLine(input.reference, p.so),
         lines: [`${there.length} ${there.length === 1 ? "item" : "items"}: ${partWords(there)}`],
       };
     }),
@@ -173,7 +179,7 @@ export function installEvent(input: InstallEventInput): InstallEvent {
         "",
       ]),
     ]),
-    `The job in full: ${input.link}`,
+    ...(input.slip ? [`Pickup slip, to show at the counter: ${input.slip}`] : []),
   ].join("\n");
 
   // Google Calendar shows a little formatting in an event's description: the same sheet with its headings in bold.
@@ -192,7 +198,7 @@ export function installEvent(input: InstallEventInput): InstallEvent {
         ),
       ].join("<br><br>"),
     ),
-    `The job in full: ${esc(input.link)}`,
+    ...(input.slip ? [`<b>Pickup slip</b>, to show at the counter: ${esc(input.slip)}`] : []),
   ].join("<br><br>");
 
   // The Google link carries the whole job sheet, as the business's own bookings do (never the customer's email).
@@ -214,6 +220,7 @@ export function installEvent(input: InstallEventInput): InstallEvent {
     location: input.address,
     sections,
     description,
+    slip: input.slip,
     googleUrl,
     ics: icsFile({
       uid: `${input.jobId}-install@renuabl`,
