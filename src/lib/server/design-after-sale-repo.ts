@@ -8,7 +8,9 @@
  * signed-in member (or, for what a signature sets going, from the proposal's
  * own record).
  */
+import { INSTALLED_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import { materialsOrder } from "@/lib/domain/design/deal";
+import { todayInMarket } from "@/lib/domain/market";
 import { depositAsked } from "@/lib/domain/design/deposit";
 import {
   installCostOf,
@@ -408,9 +410,10 @@ export async function invoicesView(businessId: string): Promise<InvoicesView> {
     installDate: string | null;
     signedAt: string;
     reference: string;
+    stage: JobStage;
   }>(
     `select distinct on (p.job_id) p.job_id as "jobId", c.name as customer, j.address, ${day("j.install_date")} as "installDate",
-            ${moment("v.accepted_at")} as "signedAt", coalesce(o.data->>'reference', '') as reference
+            ${moment("v.accepted_at")} as "signedAt", coalesce(o.data->>'reference', '') as reference, j.stage
        from design_proposals p
        join design_proposal_versions v on v.business_id = p.business_id and v.proposal_id = p.id and v.accepted_at is not null
        join design_jobs j on j.business_id = p.business_id and j.id = p.job_id
@@ -437,7 +440,20 @@ export async function invoicesView(businessId: string): Promise<InvoicesView> {
   const rows: InvoiceRow[] = jobs.map((j) => {
     const cost = costs.get(j.jobId) ?? null;
     const mine = invoices.filter((i) => i.jobId === j.jobId);
-    return { ...j, cost, invoices: mine, ...varianceOf(cost, mine, tolerance) };
+    const v = varianceOf(cost, mine, tolerance);
+    // The installer bills once the job is done: before it is installed (by its stage, or a date that has come), none is expected.
+    const installed = INSTALLED_STAGES.includes(j.stage) || (j.installDate !== null && j.installDate <= todayInMarket());
+    return {
+      jobId: j.jobId,
+      customer: j.customer,
+      address: j.address,
+      signedAt: j.signedAt,
+      installDate: j.installDate,
+      cost,
+      invoices: mine,
+      ...v,
+      status: v.status === "awaiting" && !installed ? ("upcoming" as const) : v.status,
+    };
   });
   const waiting = invoices
     .filter((i) => !i.jobId)
@@ -456,7 +472,7 @@ export async function invoicesView(businessId: string): Promise<InvoicesView> {
         .sort((a, b) => b.score - a.score)
         .slice(0, 3),
     }));
-  const order = { over: 0, awaiting: 1, under: 2, match: 3 } as const;
+  const order = { over: 0, awaiting: 1, under: 2, match: 3, upcoming: 4 } as const;
   rows.sort((a, b) => order[a.status] - order[b.status] || b.signedAt!.localeCompare(a.signedAt!));
   return { rows, waiting, tolerance };
 }

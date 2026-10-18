@@ -90,7 +90,7 @@ export const CONVERSATION = {
 export const AFTER_SIGNING = {
   eyebrow: "Once it's signed",
   headline: "A signature starts the job.",
-  body: "The parts in the design itself become the order, the installation is costed from the quote, and the install goes in the calendar.",
+  body: "The parts in the design itself become the order, the install goes in the calendar, and when the installer bills you, their invoice is checked against what the quote allowed.",
 } as const;
 
 export interface AfterStep {
@@ -120,15 +120,15 @@ export const AFTER_STEPS: readonly AfterStep[] = [
     status: "live",
   },
   {
-    key: "invoices",
-    title: "Installer Invoices",
-    body: "The installer's invoice costed from the quote; upload theirs and the differences are shown.",
-    status: "live",
-  },
-  {
     key: "scheduler",
     title: "Install Scheduler",
     body: "Every booked install in one calendar, with reminders sent to the customer to get ready.",
+    status: "live",
+  },
+  {
+    key: "invoices",
+    title: "Installer Invoices",
+    body: "After the install, upload the installer's invoice and it is checked against what the quote allowed, with the differences shown.",
     status: "live",
   },
 ] as const;

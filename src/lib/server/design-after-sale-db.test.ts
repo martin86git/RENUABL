@@ -138,7 +138,8 @@ describe.skipIf(!url)("roof designer after the sale (database)", () => {
     expect(view.rows).toHaveLength(1);
     const row = view.rows[0];
     expect(row.cost?.total).toBeGreaterThan(0);
-    expect(row.status).toBe("awaiting");
+    // Signed but not installed: no installer's invoice is expected yet.
+    expect(row.status).toBe("upcoming");
     const allowed = row.cost!.total;
     const inv = await after.addInvoice(
       a,
@@ -152,7 +153,10 @@ describe.skipIf(!url)("roof designer after the sale (database)", () => {
     expect(await after.assignInvoice(b, inv.id, null, B)).toBe(false);
     expect(await after.assignInvoice(a, inv.id, null, A)).toBe(true);
     const waiting = await after.invoicesView(a);
-    expect(waiting.rows[0].status).toBe("awaiting");
+    expect(waiting.rows[0].status).toBe("upcoming");
+    await db.query(`update design_jobs set stage = 'installed' where business_id = $1 and id = $2`, [a, signed.jobId]);
+    expect((await after.invoicesView(a)).rows[0].status).toBe("awaiting");
+    await db.query(`update design_jobs set stage = 'won' where business_id = $1 and id = $2`, [a, signed.jobId]);
     expect(waiting.waiting.map((w) => w.id)).toEqual([inv.id]);
     expect(
       await after.addInvoice(

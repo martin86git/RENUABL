@@ -20,7 +20,7 @@ import { Tile } from "./design-proposals-list";
 import { PATHS, PageHead, ui } from "./design-shell";
 
 const money2 = (n: number) => `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const FILTERS = ["all", "over", "under", "match", "awaiting"] as const;
+const FILTERS = ["all", "over", "under", "match", "awaiting", "upcoming"] as const;
 type Filter = (typeof FILTERS)[number];
 
 /**
@@ -63,8 +63,8 @@ export function InvoicesPage() {
         </button>
       </PageHead>
       <p className="mt-2 max-w-2xl text-sm text-ink-2">
-        Each signed job&apos;s installation, as your quote allowed for it, against your installer&apos;s invoice. All figures ex GST; within{" "}
-        {data ? dollars(data.tolerance) : "your tolerance"} it matches (set in Prices and settings).
+        Each signed job&apos;s installation, as your quote allowed for it, against your installer&apos;s invoice once the job is installed.
+        All figures ex GST; within {data ? dollars(data.tolerance) : "your tolerance"} it matches (set in Prices and settings).
       </p>
       {problem && (
         <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
@@ -84,10 +84,13 @@ export function InvoicesPage() {
 
       <div className="mt-6 grid gap-3 sm:grid-cols-5">
         <Tile label="Signed jobs" value={data ? String(rows.length) : "–"} />
-        <Tile label="Invoiced" value={data ? `${rows.length - count("awaiting")} of ${rows.length}` : "–"} />
+        <Tile
+          label="Invoiced"
+          value={data ? `${rows.filter((r) => r.invoices.length).length} of ${rows.length - count("upcoming")} installed` : "–"}
+        />
         <Tile label="Over" value={data ? dollars(sum("over")) : "–"} tone="over" />
         <Tile label="Under" value={data ? dollars(sum("under")) : "–"} tone="under" />
-        <Tile label="Awaiting" value={data ? String(count("awaiting")) : "–"} />
+        <Tile label="Awaiting invoice" value={data ? String(count("awaiting")) : "–"} />
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2" role="tablist">

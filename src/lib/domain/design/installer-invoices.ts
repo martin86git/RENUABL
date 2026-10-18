@@ -58,12 +58,14 @@ export interface InstallerInvoice {
   at: string;
 }
 
-export type Variance = "match" | "over" | "under" | "awaiting";
+/** "upcoming": signed but not installed yet, so no installer's invoice is expected. */
+export type Variance = "match" | "over" | "under" | "awaiting" | "upcoming";
 export const VARIANCE_LABELS: Record<Variance, string> = {
   match: "Matches",
   over: "Over",
   under: "Under",
   awaiting: "Awaiting invoice",
+  upcoming: "Not installed yet",
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -85,6 +87,7 @@ export function varianceOf(cost: InstallCost | null, invoices: readonly Pick<Ins
 /** "Over by $200", "Under by $40", "Matches (+$10)", "Awaiting invoice". */
 export function varianceText(v: { difference: number | null; status: Variance }): string {
   const money = (n: number) => `$${Math.abs(n).toLocaleString("en-AU", { maximumFractionDigits: 2 })}`;
+  if (v.status === "upcoming") return VARIANCE_LABELS.upcoming;
   if (v.difference === null) return VARIANCE_LABELS.awaiting;
   if (v.status === "over") return `Over by ${money(v.difference)}`;
   if (v.status === "under") return `Under by ${money(v.difference)}`;

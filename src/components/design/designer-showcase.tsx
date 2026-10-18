@@ -535,7 +535,8 @@ const COSTED = [
   ["Three-phase", 150],
   ["Battery", 1800],
 ] as const;
-const AFTER = { signed: 0, order: 2000, invoice: 5000, schedule: 8000, total: 12000 };
+/** The order things happen in: signed, ordered, booked (with reminders), installed, and only then the installer's invoice. */
+const AFTER = { signed: 0, order: 2000, schedule: 5000, installed: 8600, invoice: 9400, billed: 10600, total: 15000 };
 
 function Stage({
   on,
@@ -609,6 +610,44 @@ export function AfterSigningDemo() {
             {status("send-order") === "soon" && <SoonTag />}
           </p>
         </Stage>
+        <Stage on={t >= AFTER.schedule} icon={CalendarDays} title="Install Scheduler" status={status("scheduler")}>
+          <div className="grid grid-cols-5 gap-1 text-center text-[10.5px] text-muted">
+            {["Mon", "Tue", "Wed", "Thu", "Fri"].map((d) => (
+              <div key={d}>
+                <p>{d}</p>
+                <div
+                  className={clsx(
+                    "mt-1 h-12 rounded",
+                    d === "Thu" && t >= AFTER.installed
+                      ? "bg-positive text-[10px] leading-tight text-white"
+                      : d === "Thu" && t >= AFTER.schedule
+                        ? "bg-sun-line text-[10px] leading-tight text-white"
+                        : "bg-surface-2",
+                  )}
+                >
+                  {d === "Thu" && t >= AFTER.schedule && (
+                    <span className="block px-0.5 pt-1.5">
+                      Sarah N.{t >= AFTER.installed && <Check className="mx-auto mt-0.5 size-3" />}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <ul className="mt-3 space-y-1.5 text-[11.5px]">
+            {[
+              { at: AFTER.schedule + 1200, text: "Reminder sent: install on Thursday" },
+              { at: AFTER.schedule + 2400, text: "Reminder sent: clear the way to the switchboard" },
+              { at: AFTER.installed, text: "Installed. Waiting for the installer's invoice" },
+            ]
+              .filter((r) => t >= r.at)
+              .map((r) => (
+                <li key={r.text} className="flex animate-[fade-up_300ms_ease-out] items-start gap-1.5 text-ink-2">
+                  <Bell className="mt-0.5 size-3.5 shrink-0 text-sun-line" /> {r.text}
+                </li>
+              ))}
+          </ul>
+        </Stage>
         <Stage on={t >= AFTER.invoice} icon={ReceiptText} title="Installer Invoices" status={status("invoices")}>
           <ul className="space-y-0.5 text-[12px]">
             {COSTED.map(([name, n]) => (
@@ -620,53 +659,24 @@ export function AfterSigningDemo() {
           </ul>
           <div className="mt-2 space-y-0.5 border-t border-line pt-2 text-[12px]">
             <p className="flex justify-between">
-              <span className="text-muted">From the quote</span>
+              <span className="text-muted">Allowed in the quote</span>
               <span className="tabular-nums">{money(expected)}</span>
             </p>
             <p className="flex justify-between">
               <span className="text-muted">Their invoice</span>
-              <span className="tabular-nums">{t >= AFTER.invoice + 1500 ? money(expected + 200) : "–"}</span>
+              <span className="tabular-nums">{t >= AFTER.billed ? money(expected + 200) : "After the install"}</span>
             </p>
-            {t >= AFTER.invoice + 1500 && (
+            {t >= AFTER.billed && (
               <p className="mt-1 animate-[fade-up_300ms_ease-out] rounded bg-warning-soft px-2 py-1 text-warning">
                 +$200: switchboard work, not on the quote
               </p>
             )}
           </div>
         </Stage>
-        <Stage on={t >= AFTER.schedule} icon={CalendarDays} title="Install Scheduler" status={status("scheduler")}>
-          <div className="grid grid-cols-5 gap-1 text-center text-[10.5px] text-muted">
-            {["Mon", "Tue", "Wed", "Thu", "Fri"].map((d) => (
-              <div key={d}>
-                <p>{d}</p>
-                <div
-                  className={clsx(
-                    "mt-1 h-12 rounded",
-                    d === "Thu" && t >= AFTER.schedule ? "bg-sun-line text-[10px] leading-tight text-white" : "bg-surface-2",
-                  )}
-                >
-                  {d === "Thu" && t >= AFTER.schedule && <span className="block px-0.5 pt-1.5">Sarah N.</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-          <ul className="mt-3 space-y-1.5 text-[11.5px]">
-            {[
-              { at: AFTER.schedule + 1200, text: "Reminder sent: install on Thursday" },
-              { at: AFTER.schedule + 2400, text: "Reminder sent: clear the way to the switchboard" },
-            ]
-              .filter((r) => t >= r.at)
-              .map((r) => (
-                <li key={r.text} className="flex animate-[fade-up_300ms_ease-out] items-start gap-1.5 text-ink-2">
-                  <Bell className="mt-0.5 size-3.5 shrink-0 text-sun-line" /> {r.text}
-                </li>
-              ))}
-          </ul>
-        </Stage>
       </div>
       <div aria-hidden className="mt-3 hidden items-center justify-center gap-2 text-[12px] text-muted lg:flex">
-        Signed <ArrowRight className="size-3.5" /> ordered <ArrowRight className="size-3.5" /> costed <ArrowRight className="size-3.5" />{" "}
-        booked
+        Signed <ArrowRight className="size-3.5" /> ordered <ArrowRight className="size-3.5" /> booked <ArrowRight className="size-3.5" />{" "}
+        installed <ArrowRight className="size-3.5" /> invoice checked
       </div>
       <figcaption className="mt-2 text-xs text-muted">An example, with made-up customers and example prices.</figcaption>
     </figure>
