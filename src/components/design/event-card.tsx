@@ -106,14 +106,23 @@ export function EventCard({ jobId, onClose }: { jobId: string; onClose: () => vo
             <div className="border-t border-line py-2">
               <div className={row}>
                 <MapPin className={icon} aria-hidden />
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.event.location)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[13.5px] text-ink underline-offset-4 hover:underline"
-                >
-                  {data.event.location}
-                </a>
+                {/* Who to see, then where: the customer's name above the site address. */}
+                <div className="text-[13.5px]">
+                  <p className="font-medium text-ink">{data.customer.name}</p>
+                  {data.customer.phone && (
+                    <a href={`tel:${data.customer.phone.replace(/\s/g, "")}`} className="block text-ink-2 hover:text-ink">
+                      {data.customer.phone}
+                    </a>
+                  )}
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.event.location)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-ink underline-offset-4 hover:underline"
+                  >
+                    {data.event.location}
+                  </a>
+                </div>
               </div>
               <div className={row}>
                 <AlignLeft className={icon} aria-hidden />
@@ -122,28 +131,30 @@ export function EventCard({ jobId, onClose }: { jobId: string; onClose: () => vo
                     <div key={s.heading}>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">{s.heading}</p>
                       <div className="mt-1.5 space-y-3">
-                        {s.groups.map((g, i) => (
-                          <div key={i}>
-                            <p className="font-semibold text-ink">{g.title}</p>
-                            {g.note && (
-                              <p className={clsx("text-[12px]", g.note.startsWith("SO ") ? "font-mono text-ink" : "text-sun-ink")}>
-                                {g.note}
-                              </p>
-                            )}
-                            {g.lines.map((l) => (
-                              <p key={l}>{l}</p>
-                            ))}
+                        {s.groups
+                          .filter((g) => !(s.heading === "On site" && g.title === "Customer"))
+                          .map((g, i) => (
+                            <div key={i}>
+                              <p className="font-semibold text-ink">{g.title}</p>
+                              {g.note && (
+                                <p className={clsx("text-[12px]", g.note.startsWith("SO ") ? "font-mono text-ink" : "text-sun-ink")}>
+                                  {g.note}
+                                </p>
+                              )}
+                              {g.lines.map((l) => (
+                                <p key={l}>{l}</p>
+                              ))}
 
-                            {g.items?.map((it, k) => (
-                              <p key={k} className="flex flex-wrap items-baseline justify-between gap-x-3">
-                                <span className="font-medium">{it.text}</span>
-                                <span className={clsx("text-[11.5px]", it.from === "No supplier set" ? "text-sun-ink" : "text-muted")}>
-                                  {it.from}
-                                </span>
-                              </p>
-                            ))}
-                          </div>
-                        ))}
+                              {g.items?.map((it, k) => (
+                                <p key={k} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                                  <span className="font-medium">{it.text}</span>
+                                  <span className={clsx("text-[11.5px]", it.from === "No supplier set" ? "text-sun-ink" : "text-muted")}>
+                                    {it.from}
+                                  </span>
+                                </p>
+                              ))}
+                            </div>
+                          ))}
                       </div>
                     </div>
                   ))}
