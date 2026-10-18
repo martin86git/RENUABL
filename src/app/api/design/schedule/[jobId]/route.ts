@@ -9,17 +9,6 @@ import { NO_DESIGN, savedFor } from "@/lib/server/design-proposal-repo";
 
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
 const SITE_KEYS = ["distributor", "nmi", "siteAccess", "switchboard"];
-/** The system to be installed, under its headings. */
-const SYSTEM_GROUPS: { title: string; keys: string[] }[] = [
-  { title: "Solar", keys: ["systemType", "systemSize", "panel", "panelQty", "optimisers", "tiltFrames"] },
-  { title: "Inverter", keys: ["inverter", "inverterQty", "additionalInverter", "inverterCapacity", "phases"] },
-  { title: "Battery", keys: ["battery", "batteryQty", "batteryStorage"] },
-  { title: "EV charger", keys: ["evCharger"] },
-  { title: "Roof", keys: ["roofType", "storeys", "propertyType"] },
-];
-/** The order's parts under their headings, in the order they go on. */
-const PART_GROUPS = ["Panels", "Inverters", "Battery", "Racking", "Electrical", "Added"] as const;
-const PART_TITLES: Record<string, string> = { Added: "Other" };
 
 /**
  * GET: one booked installation as a calendar event: its title, day and hours, address, and the job sheet (the order's
@@ -56,21 +45,18 @@ export async function GET(request: Request, ctx: RouteContext<"/api/design/sched
       batteryKwh: extra?.batteryKwh ?? 0,
       storeys: details.find((d) => d.key === "storeys")?.value ?? null,
       installer: job.details?.installer ?? null,
-      system: SYSTEM_GROUPS.map((g) => ({
-        title: g.title,
-        lines: details.filter((d) => g.keys.includes(d.key)).map((d) => ({ label: d.label, value: d.value! })),
-      })),
+      // Each wholesaler on the order with its SO number, and every item with the part it is for and where it comes from.
       pickups:
         typeof order === "string"
           ? []
-          : order.groups.map((g) => ({
-              supplier: g.supplier,
-              so: (g.list && order.order.salesOrders?.[g.list]) || "",
-              groups: PART_GROUPS.map((part) => ({
-                title: PART_TITLES[part] ?? part,
-                items: g.items.filter((i) => i.group === part).map((i) => ({ qty: i.qty, item: i.item, sku: i.sku })),
-              })).filter((p) => p.items.length),
-            })),
+          : order.groups.flatMap((g) =>
+              g.list && g.supplier ? [{ supplier: g.supplier, so: order.order.salesOrders?.[g.list] ?? "" }] : [],
+            ),
+      items:
+        typeof order === "string"
+          ? []
+          : order.items.filter((i) => !i.off).map((i) => ({ part: i.group, qty: i.qty, item: i.item, sku: i.sku, supplier: i.supplier })),
+      details: details.map((d) => ({ key: d.key, label: d.label, value: d.value! })),
       site: details.filter((d) => SITE_KEYS.includes(d.key)).map((d) => ({ label: d.label, value: d.value! })),
       link: `${site}/design/deals/${jobId}`,
     });

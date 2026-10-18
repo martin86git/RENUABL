@@ -123,8 +123,8 @@ export function EventCard({ jobId, onClose }: { jobId: string; onClose: () => vo
                       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">{s.heading}</p>
                       <div className="mt-1.5 space-y-3">
                         {s.groups.map((g, i) => (
-                          <div key={i} className={clsx(g.supplier && "border-t border-line pt-3 first:border-0 first:pt-0")}>
-                            <p className={g.supplier ? "text-[14px] font-semibold text-ink" : "font-medium text-ink-2"}>{g.title}</p>
+                          <div key={i}>
+                            <p className="font-semibold text-ink">{g.title}</p>
                             {g.note && (
                               <p className={clsx("text-[12px]", g.note.startsWith("SO ") ? "font-mono text-ink" : "text-sun-ink")}>
                                 {g.note}
@@ -133,12 +133,21 @@ export function EventCard({ jobId, onClose }: { jobId: string; onClose: () => vo
                             {g.lines.map((l) => (
                               <p key={l}>{l}</p>
                             ))}
+
+                            {g.items?.map((it, k) => (
+                              <p key={k} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                                <span className="font-medium">{it.text}</span>
+                                <span className={clsx("text-[11.5px]", it.from === "No supplier set" ? "text-sun-ink" : "text-muted")}>
+                                  {it.from}
+                                </span>
+                              </p>
+                            ))}
                           </div>
                         ))}
                       </div>
                     </div>
                   ))}
-                  {!data.event.sections.some((s) => s.heading === "Materials") && (
+                  {!data.event.sections.some((s) => s.heading === "Collect from") && (
                     <p className="text-muted">No order yet: the materials appear here once the customer has signed.</p>
                   )}
                 </div>

@@ -2,10 +2,11 @@
  * A booked installation as a calendar event for the installer: the card the
  * Install Scheduler opens (laid out like a Google Calendar event), and the
  * same event for the business's own calendar, by a pre-filled Google
- * Calendar link or an .ics file. The description is the job sheet: what to
- * collect from which wholesaler (against which SO number), the system to be
- * installed, who to see on site, and the site's notes, each broken down
- * under its own headings.
+ * Calendar link or an .ics file. The description is the job sheet, in three
+ * parts: where to collect (each wholesaler and its SO number), the system to
+ * be installed (each part's facts and the exact items for it, each tagged
+ * with the wholesaler it comes from: the system and the pick-up list are one),
+ * and who to see on site.
  *
  * It is never for the customer: it lists the parts and where to collect them.
  * No one is invited by it, and the customer's email is never in it; the
@@ -20,11 +21,13 @@ import type { ISODate } from "../types";
 export const INSTALL_DAY = { start: "08:00", end: "16:00" } as const;
 export const MARKET_ZONE = "Australia/Melbourne";
 
-/** What to collect from one wholesaler: its name, the SO number to collect against, and the parts under their headings. */
-export interface Pickup {
+/** One item to collect, from the job's order: its part of the system and the wholesaler it comes from (null: none set). */
+export interface PickupItem {
+  part: string;
+  qty: number;
+  item: string;
+  sku: string;
   supplier: string | null;
-  so: string;
-  groups: { title: string; items: { qty: number; item: string; sku: string }[] }[];
 }
 
 export interface InstallEventInput {
@@ -37,9 +40,11 @@ export interface InstallEventInput {
   batteryKwh: number;
   storeys: string | null;
   installer: string | null;
-  pickups: Pickup[];
-  /** The system to be installed, under its headings: Solar, Inverter, Battery, EV charger, Roof. */
-  system: { title: string; lines: { label: string; value: string }[] }[];
+  /** Each wholesaler on the order, with the SO number to collect against ("" until entered). */
+  pickups: { supplier: string; so: string }[];
+  items: PickupItem[];
+  /** The deal's system details, by key, as the deal shows them. */
+  details: { key: string; label: string; value: string }[];
   /** The deal's site notes: distributor, NMI, site access, switchboard. */
   site: { label: string; value: string }[];
   /** The deal's own page, for the link in the event. */
@@ -50,9 +55,10 @@ export interface EventGroup {
   title: string;
   /** A line under the title: "SO OSW923342". */
   note?: string;
+  /** Facts, as "Label: value". */
   lines: string[];
-  /** A wholesaler to collect from: the heading the parts under it belong to. */
-  supplier?: boolean;
+  /** Things to collect, each with where from. */
+  items?: { text: string; from: string }[];
 }
 
 export interface InstallEvent {
@@ -69,7 +75,33 @@ export interface InstallEvent {
   ics: string;
 }
 
+/**
+ * The system to be installed, part by part: the order's items for each part, and the deal's facts about it. A fact the
+ * items already say (the panel and how many) is shown only when there are no items for that part.
+ */
+const SYSTEM_PARTS: { title: string; parts: string[]; keys: string[]; withoutItems: string[] }[] = [
+  {
+    title: "Solar",
+    parts: ["Panels"],
+    keys: ["systemType", "systemSize", "optimisers", "tiltFrames"],
+    withoutItems: ["panel", "panelQty"],
+  },
+  {
+    title: "Inverter",
+    parts: ["Inverters"],
+    keys: ["inverterCapacity", "phases"],
+    withoutItems: ["inverter", "inverterQty", "additionalInverter"],
+  },
+  { title: "Battery", parts: ["Battery"], keys: ["batteryStorage"], withoutItems: ["battery", "batteryQty"] },
+  { title: "EV charger", parts: [], keys: ["evCharger"], withoutItems: [] },
+  { title: "Roof and racking", parts: ["Racking"], keys: ["roofType", "storeys", "propertyType"], withoutItems: [] },
+  { title: "Electrical", parts: ["Electrical"], keys: [], withoutItems: [] },
+  { title: "Other", parts: ["Added"], keys: [], withoutItems: [] },
+];
+const NO_SUPPLIER = "No supplier set";
+
 const kwText = (kw: number | null) => (kw ? `${Math.round(kw * 1000) / 1000}kW` : "");
+const itemText = (m: PickupItem) => `${m.qty} x ${m.item}${m.sku ? ` (${m.sku})` : ""}`;
 
 export function installEvent(input: InstallEventInput): InstallEvent {
   const kind = input.batteryKwh > 0 ? "Solar + Battery" : "Solar";
@@ -79,26 +111,41 @@ export function installEvent(input: InstallEventInput): InstallEvent {
     .filter(Boolean)
     .join(" | ");
 
+  // Where to go: each wholesaler, its SO number and what is there; then anything no wholesaler has been set for.
+  const partWords = (items: PickupItem[]) =>
+    [...new Set(items.map((i) => SYSTEM_PARTS.find((p) => p.parts.includes(i.part))?.title.toLowerCase() ?? "other"))].join(", ");
+  const collect: EventGroup[] = [
+    ...input.pickups.map((p) => {
+      const there = input.items.filter((i) => i.supplier === p.supplier);
+      return {
+        title: p.supplier,
+        note: p.so ? `SO ${p.so}` : "SO number not entered yet",
+        lines: [`${there.length} ${there.length === 1 ? "item" : "items"}: ${partWords(there)}`],
+      };
+    }),
+    ...(input.items.some((i) => !i.supplier)
+      ? [
+          {
+            title: NO_SUPPLIER,
+            lines: [`${input.items.filter((i) => !i.supplier).length} to source: ${partWords(input.items.filter((i) => !i.supplier))}`],
+          },
+        ]
+      : []),
+  ];
+
+  const system: EventGroup[] = SYSTEM_PARTS.map((p) => {
+    const items = input.items.filter((i) => p.parts.includes(i.part));
+    const keys = items.length ? p.keys : [...p.keys, ...p.withoutItems];
+    return {
+      title: p.title,
+      lines: keys.flatMap((k) => input.details.filter((d) => d.key === k).map((d) => `${d.label}: ${d.value}`)),
+      items: items.map((i) => ({ text: itemText(i), from: i.supplier ?? NO_SUPPLIER })),
+    };
+  }).filter((g) => g.lines.length || g.items.length);
+
   const sections: InstallEvent["sections"] = [
-    {
-      heading: "Materials",
-      groups: input.pickups.flatMap((p) => [
-        // Where to go, and the number to collect against; then what to pick up there, under its headings.
-        {
-          title: p.supplier ? `Collect from ${p.supplier}` : "Supplier not set",
-          note: p.so ? `SO ${p.so}` : "SO number not entered yet",
-          lines: [],
-          supplier: true,
-        },
-        ...p.groups.map((g) => ({ title: g.title, lines: g.items.map((m) => `${m.qty} x ${m.item}${m.sku ? ` (${m.sku})` : ""}`) })),
-      ]),
-    },
-    {
-      heading: "System to be installed",
-      groups: input.system
-        .filter((g) => g.lines.length)
-        .map((g) => ({ title: g.title, lines: g.lines.map((d) => `${d.label}: ${d.value}`) })),
-    },
+    { heading: "Collect from", groups: collect },
+    { heading: "System to be installed", groups: system },
     {
       heading: "On site",
       groups: [
@@ -119,7 +166,13 @@ export function installEvent(input: InstallEventInput): InstallEvent {
   const description = [
     ...sections.flatMap((s) => [
       s.heading.toUpperCase(),
-      ...s.groups.flatMap((g) => [g.title, ...(g.note ? [g.note] : []), ...g.lines, ""]),
+      ...s.groups.flatMap((g) => [
+        g.title,
+        ...(g.note ? [g.note] : []),
+        ...g.lines,
+        ...(g.items ?? []).map((i) => `${i.text} · ${i.from}`),
+        "",
+      ]),
     ]),
     `The job in full: ${input.link}`,
   ].join("\n");
@@ -127,10 +180,8 @@ export function installEvent(input: InstallEventInput): InstallEvent {
   // The Google link: what isn't private, and the way back to the job for the rest.
   const stamp = (date: ISODate, time: string) => `${date.replaceAll("-", "")}T${time.replace(":", "")}00`;
   const shortDetails = [
-    ...input.pickups.map((p) => `Collect from ${p.supplier ?? "supplier not set"}${p.so ? ` · SO ${p.so}` : ""}`),
-    ...input.system.flatMap((g) =>
-      g.lines.filter((d) => /size|panel$|inverter$|battery$/i.test(d.label)).map((d) => `${d.label}: ${d.value}`),
-    ),
+    ...input.pickups.map((p) => `Collect from ${p.supplier}${p.so ? ` · SO ${p.so}` : ""}`),
+    ...input.details.filter((d) => ["systemSize", "panel", "inverter", "battery"].includes(d.key)).map((d) => `${d.label}: ${d.value}`),
     ...(input.installer ? [`Installer: ${input.installer}`] : []),
     "",
     `The job sheet in full: ${input.link}`,
