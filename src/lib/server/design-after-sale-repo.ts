@@ -34,7 +34,16 @@ import {
   type OrderTotals,
 } from "@/lib/domain/design/orders";
 import { DEFAULT_PREFS, cleanPrefs, type BusinessPrefs } from "@/lib/domain/design/prefs";
-import { proposalPath, proposalState, type ProposalInternal, type ProposalState, type ProposalView } from "@/lib/domain/design/proposal";
+import {
+  internalForChoice,
+  proposalPath,
+  proposalState,
+  viewForChoice,
+  type ProposalInternal,
+  type ProposalState,
+  type ProposalView,
+} from "@/lib/domain/design/proposal";
+import type { DesignGoal } from "@/lib/domain/design/roof-design";
 import type { CostLine } from "@/lib/domain/design/quote";
 import { readiness, type Check } from "@/lib/domain/design/schedule";
 import type { ISODate } from "@/lib/domain/types";
@@ -95,6 +104,7 @@ export async function listProposals(businessId: string, today: ISODate): Promise
     address: string;
     version: number;
     view: ProposalView;
+    option: DesignGoal | null;
     token: string;
     withdrawn: boolean;
     publishedAt: string;
@@ -102,7 +112,7 @@ export async function listProposals(businessId: string, today: ISODate): Promise
     acceptedAt: string | null;
     acceptedName: string | null;
   }>(
-    `select distinct on (p.job_id) p.job_id as "jobId", c.id as "customerId", c.name as customer, j.title, j.address, v.version, v.view,
+    `select distinct on (p.job_id) p.job_id as "jobId", c.id as "customerId", c.name as customer, j.title, j.address, v.version, v.view, v.accepted_option as option,
             p.token, p.withdrawn_at is not null as withdrawn, ${moment("v.published_at")} as "publishedAt",
             ${moment("v.opened_at")} as "openedAt", ${moment("v.accepted_at")} as "acceptedAt", v.accepted_name as "acceptedName"
        from design_proposals p
@@ -123,8 +133,9 @@ export async function listProposals(businessId: string, today: ISODate): Promise
       version: r.version,
       state: proposalState({ withdrawn: r.withdrawn, accepted: Boolean(r.acceptedAt), validUntil: r.view.validUntil }, today),
       path: proposalPath(r.token),
-      youPay: r.view.price.youPay,
-      system: systemLine(r.view),
+      // Once signed, the system the customer chose.
+      youPay: viewForChoice(r.view, r.option).price.youPay,
+      system: systemLine(viewForChoice(r.view, r.option)),
       publishedAt: r.publishedAt,
       openedAt: r.openedAt,
       acceptedAt: r.acceptedAt,
@@ -153,16 +164,27 @@ interface Signed {
 
 /** A job's newest accepted version, or null when none has been signed. */
 async function signedVersion(businessId: string, jobId: string): Promise<Signed | null> {
-  const rows = await query<{ internal: ProposalInternal; view: ProposalView; acceptedAt: string; version: number; received: boolean }>(
-    `select v.internal, v.view, ${moment("v.accepted_at")} as "acceptedAt", v.version, v.deposit_received_at is not null as received
+  const rows = await query<{
+    internal: ProposalInternal;
+    view: ProposalView;
+    acceptedAt: string;
+    version: number;
+    received: boolean;
+    option: DesignGoal | null;
+  }>(
+    `select v.internal, v.view, ${moment("v.accepted_at")} as "acceptedAt", v.version, v.deposit_received_at is not null as received,
+            v.accepted_option as option
        from design_proposal_versions v join design_proposals p on p.business_id = v.business_id and p.id = v.proposal_id
       where v.business_id = $1 and p.job_id = $2 and v.accepted_at is not null
       order by v.version desc limit 1`,
     [businessId, jobId],
   );
-  const r = rows[0];
-  if (!r) return null;
-  return { ...r, depositReceived: depositAsked(r.view) === null ? null : r.received };
+  const found = rows[0];
+  if (!found) return null;
+  // The system the customer chose, when there was a choice: its price, its lines for the order and the installation.
+  const { option, ...r } = found;
+  const view = viewForChoice(r.view, option);
+  return { ...r, view, internal: internalForChoice(r.internal, option), depositReceived: depositAsked(view) === null ? null : r.received };
 }
 
 /** The hardware the customer signed for, line by line, as the order is made from it. */
@@ -574,6 +596,7 @@ export async function bookedJobs(businessId: string, from: ISODate, to: ISODate)
     kw: number | null;
     order: OrderStatus | null;
     view: ProposalView | null;
+    option: DesignGoal | null;
     received: boolean | null;
   }>(
     `select j.id as "jobId", c.name as customer, j.address, j.title, ${day("j.install_date")} as date, j.stage, j.kw::float8 as kw,
@@ -582,7 +605,7 @@ export async function bookedJobs(businessId: string, from: ISODate, to: ISODate)
        join design_customers c on c.business_id = j.business_id and c.id = j.customer_id
        left join design_orders o on o.business_id = j.business_id and o.job_id = j.id
        left join lateral (
-         select v.view, v.deposit_received_at is not null as received
+         select v.view, v.accepted_option as option, v.deposit_received_at is not null as received
            from design_proposals p join design_proposal_versions v on v.business_id = p.business_id and v.proposal_id = p.id
           where p.business_id = j.business_id and p.job_id = j.id and v.accepted_at is not null
           order by v.version desc limit 1) s on true
@@ -591,7 +614,8 @@ export async function bookedJobs(businessId: string, from: ISODate, to: ISODate)
     [businessId, from, to],
   );
   return rows.map((r) => {
-    const ready = readiness({ order: r.order, depositReceived: r.view && depositAsked(r.view) !== null ? Boolean(r.received) : null });
+    const agreed = r.view ? viewForChoice(r.view, r.option) : null;
+    const ready = readiness({ order: r.order, depositReceived: agreed && depositAsked(agreed) !== null ? Boolean(r.received) : null });
     return { jobId: r.jobId, customer: r.customer, address: r.address, title: r.title, date: r.date, stage: r.stage, kw: r.kw, ...ready };
   });
 }

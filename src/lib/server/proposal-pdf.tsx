@@ -171,6 +171,41 @@ function ProposalDocument({
     cover: () => null,
     system: () => (
       <>
+        {/* With a choice of systems: each one in a line, and which one the rest of this file shows. */}
+        {view.options && view.options.length > 1 && (
+          <View wrap={false} style={{ marginBottom: 14 }}>
+            {view.options.map((o) => {
+              const shown = o.price.youPay === view.price.youPay && o.system.kw === view.system.kw;
+              return (
+                <View key={o.goal} style={[s.row, { alignItems: "flex-start" }]}>
+                  <View style={{ width: "46%" }}>
+                    <Text style={{ fontFamily: "Helvetica-Bold" }}>
+                      {o.name}
+                      {o.recommended ? " (recommended)" : ""}
+                      {shown ? " · shown in this proposal" : ""}
+                    </Text>
+                    <Text style={s.small}>{o.promise}</Text>
+                  </View>
+                  <Text style={{ width: "22%" }}>
+                    {o.system.kw.toFixed(2)} kW{o.system.batteryKwh > 0 ? ` · ${o.system.batteryKwh} kWh` : ""}
+                  </Text>
+                  <View style={{ width: "32%", alignItems: "flex-end" }}>
+                    <Text style={{ fontFamily: "Helvetica-Bold" }}>{dollars(o.price.youPay)}</Text>
+                    {o.bill && (
+                      <Text style={s.small}>
+                        saves about {dollars(o.bill.saving)} a year
+                        {o.paybackYears !== null ? `, pays back in about ${o.paybackYears} years` : ""}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+            <Text style={[s.small, { marginTop: 6 }]}>
+              Each system is priced in full, after the federal rebate. Savings and payback are estimates. {ESTIMATE_NOTE}
+            </Text>
+          </View>
+        )}
         {view.system.details.map((d) => (
           <Row key={d.label} label={d.label} value={d.value} />
         ))}

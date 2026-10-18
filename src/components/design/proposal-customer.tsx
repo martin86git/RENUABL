@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { PublicDeposit } from "@/lib/domain/design/deposit";
-import type { ProposalState, ProposalView } from "@/lib/domain/design/proposal";
+import { recommendedGoal, viewForChoice, type ProposalState, type ProposalView } from "@/lib/domain/design/proposal";
+import type { DesignGoal } from "@/lib/domain/design/roof-design";
 import { acceptProposal, proposalUrls, sayPaid, tellOpened } from "@/lib/services/proposals";
 import { ChatDock, ChatGreeting, useCustomerChat } from "./chat-panel";
 import { PayDeposit } from "./deposit-panel";
@@ -20,7 +21,7 @@ export function CustomerProposal(props: {
   token: string;
   view: ProposalView;
   state: ProposalState;
-  accepted: { name: string; at: string } | null;
+  accepted: { name: string; at: string; option?: DesignGoal | null } | null;
   deposit: PublicDeposit | null;
 }) {
   const { token, view } = props;
@@ -30,18 +31,22 @@ export function CustomerProposal(props: {
   const urls = useMemo(() => proposalUrls(token), [token]);
   useEffect(() => tellOpened(token), [token]);
   const chat = useCustomerChat({ token, business: view.business.name, phone: view.business.phone });
+  // With a choice of systems: the one shown (the one chosen once they have gone ahead, else the recommended one to start).
+  const [chosen, setChosen] = useState<DesignGoal | null>(props.accepted?.option ?? recommendedGoal(view));
+  const shown = viewForChoice(view, chosen);
 
   return (
     <ProposalPage
-      view={view}
+      view={shown}
       state={state}
+      choice={{ chosen, onChoose: state === "accepted" ? undefined : setChosen }}
       accepted={accepted}
       urls={urls}
       deposit={
         // Only once accepted, and only when this proposal asks for a deposit.
         state === "accepted" && deposit ? (
           <PayDeposit
-            view={view}
+            view={shown}
             deposit={deposit}
             onPaid={async (way) => {
               const res = await sayPaid(token, way);
@@ -56,7 +61,7 @@ export function CustomerProposal(props: {
       chat={<ChatDock chat={chat} />}
       actions={{
         accept: async (name, agree) => {
-          const res = await acceptProposal(token, name, agree);
+          const res = await acceptProposal(token, name, agree, chosen);
           if (!res.ok) return res.message;
           setState(res.state);
           setAccepted(res.accepted);

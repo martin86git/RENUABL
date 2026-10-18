@@ -17,9 +17,11 @@ import {
   STC_NOTE,
   TIMING_NOTE,
   warrantyNote,
+  recommendedGoal,
   type ProposalState,
   type ProposalView,
 } from "@/lib/domain/design/proposal";
+import type { DesignGoal } from "@/lib/domain/design/roof-design";
 import { money } from "@/lib/domain/design/deposit";
 import { ROOF_IMAGE, metresPerPixel } from "@/lib/domain/design/roof-design";
 
@@ -237,6 +239,11 @@ export interface ProposalPageProps {
   chat?: React.ReactNode;
   /** "Pay your deposit", once the proposal is accepted and asks for one: shown straight under the acceptance. Drawn by the page that knows the link. */
   deposit?: React.ReactNode;
+  /**
+   * With options: which one the page shows, and how the customer changes it (left out once the choice is made, by
+   * going ahead, and in the business's preview, where the cards still show the choice).
+   */
+  choice?: { chosen: DesignGoal | null; onChoose?: (goal: DesignGoal) => void };
 }
 
 /**
@@ -257,7 +264,7 @@ export interface ProposalPageProps {
  * the design tool's monospace face, and the preview must look as the
  * customer's page does.
  */
-export function ProposalPage({ view, state, accepted, urls, actions, greeting, chat, deposit }: ProposalPageProps) {
+export function ProposalPage({ view, state, accepted, urls, actions, greeting, chat, deposit, choice }: ProposalPageProps) {
   const b = view.business;
   const bold = view.template === "bold";
   const compact = view.template === "compact";
@@ -594,6 +601,9 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
           </div>
         </section>
 
+        {/* With a choice of systems: the options side by side, the one chosen showing below. */}
+        {view.options && view.options.length > 1 && <ChooseSystem view={view} choice={choice} locked={state === "accepted"} />}
+
         {/* The rest, in the business's own order: each block under its heading, with the business's own words and picture first. */}
         {blocks
           .filter((block) => block.id !== "cover")
@@ -623,6 +633,76 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
       {/* Last, so it stays at the foot of the screen all the way down the page, footer included. */}
       {chat}
     </div>
+  );
+}
+
+/**
+ * The systems on offer, side by side: what each is for, its size, what the customer pays, the estimated yearly saving
+ * and payback. Choosing one shows it through the rest of the page; going ahead takes the one chosen. Estimates, as
+ * everywhere else on the proposal.
+ */
+function ChooseSystem({ view, choice, locked }: { view: ProposalView; choice?: ProposalPageProps["choice"]; locked: boolean }) {
+  const options = view.options ?? [];
+  const chosen = choice?.chosen ?? recommendedGoal(view);
+  return (
+    <section aria-labelledby="choose-system">
+      <h2 id="choose-system" className={h2}>
+        {locked ? "The system you chose" : "Choose your system"}
+      </h2>
+      <p className={clsx(fine, "mt-1")}>Each is priced in full. Savings and payback are estimates from your bill.</p>
+      <div
+        className={clsx("mt-5 grid gap-3", options.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}
+        role="radiogroup"
+        aria-label="Systems"
+      >
+        {options.map((o) => {
+          const on = o.goal === chosen;
+          return (
+            <button
+              key={o.goal}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              disabled={locked || !choice?.onChoose}
+              onClick={() => choice?.onChoose?.(o.goal)}
+              className={clsx(
+                "relative flex flex-col rounded-xl border bg-surface p-5 text-left transition-shadow",
+                on ? "border-[var(--primary)] shadow-[0_0_0_2px_var(--primary)]" : "border-line",
+                !locked && choice?.onChoose && !on && "hover:border-ink/40",
+                locked && !on && "opacity-50",
+              )}
+            >
+              {o.recommended && (
+                <span className="absolute -top-2.5 left-4 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-medium text-primary-ink">
+                  Recommended
+                </span>
+              )}
+              <span className="text-[16px] font-semibold text-ink">{o.name}</span>
+              <span className="mt-1 text-[13.5px] leading-snug text-muted">{o.promise}</span>
+              {o.backup && (
+                <span className="mt-2 w-fit rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-ink">
+                  Blackout backup
+                </span>
+              )}
+              <span className="mt-4 text-[13.5px] text-ink">
+                {o.system.kw.toFixed(2)} kW solar{o.system.batteryKwh > 0 ? ` · ${o.system.batteryKwh} kWh battery` : ""}
+              </span>
+              <span className="mt-3 text-[24px] font-semibold tabular-nums tracking-tight text-ink">{dollars(o.price.youPay)}</span>
+              <span className={fine}>You pay, after the federal rebate</span>
+              {o.bill && (
+                <span className="mt-3 space-y-0.5 text-[13.5px] text-ink">
+                  <span className="block">Saves about {dollars(o.bill.saving)} a year</span>
+                  {o.paybackYears !== null && <span className="block">Pays for itself in about {o.paybackYears} years</span>}
+                </span>
+              )}
+              <span className={clsx("mt-4 text-[13px] font-medium", on ? "text-[color:var(--primary)]" : "text-muted")}>
+                {on ? (locked ? "Chosen" : "Showing below") : "Show this one"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

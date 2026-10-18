@@ -44,8 +44,7 @@ export const CHAPTERS: readonly Chapter[] = [
     key: "three",
     line: "Three designs. One click.",
     sub: "Quickest payback, maximum return, maximum independence. Each priced and strung, ready to send.",
-    // Shown once the designer's three-designs button is in the product.
-    live: false,
+    live: true,
   },
   {
     key: "proposal",

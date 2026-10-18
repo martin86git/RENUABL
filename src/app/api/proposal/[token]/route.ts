@@ -54,7 +54,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[t
       if (!allow(request, "proposal-accept", 20)) return slowDown();
       const input = cleanAcceptance(read.body);
       if (!input.ok) return Response.json({ ok: false, message: input.message }, { status: 422 });
-      const result = await acceptProposal(token, input.value.name, today);
+      // The system chosen, when the proposal offers a choice: checked against what it offers beside the proposal itself.
+      const option = typeof read.body.option === "string" ? read.body.option.slice(0, 20) : null;
+      const result = await acceptProposal(token, input.value.name, today, option);
       if (!result) return notFound();
       // Told once, when it is first accepted, and not waited for: an email that can't be sent never holds the customer up.
       if (result === "accepted-now")

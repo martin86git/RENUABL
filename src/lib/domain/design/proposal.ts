@@ -48,12 +48,21 @@ import {
   solarVicNote,
   stcValue,
   type CostGroup,
+  type CostLine,
   type DesignExtras,
   type SolarVic,
 } from "./quote";
-import { designPanels, designSummary, monthlyProduction, type DesignSet } from "./roof-design";
+import {
+  DESIGN_GOALS,
+  designPanels,
+  designSummary,
+  monthlyProduction,
+  type DesignGoal,
+  type DesignSet,
+  type RoofDesign,
+} from "./roof-design";
 import { NETCC_INFORMATION, STANDARD_TERMS_VERSION, fillTerms, type TermsSection } from "./standard-terms";
-import { YIELD_PER_KW_DAY, batteryKwhOf, systemSpecOf } from "./system";
+import { YIELD_PER_KW_DAY, batteryKwhOf, shiftingKwhOf, systemSpecOf } from "./system";
 
 // ---------------------------------------------------------------------------
 // What the customer sees
@@ -169,6 +178,30 @@ export interface ProposalView {
   } | null;
   /** The blocks to show, in order. Left out on a proposal published before they could be arranged (`USUAL_BLOCKS`). */
   blocks?: ViewBlock[];
+  /**
+   * The systems the customer chooses between, when the roof has two or more goal designs (Quickest payback, Maximum
+   * return, Maximum independence), in that order; the recommended one is what the rest of the view shows. Left out
+   * with one design. The customer picks one when going ahead (`viewForChoice`).
+   */
+  options?: ProposalOption[];
+}
+
+/** One system a customer can choose, with everything that differs between them. Estimates throughout, as the rest. */
+export interface ProposalOption {
+  goal: DesignGoal;
+  name: string;
+  promise: string;
+  recommended: boolean;
+  /** A battery module held back to keep chosen circuits on in a blackout. */
+  backup: boolean;
+  system: ProposalView["system"];
+  roofPanels: number[][];
+  price: Pick<ProposalView["price"], "incGst" | "stc" | "youPay" | "solarVic" | "beforeGst" | "gst">;
+  production: ProposalView["production"];
+  bill: ProposalView["bill"];
+  paybackYears: number | null;
+  deposit: number | null;
+  milestones: { name: string; percent: number; amount: number }[];
 }
 
 /** The business's own record of a published proposal. Never sent to the customer. */
@@ -181,7 +214,48 @@ export interface ProposalInternal {
   projectVersion: number;
   /** Which of the roof's designs it is. */
   design: number;
+  /** Each option's own side, when the customer chooses between options (`internalForChoice`). */
+  options?: { goal: DesignGoal; design: number; cost: number; margin: number; priceExGst: number; lines: ProposalInternal["lines"] }[];
 }
+
+/** What each goal is called on a proposal, and what it promises, in the customer's words. Never a figure. */
+export const GOAL_WORDS: Record<DesignGoal, { name: string; promise: string }> = {
+  payback: { name: "Quickest payback", promise: "The smallest outlay, paying for itself soonest." },
+  return: { name: "Maximum return", promise: "Solar and a battery: more back over the years, for a slower payback." },
+  independence: {
+    name: "Maximum independence",
+    promise: "The most of your power from your own roof, with chosen circuits kept on in a blackout.",
+  },
+};
+
+/**
+ * The proposal as the customer sees it with one option chosen: that option's system, roof, price, estimates and
+ * deposit in place of the recommended one's. Unchanged without options, or for a goal it doesn't offer.
+ */
+export function viewForChoice(view: ProposalView, goal: DesignGoal | null | undefined): ProposalView {
+  const o = view.options?.find((x) => x.goal === goal);
+  if (!o) return view;
+  return {
+    ...view,
+    system: o.system,
+    roof: { ...view.roof, panels: o.roofPanels },
+    production: o.production,
+    bill: o.bill,
+    price: { ...view.price, ...o.price },
+    paybackYears: o.paybackYears,
+    ...(view.terms ? { terms: { ...view.terms, deposit: o.deposit, milestones: o.milestones } } : {}),
+  };
+}
+
+/** The business's side of the option chosen: its lines for the order and the installation allowance. */
+export function internalForChoice(internal: ProposalInternal, goal: DesignGoal | null | undefined): ProposalInternal {
+  const o = internal.options?.find((x) => x.goal === goal);
+  return o ? { ...internal, cost: o.cost, margin: o.margin, priceExGst: o.priceExGst, lines: o.lines, design: o.design } : internal;
+}
+
+/** The option a customer would be choosing by default: the recommended one. */
+export const recommendedGoal = (view: Pick<ProposalView, "options">): DesignGoal | null =>
+  view.options?.find((o) => o.recommended)?.goal ?? view.options?.[0]?.goal ?? null;
 
 /**
  * Words that belong to the business's side of a quote. A test builds a
@@ -391,48 +465,30 @@ export type Built = { ok: true; view: ProposalView; internal: ProposalInternal }
  * sent, when something does: a customer is never sent a price with a hole in it.
  */
 export function buildProposal(input: ProposalInputs): Built {
-  const { project, workspace, brand } = input;
+  const { project, brand } = input;
   const index = project.set.primary;
   const design = project.set.designs[index];
-  const quote = project.extras.quotes[index];
-  const form = quote.form;
+  const form = project.extras.quotes[index].form;
 
-  const catalogue = workspaceCatalogue(workspace).panels ?? panelCatalogue();
-  const spec = systemSpecOf(design, catalogue[0]);
+  const main = workOut(input, index);
+  if (!main.ok) return { ok: false, problems: main.problems };
+  const { spec, lines, totals, costing, stc, youPay, solarVic, monthlyKwh, finance, saving, b, entered, selfUseShare } = main;
   const summary = designSummary(design, YIELD_PER_KW_DAY);
   const batteryKwh = batteryKwhOf(design);
 
-  const costing = costSystem(spec, form, workspace);
-  const lines = editedLines(costing.lines, quote.edits);
-  const changed = costing.lines.some((l) => quote.edits[lineKey(l)]);
-  const totals = changed ? repriced(costing, lines) : costing;
-  const missing = lines.filter((l) => l.missing).length;
-  const postcode = /^\d{4}$/.test(form.postcode) ? form.postcode : null;
-  const stc = stcValue(costing, postcode, input.today, input.rates, workspace.settings.stcPrice);
-  const youPay = totals.priceIncGst - stc;
-  const solarVic = solarVicFor(form, spec.panels, totals.priceIncGst, stc, input.rates);
-
-  const problems: string[] = [];
-  if (spec.panels === 0 && !spec.battery) problems.push(NOTHING_DRAWN);
-  else {
-    if (missing) problems.push(missingCosts(missing));
-    if (!(youPay > 0)) problems.push(NO_PRICE);
-  }
-  if (problems.length) return { ok: false, problems };
-
-  // Output and savings only where the sunshine record covers the home.
-  const covered = postcode !== null && inVictoria(postcode);
-  const monthlyKwh = covered && spec.panels > 0 ? monthlyProduction(design, YIELD_PER_KW_DAY) : null;
-  const b = project.extras.bill;
-  const entered = {
-    amount: Number(b.amount) || 0,
-    supplyPerDay: Number(b.supplyPerDay) || 0,
-    rate: Number(b.rate) || 0,
-    feedIn: Number(b.feedIn) || 0,
-  };
-  const selfUseShare = workspace.settings.bill.selfUseShare;
-  const finance = monthlyKwh ? designFinance({ interval: b.interval, ...entered }, monthlyKwh, batteryKwh, selfUseShare) : null;
-  const saving = finance ? shownSaving(finance.billNow, finance.billAfter) : 0;
+  // The roof's goal designs (Quickest payback, Maximum return, Maximum independence), when there are two or more:
+  // each becomes an option the customer chooses between. Every one is priced in full, or nothing is sent.
+  const goalDesigns = DESIGN_GOALS.flatMap((goal) => {
+    const at = project.set.designs.findIndex((d) => d.goal === goal);
+    return at >= 0 ? [{ goal, at }] : [];
+  });
+  const worked = goalDesigns.length >= 2 ? goalDesigns.map((g) => ({ ...g, out: workOut(input, g.at) })) : [];
+  const failing = worked.filter((w) => !w.out.ok);
+  if (failing.length)
+    return {
+      ok: false,
+      problems: failing.flatMap((w) => (w.out.ok ? [] : w.out.problems.map((p) => `${GOAL_WORDS[w.goal].name}: ${p}`))),
+    };
 
   const image = (kind: BrandImage["kind"]) => input.images.find((i) => i.kind === kind) ?? null;
   const groups = new Set(lines.map((l) => l.group));
@@ -474,7 +530,7 @@ export function buildProposal(input: ProposalInputs): Built {
     roof: {
       lat: project.lat,
       lng: project.lng,
-      panels: designPanels(design).map((p) => p.corners.flatMap((c) => [Math.round(c.x * 100) / 100, Math.round(c.y * 100) / 100])),
+      panels: roofPanels(design),
     },
     production: monthlyKwh ? { monthlyKwh, yearKwh: monthlyKwh.reduce((n, m) => n + m, 0) } : null,
     bill: finance
@@ -527,22 +583,139 @@ export function buildProposal(input: ProposalInputs): Built {
         words: block.words,
         image: (block.image && input.images.find((i) => i.id === block.image && i.kind === "block")) || null,
       })),
+    ...(worked.length
+      ? {
+          options: worked.map(({ goal, at, out }) => {
+            if (!out.ok) throw new Error("unreachable");
+            const d = project.set.designs[at];
+            const quoteForm = project.extras.quotes[at].form;
+            return {
+              goal,
+              name: GOAL_WORDS[goal].name,
+              promise: GOAL_WORDS[goal].promise,
+              recommended: at === index,
+              backup: Boolean(d.battery?.backup),
+              system: {
+                panels: out.spec.panels,
+                kw: designSummary(d, YIELD_PER_KW_DAY).kw,
+                batteryKwh: batteryKwhOf(d),
+                details: systemDetails(d, quoteForm, input.job.details)
+                  .filter((x) => SHOWN_DETAILS.includes(x.key) && x.value)
+                  .map((x) => ({ label: x.label, value: x.value as string })),
+              },
+              roofPanels: roofPanels(d),
+              price: {
+                incGst: out.totals.priceIncGst,
+                stc: out.stc,
+                youPay: out.youPay,
+                solarVic: out.solarVic ? { ...out.solarVic, note: solarVicNote(out.solarVic) } : null,
+                ...(brand.gst === "excluded" ? splitGst(out.totals.priceIncGst) : {}),
+              },
+              production: out.monthlyKwh ? { monthlyKwh: out.monthlyKwh, yearKwh: out.monthlyKwh.reduce((n, m) => n + m, 0) } : null,
+              bill: out.finance
+                ? {
+                    now: out.finance.billNow,
+                    after: out.finance.billAfter,
+                    saving: out.saving,
+                    dailyKwh: out.finance.dailyKwh,
+                    selfReliance: Math.round(out.finance.selfReliance * 100) / 100,
+                    assumed: { interval: b.interval, ...entered, selfUseShare },
+                  }
+                : null,
+              paybackYears: out.saving > 0 ? Math.round((out.youPay / out.saving) * 10) / 10 : null,
+              deposit: depositOf(brand.deposit, out.youPay),
+              milestones: milestoneAmounts(brand.milestones, out.youPay),
+            };
+          }),
+        }
+      : {}),
   };
   const internal: ProposalInternal = {
     cost: totals.cost,
     margin: costing.margin,
     priceExGst: totals.priceExGst,
-    lines: lines.map((l) => ({
-      group: l.group,
-      label: l.label,
-      amount: l.amount,
-      ...(l.qty !== undefined ? { qty: l.qty } : {}),
-      ...(l.sku ? { sku: l.sku } : {}),
-    })),
+    lines: internalLines(lines),
     projectVersion: project.version,
     design: index,
+    ...(worked.length
+      ? {
+          options: worked.map(({ goal, at, out }) => {
+            if (!out.ok) throw new Error("unreachable");
+            return {
+              goal,
+              design: at,
+              cost: out.totals.cost,
+              margin: out.costing.margin,
+              priceExGst: out.totals.priceExGst,
+              lines: internalLines(out.lines),
+            };
+          }),
+        }
+      : {}),
   };
   return { ok: true, view, internal };
+}
+
+/** A quote's lines as kept on the business's side: a product's code and how many where the line is one product (for the order). */
+const internalLines = (lines: readonly CostLine[]): ProposalInternal["lines"] =>
+  lines.map((l) => ({
+    group: l.group,
+    label: l.label,
+    amount: l.amount,
+    ...(l.qty !== undefined ? { qty: l.qty } : {}),
+    ...(l.sku ? { sku: l.sku } : {}),
+  }));
+
+/** Each panel's four corners, in metres from the middle of the roof's picture, to the centimetre. */
+const roofPanels = (design: RoofDesign) =>
+  designPanels(design).map((p) => p.corners.flatMap((c) => [Math.round(c.x * 100) / 100, Math.round(c.y * 100) / 100]));
+
+/**
+ * One of the roof's designs read and priced exactly as the designer's quote
+ * builder does (`systemSpecOf`, `costSystem`, the hand changes, `stcValue`),
+ * with the bill's estimates; or what stops it being sent.
+ */
+function workOut(input: ProposalInputs, at: number) {
+  const { project, workspace } = input;
+  const design = project.set.designs[at];
+  const quote = project.extras.quotes[at];
+  const form = quote.form;
+  const catalogue = workspaceCatalogue(workspace).panels ?? panelCatalogue();
+  const spec = systemSpecOf(design, catalogue[0]);
+  // What the battery shifts into the evening: a module held for blackouts doesn't count towards the saving.
+  const batteryKwh = shiftingKwhOf(design);
+  const costing = costSystem(spec, form, workspace);
+  const lines = editedLines(costing.lines, quote.edits);
+  const changed = costing.lines.some((l) => quote.edits[lineKey(l)]);
+  const totals = changed ? repriced(costing, lines) : costing;
+  const missing = lines.filter((l) => l.missing).length;
+  const postcode = /^\d{4}$/.test(form.postcode) ? form.postcode : null;
+  const stc = stcValue(costing, postcode, input.today, input.rates, workspace.settings.stcPrice);
+  const youPay = totals.priceIncGst - stc;
+  const solarVic = solarVicFor(form, spec.panels, totals.priceIncGst, stc, input.rates);
+
+  const problems: string[] = [];
+  if (spec.panels === 0 && !spec.battery) problems.push(NOTHING_DRAWN);
+  else {
+    if (missing) problems.push(missingCosts(missing));
+    if (!(youPay > 0)) problems.push(NO_PRICE);
+  }
+  if (problems.length) return { ok: false as const, problems };
+
+  // Output and savings only where the sunshine record covers the home.
+  const covered = postcode !== null && inVictoria(postcode);
+  const monthlyKwh = covered && spec.panels > 0 ? monthlyProduction(design, YIELD_PER_KW_DAY) : null;
+  const b = project.extras.bill;
+  const entered = {
+    amount: Number(b.amount) || 0,
+    supplyPerDay: Number(b.supplyPerDay) || 0,
+    rate: Number(b.rate) || 0,
+    feedIn: Number(b.feedIn) || 0,
+  };
+  const selfUseShare = workspace.settings.bill.selfUseShare;
+  const finance = monthlyKwh ? designFinance({ interval: b.interval, ...entered }, monthlyKwh, batteryKwh, selfUseShare) : null;
+  const saving = finance ? shownSaving(finance.billNow, finance.billAfter) : 0;
+  return { ok: true as const, spec, costing, lines, totals, stc, youPay, solarVic, monthlyKwh, finance, saving, b, entered, selfUseShare };
 }
 
 // ---------------------------------------------------------------------------

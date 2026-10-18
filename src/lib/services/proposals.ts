@@ -142,8 +142,9 @@ const link = (token: string) => `/api/proposal/${encodeURIComponent(token)}`;
 
 /** Says the customer has opened their proposal. Never shown, never waited for. */
 export const tellOpened = (token: string) => void ask<object>(link(token), { method: "POST", body: { action: "opened" } });
-export const acceptProposal = (token: string, name: string, agree: boolean) =>
-  ask<OpenedProposal>(link(token), { method: "POST", body: { action: "accept", name, agree } });
+/** Going ahead, on the system chosen when the proposal offers a choice (the recommended one otherwise). */
+export const acceptProposal = (token: string, name: string, agree: boolean, option: string | null = null) =>
+  ask<OpenedProposal>(link(token), { method: "POST", body: { action: "accept", name, agree, option } });
 
 /** The customer saying they have paid the deposit, and how. Kept as what they said: it is not a payment. */
 export const sayPaid = (token: string, way: PaidWay) => ask<OpenedProposal>(link(token), { method: "POST", body: { action: "paid", way } });

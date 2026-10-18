@@ -38,13 +38,15 @@ import {
   proposalPath,
   proposalState,
   published,
+  recommendedGoal,
+  viewForChoice,
   type ProposalInternal,
   type ProposalState,
   type ProposalStatus,
   type ProposalView,
 } from "@/lib/domain/design/proposal";
 import { cleanExtras, defaultBill, postcodeIn, type DesignExtras } from "@/lib/domain/design/quote";
-import { cleanDesignSet, type DesignSet } from "@/lib/domain/design/roof-design";
+import { cleanDesignSet, type DesignGoal, type DesignSet } from "@/lib/domain/design/roof-design";
 import type { ISODate } from "@/lib/domain/types";
 import { newId, query, transaction } from "./db";
 import { jobById, record, type Q } from "./design-crm-repo";
@@ -203,6 +205,8 @@ interface VersionRow {
   openedAt: string | null;
   acceptedAt: string | null;
   acceptedName: string | null;
+  /** The system chosen, when the proposal offered a choice. */
+  acceptedOption: DesignGoal | null;
   token: string;
   withdrawn: boolean;
   depositRef: string | null;
@@ -215,7 +219,11 @@ interface VersionRow {
 const VERSION = `v.version, v.view, ${moment("v.published_at")} as "publishedAt", ${moment("v.opened_at")} as "openedAt",
   ${moment("v.accepted_at")} as "acceptedAt", v.accepted_name as "acceptedName", p.token, p.withdrawn_at is not null as withdrawn,
   v.deposit_ref as "depositRef", v.deposit_said_way as "saidWay", ${moment("v.deposit_said_at")} as "saidAt",
-  ${moment("v.deposit_received_at")} as "receivedAt", v.deposit_received_by as "receivedBy"`;
+  ${moment("v.deposit_received_at")} as "receivedAt", v.deposit_received_by as "receivedBy", v.accepted_option as "acceptedOption"`;
+
+/** An accepted version as it was agreed: the system the customer chose in place of the recommended one. */
+const asAgreed = <T extends { view: ProposalView; acceptedOption?: string | null }>(row: T): T =>
+  row.acceptedOption ? { ...row, view: viewForChoice(row.view, row.acceptedOption as DesignGoal) } : row;
 
 /** What is kept about a version's deposit, as the domain reads it. */
 const depositRecord = (row: VersionRow): DepositRecord => ({
@@ -248,17 +256,17 @@ export async function proposalVersions(businessId: string, jobId: string, today:
       where v.business_id = $1 and p.job_id = $2 order by v.version desc`,
     [businessId, jobId],
   );
-  return rows.map((row) => statusOf(row, today));
+  return rows.map((row) => statusOf(asAgreed(row), today));
 }
 
 /** The customer's copy of one version the business sent, for its own preview of what went out. */
 export async function sentView(businessId: string, jobId: string, version: number): Promise<ProposalView | null> {
-  const rows = await query<{ view: ProposalView }>(
-    `select v.view from design_proposal_versions v join design_proposals p on p.business_id = v.business_id and p.id = v.proposal_id
+  const rows = await query<{ view: ProposalView; acceptedOption: string | null }>(
+    `select v.view, v.accepted_option as "acceptedOption" from design_proposal_versions v join design_proposals p on p.business_id = v.business_id and p.id = v.proposal_id
       where v.business_id = $1 and p.job_id = $2 and v.version = $3`,
     [businessId, jobId, version],
   );
-  return rows[0]?.view ?? null;
+  return rows[0] ? asAgreed(rows[0]).view : null;
 }
 
 /** The stages a job is taken out of when a proposal is sent, and when one is accepted. Never backwards. */
@@ -356,7 +364,8 @@ export interface PublicProposal {
   view: ProposalView | null;
   /** Who to contact, always: the business's name and how to reach it, as it was when the proposal was sent. */
   business: Pick<ProposalView["business"], "name" | "phone" | "email" | "website">;
-  accepted: { name: string; at: string } | null;
+  /** Who went ahead, when, and on which system when there was a choice. */
+  accepted: { name: string; at: string; option?: DesignGoal | null } | null;
   /** The deposit, once the proposal is accepted and it asks for one: the amount, the reference to pay with, where it stands. */
   deposit: PublicDeposit | null;
 }
@@ -378,7 +387,7 @@ async function behind(q: Q | typeof query, token: string, lock = false): Promise
       where p.token = $1 order by v.version desc limit 1 ${lock ? "for update of p, v" : ""}`,
     [token],
   );
-  return rows[0] ?? null;
+  return rows[0] ? asAgreed(rows[0]) : null;
 }
 
 const stateOf = (row: Found, today: ISODate) =>
@@ -397,7 +406,7 @@ export async function publicProposal(token: string, today: ISODate): Promise<Pub
     state,
     view: state === "withdrawn" ? null : row.view,
     business: { name, phone, email, website },
-    accepted: row.acceptedAt && row.acceptedName ? { name: row.acceptedName, at: row.acceptedAt } : null,
+    accepted: row.acceptedAt && row.acceptedName ? { name: row.acceptedName, at: row.acceptedAt, option: row.acceptedOption } : null,
     deposit: state === "accepted" ? publicDeposit(depositOn(row)) : null,
   };
 }
@@ -473,17 +482,25 @@ export async function markOpened(token: string): Promise<void> {
  * live proposal is refused with its state ("accepted" for one accepted
  * before: only "accepted-now" means this call did it).
  */
-export async function acceptProposal(token: string, name: string, today: ISODate): Promise<"accepted-now" | ProposalState | null> {
+export async function acceptProposal(
+  token: string,
+  name: string,
+  today: ISODate,
+  /** The system the customer chose, when the proposal offers a choice; the recommended one when it isn't one on offer. */
+  option: string | null = null,
+): Promise<"accepted-now" | ProposalState | null> {
   return transaction(async (q) => {
-    const row = await behind(q, token, true);
-    if (!row) return null;
-    const state = stateOf(row, today);
+    const found = await behind(q, token, true);
+    if (!found) return null;
+    const state = stateOf(found, today);
     if (state !== "live") return state;
-    await q(`update design_proposal_versions set accepted_at = now(), accepted_name = $3 where business_id = $1 and id = $2`, [
-      row.businessId,
-      row.versionId,
-      name,
-    ]);
+    const chosen = found.view.options?.some((o) => o.goal === option) ? (option as DesignGoal) : recommendedGoal(found.view);
+    // From here on it is the proposal as agreed: the chosen system's price, and so its deposit.
+    const row = { ...found, view: viewForChoice(found.view, chosen) };
+    await q(
+      `update design_proposal_versions set accepted_at = now(), accepted_name = $3, accepted_option = $4 where business_id = $1 and id = $2`,
+      [row.businessId, row.versionId, name, chosen],
+    );
     const jobs = await q<{ stage: JobStage }>(`select stage from design_jobs where business_id = $1 and id = $2 for update`, [
       row.businessId,
       row.jobId,

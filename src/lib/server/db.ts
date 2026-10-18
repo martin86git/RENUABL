@@ -356,6 +356,8 @@ alter table design_proposal_versions add column if not exists deposit_said_way t
 alter table design_proposal_versions add column if not exists deposit_said_at timestamptz;
 alter table design_proposal_versions add column if not exists deposit_received_at timestamptz;
 alter table design_proposal_versions add column if not exists deposit_received_by text;
+-- Which of a proposal's systems the customer went ahead on (the options in domain/design/proposal.ts), when it offered a choice.
+alter table design_proposal_versions add column if not exists accepted_option text;
 create unique index if not exists design_proposal_versions_deposit_ref
   on design_proposal_versions (business_id, deposit_ref) where deposit_ref is not null;
 -- The conversation between a business and its customer about a job (server/design-chat-repo.ts): one a job, so it
