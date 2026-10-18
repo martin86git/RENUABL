@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   BatteryCharging,
@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { AerialScene, PanelDefs, SolarPanel } from "./aerial-home";
-import { AFTER_STEPS, AUTOMATIONS, COMING_SOON_LABEL, type FeatureStatus } from "@/lib/domain/design/landing";
+import { AFTER_STEPS, COMING_SOON_LABEL, type FeatureStatus } from "@/lib/domain/design/landing";
 
 /**
  * The front page's moving examples: the quote building itself as a drawn roof
@@ -31,16 +31,36 @@ import { AFTER_STEPS, AUTOMATIONS, COMING_SOON_LABEL, type FeatureStatus } from 
 
 /** Milliseconds into a loop of `total`, ticking every `step`; the end, still, with reduced motion. */
 function useTimeline(total: number, step = 100) {
+  const ref = useRef<HTMLElement | null>(null);
   const [t, setT] = useState(total);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    // It starts from the beginning once the page is in the browser.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setT(0);
-    const timer = window.setInterval(() => setT((v) => (v + step >= total ? 0 : v + step)), step);
-    return () => window.clearInterval(timer);
+    let timer: number | undefined;
+    const play = () => {
+      // From the beginning each time it comes into view, so it is never met halfway through.
+      setT(0);
+      window.clearInterval(timer);
+      timer = window.setInterval(() => setT((v) => (v + step >= total ? 0 : v + step)), step);
+    };
+    const el = ref.current;
+    if (!el || !("IntersectionObserver" in window)) {
+      play();
+      return () => window.clearInterval(timer);
+    }
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) play();
+        else window.clearInterval(timer);
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      window.clearInterval(timer);
+    };
   }, [total, step]);
-  return t;
+  return [t, ref] as const;
 }
 
 export function SoonTag({ className }: { className?: string }) {
@@ -250,7 +270,7 @@ function quoteAt(step: number, chosen: { inverter: boolean; battery: boolean }):
 }
 
 export function AutomationDemo() {
-  const t = useTimeline(AUTO_TOTAL);
+  const [t, playing] = useTimeline(AUTO_TOTAL);
   const step = STEPS.reduce((s, x, i) => (t >= x.at ? i : s), 0);
   const now = STEPS[step];
   const into = t - now.at;
@@ -268,7 +288,11 @@ export function AutomationDemo() {
   const Icon = now.icon;
 
   return (
-    <figure className="grid w-full min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_19rem]" aria-label="The quote building itself: an example">
+    <figure
+      ref={playing}
+      className="grid w-full min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_19rem]"
+      aria-label="The quote building itself: an example"
+    >
       <div
         aria-hidden
         className="pointer-events-none relative select-none overflow-hidden rounded-xl border border-line bg-canvas p-2 [container-type:inline-size]"
@@ -591,23 +615,6 @@ export function AutomationDemo() {
   );
 }
 
-/** The automations, as a list beside the demo. */
-export function AutomationList() {
-  return (
-    <ul className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
-      {AUTOMATIONS.map((a) => (
-        <li key={a.key} className="border-t border-line-strong pt-3">
-          <p className="flex flex-wrap items-center gap-2 text-[14.5px] font-medium text-ink">
-            {a.title}
-            {a.status === "soon" && <SoonTag />}
-          </p>
-          <p className="mt-1 text-[13px] leading-snug text-ink-2">{a.body}</p>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // 2. A note and the proposal sent from the designer, answered like a text.
 
@@ -659,7 +666,7 @@ function ProposalRoof() {
 }
 
 export function ConversationDemo() {
-  const t = useTimeline(TALK.total);
+  const [t, playing] = useTimeline(TALK.total);
   const typed = NOTE.slice(0, Math.round(Math.min(1, t / TALK.typed) * NOTE.length));
   const sent = t >= TALK.sent;
   const record = [
@@ -673,6 +680,7 @@ export function ConversationDemo() {
 
   return (
     <figure
+      ref={playing}
       className="grid w-full gap-3 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.6fr)_minmax(0,0.85fr)]"
       aria-label="A proposal sent and answered from the designer: an example"
     >
@@ -887,11 +895,11 @@ function Stage({
 }
 
 export function AfterSigningDemo() {
-  const t = useTimeline(AFTER.total);
+  const [t, playing] = useTimeline(AFTER.total);
   const status = (key: string) => AFTER_STEPS.find((s) => s.key === key)?.status ?? "live";
   const expected = COSTED.reduce((s, [, n]) => s + n, 0);
   return (
-    <figure className="w-full" aria-label="What a signed proposal sets going: an example">
+    <figure ref={playing} className="w-full" aria-label="What a signed proposal sets going: an example">
       <div aria-hidden className="pointer-events-none grid select-none gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stage on={t >= AFTER.signed} icon={FileSignature} title="Signed proposals" status={status("signed")}>
           <ul className="space-y-1.5 text-[12.5px]">
@@ -999,5 +1007,82 @@ export function AfterSigningDemo() {
       </div>
       <figcaption className="mt-2 text-xs text-muted">An example, with made-up customers and example prices.</figcaption>
     </figure>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The product, as the front page reveals it: the designer with the finished design and its quote.
+
+/** A still of the designer at the end of a design: the roof strung, the inverter and battery on the wall, the quote beside it. */
+export function ProductShot() {
+  const lines = quoteAt(STEPS.length - 1, { inverter: true, battery: true });
+  const price = lines.reduce((s, l) => s + l.amount, 0) * 1.2 * 1.1;
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none select-none overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_40px_120px_-40px_rgba(15,23,42,0.45)]"
+    >
+      <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
+        <span className="flex gap-1.5">
+          <span className="size-2.5 rounded-full bg-line-strong" />
+          <span className="size-2.5 rounded-full bg-line-strong" />
+          <span className="size-2.5 rounded-full bg-line-strong" />
+        </span>
+        <span className="text-[12px] tracking-[0.2em] text-ink">RENUABL</span>
+        <span className="hidden truncate text-[12px] text-muted sm:inline">Sarah N. · 14 Sample Street</span>
+        <span className="ml-auto rounded-md border border-line px-2.5 py-1 text-[11px] tabular-nums text-ink">Quote · {money(price)}</span>
+        <span className="rounded-md bg-ink px-2.5 py-1 text-[11px] font-medium text-white">Publish design</span>
+      </div>
+      <div className="grid md:grid-cols-[minmax(0,1fr)_15rem]">
+        <svg viewBox="100 40 520 260" className="block w-full">
+          <AerialScene />
+          <PanelDefs />
+          {ARRAYS.flatMap((a) =>
+            a.spots.map((p, i) => <SolarPanel key={`${a.letter}${i}`} x={p.x} y={p.y} w={p.w} h={p.h} tint={a.colour} />),
+          )}
+          {ARRAYS.map((a) => {
+            const order = snake(a.spots);
+            return (
+              <g key={a.letter}>
+                <polyline
+                  points={order.map((c) => `${c.x},${c.y}`).join(" ")}
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                />
+                <circle cx={order[0].x} cy={order[0].y} r="6.5" fill="#0b0c0e" stroke={a.colour} strokeWidth="1.2" />
+                <text x={order[0].x} y={order[0].y + 3} fontSize="8.5" fontWeight="700" fill="#fff" textAnchor="middle">
+                  {a.letter}
+                </text>
+              </g>
+            );
+          })}
+          <g transform="translate(446 250)">
+            <rect x="-11" y="-14" width="22" height="28" rx="3" fill="#0b0c0e" stroke="var(--sun-line)" strokeWidth="1.2" />
+            <path d="M1,-8 L-4,1 H0 L-1.5,8 L4,-1.5 H0 Z" fill="var(--sun-line)" />
+          </g>
+          <g transform="translate(446 222)">
+            <rect x="-10" y="-14" width="20" height="28" rx="3" fill="#0b0c0e" stroke="#86efac" strokeWidth="1.2" />
+            <rect x="-5" y="-6" width="10" height="14" rx="1" fill="none" stroke="#86efac" strokeWidth="1" />
+          </g>
+        </svg>
+        <div className="hidden flex-col border-l border-line p-4 md:flex">
+          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted">Quote</p>
+          <ul className="mt-2 flex-1 space-y-1">
+            {lines.map((l) => (
+              <li key={l.key} className="flex justify-between gap-2 text-[11px] text-ink-2">
+                <span className="truncate">{l.label}</span>
+                <span className="shrink-0 tabular-nums">{money(l.amount)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex items-baseline justify-between border-t border-line pt-2">
+            <span className="text-[10.5px] text-muted">With margin and GST</span>
+            <span className="text-[16px] font-medium tabular-nums text-ink">{money(price)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

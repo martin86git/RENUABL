@@ -9,10 +9,10 @@ import { PIPELINES, dashboard, power, weekOf } from "@/lib/domain/design/deal";
 import { todayInMarket } from "@/lib/domain/market";
 import { dollars, listJobs, loadOverview, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
 import { useDesignAccount } from "./design-account";
-import { AFTER_SIGNING, AUTOMATION, COMPARISON, CONVERSATION } from "@/lib/domain/design/landing";
-import { AfterSigningDemo, AutomationDemo, AutomationList, ConversationDemo } from "./designer-showcase";
+import { CHAPTERS, CLOSE } from "@/lib/domain/design/landing";
+import { AfterSigningDemo, AutomationDemo, ConversationDemo } from "./designer-showcase";
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
-import { FrontHero } from "./front-hero";
+import { FrontHero, Reveal } from "./front-hero";
 import { SignInForm } from "./sign-in-form";
 
 /** A stage as a small tag. Won and installed are the good news; lost is quiet. */
@@ -67,98 +67,40 @@ export function DesignHome() {
 
 function FrontPage({ unreachable }: { unreachable: boolean }) {
   return (
-    <div className="theme-studio flex min-h-dvh flex-col">
+    <div className="theme-studio flex min-h-dvh flex-col bg-canvas">
       <FrontHero signInHref="#sign-in" tryHref={PATHS.designer} />
-      {/* The second screen: the quote building itself as the roof is designed. */}
-      <section className="border-t border-line bg-surface px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="automation">
-        <div className="mx-auto w-full max-w-6xl">
-          <SectionHead id="automation" {...AUTOMATION} />
-          <div className="mt-10">
-            <AutomationDemo />
-          </div>
-          <div className="mt-12">
-            <AutomationList />
-          </div>
-          <Link href={PATHS.designer} className={clsx(ui.primary, "mt-10 h-11 px-5")}>
-            <PenTool className="size-4" aria-hidden /> Try it on a real roof
-          </Link>
-        </div>
-      </section>
 
-      {/* The third: a note and the proposal sent from the designer, answered like a text, kept in the CRM. */}
-      <section className="border-t border-line px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="conversation">
-        <div className="mx-auto w-full max-w-6xl">
-          <SectionHead id="conversation" {...CONVERSATION} />
-          <ol className="mt-8 grid gap-4 sm:grid-cols-3">
-            {CONVERSATION.steps.map((s, i) => (
-              <li key={s.title} className="border-t border-line-strong pt-3">
-                <p className="text-[14.5px] font-medium text-ink">
-                  <span className="mr-2 tabular-nums text-sun-line">{i + 1}</span>
-                  {s.title}
-                </p>
-                <p className="mt-1 text-[13px] leading-snug text-ink-2">{s.body}</p>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-8">
-            <ConversationDemo />
-          </div>
-        </div>
-      </section>
+      {/* A sentence a screen, each with the product doing it. */}
+      {CHAPTERS.map((c, i) => (
+        <section key={c.key} className="px-5 py-24 lg:px-10 lg:py-36" aria-labelledby={`chapter-${c.key}`}>
+          <Reveal className="mx-auto w-full max-w-6xl">
+            <p className="text-center text-[12px] font-medium tabular-nums tracking-[0.3em] text-muted">0{i + 1}</p>
+            <h2
+              id={`chapter-${c.key}`}
+              className="mx-auto mt-5 max-w-4xl text-center text-[clamp(36px,6vw,76px)] font-light leading-[1.02] tracking-[-0.035em] text-ink"
+            >
+              {c.line}
+            </h2>
+            <p className="mx-auto mt-6 max-w-xl text-center text-[18px] leading-relaxed text-ink-2">{c.sub}</p>
+          </Reveal>
+          <Reveal className="mx-auto mt-16 w-full max-w-6xl">
+            {c.key === "prices" ? <AutomationDemo /> : c.key === "proposal" ? <ConversationDemo /> : <AfterSigningDemo />}
+          </Reveal>
+        </section>
+      ))}
 
-      {/* The fourth: what a signature sets going. */}
-      <section className="border-t border-line bg-surface px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="after">
-        <div className="mx-auto w-full max-w-6xl">
-          <SectionHead id="after" {...AFTER_SIGNING} />
-          <div className="mt-10">
-            <AfterSigningDemo />
-          </div>
-        </div>
-      </section>
-
-      {/* The usual way against this one. */}
-      <section className="border-t border-line px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="compare">
-        <div className="mx-auto w-full max-w-4xl">
-          <p className={ui.eyebrow}>Less to do on every job</p>
-          <h2 id="compare" className="mt-3 text-[30px] leading-[1.1] tracking-tight text-ink sm:text-[38px]">
-            The usual way, and this one.
+      {/* The close, and the way in. */}
+      <section id="sign-in" className="px-5 py-28 lg:px-10 lg:py-40" aria-labelledby="close">
+        <Reveal className="mx-auto w-full max-w-3xl text-center">
+          <h2 id="close" className="text-[clamp(56px,10vw,120px)] font-light leading-[0.9] tracking-[-0.045em] text-ink">
+            {CLOSE.line}
           </h2>
-          <ul className="mt-8 divide-y divide-line rounded-xl border border-line bg-surface">
-            {COMPARISON.map((c) => (
-              <li key={c.here} className="grid gap-1 px-5 py-3.5 sm:grid-cols-2 sm:gap-6">
-                <span className="text-[14px] text-muted line-through decoration-line-strong">{c.usual}</span>
-                <span className="flex items-start gap-2 text-[14px] font-medium text-ink">
-                  <ArrowRight className="mt-0.5 size-4 shrink-0 text-sun-line" aria-hidden /> {c.here}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-      {/* The way in. */}
-      <section id="sign-in" className="border-t border-line bg-surface px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="sign-in-title">
-        <div className="mx-auto w-full max-w-sm">
-          <h2 id="sign-in-title" className="text-center text-[30px] tracking-tight text-ink">
-            Get started
-          </h2>
-          <div className={clsx(ui.card, "mt-8 p-6 sm:p-7")}>
+          <p className="mt-6 text-[18px] text-ink-2">{CLOSE.sub}</p>
+          <div className={clsx(ui.card, "mx-auto mt-12 max-w-sm p-6 text-left sm:p-7")}>
             <SignInForm next={PATHS.home} note={unreachable ? "We couldn't reach your account just now. Try again in a moment." : null} />
           </div>
-        </div>
+        </Reveal>
       </section>
-    </div>
-  );
-}
-
-/** A section's eyebrow, heading and paragraph on the front page. */
-function SectionHead({ id, eyebrow, headline, body }: { id: string; eyebrow: string; headline: string; body: string }) {
-  return (
-    <div className="max-w-2xl">
-      <p className={ui.eyebrow}>{eyebrow}</p>
-      <h2 id={id} className="mt-3 text-[30px] leading-[1.1] tracking-tight text-ink sm:text-[38px]">
-        {headline}
-      </h2>
-      <p className="mt-4 text-[15.5px] leading-relaxed text-ink-2">{body}</p>
     </div>
   );
 }

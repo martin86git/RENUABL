@@ -220,6 +220,26 @@ body {
   }
 }
 
+/* The front page's "It's …" phrases: each rises in, holds, and lifts away for the next. */
+@keyframes follow-in {
+  0% {
+    opacity: 0;
+    transform: translateY(0.45em);
+    filter: blur(6px);
+  }
+  16%,
+  80% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-0.35em);
+    filter: blur(4px);
+  }
+}
+
 /* The front page hero's roof, drifting slowly behind the headline. */
 @keyframes hero-drift {
   from {

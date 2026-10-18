@@ -9,19 +9,29 @@
 export type FeatureStatus = "live" | "soon";
 
 export const LANDING_HERO = {
-  eyebrow: "Solar design to install",
-  headline: ["Draw the roof.", "We do the rest."],
-  body: "Quote, proposal, order and install. All from the design. Automatically.",
-  /** What follows from one design, in the order it happens: the hero's sequence. */
-  sequence: ["Lead", "Roof", "Quote", "Proposal", "Signed", "Order", "Install", "Invoice checked"],
+  /** The punchline: one drawing, and the business follows. Never said in so many words: shown. */
+  headline: "Draw once.",
+  /** What follows, a phrase at a time, each replacing the last. */
+  follows: ["It's quoted.", "It's sent.", "It's signed.", "It's ordered.", "It's booked."],
 } as const;
 
-/** The second screen: the quote that builds itself as the roof is designed. */
-export const AUTOMATION = {
-  eyebrow: "Smart automation",
-  headline: "Draw the panels. The quote does the rest.",
-  body: "Every array, frame and fee is worked out by rule as you design, from your own prices. No hunting for the right inverter, no adding up rails by hand.",
-} as const;
+/** The page after the reveal: a sentence a screen, each something the product does today, in the order a job happens. */
+export const CHAPTERS = [
+  {
+    key: "prices",
+    line: "It prices as you draw.",
+    sub: "Rails, brackets, inverter, battery, fees. Counted and costed from your own price lists.",
+  },
+  {
+    key: "proposal",
+    line: "It writes the proposal. And hears back.",
+    sub: "In your brand, with a note from you, and a chat on the proposal for their questions.",
+  },
+  { key: "after", line: "It orders the parts. Books the install. Checks the invoice.", sub: "A signature sets the rest going." },
+] as const;
+
+/** The close. */
+export const CLOSE = { line: "Draw once.", sub: "Start with a roof. The rest follows." } as const;
 
 /** One thing the designer does by itself, in the order the demo shows it. */
 export interface Automation {
@@ -76,25 +86,6 @@ export const AUTOMATIONS: readonly Automation[] = [
   },
 ] as const;
 
-/** The third screen: from the designer to the customer and back, without leaving it. */
-export const CONVERSATION = {
-  eyebrow: "Send it from the designer",
-  headline: "Write a note, send the proposal, keep talking.",
-  body: "No copying a link into an email. Write to your customer beside the design and send the proposal from the same place: your note reaches them by email with their link. They answer in a chat beside the proposal, and every word is kept on the deal.",
-  steps: [
-    { title: "In the designer", body: "Write your note and send the proposal in one go." },
-    { title: "On their proposal", body: "Emailed their link, then your brand and colours, with the chat beside the proposal." },
-    { title: "In your CRM", body: "Sent, opened, every message and the signature, on the record." },
-  ],
-} as const;
-
-/** The fourth screen: what happens once a customer signs. */
-export const AFTER_SIGNING = {
-  eyebrow: "Once it's signed",
-  headline: "A signature starts the job.",
-  body: "The parts in the design itself become the order, the install goes in the calendar, and when the installer bills you, their invoice is checked against what the quote allowed.",
-} as const;
-
 export interface AfterStep {
   key: string;
   title: string;
@@ -135,33 +126,16 @@ export const AFTER_STEPS: readonly AfterStep[] = [
   },
 ] as const;
 
-/** The usual way against this one, a line each. Names no other product. */
-export const COMPARISON: readonly { usual: string; here: string }[] = [
-  { usual: "Type the address in again for every design", here: "The roof opens from the lead's address" },
-  { usual: "Choose each inverter and battery yourself", here: "The inverter suggested from the system's size" },
-  { usual: "Add up rails, splices and brackets by hand", here: "The order counted from the design" },
-  { usual: "Copy the proposal link into an email", here: "Send it, with your note, from the designer" },
-  { usual: "Back-and-forth emails with the customer", here: "A chat on the proposal, kept on the deal" },
-  { usual: "A plain proposal that looks like everyone's", here: "Your logo, colours and words on every page" },
-] as const;
-
 export const COMING_SOON_LABEL = "Coming soon";
 
 /** Every line of copy on the page, for the test that checks it. */
 export function landingCopy(): string[] {
   return [
-    LANDING_HERO.eyebrow,
-    ...LANDING_HERO.headline,
-    LANDING_HERO.body,
-    ...LANDING_HERO.sequence,
-    ...Object.values(AUTOMATION),
+    LANDING_HERO.headline,
+    ...LANDING_HERO.follows,
+    ...CHAPTERS.flatMap((c) => [c.line, c.sub]),
+    ...Object.values(CLOSE),
     ...AUTOMATIONS.flatMap((a) => [a.title, a.body]),
-    CONVERSATION.eyebrow,
-    CONVERSATION.headline,
-    CONVERSATION.body,
-    ...CONVERSATION.steps.flatMap((s) => [s.title, s.body]),
-    ...Object.values(AFTER_SIGNING),
     ...AFTER_STEPS.flatMap((s) => [s.title, s.body]),
-    ...COMPARISON.flatMap((c) => [c.usual, c.here]),
   ];
 }
