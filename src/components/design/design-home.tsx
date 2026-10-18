@@ -10,7 +10,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import { dollars, listJobs, loadOverview, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
 import { useDesignAccount } from "./design-account";
 import { CHAPTERS, CLOSE } from "@/lib/domain/design/landing";
-import { AfterSigningDemo, AutomationDemo, ConversationDemo } from "./designer-showcase";
+import { AfterSigningDemo, AutomationDemo, ConversationDemo, ThreeDesignsDemo } from "./designer-showcase";
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
 import { FrontHero, Reveal } from "./front-hero";
 import { SignInForm } from "./sign-in-form";
@@ -68,13 +68,17 @@ export function DesignHome() {
 function FrontPage({ unreachable }: { unreachable: boolean }) {
   return (
     <div className="theme-studio flex min-h-dvh flex-col bg-canvas">
-      <FrontHero signInHref="#sign-in" tryHref={PATHS.designer} />
+      <FrontHero
+        signInHref="#sign-in"
+        tryHref={PATHS.designer}
+        reveal={{ line: CHAPTERS[0].line, sub: CHAPTERS[0].sub, demo: <AutomationDemo /> }}
+      />
 
       {/* A sentence a screen, each with the product doing it. */}
-      {CHAPTERS.map((c, i) => (
+      {CHAPTERS.filter((c) => c.live && c.key !== "prices").map((c, i) => (
         <section key={c.key} className="px-5 py-24 lg:px-10 lg:py-36" aria-labelledby={`chapter-${c.key}`}>
           <Reveal className="mx-auto w-full max-w-6xl">
-            <p className="text-center text-[12px] font-medium tabular-nums tracking-[0.3em] text-muted">0{i + 1}</p>
+            <p className="text-center text-[12px] font-medium tabular-nums tracking-[0.3em] text-muted">0{i + 2}</p>
             <h2
               id={`chapter-${c.key}`}
               className="mx-auto mt-5 max-w-4xl text-center text-[clamp(36px,6vw,76px)] font-light leading-[1.02] tracking-[-0.035em] text-ink"
@@ -84,7 +88,7 @@ function FrontPage({ unreachable }: { unreachable: boolean }) {
             <p className="mx-auto mt-6 max-w-xl text-center text-[18px] leading-relaxed text-ink-2">{c.sub}</p>
           </Reveal>
           <Reveal className="mx-auto mt-16 w-full max-w-6xl">
-            {c.key === "prices" ? <AutomationDemo /> : c.key === "proposal" ? <ConversationDemo /> : <AfterSigningDemo />}
+            {c.key === "three" ? <ThreeDesignsDemo /> : c.key === "proposal" ? <ConversationDemo /> : <AfterSigningDemo />}
           </Reveal>
         </section>
       ))}

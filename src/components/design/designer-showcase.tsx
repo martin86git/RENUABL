@@ -1011,78 +1011,109 @@ export function AfterSigningDemo() {
 }
 
 // ---------------------------------------------------------------------------
-// The product, as the front page reveals it: the designer with the finished design and its quote.
+// Three designs, one click.
 
-/** A still of the designer at the end of a design: the roof strung, the inverter and battery on the wall, the quote beside it. */
-export function ProductShot() {
-  const lines = quoteAt(STEPS.length - 1, { inverter: true, battery: true });
-  const price = lines.reduce((s, l) => s + l.amount, 0) * 1.2 * 1.1;
+/** The example's three designs on the demo roof, with example figures. */
+const THREE_EXAMPLE = [
+  {
+    name: "Quickest payback",
+    promise: "The smallest outlay, paying for itself soonest.",
+    system: "5.70 kW solar",
+    pay: 5980,
+    saving: 1450,
+    payback: 4.1,
+    panels: 12,
+    battery: false,
+  },
+  {
+    name: "Maximum return",
+    promise: "Solar and a battery: more back over the years.",
+    system: "8.55 kW · 16 kWh battery",
+    pay: 21480,
+    saving: 2350,
+    payback: 9.1,
+    panels: 18,
+    battery: true,
+    recommended: true,
+  },
+  {
+    name: "Maximum independence",
+    promise: "The most of your power from your own roof.",
+    system: "10.45 kW · 24 kWh battery",
+    pay: 28900,
+    saving: 2650,
+    payback: 10.9,
+    panels: 22,
+    battery: true,
+  },
+];
+const THREE = { press: 1200, first: 2200, gap: 1400, total: 11000 };
+
+/** The designer's "Three designs" pressed, and three priced, strung designs arriving one after another, each laid on the roof. */
+export function ThreeDesignsDemo() {
+  const [t, playing] = useTimeline(THREE.total);
+  const spots = ARRAYS.flatMap((a) => a.spots);
   return (
-    <div
-      aria-hidden
-      className="pointer-events-none select-none overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_40px_120px_-40px_rgba(15,23,42,0.45)]"
-    >
-      <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <span className="flex gap-1.5">
-          <span className="size-2.5 rounded-full bg-line-strong" />
-          <span className="size-2.5 rounded-full bg-line-strong" />
-          <span className="size-2.5 rounded-full bg-line-strong" />
-        </span>
-        <span className="text-[12px] tracking-[0.2em] text-ink">RENUABL</span>
-        <span className="hidden truncate text-[12px] text-muted sm:inline">Sarah N. · 14 Sample Street</span>
-        <span className="ml-auto rounded-md border border-line px-2.5 py-1 text-[11px] tabular-nums text-ink">Quote · {money(price)}</span>
-        <span className="rounded-md bg-ink px-2.5 py-1 text-[11px] font-medium text-white">Publish design</span>
-      </div>
-      <div className="grid md:grid-cols-[minmax(0,1fr)_15rem]">
-        <svg viewBox="100 40 520 260" className="block w-full">
-          <AerialScene />
-          <PanelDefs />
-          {ARRAYS.flatMap((a) =>
-            a.spots.map((p, i) => <SolarPanel key={`${a.letter}${i}`} x={p.x} y={p.y} w={p.w} h={p.h} tint={a.colour} />),
+    <figure ref={playing} className="w-full" aria-label="Three designs from one click: an example">
+      <div aria-hidden className="pointer-events-none flex select-none justify-center">
+        <span
+          className={clsx(
+            "inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-[14px] font-medium transition-all duration-300",
+            t >= THREE.press && t < THREE.press + 500
+              ? "scale-95 border-sun-line bg-sun-line text-white"
+              : "border-line bg-surface text-ink shadow-lift",
           )}
-          {ARRAYS.map((a) => {
-            const order = snake(a.spots);
-            return (
-              <g key={a.letter}>
-                <polyline
-                  points={order.map((c) => `${c.x},${c.y}`).join(" ")}
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth="1.4"
-                  strokeLinejoin="round"
-                />
-                <circle cx={order[0].x} cy={order[0].y} r="6.5" fill="#0b0c0e" stroke={a.colour} strokeWidth="1.2" />
-                <text x={order[0].x} y={order[0].y + 3} fontSize="8.5" fontWeight="700" fill="#fff" textAnchor="middle">
-                  {a.letter}
-                </text>
-              </g>
-            );
-          })}
-          <g transform="translate(446 250)">
-            <rect x="-11" y="-14" width="22" height="28" rx="3" fill="#0b0c0e" stroke="var(--sun-line)" strokeWidth="1.2" />
-            <path d="M1,-8 L-4,1 H0 L-1.5,8 L4,-1.5 H0 Z" fill="var(--sun-line)" />
-          </g>
-          <g transform="translate(446 222)">
-            <rect x="-10" y="-14" width="20" height="28" rx="3" fill="#0b0c0e" stroke="#86efac" strokeWidth="1.2" />
-            <rect x="-5" y="-6" width="10" height="14" rx="1" fill="none" stroke="#86efac" strokeWidth="1" />
-          </g>
-        </svg>
-        <div className="hidden flex-col border-l border-line p-4 md:flex">
-          <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted">Quote</p>
-          <ul className="mt-2 flex-1 space-y-1">
-            {lines.map((l) => (
-              <li key={l.key} className="flex justify-between gap-2 text-[11px] text-ink-2">
-                <span className="truncate">{l.label}</span>
-                <span className="shrink-0 tabular-nums">{money(l.amount)}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-3 flex items-baseline justify-between border-t border-line pt-2">
-            <span className="text-[10.5px] text-muted">With margin and GST</span>
-            <span className="text-[16px] font-medium tabular-nums text-ink">{money(price)}</span>
-          </div>
-        </div>
+        >
+          <Sparkles className="size-4" /> Three designs
+        </span>
       </div>
-    </div>
+      <div aria-hidden className="pointer-events-none mt-8 grid select-none gap-4 md:grid-cols-3">
+        {THREE_EXAMPLE.map((d, i) => {
+          const on = t >= THREE.first + i * THREE.gap;
+          return (
+            <div
+              key={d.name}
+              className={clsx(
+                "relative overflow-hidden rounded-2xl border bg-surface transition-all duration-700",
+                on ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0",
+                d.recommended ? "border-sun-line shadow-lift" : "border-line",
+              )}
+            >
+              {d.recommended && (
+                <span className="absolute left-4 top-3 z-10 rounded-full bg-sun-line px-2.5 py-0.5 text-[11px] font-medium text-white">
+                  Recommended
+                </span>
+              )}
+              <svg viewBox="104 40 516 250" className="block w-full">
+                <AerialScene />
+                <PanelDefs />
+                {spots.slice(0, Math.min(d.panels, spots.length)).map((p, k) => (
+                  <SolarPanel key={k} x={p.x} y={p.y} w={p.w} h={p.h} />
+                ))}
+                {d.battery && (
+                  <g transform="translate(446 222)">
+                    <rect x="-10" y="-14" width="20" height="28" rx="3" fill="#0b0c0e" stroke="#86efac" strokeWidth="1.2" />
+                    <rect x="-5" y="-6" width="10" height="14" rx="1" fill="none" stroke="#86efac" strokeWidth="1" />
+                  </g>
+                )}
+              </svg>
+              <div className="p-5">
+                <p className="text-[16px] font-semibold text-ink">{d.name}</p>
+                <p className="mt-1 text-[13px] leading-snug text-muted">{d.promise}</p>
+                <p className="mt-3 text-[13px] text-ink-2">{d.system}</p>
+                <p className="mt-2 text-[24px] font-semibold tabular-nums tracking-tight text-ink">{money(d.pay)}</p>
+                <p className="text-[12px] text-muted">after the federal rebate</p>
+                <p className="mt-3 text-[13px] text-ink">
+                  Saves about {money(d.saving)} a year · pays back in about {d.payback} years
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <figcaption className="mt-3 text-xs text-muted">
+        An example on a drawn roof, with example figures. Every saving and payback is an estimate.
+      </figcaption>
+    </figure>
   );
 }

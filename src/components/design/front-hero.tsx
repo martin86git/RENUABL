@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 import { LANDING_HERO } from "@/lib/domain/design/landing";
-import { ProductShot } from "./designer-showcase";
 
 /** How long each "It's …" stays before the next takes its place. */
 const FOLLOW_MS = 1700;
@@ -19,7 +18,16 @@ const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("
  * never black (Martin: black is too harsh). With reduced motion the phrases
  * stand together and nothing moves.
  */
-export function FrontHero({ signInHref, tryHref }: { signInHref: string; tryHref: string }) {
+export function FrontHero({
+  signInHref,
+  tryHref,
+  reveal,
+}: {
+  signInHref: string;
+  tryHref: string;
+  /** What rises into view below the first screen: the product at work, with its line above it. */
+  reveal: { line: string; sub: string; demo: React.ReactNode };
+}) {
   const follows = LANDING_HERO.follows;
   const [n, setN] = useState(0);
   const [still, setStill] = useState(true);
@@ -53,7 +61,11 @@ export function FrontHero({ signInHref, tryHref }: { signInHref: string; tryHref
       </header>
 
       <div className="flex min-h-[calc(100svh-4rem)] flex-col items-center justify-center px-6 pb-16 text-center">
-        <h1 id="hero" className="max-w-5xl text-balance text-[clamp(56px,11vw,150px)] font-light leading-[0.92] tracking-[-0.045em] text-ink">
+        <p className="mb-7 text-[12px] font-medium uppercase tracking-[0.3em] text-muted">{LANDING_HERO.what}</p>
+        <h1
+          id="hero"
+          className="max-w-5xl text-balance text-[clamp(56px,11vw,150px)] font-light leading-[0.92] tracking-[-0.045em] text-ink"
+        >
           {LANDING_HERO.headline}
         </h1>
         <p className="mt-8 h-[1.3em] text-[clamp(24px,3.4vw,40px)] font-light tracking-[-0.02em] text-ink-2">
@@ -65,7 +77,8 @@ export function FrontHero({ signInHref, tryHref }: { signInHref: string; tryHref
             </span>
           )}
         </p>
-        <div className="mt-12 flex flex-wrap justify-center gap-3">
+        <p className="mt-6 max-w-2xl text-balance text-[16px] leading-relaxed text-ink-2">{LANDING_HERO.covers}</p>
+        <div className="mt-10 flex flex-wrap justify-center gap-3">
           <a
             href={signInHref}
             className="inline-flex h-12 items-center rounded-full bg-ink px-8 text-[14px] font-medium text-white transition-colors hover:bg-ink/85"
@@ -79,9 +92,10 @@ export function FrontHero({ signInHref, tryHref }: { signInHref: string; tryHref
             See it work
           </a>
         </div>
+        <p className="mt-6 text-[14px] text-muted">{LANDING_HERO.speed}</p>
       </div>
 
-      <ProductReveal />
+      <ProductReveal {...reveal} />
     </section>
   );
 }
@@ -110,11 +124,15 @@ function useScrolledIn<T extends HTMLElement>() {
   return { ref, p };
 }
 
-/** The product, rising into view and settling flat as it is scrolled to. */
-function ProductReveal() {
+/** The product at work, rising into view and settling flat as it is scrolled to, with its line above it. */
+function ProductReveal({ line, sub, demo }: { line: string; sub: string; demo: React.ReactNode }) {
   const { ref, p } = useScrolledIn<HTMLDivElement>();
   return (
-    <div id="product" className="px-4 pb-24 sm:px-8" style={{ perspective: "1800px" }}>
+    <div id="product" className="px-4 pb-28 sm:px-8" style={{ perspective: "1800px" }}>
+      <Reveal className="mx-auto mb-12 max-w-4xl text-center">
+        <h2 className="text-[clamp(36px,6vw,76px)] font-light leading-[1.02] tracking-[-0.035em] text-ink">{line}</h2>
+        <p className="mx-auto mt-6 max-w-xl text-[18px] leading-relaxed text-ink-2">{sub}</p>
+      </Reveal>
       <div
         ref={ref}
         className="mx-auto w-full max-w-6xl"
@@ -125,7 +143,7 @@ function ProductReveal() {
           willChange: "transform",
         }}
       >
-        <ProductShot />
+        {demo}
       </div>
     </div>
   );

@@ -13,28 +13,56 @@ export const LANDING_HERO = {
    * The punchline (Martin, 18 Oct 2026): what the businesses we sell to want is sales, revenue, less complication and
    * speed. A roof becomes revenue; the line beneath shows how fast and how simply, without saying it.
    */
+  /** What RENUABL is, in black and white, above the punchline. */
+  what: "The all-in-one platform for solar businesses",
   headline: "From roof to revenue.",
+  /** What it covers, in one line under the phrases. */
+  covers: "Design, quotes, proposals, customers, ordering, installs and invoices. In one place.",
+  /** Under the buttons: speed, said only as far as it is true today. */
+  speed: "Roof to signed proposal, in one sitting.",
   /** What follows, a phrase at a time, each replacing the last. */
   follows: ["It's quoted.", "It's sent.", "It's signed.", "It's ordered.", "It's booked."],
 } as const;
 
 /** The page after the reveal: a sentence a screen, each something the product does today, in the order a job happens. */
-export const CHAPTERS = [
+export interface Chapter {
+  key: "prices" | "three" | "proposal" | "after";
+  line: string;
+  sub: string;
+  /** Shown only once the product does it. */
+  live: boolean;
+}
+
+export const CHAPTERS: readonly Chapter[] = [
   {
     key: "prices",
     line: "It prices as you draw.",
-    sub: "Rails, brackets, inverter, battery, fees. Counted and costed from your own price lists.",
+    sub: "No spreadsheets. No guessing. Rails, brackets, inverter, battery and every fee, worked out for you.",
+    live: true,
+  },
+  {
+    key: "three",
+    line: "Three designs. One click.",
+    sub: "Quickest payback, maximum return, maximum independence. Each priced and strung, ready to send.",
+    // Shown once the designer's three-designs button is in the product.
+    live: false,
   },
   {
     key: "proposal",
-    line: "It writes the proposal. And hears back.",
-    sub: "In your brand, with a note from you, and a chat on the proposal for their questions.",
+    line: "Send it before you leave the driveway.",
+    sub: "Your brand, your note, and a chat for their questions.",
+    live: true,
   },
-  { key: "after", line: "It orders the parts. Books the install. Checks the invoice.", sub: "A signature sets the rest going." },
-] as const;
+  {
+    key: "after",
+    line: "Signed. Then it runs itself.",
+    sub: "The parts ordered, the install booked, the invoice checked.",
+    live: true,
+  },
+];
 
 /** The close. */
-export const CLOSE = { line: "Draw once.", sub: "Start with a roof. The rest follows." } as const;
+export const CLOSE = { line: "Draw once.", sub: "The hard part's done." } as const;
 
 /** One thing the designer does by itself, in the order the demo shows it. */
 export interface Automation {
@@ -134,7 +162,10 @@ export const COMING_SOON_LABEL = "Coming soon";
 /** Every line of copy on the page, for the test that checks it. */
 export function landingCopy(): string[] {
   return [
+    LANDING_HERO.what,
     LANDING_HERO.headline,
+    LANDING_HERO.covers,
+    LANDING_HERO.speed,
     ...LANDING_HERO.follows,
     ...CHAPTERS.flatMap((c) => [c.line, c.sub]),
     ...Object.values(CLOSE),
