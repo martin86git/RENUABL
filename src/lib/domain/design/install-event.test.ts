@@ -59,14 +59,16 @@ describe("an installation as a calendar event", () => {
   it("is never for the customer: no email, no one invited", () => {
     expect(e.description).not.toMatch(/@/);
     expect(e.ics).not.toMatch(/ATTENDEE|ORGANIZER/);
-    expect(e.googleUrl).not.toMatch(/add=|0400/);
+    expect(e.googleUrl).not.toMatch(/add=|%40/);
   });
 
-  it("puts the pickup in the Google link, with the way back to the full sheet", () => {
+  it("puts the whole job sheet in the Google link", () => {
     const url = new URL(e.googleUrl);
     expect(url.searchParams.get("dates")).toBe("20261019T080000/20261019T160000");
-    expect(url.searchParams.get("details")).toContain("Collect from AWM Clayton · SO OSW923342");
-    expect(url.searchParams.get("details")).toContain(input.link);
+    expect(url.searchParams.get("details")).toContain("<b>COLLECT FROM</b>");
+    expect(url.searchParams.get("details")).toContain("<b>AWM Clayton</b><br>SO OSW923342");
+    expect(url.searchParams.get("details")).toContain("13 x Jinko 475 W panel (JKM475) · AWM Clayton");
+    expect(url.searchParams.get("details")).toContain("Phone: 0400 000 000");
   });
 
   it("makes an .ics file in the market's time zone, with text escaped and lines folded", () => {

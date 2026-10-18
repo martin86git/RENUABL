@@ -11,9 +11,8 @@
  * It is never for the customer: it lists the parts and where to collect them.
  * No one is invited by it, and the customer's email is never in it; the
  * installer gets their name, phone and address to reach them on the day.
- * The Google link carries only what isn't private (links are kept in browser
- * history): the customer's phone goes in the .ics file and on the card. Pure,
- * tested.
+ * The Google link and the .ics file carry the whole job sheet, as the
+ * business's own bookings do; never the customer's email. Pure, tested.
  */
 import type { ISODate } from "../types";
 
@@ -177,22 +176,34 @@ export function installEvent(input: InstallEventInput): InstallEvent {
     `The job in full: ${input.link}`,
   ].join("\n");
 
-  // The Google link: what isn't private, and the way back to the job for the rest.
+  // Google Calendar shows a little formatting in an event's description: the same sheet with its headings in bold.
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const descriptionHtml = [
+    ...sections.map((sec) =>
+      [
+        `<b>${esc(sec.heading.toUpperCase())}</b>`,
+        ...sec.groups.map((g) =>
+          [
+            `<b>${esc(g.title)}</b>`,
+            ...(g.note ? [esc(g.note)] : []),
+            ...g.lines.map(esc),
+            ...(g.items ?? []).map((i) => `${esc(i.text)} · ${esc(i.from)}`),
+          ].join("<br>"),
+        ),
+      ].join("<br><br>"),
+    ),
+    `The job in full: ${esc(input.link)}`,
+  ].join("<br><br>");
+
+  // The Google link carries the whole job sheet, as the business's own bookings do (never the customer's email).
   const stamp = (date: ISODate, time: string) => `${date.replaceAll("-", "")}T${time.replace(":", "")}00`;
-  const shortDetails = [
-    ...input.pickups.map((p) => `Collect from ${p.supplier}${p.so ? ` · SO ${p.so}` : ""}`),
-    ...input.details.filter((d) => ["systemSize", "panel", "inverter", "battery"].includes(d.key)).map((d) => `${d.label}: ${d.value}`),
-    ...(input.installer ? [`Installer: ${input.installer}`] : []),
-    "",
-    `The job sheet in full: ${input.link}`,
-  ].join("\n");
   const googleUrl = `https://calendar.google.com/calendar/render?${new URLSearchParams({
     action: "TEMPLATE",
     text: title,
     dates: `${stamp(input.date, INSTALL_DAY.start)}/${stamp(input.date, INSTALL_DAY.end)}`,
     ctz: MARKET_ZONE,
     location: input.address,
-    details: shortDetails,
+    details: descriptionHtml,
   })}`;
 
   return {
