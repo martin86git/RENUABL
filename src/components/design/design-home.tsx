@@ -11,7 +11,8 @@ import { todayInMarket } from "@/lib/domain/market";
 import { dollars, listJobs, loadOverview, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
 import { requestSignInLink } from "@/lib/services/design-account";
 import { useDesignAccount } from "./design-account";
-import { DesignerDemo } from "./designer-demo";
+import { AFTER_SIGNING, AUTOMATION, COMPARISON, CONVERSATION, LANDING_HERO } from "@/lib/domain/design/landing";
+import { AfterSigningDemo, AutomationDemo, AutomationList, ConversationDemo } from "./designer-showcase";
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
 
 /** A stage as a small tag. Won and installed are the good news; lost is quiet. */
@@ -88,12 +89,9 @@ function FrontPage({ unreachable }: { unreachable: boolean }) {
       </header>
       <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-5 pb-20 pt-8 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-16 lg:px-10">
         <div>
-          <p className={ui.eyebrow}>For solar installers and retailers</p>
-          <h1 className="mt-4 text-[38px] leading-[1.05] tracking-tight text-ink sm:text-[54px]">Design it. Quote it. Win the job.</h1>
-          <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-ink-2">
-            One place for your solar business: lay out a roof, see the quote build beside it, and keep every customer and job moving from
-            lead to installed.
-          </p>
+          <p className={ui.eyebrow}>{LANDING_HERO.eyebrow}</p>
+          <h1 className="mt-4 text-[38px] leading-[1.05] tracking-tight text-ink sm:text-[54px]">{LANDING_HERO.headline}</h1>
+          <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-ink-2">{LANDING_HERO.body}</p>
           <ul className="mt-10 grid gap-4 sm:grid-cols-3">
             {POINTS.map(({ icon: Icon, title, body }) => (
               <li key={title} className="border-t border-line-strong pt-4">
@@ -154,25 +152,88 @@ function FrontPage({ unreachable }: { unreachable: boolean }) {
           </p>
         </section>
       </main>
-      {/* The second screen: the design tool at work. */}
-      <section className="border-t border-line bg-surface px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="demo">
-        <div className="mx-auto grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-14">
-          <div>
-            <p className={ui.eyebrow}>The design tool</p>
-            <h2 id="demo" className="mt-3 text-[30px] leading-[1.1] tracking-tight text-ink sm:text-[38px]">
-              From a bare roof to a strung array.
-            </h2>
-            <p className="mt-4 text-[15px] leading-relaxed text-ink-2">
-              Drag out an array, add the inverter, and run the strings through the panels. The system&apos;s size and its quote keep up with
-              every panel you place.
-            </p>
-            <Link href={PATHS.designer} className={clsx(ui.primary, "mt-6 h-11 px-5")}>
-              <PenTool className="size-4" aria-hidden /> Try it on a real roof
-            </Link>
+      {/* The second screen: the quote building itself as the roof is designed. */}
+      <section className="border-t border-line bg-surface px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="automation">
+        <div className="mx-auto w-full max-w-6xl">
+          <SectionHead id="automation" {...AUTOMATION} />
+          <div className="mt-10">
+            <AutomationDemo />
           </div>
-          <DesignerDemo />
+          <div className="mt-12">
+            <AutomationList />
+          </div>
+          <Link href={PATHS.designer} className={clsx(ui.primary, "mt-10 h-11 px-5")}>
+            <PenTool className="size-4" aria-hidden /> Try it on a real roof
+          </Link>
         </div>
       </section>
+
+      {/* The third: a note and the proposal sent from the designer, answered like a text, kept in the CRM. */}
+      <section className="border-t border-line px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="conversation">
+        <div className="mx-auto w-full max-w-6xl">
+          <SectionHead id="conversation" {...CONVERSATION} />
+          <ol className="mt-8 grid gap-4 sm:grid-cols-3">
+            {CONVERSATION.steps.map((s, i) => (
+              <li key={s.title} className="border-t border-line-strong pt-3">
+                <p className="text-[14.5px] font-medium text-ink">
+                  <span className="mr-2 tabular-nums text-sun-line">{i + 1}</span>
+                  {s.title}
+                </p>
+                <p className="mt-1 text-[13px] leading-snug text-ink-2">{s.body}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-8">
+            <ConversationDemo />
+          </div>
+        </div>
+      </section>
+
+      {/* The fourth: what a signature sets going. */}
+      <section className="border-t border-line bg-surface px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="after">
+        <div className="mx-auto w-full max-w-6xl">
+          <SectionHead id="after" {...AFTER_SIGNING} />
+          <div className="mt-10">
+            <AfterSigningDemo />
+          </div>
+        </div>
+      </section>
+
+      {/* The usual way against this one. */}
+      <section className="border-t border-line px-5 py-16 lg:px-10 lg:py-24" aria-labelledby="compare">
+        <div className="mx-auto w-full max-w-4xl">
+          <p className={ui.eyebrow}>Less to do on every job</p>
+          <h2 id="compare" className="mt-3 text-[30px] leading-[1.1] tracking-tight text-ink sm:text-[38px]">
+            The usual way, and this one.
+          </h2>
+          <ul className="mt-8 divide-y divide-line rounded-xl border border-line bg-surface">
+            {COMPARISON.map((c) => (
+              <li key={c.here} className="grid gap-1 px-5 py-3.5 sm:grid-cols-2 sm:gap-6">
+                <span className="text-[14px] text-muted line-through decoration-line-strong">{c.usual}</span>
+                <span className="flex items-start gap-2 text-[14px] font-medium text-ink">
+                  <ArrowRight className="mt-0.5 size-4 shrink-0 text-sun-line" aria-hidden /> {c.here}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <a href="#sign-in" className={clsx(ui.primary, "mt-10 h-11 px-5")}>
+            Get started
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/** A section's eyebrow, heading and paragraph on the front page. */
+function SectionHead({ id, eyebrow, headline, body }: { id: string; eyebrow: string; headline: string; body: string }) {
+  return (
+    <div className="max-w-2xl">
+      <p className={ui.eyebrow}>{eyebrow}</p>
+      <h2 id={id} className="mt-3 text-[30px] leading-[1.1] tracking-tight text-ink sm:text-[38px]">
+        {headline}
+      </h2>
+      <p className="mt-4 text-[15.5px] leading-relaxed text-ink-2">{body}</p>
     </div>
   );
 }
