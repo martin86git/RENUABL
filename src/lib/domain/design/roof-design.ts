@@ -156,6 +156,8 @@ export interface RoofDesign {
   goal?: DesignGoal;
   /** Guide lines drawn along roof edges, to line panels up with and measure from. Never shown to the customer. */
   guides?: GuideLine[];
+  /** Where the main switchboard (MSB) is, marked on the drawing like the inverter and battery (Martin). */
+  switchboard?: Point;
 }
 
 /** The outcomes "Design it for me" designs for: the quickest payback, the best return, the most independence. */
@@ -701,6 +703,8 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
       b: { x: bx, y: by },
     });
   }
+  const sx = finite((r as { switchboard?: { x?: unknown } }).switchboard?.x, -LIMITS.metres, LIMITS.metres);
+  const sy = finite((r as { switchboard?: { y?: unknown } }).switchboard?.y, -LIMITS.metres, LIMITS.metres);
   return {
     lat,
     lng,
@@ -710,6 +714,7 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
     labels,
     comments,
     ...(guides.length ? { guides } : {}),
+    ...(sx !== null && sy !== null ? { switchboard: { x: Math.round(sx * 100) / 100, y: Math.round(sy * 100) / 100 } } : {}),
     ...(panel ? { panel } : {}),
     ...(inverters.length ? { inverters } : {}),
     ...(battery ? { battery } : {}),

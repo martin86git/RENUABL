@@ -421,3 +421,15 @@ describe("an inverter standing on the drawing", () => {
     expect(second.y).toBeGreaterThan(first.y);
   });
 });
+
+describe("the main switchboard on a design", () => {
+  const base = { lat: -37.9, lng: 145.1, faces: [] };
+  it("is kept where it was put, to the centimetre", () => {
+    expect(cleanDesign({ ...base, switchboard: { x: 3.456, y: -2.1 } })?.switchboard).toEqual({ x: 3.46, y: -2.1 });
+  });
+  it("is left out when it isn't a place on the drawing", () => {
+    expect(cleanDesign({ ...base, switchboard: { x: "here", y: 1 } })?.switchboard).toBeUndefined();
+    expect(cleanDesign({ ...base, switchboard: { x: 1e6, y: 1 } })?.switchboard).toBeUndefined();
+    expect(cleanDesign(base)?.switchboard).toBeUndefined();
+  });
+});

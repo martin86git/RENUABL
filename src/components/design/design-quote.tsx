@@ -48,6 +48,12 @@ export function DesignQuote(props: {
   onChange: (next: QuoteFields) => void;
   /** The price after STCs, each time it is worked out; null when there is nothing to price. For the summary over the picture. */
   onNet: (net: number | null) => void;
+  /**
+   * The short view (Martin: more room for the picture): smaller type, each group's total instead of its lines, and the
+   * price, with a way back to every line. The quote is worked out the same either way.
+   */
+  compact?: boolean;
+  onCompact?: (compact: boolean) => void;
 }) {
   const { form, edits } = props.value;
   const { spec, workspace, rates } = props;
@@ -88,13 +94,93 @@ export function DesignQuote(props: {
     props.onChange({ form, edits: next });
   };
 
+  if (props.compact) {
+    const priced = editedLines(all, edits);
+    return (
+      <section className="rounded-lg border border-line bg-surface p-2.5 text-[11px]" aria-label="Quote builder, short view">
+        <div className="flex items-center justify-between gap-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">Quote · {props.design}</p>
+          {props.onCompact && (
+            <button
+              className="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-ink-2 underline underline-offset-2 hover:text-ink"
+              onClick={() => props.onCompact?.(false)}
+              title="Show every line, and the home's roof, storeys and phase"
+            >
+              Every line
+            </button>
+          )}
+        </div>
+        {empty ? (
+          <p className="mt-2 text-ink-2">Put panels on the roof and they appear here, costed as you go.</p>
+        ) : (
+          <>
+            {missing > 0 && (
+              <button
+                className="mt-2 block w-full rounded-md bg-warning-soft px-2 py-1.5 text-left text-warning"
+                onClick={() => props.onCompact?.(false)}
+              >
+                {missing} {missing === 1 ? "line has" : "lines have"} no cost on file: open every line
+              </button>
+            )}
+            <dl className="mt-2 space-y-0.5">
+              {COST_GROUPS.map((group) => {
+                const rows = priced.filter((l) => l.group === group);
+                if (!rows.length) return null;
+                return (
+                  <div key={group} className="flex justify-between gap-2">
+                    <dt className="truncate text-ink-2">{group}</dt>
+                    <dd className="tabular-nums">{money(rows.reduce((t, l) => t + l.amount, 0))}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+            <dl className="mt-2 space-y-0.5 border-t border-line pt-2">
+              {[
+                ["Cost", money(totals.cost)],
+                ["Margin", money(costing.margin)],
+                ["Price inc. GST", money(totals.priceIncGst)],
+                ["After STCs", money(totals.priceIncGst - stc)],
+              ].map(([k, v], i) => (
+                <div key={k} className={i >= 2 ? "flex justify-between font-semibold text-ink" : "flex justify-between text-ink-2"}>
+                  <dt>{k}</dt>
+                  <dd className="tabular-nums">{v}</dd>
+                </div>
+              ))}
+              {solarVic && (
+                <div className="flex justify-between text-sun-ink">
+                  <dt>After Solar Vic, if approved</dt>
+                  <dd className="tabular-nums">{money(solarVic.afterRebate)}</dd>
+                </div>
+              )}
+            </dl>
+            <p className="mt-2 text-[10px] leading-snug text-muted">
+              {costing.panels} panels, {costing.pvKw} kW{costing.batteryKwh ? `, ${costing.batteryKwh} kWh` : ""}. Costs ex GST
+              {changed ? `; ${changed} changed by hand` : ""}.
+            </p>
+          </>
+        )}
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder">
       <div className="flex items-baseline justify-between gap-2">
         <p className={label}>Quote builder · {props.design}</p>
-        <Link href="/design/settings" className="text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
-          Prices and settings
-        </Link>
+        <span className="flex items-baseline gap-3">
+          {props.onCompact && (
+            <button
+              className="text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
+              onClick={() => props.onCompact?.(true)}
+              title="A short view of the quote, so the picture has more room"
+            >
+              Short view
+            </button>
+          )}
+          <Link href="/design/settings" className="text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
+            Prices and settings
+          </Link>
+        </span>
       </div>
       {/* The three things about the home that change the price, as toggles: one tap each. */}
       <div

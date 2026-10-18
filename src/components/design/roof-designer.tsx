@@ -4,7 +4,7 @@ import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
 import { loadTerrain } from "@/lib/services/terrain";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
-import { MOUNT_STANDOFF, clearanceFor, laidAs, packFaces, reorient } from "@/lib/domain/design/pack";
+import { MOUNT_STANDOFF, clearanceFor, laidAs, reorient } from "@/lib/domain/design/pack";
 import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
 import { NO_BILL_KW, SELF_DESIGN_AIMS, SELF_DESIGN_LABELS, selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
@@ -62,7 +62,7 @@ import {
 import type { RebateRates } from "@/lib/domain/rebates";
 import { DesignQuote } from "./design-quote";
 import type { RoofModel } from "@/lib/domain/roof-layout";
-import { MAX_SUGGESTED, mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
+import { mismatchNote, modelOffset } from "@/lib/domain/design/suggest";
 import { shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
 import { autoStringDesign } from "@/lib/domain/design/auto-string";
@@ -80,7 +80,6 @@ import {
   applyCommentOp,
   designPanels,
   designSummary,
-  facePanels,
   faceArea,
   faceFacing,
   freed,
@@ -337,6 +336,16 @@ function placeShift(group: LoosePanel[], others: LoosePanel[], faces: Face[], gu
   return shifts.length ? shifts.reduce((p, q) => (Math.hypot(q.x, q.y) < Math.hypot(p.x, p.y) ? q : p)) : null;
 }
 
+/** The main switchboard, as its button draws it: a board with two rows of breakers. */
+function SwitchboardGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="2.5" width="14" height="15" rx="1.5" />
+      <path d="M6.5 5.5v3M10 5.5v3M13.5 5.5v3M6.5 11v3M10 11v3M13.5 11v3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** A panel as the Landscape button draws it: a rectangle with a small triangle at one end, so its way round reads. */
 function PanelGlyph(props: { across: boolean }) {
   return (
@@ -463,6 +472,8 @@ export function RoofDesigner(props: {
   const [designLabel, setDesignLabel] = useState(first.label ?? "");
   // Guide lines along roof edges, and the one being drawn: its first end, and where the pointer has it reaching.
   const [rules, setRules] = useState<GuideLine[]>(first.guides ?? []);
+  // The main switchboard (MSB), marked on the drawing like the inverter and battery, and dragged to where it is.
+  const [msb, setMsb] = useState<Point | null>(first.switchboard ?? null);
   const [ruling, setRuling] = useState<{ a: Point; b: Point } | null>(null);
   // The inverters on this design: one, or more on a larger system.
   const [fitted, setFitted] = useState<InverterSpec[]>(first.inverters ?? []);
@@ -480,9 +491,6 @@ export function RoofDesigner(props: {
   // The battery or the inverter under the pointer: its details show beside it.
   const [kit, setKit] = useState<"battery" | number | null>(null);
   const [tool, setTool] = useState<Tool>("select");
-  // "Suggest a layout": how many panels to lay, and what came of asking.
-  const [want, setWant] = useState(14);
-  const [idea, setIdea] = useState<"idle" | "busy" | { note: string; bad?: boolean }>("idle");
   // Whether the quote is open beside the picture. Closed, the picture has the whole width; the choice is kept on this device.
   const [quoteOpen, setQuoteOpen] = useState(false);
   useEffect(() => {
@@ -494,6 +502,24 @@ export function RoofDesigner(props: {
       // Storage is off: the quote starts closed.
     }
   }, []);
+  // The quote's short view (smaller, group totals only), so the picture spreads out; kept on this device like the open state.
+  const [quoteShort, setQuoteShort] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (window.localStorage.getItem("renuabl.design.quote-short") === "1") setQuoteShort(true);
+    } catch {
+      // Storage is off: the full quote shows.
+    }
+  }, []);
+  const shortQuote = (next: boolean) => {
+    setQuoteShort(next);
+    try {
+      window.localStorage.setItem("renuabl.design.quote-short", next ? "1" : "0");
+    } catch {
+      // Nothing to do: it still changes for this visit.
+    }
+  };
   const toggleQuote = () => {
     const next = !quoteOpen;
     setQuoteOpen(next);
@@ -503,8 +529,6 @@ export function RoofDesigner(props: {
       // Nothing to do: it still opens and closes for this visit.
     }
   };
-  // Whether "Suggest a layout" is asking how many panels.
-  const [asking, setAsking] = useState(false);
   // "Design it for me": working, or the three designs it made and what to know about them.
   const [mine, setMine] = useState<"idle" | "busy" | SelfDesignResult>("idle");
   // Whether "Design it for me" is saying what it will do, before it does it.
@@ -687,6 +711,7 @@ export function RoofDesigner(props: {
     | { mode: "array"; anchor: LoosePanel }
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
+    | { mode: "msb"; dx: number; dy: number }
     | { mode: "inverter"; n: number; dx: number; dy: number }
     | { mode: "erase" }
     | { mode: "spin"; centre: Point; from: number; starts: Record<string, LoosePanel> }
@@ -785,6 +810,7 @@ export function RoofDesigner(props: {
     ...(panel ? { panel } : {}),
     ...(fitted.length ? { inverters: fitted } : {}),
     ...(rules.length ? { guides: rules } : {}),
+    ...(msb ? { switchboard: msb } : {}),
     ...(battery ? { battery } : {}),
     ...(designLabel.trim() ? { label: designLabel.trim().slice(0, 40) } : {}),
   });
@@ -806,6 +832,7 @@ export function RoofDesigner(props: {
     setPanel(next.panel);
     setFitted(next.inverters ?? []);
     setRules(next.guides ?? []);
+    setMsb(next.switchboard ?? null);
     setBattery(next.battery);
     setRuling(null);
     setHover(null);
@@ -928,6 +955,20 @@ export function RoofDesigner(props: {
     if (battery && Math.abs(p.x - battery.x) < 16 * u * scale && Math.abs(p.y - battery.y) < ((batteryLayers * 8) / 2 + 12) * u * scale)
       return "battery";
     return null;
+  };
+  /** Whether the main switchboard's mark is at a point on the drawing. */
+  const msbAt = (p: Point) => msb !== null && Math.abs(p.x - msb.x) < 13 * u * scale && Math.abs(p.y - msb.y) < 16 * u * scale;
+  /** The main switchboard: put on the drawing (low on the left of what is in view, to be dragged to its wall), or taken off. */
+  const toggleMsb = () => {
+    setMsb(
+      msb
+        ? null
+        : {
+            x: cm((view.x + view.w * 0.2 - ROOF_IMAGE.width / 2) * scale),
+            y: cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
+          },
+    );
+    changed();
   };
   const addInverter = (to: CatalogueInverter) => {
     if (fitted.length >= MAX_INVERTERS) return;
@@ -1362,6 +1403,10 @@ export function RoofDesigner(props: {
   const removePicked = () => removePicks(picks);
   /** The eraser: whatever is under the point goes. A panel or a label first; failing that, a guide line close by. */
   const eraseAt = (p: Point) => {
+    if (msbAt(p)) {
+      setMsb(null);
+      return changed();
+    }
     const hit = hitAt(p);
     if (hit && !hit.empty) return removePicks([hit.pick]);
     const line = rules.find((g) => {
@@ -1516,6 +1561,13 @@ export function RoofDesigner(props: {
       setGhosts([]);
       setOnPanel(false);
       return setTool("select");
+    }
+    if (tool === "select" && msb && msbAt(p)) {
+      // The main switchboard: press it and drag it to the wall it is on.
+      svg.current?.setPointerCapture(e.pointerId);
+      setPicks([]);
+      press.current = { mode: "msb", dx: p.x - msb.x, dy: p.y - msb.y };
+      return;
     }
     const grabbed = tool === "select" ? kitAt(p) : null;
     if (grabbed !== null) {
@@ -1718,6 +1770,12 @@ export function RoofDesigner(props: {
       const shift = e.altKey ? null : placeShift(drawn, standingAll(faces, loose), faces, rules, size);
       setGhosts(shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn);
       return;
+    }
+    if (held.mode === "msb") {
+      const p = pointAt(e);
+      if (!p) return;
+      setMsb({ x: cm(p.x - held.dx), y: cm(p.y - held.dy) });
+      return changed();
     }
     if (held.mode === "battery") {
       const p = pointAt(e);
@@ -2079,63 +2137,6 @@ export function RoofDesigner(props: {
     if (!info.model) return { note: "There's no roof data for this address to work from. Trace the roof faces, then ask again." };
     if (fit.kind === "mismatch") return { note: mismatchNote(info.imageryDate) };
     return { model: info.model, ...(fit.kind === "aligned" ? { offset: modelOffset(fit.shift, spot.lat) } : {}) };
-  };
-  /**
-   * A first layout, in the fewest long straight rows: on the roof faces traced (`packFaces`), or
-   * else from Google's roof model lined up with today's photo (`suggestPanels`), set down as panels placed by hand.
-   * It replaces the panels on the design (asked first); traced faces are kept.
-   */
-  const suggestLayout = async () => {
-    if (
-      (faces.some((f) => facePanels(f, size).length) || loose.length) &&
-      !window.confirm("Replace the panels on this design with a suggested layout?")
-    )
-      return;
-    setIdea("busy");
-    if (faces.length) {
-      // Laid afresh on the traced faces by the installer's rules, as panels placed by hand (`packFaces`).
-      const packed = packFaces(faces, size, want, () => newId("p"));
-      if (!packed.loose.length)
-        return setIdea({
-          bad: true,
-          note: "No panels fit on the traced faces with the distance kept from the edges. Check their outlines.",
-        });
-      setFaces(packed.faces);
-      setLoose(packed.loose);
-      setStrings([]);
-      setPicks(packed.loose.map((p): Pick => ({ kind: "loose", id: p.id })));
-      changed();
-      setTool("select");
-      return setIdea({
-        note:
-          (packed.loose.length < want
-            ? `Only ${packed.loose.length} fit in tidy rows on the traced faces, clear of the edges. `
-            : `${packed.loose.length} panels in rows on the traced faces. `) +
-          "Check them against the picture: take off any that sit on a vent or skylight.",
-      });
-    }
-    try {
-      const found = await googleModelInPlace();
-      if ("note" in found) return setIdea({ bad: true, note: found.note });
-      const made = suggestPanels(found.model, spot, want, size, () => newId("p"), found.offset);
-      if (!made.length)
-        return setIdea({ bad: true, note: "No panels could be laid from Google's roof data. Trace the roof faces instead." });
-      setFaces([]);
-      setLoose(made);
-      setStrings([]);
-      setSelected(null);
-      setPicks(made.map((p): Pick => ({ kind: "loose", id: p.id })));
-      changed();
-      setTool("select");
-      setIdea({
-        note:
-          (made.length < want
-            ? `Only ${made.length} fit in rows on the roof Google measured. `
-            : `${made.length} panels in rows from Google's roof data. `) + "Check them against the picture, then move, turn or remove any.",
-      });
-    } catch {
-      setIdea({ bad: true, note: "We couldn't reach the roof data just now. Try again in a moment, or trace the roof faces." });
-    }
   };
   /**
    * "Design it for me": the roof designs itself for three outcomes, the fastest payback, the best return and the most
@@ -2528,7 +2529,9 @@ export function RoofDesigner(props: {
       <div
         className={clsx(
           "mt-5 grid items-start gap-5",
-          quoteOpen && !costsHidden && "xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]",
+          quoteOpen &&
+            !costsHidden &&
+            (quoteShort ? "xl:grid-cols-[minmax(0,1fr)_13rem]" : "xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]"),
         )}
       >
         <div className="min-w-0">
@@ -3056,6 +3059,65 @@ export function RoofDesigner(props: {
                       </g>
                     );
                   })}
+                  {/* The main switchboard: a board of breakers in the same line style as the inverter and battery, marked MSB. */}
+                  {msb &&
+                    (() => {
+                      const [mx, my] = px(msb);
+                      const w = 22 * u;
+                      const h = 26 * u;
+                      return (
+                        <g pointerEvents="none">
+                          <rect
+                            x={mx - w / 2}
+                            y={my - h / 2}
+                            width={w}
+                            height={h}
+                            rx={3 * u}
+                            fill="#0b0c0e"
+                            fillOpacity="0.92"
+                            stroke={GOLD}
+                            strokeWidth={1.1 * u}
+                          />
+                          {[0, 1].map((row) =>
+                            Array.from({ length: 4 }, (_, k) => (
+                              <rect
+                                key={`${row}-${k}`}
+                                x={mx - w / 2 + 3.2 * u + k * 4.2 * u}
+                                y={my - h / 2 + 4 * u + row * 9 * u}
+                                width={2.6 * u}
+                                height={6 * u}
+                                rx={0.6 * u}
+                                fill="none"
+                                stroke="#ffffff"
+                                strokeOpacity="0.7"
+                                strokeWidth={0.6 * u}
+                              />
+                            )),
+                          )}
+                          <line
+                            x1={mx - w / 2 + 3 * u}
+                            x2={mx + w / 2 - 3 * u}
+                            y1={my + h / 2 - 4 * u}
+                            y2={my + h / 2 - 4 * u}
+                            stroke={GOLD}
+                            strokeWidth={1 * u}
+                          />
+                          <text
+                            x={mx}
+                            y={my + h / 2 + 11 * u}
+                            textAnchor="middle"
+                            fontSize={8 * u}
+                            fontWeight="700"
+                            fill="#ffffff"
+                            stroke="#0b0c0e"
+                            strokeWidth={2.4 * u}
+                            paintOrder="stroke"
+                          >
+                            MSB
+                          </text>
+                        </g>
+                      );
+                    })()}
                   {/* The battery: a stack of its modules charging from the bottom up, in a breathing glow, with the roof's power running down a line to it. */}
                   {battery &&
                     (() => {
@@ -4100,6 +4162,28 @@ export function RoofDesigner(props: {
                     </div>
                   )}
                 </div>
+                {/* The main switchboard (MSB), beside the battery (Martin): pressed, its mark goes on the picture to be dragged
+                    to where the board is; pressed again (or erased), it comes off. */}
+                <div className="order-5 ml-1.5">
+                  <button
+                    onClick={toggleMsb}
+                    title={
+                      msb
+                        ? "Main switchboard: drag its mark on the picture. Press again to take it off."
+                        : "Main switchboard: mark where it is"
+                    }
+                    aria-label={msb ? "Take the main switchboard off" : "Mark the main switchboard"}
+                    aria-pressed={msb !== null}
+                    className={clsx(
+                      "flex size-[2.625rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
+                      msb
+                        ? "border-line bg-surface/90 text-ink hover:bg-surface"
+                        : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
+                    )}
+                  >
+                    <SwitchboardGlyph />
+                  </button>
+                </div>
                 <div className="order-4 -ml-6">
                   <button
                     onClick={() => openMenu(menu === "batteries" ? false : "batteries")}
@@ -4667,10 +4751,30 @@ export function RoofDesigner(props: {
                     >
                       <SunMedium className="size-5" aria-hidden />
                     </button>
+                    {/* Design it for me (Martin: part of the dock): three designs for three outcomes, said first, made on "Make the three designs". */}
+                    <button
+                      onClick={() => setMineIntro(!mineIntro)}
+                      aria-expanded={mineIntro}
+                      disabled={mine === "busy" || costsHidden}
+                      title={
+                        costsHidden
+                          ? "Design it for me designs against prices, which your account can't see. Ask the owner."
+                          : mine === "busy"
+                            ? "Designing…"
+                            : "Design it for me: three designs for this home, the fastest payback, the best return and the most independence"
+                      }
+                      aria-label="Design it for me"
+                      className={clsx(
+                        "flex size-9 items-center justify-center rounded-xl disabled:text-muted",
+                        mineIntro || mine === "busy" ? "bg-primary text-primary-ink" : "text-sun-ink hover:bg-canvas",
+                      )}
+                    >
+                      <WandSparkles className={clsx("size-5", mine === "busy" && "animate-pulse")} aria-hidden />
+                    </button>
                   </div>
                 </div>
                 <span className="flex-1" aria-hidden />
-                {/* Design it for me, and Suggest a layout, in the corner: the roof designs itself three ways, or just lays panels. */}
+                {/* What Design it for me (in the dock) says before it starts, and the three designs it made. */}
                 <div className="pointer-events-auto flex max-w-80 shrink-0 flex-col items-end gap-1.5">
                   {typeof mine === "object" && !mineOpen && (
                     <div className={clsx(GLASS, "flex items-center gap-1 py-1 pl-3 pr-1 text-[13px]")}>
@@ -4802,64 +4906,6 @@ export function RoofDesigner(props: {
                       </div>
                     </div>
                   )}
-                  <button
-                    onClick={() => setMineIntro(!mineIntro)}
-                    aria-expanded={mineIntro}
-                    disabled={mine === "busy" || costsHidden}
-                    title={
-                      costsHidden
-                        ? "It designs against prices, which your account can't see. Ask the owner."
-                        : "Three designs for this home: the fastest payback, the best return and the most independence"
-                    }
-                    className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-3.5 text-[13px] font-medium text-primary-ink shadow-sm hover:bg-forest disabled:bg-line disabled:text-muted"
-                  >
-                    <WandSparkles className="size-4" aria-hidden /> {mine === "busy" ? "Designing…" : "Design it for me"}
-                  </button>
-                  {typeof idea === "object" && (
-                    <p className={clsx(GLASS, "px-3 py-2 text-[13px]", idea.bad ? "text-warning" : "text-ink-2")} role="status">
-                      {idea.note}{" "}
-                      <button className="font-medium text-ink underline underline-offset-2" onClick={() => setIdea("idle")}>
-                        Close
-                      </button>
-                    </p>
-                  )}
-                  {asking && (
-                    <div className={clsx(GLASS, "flex items-end gap-2 p-2.5")}>
-                      <label className="text-xs font-medium text-ink-2">
-                        Panels
-                        <input
-                          autoFocus
-                          type="number"
-                          min={1}
-                          max={MAX_SUGGESTED}
-                          value={want}
-                          onChange={(e) => setWant(Math.max(1, Math.min(MAX_SUGGESTED, Math.round(Number(e.target.value) || 1))))}
-                          className="mt-1 block h-9 w-16 rounded-lg border border-line bg-surface px-2 text-sm text-ink outline-none focus:border-forest"
-                        />
-                      </label>
-                      <button
-                        onClick={() => {
-                          setAsking(false);
-                          void suggestLayout();
-                        }}
-                        className="flex h-9 items-center rounded-lg bg-primary px-3 text-[13px] font-medium text-primary-ink hover:bg-forest"
-                      >
-                        Lay them out
-                      </button>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => setAsking(!asking)}
-                    disabled={idea === "busy"}
-                    aria-expanded={asking}
-                    title="A first layout from the roof's shape, to check and adjust"
-                    className={clsx(
-                      GLASS,
-                      "flex h-9 items-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-medium text-sun-ink hover:bg-sun disabled:text-muted",
-                    )}
-                  >
-                    <WandSparkles className="size-4" aria-hidden /> {idea === "busy" ? "Looking at the roof…" : "Suggest a layout"}
-                  </button>
                 </div>
               </div>
             </div>
@@ -5049,6 +5095,8 @@ export function RoofDesigner(props: {
             value={quoteNow}
             onChange={setQuote}
             onNet={onNet}
+            compact={quoteShort}
+            onCompact={shortQuote}
           />
         </div>
       </div>
