@@ -4,7 +4,7 @@
  *
  * The panels come from the roof faces traced on the picture when there are
  * any (they are the roof as it is), else from Google's roof model. Each face
- * is filled from its sunniest side, and the faces in order of how much sun
+ * is filled in the fewest straight rows (`fillFace`, `suggestPanels`), the faces in order of how much sun
  * they get at their direction and pitch. Then, for every panel count the roof
  * allows, the inverter is chosen by rule (`inverter-suggest.ts`), the battery
  * by rule (`battery-suggest.ts`), the price worked out as the quote does
@@ -46,6 +46,7 @@ import {
   monthlyProduction,
   panelOf,
   panelPlaces,
+  designSummary,
   type DesignBattery,
   type DesignGoal,
   type Face,
@@ -56,6 +57,7 @@ import {
   MAX_BATTERY_QTY,
 } from "./roof-design";
 import { MAX_SUGGESTED, suggestPanels } from "./suggest";
+import { fillFaces } from "./rows";
 import { shiftingKwhOf, systemSpecOf } from "./system";
 import { TILT, yearOnPlane } from "./tilt";
 
@@ -123,6 +125,8 @@ export interface SelfDesignInput {
   faces: Face[];
   /** Google's roof model, used when nothing is traced. */
   model: RoofModel | null;
+  /** Where Google's model sits on the picture, metres east and south, once lined up with today's photo. */
+  modelOffset?: { x: number; y: number };
   /** The panel the design is drawn with (undefined: the costing's). */
   panel?: PanelSpec;
   panelElectrical?: PanelElectrical;
@@ -157,7 +161,7 @@ interface Source {
   layout: (n: number) => Layout;
 }
 
-/** The traced faces, sunniest first, filled a face at a time: each face's places in its own order, any switched off left off. */
+/** The traced faces, sunniest first, each in the fewest straight rows (`fillFaces`); places switched off stay off. */
 function tracedSource(faces: Face[], panel: PanelSpec | undefined): Source | null {
   const size = panelOf({ panel });
   const best = yearOnPlane(TILT.roof, 0);
@@ -182,16 +186,7 @@ function tracedSource(faces: Face[], panel: PanelSpec | undefined): Source | nul
     from: "traced",
     most,
     good,
-    layout: (n) => {
-      let left = n;
-      const laid = new Map<string, Face>();
-      for (const { face, open } of ranked) {
-        const keep = Math.max(0, Math.min(left, open.length));
-        left -= keep;
-        laid.set(face.id, { ...face, off: [...face.off, ...open.slice(keep)] });
-      }
-      return { faces: faces.map((f) => laid.get(f.id) ?? f), loose: [], ...(panel ? { panel } : {}) };
-    },
+    layout: (n) => ({ faces: fillFaces(faces, size, n).faces, loose: [], ...(panel ? { panel } : {}) }),
   };
 }
 
@@ -200,9 +195,12 @@ function modelSource(input: SelfDesignInput): Source | null {
   const { model } = input;
   if (!model?.slots.length) return null;
   const size = panelOf({ panel: input.panel });
-  const most = Math.min(MAX_SUGGESTED, model.slots.length);
+  const lay = (n: number) => suggestPanels(model, input.centre, n, size, () => input.newId("p"), input.modelOffset);
+  // As many as fit in rows, which is fewer than Google's spots: our panels are laid afresh, wholly on the roof.
+  const most = lay(MAX_SUGGESTED).length;
+  if (!most) return null;
   const top = Math.max(...model.slots.map((s) => s.kwh));
-  const good = Math.min(most, model.slots.filter((s) => s.kwh >= top * GOOD_SUN).length);
+  const good = Math.round((most * model.slots.filter((s) => s.kwh >= top * GOOD_SUN).length) / model.slots.length);
   // A layout is the same for the same count: worked out once each.
   const made = new Map<number, Layout>();
   return {
@@ -214,7 +212,7 @@ function modelSource(input: SelfDesignInput): Source | null {
       if (kept) return kept;
       const laid: Layout = {
         faces: [],
-        loose: suggestPanels(model, input.centre, n, size, () => input.newId("p")),
+        loose: lay(n),
         ...(input.panel ? { panel: input.panel } : {}),
       };
       made.set(n, laid);
@@ -260,7 +258,9 @@ function build(input: SelfDesignInput, source: Source, n: number, way: BatteryWa
   const withBattery = way !== "none";
   const layout = source.layout(n);
   const size = panelOf(layout);
-  const panels = n;
+  // What was laid: a count the roof can't hold in rows comes out smaller.
+  const panels = designSummary(layout).panels;
+  if (panels < n) return null;
   const kw = Math.round(panels * size.watts) / 1000;
   const inverter = inverterFor(input, kw, withBattery);
   if (!inverter) return null;

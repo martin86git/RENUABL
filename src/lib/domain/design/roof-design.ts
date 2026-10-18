@@ -370,6 +370,20 @@ export function faceArea(face: Pick<Face, "points">): number {
  * `setback` in from every edge. Includes the places switched off (`face.off`):
  * the caller decides whether to draw them.
  */
+/** How many rows and columns a face's grid has: a place's `index` is its row × `columns` + its column. */
+export function faceGrid(face: Face, size: PanelSize = PANEL): { rows: number; columns: number } {
+  if (face.points.length < 3) return { rows: 0, columns: 0 };
+  const turned = face.points.map((p) => rotate(p, -face.angle));
+  const width = face.landscape ? size.long : size.short;
+  const height = face.landscape ? size.short : size.long;
+  const xs = turned.map((p) => p.x);
+  const ys = turned.map((p) => p.y);
+  return {
+    columns: Math.max(0, Math.floor((Math.max(...xs) - Math.min(...xs)) / (width + size.gap))),
+    rows: Math.max(0, Math.floor((Math.max(...ys) - Math.min(...ys)) / (height + size.gap))),
+  };
+}
+
 export function panelPlaces(face: Face, size: PanelSize = PANEL): PlacedPanel[] {
   if (face.points.length < 3) return [];
   // Work in the face's own frame, where the rows run straight across.
@@ -380,8 +394,7 @@ export function panelPlaces(face: Face, size: PanelSize = PANEL): PlacedPanel[] 
   const maxX = Math.max(...turned.map((p) => p.x));
   const minY = Math.min(...turned.map((p) => p.y));
   const maxY = Math.max(...turned.map((p) => p.y));
-  const columns = Math.floor((maxX - minX) / (width + size.gap));
-  const rows = Math.floor((maxY - minY) / (height + size.gap));
+  const { columns, rows } = faceGrid(face, size);
   if (columns < 1 || rows < 1 || columns * rows > 4000) return [];
   // Centre the grid in the face's bounds, so the spare room is shared between both sides.
   const startX = minX + (maxX - minX - (columns * (width + size.gap) - size.gap)) / 2;

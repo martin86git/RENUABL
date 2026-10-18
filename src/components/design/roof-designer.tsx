@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
 import { loadTerrain } from "@/lib/services/terrain";
-import { loadRoofModel } from "@/lib/services/roof-model";
+import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
+import { fillFaces } from "@/lib/domain/design/rows";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
 import { selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
 import { todayInMarket } from "@/lib/domain/market";
@@ -59,7 +60,7 @@ import {
 import type { RebateRates } from "@/lib/domain/rebates";
 import { DesignQuote } from "./design-quote";
 import type { RoofModel } from "@/lib/domain/roof-layout";
-import { MAX_SUGGESTED, suggestPanels } from "@/lib/domain/design/suggest";
+import { MAX_SUGGESTED, mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
 import { autoStringDesign } from "@/lib/domain/design/auto-string";
@@ -76,6 +77,7 @@ import {
   applyCommentOp,
   designPanels,
   designSummary,
+  facePanels,
   faceArea,
   faceFacing,
   freed,
@@ -1948,24 +1950,59 @@ export function RoofDesigner(props: {
   // A string that has been started and has no panel yet.
   const startedString = tool === "string" && wiring !== null && !strings.some((x) => x.id === wiring);
   /**
-   * A first layout from Google's roof model, set down as panels placed by hand. It replaces what is on the design
-   * (asked first), and leaves the new panels picked, ready to be nudged.
+   * Google's roof model, put where it belongs on the picture: lined up with today's photo (`loadModelFit`), or, when
+   * Google's own photo of the roof doesn't match today's (often a roof that has changed since), not used at all.
+   */
+  const googleModelInPlace = async (): Promise<{ model: RoofModel; offset?: { x: number; y: number } } | { note: string }> => {
+    const [info, fit] = await Promise.all([loadRoofInfo(spot.lat, spot.lng), loadModelFit(spot.lat, spot.lng)]);
+    if (!info.model) return { note: "There's no roof data for this address to work from. Trace the roof faces, then ask again." };
+    if (fit.kind === "mismatch") return { note: mismatchNote(info.imageryDate) };
+    return { model: info.model, ...(fit.kind === "aligned" ? { offset: modelOffset(fit.shift, spot.lat) } : {}) };
+  };
+  /**
+   * A first layout, in the fewest long straight rows: on the roof faces traced (sunniest first, `fillFaces`), or
+   * else from Google's roof model lined up with today's photo (`suggestPanels`), set down as panels placed by hand.
+   * It replaces the panels on the design (asked first); traced faces are kept.
    */
   const suggestLayout = async () => {
-    if ((faces.length || loose.length) && !window.confirm("Replace the roof faces and panels on this design with a suggested layout?"))
+    if (
+      (faces.some((f) => facePanels(f, size).length) || loose.length) &&
+      !window.confirm("Replace the panels on this design with a suggested layout?")
+    )
       return;
     setIdea("busy");
-    try {
-      const res = await fetch(`/api/roof?lat=${spot.lat}&lng=${spot.lng}`);
-      const json = (await res.json()) as { ok?: boolean; model?: RoofModel | null };
-      const model = json.ok && json.model?.slots?.length ? json.model : null;
-      if (!model)
+    if (faces.length) {
+      // Every place on the traced faces back first, so the rows are laid on the whole face.
+      const filled = fillFaces(
+        faces.map((f) => ({ ...f, off: [] })),
+        size,
+        want,
+      );
+      if (!filled.placed)
         return setIdea({
           bad: true,
-          note: "There's no roof data for this address to suggest from. Trace the roof faces instead and panels fill them.",
+          note: "No panels fit on the traced faces. Check their outlines and the distance kept from the edges.",
         });
-      const made = suggestPanels(model, spot, want, size, () => newId("p"));
-      if (!made.length) return setIdea({ bad: true, note: "No panels could be suggested for this roof. Trace the roof faces instead." });
+      setFaces(filled.faces);
+      setLoose([]);
+      setStrings([]);
+      setPicks([]);
+      changed();
+      setTool("select");
+      return setIdea({
+        note:
+          (filled.placed < want
+            ? `Only ${filled.placed} fit in rows on the traced faces. `
+            : `${filled.placed} panels in rows on the traced faces. `) +
+          "Check them against the picture: switch off any that sit on a vent or skylight.",
+      });
+    }
+    try {
+      const found = await googleModelInPlace();
+      if ("note" in found) return setIdea({ bad: true, note: found.note });
+      const made = suggestPanels(found.model, spot, want, size, () => newId("p"), found.offset);
+      if (!made.length)
+        return setIdea({ bad: true, note: "No panels could be laid from Google's roof data. Trace the roof faces instead." });
       setFaces([]);
       setLoose(made);
       setStrings([]);
@@ -1974,7 +2011,10 @@ export function RoofDesigner(props: {
       changed();
       setTool("select");
       setIdea({
-        note: `${made.length} panels suggested from the roof's shape. Check them against the picture, then move, turn or remove any.`,
+        note:
+          (made.length < want
+            ? `Only ${made.length} fit in rows on the roof Google measured. `
+            : `${made.length} panels in rows from Google's roof data. `) + "Check them against the picture, then move, turn or remove any.",
       });
     } catch {
       setIdea({ bad: true, note: "We couldn't reach the roof data just now. Try again in a moment, or trace the roof faces." });
@@ -1990,13 +2030,21 @@ export function RoofDesigner(props: {
     if (drawnSoFar && !window.confirm("Replace this roof's designs with three made for it? The roof faces traced are kept and used."))
       return;
     setMine("busy");
-    const model = faces.length ? null : await loadRoofModel(spot.lat, spot.lng);
+    let model: RoofModel | null = null;
+    let modelOffsetM: { x: number; y: number } | undefined;
+    if (!faces.length) {
+      const found = await googleModelInPlace();
+      if ("note" in found) return setMine({ options: [], notes: [found.note], from: null });
+      model = found.model;
+      modelOffsetM = found.offset;
+    }
     const amount = Number(bill.amount) || 0;
     const rate = Number(bill.rate) || 0;
     const result = selfDesign({
       centre: spot,
       faces,
       model,
+      ...(modelOffsetM ? { modelOffset: modelOffsetM } : {}),
       panel:
         panel ??
         (chosenPanel
