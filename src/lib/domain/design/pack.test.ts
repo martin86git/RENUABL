@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { EDGE_CLEARANCE, MOUNT_STANDOFF, clearanceFor, packArea, packAreas, packFaces, reorient, tracedArea, type Area } from "./pack";
+import {
+  EDGE_CLEARANCE,
+  MOUNT_STANDOFF,
+  clearanceFor,
+  laidAs,
+  packArea,
+  packAreas,
+  packFaces,
+  reorient,
+  tracedArea,
+  type Area,
+} from "./pack";
 import { PANEL, facePanels, inside, looseCorners, panelFacing, type Face, type LoosePanel, type Point } from "./roof-design";
 
 const rect = (x0: number, y0: number, x1: number, y1: number): Point[] => [
@@ -187,5 +198,19 @@ describe("turning picked panels landscape or back", () => {
       expect(p.x).toBeCloseTo(panels[i].x, 1);
       expect(p.y).toBeCloseTo(panels[i].y, 1);
     });
+  });
+});
+
+describe("a panel laid portrait or on its side, for Add a panel", () => {
+  it("keeps the way it looks and only turns it a quarter", () => {
+    const upright: LoosePanel = { id: "a", x: 1, y: 2, angle: 30, tilt: 22 };
+    const side = laidAs(upright, true);
+    expect(side.across).toBe(true);
+    expect(panelFacing(side)).toBe(30);
+    expect(side.angle).toBe(300);
+    const back = laidAs(side, false);
+    expect(back.across).toBeUndefined();
+    expect(back.angle).toBe(30);
+    expect(laidAs(upright, false)).toBe(upright);
   });
 });

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
 import { loadTerrain } from "@/lib/services/terrain";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
-import { MOUNT_STANDOFF, clearanceFor, packFaces, reorient } from "@/lib/domain/design/pack";
+import { MOUNT_STANDOFF, clearanceFor, laidAs, packFaces, reorient } from "@/lib/domain/design/pack";
 import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
 import { NO_BILL_KW, SELF_DESIGN_AIMS, SELF_DESIGN_LABELS, selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
@@ -473,6 +473,8 @@ export function RoofDesigner(props: {
   // The string whose check is open on the picture: opened from its tick or cross in the strings box, never by hovering
   // (Martin: the check covered the roof as soon as the pointer crossed a string).
   const [checking, setChecking] = useState<string | null>(null);
+  // Which way Add a panel lays new panels: chosen from the two bubbles beside the tool (Martin).
+  const [addLandscape, setAddLandscape] = useState(false);
   // The battery or the inverter under the pointer: its details show beside it.
   const [kit, setKit] = useState<"battery" | number | null>(null);
   const [tool, setTool] = useState<Tool>("select");
@@ -1056,6 +1058,8 @@ export function RoofDesigner(props: {
         ),
       ];
       for (const from of standingNow) {
+        // Only beside panels laid the way chosen; a different way is placed freely and clicks flush when drawn.
+        if (Boolean(from.across) !== addLandscape) continue;
         const { stepX, stepY } = stepsOf(from);
         const away = Math.hypot(p.x - from.x, p.y - from.y);
         if (away > stepY * 1.6 || (beside && away >= beside.away)) continue;
@@ -1072,9 +1076,12 @@ export function RoofDesigner(props: {
         if (!standingNow.some((other) => Math.hypot(other.x - x, other.y - y) < 0.4)) return { ...beside.from, id: "ghost", x, y };
       }
       const on = [...faces].reverse().find((f) => inside(p, f.points));
-      return on
-        ? { ...freed(on, { index: 0, corners: [p, p, p, p] }, "ghost"), x: p.x, y: p.y }
-        : { id: "ghost", x: p.x, y: p.y, angle: 0, tilt: TILT.roof };
+      return laidAs(
+        on
+          ? { ...freed(on, { index: 0, corners: [p, p, p, p] }, "ghost"), x: p.x, y: p.y }
+          : { id: "ghost", x: p.x, y: p.y, angle: 0, tilt: TILT.roof },
+        addLandscape,
+      );
     }
     const a = (base.angle * Math.PI) / 180;
     // The pointer in the panel's own frame: across its short side (lx) and along its long side (ly).
@@ -1281,11 +1288,11 @@ export function RoofDesigner(props: {
    * the same rows and counts, the gutter row's edge kept, each row centred where it was (`reorient`). Strings keep
    * their panels.
    */
-  const turnLandscape = () => {
+  const turnLandscape = (landscape: boolean) => {
     if (!panelPicks.length) return;
     const next = byHand(panelPicks);
     const group = next.loose.filter((p) => next.ids.includes(p.id));
-    const turned = new Map(reorient(group, size, !group.every((p) => p.across)).map((p) => [p.id, p]));
+    const turned = new Map(reorient(group, size, landscape).map((p) => [p.id, p]));
     setFaces(next.faces);
     setStrings(next.strings);
     setLoose(next.loose.map((p) => turned.get(p.id) ?? p));
@@ -2525,7 +2532,7 @@ export function RoofDesigner(props: {
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
                   that does to this home's bill. Each has one large figure in the same place every time, with its detail under it. */}
             <section
-              className="relative z-30 mx-auto mb-2 flex flex-wrap items-stretch rounded-lg bg-ink text-white"
+              className="relative z-30 mx-auto mb-2 flex flex-wrap items-stretch rounded-lg border border-line bg-surface text-ink shadow-soft"
               style={{ maxWidth: FIT }}
               aria-label="This design in figures"
             >
@@ -2556,16 +2563,16 @@ export function RoofDesigner(props: {
                   },
                 ] as { step: string; value: string; unit: string; under: string; gold?: boolean; chart?: boolean; warn?: boolean }[]
               ).map((g) => (
-                <div key={g.step} className="relative flex items-center gap-3 border-r border-white/15 px-3.5 py-1.5">
+                <div key={g.step} className="relative flex items-center gap-3 border-r border-line px-3.5 py-1.5">
                   <div>
-                    <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/50">{g.step}</p>
+                    <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-muted">{g.step}</p>
                     <p className="whitespace-nowrap leading-tight">
-                      <span className={clsx("text-xl font-medium tabular-nums tracking-[-0.02em]", g.gold && "text-sun-bright")}>
+                      <span className={clsx("text-xl font-medium tabular-nums tracking-[-0.02em]", g.gold && "text-sun-line-ink")}>
                         {g.value}
                       </span>
-                      <span className="ml-1.5 text-xs text-white/60">{g.unit}</span>
+                      <span className="ml-1.5 text-xs text-muted">{g.unit}</span>
                     </p>
-                    <p className={clsx("whitespace-nowrap text-xs tabular-nums", g.warn ? "font-medium text-sun-bright" : "text-white/60")}>
+                    <p className={clsx("whitespace-nowrap text-xs tabular-nums", g.warn ? "font-medium text-sun-line-ink" : "text-muted")}>
                       {g.under}
                     </p>
                   </div>
@@ -2577,16 +2584,16 @@ export function RoofDesigner(props: {
                     >
                       {year.map((kwh, m) => (
                         <div key={m} className="flex min-w-0 flex-1 flex-col items-center" title={`${kwh.toLocaleString("en-AU")} kWh`}>
-                          <div className="flex h-6 w-full items-end justify-center gap-[2px] border-b border-white/40">
+                          <div className="flex h-6 w-full items-end justify-center gap-[2px] border-b border-line-strong">
                             {[0.6, 1].map((strength, n) => (
                               <span
                                 key={n}
-                                className="w-px bg-sun-bright"
+                                className="w-px bg-sun-line"
                                 style={{ height: `${Math.max(6, (kwh / top) * 100)}%`, opacity: strength }}
                               />
                             ))}
                           </div>
-                          <span className="mt-0.5 text-[8px] leading-none text-white/55">{"JFMAMJJASOND"[m]}</span>
+                          <span className="mt-0.5 text-[8px] leading-none text-muted">{"JFMAMJJASOND"[m]}</span>
                         </div>
                       ))}
                     </div>
@@ -2608,9 +2615,9 @@ export function RoofDesigner(props: {
                     e.preventDefault();
                     openMenu(menu === "bill" ? false : "bill");
                   }}
-                  className="h-full cursor-pointer rounded-r-lg px-3.5 py-1.5 hover:bg-white/5"
+                  className="h-full cursor-pointer rounded-r-lg px-3.5 py-1.5 hover:bg-canvas"
                 >
-                  <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/50">4 · For this home</p>
+                  <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-muted">4 · For this home</p>
                   {finance ? (
                     <dl className="mt-0.5 flex gap-x-4">
                       {(
@@ -2622,11 +2629,11 @@ export function RoofDesigner(props: {
                         ] as const
                       ).map(([name, value, gold]) => (
                         <div key={name}>
-                          <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.14em] text-white/55">{name}</dt>
+                          <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.14em] text-muted">{name}</dt>
                           <dd
                             className={clsx(
                               "whitespace-nowrap text-lg font-semibold tabular-nums leading-tight",
-                              gold && "text-sun-bright",
+                              gold && "text-sun-line-ink",
                             )}
                           >
                             {value}
@@ -2639,7 +2646,7 @@ export function RoofDesigner(props: {
                       <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3 text-[13px] font-medium text-white">
                         <ReceiptText className="size-4" aria-hidden /> Add bill
                       </span>
-                      <span className="text-xs text-white/60">
+                      <span className="text-xs text-muted">
                         {Number(bill.amount) > 0
                           ? "That bill is no more than its supply charge: check the figures."
                           : net !== null
@@ -2758,7 +2765,7 @@ export function RoofDesigner(props: {
               </p>
             )}
             <div className="relative mx-auto" style={{ maxWidth: FIT }}>
-              <div className="overflow-hidden rounded-lg bg-ink">
+              <div className="overflow-hidden rounded-lg bg-surface-2">
                 <svg
                   ref={svg}
                   viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
@@ -3489,7 +3496,7 @@ export function RoofDesigner(props: {
                         : [];
                   return (
                     <div
-                      className="pointer-events-none absolute z-20 w-[19rem] max-w-[calc(100%-1rem)] rounded-lg bg-ink p-3 text-white shadow-lift ring-1 ring-white/15"
+                      className="pointer-events-none absolute z-20 w-[19rem] max-w-[calc(100%-1rem)] rounded-lg bg-forest p-3 text-white shadow-lift ring-1 ring-white/15"
                       style={{
                         left: `clamp(0.5rem, calc(${left}% + 2.5rem), calc(100% - 19.5rem))`,
                         top: `clamp(0.5rem, calc(${top}% - 3rem), calc(100% - 14rem))`,
@@ -4253,23 +4260,30 @@ export function RoofDesigner(props: {
                 >
                   <SquarePlus className="size-5" aria-hidden />
                 </button>
-                {/* Landscape, beside Add a panel (Martin): turns the picked panels onto their side, or back upright when
-                    every one already is, and lays them again tidily (`turnLandscape`). */}
-                <button
-                  onClick={turnLandscape}
-                  disabled={!pickedPanels.length}
-                  title={
-                    !pickedPanels.length
-                      ? "Landscape: pick panels to turn them onto their side"
-                      : pickedPanels.every((p) => p.across)
-                        ? "Portrait: turn the picked panels back upright"
-                        : "Landscape: turn the picked panels onto their side"
-                  }
-                  aria-label={pickedPanels.length && pickedPanels.every((p) => p.across) ? "Portrait" : "Landscape"}
-                  className="absolute left-[6.375rem] top-[0.5625rem] flex size-[2.625rem] items-center justify-center rounded-full border border-line bg-surface/90 text-ink shadow-lift backdrop-blur-md hover:bg-surface disabled:text-muted"
-                >
-                  <PanelGlyph across={!(pickedPanels.length && pickedPanels.every((p) => p.across))} />
-                </button>
+                {/* Portrait or landscape (Martin): two bubbles beside Add a panel while it is on, choosing the way new panels are
+                    laid; with panels picked, the same two turn those panels and lay them again tidily (`turnLandscape`). */}
+                {(tool === "panel" || pickedPanels.length > 0) &&
+                  ([false, true] as const).map((landscape, n) => {
+                    const turning = tool !== "panel";
+                    const on = turning ? pickedPanels.every((p) => Boolean(p.across) === landscape) : addLandscape === landscape;
+                    const name = landscape ? "Landscape" : "Portrait";
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => (turning ? turnLandscape(landscape) : setAddLandscape(landscape))}
+                        title={turning ? `${name}: lay the picked panels this way` : `${name}: add panels this way`}
+                        aria-label={turning ? `Lay the picked panels ${name.toLowerCase()}` : `Add panels ${name.toLowerCase()}`}
+                        aria-pressed={on}
+                        style={{ left: `${6.375 + n * 2.875}rem` }}
+                        className={clsx(
+                          "absolute top-[0.5625rem] flex size-[2.625rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
+                          on ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface/90 text-ink hover:bg-surface",
+                        )}
+                      >
+                        <PanelGlyph across={landscape} />
+                      </button>
+                    );
+                  })}
                 <button
                   onClick={() => pickTool("erase")}
                   title="Erase"

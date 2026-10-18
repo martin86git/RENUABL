@@ -88,9 +88,10 @@
   --muted: #7b7d84;
   --line: #e4e4e7;
   --line-strong: #cdced3;
-  --primary: #0b0b0c;
+  /* Accents in a soft graphite, not black (Martin: the black felt harsh); --ink stays for text. */
+  --primary: #3a3d43;
   --primary-ink: #ffffff;
-  --forest: #1d1e21;
+  --forest: #4a4d54;
   --sage: #ebebed;
   --sun: #fff0e6;
   --sun-ink: #b53c00;

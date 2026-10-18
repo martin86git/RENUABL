@@ -280,6 +280,18 @@ const SAME_ROW = 0.3;
  * nearest the gutter keeps its lower edge where it was, the rows above are spaced again for the new shape, and each
  * row stays centred where it was. The panels keep their ids (so strings keep them), their tilt and the way they look.
  */
+/**
+ * One panel laid portrait or on its side where it is, still looking the same way (the Add a panel tool's choice,
+ * Martin): on its side its long edge runs across the slope, a quarter turn from the way it looks.
+ */
+export function laidAs<T extends Pick<LoosePanel, "angle" | "across">>(panel: T, landscape: boolean): T {
+  if (Boolean(panel.across) === landscape) return panel;
+  const facing = panelFacing(panel);
+  const { across: _was, ...rest } = panel;
+  void _was;
+  return { ...rest, angle: (((facing - (landscape ? 90 : 0)) % 360) + 360) % 360, ...(landscape ? { across: true } : {}) } as T;
+}
+
 export function reorient(panels: LoosePanel[], size: PanelSize, landscape: boolean): LoosePanel[] {
   const out = new Map<string, LoosePanel>();
   const groups = new Map<number, LoosePanel[]>();
