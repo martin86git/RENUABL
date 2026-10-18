@@ -14,7 +14,7 @@ const ARROW = "inline-flex size-9 items-center justify-center rounded-md border 
 const TONE = { ready: "border-positive bg-positive-soft", partly: "border-sun-line bg-sun", not: "border-line bg-surface-2" } as const;
 
 /**
- * /design/installations/scheduler: the Install Scheduler. Every booked
+ * /design/procurement/scheduler: the Install Scheduler. Every booked
  * installation on a month or a week, each marked with whether it is ready to
  * go (the stock ordered, the deposit in): green when both, amber when one.
  * Dates are set on the deal or in the Installations list. Whether customers
@@ -58,7 +58,7 @@ export function SchedulerPage() {
 
   return (
     <div className={ui.page}>
-      <PageHead eyebrow="Installations" title="Install Scheduler">
+      <PageHead eyebrow="Procurement" title="Install Scheduler">
         <div className="flex items-center gap-1">
           <button type="button" className={ARROW} onClick={() => setDate(cal.prev)} aria-label="Earlier">
             <ChevronLeft className="size-4" />

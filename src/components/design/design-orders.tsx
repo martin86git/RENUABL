@@ -23,7 +23,7 @@ const money2 = (n: number | null) =>
   n === null ? "–" : `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /**
- * /design/installations/orders: the Ordering Station. Every signed job's
+ * /design/procurement/orders: the Ordering Station. Every signed job's
  * order, the ones still to order first, then ordered and delivered, each
  * with what it comes to and who it is bought from. An order is opened the
  * moment its customer signs.
@@ -45,7 +45,7 @@ export function OrdersPage() {
 
   return (
     <div className={ui.page}>
-      <PageHead eyebrow="Installations" title="Ordering Station" />
+      <PageHead eyebrow="Procurement" title="Ordering Station" />
       <p className="mt-2 max-w-2xl text-sm text-ink-2">
         Each signed job&apos;s bill of materials, counted from the design it was sold with: panels, inverter, battery, rails, splices, roof
         brackets and the electrical parts. Check it, send each supplier their part, and tick it off as it arrives.
@@ -105,7 +105,7 @@ export function OrdersPage() {
 }
 
 /**
- * /design/installations/orders/[jobId]: one job's order. One card for each
+ * /design/procurement/orders/[jobId]: one job's order. One card for each
  * supplier, with each product's code, how many (the design's count beside
  * any change), the price from that supplier's list, and a tick for when it is
  * ordered; products can be taken off, added, or moved to another supplier

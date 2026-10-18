@@ -706,3 +706,167 @@ export function CustomerPage({ id }: { id: string }) {
     </div>
   );
 }
+
+/**
+ * A new deal, from the Deals page: who it is for first (someone already a customer, found by name, phone, email or
+ * address, or someone new, added on the spot), then what it is and where. It opens the deal once made.
+ */
+export function NewDeal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const [customers, setCustomers] = useState<CustomerLine[] | null>(null);
+  const [find, setFind] = useState("");
+  const [who, setWho] = useState<Customer | "new" | null>(null);
+  const [draft, setDraft] = useState<CustomerInput>(BLANK);
+  const [deal, setDeal] = useState<{ title: string; address: string; lat: number | null; lng: number | null; own: boolean }>({
+    title: "Solar",
+    address: "",
+    lat: null,
+    lng: null,
+    own: false,
+  });
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    void listCustomers().then((res) => (res.ok ? setCustomers(res.customers) : setProblem(res.message)));
+  }, []);
+  const matches = useMemo(() => {
+    const q = find.trim().toLowerCase();
+    if (!customers) return [];
+    const all = q ? customers.filter((c) => [c.name, c.email, c.phone, c.address].some((v) => v.toLowerCase().includes(q))) : customers;
+    return all.slice(0, 6);
+  }, [customers, find]);
+
+  const pick = (c: Customer) => {
+    setWho(c);
+    setDeal({ ...deal, address: c.address, lat: c.lat, lng: c.lng, own: true });
+  };
+  // Someone new: the deal is at the address typed for them until another is chosen for it.
+  const where = who === "new" && !deal.own ? { address: draft.address, lat: draft.lat, lng: draft.lng } : deal;
+  const create = async () => {
+    if (!who) return setProblem("Choose who the deal is for.");
+    setSaving(true);
+    let customerId = who === "new" ? null : who.id;
+    if (who === "new") {
+      if (!(draft.firstName ?? "").trim()) {
+        setSaving(false);
+        return setProblem("Enter the customer's first name.");
+      }
+      // The customer alone: the deal is the one made here, not the first job an address would otherwise start.
+      const added = await createCustomer({ ...draft, deal: false });
+      if (!added.ok) {
+        setSaving(false);
+        return setProblem(added.message);
+      }
+      customerId = added.customer.id;
+    }
+    const res = await createJob({
+      customerId: customerId!,
+      title: deal.title.trim() || "Solar",
+      address: where.address,
+      lat: where.lat,
+      lng: where.lng,
+    });
+    setSaving(false);
+    if (!res.ok) return setProblem(res.message);
+    router.push(`${PATHS.deals}/${res.job.id}`);
+  };
+
+  return (
+    <section className={clsx(ui.card, "mt-6 p-5 sm:p-6")} aria-labelledby="new-deal">
+      <h2 id="new-deal" className="text-[17px] tracking-tight text-ink">
+        New deal
+      </h2>
+
+      <p className={clsx(ui.label, "mt-4")}>Who it&apos;s for</p>
+      {who === null && (
+        <div className="mt-1.5">
+          <label className="relative block max-w-md">
+            <span className="sr-only">Find a customer</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+            <input
+              className={clsx(ui.input, "pl-9")}
+              placeholder="Find a customer by name, phone, email or address"
+              value={find}
+              onChange={(e) => setFind(e.target.value)}
+              autoFocus
+            />
+          </label>
+          <ul className="mt-2 max-w-md divide-y divide-line rounded-md border border-line">
+            {matches.map((c) => (
+              <li key={c.id}>
+                <button type="button" onClick={() => pick(c)} className="block w-full px-3 py-2 text-left hover:bg-surface-2">
+                  <span className="block text-sm font-medium text-ink">{c.name}</span>
+                  <span className="block truncate text-xs text-muted">{c.address || c.email || c.phone || "No details yet"}</span>
+                </button>
+              </li>
+            ))}
+            {customers && !matches.length && <li className="px-3 py-2 text-sm text-ink-2">Nobody matches that.</li>}
+            <li>
+              <button
+                type="button"
+                onClick={() => setWho("new")}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-ink hover:bg-surface-2"
+              >
+                <UserPlus className="size-4" aria-hidden /> Someone new
+              </button>
+            </li>
+          </ul>
+        </div>
+      )}
+      {who && who !== "new" && (
+        <div className="mt-1.5 flex max-w-md items-center gap-3 rounded-md border border-line bg-surface-2 px-3 py-2 text-sm">
+          <span className="min-w-0 flex-1 truncate font-medium text-ink">{who.name}</span>
+          <button type="button" onClick={() => setWho(null)} className="text-xs font-medium text-ink-2 underline underline-offset-4">
+            Change
+          </button>
+        </div>
+      )}
+      {who === "new" && (
+        <div className="mt-2">
+          <CustomerFields value={draft} onChange={setDraft} />
+          <button type="button" onClick={() => setWho(null)} className="mt-2 text-xs font-medium text-ink-2 underline underline-offset-4">
+            Choose an existing customer instead
+          </button>
+        </div>
+      )}
+
+      {who && (
+        <div className="mt-5 grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
+          <label className={ui.label}>
+            What it is
+            <input
+              className={clsx(ui.input, "mt-1.5")}
+              value={deal.title}
+              onChange={(e) => setDeal({ ...deal, title: e.target.value })}
+              maxLength={80}
+              placeholder="Solar, Battery…"
+            />
+          </label>
+          <div className={ui.label}>
+            Where
+            <AddressField
+              value={where.address}
+              placed={where.lat !== null}
+              onChange={(place) => setDeal({ ...deal, ...place, own: true })}
+            />
+          </div>
+        </div>
+      )}
+
+      {problem && (
+        <p className="mt-3 text-[13px] text-danger" role="alert">
+          {problem}
+        </p>
+      )}
+      <div className="mt-5 flex gap-2">
+        <button className={ui.primary} onClick={create} disabled={saving || !who}>
+          {saving ? "Creating…" : "Create deal"}
+        </button>
+        <button className={ui.quiet} onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </section>
+  );
+}

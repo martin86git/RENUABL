@@ -555,3 +555,18 @@ export const paperworkDone = (j: Pick<Job, "details">) =>
 /** The days a job was installed on, for the calendar: its install date, else the day it was marked installed. */
 export const installedOn = (j: Pick<Job, "installDate" | "installedAt">): ISODate | null =>
   j.installDate ?? (j.installedAt ? (j.installedAt.slice(0, 10) as ISODate) : null);
+
+/** Where an installation is: still to come, under way (the day has come, but it isn't finished), or completed. */
+export type InstallPhase = "upcoming" | "in-works" | "completed";
+export const INSTALL_PHASES: readonly InstallPhase[] = ["upcoming", "in-works", "completed"];
+
+/**
+ * A sold job's installation phase, or null for one not sold (or lost). Upcoming: sold and its day not come (or no day
+ * yet). In the works: its day has come or it is marked installed, and the customer's invoice, the STCs or the grid
+ * connection is still open. Completed: installed with all three done.
+ */
+export function installPhase(j: Pick<Job, "stage" | "installDate" | "details">, today: ISODate): InstallPhase | null {
+  if (INSTALLED_STAGES.includes(j.stage)) return paperworkDone(j) ? "completed" : "in-works";
+  if (PRE_INSTALL_STAGES.includes(j.stage)) return j.installDate && j.installDate <= today ? "in-works" : "upcoming";
+  return null;
+}

@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { InstallationsPage } from "@/components/design/design-installations";
 import { DesignShell } from "@/components/design/design-shell";
+import { InstallationsPhasePage } from "@/components/design/install-lists";
 
-export const metadata: Metadata = { title: "Installations", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Upcoming installations", robots: { index: false, follow: false } };
 
-/** Every installation in the works: sold, and not yet on the roof. */
+/** Upcoming installations: sold, and the day not come yet (or not booked). */
 export default function DesignInstallationsPage() {
   return (
     <DesignShell needsAccount>
-      <InstallationsPage />
+      <InstallationsPhasePage phase="upcoming" />
     </DesignShell>
   );
 }

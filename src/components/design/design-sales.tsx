@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutGrid, List, PenTool, Trash2, UserPlus } from "lucide-react";
+import { LayoutGrid, List, PenTool, Plus, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { JOB_STAGES, STAGE_LABELS, type JobStage, type SavedPipeline } from "@/lib/domain/design/crm";
 import { DEFAULT_PIPELINE, PIPELINES, cleanPipelineChoice, pipelineOf, type PipelineChoice } from "@/lib/domain/design/deal";
@@ -18,6 +18,7 @@ import {
   shortDate,
   type JobLine,
 } from "@/lib/services/crm";
+import { NewDeal } from "./design-customers";
 import { PATHS, PageHead, ui } from "./design-shell";
 
 /** Where this person's last way of looking at their deals is kept, on their device. */
@@ -49,6 +50,7 @@ export function PipelinesPage() {
   // The deal being dragged, and the column it is over.
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<JobStage | null>(null);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     let gone = false;
@@ -127,10 +129,11 @@ export function PipelinesPage() {
   return (
     <div className="px-5 py-8 lg:px-10">
       <PageHead eyebrow="CRM · Deals" title={named.name}>
-        <Link href={`${PATHS.customers}?new=1`} className={ui.primary}>
-          <UserPlus className="size-4" aria-hidden /> New customer
-        </Link>
+        <button className={ui.primary} onClick={() => setAdding(true)} disabled={adding}>
+          <Plus className="size-4" aria-hidden /> New deal
+        </button>
       </PageHead>
+      {adding && <NewDeal onClose={() => setAdding(false)} />}
 
       <div className={clsx(ui.card, "mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3")}>
         <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Pipeline">

@@ -9,6 +9,7 @@ import {
   completedInstalls,
   inTheWorks,
   installOrder,
+  installPhase,
   installRevenueThisMonth,
   installedOn,
   installerBooked,
@@ -16,12 +17,14 @@ import {
   power,
   upcomingInstalls,
   weekOf,
+  type InstallPhase,
   type JobExtra,
 } from "@/lib/domain/design/deal";
+import { todayInMarket } from "@/lib/domain/market";
 import type { ISODate } from "@/lib/domain/types";
 import { loadInstallExtras } from "@/lib/services/after-sale";
-import { dollars, saveJob, shortDate, type JobLine } from "@/lib/services/crm";
-import { PATHS, ui } from "./design-shell";
+import { dollars, listJobs, saveJob, shortDate, type JobLine } from "@/lib/services/crm";
+import { PATHS, PageHead, ui } from "./design-shell";
 
 type ListProps = { jobs: JobLine[] | null; today: ISODate; onJob: (job: JobLine) => void };
 
@@ -294,39 +297,70 @@ function ProgressSelect({ job, field, onJob }: { job: JobLine; field: ProgressKe
   );
 }
 
-/** Completed installs: this financial year's, the paperwork still open, unpaid invoices, this week, and every job. */
-export function CompletedInstallsView({ jobs, today, onJob }: ListProps) {
+/**
+ * Completed installs: this financial year's, the paperwork still open, unpaid invoices, this week, and every job. With a
+ * phase, only the jobs in it (`installPhase`): in the works (the day has come, the paperwork isn't done) or completed.
+ */
+export function CompletedInstallsView({ jobs, today, onJob, phase }: ListProps & { phase?: Exclude<InstallPhase, "upcoming"> }) {
   const extras = useExtras();
   const c = jobs ? completedInstalls(jobs, today) : null;
   const done = jobs
-    ? jobs.filter((j) => INSTALLED_STAGES.includes(j.stage)).sort((a, b) => (installedOn(b) ?? "").localeCompare(installedOn(a) ?? ""))
+    ? jobs
+        .filter((j) => (phase ? installPhase(j, today) === phase : INSTALLED_STAGES.includes(j.stage)))
+        .sort((a, b) => (installedOn(b) ?? "").localeCompare(installedOn(a) ?? ""))
     : null;
   const open = done?.filter((j) => !paperworkDone(j)) ?? null;
   const unpaid = done?.filter((j) => j.details?.customerInvoice !== "paid") ?? null;
+  const works = phase === "in-works";
+  const title = works ? "In the works" : "Completed installs";
   return (
     <>
       <Banner
-        items={[
-          {
-            label: `Completed installs · ${c?.yearLabel ?? "financial year"}`,
-            value: c ? String(c.yearCount) : "–",
-            under: c ? `${dollars(c.yearValue)} · ${power(c.yearKw)} since 1 July` : "",
-          },
-          { label: "Paperwork open", value: open ? String(open.length) : "–", under: "Invoice, STCs or grid connection still to finish" },
-          {
-            label: "Invoices not paid",
-            value: unpaid ? String(unpaid.length) : "–",
-            under:
-              unpaid && extras
-                ? `${dollars(unpaid.reduce((n, j) => n + Math.max(0, (extras.find((e) => e.jobId === j.id)?.youPay ?? j.value ?? 0) - (extras.find((e) => e.jobId === j.id)?.depositReceived ?? 0)), 0))} still to come in`
-                : "",
-            signal: true,
-          },
-        ]}
+        items={
+          works
+            ? [
+                { label: "In the works", value: done ? String(done.length) : "–", under: "Installed or due, paperwork still to finish" },
+                {
+                  label: "STCs not claimed",
+                  value: done ? String(done.filter((j) => j.details?.stcClaim !== "claimed").length) : "–",
+                  under: "",
+                },
+                {
+                  label: "Invoices not paid",
+                  value: unpaid ? String(unpaid.length) : "–",
+                  under:
+                    unpaid && extras
+                      ? `${dollars(unpaid.reduce((n, j) => n + Math.max(0, (extras.find((e) => e.jobId === j.id)?.youPay ?? j.value ?? 0) - (extras.find((e) => e.jobId === j.id)?.depositReceived ?? 0)), 0))} still to come in`
+                      : "",
+                  signal: true,
+                },
+              ]
+            : [
+                {
+                  label: `Completed installs · ${c?.yearLabel ?? "financial year"}`,
+                  value: c ? String(c.yearCount) : "–",
+                  under: c ? `${dollars(c.yearValue)} · ${power(c.yearKw)} since 1 July` : "",
+                },
+                {
+                  label: "Paperwork open",
+                  value: open ? String(open.length) : "–",
+                  under: "Invoice, STCs or grid connection still to finish",
+                },
+                {
+                  label: "Invoices not paid",
+                  value: unpaid ? String(unpaid.length) : "–",
+                  under:
+                    unpaid && extras
+                      ? `${dollars(unpaid.reduce((n, j) => n + Math.max(0, (extras.find((e) => e.jobId === j.id)?.youPay ?? j.value ?? 0) - (extras.find((e) => e.jobId === j.id)?.depositReceived ?? 0)), 0))} still to come in`
+                      : "",
+                  signal: true,
+                },
+              ]
+        }
       />
-      <WeekCalendar title="Completed this week" jobs={done} today={today} dayOf={installedOn} />
-      <section className="mt-6" aria-label="Completed installs">
-        <h2 className="text-[15px] font-medium tracking-tight text-ink">Completed installs</h2>
+      <WeekCalendar title={works ? "Installing this week" : "Completed this week"} jobs={done} today={today} dayOf={installedOn} />
+      <section className="mt-6" aria-label={title}>
+        <h2 className="text-[15px] font-medium tracking-tight text-ink">{title}</h2>
         <div className={clsx(ui.card, "mt-2.5 overflow-x-auto")}>
           <table className="w-full min-w-[50rem]">
             <thead>
@@ -350,7 +384,7 @@ export function CompletedInstallsView({ jobs, today, onJob }: ListProps) {
               {done?.length === 0 && (
                 <tr>
                   <td colSpan={6} className="p-4 text-[13px] text-ink-2">
-                    Nothing installed yet.
+                    {works ? "Nothing in the works." : "Nothing installed yet."}
                   </td>
                 </tr>
               )}
@@ -379,5 +413,45 @@ export function CompletedInstallsView({ jobs, today, onJob }: ListProps) {
         </div>
       </section>
     </>
+  );
+}
+
+const PHASE_HEAD: Record<InstallPhase, string> = {
+  upcoming: "Upcoming installations.",
+  "in-works": "Installations in the works.",
+  completed: "Completed installations.",
+};
+
+/** An Installations page: the business's jobs in one phase (`installPhase`), as the overview's lists show them. */
+export function InstallationsPhasePage({ phase }: { phase: InstallPhase }) {
+  const [jobs, setJobs] = useState<JobLine[] | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const today = todayInMarket();
+  useEffect(() => {
+    let gone = false;
+    void listJobs().then((res) => {
+      if (gone) return;
+      if (res.ok) setJobs(res.jobs);
+      else setProblem(res.message);
+    });
+    return () => {
+      gone = true;
+    };
+  }, []);
+  const changed = (job: JobLine) => setJobs((all) => (all ?? []).map((j) => (j.id === job.id ? job : j)));
+  return (
+    <div className={ui.page}>
+      <PageHead eyebrow="Installations" title={PHASE_HEAD[phase]} />
+      {problem && (
+        <p className="mt-6 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
+          {problem}
+        </p>
+      )}
+      {phase === "upcoming" ? (
+        <UpcomingInstallsView jobs={jobs && jobs.filter((j) => installPhase(j, today) === "upcoming")} today={today} onJob={changed} />
+      ) : (
+        <CompletedInstallsView jobs={jobs} today={today} onJob={changed} phase={phase} />
+      )}
+    </div>
   );
 }

@@ -4,7 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  CalendarClock,
   CalendarDays,
+  CircleCheck,
   FileSignature,
   MessageSquare,
   ReceiptText,
@@ -40,9 +42,11 @@ export const PATHS = {
   messages: "/design/messages",
   proposalsSent: "/design/sales/proposals",
   proposalsSigned: "/design/sales/signed",
-  scheduler: "/design/installations/scheduler",
-  orders: "/design/installations/orders",
+  scheduler: "/design/procurement/scheduler",
+  orders: "/design/procurement/orders",
   invoices: "/design/installations/invoices",
+  underway: "/design/installations/underway",
+  completed: "/design/installations/completed",
   settings: "/design/settings",
   brand: "/design/settings/company",
   account: "/design/account",
@@ -84,13 +88,23 @@ const NAV: NavItem[] = [
     ],
   },
   {
+    href: PATHS.scheduler,
+    label: "Procurement",
+    icon: Truck,
+    also: [PATHS.orders],
+    under: [
+      { href: PATHS.scheduler, label: "Install Scheduler", icon: CalendarDays },
+      { href: PATHS.orders, label: "Ordering Station", icon: Truck },
+    ],
+  },
+  {
     href: PATHS.installations,
     label: "Installations",
     icon: HardHat,
     under: [
-      { href: PATHS.installations, label: "In the works", icon: HardHat },
-      { href: PATHS.scheduler, label: "Install Scheduler", icon: CalendarDays },
-      { href: PATHS.orders, label: "Ordering Station", icon: Truck },
+      { href: PATHS.installations, label: "Upcoming", icon: CalendarClock },
+      { href: PATHS.underway, label: "In the works", icon: HardHat },
+      { href: PATHS.completed, label: "Completed", icon: CircleCheck },
       { href: PATHS.invoices, label: "Installer Invoices", icon: ReceiptText },
     ],
   },
@@ -100,7 +114,8 @@ const NAV: NavItem[] = [
 
 /**
  * The frame every signed-in screen sits in: the product's sections down the
- * left (Overview, CRM (Customers, Deals), Sales (the proposals), Installations, and the
+ * left (Overview, CRM (Customers, Deals), Sales (the proposals), Procurement (scheduling and ordering),
+ * Installations (upcoming, in the works, completed, installer invoices), and the
  * Design tool in orange, as the main tool), with the business's settings
  * and account at its foot. The sections can be folded down to icons and opened
  * out again (kept on the device). `compact` keeps only the icons, for the design
