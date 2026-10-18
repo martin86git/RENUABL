@@ -17,6 +17,7 @@ import {
   Zap,
 } from "lucide-react";
 import clsx from "clsx";
+import { AerialScene, PanelDefs, SolarPanel } from "./aerial-home";
 import { AFTER_STEPS, AUTOMATIONS, COMING_SOON_LABEL, type FeatureStatus } from "@/lib/domain/design/landing";
 
 /**
@@ -59,20 +60,43 @@ const money = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
 // ---------------------------------------------------------------------------
 // 1. The quote that builds itself.
 
-const PANEL = { w: 30, h: 46, gap: 2 };
+/** A panel portrait (as on the hip and the garage) and landscape (as on the north face, to fit more rows under the ridge). */
 const WATTS = 475;
-type Spot = { x: number; y: number };
-const grid = (x: number, y: number, cols: number, rows: number): Spot[] =>
-  Array.from({ length: cols * rows }, (_, i) => ({
-    x: x + (i % cols) * (PANEL.w + PANEL.gap),
-    y: y + Math.floor(i / cols) * (PANEL.h + PANEL.gap),
-  }));
-/** Three arrays: the east face of the main roof, the west face, and the flat garage roof. */
+const PORTRAIT = { w: 30, h: 46 };
+const LANDSCAPE = { w: 44, h: 28 };
+const GAP = 2;
+type Spot = { x: number; y: number; w: number; h: number };
+/** A row of panels of one size, left to right. */
+const row = (x: number, y: number, n: number, size: { w: number; h: number }): Spot[] =>
+  Array.from({ length: n }, (_, i) => ({ x: x + i * (size.w + GAP), y, ...size }));
+/**
+ * Three arrays, laid as a designer would on this roof (the house in `aerial-home.tsx`): the north face in landscape rows that
+ * shorten towards the ridge, the west hip where it is wide enough, and the flat garage roof.
+ */
 const ARRAYS = [
-  { at: 1, spots: grid(300, 104, 4, 2), letter: "A", colour: "#86efac" },
-  { at: 2, spots: grid(176, 104, 3, 2), letter: "B", colour: "#7dd3fc" },
-  { at: 3, spots: grid(470, 222, 4, 1), letter: "C", colour: "#fcd34d" },
+  {
+    at: 1,
+    spots: [...row(164, 66, 5, LANDSCAPE), ...row(188, 96, 4, LANDSCAPE), ...row(234, 126, 2, LANDSCAPE)],
+    letter: "A",
+    colour: "#86efac",
+  },
+  {
+    at: 2,
+    spots: [...row(126, 112, 1, PORTRAIT), ...row(126, 160, 1, PORTRAIT), ...row(158, 136, 1, PORTRAIT)],
+    letter: "B",
+    colour: "#7dd3fc",
+  },
+  { at: 3, spots: row(470, 200, 4, PORTRAIT), letter: "C", colour: "#fcd34d" },
 ] as const;
+/** The way a string runs through an array: row by row, turning back at the end of each. */
+function snake(spots: readonly Spot[]): { x: number; y: number }[] {
+  const rows = new Map<number, Spot[]>();
+  for (const p of spots) rows.set(p.y, [...(rows.get(p.y) ?? []), p]);
+  return [...rows.entries()]
+    .sort(([a], [b]) => a - b)
+    .flatMap(([, r], i) => (i % 2 ? [...r].sort((p, q) => q.x - p.x) : [...r].sort((p, q) => p.x - q.x)))
+    .map((p) => ({ x: p.x + p.w / 2, y: p.y + p.h / 2 }));
+}
 
 /** The steps of the loop, each with the line the picture shows while it happens. */
 const STEPS: { at: number; text: string; status: FeatureStatus; icon: typeof Sparkles }[] = [
@@ -102,7 +126,7 @@ interface QuoteLine {
 
 /** The quote at a step, line by line, with example prices. */
 function quoteAt(step: number): QuoteLine[] {
-  const panels = step >= 3 ? 18 : step >= 2 ? 14 : step >= 1 ? 8 : 0;
+  const panels = step >= 3 ? 18 : step >= 2 ? 14 : step >= 1 ? 11 : 0;
   if (!panels) return [];
   const counted = Math.min(step, 3);
   const kw = (panels * WATTS) / 1000;
@@ -181,17 +205,9 @@ export function AutomationDemo() {
       >
         <div className="relative overflow-hidden rounded-lg">
           <svg viewBox="0 0 640 400" className="block w-full">
-            {/* A made-up home from above: lawn, a drive, a gabled roof and a flat-roofed garage. */}
-            <rect width="640" height="400" fill="#4c6b45" />
-            <rect x="0" y="330" width="640" height="70" fill="#8d8f8c" />
-            <rect x="500" y="300" width="80" height="30" fill="#a9a7a1" />
-            <circle cx="70" cy="100" r="44" fill="#3a5636" />
-            <circle cx="80" cy="270" r="30" fill="#41603c" />
-            <rect x="140" y="80" width="150" height="200" fill="#7b8087" />
-            <rect x="290" y="80" width="150" height="200" fill="#8b9097" />
-            <line x1="290" y1="80" x2="290" y2="280" stroke="#5b6067" strokeWidth="2" />
-            <rect x="140" y="80" width="300" height="200" fill="none" stroke="#565b62" strokeWidth="1.5" />
-            <rect x="455" y="200" width="155" height="100" fill="#a2a6a9" stroke="#6f7377" strokeWidth="1.2" />
+            {/* A made-up home from above, drawn to read like an aerial photograph (`aerial-home.tsx`). */}
+            <AerialScene />
+            <PanelDefs />
 
             {ARRAYS.map((a, ai) =>
               a.spots.map((p, i) => {
@@ -203,16 +219,14 @@ export function AutomationDemo() {
                     style={{ transitionDelay: on ? `${i * 90}ms` : "0ms" }}
                     className={clsx("transition-opacity duration-300", on ? "opacity-100" : "opacity-0")}
                   >
-                    {tilted && <rect x={p.x + 2} y={p.y + PANEL.h - 2} width={PANEL.w - 2} height={9} fill="#000" fillOpacity="0.28" />}
-                    <rect
+                    {tilted && <rect x={p.x + 2} y={p.y + p.h - 2} width={p.w - 2} height={9} fill="#000" fillOpacity="0.28" />}
+                    <SolarPanel
                       x={p.x}
                       y={tilted ? p.y - 3 : p.y}
-                      width={PANEL.w}
-                      height={tilted ? PANEL.h - 6 : PANEL.h}
-                      fill={strung ? a.colour : "#0d1219"}
-                      fillOpacity={strung ? 0.7 : 0.9}
-                      stroke={step === a.at || (tilted && step === 4) ? "var(--sun-line)" : strung ? a.colour : "#93a0b1"}
-                      strokeWidth={step === a.at || (tilted && step === 4) ? 1 : 0.5}
+                      w={p.w}
+                      h={tilted ? p.h - 6 : p.h}
+                      tint={strung ? a.colour : undefined}
+                      picked={step === a.at || (tilted && step === 4)}
                     />
                   </g>
                 );
@@ -221,9 +235,7 @@ export function AutomationDemo() {
             {/* The strings, once drawn: a line through each array and its letter. */}
             {strung &&
               ARRAYS.map((a) => {
-                const mids = a.spots.map((p) => ({ x: p.x + PANEL.w / 2, y: p.y + PANEL.h / 2 }));
-                const cols = a.spots.filter((p) => p.y === a.spots[0].y).length;
-                const order = [...mids.slice(0, cols), ...mids.slice(cols).reverse()];
+                const order = snake(a.spots);
                 return (
                   <g key={a.letter}>
                     <polyline
@@ -242,13 +254,13 @@ export function AutomationDemo() {
               })}
             {/* The inverter and battery on the garage wall once added. */}
             {step >= 5 && (
-              <g transform="translate(470 288)">
+              <g transform="translate(446 250)">
                 <rect x="-11" y="-14" width="22" height="28" rx="3" fill="#0b0c0e" stroke="var(--sun-line)" strokeWidth="1.2" />
                 <path d="M1,-8 L-4,1 H0 L-1.5,8 L4,-1.5 H0 Z" fill="var(--sun-line)" />
               </g>
             )}
             {step >= 7 && (
-              <g transform="translate(498 288)">
+              <g transform="translate(446 222)">
                 <rect x="-10" y="-14" width="20" height="28" rx="3" fill="#0b0c0e" stroke="#86efac" strokeWidth="1.2" />
                 <rect x="-5" y="-6" width="10" height="14" rx="1" fill="none" stroke="#86efac" strokeWidth="1" />
               </g>
