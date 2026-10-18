@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Plus, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, FileText, Plus, Trash2, Upload } from "lucide-react";
 import clsx from "clsx";
 import { BLOCKS, isCustom, isFixed, isLocked, moveBlock, type BlockSetting } from "@/lib/domain/design/blocks";
 import {
@@ -10,13 +10,23 @@ import {
   INSTALL_TIMES,
   MAX_MILESTONES,
   MAX_NOTIFY,
+  TERMS_CHOICES,
   type BrandImage,
   type BrandKit,
   type Milestone,
 } from "@/lib/domain/design/brand";
 import { NETCC_INFORMATION, STANDARD_TERMS_VERSION, fillTerms } from "@/lib/domain/design/standard-terms";
 import { designAccount, type DesignAccount } from "@/lib/services/design-account";
-import { addBrandImage, brandImageUrl, loadBrand, removeBrandImage, saveBrand } from "@/lib/services/proposals";
+import {
+  BRAND_TERMS_URL,
+  addBrandImage,
+  brandImageUrl,
+  loadBrand,
+  removeBrandImage,
+  removeTerms,
+  saveBrand,
+  uploadTerms,
+} from "@/lib/services/proposals";
 import { ui } from "./design-shell";
 import { settingsPath } from "./settings-list";
 
@@ -43,9 +53,9 @@ const TITLES: Record<ProposalPart, { title: string; intro: string }> = {
       "Conditions of your own that go on every proposal. A customer going ahead accepts them, so they can't be switched off in the customiser.",
   },
   terms: {
-    title: "Standard terms and conditions",
+    title: "Terms and conditions",
     intro:
-      "A ready-made contract for your proposals, with the New Energy Tech consumer information. Your own special conditions stay separate and come first.",
+      "The terms that go with every proposal: our ready-made contract (the default, with the New Energy Tech consumer information), your own as a PDF, or none. Your special conditions stay separate and come first.",
   },
   emails: {
     title: "Emails",
@@ -124,7 +134,14 @@ export function ProposalSettings({ part }: { part: ProposalPart }) {
       ) : part === "conditions" ? (
         <Conditions brand={brand} save={save} />
       ) : part === "terms" ? (
-        <StandardTerms brand={brand} save={save} />
+        <StandardTerms
+          brand={brand}
+          save={save}
+          onBrand={(next, text) => {
+            setBrand(next);
+            setStatus(text);
+          }}
+        />
       ) : part === "emails" ? (
         <Emails brand={brand} save={save} emailReady={emailReady} />
       ) : (
@@ -481,34 +498,117 @@ function Conditions({ brand, save }: PartProps) {
   );
 }
 
-/** The standard terms: on or off, whether the business says it is an Approved Seller, and the wording as its customers will read it. */
-function StandardTerms({ brand, save }: PartProps) {
+/**
+ * Which terms go with every proposal: ours (the default), the business's own
+ * as a PDF it uploads here, or none. Then whether it says it is an Approved
+ * Seller, and our wording as its customers will read it.
+ */
+function StandardTerms({
+  brand,
+  save,
+  onBrand,
+}: PartProps & { onBrand: (brand: BrandKit, status: { text: string; error?: boolean }) => void }) {
   const terms = fillTerms({ seller: brand.name, customer: "your customer" });
+  const [busy, setBusy] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const upload = async (file: File) => {
+    setBusy(true);
+    const res = await uploadTerms(file);
+    setBusy(false);
+    if (input.current) input.current.value = "";
+    if (res.ok) onBrand(res.brand, { text: "Uploaded. Your proposals now carry your own terms." });
+    else onBrand(brand, { text: res.message, error: true });
+  };
+  const remove = async () => {
+    if (!window.confirm("Take your own terms out? Proposals go back to our standard terms. Proposals already sent keep theirs.")) return;
+    const res = await removeTerms();
+    if (res.ok) onBrand(res.brand, { text: "Removed. Your proposals carry our standard terms again." });
+    else onBrand(brand, { text: res.message, error: true });
+  };
   return (
     <>
-      <section className={section}>
-        <div className="rounded-md border border-sun-line bg-sun p-3 text-sm leading-relaxed text-sun-ink" role="note">
-          <p className="font-medium">A draft that has not had legal review</p>
-          <p className="mt-1">
-            This wording (version {STANDARD_TERMS_VERSION}) has not been checked by a lawyer. You are responsible for the terms you send
-            your customers: have them reviewed before you rely on them, or switch them off and use your own under Special conditions.
+      <section className={section} aria-labelledby="terms-choice">
+        <h2 id="terms-choice" className={h2}>
+          The terms on your proposals
+        </h2>
+        <div className="space-y-2" role="radiogroup" aria-labelledby="terms-choice">
+          {TERMS_CHOICES.map((t) => {
+            const needsFile = t.id === "own" && !brand.ownTerms;
+            return (
+              <label
+                key={t.id}
+                className={clsx(
+                  "flex cursor-pointer items-start gap-3 rounded-md border px-3.5 py-3",
+                  brand.terms === t.id ? "border-ink bg-surface-2" : "border-line hover:border-line-strong",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="terms"
+                  className="mt-1 accent-[var(--primary)]"
+                  checked={brand.terms === t.id}
+                  onChange={() => (needsFile ? input.current?.click() : void save({ terms: t.id }))}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-ink">
+                    {t.name}
+                    {t.id === "standard" && <span className="ml-2 text-xs font-normal text-muted">Default</span>}
+                  </span>
+                  <span className="block text-xs text-muted">{t.blurb}</span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+
+        {/* Your own terms: the file kept, a way to check it, replace it or take it out. */}
+        <div className="rounded-md border border-line p-4">
+          <p className="text-sm font-medium text-ink">Your own terms and conditions</p>
+          {brand.ownTerms ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <a href={BRAND_TERMS_URL} className={clsx(ui.quiet, "h-9 px-3")} download>
+                <FileText className="size-4" aria-hidden /> {brand.ownTerms.name} (PDF)
+              </a>
+              <label htmlFor="own-terms" className={clsx(ui.quiet, "h-9 cursor-pointer px-3", busy && "pointer-events-none text-muted")}>
+                <Upload className="size-4" aria-hidden /> {busy ? "Uploading…" : "Replace"}
+              </label>
+              <button type="button" onClick={() => void remove()} className={clsx(ui.quiet, "h-9 px-3")}>
+                <Trash2 className="size-4" aria-hidden /> Remove
+              </button>
+            </div>
+          ) : (
+            <label htmlFor="own-terms" className={clsx(ui.quiet, "mt-2 cursor-pointer", busy && "pointer-events-none text-muted")}>
+              <Upload className="size-4" aria-hidden /> {busy ? "Uploading…" : "Upload a PDF"}
+            </label>
+          )}
+          <input
+            ref={input}
+            id="own-terms"
+            type="file"
+            accept="application/pdf,.pdf"
+            className="sr-only"
+            disabled={busy}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void upload(file);
+            }}
+          />
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            A PDF up to 10 MB. Uploading it chooses it for your proposals. Your customer downloads it from their proposal, the box they tick
+            to go ahead names it, and the PDF of the proposal says it goes with it. A proposal already sent keeps the terms it was sent
+            with.
           </p>
         </div>
-        <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink">
-          <input
-            type="checkbox"
-            className="mt-0.5 size-4 accent-[var(--primary)]"
-            checked={brand.standardTerms}
-            onChange={(e) => void save({ standardTerms: e.target.checked })}
-          />
-          <span>
-            <span className="block font-medium">Put the standard terms and conditions on every proposal</span>
-            <span className="block text-xs text-muted">
-              On the proposal they sit at the end behind &ldquo;Read the terms and conditions&rdquo;, and the box a customer ticks to go
-              ahead says they accept them. The PDF prints them in full. A proposal already sent keeps the terms it was sent with.
-            </span>
-          </span>
-        </label>
+      </section>
+
+      <section className={section}>
+        <div className="rounded-md border border-sun-line bg-sun p-3 text-sm leading-relaxed text-sun-ink" role="note">
+          <p className="font-medium">Our standard terms are a draft that has not had legal review</p>
+          <p className="mt-1">
+            This wording (version {STANDARD_TERMS_VERSION}) has not been checked by a lawyer. You are responsible for the terms you send
+            your customers: have them reviewed before you rely on them, or use your own.
+          </p>
+        </div>
         <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink">
           <input
             type="checkbox"
@@ -723,7 +823,7 @@ function Customiser({
                 {/* The standard terms are never reworded here: their own page switches them on or off. */}
                 {isFixed(block.id) ? (
                   <Link href={settingsPath("terms")} className={clsx(ui.quiet, "h-9 px-3")}>
-                    {brand.standardTerms ? "On" : "Off"}
+                    {brand.terms === "own" ? "Your own" : brand.terms === "standard" ? "Ours" : "Off"}
                   </Link>
                 ) : (
                   <button

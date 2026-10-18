@@ -19,8 +19,105 @@ export const TEMPLATES = [
   { id: "classic", name: "Classic", blurb: "A photo across the top, then each part in turn." },
   { id: "compact", name: "Compact", blurb: "The system, the saving and the price first, on one screen." },
   { id: "bold", name: "Bold", blurb: "Opens on a full page in your colour." },
+  { id: "minimal", name: "Minimal", blurb: "Plenty of white space, fine lines and big type. No boxes." },
+  { id: "split", name: "Split", blurb: "Your photo beside the title, and the headings down the left." },
 ] as const;
 export type TemplateId = (typeof TEMPLATES)[number]["id"];
+
+/**
+ * How each template is set, beyond how it opens: the parts in boxes or between
+ * fine lines, the headings above each part or down the left, and the parts
+ * numbered or not. The page and the PDF both read it, so they agree.
+ */
+export interface TemplateLook {
+  /** How it opens: under a photo, the three figures first, on a block of the main colour, the title alone, or photo and title side by side. */
+  cover: "photo" | "figures" | "colour" | "plain" | "split";
+  /** Each part in a box, or between fine lines with no box. */
+  parts: "boxed" | "lined";
+  /** Each part's heading above it, or in a column on its left (on a wide screen). */
+  headings: "above" | "side";
+  /** "01", "02" … before each heading. */
+  numbered: boolean;
+}
+
+export const TEMPLATE_LOOK: Record<TemplateId, TemplateLook> = {
+  classic: { cover: "photo", parts: "boxed", headings: "above", numbered: false },
+  compact: { cover: "figures", parts: "boxed", headings: "above", numbered: false },
+  bold: { cover: "colour", parts: "boxed", headings: "above", numbered: false },
+  minimal: { cover: "plain", parts: "lined", headings: "above", numbered: true },
+  split: { cover: "split", parts: "boxed", headings: "side", numbered: false },
+};
+
+/** A template's look, for any id (an unknown one reads as Classic). */
+export const lookOf = (template: string): TemplateLook => TEMPLATE_LOOK[template as TemplateId] ?? TEMPLATE_LOOK.classic;
+
+/** The box a part sits in, as values the page's styles read: a card, or no box with a fine line above. */
+export function lookVars(template: string): Record<string, string> {
+  return lookOf(template).parts === "lined"
+    ? { "--part-bg": "transparent", "--part-border": "0px", "--part-radius": "0px", "--part-pad-x": "0px", "--part-pad-x-sm": "0px" }
+    : {
+        "--part-bg": "var(--surface)",
+        "--part-border": "1px",
+        "--part-radius": "0.75rem",
+        "--part-pad-x": "1.25rem",
+        "--part-pad-x-sm": "1.75rem",
+      };
+}
+
+/** How the year's output is drawn on a proposal: the same figures each way. */
+export const CHART_STYLES = [
+  { id: "bars", name: "Bars", blurb: "A bar for each month." },
+  { id: "line", name: "Line", blurb: "One line through the year." },
+  { id: "area", name: "Shaded area", blurb: "A line with the area under it filled." },
+  { id: "table", name: "Table of figures", blurb: "Each month's kWh written out, no chart." },
+] as const;
+export type ChartStyle = (typeof CHART_STYLES)[number]["id"];
+
+/** What a proposal's terms and conditions are: ours (the default), the business's own as a PDF it has uploaded, or none. */
+export const TERMS_CHOICES = [
+  { id: "standard", name: "Our standard terms", blurb: "Written for solar sales in Australia, with your name filled in. Recommended." },
+  { id: "own", name: "Your own terms", blurb: "Upload your terms and conditions as a PDF. It goes with every proposal." },
+  { id: "none", name: "No terms", blurb: "Only your special conditions, if you have any." },
+] as const;
+export type TermsChoice = (typeof TERMS_CHOICES)[number]["id"];
+
+/** The business's own terms and conditions, as uploaded: the file's id and the name it is shown under. Never its bytes. */
+export interface TermsFile {
+  id: string;
+  name: string;
+}
+
+export const TERMS_LIMITS = { uploadBytes: 10 * 1024 * 1024 } as const;
+export const TERMS_TOO_BIG = "That file is too large. Use a PDF under 10 MB.";
+export const TERMS_WRONG = "That file isn't a PDF. Save your terms and conditions as a PDF and upload that.";
+export const TERMS_NEEDS_FILE = "Upload your terms and conditions as a PDF first.";
+
+/** Whether a file is a whole PDF, by its own first and last bytes (never its name or what the browser says it is). */
+export function isPdf(bytes: Uint8Array): boolean {
+  const text = (part: Uint8Array) => String.fromCharCode(...part);
+  if (text(bytes.slice(0, 5)) !== "%PDF-") return false;
+  // A whole PDF ends with %%EOF, sometimes followed by a line break or a little padding.
+  return text(bytes.slice(Math.max(0, bytes.length - 1024))).includes("%%EOF");
+}
+
+/** The name a terms file is shown under: the uploaded file's name without its folder or ".pdf", tidied; else a plain name. */
+export function termsFileName(raw: unknown): string {
+  const base = typeof raw === "string" ? (raw.split(/[\\/]/).pop() ?? "") : "";
+  const name = base
+    .replace(/\.pdf$/i, "")
+    .replace(/[\u0000-\u001f\u007f<>"]/g, " ")
+    .replace(/_+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+  return name || "Terms and conditions";
+}
+
+/** A terms file as kept on the kit, or null when what is there isn't one. */
+function readTermsFile(raw: unknown): TermsFile | null {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return typeof r.id === "string" && /^doc_[a-f0-9]{8,64}$/.test(r.id) ? { id: r.id, name: termsFileName(r.name) } : null;
+}
 
 /** The page a proposal is set on: its background, its cards, its text. The business's own two colours go on top. */
 export const PALETTES = [
@@ -199,6 +296,12 @@ export interface BrandKit {
   emailReplies: boolean;
   /** Whether every proposal carries RENUABL's standard terms and conditions (`standard-terms.ts`). On until the business says otherwise. */
   standardTerms: boolean;
+  /** Which terms go with a proposal: ours (the default), the business's own uploaded PDF, or none. `standardTerms` follows it. */
+  terms: TermsChoice;
+  /** The business's own terms and conditions, once uploaded. Set only by the upload (`withOwnTerms`), never by a save from the browser. */
+  ownTerms: TermsFile | null;
+  /** How the year's output is drawn on its proposals. */
+  chart: ChartStyle;
   /** The business says it is a New Energy Tech Approved Seller. We don't check it: it only chooses which line the consumer information carries. */
   netccApproved: boolean;
   /** The proposal's blocks: which show, in what order, with what heading, words and picture. */
@@ -237,6 +340,9 @@ export function defaultBrand(businessName: string): BrandKit {
     notify: [],
     emailReplies: true,
     standardTerms: true,
+    terms: "standard",
+    ownTerms: null,
+    chart: "bars",
     netccApproved: false,
     blocks: defaultBlocks(),
     template: "classic",
@@ -411,6 +517,39 @@ export function cleanNotify(raw: unknown): Cleaned<string[]> {
 }
 
 /** A brand kit as sent by a browser, laid over the one the business has: anything not sent stays as it is. */
+/**
+ * Which terms a save leaves the kit with. `terms` when it is sent; else the
+ * older on/off switch (`standardTerms`: off means no terms, unless the
+ * business's own were chosen); else as it was. A kit saved before the choice
+ * existed reads from that switch. The business's own terms only once a file
+ * is there to send.
+ */
+function chooseTerms(r: Bag, current: BrandKit): Cleaned<TermsChoice> {
+  let choice: TermsChoice = current.terms ?? (current.standardTerms === false ? "none" : "standard");
+  if (TERMS_CHOICES.some((t) => t.id === r.terms)) choice = r.terms as TermsChoice;
+  else if (typeof r.standardTerms === "boolean") choice = r.standardTerms ? "standard" : choice === "own" ? "own" : "none";
+  if (choice === "own" && !current.ownTerms)
+    return "terms" in r ? { ok: false, message: TERMS_NEEDS_FILE } : { ok: true, value: "standard" };
+  return { ok: true, value: choice };
+}
+
+/**
+ * The kit with the business's own terms file put in (and chosen), or taken
+ * out. Taking it out while it was the terms in use goes back to ours, the
+ * default, rather than leaving proposals with none.
+ */
+/** The terms a kit's proposals carry: its own when chosen and uploaded, else ours while they are on, else none. */
+export function termsInUse(kit: Pick<BrandKit, "terms" | "ownTerms" | "standardTerms">): TermsChoice {
+  if (kit.terms === "own" && kit.ownTerms) return "own";
+  return kit.standardTerms === false || kit.terms === "none" ? "none" : "standard";
+}
+
+export function withOwnTerms(kit: BrandKit, file: TermsFile | null): BrandKit {
+  if (file) return { ...kit, ownTerms: { id: file.id, name: termsFileName(file.name) }, terms: "own", standardTerms: false };
+  const terms = kit.terms === "own" ? "standard" : kit.terms;
+  return { ...kit, ownTerms: null, terms, standardTerms: terms === "standard" };
+}
+
 export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit> {
   const r: Bag = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Bag) : {};
   const sent = (key: keyof BrandKit) => key in r;
@@ -442,6 +581,8 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
   }
   const notify = sent("notify") ? cleanNotify(r.notify) : { ok: true as const, value: current.notify };
   if (!notify.ok) return notify;
+  const terms = chooseTerms(r, current);
+  if (!terms.ok) return terms;
 
   return {
     ok: true,
@@ -470,7 +611,10 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
       notify: notify.value,
       // A switch is only ever moved by an explicit true or false.
       emailReplies: typeof r.emailReplies === "boolean" ? r.emailReplies : current.emailReplies,
-      standardTerms: typeof r.standardTerms === "boolean" ? r.standardTerms : current.standardTerms,
+      standardTerms: terms.value === "standard",
+      terms: terms.value,
+      ownTerms: current.ownTerms,
+      chart: CHART_STYLES.some((c) => c.id === r.chart) ? (r.chart as ChartStyle) : current.chart,
       netccApproved: typeof r.netccApproved === "boolean" ? r.netccApproved : current.netccApproved,
       blocks: sent("blocks") ? cleanBlocks(r.blocks) : current.blocks,
       template: TEMPLATES.some((t) => t.id === r.template) ? (r.template as TemplateId) : current.template,
@@ -486,8 +630,12 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
 
 /** A kit read back from the database: the same checks, on top of the starting kit, so an old or damaged row still reads. */
 export function readBrandKit(saved: unknown, businessName: string): BrandKit {
-  const start = defaultBrand(businessName);
-  const cleaned = cleanBrandKit(saved, start);
+  // The kit's own terms file is carried over first: a save from the browser can never set it, but a kit read back keeps it.
+  const ownTerms = readTermsFile(saved && typeof saved === "object" ? (saved as Bag).ownTerms : null);
+  const start = { ...defaultBrand(businessName), ownTerms };
+  // Its own terms chosen but the file gone (or damaged): our terms, rather than the whole kit set aside.
+  const bag = saved && typeof saved === "object" ? (saved as Bag) : {};
+  const cleaned = cleanBrandKit(!ownTerms && bag.terms === "own" ? { ...bag, terms: "standard" } : saved, start);
   if (!cleaned.ok) return start;
   // A kit saved before blocks could be arranged has none: it gets the usual ones (`cleanBlocks` fills in any that are missing).
   return { ...cleaned.value, blocks: cleanBlocks(cleaned.value.blocks) };

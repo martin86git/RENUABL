@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, Copy, ExternalLink, FileText, Send, Trash2, Upload, X } from "lucide-react";
 import clsx from "clsx";
 import {
+  CHART_STYLES,
   FONTS,
   IMAGE_LIMITS,
   PALETTES,
@@ -19,6 +20,7 @@ import type { ProposalChoice, ProposalState, ProposalStatus, ProposalView } from
 import { firstTemplate } from "@/lib/domain/design/send-message";
 import { dollars, shortDate } from "@/lib/services/crm";
 import {
+  BRAND_TERMS_URL,
   addBrandImage,
   brandImageUrl,
   fullLink,
@@ -35,6 +37,7 @@ import { PATHS, ui } from "./design-shell";
 import { ChatDock, ChatGreeting, DealChat, useCustomerChat } from "./chat-panel";
 import { useDesignAccount } from "./design-account";
 import { DepositLine } from "./deposit-panel";
+import { ChartThumb, TemplateThumb } from "./proposal-thumbs";
 import { ProposalPage } from "./proposal-view";
 
 const STATE_WORDS: Record<ProposalState, string> = {
@@ -305,10 +308,15 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                   <input
                     type="radio"
                     name="template"
-                    className="mt-1 accent-[var(--primary)]"
+                    className="sr-only"
                     checked={choice.template === t.id}
                     onChange={() => change({ template: t.id })}
                   />
+                  {view && (
+                    <span className="w-12 shrink-0">
+                      <TemplateThumb template={t.id} theme={view.theme} />
+                    </span>
+                  )}
                   <span>
                     <span className="block text-sm font-medium text-ink">{t.name}</span>
                     <span className="block text-xs text-muted">{t.blurb}</span>
@@ -421,6 +429,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                 image: brandImageUrl,
                 roof: `/api/design/roof?lat=${view.roof.lat.toFixed(6)}&lng=${view.roof.lng.toFixed(6)}`,
                 pdf: null,
+                terms: BRAND_TERMS_URL,
               }}
               greeting={<ChatGreeting chat={previewChat} />}
               chat={<ChatDock chat={previewChat} />}
@@ -673,20 +682,62 @@ export function BrandSettings({ part }: { part: "who" | "look" | "words" }) {
               ))}
             </select>
           </label>
-          <label className={ui.label}>
-            Usual template
-            <select
-              className={clsx(ui.input, "mt-1.5 appearance-auto")}
-              value={brand.template}
-              onChange={(e) => void save({ template: e.target.value as BrandKit["template"] })}
-            >
+          <fieldset className="sm:col-span-2">
+            <legend className={ui.label}>Design</legend>
+            <p className="mt-0.5 text-xs text-muted">
+              The one your proposals start with. You can pick another for any proposal before you send it.
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-5">
               {TEMPLATES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}: {t.blurb}
-                </option>
+                <label
+                  key={t.id}
+                  className={clsx(
+                    "cursor-pointer rounded-lg border p-2 text-left",
+                    brand.template === t.id ? "border-ink ring-1 ring-ink" : "border-line hover:border-line-strong",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="brand-template"
+                    className="sr-only"
+                    checked={brand.template === t.id}
+                    onChange={() => void save({ template: t.id })}
+                  />
+                  <TemplateThumb template={t.id} theme={brand} />
+                  <span className="mt-2 block text-sm font-medium text-ink">{t.name}</span>
+                  <span className="block text-[11.5px] leading-snug text-muted">{t.blurb}</span>
+                </label>
               ))}
-            </select>
-          </label>
+            </div>
+          </fieldset>
+          <fieldset className="sm:col-span-2">
+            <legend className={ui.label}>Charts</legend>
+            <p className="mt-0.5 text-xs text-muted">
+              How the year&apos;s output is drawn. With any chart, the bill now and with the system is shown as two bars.
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {CHART_STYLES.map((c) => (
+                <label
+                  key={c.id}
+                  className={clsx(
+                    "cursor-pointer rounded-lg border p-2 text-left",
+                    brand.chart === c.id ? "border-ink ring-1 ring-ink" : "border-line hover:border-line-strong",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="brand-chart"
+                    className="sr-only"
+                    checked={brand.chart === c.id}
+                    onChange={() => void save({ chart: c.id })}
+                  />
+                  <ChartThumb style={c.id} theme={brand} />
+                  <span className="mt-2 block text-sm font-medium text-ink">{c.name}</span>
+                  <span className="block text-[11.5px] leading-snug text-muted">{c.blurb}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label className={ui.label}>
             Page
             <select

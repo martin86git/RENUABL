@@ -59,6 +59,17 @@ export const removeBrandImage = (id: string) =>
 /** Where one of the business's own pictures is, for its own screens (the brand page, the preview). */
 export const brandImageUrl = (id: string) => `/api/design/brand/files/${encodeURIComponent(id)}`;
 
+/** Sends the business's own terms and conditions (a PDF). The server checks it is one, keeps it, and chooses it for its proposals. */
+export function uploadTerms(file: File) {
+  const form = new FormData();
+  form.set("file", file);
+  return ask<{ brand: BrandKit }>("/api/design/brand/terms", { method: "POST", form });
+}
+/** Takes the business's own terms out: its proposals go back to our standard terms if they were using them. */
+export const removeTerms = () => ask<{ brand: BrandKit }>("/api/design/brand/terms", { method: "DELETE" });
+/** Where the business's own terms are, for its own screens. */
+export const BRAND_TERMS_URL = "/api/design/brand/terms";
+
 // ---------------------------------------------------------------------------
 // A job's proposal
 // ---------------------------------------------------------------------------
@@ -149,9 +160,10 @@ export const acceptProposal = (token: string, name: string, agree: boolean, opti
 /** The customer saying they have paid the deposit, and how. Kept as what they said: it is not a payment. */
 export const sayPaid = (token: string, way: PaidWay) => ask<OpenedProposal>(link(token), { method: "POST", body: { action: "paid", way } });
 
-/** Where a proposal's pictures, its roof from above and its PDF are, by its private link. */
+/** Where a proposal's pictures, its roof from above, its PDF and the business's own terms are, by its private link. */
 export const proposalUrls = (token: string) => ({
   image: (id: string) => `${link(token)}/file/${encodeURIComponent(id)}`,
   roof: `${link(token)}/roof`,
   pdf: `${link(token)}/pdf`,
+  terms: `${link(token)}/terms`,
 });

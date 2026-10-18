@@ -25,7 +25,7 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
       { slug: "payment", label: "Payment terms and bank details" },
       { slug: "warranty", label: "Workmanship warranty" },
       { slug: "conditions", label: "Special conditions" },
-      { slug: "terms", label: "Standard terms and conditions" },
+      { slug: "terms", label: "Terms and conditions" },
       { slug: "installation-time", label: "Installation time" },
       { slug: "signed-emails", label: "Emails for proposals and chat" },
     ],

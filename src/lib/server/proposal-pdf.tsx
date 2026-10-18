@@ -4,18 +4,20 @@
  *
  * It is made from the customer's copy of the proposal (`ProposalView`) and
  * nothing else, so it cannot carry a cost, a margin or a product code: none
- * is in what it is given. One layout for every template (the templates
- * differ on the page, not in the file), in the business's own colour with
- * its logo, on A4: the cover, then the blocks in the order the business has
+ * is in what it is given. Each design opens as it does on the page (a band
+ * of the business's colour, the title alone, or a photo beside it), sets its
+ * parts' headings the same way (numbered in Minimal, down the left in Split)
+ * and draws the year's output in the chart style chosen, in the business's
+ * own colour with its logo, on A4: the cover, then the blocks in the order the business has
  * put them in, as on the page (`view.blocks`). Type is the faces built into
  * every PDF (Helvetica, and Times for "Editorial" headings): no font file is
  * embedded. The roof is drawn as the layout of the panels on a plain
  * ground; the picture from above stays on the page. Every estimate carries
  * the same wording as the page.
  */
-import { Document, Image, Page, Polygon, Rect, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Image, Page, Polygon, Polyline, Rect, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
-import { contrast, inkOn, shownAbn, shownBsb, shownWebsite } from "@/lib/domain/design/brand";
+import { contrast, inkOn, lookOf, shownAbn, shownBsb, shownWebsite, type ChartStyle } from "@/lib/domain/design/brand";
 import { money } from "@/lib/domain/design/deposit";
 import {
   BANK_NOTE,
@@ -97,19 +99,37 @@ function RoofDrawing({ panels, colour }: { panels: number[][]; colour: string })
   );
 }
 
-/** A year month by month as bars: each month's estimate against the best month. */
-function Months({ kwh, colour }: { kwh: number[]; colour: string }) {
+/** A year month by month, as on the page: bars, a line, a shaded area, or each month's figure written out. */
+function Months({ kwh, colour, style = "bars" }: { kwh: number[]; colour: string; style?: ChartStyle }) {
   const W = 507;
   const H = 90;
   const top = Math.max(1, ...kwh);
   const slot = W / 12;
+  if (style === "table")
+    return (
+      <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+        {kwh.map((m, i) => (
+          <View key={i} style={{ width: "16.66%", paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: LINE }}>
+            <Text style={s.small}>{MONTHS[i]}</Text>
+            <Text>{m.toLocaleString("en-AU")} kWh</Text>
+          </View>
+        ))}
+      </View>
+    );
+  const at = kwh.map((m, i) => [i * slot + slot / 2, H - 4 - (m / top) * (H - 10)] as const);
+  const line = at.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   return (
     <View>
       <Svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-        {kwh.map((m, i) => {
-          const h = Math.max(1, (m / top) * (H - 4));
-          return <Rect key={i} x={i * slot + 6} y={H - h} width={slot - 12} height={h} fill={colour} />;
-        })}
+        {style === "bars" &&
+          kwh.map((m, i) => {
+            const h = Math.max(1, (m / top) * (H - 4));
+            return <Rect key={i} x={i * slot + 6} y={H - h} width={slot - 12} height={h} fill={colour} />;
+          })}
+        {style === "area" && (
+          <Polygon points={`${line} ${at[11][0].toFixed(1)},${H} ${at[0][0].toFixed(1)},${H}`} fill={colour} fillOpacity={0.18} />
+        )}
+        {style !== "bars" && <Polyline points={line} fill="none" stroke={colour} strokeWidth={1.8} />}
       </Svg>
       <View style={{ flexDirection: "row" }}>
         {MONTHS.map((m) => (
@@ -164,6 +184,22 @@ function ProposalDocument({
       </Text>
       <Text render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
     </View>
+  );
+
+  const look = lookOf(view.template);
+  const headingFace = view.theme.font === "editorial" ? "Times-Bold" : "Helvetica-Bold";
+  /** The proposal's title, in the colours it sits on. */
+  const titleBlock = (ink: string, soft: string, size?: number) => (
+    <>
+      <Text style={[s.eyebrow, { color: soft }]}>Proposal</Text>
+      <Text style={[s.h1, { color: ink, fontFamily: headingFace }, size ? { fontSize: size } : {}]}>
+        {view.title} for {view.customer.name}
+      </Text>
+      <Text style={{ marginTop: 8, color: ink }}>{view.customer.address}</Text>
+      <Text style={{ marginTop: 14, fontSize: 9, color: soft }}>
+        Prepared {day(view.publishedAt)}. The price stands until {day(view.validUntil)}.
+      </Text>
+    </>
   );
 
   // Each block's own content, by its id, as on the page: null when this proposal has nothing for it.
@@ -223,7 +259,7 @@ function ProposalDocument({
     production: () =>
       view.production ? (
         <View wrap={false}>
-          <Months kwh={view.production.monthlyKwh} colour={accent} />
+          <Months kwh={view.production.monthlyKwh} colour={accent} style={view.theme.chart ?? "bars"} />
           <Text style={[s.small, { marginTop: 6 }]}>
             About {view.production.yearKwh.toLocaleString("en-AU")} kWh a year. {PRODUCTION_NOTE}
           </Text>
@@ -369,6 +405,13 @@ function ProposalDocument({
     ),
     // The standard terms and conditions, printed in full: the details of this agreement, the consumer information, the terms.
     terms: () => {
+      if (view.ownTerms)
+        return (
+          <Text>
+            {b.name}&apos;s terms and conditions go with this proposal, in their own document: {view.ownTerms.name} (PDF). It can be
+            downloaded from the proposal&apos;s page. Going ahead with this proposal accepts them.
+          </Text>
+        );
       const contract = view.contract;
       if (!contract) return null;
       const details = contractDetails(view);
@@ -446,20 +489,31 @@ function ProposalDocument({
           )}
           <Text style={s.small}>{contact}</Text>
         </View>
-        {cover && (
-          // eslint-disable-next-line jsx-a11y/alt-text -- a PDF image has no alt attribute
-          <Image src={cover} style={{ marginTop: 20, height: 190, width: "100%", objectFit: "cover", borderRadius: 4 }} />
+        {look.cover === "split" ? (
+          // A photo (or a block of the colour) beside the title.
+          <View style={{ marginTop: 26, flexDirection: "row", gap: 18, alignItems: "stretch" }}>
+            {cover ? (
+              // eslint-disable-next-line jsx-a11y/alt-text -- a PDF image has no alt attribute
+              <Image src={cover} style={{ width: "45%", height: 220, objectFit: "cover", borderRadius: 4 }} />
+            ) : (
+              <View style={{ width: "45%", height: 220, backgroundColor: colour, borderRadius: 4 }} />
+            )}
+            <View style={{ flex: 1, justifyContent: "center" }}>{titleBlock(INK, MUTED)}</View>
+          </View>
+        ) : look.cover === "plain" ? (
+          // The title alone, larger, over a fine line.
+          <View style={{ marginTop: 40, paddingBottom: 22, borderBottomWidth: 0.5, borderBottomColor: LINE }}>
+            {titleBlock(INK, MUTED, 34)}
+          </View>
+        ) : (
+          <>
+            {cover && look.cover === "photo" && (
+              // eslint-disable-next-line jsx-a11y/alt-text -- a PDF image has no alt attribute
+              <Image src={cover} style={{ marginTop: 20, height: 190, width: "100%", objectFit: "cover", borderRadius: 4 }} />
+            )}
+            <View style={{ marginTop: 26, backgroundColor: colour, borderRadius: 4, padding: 22 }}>{titleBlock(onColour, onColour)}</View>
+          </>
         )}
-        <View style={{ marginTop: 26, backgroundColor: colour, borderRadius: 4, padding: 22 }}>
-          <Text style={[s.eyebrow, { color: onColour }]}>Proposal</Text>
-          <Text style={[s.h1, { color: onColour, fontFamily: view.theme.font === "editorial" ? "Times-Bold" : "Helvetica-Bold" }]}>
-            {view.title} for {view.customer.name}
-          </Text>
-          <Text style={{ marginTop: 8, color: onColour }}>{view.customer.address}</Text>
-          <Text style={{ marginTop: 14, fontSize: 9, color: onColour }}>
-            Prepared {day(view.publishedAt)}. The price stands until {day(view.validUntil)}.
-          </Text>
-        </View>
         {view.note ? <Text style={{ marginTop: 18 }}>{view.note}</Text> : null}
         {coverBlock && (coverBlock.words || coverBlock.image) ? <View style={{ marginTop: 14 }}>{own(coverBlock)}</View> : null}
         <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
@@ -482,15 +536,27 @@ function ProposalDocument({
       <Page size="A4" style={s.page}>
         {blocks
           .filter((block) => block.id !== "cover")
-          .map((block, i) => {
-            const inner = content[block.id]();
-            const hasOwn = Boolean(block.words || block.image);
-            if (!inner && !hasOwn) return null;
+          .map((block) => ({ block, inner: content[block.id](), hasOwn: Boolean(block.words || block.image) }))
+          .filter(({ inner, hasOwn }) => inner || hasOwn)
+          .map(({ block, inner, hasOwn }, i) => {
             const title = blockHeading(block, block.id === "about" ? `About ${b.name}` : block.id === "accept" ? "Going ahead" : "");
+            const numbered = look.numbered ? `${String(i + 1).padStart(2, "0")}   ` : "";
+            const lined = look.parts === "lined" && i > 0 ? { borderTopWidth: 0.5, borderTopColor: LINE, paddingTop: 14 } : {};
+            if (look.headings === "side")
+              return (
+                <View key={block.id} style={[i === 0 ? {} : s.section, { flexDirection: "row", gap: 14 }]}>
+                  <View style={{ width: "26%" }}>{title ? <Text style={[heading, { fontSize: 12 }]}>{title}</Text> : null}</View>
+                  <View style={{ flex: 1 }}>
+                    {hasOwn ? own(block) : null}
+                    {inner}
+                  </View>
+                </View>
+              );
             return (
-              <View key={block.id} style={i === 0 ? undefined : s.section}>
+              <View key={block.id} style={[i === 0 ? {} : s.section, lined]}>
                 {title ? (
                   <Text style={heading} minPresenceAhead={40}>
+                    {numbered}
                     {title}
                   </Text>
                 ) : null}

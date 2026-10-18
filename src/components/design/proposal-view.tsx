@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Download } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
-import { shownAbn, shownBsb, shownWebsite, themeVars } from "@/lib/domain/design/brand";
+import { lookOf, lookVars, shownAbn, shownBsb, shownWebsite, themeVars, type ChartStyle } from "@/lib/domain/design/brand";
 import {
   BANK_NOTE,
   acceptLine,
@@ -26,6 +26,7 @@ import { money } from "@/lib/domain/design/deposit";
 import { ROOF_IMAGE, metresPerPixel } from "@/lib/domain/design/roof-design";
 
 const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
 /** "3 November 2026" from a day or a moment. A bare day is that day wherever it is read. */
 const day = (iso: string) =>
@@ -36,7 +37,13 @@ const day = (iso: string) =>
     timeZone: iso.length === 10 ? "UTC" : "Australia/Melbourne",
   });
 
-const card = "rounded-xl border border-line bg-surface p-5 sm:p-7";
+/**
+ * A part of the proposal in its box. What the box is comes from the template (`lookVars`): a card with a border all
+ * round, or (Minimal) no box at all, only a fine line above. The defaults are the card, for anything drawn outside a
+ * proposal page.
+ */
+const card =
+  "rounded-[var(--part-radius,0.75rem)] border-solid border-line bg-[color:var(--part-bg,var(--surface))] [border-width:1px_var(--part-border,1px)_var(--part-border,1px)] px-[var(--part-pad-x,1.25rem)] py-5 sm:px-[var(--part-pad-x-sm,1.75rem)] sm:py-7";
 const eyebrow = "text-[11px] font-medium uppercase tracking-[0.16em] text-muted";
 // Headings are set in the face the business chose (`--proposal-heading`, from `themeVars`).
 const h2 = "text-[22px] leading-tight tracking-tight text-ink [font-family:var(--proposal-heading)] sm:text-[26px]";
@@ -53,6 +60,8 @@ export interface ProposalUrls {
   roof: string | null;
   /** Null in a preview: there is no file until it is published. */
   pdf: string | null;
+  /** The business's own terms and conditions, when the proposal carries them. */
+  terms?: string | null;
 }
 
 /** What the customer can do from the page. Left out in the business's preview, where the buttons are shown but do nothing. */
@@ -101,9 +110,48 @@ function Roof({ view, src }: { view: ProposalView; src: string | null }) {
   );
 }
 
-/** The year month by month: each month's estimate as a bar against the best month. */
-function Months({ kwh }: { kwh: number[] }) {
+/** The year month by month, drawn the way the business chose: bars, a line, a shaded area, or the figures written out. */
+function Months({ kwh, style = "bars" }: { kwh: number[]; style?: ChartStyle }) {
   const top = Math.max(1, ...kwh);
+  if (style === "table")
+    return (
+      <dl className="grid grid-cols-3 gap-x-4 gap-y-2 sm:grid-cols-6">
+        {kwh.map((m, i) => (
+          <div key={i} className="border-b border-line pb-1.5">
+            <dt className="text-[11px] uppercase tracking-[0.12em] text-muted">{MONTH_NAMES[i]}</dt>
+            <dd className="text-[15px] text-ink [font-variant-numeric:tabular-nums]">{m.toLocaleString("en-AU")} kWh</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  if (style === "line" || style === "area") {
+    // 12 points across a 360 × 120 frame, the best month at the top.
+    const [w, h] = [360, 120];
+    const pts = kwh.map((m, i) => [(i + 0.5) * (w / 12), h - 6 - (m / top) * (h - 16)] as const);
+    const path = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+    return (
+      <div role="img" aria-label="Estimated output for each month of the year">
+        <svg viewBox={`0 0 ${w} ${h}`} className="block h-36 w-full" preserveAspectRatio="none">
+          {style === "area" && (
+            <path d={`${path} L${pts[11][0].toFixed(1)},${h} L${pts[0][0].toFixed(1)},${h} Z`} fill="var(--primary)" opacity={0.18} />
+          )}
+          <path d={path} fill="none" stroke="var(--primary)" strokeWidth={2.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+          {pts.map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r={2.6} fill="var(--primary)">
+              <title>{`${kwh[i].toLocaleString("en-AU")} kWh`}</title>
+            </circle>
+          ))}
+        </svg>
+        <div className="mt-1.5 grid grid-cols-12">
+          {MONTHS.map((m, i) => (
+            <span key={i} className="text-center text-[10.5px] text-muted">
+              {m}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex h-36 items-end gap-1.5 sm:gap-2.5" role="img" aria-label="Estimated output for each month of the year">
       {kwh.map((m, i) => (
@@ -116,6 +164,35 @@ function Months({ kwh }: { kwh: number[] }) {
           <span className="text-[10.5px] text-muted">{MONTHS[i]}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** A year's bill now and with the system, as two bars against each other. Estimates, as the figures under them say. */
+function BillBars({ now, after }: { now: number; after: number }) {
+  const top = Math.max(1, now, after);
+  const bar = (label: string, value: number, strong?: boolean) => (
+    <div>
+      <div className="flex items-baseline justify-between text-[13px]">
+        <span className="text-muted">{label}</span>
+        <span className="text-ink [font-variant-numeric:tabular-nums]">{dollars(value)}</span>
+      </div>
+      <div className="mt-1.5 h-3 rounded-full bg-[color:var(--line)]">
+        <div
+          className={clsx("h-3 rounded-full", strong ? "bg-primary" : "bg-[color:var(--muted)]")}
+          style={{ width: `${Math.max(2, (value / top) * 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+  return (
+    <div
+      className="mb-4 space-y-3"
+      role="img"
+      aria-label={`A year's bill: about ${dollars(now)} now, about ${dollars(after)} with this system`}
+    >
+      {bar("Now", now)}
+      {bar("With this system", after, true)}
     </div>
   );
 }
@@ -266,15 +343,18 @@ export interface ProposalPageProps {
  */
 export function ProposalPage({ view, state, accepted, urls, actions, greeting, chat, deposit, choice }: ProposalPageProps) {
   const b = view.business;
-  const bold = view.template === "bold";
-  const compact = view.template === "compact";
+  const look = lookOf(view.template);
+  const bold = look.cover === "colour";
+  const chart = view.theme.chart ?? "bars";
   const contact = [b.phone, b.email, b.website && shownWebsite(b.website)].filter(Boolean);
   const title = (
     <>
       <p className={clsx(eyebrow, bold && "text-[color:var(--primary-ink)] opacity-80")}>Proposal · {day(view.publishedAt)}</p>
       <h1
         className={clsx(
-          "mt-3 text-[32px] leading-[1.1] tracking-tight [font-family:var(--proposal-heading)] sm:text-[44px]",
+          "mt-3 leading-[1.1] tracking-tight [font-family:var(--proposal-heading)]",
+          // Minimal leans on its type: larger and lighter, with the space around it doing the work.
+          look.cover === "plain" ? "text-[38px] font-light sm:text-[60px] sm:leading-[1.02]" : "text-[32px] sm:text-[44px]",
           bold ? "text-[color:var(--primary-ink)]" : "text-ink",
         )}
       >
@@ -318,7 +398,7 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
             a year.
           </p>
           <div className="mt-5">
-            <Months kwh={view.production.monthlyKwh} />
+            <Months kwh={view.production.monthlyKwh} style={chart} />
           </div>
           <p className={clsx(fine, "mt-4")}>{PRODUCTION_NOTE}</p>
         </div>
@@ -328,6 +408,7 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
     bill: () =>
       view.bill ? (
         <div className={card}>
+          {chart !== "table" && <BillBars now={view.bill.now} after={view.bill.after} />}
           <Line label="A year's bill now (estimate)" value={dollars(view.bill.now)} />
           <Line label="A year's bill with this system (estimate)" value={dollars(view.bill.after)} />
           <Line label="Estimated saving a year" value={`about ${dollars(view.bill.saving)}`} strong />
@@ -493,6 +574,21 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
     // proposal's own figures), the consumer information, then the terms as they stood when it was published. Closed
     // until asked for; the tick to go ahead refers to them.
     terms: () => {
+      if (view.ownTerms)
+        return (
+          <div className={card}>
+            <p className="text-[15px] text-ink">
+              {b.name}&apos;s terms and conditions go with this proposal. Please read them before you go ahead.
+            </p>
+            {urls.terms ? (
+              <a href={urls.terms} className={clsx(button, "mt-4")} download>
+                <FileText className="size-4" aria-hidden /> {view.ownTerms.name} (PDF)
+              </a>
+            ) : (
+              <p className={clsx(fine, "mt-3")}>{view.ownTerms.name} (PDF) is attached for your customer to download.</p>
+            )}
+          </div>
+        );
       const contract = view.contract;
       if (!contract) return null;
       const details = contractDetails(view);
@@ -556,7 +652,10 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
   );
 
   return (
-    <div style={themeVars(view.theme) as React.CSSProperties} className="min-h-dvh bg-canvas text-ink [color-scheme:light]">
+    <div
+      style={{ ...themeVars(view.theme), ...lookVars(view.template) } as React.CSSProperties}
+      className="min-h-dvh bg-canvas text-ink [color-scheme:light]"
+    >
       <header className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-5 sm:px-8">
         {b.logo ? (
           // eslint-disable-next-line @next/next/no-img-element -- the business's own picture, served by our own route at the size it was kept
@@ -570,11 +669,28 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
       <main className="mx-auto w-full max-w-4xl space-y-12 px-5 pb-20 sm:px-8">
         {/* How it opens: the one place the templates differ. Always first, whatever order the rest is in. */}
         <section aria-label="Proposal">
-          {bold ? (
+          {look.cover === "colour" ? (
             <div className="rounded-2xl bg-primary px-6 py-12 sm:px-10 sm:py-16">{title}</div>
+          ) : look.cover === "split" ? (
+            // The photo (or a block of the main colour without one) beside the title, side by side on a wide screen.
+            <div className="grid items-stretch gap-6 sm:grid-cols-2 sm:gap-10">
+              {b.cover ? (
+                // eslint-disable-next-line @next/next/no-img-element -- as above
+                <img
+                  src={urls.image(b.cover.id)}
+                  alt=""
+                  className="aspect-[4/3] h-full w-full rounded-2xl object-cover sm:aspect-auto sm:min-h-72"
+                />
+              ) : (
+                <div className="aspect-[4/3] rounded-2xl bg-primary sm:aspect-auto sm:min-h-72" aria-hidden />
+              )}
+              <div className="flex flex-col justify-center">{title}</div>
+            </div>
+          ) : look.cover === "plain" ? (
+            <div className="border-b border-line pb-10 pt-6 sm:pt-12">{title}</div>
           ) : (
             <>
-              {!compact && b.cover && (
+              {look.cover === "photo" && b.cover && (
                 // eslint-disable-next-line @next/next/no-img-element -- as above
                 <img src={urls.image(b.cover.id)} alt="" className="mb-8 aspect-[21/9] w-full rounded-2xl object-cover" />
               )}
@@ -607,16 +723,31 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
         {/* The rest, in the business's own order: each block under its heading, with the business's own words and picture first. */}
         {blocks
           .filter((block) => block.id !== "cover")
-          .map((block) => {
-            const inner = content[block.id]();
-            const hasOwn = Boolean(block.words || block.image);
-            if (!inner && !hasOwn) return null;
+          .map((block) => ({ block, inner: content[block.id](), hasOwn: Boolean(block.words || block.image) }))
+          .filter(({ inner, hasOwn }) => inner || hasOwn)
+          .map(({ block, inner, hasOwn }, i) => {
             const heading = blockHeading(block, block.id === "about" ? `About ${b.name}` : "");
+            const side = look.headings === "side";
             return (
-              <section key={block.id} aria-label={heading || undefined}>
-                {heading && <h2 className={h2}>{heading}</h2>}
-                {hasOwn && <div className={heading ? "mt-4" : undefined}>{own(block)}</div>}
-                {inner && <div className={heading || hasOwn ? "mt-4" : undefined}>{inner}</div>}
+              <section
+                key={block.id}
+                aria-label={heading || undefined}
+                className={clsx(side && "sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-8")}
+              >
+                {heading && (
+                  <h2 className={clsx(h2, side && "sm:sticky sm:top-6 sm:self-start sm:text-[20px]")}>
+                    {look.numbered && (
+                      <span className="mb-2 block text-[12px] font-medium tracking-[0.2em] text-muted [font-family:inherit]">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                    )}
+                    {heading}
+                  </h2>
+                )}
+                <div className={clsx(heading && !side && "mt-4", heading && side && "mt-4 sm:mt-0")}>
+                  {hasOwn && own(block)}
+                  {inner && <div className={hasOwn ? "mt-4" : undefined}>{inner}</div>}
+                </div>
               </section>
             );
           })}

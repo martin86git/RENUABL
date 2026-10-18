@@ -51,3 +51,22 @@ export function imageResponse(image: { bytes: Buffer; contentType: string }): Re
     },
   });
 }
+
+/**
+ * A business's terms and conditions PDF, sent to a browser. A PDF can't be
+ * redrawn the way a picture is, so it is never shown inside our pages: it is
+ * handed over as a download under a plain name, its kind never guessed at, and
+ * with a policy that lets nothing in it run if a browser opens it anyway.
+ */
+export function termsResponse(file: { bytes: Buffer }, name: string): Response {
+  const plain = name.replace(/[^\w .()-]/g, "").trim() || "Terms and conditions";
+  return new Response(new Uint8Array(file.bytes), {
+    headers: {
+      "content-type": "application/pdf",
+      "x-content-type-options": "nosniff",
+      "content-disposition": `attachment; filename="${plain}.pdf"`,
+      "content-security-policy": "sandbox; default-src 'none'",
+      "cache-control": "private, max-age=3600",
+    },
+  });
+}

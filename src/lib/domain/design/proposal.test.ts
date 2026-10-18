@@ -96,7 +96,7 @@ describe("a business's branding", () => {
   const start = defaultBrand("Example Solar");
   it("starts from the account's name and plain colours", () => {
     expect(start).toMatchObject({ name: "Example Solar", template: "classic", palette: "paper", validDays: 14, licences: [], points: [] });
-    expect(TEMPLATES.map((t) => t.id)).toEqual(["classic", "compact", "bold"]);
+    expect(TEMPLATES.map((t) => t.id)).toEqual(["classic", "compact", "bold", "minimal", "split"]);
     expect(PALETTES).toHaveLength(3);
   });
   it("lays what was sent over what it has, tidied and cut to length", () => {
@@ -442,6 +442,7 @@ describe("the customer's link", () => {
         "contract",
         "customer",
         "note",
+        "ownTerms",
         "paybackYears",
         "price",
         "production",

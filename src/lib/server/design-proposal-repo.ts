@@ -13,7 +13,7 @@
  * the costs and margin are.
  */
 import { randomBytes } from "node:crypto";
-import { IMAGE_LIMITS, readBrandKit, type BrandImage, type BrandKit, type ImageKind } from "@/lib/domain/design/brand";
+import { IMAGE_LIMITS, readBrandKit, type BrandImage, type BrandKit, type ImageKind, type TermsFile } from "@/lib/domain/design/brand";
 import { stageMoveText, type Customer, type Job, type JobStage } from "@/lib/domain/design/crm";
 import {
   depositAsked,
@@ -76,7 +76,7 @@ export async function saveBrand(businessId: string, kit: BrandKit, by: string): 
 export async function listImages(businessId: string): Promise<BrandImage[]> {
   return query<BrandImage>(
     `select id, kind, width, height from design_files
-      where business_id = $1 and removed_at is null
+      where business_id = $1 and removed_at is null and kind <> 'terms'
       order by case kind when 'logo' then 0 when 'cover' then 1 else 2 end, created_at, id`,
     [businessId],
   );
@@ -427,6 +427,40 @@ async function giveReference(q: Q | typeof query, businessId: string, versionId:
     if (rows[0]) return rows[0].ref;
   }
   return null;
+}
+
+/**
+ * Keeps the business's own terms and conditions (a PDF, already checked to be
+ * one) beside its pictures, in place of any it had before. The one before is
+ * only marked removed, so a proposal sent with it can still be read.
+ */
+export async function addTermsFile(businessId: string, bytes: Buffer, name: string, by: string): Promise<TermsFile> {
+  return transaction(async (q) => {
+    await q(`update design_files set removed_at = now() where business_id = $1 and kind = 'terms' and removed_at is null`, [businessId]);
+    const id = newId("doc");
+    await q(
+      `insert into design_files (id, business_id, kind, content_type, bytes, width, height, created_by) values ($2,$1,'terms','application/pdf',$3,0,0,$4)`,
+      [businessId, id, bytes, by.toLowerCase()],
+    );
+    return { id, name };
+  });
+}
+
+/** The business's own terms file, for its own screens: only a terms file, and only its own. */
+export async function termsFile(businessId: string, id: string): Promise<ImageFile | null> {
+  const rows = await query<{ bytes: Buffer; content_type: string }>(
+    `select bytes, content_type from design_files where business_id = $1 and id = $2 and kind = 'terms'`,
+    [businessId, id],
+  );
+  return rows[0] ? { bytes: rows[0].bytes, contentType: rows[0].content_type } : null;
+}
+
+/** The business's own terms on the proposal behind a link: only the file that proposal was sent with, and none once it is withdrawn. */
+export async function publicTerms(token: string): Promise<(ImageFile & { name: string }) | null> {
+  const row = await behind(query, token);
+  if (!row || row.withdrawn || !row.view.ownTerms) return null;
+  const file = await termsFile(row.businessId, row.view.ownTerms.id);
+  return file ? { ...file, name: row.view.ownTerms.name } : null;
 }
 
 /** A picture on the proposal behind a link: only one that proposal was sent with, and none once it is withdrawn. */

@@ -24,14 +24,17 @@ import type { ViewBlock } from "./blocks";
 import {
   INSTALL_TIMES,
   TEMPLATES,
+  termsInUse,
   VALID_DAYS,
   type BankDetails,
   type BrandImage,
   type BrandKit,
+  type ChartStyle,
   type FontId,
   type GstMode,
   type PaletteId,
   type TemplateId,
+  type TermsFile,
 } from "./brand";
 import type { Cleaned, Customer, DetailKey, Job } from "./crm";
 import { systemDetails } from "./deal";
@@ -74,7 +77,8 @@ export interface ProposalView {
   /** The last day the price stands. */
   validUntil: ISODate;
   template: TemplateId;
-  theme: { palette: PaletteId; primary: string; accent: string; font?: FontId };
+  /** The page's colours and type, and how the year's output is drawn (`chart`: bars when left out, as on proposals published before it could be chosen). */
+  theme: { palette: PaletteId; primary: string; accent: string; font?: FontId; chart?: ChartStyle };
   business: {
     name: string;
     tagline: string;
@@ -176,6 +180,11 @@ export interface ProposalView {
     netcc: { heading: string; intro: string; guides: string[]; url: string; seller: string };
     terms: TermsSection[];
   } | null;
+  /**
+   * The business's own terms and conditions, when it sends its own instead of ours: the PDF it uploaded, by id and
+   * name, served only from this proposal's link. Left out (or null) otherwise.
+   */
+  ownTerms?: TermsFile | null;
   /** The blocks to show, in order. Left out on a proposal published before they could be arranged (`USUAL_BLOCKS`). */
   blocks?: ViewBlock[];
   /**
@@ -290,6 +299,9 @@ export const ROOF_NOTE = "The layout is a design. It is checked on site before a
 export const ACCEPT_LINE = "I'd like to go ahead with this proposal.";
 export const ACCEPT_WITH_TERMS = "I'd like to go ahead with this proposal, and I accept the terms and conditions set out with it.";
 export const ACCEPT_WITH_CONDITIONS = "I'd like to go ahead with this proposal, and I accept the conditions set out with it.";
+/** When the business sends its own terms: they are named, so the customer knows which document they accept. */
+export const acceptWithOwnTerms = (business: string) =>
+  `I'd like to go ahead with this proposal, and I accept ${business}'s terms and conditions attached to it.`;
 
 /** Victorian postcodes: the only state the designer's sunshine record covers so far. */
 export function inVictoria(postcode: string): boolean {
@@ -343,8 +355,9 @@ export const warrantyNote = (business: string) =>
 export const BANK_NOTE = "Check these details with us by phone before you pay, if you have any doubt about a message asking for payment.";
 
 /** The line a customer ticks to go ahead: it names what they accept with the proposal, when there is anything. */
-export function acceptLine(view: Pick<ProposalView, "contract" | "business">): string {
+export function acceptLine(view: Pick<ProposalView, "contract" | "business" | "ownTerms">): string {
   if (view.contract) return ACCEPT_WITH_TERMS;
+  if (view.ownTerms) return acceptWithOwnTerms(view.business.name);
   return view.business.conditions ? ACCEPT_WITH_CONDITIONS : ACCEPT_LINE;
 }
 
@@ -498,7 +511,7 @@ export function buildProposal(input: ProposalInputs): Built {
     publishedAt: input.now,
     validUntil: addDays(input.today, input.choice.validDays),
     template: input.choice.template,
-    theme: { palette: brand.palette, primary: brand.primary, accent: brand.accent, font: brand.font },
+    theme: { palette: brand.palette, primary: brand.primary, accent: brand.accent, font: brand.font, chart: brand.chart },
     business: {
       name: brand.name,
       tagline: brand.tagline,
@@ -561,20 +574,24 @@ export function buildProposal(input: ProposalInputs): Built {
       warranty: brand.warrantyYears !== null || brand.warrantyWords ? { years: brand.warrantyYears, words: brand.warrantyWords } : null,
       installTime: brand.installTime ? (INSTALL_TIMES.find((t) => t.id === brand.installTime)?.label ?? null) : null,
     },
-    contract: brand.standardTerms
-      ? {
-          version: STANDARD_TERMS_VERSION,
-          netcc: {
-            heading: NETCC_INFORMATION.heading,
-            intro: NETCC_INFORMATION.intro,
-            guides: [...NETCC_INFORMATION.guides],
-            url: NETCC_INFORMATION.url,
-            // Only a business that says it is an Approved Seller is described as one.
-            seller: brand.netccApproved ? NETCC_INFORMATION.approvedSeller.replaceAll("{seller}", brand.name) : NETCC_INFORMATION.notStated,
-          },
-          terms: fillTerms({ seller: brand.name, customer: input.customer.name }),
-        }
-      : null,
+    ownTerms: termsInUse(brand) === "own" && brand.ownTerms ? { ...brand.ownTerms } : null,
+    contract:
+      termsInUse(brand) === "standard"
+        ? {
+            version: STANDARD_TERMS_VERSION,
+            netcc: {
+              heading: NETCC_INFORMATION.heading,
+              intro: NETCC_INFORMATION.intro,
+              guides: [...NETCC_INFORMATION.guides],
+              url: NETCC_INFORMATION.url,
+              // Only a business that says it is an Approved Seller is described as one.
+              seller: brand.netccApproved
+                ? NETCC_INFORMATION.approvedSeller.replaceAll("{seller}", brand.name)
+                : NETCC_INFORMATION.notStated,
+            },
+            terms: fillTerms({ seller: brand.name, customer: input.customer.name }),
+          }
+        : null,
     blocks: brand.blocks
       .filter((block) => block.on)
       .map((block) => ({
