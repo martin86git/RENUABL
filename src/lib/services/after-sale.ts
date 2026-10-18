@@ -17,6 +17,9 @@ export const loadPrefs = () => ask<{ prefs: BusinessPrefs }>("/api/design/prefs"
 export const savePrefs = (prefs: BusinessPrefs) => ask<{ prefs: BusinessPrefs }>("/api/design/prefs", { method: "PUT", body: { prefs } });
 
 export const listProposals = () => ask<{ proposals: ProposalLine[] }>("/api/design/proposals");
+/** A proposal's follow-up done: the follow-up day it fell due on, called or emailed. */
+export const markFollowUp = (jobId: string, day: number, how: "call" | "email") =>
+  ask<object>(`/api/design/jobs/${encodeURIComponent(jobId)}/follow-up`, { method: "POST", body: { day, how } });
 
 export const listOrders = () => ask<{ orders: OrderRow[] }>("/api/design/orders");
 export const loadOrder = (jobId: string) => ask<{ order: JobOrder }>(`/api/design/orders/${encodeURIComponent(jobId)}`);

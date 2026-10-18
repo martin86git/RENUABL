@@ -49,6 +49,7 @@ import { readiness, type Check } from "@/lib/domain/design/schedule";
 import type { ISODate } from "@/lib/domain/types";
 import { newId, query, transaction } from "./db";
 import { record } from "./design-crm-repo";
+import { FOLLOW_UP_DAYS, FOLLOW_UP_WORDS } from "@/lib/domain/design/proposal-lists";
 import { loadLists } from "./design-repo";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -92,6 +93,21 @@ export interface ProposalLine {
   openedAt: string | null;
   acceptedAt: string | null;
   acceptedName: string | null;
+  /** The member who published it (their email: shown to the business only). */
+  by: string;
+  /** How many systems it offers (1 without a choice). */
+  options: number;
+  kw: number;
+  batteryKwh: number;
+  /** The signed copy's PDF, for the business. */
+  pdf: string;
+  /** Follow-ups marked done: the day each fell due on, how and when. */
+  followUps: { day: number; how: "call" | "email"; at: string }[];
+  /** When the customer last wrote in the chat, if ever. */
+  lastWord: string | null;
+  /** The deposit marked received (dollars), else 0; and whether the customer says they paid. */
+  depositReceived: number;
+  depositSaid: boolean;
 }
 
 /** Each job's newest proposal, newest first: what was sent, whether it was opened, and whether it was signed. */
@@ -111,10 +127,20 @@ export async function listProposals(businessId: string, today: ISODate): Promise
     openedAt: string | null;
     acceptedAt: string | null;
     acceptedName: string | null;
+    by: string;
+    received: boolean;
+    said: boolean;
+    followUps: { day: number; how: "call" | "email"; at: string }[] | null;
+    lastWord: string | null;
   }>(
     `select distinct on (p.job_id) p.job_id as "jobId", c.id as "customerId", c.name as customer, j.title, j.address, v.version, v.view, v.accepted_option as option,
             p.token, p.withdrawn_at is not null as withdrawn, ${moment("v.published_at")} as "publishedAt",
-            ${moment("v.opened_at")} as "openedAt", ${moment("v.accepted_at")} as "acceptedAt", v.accepted_name as "acceptedName"
+            ${moment("v.opened_at")} as "openedAt", ${moment("v.accepted_at")} as "acceptedAt", v.accepted_name as "acceptedName",
+            v.published_by as by, v.deposit_received_at is not null as received, v.deposit_said_at is not null as said,
+            (select json_agg(json_build_object('day', f.day, 'how', f.how, 'at', f.at) order by f.day) from design_followups f
+              where f.business_id = p.business_id and f.job_id = p.job_id) as "followUps",
+            (select ${moment("max(m.at)")} from design_messages m
+              where m.business_id = p.business_id and m.job_id = p.job_id and m.from_customer) as "lastWord"
        from design_proposals p
        join design_proposal_versions v on v.business_id = p.business_id and v.proposal_id = p.id
        join design_jobs j on j.business_id = p.business_id and j.id = p.job_id
@@ -124,23 +150,35 @@ export async function listProposals(businessId: string, today: ISODate): Promise
     [businessId],
   );
   return rows
-    .map((r) => ({
-      jobId: r.jobId,
-      customerId: r.customerId,
-      customer: r.customer,
-      title: r.title,
-      address: r.address,
-      version: r.version,
-      state: proposalState({ withdrawn: r.withdrawn, accepted: Boolean(r.acceptedAt), validUntil: r.view.validUntil }, today),
-      path: proposalPath(r.token),
-      // Once signed, the system the customer chose.
-      youPay: viewForChoice(r.view, r.option).price.youPay,
-      system: systemLine(viewForChoice(r.view, r.option)),
-      publishedAt: r.publishedAt,
-      openedAt: r.openedAt,
-      acceptedAt: r.acceptedAt,
-      acceptedName: r.acceptedName,
-    }))
+    .map((r) => {
+      const agreed = viewForChoice(r.view, r.option);
+      return {
+        jobId: r.jobId,
+        customerId: r.customerId,
+        customer: r.customer,
+        title: r.title,
+        address: r.address,
+        version: r.version,
+        state: proposalState({ withdrawn: r.withdrawn, accepted: Boolean(r.acceptedAt), validUntil: r.view.validUntil }, today),
+        path: proposalPath(r.token),
+        // Once signed, the system the customer chose.
+        youPay: agreed.price.youPay,
+        system: systemLine(agreed),
+        publishedAt: r.publishedAt,
+        openedAt: r.openedAt,
+        acceptedAt: r.acceptedAt,
+        acceptedName: r.acceptedName,
+        by: r.by,
+        options: r.view.options?.length || 1,
+        kw: agreed.system.kw,
+        batteryKwh: agreed.system.batteryKwh,
+        pdf: `/api/proposal/${r.token}/pdf`,
+        followUps: r.followUps ?? [],
+        lastWord: r.lastWord,
+        depositReceived: r.received ? (agreed.terms?.deposit ?? 0) : 0,
+        depositSaid: r.said,
+      };
+    })
     .sort((a, b) => (b.acceptedAt ?? b.publishedAt).localeCompare(a.acceptedAt ?? a.publishedAt));
 }
 
@@ -721,5 +759,41 @@ export async function installExtras(businessId: string): Promise<InstallExtra[]>
       solarVicRebate: agreed.price.solarVic?.rebate ?? null,
       solarVicLoan: agreed.price.solarVic?.loan ?? null,
     };
+  });
+}
+
+/**
+ * Marks a proposal's follow-up done: which follow-up day, called or emailed, by whom, kept once, and written on the
+ * deal's record as a call or an email. "missing" for a job the business hasn't.
+ */
+export async function markFollowUp(
+  businessId: string,
+  jobId: string,
+  day: number,
+  how: "call" | "email",
+  by: string,
+): Promise<"done" | "missing"> {
+  return transaction(async (q) => {
+    const jobs = await q<{ customerId: string }>(`select customer_id as "customerId" from design_jobs where business_id = $1 and id = $2`, [
+      businessId,
+      jobId,
+    ]);
+    if (!jobs[0]) return "missing";
+    const added = await q(
+      `insert into design_followups (business_id, job_id, day, how, by_email) values ($1, $2, $3, $4, $5)
+       on conflict (business_id, job_id, day) do nothing returning day`,
+      [businessId, jobId, day, how, by.toLowerCase()],
+    );
+    if (added.length) {
+      const step = FOLLOW_UP_DAYS.indexOf(day as (typeof FOLLOW_UP_DAYS)[number]);
+      await record(q, businessId, {
+        customerId: jobs[0].customerId,
+        jobId,
+        kind: how,
+        text: `${FOLLOW_UP_WORDS[step] ?? "A"} follow-up on the proposal: ${how === "call" ? "called" : "emailed"}`,
+        by: by.toLowerCase(),
+      });
+    }
+    return "done";
   });
 }

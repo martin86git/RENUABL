@@ -409,6 +409,18 @@ create table if not exists design_pickup_links (
   unique (business_id, job_id),
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
+-- Follow-ups made on a proposal that is out (domain/design/proposal-lists.ts): one for each follow-up day reached,
+-- marked called or emailed by a member.
+create table if not exists design_followups (
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  day integer not null,
+  how text not null,
+  at timestamptz not null default now(),
+  by_email text not null,
+  primary key (business_id, job_id, day),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
 -- What a signed job's installation was allowed for in its quote (domain/design/installer-invoices.ts), fixed at signing.
 create table if not exists design_install_costs (
   business_id text not null references businesses(id) on delete cascade,
