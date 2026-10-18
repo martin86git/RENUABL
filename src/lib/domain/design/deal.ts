@@ -355,3 +355,157 @@ export function weekOf(today: ISODate): ISODate[] {
 export function power(kw: number): string {
   return kw >= 1000 ? `${Math.round(kw / 10) / 100} MW` : `${Math.round(kw * 10) / 10} kW`;
 }
+
+// ---------------------------------------------------------------------------
+// The overview's three views
+// ---------------------------------------------------------------------------
+
+/** What the overview is looking at: the selling, the installations to come, or the installations done. */
+export type OverviewView = "sales" | "upcoming" | "completed";
+
+export const OVERVIEW_VIEWS: readonly { id: OverviewView; label: string }[] = [
+  { id: "sales", label: "Sales" },
+  { id: "upcoming", label: "Upcoming installs" },
+  { id: "completed", label: "Completed installs" },
+];
+
+/** The pipeline each view shows the stages of: the sale, from won to installed, and after the install. */
+export const VIEW_PIPELINE: Record<OverviewView, string> = { sales: "sales", upcoming: "post-sale", completed: "post-installation" };
+
+export type UpcomingJob = Pick<Job, "stage" | "value" | "kw" | "installDate" | "updatedAt">;
+
+export interface UpcomingInstalls {
+  /** Every installation sold and not yet done (won, ordered or scheduled), what they come to and their solar. */
+  total: number;
+  value: number;
+  kw: number;
+  /** With a date from today on; with a date this week (Monday to Sunday) and this calendar month. */
+  booked: number;
+  thisWeek: number;
+  thisMonth: number;
+  /** With no date yet. */
+  toBook: number;
+  /** With a date that has passed while still not marked installed. */
+  overdue: number;
+  /** Sold but nothing ordered yet (still at Won), and ordered (stock on its way). */
+  toOrder: number;
+  ordered: number;
+  /** The next date with an installation on it, and how many are on it. Null with none booked. */
+  next: { date: ISODate; count: number } | null;
+}
+
+/** The installations still to come, as the overview's "Upcoming installs" shows them. */
+export function upcomingInstalls<T extends UpcomingJob>(jobs: readonly T[], today: ISODate): UpcomingInstalls {
+  const coming = inTheWorks(jobs);
+  const week = weekOf(today);
+  const dated = coming.filter((j) => j.installDate);
+  const ahead = dated.filter((j) => j.installDate! >= today);
+  const first = ahead.map((j) => j.installDate!).sort()[0];
+  return {
+    total: coming.length,
+    value: coming.reduce((n, j) => n + (j.value ?? 0), 0),
+    kw: Math.round(coming.reduce((n, j) => n + (j.kw ?? 0), 0) * 100) / 100,
+    booked: ahead.length,
+    thisWeek: dated.filter((j) => j.installDate! >= week[0] && j.installDate! <= week[6]).length,
+    thisMonth: dated.filter((j) => j.installDate!.startsWith(today.slice(0, 7))).length,
+    toBook: coming.length - dated.length,
+    overdue: dated.filter((j) => j.installDate! < today).length,
+    toOrder: coming.filter((j) => j.stage === "won").length,
+    ordered: coming.filter((j) => j.stage === "ordered").length,
+    next: first ? { date: first as ISODate, count: ahead.filter((j) => j.installDate === first).length } : null,
+  };
+}
+
+export type CompletedJob = Pick<Job, "stage" | "value" | "kw" | "installedAt">;
+
+export interface CompletedInstalls {
+  /** Installed this financial year (by the day it was marked installed), what they came to and their solar. */
+  yearCount: number;
+  yearValue: number;
+  yearKw: number;
+  yearLabel: string;
+  /** Installed this month to date, and against the same days of last month, as a whole percentage (null with none then). */
+  monthCount: number;
+  monthKw: number;
+  vsLastMonth: number | null;
+  /** Where the installed jobs stand now: inspection booked, certificate of compliance received, at grid connection, rebates claimed. */
+  inspection: number;
+  coes: number;
+  grid: number;
+  claimed: number;
+  /** Installed but not yet through to claimed: the paperwork still open. */
+  paperwork: number;
+}
+
+/** The installations done, as the overview's "Completed installs" shows them. */
+export function completedInstalls<T extends CompletedJob>(jobs: readonly T[], today: ISODate): CompletedInstalls {
+  const day = (iso: string | null) => (iso ? todayInMarket(new Date(iso)) : null);
+  const [y, m] = [Number(today.slice(0, 4)), Number(today.slice(5, 7))];
+  const two = (n: number) => String(n).padStart(2, "0");
+  const month = `${y}-${two(m)}`;
+  const lastMonth = m === 1 ? `${y - 1}-12` : `${y}-${two(m - 1)}`;
+  const yearFrom = m >= 7 ? y : y - 1;
+  const toDate = (d: string | null, ofMonth: string) => d !== null && d >= `${ofMonth}-01` && d <= `${ofMonth}-${today.slice(8, 10)}`;
+  const done = jobs.filter((j) => INSTALLED_STAGES.includes(j.stage)).map((j) => ({ ...j, on: day(j.installedAt) }));
+  const kw = (list: typeof done) => Math.round(list.reduce((n, j) => n + (j.kw ?? 0), 0) * 100) / 100;
+  const year = done.filter((j) => j.on !== null && j.on >= `${yearFrom}-07-01` && j.on <= today);
+  const thisMonth = done.filter((j) => toDate(j.on, month));
+  const at = (stage: JobStage) => done.filter((j) => j.stage === stage).length;
+  return {
+    yearCount: year.length,
+    yearValue: year.reduce((n, j) => n + (j.value ?? 0), 0),
+    yearKw: kw(year),
+    yearLabel: `FY ${yearFrom}-${two((yearFrom + 1) % 100)}`,
+    monthCount: thisMonth.length,
+    monthKw: kw(thisMonth),
+    vsLastMonth: change(thisMonth.length, done.filter((j) => toDate(j.on, lastMonth)).length),
+    inspection: at("inspection"),
+    coes: at("coes"),
+    grid: at("grid"),
+    claimed: at("claimed"),
+    paperwork: done.filter((j) => j.stage !== "claimed").length,
+  };
+}
+
+/**
+ * The name to greet someone by, from their sign-in email: the part before the
+ * @ when it is a plain word ("martin@…" → "Martin"), else nothing (an address
+ * like "sales@" or "j.smith2@" is no one's name, so no guess is made).
+ */
+export function greetingName(email: string | null | undefined): string | null {
+  const local = (email ?? "").split("@")[0] ?? "";
+  if (!/^[a-z]{2,20}$/i.test(local)) return null;
+  if (
+    ["admin", "info", "sales", "office", "hello", "contact", "accounts", "team", "support", "enquiries", "mail"].includes(
+      local.toLowerCase(),
+    )
+  )
+    return null;
+  return local[0].toUpperCase() + local.slice(1).toLowerCase();
+}
+
+/** One line for each view, shown under the greeting before a view is picked: where each part of the business stands, in a sentence. */
+export function viewLines(jobs: readonly (DashJob & Pick<Job, "updatedAt">)[], today: ISODate): Record<OverviewView, string> {
+  const d = dashboard(jobs, today);
+  const u = upcomingInstalls(jobs, today);
+  const c = completedInstalls(jobs, today);
+  const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+  const monthName = new Date(`${today}T00:00:00Z`).toLocaleDateString("en-AU", { month: "long", timeZone: "UTC" });
+  const proposals = jobs.filter((j) => j.stage === "proposal").length;
+  const nextDay = u.next
+    ? new Date(`${u.next.date}T00:00:00Z`).toLocaleDateString("en-AU", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        timeZone: "UTC",
+      })
+    : null;
+  return {
+    sales: `${n(d.sold, "deal", "deals")} sold in ${monthName}, ${n(proposals, "proposal", "proposals")} with customers.`,
+    upcoming:
+      u.total === 0
+        ? "Nothing sold is waiting to be installed."
+        : `${n(u.thisWeek, "install", "installs")} this week${nextDay ? `, the next on ${nextDay}` : ""}. ${n(u.toBook, "still to book", "still to book")}.`,
+    completed: `${n(c.yearCount, "install", "installs")} done this financial year, ${n(c.paperwork, "with paperwork open", "with paperwork open")}.`,
+  };
+}
