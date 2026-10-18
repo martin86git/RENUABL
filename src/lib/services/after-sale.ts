@@ -51,3 +51,7 @@ export async function readInvoice(file: File): Promise<Answer<{ figures: Invoice
 
 export const loadSchedule = (from: string, to: string) =>
   ask<{ jobs: BookedJob[] }>(`/api/design/schedule?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+
+export type { InstallExtra } from "@/lib/server/design-after-sale-repo";
+export const loadInstallExtras = () =>
+  ask<{ extras: import("@/lib/server/design-after-sale-repo").InstallExtra[] }>("/api/design/installs");

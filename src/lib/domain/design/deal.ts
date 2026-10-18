@@ -109,6 +109,7 @@ export const DETAIL_LABELS: Record<DetailKey, string> = {
   battery: "Battery",
   batteryQty: "Battery qty",
   batteryStorage: "Battery storage",
+  evCharger: "EV charger",
   arrays: "Arrays",
   strings: "Strings",
   tiltFrames: "Tilt frames",
@@ -509,3 +510,48 @@ export function viewLines(jobs: readonly (DashJob & Pick<Job, "updatedAt">)[], t
     completed: `${n(c.yearCount, "install", "installs")} done this financial year, ${n(c.paperwork, "with paperwork open", "with paperwork open")}.`,
   };
 }
+
+// ---------------------------------------------------------------------------
+// The Installations lists on the overview: awaiting install and completed
+// ---------------------------------------------------------------------------
+
+/** What a signed job carries for the lists, from its signed proposal (`/api/design/installs`). */
+export interface JobExtra {
+  jobId: string;
+  batteryKwh: number;
+  youPay: number;
+  depositReceived: number;
+  ordered: boolean;
+}
+
+/**
+ * Install revenue this month to date: for the jobs awaiting install whose install date falls this month, what is still
+ * payable on their contracts (what the customer pays, after the federal rebate, less any deposit received). A job with
+ * no signed proposal counts at its value.
+ */
+export function installRevenueThisMonth(
+  jobs: readonly Pick<Job, "id" | "stage" | "installDate" | "value">[],
+  extras: readonly JobExtra[],
+  today: ISODate,
+): number {
+  const month = today.slice(0, 7);
+  return Math.round(
+    inTheWorks(jobs)
+      .filter((j) => j.installDate?.startsWith(month))
+      .reduce((n, j) => {
+        const x = extras.find((e) => e.jobId === j.id);
+        return n + Math.max(0, (x ? x.youPay : (j.value ?? 0)) - (x?.depositReceived ?? 0));
+      }, 0),
+  );
+}
+
+/** Whether an installer is booked: someone is named on the job and it has an install date. */
+export const installerBooked = (j: Pick<Job, "details" | "installDate">) => Boolean(j.details?.installer && j.installDate);
+
+/** After the install, whether a job's paperwork is all done: the customer's invoice paid, the STCs claimed, the grid connected. */
+export const paperworkDone = (j: Pick<Job, "details">) =>
+  j.details?.customerInvoice === "paid" && j.details?.stcClaim === "claimed" && j.details?.gridConnection === "completed";
+
+/** The days a job was installed on, for the calendar: its install date, else the day it was marked installed. */
+export const installedOn = (j: Pick<Job, "installDate" | "installedAt">): ISODate | null =>
+  j.installDate ?? (j.installedAt ? (j.installedAt.slice(0, 10) as ISODate) : null);

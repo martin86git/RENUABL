@@ -272,6 +272,7 @@ export const DETAIL_KEYS = [
   "battery",
   "batteryQty",
   "batteryStorage",
+  "evCharger",
   "arrays",
   "strings",
   "tiltFrames",
@@ -282,6 +283,25 @@ export const DETAIL_KEYS = [
 ] as const;
 export type DetailKey = (typeof DETAIL_KEYS)[number];
 
+/**
+ * How a sold job is getting on, kept beside its details (and sent with them): who is installing it, and after the
+ * install the customer's invoice, the STC claim and the grid connection. Each is set by hand from the Installations
+ * lists; the pipeline stages are left as they are.
+ */
+export const PROGRESS = {
+  customerInvoice: ["not-issued", "pending", "paid"],
+  stcClaim: ["not-claimed", "claimed"],
+  gridConnection: ["pending", "underway", "completed"],
+} as const;
+export type ProgressKey = keyof typeof PROGRESS;
+export const PROGRESS_LABELS: { [K in ProgressKey]: Record<(typeof PROGRESS)[K][number], string> } = {
+  customerInvoice: { "not-issued": "Not issued", pending: "Pending", paid: "Paid" },
+  stcClaim: { "not-claimed": "Not claimed", claimed: "Claimed" },
+  gridConnection: { pending: "Pending", underway: "Underway", completed: "Completed" },
+};
+/** Who is installing a job, as the business writes it. */
+export const INSTALLER_KEY = "installer";
+
 /** System details as typed: known keys only, each one tidy line of up to 120 characters; an empty one is dropped. */
 export function cleanJobDetails(raw: unknown): Record<string, string> {
   const r = bag(raw);
@@ -290,6 +310,10 @@ export function cleanJobDetails(raw: unknown): Record<string, string> {
     const text = line(r[key], 120);
     if (text) kept[key] = text;
   }
+  const installer = line(r[INSTALLER_KEY], 80);
+  if (installer) kept[INSTALLER_KEY] = installer;
+  for (const key of Object.keys(PROGRESS) as ProgressKey[])
+    if ((PROGRESS[key] as readonly string[]).includes(r[key] as string)) kept[key] = r[key] as string;
   return kept;
 }
 

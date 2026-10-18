@@ -673,3 +673,42 @@ export async function claimReminder(r: ReminderToSend): Promise<boolean> {
   );
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// The Installations lists on the overview
+// ---------------------------------------------------------------------------
+
+export interface InstallExtra {
+  jobId: string;
+  /** The battery on the system the customer signed for, kWh: 0 with none. */
+  batteryKwh: number;
+  /** What the customer pays on the signed system, after the federal rebate. */
+  youPay: number;
+  /** The deposit the business has marked received, dollars; 0 when none has been. */
+  depositReceived: number;
+  /** Whether its order has gone to the suppliers (ordered or delivered). */
+  ordered: boolean;
+}
+
+/** For each signed job: its battery, what is payable, the deposit received and whether its parts are ordered. */
+export async function installExtras(businessId: string): Promise<InstallExtra[]> {
+  const rows = await query<{ jobId: string; view: ProposalView; option: DesignGoal | null; received: boolean; status: string | null }>(
+    `select distinct on (p.job_id) p.job_id as "jobId", v.view, v.accepted_option as option,
+            v.deposit_received_at is not null as received, o.status
+       from design_proposals p
+       join design_proposal_versions v on v.business_id = p.business_id and v.proposal_id = p.id and v.accepted_at is not null
+       left join design_orders o on o.business_id = p.business_id and o.job_id = p.job_id
+      where p.business_id = $1 order by p.job_id, v.version desc`,
+    [businessId],
+  );
+  return rows.map((r) => {
+    const agreed = viewForChoice(r.view, r.option);
+    return {
+      jobId: r.jobId,
+      batteryKwh: agreed.system.batteryKwh,
+      youPay: agreed.price.youPay,
+      depositReceived: r.received ? (agreed.terms?.deposit ?? 0) : 0,
+      ordered: r.status === "ordered" || r.status === "delivered",
+    };
+  });
+}

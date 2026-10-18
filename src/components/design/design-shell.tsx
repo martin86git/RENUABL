@@ -348,7 +348,7 @@ export function PageHead({ eyebrow, title, children }: { eyebrow: string; title:
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
         <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{eyebrow}</p>
-        <h1 className="mt-1.5 text-[28px] leading-tight tracking-tight text-ink">{title}</h1>
+        <h1 className="mt-1 text-[22px] leading-tight tracking-tight text-ink">{title}</h1>
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>

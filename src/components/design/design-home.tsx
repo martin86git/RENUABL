@@ -4,20 +4,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, PenTool, UserPlus } from "lucide-react";
 import clsx from "clsx";
-import { INSTALLED_STAGES, STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
+import { STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import {
   OVERVIEW_VIEWS,
   PIPELINES,
   VIEW_PIPELINE,
-  completedInstalls,
   dashboard,
   greetingName,
-  inTheWorks,
-  installOrder,
   power,
-  upcomingInstalls,
   viewLines,
-  weekOf,
   type OverviewView,
 } from "@/lib/domain/design/deal";
 import { greeting, todayInMarket } from "@/lib/domain/market";
@@ -29,6 +24,7 @@ import { AfterSigningDemo, AutomationDemo, ConversationDemo, ThreeDesignsDemo } 
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
 import { FrontHero, Reveal } from "./front-hero";
 import { SignInForm } from "./sign-in-form";
+import { CompletedInstallsView, UpcomingInstallsView } from "./install-lists";
 
 /** A stage as a small tag. Won and installed are the good news; lost is quiet. */
 export function StageTag({ stage }: { stage: JobStage }) {
@@ -186,6 +182,8 @@ function OverviewPage({ business, email }: { business: string; email: string }) 
 
   const today = todayInMarket();
   const name = greetingName(email);
+  /** A job changed from one of the lists (its installer or its paperwork), put back in place. */
+  const changed = (job: JobLine) => setJobs((all) => (all ?? []).map((j) => (j.id === job.id ? job : j)));
 
   return (
     <div className={ui.page}>
@@ -229,8 +227,8 @@ function OverviewPage({ business, email }: { business: string; email: string }) 
 
       {view === null && <Greeting name={name} jobs={jobs} today={today} onPick={setView} />}
       {view === "sales" && <SalesView jobs={jobs} data={data} today={today} />}
-      {view === "upcoming" && <UpcomingView jobs={jobs} data={data} today={today} />}
-      {view === "completed" && <CompletedView jobs={jobs} data={data} today={today} />}
+      {view === "upcoming" && <UpcomingInstallsView jobs={jobs} today={today} onJob={changed} />}
+      {view === "completed" && <CompletedInstallsView jobs={jobs} today={today} onJob={changed} />}
     </div>
   );
 }
@@ -246,11 +244,11 @@ function Greeting(props: { name: string | null; jobs: JobLine[] | null; today: I
   });
   return (
     <section className="mt-10" aria-labelledby="greeting">
-      <h2 id="greeting" className="text-[clamp(32px,5vw,48px)] font-light leading-[1.05] tracking-[-0.03em] text-ink">
+      <h2 id="greeting" className="text-[clamp(24px,3.4vw,34px)] font-light leading-[1.1] tracking-[-0.02em] text-ink">
         {greeting()}
         {props.name ? `, ${props.name}` : ""}.
       </h2>
-      <p className="mt-3 text-[16px] text-ink-2">It&apos;s {day}. Here&apos;s where things stand.</p>
+      <p className="mt-2 text-[14px] text-ink-2">It&apos;s {day}. Here&apos;s where things stand.</p>
       <div className="mt-8 grid gap-3 md:grid-cols-3">
         {OVERVIEW_VIEWS.map((v) => (
           <button
@@ -260,7 +258,7 @@ function Greeting(props: { name: string | null; jobs: JobLine[] | null; today: I
             className={clsx(ui.card, "group flex flex-col p-5 text-left hover:ring-1 hover:ring-ink-2")}
           >
             <span className={ui.eyebrow}>{v.label}</span>
-            <span className="mt-3 flex-1 text-[16px] leading-snug text-ink">{lines ? lines[v.id] : "…"}</span>
+            <span className="mt-2.5 flex-1 text-[14px] leading-snug text-ink">{lines ? lines[v.id] : "…"}</span>
             <span className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-ink-2 group-hover:text-ink">
               Open <ArrowRight className="size-3.5" aria-hidden />
             </span>
@@ -278,12 +276,12 @@ function Headline(props: { items: { label: string; value: string; under: React.R
   return (
     <section className="mt-6 grid overflow-hidden rounded-lg bg-ink text-white sm:grid-cols-2" aria-label="Headline">
       {props.items.map((item, i) => (
-        <div key={item.label} className={clsx("p-6", i > 0 && "border-t border-white/15 sm:border-l sm:border-t-0")}>
+        <div key={item.label} className={clsx("px-5 py-4", i > 0 && "border-t border-white/15 sm:border-l sm:border-t-0")}>
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/60">{item.label}</p>
-          <p className={clsx("mt-3 text-[40px] font-medium leading-none tabular-nums tracking-tight", item.signal && "text-sun-line")}>
+          <p className={clsx("mt-2 text-[26px] font-medium leading-none tabular-nums tracking-tight", item.signal && "text-sun-line")}>
             {item.value}
           </p>
-          <div className="mt-3 text-xs text-white/60">{item.under}</div>
+          <div className="mt-2 text-[11.5px] text-white/60">{item.under}</div>
         </div>
       ))}
     </section>
@@ -295,10 +293,10 @@ function Tiles({ tiles }: { tiles: [name: string, value: string, under: string][
   return (
     <section className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Figures">
       {tiles.map(([name, value, under]) => (
-        <div key={name} className={clsx(ui.card, "p-5")}>
+        <div key={name} className={clsx(ui.card, "px-4 py-3.5")}>
           <p className={ui.eyebrow}>{name}</p>
-          <p className="mt-2 text-[28px] font-medium leading-none tabular-nums tracking-tight text-ink">{value}</p>
-          <p className="mt-2 text-[12.5px] text-muted">{under}</p>
+          <p className="mt-1.5 text-[20px] font-medium leading-none tabular-nums tracking-tight text-ink">{value}</p>
+          <p className="mt-1.5 text-[11.5px] text-muted">{under}</p>
         </div>
       ))}
     </section>
@@ -311,7 +309,7 @@ function PipelineCard({ id, data }: { id: string; data: Overview | null }) {
   return (
     <section className="mt-8" aria-labelledby={`pipe-${p.id}`}>
       <div className="flex items-baseline justify-between">
-        <h2 id={`pipe-${p.id}`} className="text-[17px] tracking-tight text-ink">
+        <h2 id={`pipe-${p.id}`} className="text-[15px] font-medium tracking-tight text-ink">
           {p.name}
         </h2>
         <Link href={PATHS.sales} className={clsx(ui.link, "text-[13px]")}>
@@ -322,54 +320,13 @@ function PipelineCard({ id, data }: { id: string; data: Overview | null }) {
         {p.stages.map((stage, i) => (
           <li key={stage} className="flex min-w-[7.5rem] flex-1 items-center gap-2">
             <div className="min-w-0 flex-1 rounded-md bg-surface-2 px-3 py-2.5">
-              <p className="text-[22px] font-medium leading-none tabular-nums text-ink">{data ? (data.counts[stage] ?? 0) : "–"}</p>
+              <p className="text-[17px] font-medium leading-none tabular-nums text-ink">{data ? (data.counts[stage] ?? 0) : "–"}</p>
               <p className="mt-1.5 truncate text-xs text-ink-2">{STAGE_LABELS[stage]}</p>
             </div>
             {i < p.stages.length - 1 && <ArrowRight className="size-3.5 shrink-0 text-muted" aria-hidden />}
           </li>
         ))}
       </ol>
-    </section>
-  );
-}
-
-/** A short list of deals, each opening its deal. */
-function DealList(props: { title: string; jobs: JobLine[] | null; empty: string; when: (j: JobLine) => string; more?: string }) {
-  return (
-    <section className="mt-8" aria-label={props.title}>
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-[17px] tracking-tight text-ink">{props.title}</h2>
-        {props.more && (
-          <Link href={props.more} className={clsx(ui.link, "text-[13px]")}>
-            See all <ArrowRight className="inline size-3.5" aria-hidden />
-          </Link>
-        )}
-      </div>
-      <div className={clsx(ui.card, "mt-3")}>
-        {!props.jobs ? (
-          <p className="p-5 text-sm text-muted">Loading…</p>
-        ) : props.jobs.length === 0 ? (
-          <p className="p-5 text-sm text-ink-2">{props.empty}</p>
-        ) : (
-          <ul className="divide-y divide-line">
-            {props.jobs.map((j) => (
-              <li key={j.id}>
-                <Link href={`${PATHS.deals}/${j.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2">
-                  <span className="w-28 shrink-0 text-xs tabular-nums text-ink-2">{props.when(j)}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-ink">{j.customerName}</span>
-                    <span className="block truncate text-xs text-muted">
-                      {j.kw ? `${power(j.kw)} · ` : ""}
-                      {j.address ? j.address.split(",")[0] : j.title}
-                    </span>
-                  </span>
-                  <StageTag stage={j.stage} />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </section>
   );
 }
@@ -430,168 +387,11 @@ function SalesView({ jobs, data, today }: ViewProps) {
   );
 }
 
-/** Upcoming installs: what is sold and waiting to go on a roof, this week's days, and the next ones in order. */
-function UpcomingView({ jobs, data, today }: ViewProps) {
-  const u = jobs ? upcomingInstalls(jobs, today) : null;
-  const next = u?.next ? new Date(`${u.next.date}T00:00:00Z`) : null;
-  const order = jobs ? installOrder(inTheWorks(jobs)) : null;
-  return (
-    <>
-      <Headline
-        items={[
-          {
-            label: "Sold, waiting to install",
-            value: u ? String(u.total) : "–",
-            under: u ? `${dollars(u.value)} · ${power(u.kw)} to go on roofs` : "",
-          },
-          {
-            label: "Next install",
-            value: next ? next.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }) : "–",
-            signal: true,
-            under: u ? (u.next ? `${count(u.next.count, "install", "installs")} that day` : "Nothing booked yet") : "",
-          },
-        ]}
-      />
-      <Tiles
-        tiles={[
-          ["This week", u ? String(u.thisWeek) : "–", "Booked Monday to Sunday"],
-          ["This month", u ? String(u.thisMonth) : "–", `Booked in ${monthOf(today)}`],
-          ["To book", u ? String(u.toBook) : "–", "Sold, no date yet"],
-          ["Overdue", u ? String(u.overdue) : "–", "Date passed, not marked installed"],
-          ["To order", u ? String(u.toOrder) : "–", "Sold, nothing ordered yet"],
-          ["Ordered", u ? String(u.ordered) : "–", "Stock on its way"],
-        ]}
-      />
-      <Week jobs={jobs} today={today} />
-      <PipelineCard id={VIEW_PIPELINE.upcoming} data={data} />
-      <DealList
-        title="Next installs"
-        jobs={order ? [...order.booked.filter((j) => j.installDate! >= today), ...order.toBook].slice(0, 8) : null}
-        empty="Nothing sold is waiting to be installed."
-        when={(j) => (j.installDate ? shortDate(j.installDate) : "To book")}
-        more={PATHS.installations}
-      />
-    </>
-  );
-}
-
-/** Completed installs: what has gone on a roof this financial year and this month, and the paperwork after it. */
-function CompletedView({ jobs, data, today }: ViewProps) {
-  const c = jobs ? completedInstalls(jobs, today) : null;
-  const recent = jobs
-    ? jobs
-        .filter((j) => INSTALLED_STAGES.includes(j.stage))
-        .sort((a, b) => (b.installedAt ?? "").localeCompare(a.installedAt ?? ""))
-        .slice(0, 8)
-    : null;
-  return (
-    <>
-      <Headline
-        items={[
-          {
-            label: `Installed · ${c?.yearLabel ?? "financial year"}`,
-            value: c ? String(c.yearCount) : "–",
-            under: c ? `${dollars(c.yearValue)} · ${power(c.yearKw)} on roofs since 1 July` : "",
-          },
-          {
-            label: `Installed · ${monthOf(today)} to date`,
-            value: c ? String(c.monthCount) : "–",
-            signal: true,
-            under: c && (
-              <span className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                <span>{power(c.monthKw)}</span>
-                <Delta value={c.vsLastMonth} against="on the same days last month" nothing="No installs" dark />
-              </span>
-            ),
-          },
-        ]}
-      />
-      <Tiles
-        tiles={[
-          ["Paperwork open", c ? String(c.paperwork) : "–", "Installed, rebates not yet claimed"],
-          ["Inspection", c ? String(c.inspection) : "–", "Inspection booked"],
-          ["CoES", c ? String(c.coes) : "–", "Certificate of compliance received"],
-          ["Grid connection", c ? String(c.grid) : "–", "With the network"],
-          ["Claimed", c ? String(c.claimed) : "–", "Rebates claimed: done"],
-          ["Solar installed", c ? power(c.yearKw) : "–", "This financial year"],
-        ]}
-      />
-      <PipelineCard id={VIEW_PIPELINE.completed} data={data} />
-      <DealList
-        title="Recently installed"
-        jobs={recent}
-        empty="Nothing installed yet."
-        when={(j) => (j.installedAt ? shortDate(j.installedAt) : "Installed")}
-      />
-    </>
-  );
-}
-
-/** This week's installations: Monday to Sunday, each day with what is booked on it. */
-function Week({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
-  return (
-    <section className="mt-8" aria-labelledby="week">
-      <div className="flex items-baseline justify-between">
-        <h2 id="week" className="text-[17px] tracking-tight text-ink">
-          Installs this week
-        </h2>
-        <Link href={PATHS.installations} className={clsx(ui.link, "text-[13px]")}>
-          All installations <ArrowRight className="inline size-3.5" aria-hidden />
-        </Link>
-      </div>
-      <ol className={clsx(ui.card, "mt-3 grid grid-cols-1 divide-y divide-line sm:grid-cols-7 sm:divide-x sm:divide-y-0")}>
-        {weekOf(today).map((date) => {
-          const booked = (jobs ?? []).filter((j) => j.installDate === date && j.stage !== "lost");
-          const day = new Date(`${date}T00:00:00Z`);
-          return (
-            <li key={date} className={clsx("flex min-h-32 flex-col p-3", date === today && "bg-sun")}>
-              <p className="flex items-baseline justify-between gap-2 sm:block">
-                <span
-                  className={clsx("text-[11px] font-medium uppercase tracking-[0.14em]", date === today ? "text-sun-ink" : "text-muted")}
-                >
-                  {day.toLocaleDateString("en-AU", { weekday: "short", timeZone: "UTC" })}
-                </span>
-                <span className="block text-[20px] font-medium leading-tight tabular-nums text-ink sm:mt-0.5">
-                  {day.toLocaleDateString("en-AU", { day: "numeric", timeZone: "UTC" })}
-                  <span className="ml-1 text-xs font-normal text-muted">
-                    {day.toLocaleDateString("en-AU", { month: "short", timeZone: "UTC" })}
-                  </span>
-                </span>
-              </p>
-              <ul className="mt-2 space-y-1.5">
-                {booked.map((j) => (
-                  <li key={j.id}>
-                    <Link
-                      href={`${PATHS.deals}/${j.id}`}
-                      className={clsx(
-                        "block rounded-md px-2 py-1.5 text-xs leading-snug ring-1 hover:ring-ink-2",
-                        WON_STAGES.includes(j.stage) ? "bg-surface text-ink ring-line" : "bg-surface-2 text-ink-2 ring-line",
-                      )}
-                    >
-                      <span className="block truncate font-medium">{j.customerName}</span>
-                      <span className="block truncate text-muted">
-                        {j.kw ? `${power(j.kw)} · ` : ""}
-                        {j.address ? j.address.split(",")[0] : j.title}
-                      </span>
-                      <span className="block truncate text-[10px] uppercase tracking-[0.08em] text-muted">{STAGE_LABELS[j.stage]}</span>
-                    </Link>
-                  </li>
-                ))}
-                {jobs && booked.length === 0 && <li className="text-xs text-muted">–</li>}
-              </ul>
-            </li>
-          );
-        })}
-      </ol>
-    </section>
-  );
-}
-
 /** What happened last, across every customer. */
 function Latest({ data, problem }: { data: Overview | null; problem: string | null }) {
   return (
     <section className="mt-8" aria-labelledby="recent">
-      <h2 id="recent" className="text-[17px] tracking-tight text-ink">
+      <h2 id="recent" className="text-[15px] font-medium tracking-tight text-ink">
         Latest
       </h2>
       <div className={clsx(ui.card, "mt-3")}>
