@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { RoofModel } from "../roof-layout";
 import { FACE_EDGE } from "./drawing";
 import { EDGE_CLEARANCE } from "./pack";
-import { PANEL, looseCorners, panelFacing, type LoosePanel } from "./roof-design";
-import { MAX_SUGGESTED, imageryWhen, mismatchNote, modelOffset, suggestPanels } from "./suggest";
+import { PANEL, looseCorners, panelFacing, planSize, type LoosePanel } from "./roof-design";
+import { MAX_SUGGESTED, houseGrid, imageryWhen, mismatchNote, modelOffset, squareTo, suggestPanels } from "./suggest";
 
 const centre = { lat: -37.89, lng: 145.18 };
 const mLat = 111_132.954 - 559.822 * Math.cos((2 * centre.lat * Math.PI) / 180);
@@ -162,11 +162,12 @@ describe("a hip roof cut into many small faces (3 Bill Place)", () => {
     return [...by.values()];
   };
 
-  it.each([6, 10, 12, 14, 24])("lays %i panels as at most two arrays, none of fewer than four", (want) => {
+  it.each([6, 10, 12, 14, 24])("lays %i panels in the fewest arrays, none of fewer than four", (want) => {
     const panels = lay(want);
     expect(panels.length).toBeGreaterThanOrEqual(Math.min(want, 6));
     expect(panels.length).toBeLessThanOrEqual(want);
-    expect(arrays(panels).length).toBeLessThanOrEqual(2);
+    // Two arrays, or three above 18 panels, as pricing allows.
+    expect(arrays(panels).length).toBeLessThanOrEqual(want > 18 ? 3 : 2);
     expect(Math.min(...arrays(panels))).toBeGreaterThanOrEqual(4);
     expect(overlapping(panels)).toBe(false);
   });
@@ -176,5 +177,47 @@ describe("a hip roof cut into many small faces (3 Bill Place)", () => {
     expect(panels).toHaveLength(10);
     expect(panels.every((p) => !p.across)).toBe(true);
     expect(allWithin(hip, panels, offset)).toBe(true);
+  });
+});
+
+describe("square with the roof lines", () => {
+  it("reads the house's lines from its pitched faces, a quarter turn apart counting as one", () => {
+    const grid = houseGrid([
+      { facing: 53, weight: 16 },
+      { facing: 143, weight: 12 },
+      { facing: 233, weight: 8 },
+      { facing: 323, weight: 4 },
+    ])!;
+    expect(grid).toBeCloseTo(53, 0);
+    expect(squareTo(grid, 279)).toBeCloseTo(323, 0);
+    expect(squareTo(grid, 140)).toBeCloseTo(143, 0);
+  });
+
+  it("turns a nearly flat face's rows square with the house, and leaves a pitched face's as Google measured them", () => {
+    const model: RoofModel = {
+      panel: google,
+      faces: [
+        { azimuth: 45, pitch: 22 },
+        { azimuth: 280, pitch: 7 },
+      ],
+      slots: [
+        ...face(45, 22, 3, 8, "PORTRAIT", 0).map((s) => ({ ...s, kwh: 600 })),
+        ...face(280, 7, 4, 4, "PORTRAIT", 1, -15).map((s) => ({ ...s, kwh: 590 })),
+      ],
+    };
+    const panels = suggestPanels(model, centre, 20, PANEL, id);
+    const facings = new Set(panels.map((p) => panelFacing(p)));
+    expect(facings.has(45)).toBe(true);
+    // The low face looked 280° by Google's measure: its panels are laid square with the house, at 315°.
+    expect([...facings].every((f) => f === 45 || f === 315)).toBe(true);
+  });
+});
+
+describe("panels as seen from above", () => {
+  it("are shorter down their slope by the cosine of their tilt", () => {
+    const k = Math.cos((25 * Math.PI) / 180);
+    expect(planSize({ tilt: 25 }, PANEL)).toEqual({ w: PANEL.short, h: PANEL.long * k });
+    expect(planSize({ tilt: 25, across: true }, PANEL)).toEqual({ w: PANEL.short * k, h: PANEL.long });
+    expect(planSize({ tilt: 0 }, PANEL)).toEqual({ w: PANEL.short, h: PANEL.long });
   });
 });

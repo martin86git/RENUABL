@@ -81,6 +81,12 @@ export interface Face {
   tilt?: number;
   /** Places in the grid where a panel has been taken out. */
   off: number[];
+  /**
+   * Its grid drawn at the panels' true size from above (shorter down the slope by the cosine of the pitch), as
+   * panels placed by hand are (`planSize`). Faces traced before this have full-length places, so the places
+   * switched off and the strings saved with them still mean the same panels.
+   */
+  plan?: boolean;
 }
 
 /**
@@ -326,9 +332,21 @@ export const clearOf = (p: Point, polygon: Point[], margin: number) =>
   inside(p, polygon) && polygon.every((a, i) => distanceToEdge(p, a, polygon[(i + 1) % polygon.length]) >= margin - 1e-9);
 
 /** The four corners of a panel placed by hand. */
+/**
+ * A panel placed by hand, as seen from above: on a slope (or a tilt frame) the edge running down it is shorter by
+ * the cosine of its tilt, so a panel is drawn where it really sits on the roof in the photo (`w` across its long
+ * edge's side, `h` along it, before it is turned). Two rows of full-length panels on a 25° roof otherwise reach
+ * past the ridge on the picture while the real ones don't (Martin, 3 Bill Place).
+ */
+export function planSize(panel: Pick<LoosePanel, "across" | "tilt">, size: PanelSize = PANEL): { w: number; h: number } {
+  const k = Math.cos(((panel.tilt ?? TILT.roof) * Math.PI) / 180);
+  return panel.across ? { w: size.short * k, h: size.long } : { w: size.short, h: size.long * k };
+}
+
 export function looseCorners(panel: LoosePanel, size: PanelSize = PANEL): PlacedPanel["corners"] {
-  const w = size.short / 2;
-  const h = size.long / 2;
+  const plan = planSize(panel, size);
+  const w = plan.w / 2;
+  const h = plan.h / 2;
   return [
     { x: -w, y: -h },
     { x: w, y: -h },
@@ -370,12 +388,15 @@ export function faceArea(face: Pick<Face, "points">): number {
  * `setback` in from every edge. Includes the places switched off (`face.off`):
  * the caller decides whether to draw them.
  */
+/** How much shorter a face's places are down its slope, seen from above: by the cosine of its pitch, for faces drawn that way (`plan`). */
+const downSlope = (face: Pick<Face, "plan" | "tilt">) => (face.plan ? Math.cos(((face.tilt ?? TILT.roof) * Math.PI) / 180) : 1);
+
 /** How many rows and columns a face's grid has: a place's `index` is its row × `columns` + its column. */
 export function faceGrid(face: Face, size: PanelSize = PANEL): { rows: number; columns: number } {
   if (face.points.length < 3) return { rows: 0, columns: 0 };
   const turned = face.points.map((p) => rotate(p, -face.angle));
   const width = face.landscape ? size.long : size.short;
-  const height = face.landscape ? size.short : size.long;
+  const height = (face.landscape ? size.short : size.long) * downSlope(face);
   const xs = turned.map((p) => p.x);
   const ys = turned.map((p) => p.y);
   return {
@@ -389,7 +410,7 @@ export function panelPlaces(face: Face, size: PanelSize = PANEL): PlacedPanel[] 
   // Work in the face's own frame, where the rows run straight across.
   const turned = face.points.map((p) => rotate(p, -face.angle));
   const width = face.landscape ? size.long : size.short;
-  const height = face.landscape ? size.short : size.long;
+  const height = (face.landscape ? size.short : size.long) * downSlope(face);
   const minX = Math.min(...turned.map((p) => p.x));
   const maxX = Math.max(...turned.map((p) => p.x));
   const minY = Math.min(...turned.map((p) => p.y));
@@ -561,6 +582,7 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
       facing: FACINGS.includes(f.facing as Facing) ? (f.facing as Facing) : "N",
       tilt: Math.round(finite(f.tilt, 0, TILT.max) ?? TILT.roof),
       off: off.sort((a, b) => a - b),
+      ...(f.plan === true ? { plan: true } : {}),
     });
   }
   const loose: LoosePanel[] = [];

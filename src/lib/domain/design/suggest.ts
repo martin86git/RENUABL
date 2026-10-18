@@ -86,6 +86,45 @@ function longAxis(points: Pt[]): number {
   return turn360(90 + (fromEast * 180) / Math.PI) % 180;
 }
 
+/**
+ * Below this pitch, Google's measure of which way a face looks can't be trusted (a nearly flat roof barely slopes
+ * any way), so its rows are set square with the house instead.
+ */
+export const LOW_PITCH = 12;
+
+/**
+ * The way the house is set out: the direction its roof lines run, as an angle from 0 to 90, from its pitched faces'
+ * directions (a hip roof's faces look four ways at right angles), the faces with more spots counting more.
+ */
+export function houseGrid(faces: { facing: number; weight: number }[]): number | null {
+  let x = 0;
+  let y = 0;
+  for (const f of faces) {
+    // Four times the angle, so directions a quarter turn apart count as the same line.
+    x += f.weight * Math.cos(rad(f.facing * 4));
+    y += f.weight * Math.sin(rad(f.facing * 4));
+  }
+  if (Math.hypot(x, y) < 1e-9) return null;
+  return turn360((Math.atan2(y, x) * 180) / Math.PI / 4) % 90;
+}
+
+/** The direction square with the house (`grid`, plus a quarter turn or more) nearest a given one. */
+export function squareTo(grid: number, facing: number): number {
+  return turn360(grid + Math.round((facing - grid) / 90) * 90);
+}
+
+/**
+ * Rows square with the roof lines (Martin, 3 Bill Place: panels are never laid askew to the roof). A pitched face's
+ * rows follow Google's measure of it, which its spots are laid along; a nearly flat one's (under `LOW_PITCH`) are
+ * turned square with the house, set out from the pitched faces.
+ */
+function squared(groups: Group[]): Group[] {
+  const pitched = groups.filter((g) => g.pitch >= LOW_PITCH);
+  const grid = houseGrid(pitched.map((g) => ({ facing: g.facing, weight: g.spots.length })));
+  if (grid === null) return groups;
+  return groups.map((g) => (g.pitch < LOW_PITCH ? { ...g, facing: squareTo(grid, g.facing) } : g));
+}
+
 /** Google's spots, grouped: each sloped face on its own, the flat ones together. */
 function groupsOf(model: RoofModel, centre: { lat: number; lng: number }, offset: Pt): Group[] {
   const mLat = 111_132.954 - 559.822 * Math.cos(2 * rad(centre.lat));
@@ -123,7 +162,7 @@ function groupsOf(model: RoofModel, centre: { lat: number; lng: number }, offset
     const facing = [turn360(axis - 90), turn360(axis + 90)].reduce((a, b) => (Math.min(b, 360 - b) < Math.min(a, 360 - a) ? b : a));
     groups.push({ facing, pitch: Math.max(...flatPitches), spots: flat });
   }
-  return groups;
+  return squared(groups);
 }
 
 /** A group of Google's spots as a face to pack (`pack.ts`): on it means on one of its spots. */

@@ -120,7 +120,8 @@ export function packArea(area: Area, n: number, size: PanelSize, newId: () => st
   let below: { room: number; lo: number; hi: number } | null = null;
   while (lowerEdge > v0 && rows.length < 40) {
     const tryWay = (landscape: boolean) => {
-      const along = landscape ? size.short : size.long;
+      // Down the slope, as seen from above: shorter by the cosine of the pitch, as the designer draws it (`planSize`).
+      const along = (landscape ? size.short : size.long) * Math.cos((tilt * Math.PI) / 180);
       const across = landscape ? size.long : size.short;
       const v = lowerEdge - along / 2;
       const found = runs(v, across, along);

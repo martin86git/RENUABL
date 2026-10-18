@@ -86,18 +86,22 @@ describe("the roof designer", () => {
     expect(summary.kwhPerDay).toBeGreaterThan(summary.kw * 3.6 * 0.6);
   });
   it("lets a panel be placed by hand: freed from the grid where it stands, then moved and turned", () => {
-    const place = panelPlaces(face)[0];
-    const panel = freed(face, place, "p1");
-    // Freed, it covers exactly the place it came from.
-    const before = place.corners.map((c) => [c.x.toFixed(2), c.y.toFixed(2)].join()).sort();
-    const after = looseCorners(panel)
-      .map((c) => [c.x.toFixed(2), c.y.toFixed(2)].join())
-      .sort();
-    expect(after).toEqual(before);
-    // Turned a quarter, it lies on its side: wider than it is tall.
+    // A face drawn at the panels' true size from above, as every face traced now is.
+    const drawn = { ...face, plan: true };
+    const place = panelPlaces(drawn)[0];
+    const panel = freed(drawn, place, "p1");
+    // Freed, it covers the place it came from (to the centimetre its position is kept to).
+    const key = (c: { x: number; y: number }) => Math.round(c.x * 10) * 1000 + Math.round(c.y * 10);
+    const before = [...place.corners].sort((a, b) => key(a) - key(b));
+    const after = [...looseCorners(panel)].sort((a, b) => key(a) - key(b));
+    after.forEach((c, i) => {
+      expect(Math.abs(c.x - before[i].x)).toBeLessThanOrEqual(0.011);
+      expect(Math.abs(c.y - before[i].y)).toBeLessThanOrEqual(0.011);
+    });
+    // Turned a quarter, it lies on its side: wider than it is tall (seen from above, shorter down its slope).
     const turned = looseCorners({ ...panel, angle: 90 });
     const width = Math.max(...turned.map((c) => c.x)) - Math.min(...turned.map((c) => c.x));
-    expect(width).toBeCloseTo(PANEL.long, 5);
+    expect(width).toBeCloseTo(PANEL.long * Math.cos(((panel.tilt ?? TILT.roof) * Math.PI) / 180), 5);
     // With its place switched off and the panel placed by hand, the count is what it was.
     const design = { faces: [{ ...face, off: [place.index] }], loose: [panel] };
     expect(designSummary(design).panels).toBe(16);

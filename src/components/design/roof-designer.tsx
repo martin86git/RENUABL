@@ -92,6 +92,7 @@ import {
   panelFacing,
   panelOf,
   panelPlaces,
+  planSize,
   stringIsMixed,
   type DesignBattery,
   type DesignComment,
@@ -990,8 +991,11 @@ export function RoofDesigner(props: {
     if (!base) {
       // In the open, next to a panel: the outline takes the place the pointer is in, beside, above, below or at a
       // corner of the nearest panel, laid the way that panel is. Further off, it is a panel under the pointer.
-      const stepX = size.short + size.gap;
-      const stepY = size.long + size.gap;
+      // Each panel steps by its own size seen from above (`planSize`: shorter down a slope).
+      const stepsOf = (panel: LoosePanel) => {
+        const plan = planSize(panel, size);
+        return { stepX: plan.w + size.gap, stepY: plan.h + size.gap };
+      };
       let beside: { from: LoosePanel; i: number; j: number; away: number } | null = null;
       const standingNow = [
         ...loose,
@@ -1002,6 +1006,7 @@ export function RoofDesigner(props: {
         ),
       ];
       for (const from of standingNow) {
+        const { stepX, stepY } = stepsOf(from);
         const away = Math.hypot(p.x - from.x, p.y - from.y);
         if (away > stepY * 1.6 || (beside && away >= beside.away)) continue;
         const t = (from.angle * Math.PI) / 180;
@@ -1010,6 +1015,7 @@ export function RoofDesigner(props: {
         if ((i || j) && Math.abs(i) <= 1 && Math.abs(j) <= 1) beside = { from, i, j, away };
       }
       if (beside) {
+        const { stepX, stepY } = stepsOf(beside.from);
         const t = (beside.from.angle * Math.PI) / 180;
         const x = cm(beside.from.x + beside.i * stepX * Math.cos(t) - beside.j * stepY * Math.sin(t));
         const y = cm(beside.from.y + beside.i * stepX * Math.sin(t) + beside.j * stepY * Math.cos(t));
@@ -1026,9 +1032,10 @@ export function RoofDesigner(props: {
     const dy = p.y - base.y;
     const lx = dx * Math.cos(a) + dy * Math.sin(a);
     const ly = -dx * Math.sin(a) + dy * Math.cos(a);
-    const across = Math.abs(lx) / (size.short / 2) > Math.abs(ly) / (size.long / 2);
-    const ox = across ? Math.sign(lx || 1) * (size.short + size.gap) : 0;
-    const oy = across ? 0 : Math.sign(ly || 1) * (size.long + size.gap);
+    const plan = planSize(base, size);
+    const across = Math.abs(lx) / (plan.w / 2) > Math.abs(ly) / (plan.h / 2);
+    const ox = across ? Math.sign(lx || 1) * (plan.w + size.gap) : 0;
+    const oy = across ? 0 : Math.sign(ly || 1) * (plan.h + size.gap);
     const next = {
       ...base,
       id: "ghost",
@@ -1052,8 +1059,9 @@ export function RoofDesigner(props: {
     const a = (anchor.angle * Math.PI) / 180;
     const dx = p.x - anchor.x;
     const dy = p.y - anchor.y;
-    const stepX = size.short + size.gap;
-    const stepY = size.long + size.gap;
+    const plan = planSize(anchor, size);
+    const stepX = plan.w + size.gap;
+    const stepY = plan.h + size.gap;
     // How many panels the pointer is away from the first, across and along, in that panel's frame.
     const across = Math.max(-40, Math.min(40, Math.round((dx * Math.cos(a) + dy * Math.sin(a)) / stepX)));
     const along = Math.max(-20, Math.min(20, Math.round((-dx * Math.sin(a) + dy * Math.cos(a)) / stepY)));
@@ -1118,7 +1126,7 @@ export function RoofDesigner(props: {
     setTracing([]);
     if (points.length < 3) return;
     const id = newId("f");
-    const made: Face = { id, points, angle: 0, landscape: false, setback: 0.3, facing: "N", tilt: TILT.roof, off: [] };
+    const made: Face = { id, points, angle: 0, landscape: false, setback: 0.3, facing: "N", tilt: TILT.roof, off: [], plan: true };
     setFaces([...faces, { ...made, angle: angleOfLongestEdge(made) }]);
     changed();
     setSelected(id);
