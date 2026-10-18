@@ -4255,10 +4255,11 @@ export function RoofDesigner(props: {
                 <button
                   onClick={() => {
                     const wasOpen = fanOpen;
-                    pickTool("panel");
+                    // With panels picked, the fan is for turning them: Select stays on so they stay picked (Martin).
+                    if (!(tool === "select" && pickedPanels.length)) pickTool("panel");
                     setFanOpen(!wasOpen);
                   }}
-                  title="Add a panel"
+                  title={tool === "select" && pickedPanels.length ? "Portrait or landscape for the picked panels" : "Add a panel"}
                   aria-label="Add a panel"
                   aria-pressed={tool === "panel"}
                   className={clsx(
@@ -4273,7 +4274,9 @@ export function RoofDesigner(props: {
                     and the fan folds away. Each starts at the tool's icon and swings out to its place. */}
                 {([false, true] as const).map((landscape, n) => {
                   const name = landscape ? "Landscape" : "Portrait";
-                  const on = addLandscape === landscape;
+                  // Turning picked panels (Select still on), the lit bubble is the way they all lie now.
+                  const turning = tool === "select" && pickedPanels.length > 0;
+                  const on = turning ? pickedPanels.every((p) => Boolean(p.across) === landscape) : addLandscape === landscape;
                   // The icon of Add a panel, and each bubble's place on an arc around it (degrees clockwise from east).
                   const icon = { x: 4.8, y: 1.875 };
                   const angle = (n === 0 ? -8 : 48) * (Math.PI / 180);
