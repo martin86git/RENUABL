@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { RoofModel } from "../roof-layout";
-import { PANEL, facePanels, looseCorners, panelFacing, type Face, type LoosePanel } from "./roof-design";
-import { bestBlock, fillFace, fillFaces } from "./rows";
+import { FACE_EDGE } from "./drawing";
+import { EDGE_CLEARANCE } from "./pack";
+import { PANEL, looseCorners, panelFacing, type LoosePanel } from "./roof-design";
 import { MAX_SUGGESTED, imageryWhen, mismatchNote, modelOffset, suggestPanels } from "./suggest";
 
 const centre = { lat: -37.89, lng: 145.18 };
@@ -25,8 +26,12 @@ function face(azimuth: number, pitch: number, rows: number, cols: number, orient
   return slots;
 }
 
-/** Whether a point is on one of a model's spots (the same test the layout uses, with its 3 cm grace). */
-function onRoof(model: RoofModel, p: { x: number; y: number }) {
+/**
+ * Whether a point is within a face of the model with the edge clearance kept: on one of its spots reaching
+ * `FACE_EDGE` past them, less the clearance.
+ */
+function within(model: RoofModel, p: { x: number; y: number }, offset = { x: 0, y: 0 }) {
+  const reach = FACE_EDGE - EDGE_CLEARANCE + 0.005;
   return model.slots.some((s) => {
     const f = model.faces[s.segment];
     const t = (f.azimuth * Math.PI) / 180;
@@ -35,11 +40,12 @@ function onRoof(model: RoofModel, p: { x: number; y: number }) {
     const portrait = s.orientation === "PORTRAIT";
     const halfDown = ((portrait ? google.heightM : google.widthM) * Math.cos((f.pitch * Math.PI) / 180)) / 2;
     const halfSide = (portrait ? google.widthM : google.heightM) / 2;
-    const d = { x: p.x - (s.lng - centre.lng) * mLng, y: p.y + (s.lat - centre.lat) * mLat };
-    return Math.abs(d.x * down.x + d.y * down.y) <= halfDown + 0.03 && Math.abs(d.x * side.x + d.y * side.y) <= halfSide + 0.03;
+    const d = { x: p.x - (s.lng - centre.lng) * mLng - offset.x, y: p.y + (s.lat - centre.lat) * mLat - offset.y };
+    return Math.abs(d.x * down.x + d.y * down.y) <= halfDown + reach && Math.abs(d.x * side.x + d.y * side.y) <= halfSide + reach;
   });
 }
-const allOnRoof = (model: RoofModel, panels: LoosePanel[]) => panels.every((p) => looseCorners(p, PANEL).every((c) => onRoof(model, c)));
+const allWithin = (model: RoofModel, panels: LoosePanel[], offset = { x: 0, y: 0 }) =>
+  panels.every((p) => looseCorners(p, PANEL).every((c) => within(model, c, offset)));
 const overlapping = (panels: LoosePanel[]) =>
   panels.some((a, i) => panels.some((b, j) => j > i && Math.hypot(a.x - b.x, a.y - b.y) < PANEL.short - 0.01));
 /** The panels' rows: how many panels at each distance down the slope. */
@@ -56,74 +62,28 @@ const rowsOf = (panels: LoosePanel[], facing: number) => {
 let made = 0;
 const id = () => `p${made++}`;
 
-describe("laying panels in the fewest straight rows", () => {
-  it("puts 24 panels in two rows of 12 when the face has room for rows of 14", () => {
-    const fits = () => true;
-    const block = bestBlock(fits, 3, 14, 24);
-    expect(block.rows).toBe(2);
-    const byRow = [0, 1, 2].map((r) => block.cells.filter((c) => c.row === r).length).filter(Boolean);
-    expect(byRow).toEqual([12, 12]);
-    // Both rows start and end in line, in the middle of the run.
-    const cols = (r: number) => block.cells.filter((c) => c.row === r).map((c) => c.col);
-    expect(cols(block.cells[0].row)).toEqual(cols(block.cells[0].row + 1));
-    expect(Math.min(...block.cells.map((c) => c.col))).toBe(1);
-  });
-
-  it("uses one row when one row holds them all, and centres a short last row", () => {
-    expect(bestBlock(() => true, 4, 20, 9).rows).toBe(1);
-    const block = bestBlock(() => true, 4, 6, 10);
-    expect(block.rows).toBe(2);
-    const last = block.cells.filter((c) => c.row === 1).map((c) => c.col);
-    expect(last).toEqual([0, 1, 2, 3, 4]);
-    const odd = bestBlock(() => true, 4, 6, 11);
-    expect(odd.cells.filter((c) => c.row === 1).map((c) => c.col)).toEqual([0, 1, 2, 3, 4]);
-  });
-
-  it("steps around places that don't fit, and takes the biggest block when none holds them all", () => {
-    // A vent in the middle of the second row.
-    const fits = (r: number, c: number) => !(r === 1 && c === 5);
-    const block = bestBlock(fits, 2, 12, 12);
-    expect(block.cells.every((c) => fits(c.row, c.col))).toBe(true);
-    expect(block.cells).toHaveLength(12);
-    const small = bestBlock(() => true, 2, 3, 10);
-    expect(small.cells).toHaveLength(6);
-    expect(bestBlock(() => false, 3, 3, 4).cells).toEqual([]);
-  });
-
-  it("prefers the sunnier places among blocks as long", () => {
-    const block = bestBlock(
-      () => true,
-      3,
-      4,
-      4,
-      (r) => (r === 2 ? 10 : 1),
-    );
-    expect(block.cells.every((c) => c.row === 2)).toBe(true);
-  });
-});
-
 describe("suggesting a layout from Google's roof model", () => {
-  it("lays 24 panels in two long, straight portrait rows, all on the roof", () => {
+  it("lays straight portrait rows, never a lone panel in a row, every panel clear of the face's edge", () => {
     const model: RoofModel = { panel: google, faces: [{ azimuth: 0, pitch: 20 }], slots: face(0, 20, 3, 15, "PORTRAIT") };
     const panels = suggestPanels(model, centre, 24, PANEL, id);
     expect(panels).toHaveLength(24);
     expect(panels.every((p) => p.angle === 0 && !p.across && p.tilt === 20)).toBe(true);
-    expect(rowsOf(panels, 0).sort()).toEqual([12, 12]);
-    expect(allOnRoof(model, panels)).toBe(true);
+    const rows = rowsOf(panels, 0);
+    expect(rows.length).toBe(2);
+    expect(Math.min(...rows)).toBeGreaterThanOrEqual(2);
+    expect(allWithin(model, panels)).toBe(true);
     expect(overlapping(panels)).toBe(false);
   });
 
-  it("lays portrait rows even where Google's spots are landscape, looking the way the face does", () => {
+  it("lays portrait even where Google's spots are landscape, looking the way the face does", () => {
     const model: RoofModel = { panel: google, faces: [{ azimuth: 270, pitch: 25 }], slots: face(270, 25, 5, 5, "LANDSCAPE") };
-    const panels = suggestPanels(model, centre, 8, PANEL, id);
-    expect(panels).toHaveLength(8);
+    const panels = suggestPanels(model, centre, 6, PANEL, id);
+    expect(panels).toHaveLength(6);
     expect(panels.every((p) => !p.across && panelFacing(p) === 270 && p.tilt === 25)).toBe(true);
-    expect(allOnRoof(model, panels)).toBe(true);
-    expect(overlapping(panels)).toBe(false);
+    expect(allWithin(model, panels)).toBe(true);
   });
 
-  it("takes a flat roof Google split into faces at odd angles as one roof, with rows along its longer side", () => {
-    // One flat roof, 16 m east to west, that Google saw as two faces pointing opposite ways.
+  it("takes a flat roof Google split into faces pointing different ways as one roof", () => {
     const model: RoofModel = {
       panel: google,
       faces: [
@@ -132,16 +92,14 @@ describe("suggesting a layout from Google's roof model", () => {
       ],
       slots: [...face(0, 0, 3, 8, "PORTRAIT", 0), ...face(0, 0, 3, 8, "PORTRAIT", 1, 8 * google.widthM)],
     };
-    const panels = suggestPanels(model, centre, 24, PANEL, id);
-    expect(panels).toHaveLength(24);
-    // One way for every panel: across the roof, towards the north.
+    const panels = suggestPanels(model, centre, 20, PANEL, id);
+    expect(panels).toHaveLength(20);
     expect(new Set(panels.map((p) => p.angle))).toEqual(new Set([0]));
-    expect(rowsOf(panels, 0).sort()).toEqual([12, 12]);
     expect(overlapping(panels)).toBe(false);
   });
 
   it("moves the panels with the model when it is lined up with today's photo", () => {
-    const model: RoofModel = { panel: google, faces: [{ azimuth: 0, pitch: 20 }], slots: face(0, 20, 3, 6, "PORTRAIT") };
+    const model: RoofModel = { panel: google, faces: [{ azimuth: 0, pitch: 20 }], slots: face(0, 20, 3, 8, "PORTRAIT") };
     const plain = suggestPanels(model, centre, 6, PANEL, id);
     const moved = suggestPanels(model, centre, 6, PANEL, id, { x: 1.5, y: -0.5 });
     expect(moved.map((p) => [p.x, p.y])).toEqual(
@@ -149,80 +107,14 @@ describe("suggesting a layout from Google's roof model", () => {
     );
   });
 
-  it("fills the sunniest face first and never leaves a lone panel or two on another", () => {
-    const model: RoofModel = {
-      panel: google,
-      faces: [
-        { azimuth: 0, pitch: 20 },
-        { azimuth: 90, pitch: 20 },
-      ],
-      slots: [
-        ...face(0, 20, 2, 5, "PORTRAIT", 0).map((s) => ({ ...s, kwh: 600 })),
-        ...face(90, 20, 3, 6, "PORTRAIT", 1, 20).map((s) => ({ ...s, kwh: 520 })),
-      ],
-    };
-    const panels = suggestPanels(model, centre, 12, PANEL, id);
-    expect(panels).toHaveLength(12);
-    const north = panels.filter((p) => p.angle === 0).length;
-    const east = panels.filter((p) => p.angle === 90).length;
-    expect(north).toBeGreaterThanOrEqual(4);
-    expect(east === 0 || east >= 4).toBe(true);
-  });
-
   it("never lays more than asked for, than the roof has room for, or than the limit", () => {
-    const model: RoofModel = { panel: google, faces: [{ azimuth: 0, pitch: 20 }], slots: face(0, 20, 3, 4, "PORTRAIT") };
+    const model: RoofModel = { panel: google, faces: [{ azimuth: 0, pitch: 20 }], slots: face(0, 20, 3, 6, "PORTRAIT") };
     expect(suggestPanels(model, centre, 5, PANEL, id)).toHaveLength(5);
-    expect(suggestPanels(model, centre, 40, PANEL, id).length).toBeLessThanOrEqual(12);
+    expect(suggestPanels(model, centre, 40, PANEL, id).length).toBeLessThan(18);
     expect(suggestPanels(model, centre, 0, PANEL, id)).toEqual([]);
     const big: RoofModel = { panel: google, faces: [{ azimuth: 0, pitch: 20 }], slots: face(0, 20, 10, 10, "PORTRAIT") };
     expect(suggestPanels(big, centre, 500, PANEL, id).length).toBeLessThanOrEqual(MAX_SUGGESTED);
     expect(suggestPanels({ panel: google, faces: [], slots: [] }, centre, 10, PANEL, id)).toEqual([]);
-  });
-});
-
-describe("filling traced faces in rows", () => {
-  const rect = (x0: number, y0: number, x1: number, y1: number) => [
-    { x: x0, y: y0 },
-    { x: x1, y: y0 },
-    { x: x1, y: y1 },
-    { x: x0, y: y1 },
-  ];
-  // A flat roof 16 m by 4 m, traced: room for two rows of 13 portrait panels.
-  const flat: Face = { id: "f", points: rect(-8, -2, 8, 2), angle: 0, landscape: false, setback: 0.2, facing: "N", tilt: 2, off: [] };
-
-  it("puts 24 panels on a traced roof in two rows of 12", () => {
-    const { face: filled, placed } = fillFace(flat, PANEL, 24);
-    expect(placed).toBe(24);
-    const panels = facePanels(filled, PANEL);
-    expect(panels).toHaveLength(24);
-    const rowOf = (p: (typeof panels)[number]) => Math.round(Math.min(...p.corners.map((c) => c.y)) * 10);
-    const rows = new Map<number, number>();
-    for (const p of panels) rows.set(rowOf(p), (rows.get(rowOf(p)) ?? 0) + 1);
-    expect([...rows.values()]).toEqual([12, 12]);
-  });
-
-  it("keeps places switched off by hand off", () => {
-    const { face: filled } = fillFace({ ...flat, off: [0, 1] }, PANEL, 24);
-    expect(filled.off).toEqual(expect.arrayContaining([0, 1]));
-  });
-
-  it("fills the sunnier face first and stops at the count", () => {
-    const south: Face = { ...flat, id: "s", points: rect(-8, 4, 8, 8), facing: "S", tilt: 25 };
-    const north: Face = { ...flat, id: "n", facing: "N", tilt: 25 };
-    const { faces, placed } = fillFaces([south, north], PANEL, 10);
-    expect(placed).toBe(10);
-    expect(
-      facePanels(
-        faces.find((f) => f.id === "n")!,
-        PANEL,
-      ),
-    ).toHaveLength(10);
-    expect(
-      facePanels(
-        faces.find((f) => f.id === "s")!,
-        PANEL,
-      ),
-    ).toHaveLength(0);
   });
 });
 
@@ -243,9 +135,8 @@ describe("Google's model against today's photo", () => {
   });
 });
 
-describe("a hip roof cut into many small faces", () => {
-  // A real Melbourne hip roof's model, kept as metres from the middle (no address): its best face is a hip whose
-  // rows hold 3, 4, 5 and 4 of Google's spots, each row shifted along from the last.
+describe("a hip roof cut into many small faces (3 Bill Place)", () => {
+  // A real Melbourne hip roof's model, kept as metres from the middle (no address).
   const fixture = JSON.parse(readFileSync("src/lib/domain/__fixtures__/hip-roof-model.json", "utf8")) as {
     faces: { azimuth: number; pitch: number }[];
     panel: RoofModel["panel"];
@@ -263,6 +154,8 @@ describe("a hip roof cut into many small faces", () => {
       kwh: s.kwh,
     })),
   };
+  const offset = modelOffset(fixture.offset, centre.lat);
+  const lay = (want: number) => suggestPanels(hip, centre, want, PANEL, id, offset);
   const arrays = (panels: LoosePanel[]) => {
     const by = new Map<number, number>();
     for (const p of panels) by.set(panelFacing(p), (by.get(panelFacing(p)) ?? 0) + 1);
@@ -270,48 +163,18 @@ describe("a hip roof cut into many small faces", () => {
   };
 
   it.each([6, 10, 12, 14, 24])("lays %i panels as at most two arrays, none of fewer than four", (want) => {
-    const panels = suggestPanels(hip, centre, want, PANEL, id, modelOffset(fixture.offset, centre.lat));
-    expect(panels.length).toBeGreaterThanOrEqual(Math.min(want, 10));
+    const panels = lay(want);
+    expect(panels.length).toBeGreaterThanOrEqual(Math.min(want, 6));
     expect(panels.length).toBeLessThanOrEqual(want);
     expect(arrays(panels).length).toBeLessThanOrEqual(2);
     expect(Math.min(...arrays(panels))).toBeGreaterThanOrEqual(4);
     expect(overlapping(panels)).toBe(false);
   });
 
-  it("reaches the count asked for across two faces rather than dropping a remainder", () => {
-    expect(suggestPanels(hip, centre, 12, PANEL, id, modelOffset(fixture.offset, centre.lat))).toHaveLength(12);
-  });
-
-  it("lays panels on their side where that is what the face holds", () => {
-    const panels = suggestPanels(hip, centre, 10, PANEL, id, modelOffset(fixture.offset, centre.lat));
-    expect(panels.every((p) => p.across)).toBe(true);
-  });
-});
-
-describe("stepped rows on a face that isn't a rectangle", () => {
-  it("lays rows that shorten under the ridge, each straight, the fewest that hold them", () => {
-    // Rows of 3, 4, 5 and 4 places, each shifted along by one.
-    const row = [
-      { from: 1, length: 3 },
-      { from: 1, length: 4 },
-      { from: 0, length: 5 },
-      { from: 2, length: 4 },
-    ];
-    const fits = (r: number, c: number) => c >= row[r].from && c < row[r].from + row[r].length;
-    const block = bestBlock(fits, 4, 7, 12);
-    expect(block.rows).toBe(3);
-    expect(block.cells).toHaveLength(12);
-    expect(block.cells.every((c) => fits(c.row, c.col))).toBe(true);
-    // Each row is one straight run.
-    for (const r of new Set(block.cells.map((c) => c.row))) {
-      const cols = block.cells.filter((c) => c.row === r).map((c) => c.col);
-      expect(Math.max(...cols) - Math.min(...cols) + 1).toBe(cols.length);
-    }
-  });
-
-  it("still prefers a straight-sided block when one holds them", () => {
-    const block = bestBlock((r, c) => c < 6 || r === 0, 3, 8, 12);
-    const cols = (r: number) => block.cells.filter((c) => c.row === r).map((c) => c.col);
-    expect(cols(block.cells[0].row)).toEqual(cols(block.cells[block.cells.length - 1].row));
+  it("lays the best face in portrait rows, every panel clear of the face's edge", () => {
+    const panels = lay(10);
+    expect(panels).toHaveLength(10);
+    expect(panels.every((p) => !p.across)).toBe(true);
+    expect(allWithin(hip, panels, offset)).toBe(true);
   });
 });

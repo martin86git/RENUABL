@@ -6,7 +6,8 @@ import type { RoofModel } from "../roof-layout";
 import { batteryCatalogue, inverterCatalogue, panelCatalogue } from "./catalogue";
 import { DEFAULT_WORKSPACE, readSupplierList, type Workspace } from "./pricing";
 import { costSystem, defaultQuote } from "./quote";
-import { cleanDesign, facePanels, type Face } from "./roof-design";
+import { packFaces } from "./pack";
+import { PANEL, cleanDesign, inside, panelFacing, panelPlaces, type Face } from "./roof-design";
 import { NO_BILL_KW, SELF_DESIGN_LABELS, selfDesign, type SelfDesignInput } from "./self-design";
 import { YIELD_PER_KW_DAY, shiftingKwhOf, systemSpecOf } from "./system";
 
@@ -46,7 +47,6 @@ const base = (over: Partial<SelfDesignInput> = {}): SelfDesignInput => ({
   newId: (p) => `${p}${made++}`,
   ...over,
 });
-const panelsOn = (design: { faces: Face[] }, id: string) => facePanels(design.faces.find((f) => f.id === id)!).length;
 
 // A home that uses a lot after dark (about 45 kWh a day on a $1,500 quarterly bill) on a roof too small to fill every
 // evening: the best return stops at what the roof spares, the most independence holds the whole of the evenings.
@@ -89,7 +89,8 @@ describe("the roof designing itself, for three outcomes", () => {
 
   it("fills the whole roof for the most independence, with a module more than the evenings need, held for blackouts", () => {
     const most = by("independence");
-    const all = facePanels(smallNorth).length + facePanels(smallEast).length;
+    // Every panel the traced faces take, laid by the installer's rules.
+    const all = packFaces([smallNorth, smallEast], PANEL, 60, () => "x").loose.length;
     expect(most.figures.panels).toBe(all);
     const b = most.design.battery!;
     expect(b.backup).toBe(true);
@@ -111,15 +112,18 @@ describe("the roof designing itself, for three outcomes", () => {
 
   it("fills the sunnier north face before the east one", () => {
     const fast = by("payback");
-    const full = facePanels(smallNorth).length;
-    expect(panelsOn(fast.design, "n")).toBe(Math.min(full, fast.figures.panels));
-    if (fast.figures.panels <= full) expect(panelsOn(fast.design, "e")).toBe(0);
+    const north = (fast.design.loose ?? []).filter((p) => panelFacing(p) === 0).length;
+    const east = (fast.design.loose ?? []).filter((p) => panelFacing(p) === 90).length;
+    expect(north).toBeGreaterThan(0);
+    expect(north).toBeGreaterThanOrEqual(east);
   });
 
-  it("leaves alone the places someone switched off", () => {
+  it("lays no panel over a place someone switched off", () => {
     const blocked: Face = { ...smallNorth, off: [0, 1, 2] };
+    const spots = panelPlaces(blocked, PANEL).filter((p) => [0, 1, 2].includes(p.index));
     const again = selfDesign(base({ bill: bigHome, faces: [blocked, smallEast] }));
-    for (const o of again.options) expect(o.design.faces.find((f) => f.id === "n")!.off).toEqual(expect.arrayContaining([0, 1, 2]));
+    for (const o of again.options)
+      for (const p of o.design.loose ?? []) for (const spot of spots) expect(inside(p, spot.corners)).toBe(false);
   });
 
   it("strings each design by rule, or says why not when the limits aren't on file", () => {

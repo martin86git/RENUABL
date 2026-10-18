@@ -39,7 +39,8 @@ export function hull(points: readonly P[]): P[] {
 }
 
 /** How far a drawn face reaches past its outermost panel spots: a little, as a roof's edge does. */
-const EDGE = 0.35;
+export const FACE_EDGE = 0.35;
+const EDGE = FACE_EDGE;
 
 /**
  * Google's roof model as faces to draw: for each of its faces with panel

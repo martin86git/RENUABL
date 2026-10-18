@@ -21,9 +21,6 @@ import { todayInMarket } from "@/lib/domain/market";
 import type { RebateRates } from "@/lib/domain/rebates";
 
 const money = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
-/** The three things about the home, small, so they take one row. */
-const small =
-  "mt-0.5 block h-8 w-full appearance-auto rounded-md border border-line bg-surface px-1 text-xs tabular-nums outline-none focus:border-forest";
 const label = "text-[10px] font-medium uppercase tracking-[0.14em] text-muted";
 
 /**
@@ -75,9 +72,9 @@ export function DesignQuote(props: {
   // The three things about the home that change the price are easy to pass over: they sit in a pad that asks to be
   // checked, and it settles once one of them has been set on this visit.
   const [checked, setChecked] = useState(false);
-  const set = (name: keyof typeof form) => (e: { target: { value: string } }) => {
+  const pick = (name: "roof" | "storeys" | "phase", value: string) => {
     setChecked(true);
-    props.onChange({ form: { ...form, [name]: e.target.value } as QuoteFields["form"], edits });
+    props.onChange({ form: { ...form, [name]: value } as QuoteFields["form"], edits });
   };
   const edit = (l: CostLine, to: { amount?: number; removed?: boolean } | null) => {
     const next = { ...edits };
@@ -87,69 +84,119 @@ export function DesignQuote(props: {
   };
 
   return (
-    <section className="rounded-lg border border-line bg-surface p-4" aria-label="Quote builder">
+    <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder">
       <div className="flex items-baseline justify-between gap-2">
         <p className={label}>Quote builder · {props.design}</p>
         <Link href="/design/settings" className="text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
           Prices and settings
         </Link>
       </div>
-      <div className={checked ? "mt-3 rounded-md border border-line bg-canvas p-2" : "mt-3 rounded-md border border-sun-line bg-sun p-2"}>
-        <p className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]">
-          <span className={checked ? "text-ink-2" : "text-sun-ink"}>This home</span>
-          <span className={checked ? "text-muted" : "text-sun-ink"}>
-            {checked ? "Set on this visit" : "Check these: they change the price"}
-          </span>
+      {/* The three things about the home that change the price, as toggles: one tap each. */}
+      <div
+        className={checked ? "mt-2.5 rounded-md border border-line bg-canvas p-2" : "mt-2.5 rounded-md border border-sun-line bg-sun p-2"}
+      >
+        <p
+          className={
+            checked
+              ? "text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2"
+              : "text-[10px] font-semibold uppercase tracking-[0.14em] text-sun-ink"
+          }
+        >
+          {checked ? "This home" : "This home · check these, they change the price"}
         </p>
-        <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-[11px] font-medium">
-          <label>
-            Roof
-            <select value={form.roof} onChange={set("roof")} className={small}>
-              <option value="tile">Tile</option>
-              <option value="tin">Tin</option>
-              <option value="flat">Flat</option>
-            </select>
-          </label>
-          <label>
-            Storeys
-            <select value={form.storeys} onChange={set("storeys")} className={small}>
-              <option value="single">Single</option>
-              <option value="double">Double</option>
-            </select>
-          </label>
-          <label>
-            Phase
-            <select value={form.phase} onChange={set("phase")} className={small}>
-              <option value="single">Single</option>
-              <option value="three">Three</option>
-            </select>
-          </label>
+        <div className="mt-1.5 grid grid-cols-[3.5rem_1fr] items-center gap-x-2 gap-y-1 text-[11px] font-medium text-ink-2">
+          {(
+            [
+              [
+                "roof",
+                "Roof",
+                form.roof,
+                [
+                  ["tile", "Tile"],
+                  ["tin", "Tin"],
+                  ["flat", "Flat"],
+                ],
+              ],
+              [
+                "storeys",
+                "Storeys",
+                form.storeys,
+                [
+                  ["single", "Single"],
+                  ["double", "Double"],
+                ],
+              ],
+              [
+                "phase",
+                "Phase",
+                form.phase,
+                [
+                  ["single", "Single"],
+                  ["three", "Three"],
+                ],
+              ],
+            ] as const
+          ).map(([name, title, value, choices]) => (
+            <div key={name} className="contents">
+              <span>{title}</span>
+              <div role="radiogroup" aria-label={title} className="flex rounded-md border border-line bg-surface p-0.5">
+                {choices.map(([v, text]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    role="radio"
+                    aria-checked={value === v}
+                    onClick={() => pick(name, v)}
+                    className={
+                      value === v
+                        ? "flex-1 rounded-[5px] bg-ink px-2 py-0.5 text-canvas"
+                        : "flex-1 rounded-[5px] px-2 py-0.5 text-ink-2 hover:text-ink"
+                    }
+                  >
+                    {text}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Solar Victoria: switched on, the rebate (and loan) go on the quote and on its proposal, always as "if approved". */}
-      <div className="mt-3 rounded-md border border-sun-line bg-sun p-2.5" role="group" aria-label="Solar Victoria">
-        <p className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sun-ink">
-          <span>Solar Victoria</span>
-          <span>Subject to eligibility and approval</span>
-        </p>
-        {(
-          [
-            ["Solar Victoria rebate", Boolean(form.solarVicRebate), (on: boolean) => setSolarVic(on, on && Boolean(form.solarVicLoan))],
-            ["Solar Victoria loan", Boolean(form.solarVicLoan), (on: boolean) => setSolarVic(Boolean(form.solarVicRebate) || on, on)],
-          ] as const
-        ).map(([name, on, set]) => (
-          <label key={name} className="mt-2 flex cursor-pointer items-center justify-between gap-3 text-[13px] font-medium text-ink">
-            {name}
-            <span className="relative inline-flex shrink-0">
-              <input type="checkbox" role="switch" className="peer sr-only" checked={on} onChange={(e) => set(e.target.checked)} />
-              <span className="h-6 w-11 rounded-full bg-line-strong peer-checked:bg-sun-line peer-focus-visible:ring-2 peer-focus-visible:ring-ink" />
-              <span className="absolute left-0.5 top-0.5 size-5 rounded-full bg-surface shadow-[var(--shadow-soft)] peer-checked:translate-x-5" />
-            </span>
-          </label>
-        ))}
-        {form.solarVicRebate && solarVicOff && <p className="mt-2 text-xs text-sun-ink">{solarVicOff} Nothing is added to this quote.</p>}
-        {!form.solarVicRebate && <p className="mt-2 text-xs text-ink-2">Off: neither appears on the quote or its proposal.</p>}
+      <div className="mt-2 rounded-md border border-line bg-canvas px-2 py-1.5" role="group" aria-label="Solar Victoria">
+        <div className="flex items-center gap-3 text-[11px] font-medium text-ink">
+          <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">Solar Vic</span>
+          {(
+            [
+              ["Rebate", Boolean(form.solarVicRebate), (on: boolean) => setSolarVic(on, on && Boolean(form.solarVicLoan))],
+              ["Loan", Boolean(form.solarVicLoan), (on: boolean) => setSolarVic(Boolean(form.solarVicRebate) || on, on)],
+            ] as const
+          ).map(([name, on, set]) => (
+            <label
+              key={name}
+              className="flex cursor-pointer items-center gap-1.5"
+              title={`Solar Victoria ${name.toLowerCase()}: subject to eligibility and approval`}
+            >
+              <span className="relative inline-flex shrink-0">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  aria-label={`Solar Victoria ${name.toLowerCase()}`}
+                  className="peer sr-only"
+                  checked={on}
+                  onChange={(e) => set(e.target.checked)}
+                />
+                <span className="h-4 w-7 rounded-full bg-line-strong peer-checked:bg-sun-line peer-focus-visible:ring-2 peer-focus-visible:ring-ink" />
+                <span className="absolute left-0.5 top-0.5 size-3 rounded-full bg-surface shadow-[var(--shadow-soft)] peer-checked:translate-x-3" />
+              </span>
+              {name}
+            </label>
+          ))}
+          <span className="ml-auto whitespace-nowrap text-[10px] text-muted">If approved</span>
+        </div>
+        {form.solarVicRebate && solarVicOff && (
+          <p className="mt-1 text-[11px] text-sun-ink">{solarVicOff} Nothing is added to this quote.</p>
+        )}
       </div>
 
       {empty ? (

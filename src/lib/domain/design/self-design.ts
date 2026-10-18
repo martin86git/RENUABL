@@ -41,11 +41,9 @@ import type { Workspace } from "./pricing";
 import { DAY, costSystem, designFinance, stcValue, type BillInterval, type QuoteForm } from "./quote";
 import {
   ROOF_IMAGE,
-  faceFacing,
   metresPerPixel,
   monthlyProduction,
   panelOf,
-  panelPlaces,
   designSummary,
   type DesignBattery,
   type DesignGoal,
@@ -57,9 +55,8 @@ import {
   MAX_BATTERY_QTY,
 } from "./roof-design";
 import { MAX_SUGGESTED, suggestPanels } from "./suggest";
-import { fillFaces } from "./rows";
+import { packFaces } from "./pack";
 import { shiftingKwhOf, systemSpecOf } from "./system";
-import { TILT, yearOnPlane } from "./tilt";
 
 /**
  * The years "best return" is counted over. VERIFY: panels are warranted for 25 years or more and batteries
@@ -161,33 +158,24 @@ interface Source {
   layout: (n: number) => Layout;
 }
 
-/** The traced faces, sunniest first, each in the fewest straight rows (`fillFaces`); places switched off stay off. */
-function tracedSource(faces: Face[], panel: PanelSpec | undefined): Source | null {
+/**
+ * The traced faces, laid by the installer's rules (`packFaces`: rows from the gutter up, portrait unless only
+ * landscape fits, clear of every edge, the fewest arrays), as panels placed by hand on the faces.
+ */
+function tracedSource(faces: Face[], panel: PanelSpec | undefined, newId: (prefix: string) => string): Source | null {
   const size = panelOf({ panel });
-  const best = yearOnPlane(TILT.roof, 0);
-  const ranked = faces
-    .map((face) => {
-      const off = new Set(face.off);
-      return {
-        face,
-        open: panelPlaces(face, size)
-          .map((p) => p.index)
-          .filter((i) => !off.has(i)),
-        sun: yearOnPlane(face.tilt ?? TILT.roof, faceFacing(face)) / best,
-      };
-    })
-    .filter((f) => f.open.length)
-    .sort((a, b) => b.sun - a.sun);
-  const most = ranked.reduce((n, f) => n + f.open.length, 0);
-  if (!most) return null;
-  const top = ranked[0].sun;
-  const good = ranked.filter((f) => f.sun >= top * GOOD_SUN).reduce((n, f) => n + f.open.length, 0);
-  return {
-    from: "traced",
-    most,
-    good,
-    layout: (n) => ({ faces: fillFaces(faces, size, n).faces, loose: [], ...(panel ? { panel } : {}) }),
+  const made = new Map<number, Layout>();
+  const lay = (n: number): Layout => {
+    const kept = made.get(n);
+    if (kept) return kept;
+    const packed = packFaces(faces, size, n, () => newId("p"));
+    const laid: Layout = { faces: packed.faces, loose: packed.loose, ...(panel ? { panel } : {}) };
+    made.set(n, laid);
+    return laid;
   };
+  const most = lay(MAX_SUGGESTED).loose?.length ?? 0;
+  if (!most) return null;
+  return { from: "traced", most, good: most, layout: lay };
 }
 
 /** Google's roof model: its spots laid as panels placed by hand (`suggestPanels`). */
@@ -367,7 +355,7 @@ function dailyUse(bill: NonNullable<SelfDesignInput["bill"]>): number | null {
 const countFor = (kw: number, watts: number, most: number) => Math.max(1, Math.min(most, Math.round((kw * 1000) / watts)));
 
 export function selfDesign(input: SelfDesignInput): SelfDesignResult {
-  const source = (input.faces.length ? tracedSource(input.faces, input.panel) : null) ?? modelSource(input);
+  const source = (input.faces.length ? tracedSource(input.faces, input.panel, input.newId) : null) ?? modelSource(input);
   if (!source)
     return {
       options: [],

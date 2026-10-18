@@ -4,25 +4,23 @@
  *
  * Google's model says where on the roof a panel can go (every spot it found,
  * each on a roof face with that face's direction and pitch). Those spots are
- * used only as the area panels may cover: the panels themselves are laid
- * afresh, all portrait, in long straight rows along each face (the fewest rows
- * that hold them, `bestBlock`), every one wholly inside that area. Google's
- * own spots are often landscape and laid at odd angles on flat roofs; copying
- * them gave blocks stacked at angles and panels hanging off the roof. Faces
- * flatter than `FLAT_FACE` are taken together as one flat roof, with rows
- * along its longer side. The sunniest face is filled first; the rest go on
- * the next, never a group of fewer than `MIN_ARRAY_PANELS` unless nothing
- * else fits.
+ * used only as the area each face offers: the panels are laid afresh by the
+ * installer's rules in `pack.ts` (rows from the gutter up in a pyramid,
+ * portrait unless only landscape fits, clear of every edge for wind, one face
+ * per array, the fewest arrays). Google's own spots are often landscape and
+ * laid at odd angles on flat roofs; copying them gave blocks stacked at angles
+ * and panels hanging off the roof. Faces flatter than `FLAT_FACE` are taken
+ * together as one flat roof, with rows along its longer side.
  *
  * Google's model can be older than the roof (2 Hanwell Court, Glen Waverley:
  * the 2018 house), so the designer checks it lines up with today's photo
  * before using it. Whatever comes out is a starting point to check against
  * the picture: it knows nothing of vents, skylights or setbacks it isn't shown.
  */
-import { MIN_ARRAY_PANELS, type RoofModel } from "../roof-layout";
+import type { RoofModel } from "../roof-layout";
 import { metresPerPixel, type LoosePanel, type PanelSize } from "./roof-design";
-import { bestBlock } from "./rows";
-import { TILT } from "./tilt";
+import { FACE_EDGE, hull } from "./drawing";
+import { packAreas, type Area } from "./pack";
 
 /** The most panels a suggestion lays out. */
 export const MAX_SUGGESTED = 60;
@@ -64,10 +62,10 @@ const downOf = (bearing: number): Pt => ({ x: Math.sin(rad(bearing)), y: -Math.c
 const sideOf = (bearing: number): Pt => ({ x: Math.cos(rad(bearing)), y: Math.sin(rad(bearing)) });
 
 /** Whether a point is on one of the spots (a couple of centimetres' grace for rounding). */
-const covered = (p: Pt, spots: Footprint[]) =>
+const covered = (p: Pt, spots: Footprint[], reach = 0.03) =>
   spots.some((s) => {
     const d = { x: p.x - s.centre.x, y: p.y - s.centre.y };
-    return Math.abs(dot(d, s.down)) <= s.halfDown + 0.06 && Math.abs(dot(d, s.side)) <= s.halfSide + 0.06;
+    return Math.abs(dot(d, s.down)) <= s.halfDown + reach && Math.abs(dot(d, s.side)) <= s.halfSide + reach;
   });
 
 /** The direction of the longer side of a scatter of points, as a bearing (0 to 180). */
@@ -128,89 +126,29 @@ function groupsOf(model: RoofModel, centre: { lat: number; lng: number }, offset
   return groups;
 }
 
-/** Panels laid on a group in the fewest straight rows, at most `n`: portrait (long edge down the slope) or landscape. */
-function layGroup(group: Group, n: number, size: PanelSize, newId: () => string, landscape = false): LoosePanel[] {
-  const down = downOf(group.facing);
-  const side = sideOf(group.facing);
-  const along = landscape ? size.short : size.long;
-  const across = landscape ? size.long : size.short;
-  // Spaced at full size, as the designer draws every panel from above, so drawn panels never overlap.
-  const stepDown = along + size.gap;
-  const stepSide = across + size.gap;
-  const corners = group.spots.flatMap((s) =>
-    [-1, 1].flatMap((a) =>
-      [-1, 1].map((b) => ({
-        x: s.centre.x + a * s.halfDown * s.down.x + b * s.halfSide * s.side.x,
-        y: s.centre.y + a * s.halfDown * s.down.y + b * s.halfSide * s.side.y,
-      })),
+/** A group of Google's spots as a face to pack (`pack.ts`): on it means on one of its spots. */
+function areaOf(group: Group, others: Group[]): Area {
+  // The face: its spots, each reaching `FACE_EDGE` past its edges as a roof's edge does (which bridges the gaps
+  // where Google staggered them, without filling in what isn't roof), and never a point on another face's spots,
+  // so an array can't reach across onto the next roof. The packer keeps its distance from that edge.
+  const outline = hull(
+    group.spots.flatMap((s) =>
+      [-1, 1].flatMap((a) =>
+        [-1, 1].map((b) => ({
+          x: s.centre.x + a * (s.halfDown + FACE_EDGE) * s.down.x + b * (s.halfSide + FACE_EDGE) * s.side.x,
+          y: s.centre.y + a * (s.halfDown + FACE_EDGE) * s.down.y + b * (s.halfSide + FACE_EDGE) * s.side.y,
+        })),
+      ),
     ),
   );
-  const us = corners.map((p) => dot(p, side));
-  const vs = corners.map((p) => dot(p, down));
-  const [u0, u1, v0, v1] = [Math.min(...us), Math.max(...us), Math.min(...vs), Math.max(...vs)];
-  const cols = Math.floor((u1 - u0) / stepSide) + 1;
-  const rows = Math.floor((v1 - v0) / stepDown) + 1;
-  if (cols < 1 || rows < 1 || cols * rows > 6000) return [];
-  const at = (u: number, v: number): Pt => ({ x: u * side.x + v * down.x, y: u * side.y + v * down.y });
-  const hw = across / 2 - 0.02;
-  // Seen from above, a panel on a slope is shorter down it: what it really covers of the roof is what must fit.
-  const hl = (along * Math.cos(rad(group.pitch))) / 2 - 0.02;
-  // The grid can start anywhere within a step: try a few starts each way and keep the one where most panels fit.
-  let best: { fits: boolean[]; kwh: number[]; start: Pt; count: number } | null = null;
-  for (const fu of [0, 0.25, 0.5, 0.75])
-    for (const fv of [0, 0.25, 0.5, 0.75]) {
-      const start = { x: u0 + fu * stepSide + across / 2, y: v0 + fv * stepDown + along / 2 };
-      const fits: boolean[] = [];
-      const kwh: number[] = [];
-      let count = 0;
-      for (let r = 0; r < rows; r++)
-        for (let c = 0; c < cols; c++) {
-          const u = start.x + c * stepSide;
-          const v = start.y + r * stepDown;
-          const probe = [-1, 0, 1].flatMap((a) => [-1, 0, 1].map((b) => at(u + a * hw, v + b * hl)));
-          const ok = probe.every((p) => covered(p, group.spots));
-          fits.push(ok);
-          const mid = at(u, v);
-          const near = group.spots.reduce((a, s) =>
-            (s.centre.x - mid.x) ** 2 + (s.centre.y - mid.y) ** 2 < (a.centre.x - mid.x) ** 2 + (a.centre.y - mid.y) ** 2 ? s : a,
-          );
-          kwh.push(near.kwh);
-          if (ok) count++;
-        }
-      if (!best || count > best.count) best = { fits, kwh, start, count };
-    }
-  if (!best?.count) return [];
-  const { fits, kwh, start } = best;
-  const block = bestBlock(
-    (r, c) => fits[r * cols + c],
-    rows,
-    cols,
-    n,
-    (r, c) => kwh[r * cols + c],
-  );
-  const tilt = Math.max(0, Math.min(TILT.max, Math.round(group.pitch)));
-  const facing = Math.round(group.facing) % 360;
-  return block.cells.map(({ row, col }) => {
-    const p = at(start.x + col * stepSide, start.y + row * stepDown);
-    // On its side, a panel's angle is a quarter turn back from the way it looks (`panelFacing`).
-    return landscape
-      ? { id: newId(), x: cm(p.x), y: cm(p.y), angle: (facing + 270) % 360, across: true, tilt }
-      : { id: newId(), x: cm(p.x), y: cm(p.y), angle: facing, tilt };
-  });
+  return {
+    facing: group.facing,
+    pitch: group.pitch,
+    covers: (p) => covered(p, group.spots, FACE_EDGE) && !others.some((o) => covered(p, o.spots, 0)),
+    outline,
+    sun: group.spots.reduce((t, s) => t + s.kwh, 0) / group.spots.length,
+  };
 }
-
-/** The way a group is laid: portrait when that holds the panels wanted (or as many as landscape would), else landscape. */
-function bestWay(group: Group, n: number, size: PanelSize, newId: () => string): LoosePanel[] {
-  const upright = layGroup(group, n, size, newId);
-  if (upright.length >= n) return upright;
-  const onSide = layGroup(group, n, size, newId, true);
-  return onSide.length > upright.length ? onSide : upright;
-}
-
-/** Faces steeper than this are walls or gables in Google's model, never a place for panels. */
-const STEEPEST = 45;
-/** A face gets at least this share of the sunniest face's sun to be used. */
-const SUNNY_ENOUGH = 0.8;
 
 export function suggestPanels(
   model: RoofModel,
@@ -222,48 +160,19 @@ export function suggestPanels(
   /** Where Google's model sits on the picture, in metres east and south: from lining it up with today's photo. */
   offset: Pt = { x: 0, y: 0 },
 ): LoosePanel[] {
-  const want = Math.min(MAX_SUGGESTED, Math.max(0, Math.round(count)));
-  if (!want) return [];
-  const sun = (g: Group) => g.spots.reduce((t, s) => t + s.kwh, 0) / g.spots.length;
-  const groups = groupsOf(model, centre, offset)
-    .filter((g) => g.pitch <= STEEPEST)
-    .sort((a, b) => sun(b) - sun(a));
-  if (!groups.length) return [];
-  const top = sun(groups[0]);
-  const sunny = groups.filter((g) => sun(g) >= top * SUNNY_ENOUGH);
-  // How many each face holds in one tidy block: one id for every panel tried, so the count of ids stays honest.
-  let tried = 0;
-  const probeId = () => `t${tried++}`;
-  const room = new Map(sunny.map((g) => [g, bestWay(g, MAX_SUGGESTED, size, probeId).length]));
-
-  // One array when a face nearly as sunny as the best (within 5%) holds them all: the sunniest that does.
-  const whole = sunny.find((g) => (room.get(g) ?? 0) >= want && sun(g) >= top * 0.95);
-  if (whole) return bestWay(whole, want, size, newId);
-
-  // Else the fewest arrays (two, or three above 18 panels, as pricing allows), the sunniest faces first, none under
-  // `MIN_ARRAY_PANELS`: a remainder too small for an array of its own is left off rather than scattered.
-  const most = want > 18 ? 3 : 2;
-  const out: LoosePanel[] = [];
-  let left = want;
-  let arrays = 0;
-  // The sunniest faces first (`sunny` is in order of sun).
-  const order = sunny;
-  order.forEach((g, i) => {
-    if (!left || arrays >= most) return;
-    let take = Math.min(left, room.get(g) ?? 0);
-    // Leave enough for a proper array on a face still to come, rather than a remainder too small to lay.
-    const rest = left - take;
-    const later = order.slice(i + 1).some((h) => (room.get(h) ?? 0) >= MIN_ARRAY_PANELS);
-    if (rest > 0 && rest < MIN_ARRAY_PANELS && later && arrays + 1 < most && take - (MIN_ARRAY_PANELS - rest) >= MIN_ARRAY_PANELS)
-      take -= MIN_ARRAY_PANELS - rest;
-    if (take < MIN_ARRAY_PANELS) return;
-    const panels = bestWay(g, take, size, newId);
-    if (panels.length < MIN_ARRAY_PANELS) return;
-    out.push(...panels);
-    arrays += 1;
-    left -= panels.length;
-  });
-  return out;
+  const groups = groupsOf(model, centre, offset);
+  return packAreas(
+    groups.map((g) =>
+      areaOf(
+        g,
+        groups.filter((o) => o !== g),
+      ),
+    ),
+    Math.min(MAX_SUGGESTED, count),
+    size,
+    newId,
+    MAX_SUGGESTED,
+  );
 }
 
 /**
