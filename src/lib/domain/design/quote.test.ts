@@ -276,3 +276,46 @@ describe("Solar Victoria on a quote", () => {
     expect(read({ solarVicRebate: true, solarVicLoan: true })).toMatchObject({ solarVicRebate: true, solarVicLoan: true });
   });
 });
+
+describe("quantities typed over a line", () => {
+  const line = { group: "Battery" as const, label: "3 × Battery module", amount: 3000, qty: 3, sku: "BAT" };
+  const allowance = { group: "Electrical" as const, label: "Cable, conduit, labels and sundries (allowance)", amount: 120 };
+
+  it("price the line again at its cost each", () => {
+    const [edited] = editedLines([line], { [lineKey(line)]: { qty: 5 } });
+    expect(edited.qty).toBe(5);
+    expect(edited.amount).toBe(5000);
+  });
+
+  it("give way to a cost typed over the same line", () => {
+    const [edited] = editedLines([line], { [lineKey(line)]: { qty: 5, amount: 4200 } });
+    expect(edited.qty).toBe(5);
+    expect(edited.amount).toBe(4200);
+  });
+
+  it("leave a line with no count alone", () => {
+    const [edited] = editedLines([allowance], { [lineKey(allowance)]: { qty: 4 } });
+    expect(edited).toEqual(allowance);
+  });
+
+  it("are kept with the design, whole numbers within reason only", () => {
+    const kept = cleanExtras(
+      {
+        quotes: [
+          {
+            edits: {
+              a: { qty: 5 },
+              b: { qty: 5, amount: 99.5 },
+              c: { qty: -1 },
+              d: { qty: 2.5 },
+              e: { qty: 5000 },
+            },
+          },
+        ],
+      },
+      1,
+      { bill: defaultBill(DEFAULT_WORKSPACE.settings.bill), postcode: "3150" },
+    );
+    expect(kept.quotes[0].edits).toEqual({ a: { qty: 5 }, b: { amount: 99.5, qty: 5 } });
+  });
+});

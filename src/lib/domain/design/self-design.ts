@@ -81,6 +81,13 @@ export const SELF_DESIGN_LABELS: Record<SelfDesignKey, string> = {
   independence: "Most independence",
 };
 
+/** What each design aims for, as the designer says it before making them (Martin: say what to expect first). */
+export const SELF_DESIGN_AIMS: Record<SelfDesignKey, string> = {
+  payback: "Panels only, the size that pays for itself soonest, for the least outlay.",
+  return: "Panels and a battery, the most dollars ahead once it's paid for. Slower to pay back.",
+  independence: "The whole roof, a battery for the evenings and one module more held back for blackouts, with the backup circuits.",
+};
+
 export interface SelfDesignFigures {
   panels: number;
   kw: number;

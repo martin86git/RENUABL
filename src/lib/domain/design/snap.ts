@@ -7,7 +7,7 @@
  * with the usual gap, one above the other or side by side, and lined up along the row too: centred, edge to edge, or
  * panel over panel, whichever is nearest. Sizes are as drawn from above (`planSize`).
  */
-import { planSize, type LoosePanel, type PanelSize, type Point } from "./roof-design";
+import { looseCorners, planSize, type LoosePanel, type PanelSize, type Point } from "./roof-design";
 
 /** How near panels must come to click into place, metres. */
 export const SNAP_REACH = 0.35;
@@ -82,4 +82,47 @@ export function snapShift(group: LoosePanel[], others: LoosePanel[], size: Panel
     }),
   );
   return clash ? null : { x: Math.round(best.shift.x * 100) / 100, y: Math.round(best.shift.y * 100) / 100 };
+}
+
+/** A straight edge on the roof: a side of a traced face, or a guide line. */
+export interface Edge {
+  a: Point;
+  b: Point;
+}
+
+/**
+ * The shift that sets a group of panels at `clearance` from a roof edge they have come near (Martin: the same click
+ * into place as against other panels, for the roof's edge), or null when none is near enough. Only an edge the
+ * panels run along (square to it, or along it) counts, and only where they sit beside it; the group moves straight
+ * towards or away from the edge.
+ */
+export function edgeShift(group: LoosePanel[], edges: Edge[], size: PanelSize, clearance: number, reach = SNAP_REACH): Point | null {
+  if (!group.length) return null;
+  let best: { shift: Point; cost: number } | null = null;
+  const centre = { x: group.reduce((t, p) => t + p.x, 0) / group.length, y: group.reduce((t, p) => t + p.y, 0) / group.length };
+  for (const { a, b } of edges) {
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (length < 0.2) continue;
+    const d = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+    const n = { x: -d.y, y: d.x };
+    const bearing = (Math.atan2(d.y, d.x) * 180) / Math.PI;
+    if (!group.some((p) => turnGap(p.angle, bearing) <= SNAP_ANGLE)) continue;
+    // Which side of the edge the panels are on, and how close their nearest corner comes.
+    const side = Math.sign((centre.x - a.x) * n.x + (centre.y - a.y) * n.y) || 1;
+    let nearest = Infinity;
+    let beside = false;
+    for (const p of group) {
+      for (const c of looseCorners(p, size)) {
+        const off = side * ((c.x - a.x) * n.x + (c.y - a.y) * n.y);
+        const along = (c.x - a.x) * d.x + (c.y - a.y) * d.y;
+        if (along >= -0.1 && along <= length + 0.1) beside = true;
+        nearest = Math.min(nearest, off);
+      }
+    }
+    if (!beside) continue;
+    const move = clearance - nearest;
+    if (Math.abs(move) > reach) continue;
+    if (!best || Math.abs(move) < best.cost) best = { shift: { x: n.x * side * move, y: n.y * side * move }, cost: Math.abs(move) };
+  }
+  return best ? { x: Math.round(best.shift.x * 100) / 100, y: Math.round(best.shift.y * 100) / 100 } : null;
 }

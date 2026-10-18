@@ -8,12 +8,14 @@ import {
   costSystem,
   editedLines,
   lineKey,
+  MAX_LINE_QTY,
   repriced,
   solarVicBar,
   solarVicFor,
   solarVicNote,
   stcValue,
   type CostLine,
+  type LineEdit,
   type QuoteFields,
   type SystemSpec,
 } from "@/lib/domain/design/quote";
@@ -76,10 +78,13 @@ export function DesignQuote(props: {
     setChecked(true);
     props.onChange({ form: { ...form, [name]: value } as QuoteFields["form"], edits });
   };
-  const edit = (l: CostLine, to: { amount?: number; removed?: boolean } | null) => {
+  /** Changes a line by hand: a quantity and a cost typed over it sit together; null puts the line back as worked out. */
+  const edit = (l: CostLine, to: LineEdit | null) => {
     const next = { ...edits };
-    if (to) next[lineKey(l)] = to;
-    else delete next[lineKey(l)];
+    const key = lineKey(l);
+    if (!to) delete next[key];
+    else if (to.removed) next[key] = { removed: true };
+    else next[key] = { ...next[key], ...to };
     props.onChange({ form, edits: next });
   };
 
@@ -229,6 +234,9 @@ export function DesignQuote(props: {
                 <tbody>
                   {rows.map((l, i) => {
                     const typed = edits[lineKey(l)]?.amount;
+                    const typedQty = edits[lineKey(l)]?.qty;
+                    // The line as it stands with any hand changes: a quantity typed over it prices it again.
+                    const shown = editedLines([l], edits)[0] ?? l;
                     const unset = l.missing && typed === undefined;
                     return (
                       <tr
@@ -251,18 +259,39 @@ export function DesignQuote(props: {
                               </button>
                             </span>
                           )}
-                          {typed !== undefined &&
-                            (l.missing && typed === 0 ? (
+                          {(typed !== undefined || typedQty !== undefined) &&
+                            (l.missing && typed === 0 && typedQty === undefined ? (
                               <button className="block text-xs text-muted underline underline-offset-2" onClick={() => edit(l, null)}>
                                 Left at $0 (no cost on file): undo
                               </button>
                             ) : (
                               <button className="block text-xs text-sun-ink underline underline-offset-2" onClick={() => edit(l, null)}>
-                                Changed by hand: back to {l.missing ? "no cost" : money(l.amount)}
+                                Changed by hand: back to {typedQty !== undefined ? `${l.qty} at ` : ""}
+                                {l.missing ? "no cost" : money(l.amount)}
                               </button>
                             ))}
                         </td>
-                        <td className="py-1.5 text-right tabular-nums text-ink-2">{l.qty ?? ""}</td>
+                        <td className="py-1 text-right tabular-nums text-ink-2">
+                          {l.qty === undefined ? (
+                            ""
+                          ) : (
+                            <input
+                              type="number"
+                              min="0"
+                              max={MAX_LINE_QTY}
+                              step="1"
+                              value={typedQty ?? l.qty}
+                              onChange={(e) =>
+                                edit(l, { qty: Math.max(0, Math.min(MAX_LINE_QTY, Math.round(Number(e.target.value) || 0))) })
+                              }
+                              aria-label={`How many: ${l.label}`}
+                              style={{ width: `${String(typedQty ?? l.qty).length + 1.6}ch` }}
+                              className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
+                                typedQty !== undefined ? "border-sun-line font-semibold text-ink" : "border-transparent hover:border-line"
+                              }`}
+                            />
+                          )}
+                        </td>
                         <td className="py-1 pl-1 text-right">
                           <span className="inline-flex items-center justify-end gap-px">
                             <span className="text-muted">$</span>
@@ -270,10 +299,10 @@ export function DesignQuote(props: {
                               type="number"
                               min="0"
                               step="1"
-                              value={Math.round(typed ?? l.amount)}
+                              value={Math.round(typed ?? shown.amount)}
                               onChange={(e) => edit(l, { amount: Math.max(0, Number(e.target.value) || 0) })}
                               aria-label={`Cost of ${l.label}`}
-                              style={{ width: `${String(Math.round(typed ?? l.amount)).length + 1.6}ch` }}
+                              style={{ width: `${String(Math.round(typed ?? shown.amount)).length + 1.6}ch` }}
                               className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
                                 typed !== undefined
                                   ? "border-sun-line font-semibold"

@@ -193,11 +193,16 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
   };
 }
 
-/** A quote line changed by hand: a cost typed over the worked-out one, or the line taken out. */
+/** A quote line changed by hand: a quantity or a cost typed over the worked-out one, or the line taken out. */
 export interface LineEdit {
   amount?: number;
+  /** How many, typed over the worked-out count: the line is priced again at its cost each, unless a cost is typed too. */
+  qty?: number;
   removed?: boolean;
 }
+
+/** The most a quantity typed over a line may be. */
+export const MAX_LINE_QTY = 999;
 
 /** One design's quote: what was asked about the home, and the lines changed by hand (by `lineKey`). */
 export interface QuoteFields {
@@ -218,9 +223,15 @@ export function editedLines(lines: readonly CostLine[], edits: Record<string, Li
   return lines
     .filter((l) => !edits[lineKey(l)]?.removed)
     .map((l) => {
-      const typed = edits[lineKey(l)]?.amount;
-      // A cost typed over a line with none on file settles it.
-      return typed === undefined ? l : { ...l, amount: typed, missing: undefined };
+      const edit = edits[lineKey(l)];
+      let line = l;
+      // A quantity typed over a counted line prices it again at its cost each (a line with no cost on file stays at $0).
+      if (edit?.qty !== undefined && l.qty !== undefined) {
+        const each = l.qty > 0 ? l.amount / l.qty : 0;
+        line = { ...line, qty: edit.qty, amount: Math.round(each * edit.qty * 100) / 100 };
+      }
+      // A cost typed over a line settles it, and wins over the quantity's.
+      return edit?.amount === undefined ? line : { ...line, amount: edit.amount, missing: undefined };
     });
 }
 
@@ -462,10 +473,18 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
     const edits: Record<string, LineEdit> = {};
     for (const [key, value] of Object.entries(q.edits && typeof q.edits === "object" ? q.edits : {}).slice(0, 60)) {
       if (key.length > 160 || !value || typeof value !== "object") continue;
-      const v = value as { amount?: unknown; removed?: unknown };
-      if (v.removed === true) edits[key] = { removed: true };
-      else if (typeof v.amount === "number" && Number.isFinite(v.amount) && v.amount >= 0 && v.amount <= 1_000_000)
-        edits[key] = { amount: Math.round(v.amount * 100) / 100 };
+      const v = value as { amount?: unknown; qty?: unknown; removed?: unknown };
+      if (v.removed === true) {
+        edits[key] = { removed: true };
+        continue;
+      }
+      const amount =
+        typeof v.amount === "number" && Number.isFinite(v.amount) && v.amount >= 0 && v.amount <= 1_000_000
+          ? Math.round(v.amount * 100) / 100
+          : undefined;
+      const qty = typeof v.qty === "number" && Number.isInteger(v.qty) && v.qty >= 0 && v.qty <= MAX_LINE_QTY ? v.qty : undefined;
+      if (amount !== undefined || qty !== undefined)
+        edits[key] = { ...(amount !== undefined ? { amount } : {}), ...(qty !== undefined ? { qty } : {}) };
     }
     quotes.push({
       form: {

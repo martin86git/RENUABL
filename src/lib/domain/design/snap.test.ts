@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PANEL, type LoosePanel } from "./roof-design";
-import { SNAP_REACH, snapShift } from "./snap";
+import { SNAP_REACH, edgeShift, snapShift } from "./snap";
 
 // Laid flat (tilt 0) so sizes from above are the panel's own: 1.134 wide, 1.762 long, 2 cm apart.
 const at = (x: number, y: number, id: string, extra: Partial<LoosePanel> = {}): LoosePanel => ({ id, x, y, angle: 0, tilt: 0, ...extra });
@@ -46,5 +46,28 @@ describe("panels clicking into place", () => {
     expect(snapShift(row(-flush - SNAP_REACH - 0.1, 4, "m"), below, PANEL)).toBeNull();
     expect(snapShift(row(-flush - 0.1, 4, "m", { angle: 20 }), below, PANEL)).toBeNull();
     expect(snapShift([at(0.05, 0.05, "m")], below, PANEL)).toBeNull();
+  });
+});
+
+describe("panels clicking to the roof's edge", () => {
+  // A roof edge running east to west at y = 0 (the panels sit below it, at larger y), flat panels so sizes are as built.
+  const edge = [{ a: { x: -10, y: 0 }, b: { x: 10, y: 0 } }];
+  const halfLong = PANEL.long / 2;
+
+  it("sets panels that come near at the clearance from the edge, whether too close or too far", () => {
+    expect(edgeShift([at(0, halfLong + 0.35, "m")], edge, PANEL, 0.2)!.y).toBeCloseTo(-0.15, 2);
+    expect(edgeShift([at(0, halfLong + 0.05, "m")], edge, PANEL, 0.2)!.y).toBeCloseTo(0.15, 2);
+    expect(edgeShift([at(0, halfLong + 0.05, "m")], edge, PANEL, 0.2)!.x).toBeCloseTo(0, 5);
+  });
+
+  it("moves a whole row by its nearest panel", () => {
+    const moving = row(halfLong + 0.3, 3, "m");
+    expect(edgeShift(moving, edge, PANEL, 0.2)!.y).toBeCloseTo(-0.1, 2);
+  });
+
+  it("leaves panels alone that are far off, turned askew to the edge, or beyond its ends", () => {
+    expect(edgeShift([at(0, halfLong + 1, "m")], edge, PANEL, 0.2)).toBeNull();
+    expect(edgeShift([at(0, halfLong + 0.3, "m", { angle: 20 })], edge, PANEL, 0.2)).toBeNull();
+    expect(edgeShift([at(30, halfLong + 0.3, "m")], edge, PANEL, 0.2)).toBeNull();
   });
 });

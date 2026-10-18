@@ -4,10 +4,10 @@ import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
 import { loadTerrain } from "@/lib/services/terrain";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
-import { packFaces, reorient } from "@/lib/domain/design/pack";
-import { snapShift } from "@/lib/domain/design/snap";
+import { MOUNT_STANDOFF, clearanceFor, packFaces, reorient } from "@/lib/domain/design/pack";
+import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
-import { selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
+import { NO_BILL_KW, SELF_DESIGN_AIMS, SELF_DESIGN_LABELS, selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
 import { todayInMarket } from "@/lib/domain/market";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -69,6 +69,7 @@ import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import {
+  DESIGN_GOALS,
   FACINGS,
   LABEL_KINDS,
   MAX_BATTERY_QTY,
@@ -105,6 +106,7 @@ import {
   type InverterSpec,
   type LabelKind,
   type LoosePanel,
+  type PanelSize,
   type PanelSpec,
   type PanelString,
   type Point,
@@ -311,6 +313,48 @@ const besideFlat = (tilt: number, facing: number) => {
   return gain === 0 ? "The same as lying flat" : `${Math.abs(gain)}% ${gain > 0 ? "more" : "less"} than lying flat`;
 };
 const cm = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Where panels being moved or drawn click into place: flush against the panels near them (`snapShift`), else at the
+ * wind clearance from a traced face's edge or a guide line they come near (`edgeShift`; a face's own setback when
+ * larger). Null when nothing is near.
+ */
+function placeShift(group: LoosePanel[], others: LoosePanel[], faces: Face[], guides: GuideLine[], size: PanelSize): Point | null {
+  const flush = snapShift(group, others, size);
+  if (flush) return flush;
+  const wind = clearanceFor(MOUNT_STANDOFF);
+  const shifts = [
+    ...faces.map((f) =>
+      edgeShift(
+        group,
+        f.points.map((a, i) => ({ a, b: f.points[(i + 1) % f.points.length] })),
+        size,
+        Math.max(wind, f.setback),
+      ),
+    ),
+    edgeShift(group, guides, size, wind),
+  ].filter((x): x is Point => x !== null);
+  return shifts.length ? shifts.reduce((p, q) => (Math.hypot(q.x, q.y) < Math.hypot(p.x, p.y) ? q : p)) : null;
+}
+
+/** A panel as the Landscape button draws it: a rectangle with a small triangle at one end, so its way round reads. */
+function PanelGlyph(props: { across: boolean }) {
+  return (
+    <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" aria-hidden>
+      {props.across ? (
+        <>
+          <rect x="2" y="5.5" width="16" height="9" rx="1" />
+          <path d="M4.5 8 L7 10 L4.5 12 Z" fill="currentColor" stroke="none" />
+        </>
+      ) : (
+        <>
+          <rect x="5.5" y="2" width="9" height="16" rx="1" />
+          <path d="M8 4.5 L10 7 L12 4.5 Z" fill="currentColor" stroke="none" />
+        </>
+      )}
+    </svg>
+  );
+}
 /**
  * The widest the picture may be and still fit the window with the bar and the figures above it: the picture is
  * given all the room there is, since it is where the work is done.
@@ -456,6 +500,8 @@ export function RoofDesigner(props: {
   const [asking, setAsking] = useState(false);
   // "Design it for me": working, or the three designs it made and what to know about them.
   const [mine, setMine] = useState<"idle" | "busy" | SelfDesignResult>("idle");
+  // Whether "Design it for me" is saying what it will do, before it does it.
+  const [mineIntro, setMineIntro] = useState(false);
   // Whether that card is open: it folds to a chip once a design is picked, so the roof has the room.
   const [mineOpen, setMineOpen] = useState(true);
   /** Takes up a tool, leaving behind anything half-drawn with the last one. */
@@ -1649,9 +1695,9 @@ export function RoofDesigner(props: {
     if (held.mode === "array") {
       const p = pointAt(e);
       if (!p) return;
-      // The row being drawn clicks flush against the panels near it (`snapShift`); Alt places it freely.
+      // The row being drawn clicks into place against the panels or roof edge near it (`placeShift`); Alt places it freely.
       const drawn = arrayFrom(held.anchor, p);
-      const shift = e.altKey ? null : snapShift(drawn, standingAll(faces, loose), size);
+      const shift = e.altKey ? null : placeShift(drawn, standingAll(faces, loose), faces, rules, size);
       setGhosts(shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn);
       return;
     }
@@ -1763,11 +1809,11 @@ export function RoofDesigner(props: {
     const starts = held.starts ?? {};
     let dx = p.x - held.at.x;
     let dy = p.y - held.at.y;
-    // Moved panels click flush against the panels they come near (`snapShift`); Alt moves them freely.
+    // Moved panels click into place against the panels or roof edge they come near (`placeShift`); Alt moves them freely.
     const going = loose
       .filter((panel) => starts[`l:${panel.id}`])
       .map((panel) => ({ ...panel, x: starts[`l:${panel.id}`].x + dx, y: starts[`l:${panel.id}`].y + dy }));
-    const shift = e.altKey || !going.length ? null : snapShift(going, held.others ?? [], size);
+    const shift = e.altKey || !going.length ? null : placeShift(going, held.others ?? [], faces, rules, size);
     if (shift) {
       dx += shift.x;
       dy += shift.y;
@@ -2079,9 +2125,7 @@ export function RoofDesigner(props: {
    * business's prices. They replace the roof's designs (asked first), each with its goal, the best return the primary.
    */
   const designForMe = async () => {
-    const drawnSoFar = everyDesign().some((d) => d.faces.length || d.loose?.length);
-    if (drawnSoFar && !window.confirm("Replace this roof's designs with three made for it? The roof faces traced are kept and used."))
-      return;
+    setMineIntro(false);
     setMine("busy");
     let model: RoofModel | null = null;
     let modelOffsetM: { x: number; y: number } | undefined;
@@ -3771,13 +3815,6 @@ export function RoofDesigner(props: {
                           className="mt-2 block w-full"
                         />
                       </label>
-                      <button
-                        onClick={turnLandscape}
-                        className="mt-2.5 w-full rounded-md border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:bg-canvas"
-                        title="Turn what is picked onto its side (or back upright) and lay it again tidily"
-                      >
-                        {pickedPanels.every((p) => p.across) ? "Portrait" : "Landscape"}
-                      </button>
                       <p className="mt-2.5 text-xs leading-snug text-ink-2">
                         {pickedFacing === null ? "Facing different ways" : `Facing ${compass(pickedFacing)} (${pickedFacing}°)`}
                       </p>
@@ -4170,7 +4207,7 @@ export function RoofDesigner(props: {
               {/* The pad, in the top left corner: the select arrow in a circle of its own, since it is the tool every other
                   is left for, with two smaller half-rounds growing out of it for the two things done most with it:
                   add a panel (to its right) and erase (beneath it). */}
-              <div className="absolute left-3 top-3 z-20 size-[6.25rem]" role="toolbar" aria-label="Select, add a panel, erase">
+              <div className="absolute left-3 top-3 z-20 size-[6.25rem]" role="toolbar" aria-label="Select, add a panel, landscape, erase">
                 <button
                   onClick={() => pickTool("panel")}
                   title="Add a panel"
@@ -4182,6 +4219,23 @@ export function RoofDesigner(props: {
                   )}
                 >
                   <SquarePlus className="size-5" aria-hidden />
+                </button>
+                {/* Landscape, beside Add a panel (Martin): turns the picked panels onto their side, or back upright when
+                    every one already is, and lays them again tidily (`turnLandscape`). */}
+                <button
+                  onClick={turnLandscape}
+                  disabled={!pickedPanels.length}
+                  title={
+                    !pickedPanels.length
+                      ? "Landscape: pick panels to turn them onto their side"
+                      : pickedPanels.every((p) => p.across)
+                        ? "Portrait: turn the picked panels back upright"
+                        : "Landscape: turn the picked panels onto their side"
+                  }
+                  aria-label={pickedPanels.length && pickedPanels.every((p) => p.across) ? "Portrait" : "Landscape"}
+                  className="absolute left-[6.375rem] top-[0.5625rem] flex size-[2.625rem] items-center justify-center rounded-full border border-line bg-surface/90 text-ink shadow-lift backdrop-blur-md hover:bg-surface disabled:text-muted"
+                >
+                  <PanelGlyph across={!(pickedPanels.length && pickedPanels.every((p) => p.across))} />
                 </button>
                 <button
                   onClick={() => pickTool("erase")}
@@ -4620,8 +4674,59 @@ export function RoofDesigner(props: {
                       </p>
                     </div>
                   )}
+                  {mineIntro && (
+                    <div className={clsx(GLASS, "w-80 space-y-2 p-3 text-[13px] text-ink-2")} role="dialog" aria-label="Design it for me">
+                      <p className="font-semibold text-ink">Design it for me</p>
+                      <p>Three designs for this home, each priced from your price lists and set against the customer&apos;s bill:</p>
+                      <ul className="space-y-1.5">
+                        {DESIGN_GOALS.map((goal) => (
+                          <li key={goal}>
+                            <span className="font-semibold text-ink">{SELF_DESIGN_LABELS[goal]}.</span> {SELF_DESIGN_AIMS[goal]}
+                          </li>
+                        ))}
+                      </ul>
+                      <p>
+                        Each is laid by the installer&apos;s rules (rows from the gutter up, portrait unless only landscape fits, clear of
+                        every edge) {faces.length ? "on the roof faces you traced" : "from Google's roof data"}, with an inverter and
+                        strings.
+                      </p>
+                      {!finance && Number(bill.amount) <= 0 && (
+                        <p className="text-sun-ink">
+                          No bill yet: they&apos;re sized to about {NO_BILL_KW} kW.{" "}
+                          <button
+                            className="font-medium underline underline-offset-2"
+                            onClick={() => {
+                              setMineIntro(false);
+                              openMenu("bill");
+                            }}
+                          >
+                            Add the bill
+                          </button>{" "}
+                          to size them to this home.
+                        </p>
+                      )}
+                      {everyDesign().some((d) => d.faces.length || d.loose?.length) && (
+                        <p>They replace this roof&apos;s designs (the traced faces are kept). Best return is the primary.</p>
+                      )}
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          className="rounded-full px-3 py-1.5 font-medium text-ink-2 hover:text-ink"
+                          onClick={() => setMineIntro(false)}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="rounded-full bg-primary px-3.5 py-1.5 font-medium text-primary-ink hover:bg-forest"
+                          onClick={() => void designForMe()}
+                        >
+                          Make the three designs
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <button
-                    onClick={() => void designForMe()}
+                    onClick={() => setMineIntro(!mineIntro)}
+                    aria-expanded={mineIntro}
                     disabled={mine === "busy" || costsHidden}
                     title={
                       costsHidden
