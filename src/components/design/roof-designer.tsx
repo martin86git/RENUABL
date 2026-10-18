@@ -45,6 +45,7 @@ import type { CatalogueBattery, CatalogueInverter, CataloguePanel } from "@/lib/
 import type { Workspace } from "@/lib/domain/design/pricing";
 import {
   defaultQuote,
+  DAY,
   designFinance,
   type BillInterval,
   type DesignExtras,
@@ -57,6 +58,8 @@ import type { RoofModel } from "@/lib/domain/roof-layout";
 import { MAX_SUGGESTED, suggestPanels } from "@/lib/domain/design/suggest";
 import { systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
+import { autoStringDesign } from "@/lib/domain/design/auto-string";
+import { suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import {
   FACINGS,
@@ -309,6 +312,10 @@ export function RoofDesigner(props: {
   savedLabel?: string;
   /** Makes the proposal from the design just saved. Answers with what went wrong, or null. */
   onPublish?: () => Promise<string | null>;
+  /** For a roof opened from a deal: sends a note to the customer in the job's conversation, with the proposal just published. Answers what happened. */
+  onNote?: (text: string) => Promise<{ ok: boolean; message: string }>;
+  /** Who the note goes to, for the box's wording. */
+  customerName?: string;
   /** Where this roof's proposal is, once there is one. */
   proposalHref?: string | null;
   /** The conversation with the customer, for a roof opened from a deal: drawn by the page, shown beside View proposal. */
@@ -366,6 +373,8 @@ export function RoofDesigner(props: {
   const [faces, setFaces] = useState<Face[]>(first.faces);
   const [loose, setLoose] = useState<LoosePanel[]>(first.loose ?? []);
   const [strings, setStrings] = useState<PanelString[]>(first.strings ?? []);
+  /** What String automatically did, in plain words, until the strings are next changed by hand. */
+  const [autoNote, setAutoNote] = useState<{ ok: boolean; note: string } | null>(null);
   const [labels, setLabels] = useState<DesignLabel[]>(first.labels ?? []);
   const [panel, setPanel] = useState<PanelSpec | undefined>(first.panel);
   const [designLabel, setDesignLabel] = useState(first.label ?? "");
@@ -1713,15 +1722,32 @@ export function RoofDesigner(props: {
 
   const [publishing, setPublishing] = useState(false);
   /** Publish: the design is saved, then its proposal is made from it (`onPublish`), and any problem with either is said. */
-  const publish = async () => {
+  const publish = async (note = "") => {
     setPublishing(true);
+    setSent(null);
     const kept = await save();
     if (kept && props.onPublish) {
       const problem = await props.onPublish();
-      if (problem) setSaved({ error: problem });
+      if (problem) {
+        setSaved({ error: problem });
+        setSent({ ok: false, message: problem });
+      }
+      // The note goes with the proposal only once the proposal is out; it is kept in the job's conversation and on the record.
+      else if (note.trim() && props.onNote) {
+        const told = await props.onNote(note.trim());
+        setSent(told);
+        if (told.ok) {
+          setNote("");
+          setSending(false);
+        }
+      } else setSending(false);
     }
     setPublishing(false);
   };
+  /** Publish design, with a note: the box beneath the button for a roof opened from a deal. */
+  const [sending, setSending] = useState(false);
+  const [note, setNote] = useState("");
+  const [sent, setSent] = useState<{ ok: boolean; message: string } | null>(null);
   const save = async () => {
     setSaved("saving");
     // The price after STCs goes with it only when the primary design is the one open: that is the one a job is quoted on.
@@ -1902,6 +1928,35 @@ export function RoofDesigner(props: {
         strings: strings.map((x) => x.panels.length),
       })
     : [];
+  // How much storage the home needs, by rule (`battery-suggest.ts`): from what the panels make each month and, with the bill in, the home's evenings.
+  const batteryIdea =
+    menu === "batteries" && summary.panels > 0
+      ? suggestBatteries({
+          batteries: props.batteries,
+          inverters: fitted.map((f, n) => ({
+            name: f.name,
+            ...(fittedItems[n]?.hybrid !== undefined ? { hybrid: fittedItems[n]?.hybrid } : {}),
+          })),
+          monthlyKwh: year,
+          dailyKwh: finance?.dailyKwh ?? null,
+          selfUseShare: props.workspace.settings.bill.selfUseShare,
+          eveningShare: DAY.eveningShare,
+        })
+      : null;
+  /** Strings the panels by rule (`auto-string.ts`) in place of the strings drawn, and says what it did. */
+  const stringForMe = () => {
+    const done = autoStringDesign(
+      design,
+      fittedItems.map((i) => ({ electrical: i?.electrical, name: i?.name })),
+      chosenPanel?.electrical,
+      chosenPanel?.name,
+    );
+    setAutoNote({ ok: done.ok, note: done.note });
+    if (!done.strings.length) return;
+    setStrings(done.strings);
+    setWiring(null);
+    changed();
+  };
   // Lining panels up with the roof: while panels are being added, or are picked, every traced face's outline is
   // lit in gold, and the face they stand on shows how far they are from each of its edges.
   const guide = tool === "panel" || tool === "rule" || pickedPanels.length > 0;
@@ -2139,14 +2194,60 @@ export function RoofDesigner(props: {
               <FileText className="size-4" aria-hidden /> View proposal
             </button>
           )}
-          {/* Publishing saves the design and makes (or brings up to date) its proposal. */}
-          <button
-            onClick={publish}
-            disabled={saved === "saving" || publishing}
-            className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
-          >
-            <Send className="size-4" aria-hidden /> {publishing ? "Publishing…" : "Publish design"}
-          </button>
+          {/* Publishing saves the design and makes (or brings up to date) its proposal. From a deal it opens a box for a note to the customer, sent with it. */}
+          <div className="relative">
+            <button
+              onClick={() => (props.onNote ? setSending(!sending) : void publish())}
+              aria-expanded={props.onNote ? sending : undefined}
+              disabled={saved === "saving" || publishing}
+              className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+            >
+              <Send className="size-4" aria-hidden /> {publishing ? "Publishing…" : "Publish design"}
+            </button>
+            {sending && props.onNote && (
+              <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line">
+                <p className="text-sm font-medium text-ink">Send the proposal{props.customerName ? ` to ${props.customerName}` : ""}</p>
+                <p className="mt-0.5 text-xs text-muted">
+                  Your note goes in their chat on the proposal, and by email when replies are emailed. It is kept on the deal.
+                </p>
+                <textarea
+                  autoFocus
+                  value={note}
+                  maxLength={2000}
+                  onChange={(e) => setNote(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void publish(note);
+                  }}
+                  placeholder="Hi, here's your design with the battery we spoke about. Any questions, just reply on the proposal."
+                  className="mt-3 block min-h-24 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-forest"
+                />
+                {sent && (
+                  <p
+                    className={clsx(
+                      "mt-2 rounded-md px-2.5 py-2 text-xs",
+                      sent.ok ? "bg-positive-soft text-positive" : "bg-warning-soft text-warning",
+                    )}
+                    role="status"
+                  >
+                    {sent.message}
+                  </p>
+                )}
+                <div className="mt-3 flex justify-end gap-2">
+                  <button type="button" className={button} onClick={() => void publish()} disabled={publishing}>
+                    Publish only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void publish(note)}
+                    disabled={publishing || !note.trim()}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+                  >
+                    <Send className="size-4" aria-hidden /> {publishing ? "Sending…" : "Publish and send"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -3386,6 +3487,25 @@ export function RoofDesigner(props: {
                     </p>
                   )}
                   <button
+                    className={clsx(button, "!min-h-9 w-full justify-center !border-sun-line")}
+                    onClick={stringForMe}
+                    disabled={summary.panels === 0}
+                    title="String the panels by rule, checked against the inverter's inputs"
+                  >
+                    <Sparkles className="mr-1.5 size-4 text-sun-ink" aria-hidden /> String automatically
+                  </button>
+                  {autoNote && (
+                    <p
+                      className={clsx(
+                        "rounded-md px-2.5 py-2 text-xs",
+                        autoNote.ok ? "bg-positive-soft text-positive" : "bg-sun text-sun-ink",
+                      )}
+                      role="status"
+                    >
+                      {autoNote.note}
+                    </p>
+                  )}
+                  <button
                     className={clsx(button, "!min-h-9 w-full justify-center")}
                     onClick={() => setWiring(newId("s"))}
                     disabled={startedString}
@@ -3730,6 +3850,33 @@ export function RoofDesigner(props: {
                         </div>
                       ) : (
                         <p className="px-2 pb-1 text-sm text-muted">None: this design is solar only. Choose one below.</p>
+                      )}
+                      {batteryIdea && batteryIdea.size > 0 && (
+                        <div className="mt-2 space-y-1 rounded-md border border-sun-line bg-sun p-2">
+                          <p className="flex items-center gap-1.5 px-1 text-sm font-semibold text-sun-ink">
+                            <Sparkles className="size-4" aria-hidden /> Recommended for this home: about {batteryIdea.size} kWh
+                          </p>
+                          <p className="px-1 text-xs text-ink-2">{batteryIdea.note}</p>
+                          {batteryIdea.suggestions.slice(0, 3).map((sug) => (
+                            <div key={sug.battery.sku} className="rounded-lg bg-surface p-2">
+                              <p className="text-sm font-semibold">
+                                {sug.qty > 1 ? `${sug.qty} × ` : ""}
+                                {sug.battery.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-ink-2">{sug.why}</p>
+                              <button
+                                className="mt-1 text-sm font-semibold underline underline-offset-4"
+                                onClick={() => {
+                                  chooseBattery(sug.battery);
+                                  setBattery((b) => (b ? { ...b, qty: sug.qty } : b));
+                                }}
+                              >
+                                Use this
+                              </button>
+                            </div>
+                          ))}
+                          {!finance && <p className="px-1 text-[11px] text-muted">Add the customer&apos;s bill for a closer size.</p>}
+                        </div>
                       )}
                       <p className={clsx(label, "mt-2 px-2 py-1")}>
                         {battery ? "Change it" : "Batteries to choose from"} · {props.batteries.length} to choose from

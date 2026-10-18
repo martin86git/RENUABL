@@ -74,7 +74,7 @@ export function OrdersPage() {
             <ul className={clsx(ui.card, "mt-3 divide-y divide-line")}>
               {these.map((r) => (
                 <li key={r.jobId} className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-4">
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-[14rem] flex-1">
                     <p className="font-medium text-ink">{r.customer}</p>
                     <p className="truncate text-sm text-muted">{r.address || "No address"}</p>
                     <p className="mt-1 text-xs text-ink-2 tabular-nums">
@@ -86,7 +86,7 @@ export function OrdersPage() {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {r.suppliers.map((s) => (
-                      <span key={s} className="rounded bg-surface-2 px-2 py-0.5 text-xs text-ink-2">
+                      <span key={s} className="max-w-[14rem] truncate rounded bg-surface-2 px-2 py-0.5 text-xs text-ink-2" title={s}>
                         {s}
                       </span>
                     ))}

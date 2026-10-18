@@ -11,8 +11,7 @@ describe("the roof designer's front page", () => {
     for (const line of landingCopy()) expect(line).not.toMatch(/pylon|opensolar|solargraf|aurora/i);
   });
 
-  it("marks what isn't built yet as coming soon", () => {
-    const soon = [...AUTOMATIONS, ...AFTER_STEPS].filter((f) => f.status === "soon").map((f) => f.key);
-    expect(soon).toEqual(["battery", "strings", "send-order", "invoices", "scheduler"]);
+  it("shows only what the product does today", () => {
+    expect([...AUTOMATIONS, ...AFTER_STEPS].filter((f) => f.status !== "live")).toEqual([]);
   });
 });

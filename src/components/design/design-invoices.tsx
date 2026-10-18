@@ -111,7 +111,7 @@ export function InvoicesPage() {
         {shown.map((r) => (
           <li key={r.jobId} className="px-5 py-4">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-[14rem] flex-1">
                 <Link href={`${PATHS.deals}/${r.jobId}`} className="font-medium text-ink hover:underline">
                   {r.customer}
                 </Link>

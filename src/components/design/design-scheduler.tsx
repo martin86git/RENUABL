@@ -9,6 +9,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import { loadPrefs, loadSchedule, type BookedJob } from "@/lib/services/after-sale";
 import { PATHS, PageHead, ui } from "./design-shell";
 
+const ARROW = "inline-flex size-9 items-center justify-center rounded-md border border-line bg-surface text-ink hover:border-forest";
 const TONE = { ready: "border-positive bg-positive-soft", partly: "border-sun-line bg-sun", not: "border-line bg-surface-2" } as const;
 
 /**
@@ -56,13 +57,13 @@ export function SchedulerPage() {
     <div className={ui.page}>
       <PageHead eyebrow="Installations" title="Install Scheduler">
         <div className="flex items-center gap-1">
-          <button type="button" className={clsx(ui.quiet, "h-9 w-9 px-0")} onClick={() => setDate(cal.prev)} aria-label="Earlier">
+          <button type="button" className={ARROW} onClick={() => setDate(cal.prev)} aria-label="Earlier">
             <ChevronLeft className="size-4" />
           </button>
           <button type="button" className={clsx(ui.quiet, "h-9")} onClick={() => setDate(today)}>
             Today
           </button>
-          <button type="button" className={clsx(ui.quiet, "h-9 w-9 px-0")} onClick={() => setDate(cal.next)} aria-label="Later">
+          <button type="button" className={ARROW} onClick={() => setDate(cal.next)} aria-label="Later">
             <ChevronRight className="size-4" />
           </button>
         </div>

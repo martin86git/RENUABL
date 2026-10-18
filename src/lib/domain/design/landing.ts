@@ -64,13 +64,13 @@ export const AUTOMATIONS: readonly Automation[] = [
     key: "battery",
     title: "The battery recommended",
     body: "From the panels' output and the customer's bill, how much storage the home needs.",
-    status: "soon",
+    status: "live",
   },
   {
     key: "strings",
     title: "Strings drawn for you",
     body: "The panels strung automatically and checked against the inverter's inputs.",
-    status: "soon",
+    status: "live",
   },
 ] as const;
 
@@ -117,19 +117,19 @@ export const AFTER_STEPS: readonly AfterStep[] = [
     key: "send-order",
     title: "Order sent to your supplier",
     body: "Send the order straight from the platform.",
-    status: "soon",
+    status: "live",
   },
   {
     key: "invoices",
     title: "Installer Invoices",
     body: "The installer's invoice costed from the quote; upload theirs and the differences are shown.",
-    status: "soon",
+    status: "live",
   },
   {
     key: "scheduler",
     title: "Install Scheduler",
     body: "Every booked install in one calendar, with reminders sent to the customer to get ready.",
-    status: "soon",
+    status: "live",
   },
 ] as const;
 

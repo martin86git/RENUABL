@@ -27,6 +27,7 @@ import {
 import { loadJob, saveJob } from "@/lib/services/crm";
 import { NEEDS_ACCOUNT, NO_DEAL, proposalScreen, publishFromDesigner } from "@/lib/services/proposals";
 import { ChatButton } from "./chat-panel";
+import { sendReply, unreadChanged } from "@/lib/services/chat";
 import { DesignKeptNote, DesignRoofList } from "./design-account";
 import { RoofDesigner } from "./roof-designer";
 
@@ -214,6 +215,17 @@ export function DesignStudio() {
           }
           proposalHref={onJob ? proposalScreen(onJob.id) : null}
           chat={onJob ? <ChatButton jobId={onJob.id} /> : null}
+          customerName={onJob?.customerName.split(" ")[0]}
+          onNote={
+            onJob
+              ? async (text) => {
+                  const res = await sendReply(onJob.id, text);
+                  if (!res.ok) return { ok: false, message: res.message };
+                  unreadChanged();
+                  return { ok: true, message: res.outcome };
+                }
+              : undefined
+          }
           costsHidden={costsHidden()}
           savedLabel={kept}
           onUnsaved={noteUnsaved}

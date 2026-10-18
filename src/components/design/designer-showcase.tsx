@@ -83,8 +83,8 @@ const STEPS: { at: number; text: string; status: FeatureStatus; icon: typeof Spa
   { at: 8800, text: "Tilted 10°: tilt kits and tilt frames added", status: "live", icon: Sparkles },
   { at: 11000, text: "Suggested for 8.55 kW of panels: 8 kW three-phase hybrid (107%)", status: "live", icon: Zap },
   { at: 13200, text: "Three-phase inverter: installation fee and meter added", status: "live", icon: Zap },
-  { at: 15400, text: "From output and the bill: 16 kWh battery recommended", status: "soon", icon: BatteryCharging },
-  { at: 17600, text: "Strings drawn and checked against the inverter", status: "soon", icon: Sparkles },
+  { at: 15400, text: "From output and the bill: 16 kWh battery recommended", status: "live", icon: BatteryCharging },
+  { at: 17600, text: "Strings drawn and checked against the inverter", status: "live", icon: Sparkles },
 ];
 const AUTO_TOTAL = 22500;
 
