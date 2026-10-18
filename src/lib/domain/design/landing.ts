@@ -78,10 +78,10 @@ export const AUTOMATIONS: readonly Automation[] = [
 export const CONVERSATION = {
   eyebrow: "Send it from the designer",
   headline: "Write a note, send the proposal, keep talking.",
-  body: "No copying a link into an email. Write to your customer beside the design and send the proposal from the same place. They answer on the proposal, like a text message, and every word is kept on the deal.",
+  body: "No copying a link into an email. Write to your customer beside the design and send the proposal from the same place: your note reaches them by email with their link. They answer in a chat beside the proposal, and every word is kept on the deal.",
   steps: [
     { title: "In the designer", body: "Write your note and send the proposal in one go." },
-    { title: "On their proposal", body: "Your brand, your colours, and a chat they can answer." },
+    { title: "On their proposal", body: "Emailed their link, then your brand and colours, with the chat beside the proposal." },
     { title: "In your CRM", body: "Sent, opened, every message and the signature, on the record." },
   ],
 } as const;
