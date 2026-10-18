@@ -13,8 +13,8 @@ const FOLLOW_MS = 1700;
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
- * The front page's first screen, the way Apple would: two words, alone,
- * and the line under them answering by itself what follows a drawing, a
+ * The front page's first screen, the way Apple would: the punchline alone,
+ * and the line under it answering by itself how a roof becomes revenue, a
  * phrase at a time. Then the product rises into view as you scroll. Light,
  * never black (Martin: black is too harsh). With reduced motion the phrases
  * stand together and nothing moves.
@@ -53,7 +53,7 @@ export function FrontHero({ signInHref, tryHref }: { signInHref: string; tryHref
       </header>
 
       <div className="flex min-h-[calc(100svh-4rem)] flex-col items-center justify-center px-6 pb-16 text-center">
-        <h1 id="hero" className="text-[clamp(72px,15vw,200px)] font-light leading-[0.9] tracking-[-0.045em] text-ink">
+        <h1 id="hero" className="max-w-5xl text-balance text-[clamp(56px,11vw,150px)] font-light leading-[0.92] tracking-[-0.045em] text-ink">
           {LANDING_HERO.headline}
         </h1>
         <p className="mt-8 h-[1.3em] text-[clamp(24px,3.4vw,40px)] font-light tracking-[-0.02em] text-ink-2">

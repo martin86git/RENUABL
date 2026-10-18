@@ -9,8 +9,11 @@
 export type FeatureStatus = "live" | "soon";
 
 export const LANDING_HERO = {
-  /** The punchline: one drawing, and the business follows. Never said in so many words: shown. */
-  headline: "Draw once.",
+  /**
+   * The punchline (Martin, 18 Oct 2026): what the businesses we sell to want is sales, revenue, less complication and
+   * speed. A roof becomes revenue; the line beneath shows how fast and how simply, without saying it.
+   */
+  headline: "From roof to revenue.",
   /** What follows, a phrase at a time, each replacing the last. */
   follows: ["It's quoted.", "It's sent.", "It's signed.", "It's ordered.", "It's booked."],
 } as const;
