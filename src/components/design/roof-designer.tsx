@@ -470,6 +470,9 @@ export function RoofDesigner(props: {
   const [suggesting, setSuggesting] = useState(false);
   // The string the pointer is over, on the picture or in the list of strings: its check is shown.
   const [hover, setHover] = useState<string | null>(null);
+  // The string whose check is open on the picture: opened from its tick or cross in the strings box, never by hovering
+  // (Martin: the check covered the roof as soon as the pointer crossed a string).
+  const [checking, setChecking] = useState<string | null>(null);
   // The battery or the inverter under the pointer: its details show beside it.
   const [kit, setKit] = useState<"battery" | number | null>(null);
   const [tool, setTool] = useState<Tool>("select");
@@ -1405,6 +1408,8 @@ export function RoofDesigner(props: {
         setThread(null);
         openMenu(false);
         setRuling(null);
+        setChecking(null);
+        if (tool === "string") setTool("select");
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1606,7 +1611,9 @@ export function RoofDesigner(props: {
     }
     const hit = hitAt(p);
     if (tool === "string") {
-      if (!hit || hit.pick.kind === "label" || hit.empty) return;
+      // A click off the panels is done stringing: the strings box closes and Select is back.
+      if (!hit || hit.empty) return pickTool("select");
+      if (hit.pick.kind === "label") return;
       const key = keyOf(hit.pick);
       const id = wiring && strings.some((s) => s.id === wiring) ? wiring : newId("s");
       const others = strings.map((s) => (s.id === id ? s : { ...s, panels: s.panels.filter((k) => k !== key) }));
@@ -3512,70 +3519,80 @@ export function RoofDesigner(props: {
                   );
                 })()}
 
-              {/* The string under the pointer, checked against the inverter input it is on. */}
-              {(() => {
-                const index = strings.findIndex((x) => x.id === hover);
-                const at = index >= 0 ? centres[strings[index].panels[0]] : null;
-                if (index < 0 || !at) return null;
-                const check = checks[index];
-                const string = strings[index];
-                const left = ((ROOF_IMAGE.width / 2 + at.x / scale - view.x) / view.w) * 100;
-                const top = ((ROOF_IMAGE.height / 2 + at.y / scale - view.y) / view.h) * 100;
-                return (
-                  <div
-                    className="pointer-events-none absolute z-20 w-[22rem] max-w-[calc(100%-1rem)] rounded-lg bg-forest p-3 text-white shadow-lift ring-1 ring-white/15"
-                    style={{
-                      left: `clamp(0.5rem, calc(${left}% + 2rem), calc(100% - 22.5rem))`,
-                      top: `clamp(0.5rem, calc(${top}% + 1.5rem), calc(100% - 15rem))`,
-                    }}
-                    role="status"
-                  >
-                    <p className="flex items-center gap-2 text-sm font-semibold">
-                      <span
-                        className="size-3 rounded-full"
-                        style={{ background: STRING_COLOURS[index % STRING_COLOURS.length] }}
-                        aria-hidden
-                      />
-                      String {letter(index)} · {string.panels.length} panels ·
-                      {fitted.length > 1 ? ` inverter ${(string.inverter ?? 0) + 1},` : ""} input {(string.mppt ?? 0) + 1}
-                    </p>
-                    {fitted[string.inverter ?? 0] ? (
-                      <p className="mt-0.5 truncate text-xs text-white/60">{fitted[string.inverter ?? 0].name}</p>
-                    ) : null}
-                    {check.lines.length > 0 && (
-                      <table className="mt-2 w-full text-xs">
-                        <tbody>
-                          {check.lines.map((line) => (
-                            <tr key={line.what} className="align-top">
-                              <td className="py-0.5 pr-2 text-white/70">{line.what}</td>
-                              <td className="whitespace-nowrap py-0.5 text-right tabular-nums">{line.value}</td>
-                              <td className="whitespace-nowrap py-0.5 pl-2 tabular-nums text-white/60">{line.limit}</td>
-                              <td
-                                className={clsx(
-                                  "w-4 py-0.5 pl-2 font-bold",
-                                  line.ok === false && "text-[#ff8a80]",
-                                  line.ok === null && "text-sun-bright",
-                                )}
-                              >
-                                {line.ok === true ? "✓" : line.ok === false ? "✕" : line.ok === null ? "!" : ""}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                    <p className={clsx("mt-2 rounded-lg px-2 py-1.5 text-xs font-medium", VERDICT[check.verdict].pad)}>
-                      {VERDICT[check.verdict].mark} {check.words}
-                    </p>
-                    {check.basis.length > 0 && (
-                      <p className="mt-1.5 text-[10px] leading-snug text-white/50">
-                        Tested at {DESIGN_TEMPERATURES.cold} °C and {HOT_CELL} °C in the panel. Figures from: {check.basis.join("; ")}.
-                        Check them against the datasheets before relying on this.
+              {/* The string asked about, checked against the inverter input it is on. */}
+              {tool === "string" &&
+                (() => {
+                  const index = strings.findIndex((x) => x.id === checking);
+                  const at = index >= 0 ? centres[strings[index].panels[0]] : null;
+                  if (index < 0 || !at) return null;
+                  const check = checks[index];
+                  const string = strings[index];
+                  const left = ((ROOF_IMAGE.width / 2 + at.x / scale - view.x) / view.w) * 100;
+                  const top = ((ROOF_IMAGE.height / 2 + at.y / scale - view.y) / view.h) * 100;
+                  return (
+                    <div
+                      className="absolute z-20 w-[22rem] max-w-[calc(100%-1rem)] rounded-lg bg-forest p-3 text-white shadow-lift ring-1 ring-white/15"
+                      style={{
+                        // Kept clear of the strings box on the right where the picture is wide enough.
+                        left: `clamp(0.5rem, calc(${left}% + 2rem), calc(100% - 41.5rem))`,
+                        top: `clamp(0.5rem, calc(${top}% + 1.5rem), calc(100% - 15rem))`,
+                      }}
+                      role="status"
+                    >
+                      <button
+                        onClick={() => setChecking(null)}
+                        title="Close the check (Esc)"
+                        aria-label="Close the check"
+                        className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+                      >
+                        <X className="size-4" aria-hidden />
+                      </button>
+                      <p className="flex items-center gap-2 pr-8 text-sm font-semibold">
+                        <span
+                          className="size-3 rounded-full"
+                          style={{ background: STRING_COLOURS[index % STRING_COLOURS.length] }}
+                          aria-hidden
+                        />
+                        String {letter(index)} · {string.panels.length} panels ·
+                        {fitted.length > 1 ? ` inverter ${(string.inverter ?? 0) + 1},` : ""} input {(string.mppt ?? 0) + 1}
                       </p>
-                    )}
-                  </div>
-                );
-              })()}
+                      {fitted[string.inverter ?? 0] ? (
+                        <p className="mt-0.5 truncate text-xs text-white/60">{fitted[string.inverter ?? 0].name}</p>
+                      ) : null}
+                      {check.lines.length > 0 && (
+                        <table className="mt-2 w-full text-xs">
+                          <tbody>
+                            {check.lines.map((line) => (
+                              <tr key={line.what} className="align-top">
+                                <td className="py-0.5 pr-2 text-white/70">{line.what}</td>
+                                <td className="whitespace-nowrap py-0.5 text-right tabular-nums">{line.value}</td>
+                                <td className="whitespace-nowrap py-0.5 pl-2 tabular-nums text-white/60">{line.limit}</td>
+                                <td
+                                  className={clsx(
+                                    "w-4 py-0.5 pl-2 font-bold",
+                                    line.ok === false && "text-[#ff8a80]",
+                                    line.ok === null && "text-sun-bright",
+                                  )}
+                                >
+                                  {line.ok === true ? "✓" : line.ok === false ? "✕" : line.ok === null ? "!" : ""}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                      <p className={clsx("mt-2 rounded-lg px-2 py-1.5 text-xs font-medium", VERDICT[check.verdict].pad)}>
+                        {VERDICT[check.verdict].mark} {check.words}
+                      </p>
+                      {check.basis.length > 0 && (
+                        <p className="mt-1.5 text-[10px] leading-snug text-white/50">
+                          Tested at {DESIGN_TEMPERATURES.cold} °C and {HOT_CELL} °C in the panel. Figures from: {check.basis.join("; ")}.
+                          Check them against the datasheets before relying on this.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
 
               {/* The open comment, beside its bubble: this is where it is read and written. */}
               {thread && threadSpot && (
@@ -3664,12 +3681,22 @@ export function RoofDesigner(props: {
                   role="group"
                   aria-label="Strings"
                 >
-                  <p className={label}>
-                    Strings
-                    {fitted.length
-                      ? ` · ${fitted.length > 1 ? `${fitted.length} inverters, ` : ""}${fittedKw} kW of inverter for ${summary.kw.toFixed(2)} kW of panels`
-                      : " · no inverter chosen"}
-                  </p>
+                  <div className="flex items-start gap-2">
+                    <p className={clsx(label, "flex-1")}>
+                      Strings
+                      {fitted.length
+                        ? ` · ${fitted.length > 1 ? `${fitted.length} inverters, ` : ""}${fittedKw} kW of inverter for ${summary.kw.toFixed(2)} kW of panels`
+                        : " · no inverter chosen"}
+                    </p>
+                    <button
+                      onClick={() => pickTool("select")}
+                      title="Done stringing (Esc)"
+                      aria-label="Close strings"
+                      className="-mr-1 -mt-1 flex size-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+                    >
+                      <X className="size-4" aria-hidden />
+                    </button>
+                  </div>
                   {strings.length === 0 && <p className="text-sm text-muted">Click panels on the roof in the order they&apos;re wired.</p>}
                   <ul className="space-y-1">
                     {strings.map((x, i) => (
@@ -3719,13 +3746,19 @@ export function RoofDesigner(props: {
                             )),
                           )}
                         </select>
-                        <span
-                          className={clsx("w-5 text-center text-sm font-bold", VERDICT[checks[i].verdict].tone)}
-                          title={checks[i].words}
-                          aria-label={checks[i].words}
+                        <button
+                          onClick={() => setChecking(checking === x.id ? null : x.id)}
+                          className={clsx(
+                            "flex size-7 items-center justify-center rounded-full text-sm font-bold hover:bg-canvas",
+                            checking === x.id && "bg-canvas ring-1 ring-line",
+                            VERDICT[checks[i].verdict].tone,
+                          )}
+                          title={`${checks[i].words} (show the check)`}
+                          aria-label={`${checks[i].words}. Show the check for string ${letter(i)}`}
+                          aria-pressed={checking === x.id}
                         >
                           {VERDICT[checks[i].verdict].mark}
-                        </span>
+                        </button>
                         <button
                           className="px-1 text-lg leading-none text-muted hover:text-danger"
                           aria-label={`Delete string ${letter(i)}`}
@@ -3784,7 +3817,7 @@ export function RoofDesigner(props: {
                   </button>
                   <p className="text-xs text-muted">
                     {summary.panels - strings.reduce((n, x) => n + x.panels.length, 0)} of {summary.panels} panels aren&apos;t on a string.
-                    Hover over a string for its check. String last: re-laying a face&apos;s rows renumbers its panels.
+                    Tap the tick or cross beside a string for its check. String last: re-laying a face&apos;s rows renumbers its panels.
                   </p>
                 </div>
               ) : picks.length > 0 ? (
