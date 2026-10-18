@@ -4,7 +4,7 @@ import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
 import { loadTerrain } from "@/lib/services/terrain";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
-import { packFaces } from "@/lib/domain/design/pack";
+import { packFaces, reorient } from "@/lib/domain/design/pack";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
 import { selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
 import { todayInMarket } from "@/lib/domain/market";
@@ -1212,6 +1212,23 @@ export function RoofDesigner(props: {
         };
       }),
     );
+    setPicks([...next.ids.map((id): Pick => ({ kind: "loose", id })), ...picks.filter((p) => p.kind === "label")]);
+    changed();
+  };
+
+  /**
+   * Turns the picked panels onto their side, or back upright when every one already is, and lays them again tidily:
+   * the same rows and counts, the gutter row's edge kept, each row centred where it was (`reorient`). Strings keep
+   * their panels.
+   */
+  const turnLandscape = () => {
+    if (!panelPicks.length) return;
+    const next = byHand(panelPicks);
+    const group = next.loose.filter((p) => next.ids.includes(p.id));
+    const turned = new Map(reorient(group, size, !group.every((p) => p.across)).map((p) => [p.id, p]));
+    setFaces(next.faces);
+    setStrings(next.strings);
+    setLoose(next.loose.map((p) => turned.get(p.id) ?? p));
     setPicks([...next.ids.map((id): Pick => ({ kind: "loose", id })), ...picks.filter((p) => p.kind === "label")]);
     changed();
   };
@@ -3725,6 +3742,13 @@ export function RoofDesigner(props: {
                           className="mt-2 block w-full"
                         />
                       </label>
+                      <button
+                        onClick={turnLandscape}
+                        className="mt-2.5 w-full rounded-md border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:bg-canvas"
+                        title="Turn what is picked onto its side (or back upright) and lay it again tidily"
+                      >
+                        {pickedPanels.every((p) => p.across) ? "Portrait" : "Landscape"}
+                      </button>
                       <p className="mt-2.5 text-xs leading-snug text-ink-2">
                         {pickedFacing === null ? "Facing different ways" : `Facing ${compass(pickedFacing)} (${pickedFacing}°)`}
                       </p>

@@ -25,7 +25,18 @@
  * spaced at full size, as the designer draws them from above.
  */
 import { MIN_ARRAY_PANELS } from "../roof-layout";
-import { PANEL, faceFacing, inside, panelPlaces, type Face, type LoosePanel, type PanelSize, type Point } from "./roof-design";
+import {
+  PANEL,
+  faceFacing,
+  inside,
+  panelFacing,
+  panelPlaces,
+  planSize,
+  type Face,
+  type LoosePanel,
+  type PanelSize,
+  type Point,
+} from "./roof-design";
 import { TILT, yearOnPlane } from "./tilt";
 
 /** The least distance from any edge of a face to any panel on it, metres. */
@@ -258,4 +269,65 @@ export function packFaces(faces: Face[], size: PanelSize, n: number, newId: () =
     newId,
   );
   return { faces: faces.map((f) => ({ ...f, off: panelPlaces(f, size).map((p) => p.index) })), loose };
+}
+
+/** Panels within this far of each other down the slope are taken to be in the same row, metres. */
+const SAME_ROW = 0.3;
+
+/**
+ * Picked panels turned onto their side (`landscape`) or back upright, and laid again tidily (Martin, 18 Oct 2026: a
+ * Landscape button for what is picked). Each group facing one way keeps its rows and the count in each; the row
+ * nearest the gutter keeps its lower edge where it was, the rows above are spaced again for the new shape, and each
+ * row stays centred where it was. The panels keep their ids (so strings keep them), their tilt and the way they look.
+ */
+export function reorient(panels: LoosePanel[], size: PanelSize, landscape: boolean): LoosePanel[] {
+  const out = new Map<string, LoosePanel>();
+  const groups = new Map<number, LoosePanel[]>();
+  for (const p of panels) {
+    const facing = Math.round(panelFacing(p)) % 360;
+    groups.set(facing, [...(groups.get(facing) ?? []), p]);
+  }
+  for (const [facing, group] of groups) {
+    const down = downOf(facing);
+    const side = sideOf(facing);
+    // Each panel's place on the slope, and how far it reaches down it now (seen from above).
+    const placed = group.map((p) => {
+      const plan = planSize(p, size);
+      return { p, u: dot(p, side), v: dot(p, down), along: p.across ? plan.w : plan.h };
+    });
+    // Rows from the gutter (furthest down the slope) up.
+    placed.sort((a, b) => b.v - a.v);
+    const rows: (typeof placed)[] = [];
+    for (const item of placed) {
+      const row = rows.find((r) => Math.abs(r[0].v - item.v) <= SAME_ROW);
+      if (row) row.push(item);
+      else rows.push([item]);
+    }
+    let edge = Math.max(...rows[0].map((i) => i.v + i.along / 2));
+    for (const row of rows) {
+      row.sort((a, b) => a.u - b.u);
+      const turned = row.map(({ p }) =>
+        landscape ? { ...p, angle: (facing + 270) % 360, across: true } : { ...p, angle: facing, across: false },
+      );
+      const plan = planSize(turned[0], size);
+      const along = landscape ? plan.w : plan.h;
+      const across = landscape ? plan.h : plan.w;
+      const v = edge - along / 2;
+      const middle = row.reduce((t, i) => t + i.u, 0) / row.length;
+      turned.forEach((p, j) => {
+        const u = middle + (j - (row.length - 1) / 2) * (across + size.gap);
+        const next: LoosePanel = {
+          id: p.id,
+          x: cm(u * side.x + v * down.x),
+          y: cm(u * side.y + v * down.y),
+          angle: p.angle,
+          ...(landscape ? { across: true } : {}),
+          ...(p.tilt !== undefined ? { tilt: p.tilt } : {}),
+        };
+        out.set(p.id, next);
+      });
+      edge = v - along / 2 - size.gap;
+    }
+  }
+  return panels.map((p) => out.get(p.id) ?? p);
 }

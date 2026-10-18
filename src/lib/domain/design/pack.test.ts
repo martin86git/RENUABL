@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EDGE_CLEARANCE, MOUNT_STANDOFF, clearanceFor, packArea, packAreas, packFaces, tracedArea, type Area } from "./pack";
+import { EDGE_CLEARANCE, MOUNT_STANDOFF, clearanceFor, packArea, packAreas, packFaces, reorient, tracedArea, type Area } from "./pack";
 import { PANEL, facePanels, inside, looseCorners, panelFacing, type Face, type LoosePanel, type Point } from "./roof-design";
 
 const rect = (x0: number, y0: number, x1: number, y1: number): Point[] => [
@@ -152,5 +152,40 @@ describe("traced faces", () => {
   it("keep the face's own distance from its edges when it asks for more than the wind rule", () => {
     const wide = packArea(tracedArea({ ...traced, setback: 0.6 }), 30, PANEL, id);
     for (const p of wide) for (const c of looseCorners(p, PANEL)) expect(toEdge(c, traced.points)).toBeGreaterThanOrEqual(0.6 - 1e-6);
+  });
+});
+
+describe("turning picked panels landscape or back", () => {
+  // Two portrait rows on a north face (gutter to the north, the lowest y): 4 along the gutter, 2 above.
+  const k = Math.cos((22 * Math.PI) / 180);
+  const step = PANEL.short + PANEL.gap;
+  const rowStep = PANEL.long * k + PANEL.gap;
+  const at = (x: number, y: number, id: string): LoosePanel => ({ id, x, y, angle: 0, tilt: 22 });
+  const panels = [
+    ...[0, 1, 2, 3].map((i) => at((i - 1.5) * step, 0, `a${i}`)),
+    ...[0, 1].map((i) => at((i - 0.5) * step, rowStep, `b${i}`)),
+  ];
+
+  it("lays them on their side, keeping each row, its count and its middle, and the gutter row's edge", () => {
+    const turned = reorient(panels, PANEL, true);
+    expect(turned.map((p) => p.id)).toEqual(panels.map((p) => p.id));
+    expect(turned.every((p) => p.across && panelFacing(p) === 0 && p.tilt === 22)).toBe(true);
+    const gutterEdge = (list: LoosePanel[]) => Math.min(...list.flatMap((p) => looseCorners(p, PANEL).map((c) => c.y)));
+    expect(gutterEdge(turned)).toBeCloseTo(gutterEdge(panels), 1);
+    const rows = rowsOf(turned);
+    expect(rows).toEqual([4, 2]);
+    // Side by side with no overlap: neighbours a whole long edge apart.
+    const gutter = turned.filter((p) => p.id.startsWith("a")).map((p) => p.x);
+    expect(gutter[1] - gutter[0]).toBeCloseTo(PANEL.long + PANEL.gap, 2);
+    expect(gutter.reduce((t, x) => t + x, 0) / 4).toBeCloseTo(0, 2);
+  });
+
+  it("turns them back upright the same way", () => {
+    const back = reorient(reorient(panels, PANEL, true), PANEL, false);
+    expect(back.every((p) => !p.across && panelFacing(p) === 0)).toBe(true);
+    back.forEach((p, i) => {
+      expect(p.x).toBeCloseTo(panels[i].x, 1);
+      expect(p.y).toBeCloseTo(panels[i].y, 1);
+    });
   });
 });
