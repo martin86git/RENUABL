@@ -102,16 +102,16 @@ function snake(spots: readonly Spot[]): { x: number; y: number }[] {
 /** The steps of the loop, each with the line the picture shows while it happens. */
 const STEPS: { at: number; text: string; status: FeatureStatus; icon: typeof Sparkles }[] = [
   { at: 0, text: "Site created from the lead's address", status: "live", icon: MapPin },
-  { at: 2200, text: "Array A: rails, splices and roof kits counted", status: "live", icon: Sparkles },
-  { at: 4400, text: "Array B: the quote keeps up, panel by panel", status: "live", icon: Sparkles },
-  { at: 6600, text: "Array C on the flat garage: split array cost added", status: "live", icon: Sparkles },
-  { at: 8800, text: "Tilted 10°: tilt kits and tilt frames added", status: "live", icon: Sparkles },
-  { at: 11000, text: "Suggested for 8.55 kW of panels: 8 kW three-phase hybrid (107%)", status: "live", icon: Zap },
-  { at: 13200, text: "Three-phase inverter: installation fee and meter added", status: "live", icon: Zap },
-  { at: 15400, text: "From output and the bill: 16 kWh battery recommended", status: "live", icon: BatteryCharging },
-  { at: 17600, text: "Strings drawn and checked against the inverter", status: "live", icon: Sparkles },
+  { at: 3300, text: "Array A: rails, splices and roof kits counted", status: "live", icon: Sparkles },
+  { at: 6600, text: "Array B: the quote keeps up, panel by panel", status: "live", icon: Sparkles },
+  { at: 9900, text: "Array C on the flat garage: split array cost added", status: "live", icon: Sparkles },
+  { at: 13200, text: "Tilted 10°: tilt kits and tilt frames added", status: "live", icon: Sparkles },
+  { at: 16500, text: "Suggested for 8.55 kW of panels: 8 kW three-phase hybrid (107%)", status: "live", icon: Zap },
+  { at: 19800, text: "Three-phase inverter: installation fee and meter added", status: "live", icon: Zap },
+  { at: 23100, text: "From output and the bill: 16 kWh battery recommended", status: "live", icon: BatteryCharging },
+  { at: 26400, text: "Strings drawn and checked against the inverter", status: "live", icon: Sparkles },
 ];
-const AUTO_TOTAL = 22500;
+const AUTO_TOTAL = 31500;
 
 /** Where the eye goes at each step: the part of the picture lit (x, y, width, height), the quote lines and the overlays that go with it. */
 type Overlay = "lead" | "stats" | "kit" | "supply" | "bill";
@@ -131,7 +131,7 @@ const SPOT_MOVE = "x 700ms ease, y 700ms ease, width 700ms ease, height 700ms ea
 /** An overlay that isn't part of what is being shown steps back. */
 const dim = (on: boolean) => (on ? "opacity-100" : "opacity-35");
 /** How long after its step begins the inverter (or battery) is chosen from the dropdown and goes on the design. */
-const CHOSEN_AFTER = 1500;
+const CHOSEN_AFTER = 2200;
 
 const railLengths = (n: number) => Math.ceil((n * (1.134 + 0.1) * 2 * 1.05) / 4.8);
 
@@ -557,17 +557,17 @@ const ASK = "Thanks! Could we add an EV charger too?";
 const ANSWER = "Yes, added and your proposal's updated.";
 /** The conversation's beats: the note typed and sent, the email arriving, the proposal opened, a question and its answer, the signature. */
 const TALK = {
-  typed: 2600,
-  sent: 3200,
-  emailed: 3600,
-  opening: 4600,
-  delivered: 5000,
-  opened: 5300,
-  asking: 6300,
-  asked: 7300,
-  answered: 8800,
-  signed: 10400,
-  total: 14000,
+  typed: 3200,
+  sent: 4000,
+  emailed: 4800,
+  opening: 6600,
+  delivered: 7200,
+  opened: 7800,
+  asking: 9200,
+  asked: 10600,
+  answered: 12600,
+  signed: 14800,
+  total: 19000,
 };
 
 function Bubble({ mine, children, show = true }: { mine?: boolean; children: React.ReactNode; show?: boolean }) {
@@ -796,7 +796,7 @@ const COSTED = [
   ["Battery", 1800],
 ] as const;
 /** The order things happen in: signed, ordered, booked (with reminders), installed, and only then the installer's invoice. */
-const AFTER = { signed: 0, order: 2000, schedule: 5000, installed: 8600, invoice: 9400, billed: 10600, total: 15000 };
+const AFTER = { signed: 0, order: 3000, schedule: 7000, installed: 11400, invoice: 12600, billed: 14200, total: 19500 };
 
 function Stage({
   on,
@@ -896,8 +896,8 @@ export function AfterSigningDemo() {
           </div>
           <ul className="mt-3 space-y-1.5 text-[11.5px]">
             {[
-              { at: AFTER.schedule + 1200, text: "Reminder sent: install on Thursday" },
-              { at: AFTER.schedule + 2400, text: "Reminder sent: clear the way to the switchboard" },
+              { at: AFTER.schedule + 1500, text: "Reminder sent: install on Thursday" },
+              { at: AFTER.schedule + 3000, text: "Reminder sent: clear the way to the switchboard" },
               { at: AFTER.installed, text: "Installed. Waiting for the installer's invoice" },
             ]
               .filter((r) => t >= r.at)
