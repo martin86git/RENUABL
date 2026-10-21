@@ -128,3 +128,13 @@ export const emailDeal = (jobId: string, email: { to: string; subject: string; b
     method: "POST",
     body: email,
   });
+
+/** The business's arrangement of a deal's fields (Settings → Deal fields), and whether it is its own. */
+export const loadDealFields = () =>
+  ask<{ fields: import("@/lib/domain/design/deal-sections").DealFieldsConfig; own: boolean }>("/api/design/deal-fields");
+/** Keeps the arrangement (null: back to ours). */
+export const saveDealFields = (fields: import("@/lib/domain/design/deal-sections").DealFieldsConfig | null) =>
+  ask<{ fields: import("@/lib/domain/design/deal-sections").DealFieldsConfig; own: boolean }>("/api/design/deal-fields", {
+    method: "PUT",
+    body: { fields },
+  });

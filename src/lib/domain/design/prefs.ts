@@ -5,6 +5,7 @@
  * its own switch, off until the business turns it on). Kept as one record a
  * business (`design_prefs`), always through `cleanPrefs`. Pure, tested.
  */
+import { cleanDealFields, type DealFieldsConfig } from "./deal-sections";
 
 /** A supplier's details for orders, against the name its price list was uploaded under. */
 export interface SupplierContact {
@@ -27,6 +28,8 @@ export interface BusinessPrefs {
   };
   /** How many days before the installation the reminder goes. */
   reminderDaysBefore: number;
+  /** The business's own arrangement of a deal's fields (Settings → Deal fields); null: ours. */
+  dealFields: DealFieldsConfig | null;
 }
 
 export const DEFAULT_PREFS: BusinessPrefs = {
@@ -35,6 +38,7 @@ export const DEFAULT_PREFS: BusinessPrefs = {
   invoiceTolerance: 50,
   automations: { installReminders: false },
   reminderDaysBefore: 2,
+  dealFields: null,
 };
 
 export const MAX_SUPPLIERS = 12;
@@ -75,6 +79,7 @@ export function cleanPrefs(raw: unknown): BusinessPrefs {
       Number.isFinite(tolerance) && tolerance >= 0 && tolerance <= 2000 ? Math.round(tolerance) : DEFAULT_PREFS.invoiceTolerance,
     automations: { installReminders: auto.installReminders === true },
     reminderDaysBefore: (REMINDER_DAY_CHOICES as readonly number[]).includes(days) ? days : DEFAULT_PREFS.reminderDaysBefore,
+    dealFields: r.dealFields && typeof r.dealFields === "object" ? cleanDealFields(r.dealFields) : null,
   };
 }
 

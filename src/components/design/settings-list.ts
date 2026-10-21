@@ -5,6 +5,10 @@
  */
 export const SETTINGS: { title: string; items: { slug: string; label: string; soon?: string }[] }[] = [
   {
+    title: "CRM",
+    items: [{ slug: "deal-fields", label: "Deal fields" }],
+  },
+  {
     title: "Pricing",
     items: [
       { slug: "price-lists", label: "Price lists" },

@@ -8,7 +8,7 @@
  * These are a solar business's own customers. They have nothing to do with
  * RENUABL's homeowners, reservations or installation partners.
  */
-import { cleanSectionDetails } from "./deal-sections";
+import { cleanSectionDetails, type SectionField } from "./deal-sections";
 
 // ---------------------------------------------------------------------------
 // Stages and sources
@@ -304,7 +304,7 @@ export const PROGRESS_LABELS: { [K in ProgressKey]: Record<(typeof PROGRESS)[K][
 export const INSTALLER_KEY = "installer";
 
 /** System details as typed: known keys only, each one tidy line of up to 120 characters; an empty one is dropped. */
-export function cleanJobDetails(raw: unknown): Record<string, string> {
+export function cleanJobDetails(raw: unknown, fields?: readonly SectionField[]): Record<string, string> {
   const r = bag(raw);
   const kept: Record<string, string> = {};
   for (const key of DETAIL_KEYS) {
@@ -316,7 +316,7 @@ export function cleanJobDetails(raw: unknown): Record<string, string> {
   for (const key of Object.keys(PROGRESS) as ProgressKey[])
     if ((PROGRESS[key] as readonly string[]).includes(r[key] as string)) kept[key] = r[key] as string;
   // The Installation, Network and Financials tabs' fields, each in range for its kind.
-  return { ...kept, ...cleanSectionDetails(r) };
+  return { ...kept, ...cleanSectionDetails(r, fields) };
 }
 
 /** What a job is called when nothing was typed. */
@@ -338,7 +338,7 @@ function realDate(raw: unknown): string | null {
  * A job as sent. A new job starts as a lead with no price or date; with
  * `current` (an edit), anything not sent stays as it is.
  */
-export function cleanJobInput(raw: unknown, current?: JobInput): Cleaned<JobInput> {
+export function cleanJobInput(raw: unknown, current?: JobInput, fields?: readonly SectionField[]): Cleaned<JobInput> {
   const r = bag(raw);
   const sent = (key: string) => key in r;
   const start: JobInput = current ?? {
@@ -391,7 +391,7 @@ export function cleanJobInput(raw: unknown, current?: JobInput): Cleaned<JobInpu
         ? { kw: typeof r.kw === "number" && Number.isFinite(r.kw) && r.kw >= 0 && r.kw <= 10_000 ? Math.round(r.kw * 1000) / 1000 : null }
         : {}),
       // The details are sent whole: the ones typed in by hand, as they now stand.
-      details: sent("details") ? cleanJobDetails(r.details) : start.details,
+      details: sent("details") ? cleanJobDetails(r.details, fields) : start.details,
     },
   };
 }

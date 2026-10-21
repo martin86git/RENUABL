@@ -1,4 +1,6 @@
 import { cleanJobInput } from "@/lib/domain/design/crm";
+import { typedFields } from "@/lib/domain/design/deal-sections";
+import { loadPrefs } from "@/lib/server/design-after-sale-repo";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { deleteJob, jobById, updateJob } from "@/lib/server/design-crm-repo";
 
@@ -30,7 +32,9 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/jobs/
     const read = await readBody(request, 20_000);
     if ("refuse" in read) return read.refuse;
     if (!validId(id)) return notFound();
-    const job = await updateJob(who.member.businessId, id, (current) => cleanJobInput(read.body, current), who.member.email);
+    // A deal's fields are cleaned against the business's own (Settings → Deal fields): its dropdown choices, its own fields.
+    const fields = typedFields((await loadPrefs(who.member.businessId)).dealFields);
+    const job = await updateJob(who.member.businessId, id, (current) => cleanJobInput(read.body, current, fields), who.member.email);
     if (!job) return notFound();
     if ("refused" in job) return Response.json({ ok: false, message: job.refused }, { status: 422 });
     return Response.json({ ok: true, job });

@@ -15,10 +15,20 @@ import {
   type JobStage,
 } from "@/lib/domain/design/crm";
 import { systemDetails, type DealDetail, type JobExtra } from "@/lib/domain/design/deal";
-import { DEAL_SECTIONS, MOVED_FROM_SYSTEM, sectionLines, type DealSection } from "@/lib/domain/design/deal-sections";
+import { fieldLine, resolveDealFields, type DealFieldsConfig } from "@/lib/domain/design/deal-sections";
 import { INSTALLER_KEY } from "@/lib/domain/design/crm";
 import { loadInstallExtras } from "@/lib/services/after-sale";
-import { addActivity, deleteJob, dollars, loadCustomer, loadDealDesign, loadJob, saveJob, shortDate } from "@/lib/services/crm";
+import {
+  addActivity,
+  deleteJob,
+  dollars,
+  loadCustomer,
+  loadDealDesign,
+  loadDealFields,
+  loadJob,
+  saveJob,
+  shortDate,
+} from "@/lib/services/crm";
 import { ACTIVITY_WORD, StageTag } from "./design-home";
 import { DealChat } from "./chat-panel";
 import { useDesignAccount } from "./design-account";
@@ -139,7 +149,12 @@ export function DealPage({ id }: { id: string }) {
   const [folded, setFolded] = useState(false);
   const [account] = useDesignAccount();
   // Which of the deal's tabs of fields is showing, and the signed proposal's figures for Financials.
-  const [section, setSection] = useState<DealSection["id"]>("system");
+  const [section, setSection] = useState("system");
+  // The business's own arrangement of a deal's fields (Settings → Deal fields); ours until it has loaded.
+  const [fieldsConfig, setFieldsConfig] = useState<DealFieldsConfig | null>(null);
+  useEffect(() => {
+    void loadDealFields().then((res) => res.ok && setFieldsConfig(res.fields));
+  }, []);
   const [extra, setExtra] = useState<JobExtra | null>(null);
   useEffect(() => {
     void loadInstallExtras().then((res) => res.ok && setExtra(res.extras.find((e) => e.jobId === id) ?? null));
@@ -230,27 +245,30 @@ export function DealPage({ id }: { id: string }) {
   }
   const details = systemDetails(designed?.design ?? null, designed?.form ?? null, job.details);
   const known = details.filter((d) => d.value).length;
-  const systemLines = details.filter((d) => !(MOVED_FROM_SYSTEM as readonly string[]).includes(d.key));
-  const sectionTab =
-    section === "system"
-      ? []
-      : sectionLines(section, job.details, {
-          installDate: job.installDate ? shortDate(job.installDate) : null,
-          installer: job.details?.[INSTALLER_KEY] ?? null,
-          signed: extra
-            ? {
-                incGst: extra.incGst ?? null,
-                stc: extra.stc ?? null,
-                youPay: extra.youPay,
-                depositAsked: extra.depositAsked ?? null,
-                depositReceived: extra.depositReceived,
-                solarVicRebate: extra.solarVicRebate ?? null,
-                solarVicLoan: extra.solarVicLoan ?? null,
-              }
-            : null,
-        });
-  const tabLines = section === "system" ? systemLines : sectionTab;
+  // The tabs and fields as the business has set them out; each field's line from the deal, its design and its proposal.
+  const tabs = resolveDealFields(fieldsConfig).filter((t) => !t.hidden);
+  const shownTab = tabs.find((t) => t.id === section) ?? tabs[0];
+  const fromDesign = Object.fromEntries(details.filter((d) => d.designed).map((d) => [d.key, d.designed!]));
+  const ctx = {
+    installDate: job.installDate ? shortDate(job.installDate) : null,
+    installer: job.details?.[INSTALLER_KEY] ?? null,
+    designed: fromDesign,
+    signed: extra
+      ? {
+          incGst: extra.incGst ?? null,
+          stc: extra.stc ?? null,
+          youPay: extra.youPay,
+          depositAsked: extra.depositAsked ?? null,
+          depositReceived: extra.depositReceived,
+          solarVicRebate: extra.solarVicRebate ?? null,
+          solarVicLoan: extra.solarVicLoan ?? null,
+        }
+      : null,
+  };
+  const tabFields = shownTab ? shownTab.fields.filter((f) => !f.hidden) : [];
+  const tabLines = tabFields.map((f) => fieldLine(f, job.details, ctx));
   const tabFilled = tabLines.filter((l) => l.value).length;
+  const PROPOSAL_KEYS = ["incGst", "stc", "youPay", "depositAsked", "depositReceived"];
   const setDetail = (key: string, text: string) => {
     const next = { ...job.details };
     if (text) next[key] = text;
@@ -414,46 +432,47 @@ export function DealPage({ id }: { id: string }) {
             </span>
           }
         >
-          {/* System, Installation, Network and Financials, as tabs. */}
-          <div className="-mx-1 flex gap-1 rounded-md bg-surface-2 p-1" role="tablist" aria-label="Deal properties">
-            {DEAL_SECTIONS.map((sec) => (
+          {/* The tabs as the business has set them out (Settings → Deal fields). */}
+          <div className="-mx-1 flex flex-wrap gap-1 rounded-md bg-surface-2 p-1" role="tablist" aria-label="Deal properties">
+            {tabs.map((t) => (
               <button
-                key={sec.id}
+                key={t.id}
                 role="tab"
-                aria-selected={section === sec.id}
-                onClick={() => setSection(sec.id)}
+                aria-selected={shownTab?.id === t.id}
+                onClick={() => setSection(t.id)}
                 className={clsx(
-                  "h-7 flex-1 rounded px-1 text-[11.5px] font-medium",
-                  section === sec.id ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-2 hover:text-ink",
+                  "h-7 flex-1 whitespace-nowrap rounded px-1.5 text-[11.5px] font-medium",
+                  shownTab?.id === t.id ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-2 hover:text-ink",
                 )}
               >
-                {sec.label}
+                {t.label}
               </button>
             ))}
           </div>
-          {section === "system" ? (
-            <>
-              <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
-                {job.projectId
-                  ? "Filled in from the design. Click any line to type over it."
-                  : "These fill in from the design once the roof has been drawn and saved. Click any line to type it in now."}
-              </p>
-              {systemLines.map((d) => (
-                <DetailField key={d.key} line={d} onSave={(text) => setDetail(d.key, text)} />
-              ))}
-            </>
-          ) : (
-            <>
-              {section === "financials" && !extra && (
-                <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
-                  The price, STCs and deposit fill in once the customer signs a proposal.
-                </p>
-              )}
-              {sectionTab.map((l) => (
-                <SectionFieldLine key={l.key} line={l} onSave={(text) => setDetail(l.key, text)} />
-              ))}
-            </>
+          {tabFields.some((f) => f.source === "design") && (
+            <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
+              {job.projectId
+                ? "Filled in from the design. Click any line to type over it."
+                : "These fill in from the design once the roof has been drawn and saved. Click any line to type it in now."}
+            </p>
           )}
+          {!extra && tabFields.some((f) => PROPOSAL_KEYS.includes(f.key)) && (
+            <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
+              The price, STCs and deposit fill in once the customer signs a proposal.
+            </p>
+          )}
+          {tabLines.map((l) => {
+            const d = l.source === "design" ? details.find((x) => x.key === l.key) : null;
+            return d ? (
+              <DetailField key={l.key} line={{ ...d, label: l.label }} onSave={(text) => setDetail(l.key, text)} />
+            ) : (
+              <SectionFieldLine key={l.key} line={l} onSave={(text) => setDetail(l.key, text)} />
+            );
+          })}
+          {tabs.length === 0 && <p className="text-sm text-ink-2">Every tab is hidden in Settings → Deal fields.</p>}
+          <Link href={`${PATHS.settings}/deal-fields`} className="block text-xs text-muted underline underline-offset-4 hover:text-ink">
+            Arrange these fields
+          </Link>
         </Block>
       </aside>
 
