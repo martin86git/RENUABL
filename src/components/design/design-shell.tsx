@@ -21,12 +21,13 @@ import {
   SquareKanban,
   TrendingUp,
   Users,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
-import { loadWeather } from "@/lib/services/crm";
+import { loadWeather, serviceCount } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 
@@ -40,6 +41,7 @@ export const PATHS = {
   customers: "/design/customers",
   designer: "/design/roof",
   messages: "/design/messages",
+  service: "/design/service",
   proposalsSent: "/design/sales/proposals",
   proposalsSigned: "/design/sales/signed",
   scheduler: "/design/procurement/scheduler",
@@ -108,6 +110,7 @@ const NAV: NavItem[] = [
       { href: PATHS.invoices, label: "Installer Invoices", icon: ReceiptText },
     ],
   },
+  { href: PATHS.service, label: "Service", icon: Wrench },
   { href: PATHS.messages, label: "Messages", icon: MessageSquare },
   { href: PATHS.designer, label: "Design tool", icon: PenTool, main: true },
 ];
@@ -170,6 +173,9 @@ function Shell({
   const [account] = useDesignAccount();
   // How many of the customers' messages nobody has seen: the number on Messages. Asked only for a signed-in business.
   const unread = useUnreadMessages(Boolean(account?.signedIn && account.business));
+  // How many service cases are still to put right: the number on Service.
+  const service = useServiceCount(Boolean(account?.signedIn && account.business));
+  const counts: Record<string, number> = { [PATHS.messages]: unread, [PATHS.service]: service };
   const path = usePathname();
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (!account.signedIn) {
@@ -219,19 +225,19 @@ function Shell({
       <span className="relative shrink-0">
         <Icon className="size-[18px]" aria-hidden />
         {/* Folded down to icons, the count rides on the icon. */}
-        {compact && href === PATHS.messages && unread > 0 && (
+        {compact && (counts[href] ?? 0) > 0 && (
           <span className="absolute -right-2 -top-2 rounded-full bg-sun-line px-1 text-[10px] font-semibold leading-4 text-white">
-            {unread}
+            {counts[href]}
           </span>
         )}
       </span>
       {!compact && <span className="truncate">{label}</span>}
-      {!compact && href === PATHS.messages && unread > 0 && (
+      {!compact && (counts[href] ?? 0) > 0 && (
         <span
           className="ml-auto rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white"
-          aria-label={`${unread} unread`}
+          aria-label={href === PATHS.messages ? `${unread} unread` : `${counts[href]} to resolve`}
         >
-          {unread}
+          {counts[href]}
         </span>
       )}
     </Link>
@@ -404,3 +410,23 @@ export const ui = {
   eyebrow: "text-[11px] font-medium uppercase tracking-[0.16em] text-muted",
   link: "font-medium text-ink underline underline-offset-4 hover:text-ink-2",
 } as const;
+
+/** How many service cases are still to put right, asked when the shell opens and whenever a case changes. */
+function useServiceCount(on: boolean): number {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!on) return;
+    let gone = false;
+    const look = async () => {
+      const res = await serviceCount();
+      if (!gone && res.ok) setN(res.open);
+    };
+    void look();
+    window.addEventListener("renuabl:service", look);
+    return () => {
+      gone = true;
+      window.removeEventListener("renuabl:service", look);
+    };
+  }, [on]);
+  return on ? n : 0;
+}

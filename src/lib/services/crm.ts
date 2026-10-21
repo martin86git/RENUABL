@@ -138,3 +138,17 @@ export const saveDealFields = (fields: import("@/lib/domain/design/deal-sections
     method: "PUT",
     body: { fields },
   });
+
+/** The business's service cases (Service pipeline), each with its customer and deal. */
+export const listService = () => ask<{ cases: import("@/lib/server/design-service-repo").ServiceLine[] }>("/api/design/service");
+/** How many service cases are still to resolve, for the nav. */
+export const serviceCount = () => ask<{ open: number }>("/api/design/service?count=1");
+/** Flags a deal for service. */
+export const raiseService = (jobId: string, issue: string) =>
+  ask<{ case: import("@/lib/domain/design/service").ServiceCase }>("/api/design/service", { method: "POST", body: { jobId, issue } });
+/** Moves a case on, adds a note, or both. */
+export const updateService = (id: string, change: { state?: string; text?: string }) =>
+  ask<{ case: import("@/lib/domain/design/service").ServiceCase }>(`/api/design/service/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: change,
+  });

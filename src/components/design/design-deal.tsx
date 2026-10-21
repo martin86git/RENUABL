@@ -31,6 +31,7 @@ import {
 } from "@/lib/services/crm";
 import { ACTIVITY_WORD, StageTag } from "./design-home";
 import { DealChat } from "./chat-panel";
+import { DealService } from "./design-service";
 import { useDesignAccount } from "./design-account";
 import { ContactActions, DealEmail, DesignDrawer, SectionFieldLine } from "./deal-tools";
 import { DealProposal } from "./design-proposal";
@@ -48,6 +49,7 @@ const FILTERS: { key: "all" | ActivityKind; label: string }[] = [
   { key: "stage", label: "Stage moves" },
   { key: "proposal", label: "Proposal" },
   { key: "message", label: "Messages" },
+  { key: "service", label: "Service" },
 ];
 
 /** A block of the left-hand column that folds away, with its lines one under the next: a quiet label over its value. */
@@ -370,6 +372,11 @@ export function DealPage({ id }: { id: string }) {
 
         {/* The proposal worked out from this deal's design: whether one is out, and the way to preview and send it. */}
         <DealProposal jobId={job.id} hasDesign={Boolean(job.projectId)} />
+
+        {/* Something to put right after the sale: its open case, or the way to flag one. */}
+        <Block title="Service">
+          <DealService jobId={job.id} />
+        </Block>
 
         <Block title="Deal details">
           <label className="block text-xs text-muted">

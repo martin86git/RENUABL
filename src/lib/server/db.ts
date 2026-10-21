@@ -421,6 +421,22 @@ create table if not exists design_followups (
   primary key (business_id, job_id, day),
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
+-- The service pipeline (domain/design/service.ts): a job's cases to put right after the sale, Open, In hand, Resolved,
+-- with their history kept on the case. One open at a time a job (checked in the repo, under a lock on the job).
+create table if not exists design_service_cases (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  customer_id text not null,
+  issue text not null,
+  state text not null default 'open',
+  raised_at timestamptz not null default now(),
+  raised_by text not null,
+  resolved_at timestamptz,
+  updates jsonb not null default '[]',
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create index if not exists design_service_cases_business on design_service_cases(business_id, state);
 -- What a signed job's installation was allowed for in its quote (domain/design/installer-invoices.ts), fixed at signing.
 create table if not exists design_install_costs (
   business_id text not null references businesses(id) on delete cascade,

@@ -57,6 +57,7 @@ export const ACTIVITY_WORD = {
   order: "Order",
   invoice: "Invoice",
   reminder: "Reminder",
+  service: "Service",
 } as const;
 
 /**
