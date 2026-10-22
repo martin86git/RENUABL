@@ -63,7 +63,10 @@ export const saveCustomer = (id: string, input: CustomerInput) =>
   ask<{ customer: Customer }>(`/api/design/customers/${encodeURIComponent(id)}`, { method: "PUT", body: input });
 export const deleteCustomer = (id: string) => ask<object>(`/api/design/customers/${encodeURIComponent(id)}`, { method: "DELETE" });
 export const addActivity = (customerId: string, entry: { kind: "note" | "call" | "email"; text: string; jobId?: string }) =>
-  ask<{ activity: Activity }>(`/api/design/customers/${encodeURIComponent(customerId)}/activity`, { method: "POST", body: entry });
+  ask<{ activity: Activity; mentioned?: string[] }>(`/api/design/customers/${encodeURIComponent(customerId)}/activity`, {
+    method: "POST",
+    body: entry,
+  });
 
 export const listJobs = () => ask<{ jobs: JobLine[] }>("/api/design/jobs");
 export const createJob = (input: { customerId: string; title: string; address: string; lat: number | null; lng: number | null }) =>
@@ -152,3 +155,15 @@ export const updateService = (id: string, change: { state?: string; text?: strin
     method: "PUT",
     body: change,
   });
+
+/** The signed-in member's notifications (their @mentions), newest first, and how many are unread. */
+export const loadNotifications = () =>
+  ask<{ notifications: import("@/lib/server/design-notifications-repo").Notification[]; unread: number }>("/api/design/notifications");
+/** How many of the member's notifications are unread, for the nav. */
+export const notificationCount = () => ask<{ unread: number }>("/api/design/notifications?count=1");
+/** Marks the member's own notifications read: those named, those on a deal, or all. */
+export const markNotificationsRead = (which: { ids?: string[]; jobId?: string; all?: boolean }) =>
+  ask<object>("/api/design/notifications", { method: "PUT", body: which });
+/** Gives a deal to a member of the business (their email), or to no one (null). */
+export const setDealOwner = (jobId: string, owner: string | null) =>
+  ask<{ job: Job }>(`/api/design/jobs/${encodeURIComponent(jobId)}`, { method: "PUT", body: { owner } });

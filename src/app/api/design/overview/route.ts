@@ -1,4 +1,4 @@
-import { answer, requireMember } from "@/lib/server/design-context";
+import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
 import { overview } from "@/lib/server/design-crm-repo";
 
 /**
@@ -10,6 +10,6 @@ export async function GET() {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    return Response.json({ ok: true, ...(await overview(who.member.businessId)) });
+    return Response.json({ ok: true, ...(await overview(who.member.businessId, viewerOf(who.member))) });
   });
 }

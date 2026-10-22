@@ -115,6 +115,8 @@ export interface Job {
   installedAt: string | null;
   /** System details typed in by hand, by their key (`DETAIL_KEYS`): each stands in place of what the design says. */
   details: Record<string, string>;
+  /** The member it belongs to (their email); null when no one owns it yet. */
+  owner: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,5 +1,5 @@
 import { todayInMarket } from "@/lib/domain/market";
-import { answer, readBody, requireMember } from "@/lib/server/design-context";
+import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { workOutProposal } from "@/lib/server/design-proposal";
 import { NO_DESIGN, proposalVersions, publishProposal, withdrawProposal } from "@/lib/server/design-proposal-repo";
@@ -13,7 +13,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/jobs
     const { id } = await ctx.params;
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    if (!validId(id) || !(await jobById(who.member.businessId, id))) return notFound();
+    if (!validId(id) || !(await jobById(who.member.businessId, id, viewerOf(who.member)))) return notFound();
     return Response.json({ ok: true, versions: await proposalVersions(who.member.businessId, id, todayInMarket()) });
   });
 }
@@ -48,7 +48,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if (kept === "raced")
       return Response.json({ ok: false, message: "Someone published this a moment ago. Reload to see it." }, { status: 409 });
     const versions = await proposalVersions(who.member.businessId, id, todayInMarket());
-    const found = await jobById(who.member.businessId, id);
+    const found = await jobById(who.member.businessId, id, viewerOf(who.member));
     return Response.json({ ok: true, proposal: versions[0], versions, job: found?.job });
   });
 }

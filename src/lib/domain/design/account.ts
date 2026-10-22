@@ -30,6 +30,8 @@ export interface MemberPermissions {
   prices: boolean;
   /** Publishes and withdraws proposals. */
   publish: boolean;
+  /** Sees every deal. Without it, only the deals they own, those no one owns, and those they are mentioned on. */
+  allDeals: boolean;
 }
 
 export const PERMISSIONS: { key: keyof MemberPermissions; label: string; about: string }[] = [
@@ -44,10 +46,15 @@ export const PERMISSIONS: { key: keyof MemberPermissions; label: string; about: 
     about: 'Price lists, rates and margin, and the proposal\'s branding, terms and blocks. Needs "Sees costs and margin".',
   },
   { key: "publish", label: "Publishes proposals", about: "Publishes a proposal to its private link, and takes one back." },
+  {
+    key: "allDeals",
+    label: "Sees every deal",
+    about: "Without it they see the deals they own, the deals no one owns yet, and any deal they are mentioned on.",
+  },
 ];
 
 /** What a member starts with: everything, as it was before permissions could be set. */
-export const ALL_PERMISSIONS: MemberPermissions = { costs: true, prices: true, publish: true };
+export const ALL_PERMISSIONS: MemberPermissions = { costs: true, prices: true, publish: true, allDeals: true };
 
 /**
  * A member's permissions as sent or as saved: only an explicit false switches
@@ -57,7 +64,7 @@ export const ALL_PERMISSIONS: MemberPermissions = { costs: true, prices: true, p
 export function cleanPermissions(raw: unknown): MemberPermissions {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const costs = r.costs !== false;
-  return { costs, prices: costs && r.prices !== false, publish: r.publish !== false };
+  return { costs, prices: costs && r.prices !== false, publish: r.publish !== false, allDeals: r.allDeals !== false };
 }
 
 /**
@@ -251,4 +258,20 @@ export function cleanImportRoofs(raw: unknown): ImportRoof[] {
     out.push({ ...roof, ...work });
   }
   return out;
+}
+
+/** Whose deals someone sees: everyone's, or (`all` false) their own, no one's, and those they are mentioned on. */
+export interface DealViewer {
+  email: string;
+  all: boolean;
+}
+
+/** Whether this member sees every deal: the owner always; a member unless the owner has switched it off. */
+export function seesAllDeals(role: MemberRole, permissions: MemberPermissions = ALL_PERMISSIONS): boolean {
+  return role === "owner" || (role === "member" && cleanPermissions(permissions).allDeals);
+}
+
+/** Whether a viewer sees a deal, by its owner and whether they are mentioned on it. The server's queries say the same. */
+export function seesDeal(viewer: DealViewer, owner: string | null, mentioned = false): boolean {
+  return viewer.all || !owner || owner === viewer.email.toLowerCase() || mentioned;
 }

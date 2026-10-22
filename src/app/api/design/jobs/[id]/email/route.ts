@@ -1,5 +1,5 @@
 import { cleanDealEmail, dealEmail, emailRecord } from "@/lib/domain/design/deal-email";
-import { answer, readBody, requireMember } from "@/lib/server/design-context";
+import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { addActivity, jobById } from "@/lib/server/design-crm-repo";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
 import { emailProvider, sendEmail } from "@/lib/server/email";
@@ -33,7 +33,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if ("refuse" in read) return read.refuse;
     if (!emailProvider()) return fail(NOT_SET_UP, 503);
     if (!validId(id)) return fail("There's no such deal.", 404);
-    const found = await jobById(who.member.businessId, id);
+    const found = await jobById(who.member.businessId, id, viewerOf(who.member));
     if (!found) return fail("There's no such deal.", 404);
     const clean = cleanDealEmail(read.body);
     if (!clean.ok) return fail(clean.message, 422);

@@ -7,7 +7,7 @@
  * comes from the signed-in member (`design-context.ts`). A customer, job or
  * activity that belongs to another business reads as not there at all.
  */
-import { roofKey } from "@/lib/domain/design/account";
+import { roofKey, type DealViewer } from "@/lib/domain/design/account";
 import {
   INSTALLED_STAGES,
   JOB_STAGES,
@@ -49,7 +49,7 @@ const CUSTOMER = `c.id, c.name,
   ${moment("c.created_at")} as "createdAt", ${moment("c.updated_at")} as "updatedAt"`;
 const JOB = `j.id, j.customer_id as "customerId", j.title, j.address, j.lat, j.lng, j.stage, j.project_id as "projectId",
   j.value::float8 as value, to_char(j.install_date, 'YYYY-MM-DD') as "installDate", j.details,
-  j.kw::float8 as kw,
+  j.kw::float8 as kw, j.owner_email as owner,
   ${moment(`coalesce(j.won_at, case when j.stage in (${inList(WON_STAGES)}) then j.updated_at end)`)} as "wonAt",
   ${moment(`coalesce(j.installed_at, case when j.stage in (${inList(INSTALLED_STAGES)}) then j.updated_at end)`)} as "installedAt",
   ${moment("j.created_at")} as "createdAt", ${moment("j.updated_at")} as "updatedAt"`;
@@ -200,8 +200,8 @@ async function customerRow(q: Q | typeof query, businessId: string, id: string):
 async function insertJob(q: Q, businessId: string, customerId: string, job: JobInput, by: string): Promise<Job> {
   const id = newId("job");
   await q(
-    `insert into design_jobs (id, business_id, customer_id, title, address, lat, lng, roof_key, stage, value, install_date, created_by, details)
-     values ($2,$1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)`,
+    `insert into design_jobs (id, business_id, customer_id, title, address, lat, lng, roof_key, stage, value, install_date, created_by, details, owner_email)
+     values ($2,$1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$12)`,
     [
       businessId,
       id,
@@ -273,14 +273,15 @@ export async function customerById(businessId: string, id: string): Promise<Cust
 export async function customerDetail(
   businessId: string,
   id: string,
+  viewer?: DealViewer,
 ): Promise<{ customer: Customer; jobs: Job[]; activity: Activity[] } | null> {
   const customer = await customerRow(query, businessId, id);
   if (!customer) return null;
   const [jobs, activity] = await Promise.all([
-    query<Job>(`select ${JOB} from design_jobs j where j.business_id = $1 and j.customer_id = $2 order by j.created_at desc, j.id`, [
-      businessId,
-      id,
-    ]),
+    query<Job>(
+      `select ${JOB} from design_jobs j where j.business_id = $1 and j.customer_id = $2 and ${seen(viewer, 3)} order by j.created_at desc, j.id`,
+      [businessId, id, ...seenParams(viewer)],
+    ),
     query<Activity>(
       `select ${ACTIVITY} from design_activity a where a.business_id = $1 and a.customer_id = $2 order by a.at desc, a.id limit 200`,
       [businessId, id],
@@ -353,14 +354,45 @@ export async function addActivity(
 // ---------------------------------------------------------------------------
 
 /** Every job the business has, the most recently changed first, each with its customer's name. */
-export async function listJobs(businessId: string): Promise<(Job & { customerName: string })[]> {
+export async function listJobs(businessId: string, viewer?: DealViewer): Promise<(Job & { customerName: string })[]> {
   await ensureSamples(businessId);
   return query(
     `select ${JOB}, c.name as "customerName"
        from design_jobs j join design_customers c on c.business_id = j.business_id and c.id = j.customer_id
-      where j.business_id = $1 order by j.updated_at desc, j.id limit 20000`,
-    [businessId],
+      where j.business_id = $1 and ${seen(viewer, 2)} order by j.updated_at desc, j.id limit 20000`,
+    [businessId, ...seenParams(viewer)],
   );
+}
+
+/**
+ * The deals a viewer sees, as a condition on design_jobs j: everyone's, or (not seeing every deal) their own, no one's,
+ * and those they are mentioned on. The same rule as `seesDeal`. Its parameter is the viewer's email, at `at`.
+ */
+function seen(viewer: DealViewer | undefined, at: number): string {
+  if (!viewer || viewer.all) return "true";
+  const p = `$${at}`;
+  return `(j.owner_email is null or j.owner_email = ${p} or exists (select 1 from design_notifications n
+    where n.business_id = j.business_id and n.job_id = j.id and n.to_email = ${p}))`;
+}
+const seenParams = (viewer: DealViewer | undefined) => (viewer && !viewer.all ? [viewer.email.toLowerCase()] : []);
+
+/** Gives a deal to a member of the business (an email) or to no one (null), written on its record. Null: no such deal. */
+export async function setJobOwner(businessId: string, id: string, owner: string | null, by: string): Promise<Job | null> {
+  return transaction(async (q) => {
+    const rows = await q<Job>(
+      `update design_jobs j set owner_email = $3, updated_at = now() where j.business_id = $1 and j.id = $2 returning ${JOB}`,
+      [businessId, id, owner],
+    );
+    if (!rows[0]) return null;
+    await record(q, businessId, {
+      customerId: rows[0].customerId,
+      jobId: id,
+      kind: "note",
+      text: owner ? `Deal given to ${owner.split("@")[0]}` : "Deal left with no owner",
+      by: by.toLowerCase(),
+    });
+    return rows[0];
+  });
 }
 
 /** A new job for one of the business's customers. "missing" when it has no such customer, "full" at the limit. */
@@ -376,8 +408,12 @@ export async function createJob(businessId: string, customerId: string, input: J
   });
 }
 
-export async function jobById(businessId: string, id: string): Promise<{ job: Job; customer: Customer } | null> {
-  const jobs = await query<Job>(`select ${JOB} from design_jobs j where j.business_id = $1 and j.id = $2`, [businessId, id]);
+export async function jobById(businessId: string, id: string, viewer?: DealViewer): Promise<{ job: Job; customer: Customer } | null> {
+  const jobs = await query<Job>(`select ${JOB} from design_jobs j where j.business_id = $1 and j.id = $2 and ${seen(viewer, 3)}`, [
+    businessId,
+    id,
+    ...seenParams(viewer),
+  ]);
   const customer = jobs[0] && (await customerRow(query, businessId, jobs[0].customerId));
   return jobs[0] && customer ? { job: jobs[0], customer } : null;
 }
@@ -507,12 +543,12 @@ export interface Overview {
   recent: (Activity & { customerName: string })[];
 }
 
-export async function overview(businessId: string): Promise<Overview> {
+export async function overview(businessId: string, viewer?: DealViewer): Promise<Overview> {
   await ensureSamples(businessId);
   const [stages, customers, recent] = await Promise.all([
     query<{ stage: JobStage; n: string; value: number }>(
-      `select stage, count(*) as n, coalesce(sum(value), 0)::float8 as value from design_jobs where business_id = $1 group by stage`,
-      [businessId],
+      `select stage, count(*) as n, coalesce(sum(value), 0)::float8 as value from design_jobs j where business_id = $1 and ${seen(viewer, 2)} group by stage`,
+      [businessId, ...seenParams(viewer)],
     ),
     query<{ n: string }>(`select count(*) as n from design_customers where business_id = $1`, [businessId]),
     query<Activity & { customerName: string }>(

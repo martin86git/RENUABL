@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Bell,
   CalendarClock,
   CalendarDays,
   CircleCheck,
@@ -27,7 +28,7 @@ import {
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
-import { loadWeather, serviceCount } from "@/lib/services/crm";
+import { loadWeather, notificationCount, serviceCount } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 
@@ -42,6 +43,7 @@ export const PATHS = {
   designer: "/design/roof",
   messages: "/design/messages",
   service: "/design/service",
+  notifications: "/design/notifications",
   proposalsSent: "/design/sales/proposals",
   proposalsSigned: "/design/sales/signed",
   scheduler: "/design/procurement/scheduler",
@@ -112,6 +114,7 @@ const NAV: NavItem[] = [
   },
   { href: PATHS.service, label: "Service", icon: Wrench },
   { href: PATHS.messages, label: "Messages", icon: MessageSquare },
+  { href: PATHS.notifications, label: "Notifications", icon: Bell },
   { href: PATHS.designer, label: "Design tool", icon: PenTool, main: true },
 ];
 
@@ -175,7 +178,12 @@ function Shell({
   const unread = useUnreadMessages(Boolean(account?.signedIn && account.business));
   // How many service cases are still to put right: the number on Service.
   const service = useServiceCount(Boolean(account?.signedIn && account.business));
-  const counts: Record<string, number> = { [PATHS.messages]: unread, [PATHS.service]: service };
+  // How many times this member has been @mentioned and not looked yet: the number on Notifications.
+  const mentions = useCount(Boolean(account?.signedIn && account.business), "renuabl:notifications", async () => {
+    const res = await notificationCount();
+    return res.ok ? res.unread : null;
+  });
+  const counts: Record<string, number> = { [PATHS.messages]: unread, [PATHS.service]: service, [PATHS.notifications]: mentions };
   const path = usePathname();
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (!account.signedIn) {
@@ -235,7 +243,7 @@ function Shell({
       {!compact && (counts[href] ?? 0) > 0 && (
         <span
           className="ml-auto rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white"
-          aria-label={href === PATHS.messages ? `${unread} unread` : `${counts[href]} to resolve`}
+          aria-label={href === PATHS.service ? `${counts[href]} to resolve` : `${counts[href]} unread`}
         >
           {counts[href]}
         </span>
@@ -428,5 +436,31 @@ function useServiceCount(on: boolean): number {
       window.removeEventListener("renuabl:service", look);
     };
   }, [on]);
+  return on ? n : 0;
+}
+
+/** A count for the nav, asked when the shell opens, each minute while the page is in view, and on `event`. */
+function useCount(on: boolean, event: string, ask: () => Promise<number | null>): number {
+  const [n, setN] = useState(0);
+  const latest = useRef(ask);
+  useEffect(() => {
+    latest.current = ask;
+  });
+  useEffect(() => {
+    if (!on) return;
+    let gone = false;
+    const look = async () => {
+      const got = await latest.current();
+      if (!gone && got !== null) setN(got);
+    };
+    void look();
+    const timer = window.setInterval(() => void (document.visibilityState === "visible" && look()), 60_000);
+    window.addEventListener(event, look);
+    return () => {
+      gone = true;
+      window.clearInterval(timer);
+      window.removeEventListener(event, look);
+    };
+  }, [on, event]);
   return on ? n : 0;
 }

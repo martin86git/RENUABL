@@ -279,6 +279,9 @@ alter table design_customers add column if not exists first_name text not null d
 alter table design_customers add column if not exists last_name text not null default '';
 -- A job's solar size from its design, and when it was sold and installed (for the overview's figures).
 alter table design_jobs add column if not exists kw numeric;
+-- Who a deal belongs to (a member's email), set to whoever made it; null = no one yet. A member who doesn't see every
+-- deal sees only their own, no one's, and those they are mentioned on (seesDeal in domain/design/account.ts).
+alter table design_jobs add column if not exists owner_email text;
 alter table design_jobs add column if not exists won_at timestamptz;
 alter table design_jobs add column if not exists installed_at timestamptz;
 -- System details typed in by hand on a deal, by key (domain/design/crm.ts DETAIL_KEYS).
@@ -421,6 +424,22 @@ create table if not exists design_followups (
   primary key (business_id, job_id, day),
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
+-- A member's notifications (domain/design/mentions.ts): each time they are @mentioned in a deal's note. Read when they
+-- open it or mark it read; a mention also lets them see that deal.
+create table if not exists design_notifications (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  to_email text not null,
+  kind text not null default 'mention',
+  job_id text not null,
+  customer_id text not null,
+  text text not null,
+  by_email text not null,
+  at timestamptz not null default now(),
+  read_at timestamptz,
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create index if not exists design_notifications_to on design_notifications(business_id, to_email, at desc);
 -- The service pipeline (domain/design/service.ts): a job's cases to put right after the sale, Open, In hand, Resolved,
 -- with their history kept on the case. One open at a time a job (checked in the repo, under a lock on the job).
 create table if not exists design_service_cases (

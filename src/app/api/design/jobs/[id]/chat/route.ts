@@ -1,7 +1,7 @@
 import { cleanLine, replyOutcome, unanswered } from "@/lib/domain/design/chat";
 import { memberReplies } from "@/lib/server/design-chat";
 import { chatLines, markRead } from "@/lib/server/design-chat-repo";
-import { answer, readBody, requireMember } from "@/lib/server/design-context";
+import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { tokenForJob } from "@/lib/server/design-proposal-repo";
 import { allow } from "@/lib/server/rate-limit";
@@ -20,7 +20,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/jobs
     const { id } = await ctx.params;
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    const found = validId(id) ? await jobById(who.member.businessId, id) : null;
+    const found = validId(id) ? await jobById(who.member.businessId, id, viewerOf(who.member)) : null;
     if (!found) return notFound();
     const lines = await chatLines(who.member.businessId, id);
     return Response.json({
@@ -63,7 +63,7 @@ export async function PUT(_request: Request, ctx: RouteContext<"/api/design/jobs
     const { id } = await ctx.params;
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    if (!validId(id) || !(await jobById(who.member.businessId, id))) return notFound();
+    if (!validId(id) || !(await jobById(who.member.businessId, id, viewerOf(who.member)))) return notFound();
     return Response.json({ ok: true, marked: await markRead(who.member.businessId, id) });
   });
 }

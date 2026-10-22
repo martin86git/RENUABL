@@ -19,6 +19,7 @@ import {
   type JobLine,
 } from "@/lib/services/crm";
 import { NewDeal } from "./design-customers";
+import { useDesignAccount } from "./design-account";
 import { PATHS, PageHead, ui } from "./design-shell";
 
 /** Where this person's last way of looking at their deals is kept, on their device. */
@@ -42,6 +43,10 @@ const stageSelect =
 export function PipelinesPage() {
   const router = useRouter();
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
+  // Whose deals: everyone's (that this member sees), their own, or no one's yet.
+  const [whose, setWhose] = useState<"all" | "mine" | "none">("all");
+  const [account] = useDesignAccount();
+  const me = account?.signedIn ? account.email.toLowerCase() : "";
   const [problem, setProblem] = useState<string | null>(null);
   const [choice, setChoice] = useState<PipelineChoice>(DEFAULT_PIPELINE);
   // The pipelines the business has saved, and the name being typed for a new one or a renamed one.
@@ -122,7 +127,7 @@ export function PipelinesPage() {
   const named = pipelineOf(choice.stages, choice.pipeline, saved) ?? PIPELINES[0];
   const stages = named.stages;
   const own = saved.find((s) => s.id === named.id) ?? null;
-  const shown = (jobs ?? []).filter((j) => stages.includes(j.stage));
+  const shown = (jobs ?? []).filter((j) => stages.includes(j.stage) && (whose === "all" || (whose === "mine" ? j.owner === me : !j.owner)));
   const worth = shown.reduce((n, j) => n + (j.value ?? 0), 0);
   const deal = (id: string) => `${PATHS.deals}/${id}`;
 
@@ -136,6 +141,18 @@ export function PipelinesPage() {
       {adding && <NewDeal onClose={() => setAdding(false)} />}
 
       <div className={clsx(ui.card, "mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3")}>
+        <label className="inline-flex items-center gap-2">
+          <span className="sr-only">Whose deals</span>
+          <select
+            className={clsx(ui.input, "h-9 min-h-9 w-40 appearance-auto")}
+            value={whose}
+            onChange={(e) => setWhose(e.target.value as typeof whose)}
+          >
+            <option value="all">Everyone&apos;s deals</option>
+            <option value="mine">My deals</option>
+            <option value="none">No owner yet</option>
+          </select>
+        </label>
         <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Pipeline">
           <label className="inline-flex items-center gap-2">
             <span className="sr-only">Pipeline</span>
@@ -298,7 +315,10 @@ export function PipelinesPage() {
                         {job.address ? ` · ${job.address.split(",")[0]}` : ""}
                       </p>
                       <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="text-sm tabular-nums text-ink">{dollars(job.value)}</span>
+                        <span className="flex items-center gap-1.5 text-sm tabular-nums text-ink">
+                          <Owner email={job.owner} />
+                          {dollars(job.value)}
+                        </span>
                         {job.lat !== null && (
                           <Link
                             href={`${PATHS.designer}?job=${job.id}`}
@@ -393,5 +413,27 @@ export function PipelinesPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Whose a deal is, as their initials in a small round ("–" for no one yet), their email on hover. */
+export function Owner({ email }: { email: string | null }) {
+  const name = email?.split("@")[0] ?? "";
+  const initials = name
+    .split(/[._+-]/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join("");
+  return (
+    <span
+      title={email ? `Owner: ${email}` : "No owner yet"}
+      className={clsx(
+        "inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
+        email ? "bg-primary text-primary-ink" : "border border-dashed border-line text-muted",
+      )}
+    >
+      {email ? initials || "?" : "–"}
+    </span>
   );
 }

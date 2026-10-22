@@ -1,5 +1,5 @@
 import { cleanCustomerInput } from "@/lib/domain/design/crm";
-import { answer, readBody, requireMember } from "@/lib/server/design-context";
+import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { customerById, customerDetail, deleteCustomer, updateCustomer } from "@/lib/server/design-crm-repo";
 
 const validId = (id: string) => /^cus_[a-f0-9]{8,64}$/.test(id);
@@ -12,7 +12,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/cust
     const { id } = await ctx.params;
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    const detail = validId(id) ? await customerDetail(who.member.businessId, id) : null;
+    const detail = validId(id) ? await customerDetail(who.member.businessId, id, viewerOf(who.member)) : null;
     return detail ? Response.json({ ok: true, ...detail }) : notFound();
   });
 }

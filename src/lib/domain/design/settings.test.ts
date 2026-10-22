@@ -358,10 +358,10 @@ describe("a proposal with the business's terms and blocks", () => {
 describe("what each person may do", () => {
   it("lets the owner do everything, whatever is stored against them", () => {
     for (const action of ["design", "costs", "prices", "publish", "members"] as const)
-      expect(can("owner", action, { costs: false, prices: false, publish: false })).toBe(true);
+      expect(can("owner", action, { costs: false, prices: false, publish: false, allDeals: false })).toBe(true);
   });
   it("lets a member design always, manage people never, and the rest as the owner has set", () => {
-    const none = { costs: false, prices: false, publish: false };
+    const none = { costs: false, prices: false, publish: false, allDeals: false };
     expect(can("member", "design", none)).toBe(true);
     expect(can("member", "members", ALL_PERMISSIONS)).toBe(false);
     for (const action of ["costs", "prices", "publish"] as const) {
@@ -370,15 +370,15 @@ describe("what each person may do", () => {
       expect(can("member", action)).toBe(true);
       expect(can("stranger" as never, action, ALL_PERMISSIONS)).toBe(false);
     }
-    expect(can("member", "publish", { costs: false, prices: false, publish: true })).toBe(true);
+    expect(can("member", "publish", { costs: false, prices: false, publish: true, allDeals: true })).toBe(true);
   });
   it("reads permissions so only an explicit no switches one off, and nobody changes prices they can't see", () => {
     expect(cleanPermissions(null)).toEqual(ALL_PERMISSIONS);
     expect(cleanPermissions({ costs: "false", publish: 0 })).toEqual(ALL_PERMISSIONS);
-    expect(cleanPermissions({ publish: false })).toEqual({ costs: true, prices: true, publish: false });
-    expect(cleanPermissions({ costs: false, prices: true })).toEqual({ costs: false, prices: false, publish: true });
-    expect(can("member", "prices", { costs: false, prices: true, publish: true })).toBe(false);
-    expect(PERMISSIONS.map((p) => p.key)).toEqual(["costs", "prices", "publish"]);
+    expect(cleanPermissions({ publish: false })).toEqual({ costs: true, prices: true, publish: false, allDeals: true });
+    expect(cleanPermissions({ costs: false, prices: true })).toEqual({ costs: false, prices: false, publish: true, allDeals: true });
+    expect(can("member", "prices", { costs: false, prices: true, publish: true, allDeals: true })).toBe(false);
+    expect(PERMISSIONS.map((p) => p.key)).toEqual(["costs", "prices", "publish", "allDeals"]);
     for (const action of ["costs", "prices", "publish", "members"] as const) expect(refusal(action)).toMatch(/owner/);
   });
   it("sends someone who may not see costs the products without a single real figure", () => {

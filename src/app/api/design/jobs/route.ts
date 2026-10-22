@@ -1,5 +1,5 @@
 import { JOBS_FULL, cleanJobInput } from "@/lib/domain/design/crm";
-import { answer, readBody, requireMember } from "@/lib/server/design-context";
+import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { createJob, customerById, listJobs } from "@/lib/server/design-crm-repo";
 
 /** GET: every job the business has, the most recently changed first, each with its customer's name. */
@@ -7,7 +7,7 @@ export async function GET() {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    return Response.json({ ok: true, jobs: await listJobs(who.member.businessId) });
+    return Response.json({ ok: true, jobs: await listJobs(who.member.businessId, viewerOf(who.member)) });
   });
 }
 

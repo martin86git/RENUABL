@@ -5,7 +5,7 @@
  * loses access at once, and nothing a browser sends can name another business.
  * It is also the one place a member's role is checked (`can`).
  */
-import { BUSINESS_TERMS_VERSION, can, refusal, type MemberAction } from "@/lib/domain/design/account";
+import { BUSINESS_TERMS_VERSION, can, refusal, seesAllDeals, type DealViewer, type MemberAction } from "@/lib/domain/design/account";
 import { currentSession } from "./accounts";
 import { dbConfigured } from "./db";
 import { memberByEmail, type Member } from "./design-repo";
@@ -68,4 +68,9 @@ export async function readBody(request: Request, maxBytes: number): Promise<{ bo
   } catch {
     return { refuse: refused(400, "That couldn't be read.") };
   }
+}
+
+/** Whose deals a member sees (`seesDeal`): everyone's, or their own, no one's and those they are mentioned on. */
+export function viewerOf(member: Member): DealViewer {
+  return { email: member.email.toLowerCase(), all: seesAllDeals(member.role, member.permissions) };
 }

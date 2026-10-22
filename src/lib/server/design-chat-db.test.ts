@@ -42,7 +42,7 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
     email: A,
     role: "owner" as const,
     termsVersion: BUSINESS_TERMS_VERSION,
-    permissions: { costs: true, prices: true, publish: true },
+    permissions: { costs: true, prices: true, publish: true, allDeals: true },
   });
 
   beforeAll(async () => {

@@ -26,9 +26,13 @@ import {
   loadDealDesign,
   loadDealFields,
   loadJob,
+  markNotificationsRead,
   saveJob,
+  setDealOwner,
   shortDate,
 } from "@/lib/services/crm";
+import { loadMembers } from "@/lib/services/design-account";
+import { handleOf, mentionText } from "@/lib/domain/design/mentions";
 import { ACTIVITY_WORD, StageTag } from "./design-home";
 import { DealChat } from "./chat-panel";
 import { DealService } from "./design-service";
@@ -154,6 +158,13 @@ export function DealPage({ id }: { id: string }) {
   const [section, setSection] = useState("system");
   // The business's own arrangement of a deal's fields (Settings → Deal fields); ours until it has loaded.
   const [fieldsConfig, setFieldsConfig] = useState<DealFieldsConfig | null>(null);
+  // The business's people: who a deal can be given to, and who can be @mentioned in a note.
+  const [members, setMembers] = useState<string[]>([]);
+  useEffect(() => {
+    void loadMembers().then((m) => m && setMembers(m.map((x) => x.email.toLowerCase())));
+    // Opening the deal reads any mention of this member on it.
+    void markNotificationsRead({ jobId: id }).then(() => window.dispatchEvent(new Event("renuabl:notifications")));
+  }, [id]);
   useEffect(() => {
     void loadDealFields().then((res) => res.ok && setFieldsConfig(res.fields));
   }, []);
@@ -219,6 +230,7 @@ export function DealPage({ id }: { id: string }) {
     if (!res.ok) return setStatus(res.message);
     setActivity([res.activity, ...activity]);
     setText("");
+    if (res.mentioned?.length) setStatus(`Told ${res.mentioned.map(handleOf).join(", ")}`);
   };
 
   if (problem)
@@ -426,6 +438,28 @@ export function DealPage({ id }: { id: string }) {
           <Line label="Phone" value={customer.phone || null} />
           <Line label="Email" value={customer.email || null} />
           <Line label="Lead source" value={customer.source || null} />
+          <label className="block text-xs text-muted">
+            Owner
+            <select
+              className={clsx(ui.input, "mt-1 appearance-auto")}
+              value={job.owner ?? ""}
+              onChange={async (e) => {
+                const res = await setDealOwner(job.id, e.target.value || null);
+                if (!res.ok) return setStatus(res.message);
+                setJob(res.job);
+                setStatus("Saved");
+                void load();
+              }}
+            >
+              <option value="">No one yet</option>
+              {/* Someone who has left the business still shows, so the deal isn't silently handed on. */}
+              {[...new Set([...members, ...(job.owner ? [job.owner] : [])])].map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
           <p className="text-xs text-muted" role="status">
             {status || `Started ${shortDate(job.createdAt)}`}
           </p>
@@ -621,8 +655,26 @@ export function DealPage({ id }: { id: string }) {
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void say()}
                 maxLength={1000}
-                placeholder="Write a note, or log a call or an email"
+                placeholder="Write a note, or log a call or an email. Type @ to mention someone"
               />
+              {members.length > 1 && (
+                <select
+                  aria-label="Mention someone"
+                  className={clsx(ui.input, "w-36 appearance-auto")}
+                  value=""
+                  onChange={(e) => {
+                    const who = e.target.value;
+                    if (who) setText((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${mentionText(who)}`);
+                  }}
+                >
+                  <option value="">Mention…</option>
+                  {members.map((m) => (
+                    <option key={m} value={m}>
+                      @{handleOf(m)}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button className={ui.primary} onClick={say} disabled={!text.trim()}>
                 Add
               </button>
