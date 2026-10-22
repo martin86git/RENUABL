@@ -1,5 +1,7 @@
 "use client";
 
+import { withDatasheets, type Datasheets } from "@/lib/domain/design/datasheets";
+import { loadDatasheets } from "@/lib/services/datasheets";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -159,15 +161,22 @@ export function DesignStudio() {
     };
   }, [jobId]);
 
-  // What the designer offers: the products on the uploaded price lists, or our own range for a kind the lists don't carry.
+  // The business's own checked datasheets (Settings → Product datasheets): signed out there are none.
+  const [sheets, setSheets] = useState<Datasheets | null>(null);
+  useEffect(() => {
+    void loadDatasheets().then((res) => res.ok && setSheets(res.datasheets));
+  }, []);
+
+  // What the designer offers: the products on the uploaded price lists, or our own range for a kind the lists don't carry,
+  // each with the business's checked electrical figures ahead of RENUABL's own, so the string check can use them.
   const catalogue = useMemo(() => {
     const own = workspaceCatalogue(workspace);
     return {
-      panels: own.panels ?? panelCatalogue(),
-      inverters: own.inverters ?? inverterCatalogue(),
+      panels: withDatasheets(own.panels ?? panelCatalogue(), sheets?.panels),
+      inverters: withDatasheets(own.inverters ?? inverterCatalogue(), sheets?.inverters),
       batteries: own.batteries ?? batteryCatalogue(),
     };
-  }, [workspace]);
+  }, [workspace, sheets]);
 
   // Whether the designer has changes that aren't saved: asked about before another roof replaces it.
   const unsaved = useRef(false);

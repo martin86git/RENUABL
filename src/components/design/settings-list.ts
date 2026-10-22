@@ -12,6 +12,7 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
     title: "Pricing",
     items: [
       { slug: "price-lists", label: "Price lists" },
+      { slug: "datasheets", label: "Product datasheets" },
       { slug: "parts", label: "Parts on every job" },
       { slug: "installation-rates", label: "Installation rates" },
       { slug: "commission", label: "Sales commission" },

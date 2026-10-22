@@ -6,6 +6,7 @@ import { AfterSaleSettings, type AfterSalePart } from "@/components/design/setti
 import { DesignSettings, type PricePart } from "@/components/design/design-settings";
 import { DesignShell } from "@/components/design/design-shell";
 import { DealFieldsSettings } from "@/components/design/settings-deal-fields";
+import { DatasheetSettings } from "@/components/design/settings-datasheets";
 import { settingBySlug } from "@/components/design/settings-list";
 import { SettingSoon, SettingsFrame } from "@/components/design/settings-nav";
 import { BillingPage, NeedsCosts, ProposalSettings, type ProposalPart } from "@/components/design/settings-proposal";
@@ -56,6 +57,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <ProposalSettings part={PROPOSAL[section]} />
         ) : section in AFTER_SALE ? (
           <AfterSaleSettings part={AFTER_SALE[section]} />
+        ) : section === "datasheets" ? (
+          <DatasheetSettings />
         ) : section === "deal-fields" ? (
           <DealFieldsSettings />
         ) : section === "billing" ? (

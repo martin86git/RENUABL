@@ -440,6 +440,19 @@ create table if not exists design_notifications (
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
 create index if not exists design_notifications_to on design_notifications(business_id, to_email, at desc);
+-- A business's checked product datasheets (domain/design/datasheets.ts): a panel's or inverter's electrical figures
+-- by product code, read from its datasheet and checked by a member; the file itself is never kept.
+create table if not exists design_datasheets (
+  business_id text not null references businesses(id) on delete cascade,
+  kind text not null,
+  sku text not null,
+  model text not null default '',
+  figures jsonb not null,
+  file_name text not null default '',
+  checked_by text not null,
+  checked_at timestamptz not null default now(),
+  primary key (business_id, kind, sku)
+);
 -- The service pipeline (domain/design/service.ts): a job's cases to put right after the sale, Open, In hand, Resolved,
 -- with their history kept on the case. One open at a time a job (checked in the repo, under a lock on the job).
 create table if not exists design_service_cases (
