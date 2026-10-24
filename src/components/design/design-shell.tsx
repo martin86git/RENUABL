@@ -141,7 +141,10 @@ export function DesignShell(props: { children: React.ReactNode; compact?: boolea
   );
 }
 
-/** Whether this person keeps the sections folded down to icons, on their device. */
+/**
+ * Whether this person keeps the sections folded down to icons, on their device. Folded unless they opened them out
+ * (25 Oct 2026, Martin: the nav was competing with the page for attention).
+ */
 const FOLDED = "renuabl.design.nav-folded";
 
 function Shell({
@@ -157,14 +160,14 @@ function Shell({
   bare?: boolean;
 }) {
   // The sections can be folded down to their icons, as they always are on the design tool, and opened out again.
-  const [folded, setFolded] = useState(false);
+  const [folded, setFolded] = useState(true);
   useEffect(() => {
     try {
       // What was chosen last time is only known once the page is in the browser.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFolded(window.localStorage.getItem(FOLDED) === "1");
+      setFolded(window.localStorage.getItem(FOLDED) !== "0");
     } catch {
-      // Opened out, then.
+      // Folded, then.
     }
   }, []);
   const fold = (to: boolean) => {

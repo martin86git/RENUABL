@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowRight, Check, PenTool, UserPlus } from "lucide-react";
+import { ArrowRight, Check, ChevronLeft, PenTool, UserPlus } from "lucide-react";
 import clsx from "clsx";
 import { STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import {
@@ -14,10 +14,10 @@ import {
   greetingName,
   inTheWorks,
   power,
-  viewLines,
   type OverviewView,
 } from "@/lib/domain/design/deal";
 import { LAUNCH_MARKET, greeting, todayInMarket } from "@/lib/domain/market";
+import { journey, type JourneyStop } from "@/lib/domain/design/journey";
 import { dayCleared, dayList, orderDueSoon, sunNow, sunTimes, type DayCounts, type DayItem } from "@/lib/domain/design/today";
 import { dueFollowUp } from "@/lib/domain/design/proposal-lists";
 import { listOrders, listProposals } from "@/lib/services/after-sale";
@@ -184,6 +184,7 @@ function OverviewPage({ business, email }: { business: string; email: string }) 
   const [data, setData] = useState<Overview | null>(null);
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [serviceOpen, setServiceOpen] = useState<number | null>(null);
   // The view picked is in the address (?view=sales), so Overview in the nav (plain /design) always comes back to the greeting.
   const router = useRouter();
   const asked = useSearchParams().get("view");
@@ -199,6 +200,9 @@ function OverviewPage({ business, email }: { business: string; email: string }) 
     void listJobs().then((res) => {
       if (!gone && res.ok) setJobs(res.jobs);
     });
+    void serviceCount().then((res) => {
+      if (!gone) setServiceOpen(res.ok ? res.open : 0);
+    });
     return () => {
       gone = true;
     };
@@ -209,38 +213,70 @@ function OverviewPage({ business, email }: { business: string; email: string }) 
   /** A job changed from one of the lists (its installer or its paperwork), put back in place. */
   const changed = (job: JobLine) => setJobs((all) => (all ?? []).map((j) => (j.id === job.id ? job : j)));
 
+  if (view !== null) {
+    const label = OVERVIEW_VIEWS.find((v) => v.id === view)?.label ?? "";
+    return (
+      <div className={ui.page}>
+        <Link href={PATHS.home} className="inline-flex items-center gap-1 text-[13px] font-medium text-ink-2 hover:text-ink">
+          <ChevronLeft className="size-4" aria-hidden /> Overview
+        </Link>
+        <div className="mt-3">
+          <PageHead eyebrow={business || "Your business"} title={label} />
+        </div>
+        {/* The other closer looks, a press away. */}
+        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[13px]">
+          {OVERVIEW_VIEWS.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              aria-current={view === v.id ? "page" : undefined}
+              onClick={() => setView(v.id)}
+              className={clsx(
+                "tap-area font-medium",
+                view === v.id ? "text-ink underline underline-offset-[6px]" : "text-ink-2 hover:text-ink",
+              )}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+        {problem && (
+          <p className="mt-6 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
+            {problem}
+          </p>
+        )}
+        {view === "sales" && <SalesView jobs={jobs} data={data} today={today} />}
+        {view === "upcoming" && <UpcomingInstallsView jobs={jobs} today={today} onJob={changed} />}
+        {view === "completed" && <CompletedInstallsView jobs={jobs} today={today} onJob={changed} />}
+      </div>
+    );
+  }
+
+  const day = new Date(`${today}T00:00:00Z`).toLocaleDateString("en-AU", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
   return (
     <div className={ui.page}>
-      <PageHead eyebrow="Overview" title={business || "Your business"}>
-        <Link href={`${PATHS.customers}?new=1`} className={ui.quiet}>
-          <UserPlus className="size-4" aria-hidden /> New customer
-        </Link>
-        <Link href={PATHS.designer} className={ui.primary}>
-          <PenTool className="size-4" aria-hidden /> Open the design tool
-        </Link>
-      </PageHead>
-
-      {/* Which part of the business to look at. Pressing the one that is open again goes back to the greeting. */}
-      <div
-        role="tablist"
-        aria-label="What to look at"
-        className="mt-6 inline-flex max-w-full gap-1 overflow-x-auto rounded-lg border border-line bg-surface-2 p-1"
-      >
-        {OVERVIEW_VIEWS.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            role="tab"
-            aria-selected={view === v.id}
-            onClick={() => setView(view === v.id ? null : v.id)}
-            className={clsx(
-              "h-9 shrink-0 whitespace-nowrap rounded-md px-4 text-sm font-medium",
-              view === v.id ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)] ring-1 ring-line" : "text-ink-2 hover:text-ink",
-            )}
-          >
-            {v.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{business || "Your business"}</p>
+          <h1 id="greeting" className="mt-2 text-[clamp(26px,3.6vw,36px)] font-light leading-[1.1] tracking-[-0.02em] text-ink">
+            {greeting()}
+            {name ? `, ${name}` : ""}.
+          </h1>
+          <p className="mt-2 text-[14px] text-ink-2">It&apos;s {day}.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={`${PATHS.customers}?new=1`} className={ui.quiet}>
+            <UserPlus className="size-4" aria-hidden /> New customer
+          </Link>
+          <Link href={PATHS.designer} className={ui.primary}>
+            <PenTool className="size-4" aria-hidden /> Open the design tool
+          </Link>
+        </div>
       </div>
 
       {problem && (
@@ -249,47 +285,120 @@ function OverviewPage({ business, email }: { business: string; email: string }) 
         </p>
       )}
 
-      {view === null && <Greeting name={name} jobs={jobs} today={today} onPick={setView} />}
-      {view === "sales" && <SalesView jobs={jobs} data={data} today={today} />}
-      {view === "upcoming" && <UpcomingInstallsView jobs={jobs} today={today} onJob={changed} />}
-      {view === "completed" && <CompletedInstallsView jobs={jobs} today={today} onJob={changed} />}
+      <JourneyLine jobs={jobs} serviceOpen={serviceOpen} />
+      <h2 className="mt-14 text-[15px] font-medium tracking-tight text-ink">Today</h2>
+      <YourDay jobs={jobs} today={today} serviceOpen={serviceOpen} />
+
+      <p className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-muted">
+        Look closer:
+        {OVERVIEW_VIEWS.map((v) => (
+          <button key={v.id} type="button" onClick={() => setView(v.id)} className="tap-area font-medium text-ink-2 hover:text-ink">
+            {v.label} <ArrowRight className="inline size-3.5" aria-hidden />
+          </button>
+        ))}
+      </p>
     </div>
   );
 }
 
-/** Before a view is picked: a greeting, the day, and where each part of the business stands, each a way into its view. */
-function Greeting(props: { name: string | null; jobs: JobLine[] | null; today: ISODate; onPick: (view: OverviewView) => void }) {
-  const lines = props.jobs ? viewLines(props.jobs, props.today) : null;
-  const day = new Date(`${props.today}T00:00:00Z`).toLocaleDateString("en-AU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  });
+const JOURNEY_PATHS: Record<JourneyStop, string> = {
+  enquiries: PATHS.pipelines,
+  design: PATHS.pipelines,
+  sale: PATHS.proposalsSent,
+  approvals: PATHS.installations,
+  procure: PATHS.orders,
+  install: PATHS.scheduler,
+  after: PATHS.underway,
+  running: PATHS.completed,
+  service: PATHS.service,
+};
+
+/** The journey's three parts, over the stops they hold. */
+const PHASES = [
+  { name: "Win the work", stops: 3 },
+  { name: "Deliver it", stops: 4 },
+  { name: "Look after it", stops: 2 },
+];
+const PHASE_STARTS = PHASES.flatMap((p) => Array.from({ length: p.stops }, (_, i) => (i === 0 ? p.name : null)));
+
+/**
+ * The business as one line (25 Oct 2026, Martin: RENUABL is the end to end tool, and the overview should show that
+ * simply): every stop from an enquiry to a system running and looked after, how many jobs are at each, lit where there
+ * are some, each a way to where that work is done. Across the page on a wide screen, down it on a phone.
+ */
+function JourneyLine({ jobs, serviceOpen }: { jobs: JobLine[] | null; serviceOpen: number | null }) {
+  const stops = journey(jobs ?? [], serviceOpen ?? 0, JOURNEY_PATHS);
+  const ready = jobs !== null && serviceOpen !== null;
   return (
-    <section className="mt-10" aria-labelledby="greeting">
-      <h2 id="greeting" className="text-[clamp(24px,3.4vw,34px)] font-light leading-[1.1] tracking-[-0.02em] text-ink">
-        {greeting()}
-        {props.name ? `, ${props.name}` : ""}.
+    <section className="mt-12" aria-labelledby="journey">
+      <h2 id="journey" className="sr-only">
+        Every job, from enquiry to service
       </h2>
-      <p className="mt-2 text-[14px] text-ink-2">It&apos;s {day}. Here&apos;s what today needs.</p>
-      <YourDay jobs={props.jobs} today={props.today} />
-      <div className="mt-8 grid gap-3 md:grid-cols-3">
-        {OVERVIEW_VIEWS.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            onClick={() => props.onPick(v.id)}
-            className={clsx(ui.card, "group flex flex-col p-5 text-left hover:ring-1 hover:ring-ink-2")}
+      {/* The three parts, over their stops (wide screens). */}
+      <div className="hidden grid-cols-9 gap-x-2 lg:grid" aria-hidden>
+        {PHASES.map((p, i) => (
+          <div
+            key={p.name}
+            style={{ gridColumn: `${PHASES.slice(0, i).reduce((n, q) => n + q.stops, 0) + 1} / span ${p.stops}` }}
+            className="border-b border-line pb-2"
           >
-            <span className={ui.eyebrow}>{v.label}</span>
-            <span className="mt-2.5 flex-1 text-[14px] leading-snug text-ink">{lines ? lines[v.id] : "…"}</span>
-            <span className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-ink-2 group-hover:text-ink">
-              Open <ArrowRight className="size-3.5" aria-hidden />
-            </span>
-          </button>
+            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{p.name}</span>
+          </div>
         ))}
       </div>
+      <ol className="lg:mt-6 lg:grid lg:grid-cols-9 lg:gap-x-2">
+        {stops.map((s, i) => {
+          const lit = ready && s.count > 0;
+          return (
+            <li key={s.stop} className="relative">
+              {PHASE_STARTS[i] && (
+                <p className="mb-1 mt-6 pl-9 text-[11px] font-medium uppercase tracking-[0.14em] text-muted lg:hidden">{PHASE_STARTS[i]}</p>
+              )}
+              <Link
+                href={s.href}
+                className="group relative flex items-center gap-4 rounded-md py-2.5 lg:flex-col lg:gap-0 lg:px-1 lg:py-0 lg:text-center"
+              >
+                {/* The line through the stops: down the page on a phone, across it on a wide screen. */}
+                <span
+                  aria-hidden
+                  className="absolute left-[9px] w-px bg-line-strong lg:hidden"
+                  style={{ top: i === 0 ? "50%" : 0, bottom: i === stops.length - 1 ? "50%" : 0 }}
+                />
+                <span
+                  aria-hidden
+                  className="absolute top-[3.6rem] hidden h-px bg-line-strong lg:block"
+                  style={{ left: i === 0 ? "50%" : "-0.25rem", right: i === stops.length - 1 ? "50%" : "-0.25rem" }}
+                />
+                <span
+                  className={clsx(
+                    "order-3 ml-auto text-[22px] font-light leading-none tabular-nums lg:order-none lg:ml-0 lg:flex lg:h-8 lg:items-end lg:text-[30px]",
+                    lit ? "text-ink" : "text-muted",
+                  )}
+                >
+                  {ready ? s.count : "–"}
+                </span>
+                <span
+                  aria-hidden
+                  className={clsx(
+                    "relative z-10 grid size-[19px] shrink-0 place-items-center rounded-full lg:mt-4",
+                    lit ? "bg-[#ffb347] shadow-[0_0_10px_2px_rgb(255_138_61_/_0.5)]" : "border border-line-strong bg-canvas",
+                  )}
+                >
+                  {lit && <span className="size-[7px] rounded-full bg-[#fff4e0]" />}
+                </span>
+                <span className="min-w-0 lg:mt-3">
+                  <span className="block text-[14px] font-medium text-ink group-hover:underline group-hover:underline-offset-4">
+                    {s.name}
+                  </span>
+                  <span className="mt-0.5 block text-[12px] leading-snug text-ink-2">
+                    {s.stop === "running" ? "Monitoring coming soon" : s.what}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }
@@ -313,17 +422,17 @@ const clock = (d: Date) =>
  * against the sun's line (clear ahead of the sun is a good day). Then the list itself, each thing waiting lit, each
  * clear thing a quiet tick, each a way to go and do it.
  */
-function YourDay({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
+function YourDay({ jobs, today, serviceOpen }: { jobs: JobLine[] | null; today: ISODate; serviceOpen: number | null }) {
   const [now, setNow] = useState(() => new Date());
-  const [counts, setCounts] = useState<Omit<DayCounts, "installsToday" | "needDate"> | null>(null);
+  const [counts, setCounts] = useState<Omit<DayCounts, "installsToday" | "needDate" | "serviceOpen"> | null>(null);
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(id);
   }, []);
   useEffect(() => {
     let gone = false;
-    void Promise.all([listProposals(), listOrders(), loadUnreadCount(), notificationCount(), serviceCount()]).then(
-      ([proposals, orders, messages, mentions, service]) => {
+    void Promise.all([listProposals(), listOrders(), loadUnreadCount(), notificationCount()]).then(
+      ([proposals, orders, messages, mentions]) => {
         if (gone) return;
         const at = new Date();
         setCounts({
@@ -337,7 +446,6 @@ function YourDay({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
           ordersToPlace: orders.ok ? orders.orders.filter((o) => orderDueSoon(o.status, o.installDate, today)).length : 0,
           messages: messages.ok ? messages.unread : 0,
           mentions: mentions.ok ? mentions.unread : 0,
-          serviceOpen: service.ok ? service.open : 0,
         });
       },
     );
@@ -349,10 +457,11 @@ function YourDay({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
   const sun = sunTimes(today, LAUNCH_MARKET.capitalPlace.lat, LAUNCH_MARKET.capitalPlace.lng);
   const where = sun ? sunNow(now, sun) : null;
   const items =
-    counts && jobs
+    counts && jobs && serviceOpen !== null
       ? dayList(
           {
             ...counts,
+            serviceOpen,
             installsToday: jobs.filter((j) => j.installDate === today && j.stage !== "lost").length,
             needDate: inTheWorks(jobs).filter((j) => !j.installDate).length,
           },
