@@ -21,7 +21,7 @@ import {
 import { listService, raiseService, shortDate, updateService } from "@/lib/services/crm";
 import type { ServiceLine } from "@/lib/server/design-service-repo";
 import { PATHS, PageHead, ui } from "./design-shell";
-import { PanelTally } from "./solar-gauges";
+import { Tally } from "./gauges";
 
 const PILL: Record<ServiceState, string> = {
   open: "bg-danger/10 text-danger",
@@ -152,7 +152,7 @@ export function ServicePlanner() {
         {/* One panel a case: lit when resolved, half-lit in hand, dark while open. */}
         <div className={clsx(ui.card, "flex flex-col justify-center gap-1.5 px-4 py-3")}>
           <p className={ui.eyebrow}>Every case</p>
-          <PanelTally
+          <Tally
             states={cases ? cases.map((c) => (c.state === "resolved" ? "done" : c.state === "in-hand" ? "part" : "todo")) : null}
             label="Every case: lit when resolved, half-lit when in hand"
           />

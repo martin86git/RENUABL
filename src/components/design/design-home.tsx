@@ -19,7 +19,7 @@ import { greeting, todayInMarket } from "@/lib/domain/market";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, listJobs, loadOverview, loadTargets, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
 import { NO_TARGETS, monthPace, monthRings, monthlyHistory, pipelineByStage, type SalesTargets } from "@/lib/domain/design/sales-rings";
-import { MonthArrayCard, MonthBars, PanelTally, PipelineBar } from "./solar-gauges";
+import { MonthCard, MonthBars, Tally, PipelineBar } from "./gauges";
 import { newDealPanels } from "@/lib/domain/design/gauges";
 import { useDesignAccount } from "./design-account";
 import { CHAPTERS, CLOSE } from "@/lib/domain/design/landing";
@@ -307,11 +307,11 @@ const monthOf = (today: ISODate) => new Date(`${today}T00:00:00Z`).toLocaleDateS
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
- * Sales in RENUABL's own visual language (24 Oct 2026, Martin: native to RENUABL, not borrowed rings): the month as the
- * sun over three panel arrays (sales, deals sold, kW sold), each lit for its share of the business's target or else its
- * own 3-month average, the sun's line showing whether each is ahead; the financial year beside it with six months as
- * bars; then tiles that draw their figure: the month's new deals as a panel tally, the open pipeline as one bar split by
- * stage, proposals out as panels.
+ * Sales in RENUABL's own visual language (24 Oct 2026, Martin: restraint, as Apple and Tesla would; the sun keeping time):
+ * the month as the sun on its arc over three hairlines (sales, deals sold, kW sold), each grown to its share of the
+ * business's target or else its own 3-month average, the sun's line showing whether each is ahead; the financial year
+ * beside it with six months as fine bars; then tiles: the month's new deals as ticks, the open pipeline as one fine line
+ * split by stage, proposals out as ticks.
  */
 function SalesView({ jobs, data, today }: ViewProps) {
   const d = jobs ? dashboard(jobs, today) : null;
@@ -330,7 +330,7 @@ function SalesView({ jobs, data, today }: ViewProps) {
   return (
     <>
       <div className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <MonthArrayCard goals={rings} month={monthName} pace={pace} canSetTargets={canSetTargets} />
+        <MonthCard goals={rings} month={monthName} pace={pace} canSetTargets={canSetTargets} />
         <section className={clsx(ui.card, "flex flex-col justify-between gap-4 p-5")} aria-label="The financial year">
           <div>
             <p className={ui.eyebrow}>Sales · {d?.yearLabel ?? "financial year"}</p>
@@ -357,7 +357,7 @@ function SalesView({ jobs, data, today }: ViewProps) {
             <p className="mt-1.5 text-[20px] font-medium leading-none tabular-nums tracking-tight text-ink">{d ? d.newDeals : "–"}</p>
           </div>
           <div>
-            <PanelTally
+            <Tally
               states={jobs ? newDealPanels(jobs, today, WON_STAGES) : null}
               label={`${monthName}'s new deals: lit when sold, half-lit with a proposal out`}
             />
@@ -382,7 +382,7 @@ function SalesView({ jobs, data, today }: ViewProps) {
             <p className="mt-1.5 text-[20px] font-medium leading-none tabular-nums tracking-tight text-ink">{proposals ?? "–"}</p>
             <p className="mt-1 text-[11.5px] text-muted">With customers, waiting on an answer</p>
           </div>
-          <PanelTally
+          <Tally
             states={proposals === undefined ? null : Array.from({ length: proposals }, () => "part" as const)}
             label={`${proposals ?? 0} proposals out`}
           />

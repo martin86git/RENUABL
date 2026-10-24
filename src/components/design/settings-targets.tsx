@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { loadTargets, saveTargets } from "@/lib/services/crm";
-import { ArrayGauge } from "./solar-gauges";
+import { GoalLine } from "./gauges";
 import { ui } from "./design-shell";
 
 const FIELDS = [
@@ -14,7 +14,7 @@ const FIELDS = [
 type Form = Record<(typeof FIELDS)[number]["key"], string>;
 
 /**
- * Settings → Sales targets: what the overview's panel arrays light up to each month. A blank target leaves that array aiming at
+ * Settings → Sales targets: what the overview's lines grow toward each month. A blank target leaves that line aiming at
  * the business's own average of the three months before.
  */
 export function TargetsSettings() {
@@ -38,21 +38,21 @@ export function TargetsSettings() {
       deals: res.targets.deals?.toString() ?? "",
       kw: res.targets.kw?.toString() ?? "",
     });
-    setStatus({ ok: true, text: "Saved. The overview's arrays now light up to these." });
+    setStatus({ ok: true, text: "Saved. The overview's lines now grow toward these." });
   };
   return (
     <div className={clsx(ui.page, "max-w-3xl")}>
       <p className={ui.eyebrow}>Settings · CRM</p>
       <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">Sales targets</h1>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">
-        What the panel arrays on your overview light up to each month. Leave one blank and its array aims at your own average of the three
-        months before.
+        What the lines on your overview grow toward each month. Leave one blank and its line aims at your own average of the three months
+        before.
       </p>
       <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start">
-        {/* Each target is an array on the overview, lit as the month gets there: a glimpse of how it reads. */}
+        {/* Each target is a line on the overview, grown as the month gets there under the sun's mark: a glimpse of how it reads. */}
         <div className="mx-auto w-56 shrink-0 space-y-2.5 rounded-xl bg-primary p-4 sm:mx-0">
           {FIELDS.map((f) => (
-            <ArrayGauge key={f.key} share={form[f.key] ? 0.62 : 0} cols={10} now={0.55} label={f.label} />
+            <GoalLine key={f.key} share={form[f.key] ? 0.62 : 0} now={0.55} label={f.label} />
           ))}
         </div>
         <div className="min-w-0 flex-1 space-y-4">

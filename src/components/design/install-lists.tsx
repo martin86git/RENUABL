@@ -25,7 +25,7 @@ import type { ISODate } from "@/lib/domain/types";
 import { loadInstallExtras } from "@/lib/services/after-sale";
 import { dollars, listJobs, saveJob, shortDate, type JobLine } from "@/lib/services/crm";
 import { PATHS, PageHead, ui } from "./design-shell";
-import { PanelTally } from "./solar-gauges";
+import { Tally } from "./gauges";
 import { installPanel, paperworkPanel, type PanelState } from "@/lib/domain/design/gauges";
 
 type ListProps = { jobs: JobLine[] | null; today: ISODate; onJob: (job: JobLine) => void };
@@ -65,7 +65,7 @@ function Banner({
           {/* One panel a job: lit when it's done, half-lit when partly. */}
           {item.tally && (
             <div className="mt-3">
-              <PanelTally states={item.tally.states} tone="dark" label={item.tally.label} />
+              <Tally states={item.tally.states} tone="dark" label={item.tally.label} />
             </div>
           )}
         </div>

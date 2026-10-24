@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { arrayLight, dayShare, installPanel, newDealPanels, paceOf, paperworkPanel, tallyOrder } from "./gauges";
+import { dayShare, installPanel, newDealPanels, paceOf, paperworkPanel, tallyOrder } from "./gauges";
 
-describe("the sun over the array", () => {
-  it("lights whole panels, then one partly, and says how far past the goal", () => {
-    expect(arrayLight(0.7, 24)).toEqual({ full: 16, part: expect.closeTo(0.8, 5), over: 0 });
-    expect(arrayLight(1.43, 24)).toEqual({ full: 24, part: 0, over: 43 });
-    expect(arrayLight(-1, 24)).toEqual({ full: 0, part: 0, over: 0 });
-  });
-
+describe("the sun keeping time, and the tallies", () => {
   it("puts the sun at the day's share of the month, and reads ahead or behind it", () => {
     expect(dayShare(24, 31)).toBeCloseTo(0.774, 3);
     expect(paceOf(0.7, dayShare(24, 31))).toBe("behind");
