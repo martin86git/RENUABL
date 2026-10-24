@@ -15,6 +15,7 @@ import {
   Truck,
   HardHat,
   LayoutDashboard,
+  MapPinned,
   ChevronLeft,
   ChevronRight,
   PenTool,
@@ -48,6 +49,7 @@ export const PATHS = {
   proposalsSigned: "/design/sales/signed",
   scheduler: "/design/procurement/scheduler",
   orders: "/design/procurement/orders",
+  jobMap: "/design/procurement/map",
   invoices: "/design/installations/invoices",
   underway: "/design/installations/underway",
   completed: "/design/installations/completed",
@@ -95,10 +97,11 @@ const NAV: NavItem[] = [
     href: PATHS.scheduler,
     label: "Procurement",
     icon: Truck,
-    also: [PATHS.orders],
+    also: [PATHS.orders, PATHS.jobMap],
     under: [
       { href: PATHS.scheduler, label: "Install Scheduler", icon: CalendarDays },
       { href: PATHS.orders, label: "Ordering Station", icon: Truck },
+      { href: PATHS.jobMap, label: "Job map", icon: MapPinned },
     ],
   },
   {

@@ -172,3 +172,24 @@ export const setDealOwner = (jobId: string, owner: string | null) =>
 export const loadTargets = () => ask<{ targets: import("@/lib/domain/design/sales-rings").SalesTargets }>("/api/design/targets");
 export const saveTargets = (targets: { sales: string; deals: string; kw: string }) =>
   ask<{ targets: import("@/lib/domain/design/sales-rings").SalesTargets }>("/api/design/targets", { method: "PUT", body: { targets } });
+
+export interface MapJob {
+  id: string;
+  customer: string;
+  address: string;
+  lat: number;
+  lng: number;
+  stage: JobStage;
+  installDate: string | null;
+  kw: number | null;
+  installer: string | null;
+  wholesalers: string[];
+}
+/** The job map: sold jobs with places, the base and collection points, and the wholesalers to mark. */
+export const loadJobMap = () =>
+  ask<{ jobs: MapJob[]; places: import("@/lib/domain/design/job-map").JobPlaces; wholesalers: string[] }>("/api/design/job-map");
+export const saveJobPlaces = (places: import("@/lib/domain/design/job-map").JobPlaces) =>
+  ask<{ places: import("@/lib/domain/design/job-map").JobPlaces }>("/api/design/job-map", { method: "PUT", body: { places } });
+/** The map's picture for a view (fetched by the server in the map's style). */
+export const jobMapImage = (v: { lat: number; lng: number; zoom: number }) =>
+  `/api/design/job-map/image?lat=${v.lat.toFixed(6)}&lng=${v.lng.toFixed(6)}&zoom=${v.zoom}`;

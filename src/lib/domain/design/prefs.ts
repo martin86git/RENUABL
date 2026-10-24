@@ -7,6 +7,7 @@
  */
 import { cleanDealFields, type DealFieldsConfig } from "./deal-sections";
 import { NO_TARGETS, cleanTargets, type SalesTargets } from "./sales-rings";
+import { NO_PLACES, cleanJobPlaces, type JobPlaces } from "./job-map";
 
 /** A supplier's details for orders, against the name its price list was uploaded under. */
 export interface SupplierContact {
@@ -33,6 +34,8 @@ export interface BusinessPrefs {
   dealFields: DealFieldsConfig | null;
   /** The month's sales targets the overview's rings close at (Settings → Sales targets); null each: its own 3-month average. */
   targets: SalesTargets;
+  /** The job map's base and each wholesaler's collection point (Procurement → Job map). */
+  places: JobPlaces;
 }
 
 export const DEFAULT_PREFS: BusinessPrefs = {
@@ -43,6 +46,7 @@ export const DEFAULT_PREFS: BusinessPrefs = {
   reminderDaysBefore: 2,
   dealFields: null,
   targets: NO_TARGETS,
+  places: NO_PLACES,
 };
 
 export const MAX_SUPPLIERS = 12;
@@ -85,6 +89,7 @@ export function cleanPrefs(raw: unknown): BusinessPrefs {
     reminderDaysBefore: (REMINDER_DAY_CHOICES as readonly number[]).includes(days) ? days : DEFAULT_PREFS.reminderDaysBefore,
     dealFields: r.dealFields && typeof r.dealFields === "object" ? cleanDealFields(r.dealFields) : null,
     targets: cleanTargets(r.targets),
+    places: cleanJobPlaces(r.places),
   };
 }
 
