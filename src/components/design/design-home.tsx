@@ -17,7 +17,7 @@ import {
   type OverviewView,
 } from "@/lib/domain/design/deal";
 import { LAUNCH_MARKET, greeting, todayInMarket } from "@/lib/domain/market";
-import { CANVAS_GREETING, CANVAS_STARTERS, type CanvasPanel } from "@/lib/domain/design/canvas";
+import { CANVAS_GREETING, type CanvasPanel } from "@/lib/domain/design/canvas";
 import { journey, type JourneyStop } from "@/lib/domain/design/journey";
 import { dayCleared, dayList, orderDueSoon, sunNow, sunTimes, type DayCounts, type DayItem } from "@/lib/domain/design/today";
 import { dueFollowUp } from "@/lib/domain/design/proposal-lists";
@@ -46,6 +46,7 @@ import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
 import { FrontHero, Reveal } from "./front-hero";
 import { SignInForm } from "./sign-in-form";
 import { CompletedInstallsView, UpcomingInstallsView } from "./install-lists";
+import { CanvasPad } from "./canvas-pad";
 
 /** A stage as a small tag. Won and installed are the good news; lost is quiet. */
 export function StageTag({ stage }: { stage: JobStage }) {
@@ -259,6 +260,7 @@ function OverviewPage({ business, email }: { business: string; email: string }) 
       business={business}
       name={name}
       problem={problem}
+      pad={(grow) => <CanvasPad jobs={jobs} today={today} grow={grow} />}
       draw={(panel) =>
         panel === "journey" ? (
           <JourneyLine jobs={jobs} serviceOpen={serviceOpen} />
@@ -285,11 +287,18 @@ interface Turn {
 
 /**
  * The overview as a blank canvas (25 Oct 2026, Martin: show what is asked for, rather than guess what someone needs).
- * A greeting, and a box at the foot of the page; each question is answered in a few words with what it asked to see
- * drawn under the answer, newest last. Ready-made questions sit over the box while the canvas is empty, so nothing has
- * to be typed. The conversation lasts for the visit to the page.
+ * A greeting near the top, a pad filling the space beneath it (`CanvasPad`: four rounds, each one thing, so nothing has
+ * to be typed), and a box at the foot of the page; each question is answered in a few words with what it asked to see
+ * drawn under the answer, newest last, beneath the pad. The conversation lasts for the visit to the page.
  */
-function Canvas(props: { business: string; name: string | null; problem: string | null; draw: (panel: CanvasPanel) => React.ReactNode }) {
+function Canvas(props: {
+  business: string;
+  name: string | null;
+  problem: string | null;
+  /** The pad, filling the space between the greeting and the box while nothing has been asked (`grow`). */
+  pad: (grow: boolean) => React.ReactNode;
+  draw: (panel: CanvasPanel) => React.ReactNode;
+}) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [text, setText] = useState("");
   const last = useRef<HTMLDivElement>(null);
@@ -315,18 +324,22 @@ function Canvas(props: { business: string; name: string | null; problem: string 
 
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-4.5rem)] w-full max-w-6xl flex-col px-5 lg:px-10">
-      <div className={clsx("pt-10", turns.length === 0 && "flex flex-1 flex-col justify-center pb-24")}>
+      <div className="pt-2">
         <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{props.business || "Your business"}</p>
-        <h1 className="mt-2 text-[clamp(28px,4vw,40px)] font-light leading-[1.1] tracking-[-0.02em] text-ink">
+        <h1 className="mt-1.5 text-[clamp(24px,3.2vw,32px)] font-light leading-[1.1] tracking-[-0.02em] text-ink">
           {greeting()}
           {props.name ? `, ${props.name}` : ""}.
         </h1>
-        <p className="mt-2 text-[15px] text-ink-2">{CANVAS_GREETING}</p>
+        <p className="mt-1.5 text-[14px] text-ink-2">{CANVAS_GREETING}</p>
         {props.problem && (
           <p className="mt-6 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
             {props.problem}
           </p>
         )}
+      </div>
+
+      <div className={clsx("mt-6 flex", turns.length === 0 && "flex-1")}>
+        <div className="flex w-full flex-col">{props.pad(turns.length === 0)}</div>
       </div>
 
       {turns.length > 0 && (
@@ -347,20 +360,6 @@ function Canvas(props: { business: string; name: string | null; problem: string 
 
       {/* The box, at the foot of the page whatever has been drawn above it. */}
       <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-70% to-transparent pb-5 pt-6 print:hidden">
-        {turns.length === 0 && (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {CANVAS_STARTERS.map((st) => (
-              <button
-                key={st.label}
-                type="button"
-                onClick={() => send(st.question)}
-                className="h-9 rounded-full bg-surface px-4 text-[13px] text-ink-2 ring-1 ring-line hover:text-ink hover:ring-ink-2"
-              >
-                {st.label}
-              </button>
-            ))}
-          </div>
-        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
