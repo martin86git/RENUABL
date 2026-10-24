@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { DesignHome } from "@/components/design/design-home";
 
 export const metadata: Metadata = {
@@ -10,5 +11,10 @@ export const metadata: Metadata = {
 
 /** The product's front page with the way in; signed in, the business's overview. */
 export default function DesignHomePage() {
-  return <DesignHome />;
+  // The overview reads which view is open from the address.
+  return (
+    <Suspense>
+      <DesignHome />
+    </Suspense>
+  );
 }

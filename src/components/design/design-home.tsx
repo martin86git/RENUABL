@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowRight, Check, PenTool, UserPlus } from "lucide-react";
 import clsx from "clsx";
@@ -183,7 +184,11 @@ function OverviewPage({ business, email }: { business: string; email: string }) 
   const [data, setData] = useState<Overview | null>(null);
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [view, setView] = useState<OverviewView | null>(null);
+  // The view picked is in the address (?view=sales), so Overview in the nav (plain /design) always comes back to the greeting.
+  const router = useRouter();
+  const asked = useSearchParams().get("view");
+  const view = OVERVIEW_VIEWS.find((v) => v.id === asked)?.id ?? null;
+  const setView = (next: OverviewView | null) => router.push(next ? `${PATHS.home}?view=${next}` : PATHS.home, { scroll: false });
   useEffect(() => {
     let gone = false;
     void loadOverview().then((res) => {
