@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, PenTool, UserPlus } from "lucide-react";
+import { ArrowRight, Check, PenTool, UserPlus } from "lucide-react";
 import clsx from "clsx";
 import { STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import {
@@ -11,15 +11,30 @@ import {
   VIEW_PIPELINE,
   dashboard,
   greetingName,
+  inTheWorks,
   power,
   viewLines,
   type OverviewView,
 } from "@/lib/domain/design/deal";
-import { greeting, todayInMarket } from "@/lib/domain/market";
+import { LAUNCH_MARKET, greeting, todayInMarket } from "@/lib/domain/market";
+import { dayCleared, dayList, orderDueSoon, sunNow, sunTimes, type DayCounts, type DayItem } from "@/lib/domain/design/today";
+import { dueFollowUp } from "@/lib/domain/design/proposal-lists";
+import { listOrders, listProposals } from "@/lib/services/after-sale";
+import { loadUnreadCount } from "@/lib/services/chat";
 import type { ISODate } from "@/lib/domain/types";
-import { dollars, listJobs, loadOverview, loadTargets, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
+import {
+  dollars,
+  listJobs,
+  loadOverview,
+  loadTargets,
+  notificationCount,
+  serviceCount,
+  shortDate,
+  type JobLine,
+  type Overview,
+} from "@/lib/services/crm";
 import { NO_TARGETS, monthPace, monthRings, monthlyHistory, pipelineByStage, type SalesTargets } from "@/lib/domain/design/sales-rings";
-import { MonthCard, MonthBars, Tally, PipelineBar } from "./gauges";
+import { GoalLine, MonthCard, MonthBars, Tally, PipelineBar, SunArc } from "./gauges";
 import { newDealPanels } from "@/lib/domain/design/gauges";
 import { useDesignAccount } from "./design-account";
 import { CHAPTERS, CLOSE } from "@/lib/domain/design/landing";
@@ -252,7 +267,8 @@ function Greeting(props: { name: string | null; jobs: JobLine[] | null; today: I
         {greeting()}
         {props.name ? `, ${props.name}` : ""}.
       </h2>
-      <p className="mt-2 text-[14px] text-ink-2">It&apos;s {day}. Here&apos;s where things stand.</p>
+      <p className="mt-2 text-[14px] text-ink-2">It&apos;s {day}. Here&apos;s what today needs.</p>
+      <YourDay jobs={props.jobs} today={props.today} />
       <div className="mt-8 grid gap-3 md:grid-cols-3">
         {OVERVIEW_VIEWS.map((v) => (
           <button
@@ -270,6 +286,157 @@ function Greeting(props: { name: string | null; jobs: JobLine[] | null; today: I
         ))}
       </div>
     </section>
+  );
+}
+
+const DAY_PATHS: Record<keyof DayCounts, string> = {
+  installsToday: PATHS.scheduler,
+  followUpsDue: PATHS.proposalsSent,
+  messages: PATHS.messages,
+  mentions: PATHS.notifications,
+  ordersToPlace: PATHS.orders,
+  needDate: PATHS.installations,
+  serviceOpen: PATHS.service,
+};
+
+const clock = (d: Date) =>
+  d.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", timeZone: LAUNCH_MARKET.timeZone }).replace(/\s/g, " ");
+
+/**
+ * The day (24 Oct 2026, Martin: the sun tracker showing what needs doing today): the sun on its arc from today's sunrise
+ * to sunset in the market, where it is now, and under it one hairline for how much of the day's list is clear, set
+ * against the sun's line (clear ahead of the sun is a good day). Then the list itself, each thing waiting lit, each
+ * clear thing a quiet tick, each a way to go and do it.
+ */
+function YourDay({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
+  const [now, setNow] = useState(() => new Date());
+  const [counts, setCounts] = useState<Omit<DayCounts, "installsToday" | "needDate"> | null>(null);
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  useEffect(() => {
+    let gone = false;
+    void Promise.all([listProposals(), listOrders(), loadUnreadCount(), notificationCount(), serviceCount()]).then(
+      ([proposals, orders, messages, mentions, service]) => {
+        if (gone) return;
+        const at = new Date();
+        setCounts({
+          followUpsDue: proposals.ok
+            ? proposals.proposals.filter(
+                (p) =>
+                  p.state === "live" &&
+                  dueFollowUp({ sentAt: p.publishedAt, now: at, done: p.followUps.map((f) => f.day), lastWord: p.lastWord }),
+              ).length
+            : 0,
+          ordersToPlace: orders.ok ? orders.orders.filter((o) => orderDueSoon(o.status, o.installDate, today)).length : 0,
+          messages: messages.ok ? messages.unread : 0,
+          mentions: mentions.ok ? mentions.unread : 0,
+          serviceOpen: service.ok ? service.open : 0,
+        });
+      },
+    );
+    return () => {
+      gone = true;
+    };
+  }, [today]);
+
+  const sun = sunTimes(today, LAUNCH_MARKET.capitalPlace.lat, LAUNCH_MARKET.capitalPlace.lng);
+  const where = sun ? sunNow(now, sun) : null;
+  const items =
+    counts && jobs
+      ? dayList(
+          {
+            ...counts,
+            installsToday: jobs.filter((j) => j.installDate === today && j.stage !== "lost").length,
+            needDate: inTheWorks(jobs).filter((j) => !j.installDate).length,
+          },
+          DAY_PATHS,
+        )
+      : null;
+  const clear = items ? dayCleared(items) : null;
+  const ahead = clear && where ? clear.share >= where.share : null;
+
+  return (
+    <div className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      <div className="rounded-xl bg-primary p-6 text-white">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/50">Today</p>
+          <p className="text-[13px] tabular-nums text-white/70">{clock(now)}</p>
+        </div>
+        <div className="mt-5">
+          {sun && where ? (
+            <SunArc now={where.share} start={`Sunrise ${clock(sun.rise)}`} end={`Sunset ${clock(sun.set)}`} />
+          ) : (
+            <div className="h-14" />
+          )}
+        </div>
+        <div className="mt-6">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[13px] text-white/70">Today&apos;s list</p>
+            <p className="text-[26px] font-light leading-none tabular-nums text-[#ffb347]">
+              {clear ? `${clear.cleared}/${clear.of}` : "–"}
+              <span className="ml-1.5 text-[12px] text-white/50">clear</span>
+            </p>
+          </div>
+          <div className="mt-2">
+            <GoalLine
+              share={clear?.share ?? 0}
+              now={where?.share ?? null}
+              label={clear ? `${clear.cleared} of ${clear.of} clear` : undefined}
+            />
+          </div>
+          <p className="mt-2 text-[12px] text-white/50">
+            {!clear || !where
+              ? "Working out the day…"
+              : clear.cleared === clear.of
+                ? "Everything's clear. Nothing is waiting on you."
+                : where.phase === "set"
+                  ? `The sun has set. ${clear.of - clear.cleared} still to clear.`
+                  : ahead
+                    ? "Ahead of the sun."
+                    : `${clear.of - clear.cleared} to clear before the sun sets.`}
+          </p>
+        </div>
+      </div>
+
+      <ul className={clsx(ui.card, "divide-y divide-line p-1")} aria-label="What needs doing today">
+        {(items ?? Array.from({ length: 7 }, () => null as DayItem | null)).map((item, i) =>
+          item ? (
+            <li key={item.key}>
+              <Link href={item.href} className="group flex items-center gap-3 rounded-md px-4 py-2.5 hover:bg-surface-2">
+                <DayMark item={item} />
+                <span className={clsx("flex-1 text-[13.5px]", item.count ? "text-ink" : "text-ink-2")}>{item.label}</span>
+                <ArrowRight className="size-3.5 text-muted opacity-0 group-hover:opacity-100" aria-hidden />
+              </Link>
+            </li>
+          ) : (
+            <li key={i} className="flex items-center gap-3 px-4 py-2.5">
+              <span className="size-[18px] rounded-full border border-line" />
+              <span className="h-3 w-40 rounded bg-surface-2" />
+            </li>
+          ),
+        )}
+      </ul>
+    </div>
+  );
+}
+
+/** Something waiting: a small glowing sun with its count. Clear: a quiet tick in a fine ring. Today's installs: the day's work, lit. */
+function DayMark({ item }: { item: DayItem }) {
+  if (!item.count)
+    return (
+      <span className="grid size-[18px] place-items-center rounded-full border border-line-strong text-muted" aria-hidden>
+        <Check className="size-2.5" strokeWidth={3} />
+      </span>
+    );
+  return (
+    <span
+      className="grid size-[18px] place-items-center rounded-full bg-[#ffb347] text-[10px] font-semibold tabular-nums text-[#3a1d00] shadow-[0_0_8px_1px_rgb(255_138_61_/_0.45)]"
+      aria-hidden
+    >
+      {item.count > 9 ? "9+" : item.count}
+    </span>
   );
 }
 
