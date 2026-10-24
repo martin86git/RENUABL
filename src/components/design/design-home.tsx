@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { ArrowRight, Check, ChevronLeft, PenTool, UserPlus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, ArrowUp, Check, ChevronLeft } from "lucide-react";
 import clsx from "clsx";
 import { STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import {
@@ -17,6 +17,7 @@ import {
   type OverviewView,
 } from "@/lib/domain/design/deal";
 import { LAUNCH_MARKET, greeting, todayInMarket } from "@/lib/domain/market";
+import { CANVAS_GREETING, CANVAS_STARTERS, type CanvasPanel } from "@/lib/domain/design/canvas";
 import { journey, type JourneyStop } from "@/lib/domain/design/journey";
 import { dayCleared, dayList, orderDueSoon, sunNow, sunTimes, type DayCounts, type DayItem } from "@/lib/domain/design/today";
 import { dueFollowUp } from "@/lib/domain/design/proposal-lists";
@@ -24,6 +25,7 @@ import { listOrders, listProposals } from "@/lib/services/after-sale";
 import { loadUnreadCount } from "@/lib/services/chat";
 import type { ISODate } from "@/lib/domain/types";
 import {
+  askCanvas,
   dollars,
   listJobs,
   loadOverview,
@@ -252,51 +254,142 @@ function OverviewPage({ business, email }: { business: string; email: string }) 
     );
   }
 
-  const day = new Date(`${today}T00:00:00Z`).toLocaleDateString("en-AU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  });
   return (
-    <div className={ui.page}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{business || "Your business"}</p>
-          <h1 id="greeting" className="mt-2 text-[clamp(26px,3.6vw,36px)] font-light leading-[1.1] tracking-[-0.02em] text-ink">
-            {greeting()}
-            {name ? `, ${name}` : ""}.
-          </h1>
-          <p className="mt-2 text-[14px] text-ink-2">It&apos;s {day}.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href={`${PATHS.customers}?new=1`} className={ui.quiet}>
-            <UserPlus className="size-4" aria-hidden /> New customer
-          </Link>
-          <Link href={PATHS.designer} className={ui.primary}>
-            <PenTool className="size-4" aria-hidden /> Open the design tool
-          </Link>
-        </div>
+    <Canvas
+      business={business}
+      name={name}
+      problem={problem}
+      draw={(panel) =>
+        panel === "journey" ? (
+          <JourneyLine jobs={jobs} serviceOpen={serviceOpen} />
+        ) : panel === "today" ? (
+          <YourDay jobs={jobs} today={today} serviceOpen={serviceOpen} />
+        ) : panel === "sales" ? (
+          <SalesView jobs={jobs} data={data} today={today} />
+        ) : panel === "upcoming" ? (
+          <UpcomingInstallsView jobs={jobs} today={today} onJob={changed} />
+        ) : (
+          <CompletedInstallsView jobs={jobs} today={today} onJob={changed} />
+        )
+      }
+    />
+  );
+}
+
+interface Turn {
+  question: string;
+  /** Null while the answer is on its way. */
+  reply: string | null;
+  show: CanvasPanel[];
+}
+
+/**
+ * The overview as a blank canvas (25 Oct 2026, Martin: show what is asked for, rather than guess what someone needs).
+ * A greeting, and a box at the foot of the page; each question is answered in a few words with what it asked to see
+ * drawn under the answer, newest last. Ready-made questions sit over the box while the canvas is empty, so nothing has
+ * to be typed. The conversation lasts for the visit to the page.
+ */
+function Canvas(props: { business: string; name: string | null; problem: string | null; draw: (panel: CanvasPanel) => React.ReactNode }) {
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [text, setText] = useState("");
+  const last = useRef<HTMLDivElement>(null);
+  const busy = turns.some((t) => t.reply === null);
+
+  const send = (question: string) => {
+    const q = question.trim();
+    if (q.length < 2 || busy) return;
+    const history = turns.filter((t) => t.reply).map((t) => ({ q: t.question, a: t.reply! }));
+    const at = turns.length;
+    setTurns((all) => [...all, { question: q, reply: null, show: [] }]);
+    setText("");
+    void askCanvas(q, history).then((res) =>
+      setTurns((all) =>
+        all.map((t, i) => (i === at ? (res.ok ? { ...t, reply: res.reply, show: res.show } : { ...t, reply: res.message, show: [] }) : t)),
+      ),
+    );
+  };
+
+  useEffect(() => {
+    last.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [turns.length]);
+
+  return (
+    <div className="mx-auto flex min-h-[calc(100dvh-4.5rem)] w-full max-w-6xl flex-col px-5 lg:px-10">
+      <div className={clsx("pt-10", turns.length === 0 && "flex flex-1 flex-col justify-center pb-24")}>
+        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{props.business || "Your business"}</p>
+        <h1 className="mt-2 text-[clamp(28px,4vw,40px)] font-light leading-[1.1] tracking-[-0.02em] text-ink">
+          {greeting()}
+          {props.name ? `, ${props.name}` : ""}.
+        </h1>
+        <p className="mt-2 text-[15px] text-ink-2">{CANVAS_GREETING}</p>
+        {props.problem && (
+          <p className="mt-6 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
+            {props.problem}
+          </p>
+        )}
       </div>
 
-      {problem && (
-        <p className="mt-6 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
-          {problem}
-        </p>
+      {turns.length > 0 && (
+        <div className="flex-1 pb-8">
+          {turns.map((t, i) => (
+            <div key={i} ref={i === turns.length - 1 ? last : undefined} className="scroll-mt-6 pt-10">
+              <p className="ml-auto w-fit max-w-[80%] rounded-2xl bg-surface-2 px-4 py-2 text-[14px] text-ink">{t.question}</p>
+              <p className="mt-5 max-w-3xl text-[16px] leading-relaxed text-ink" aria-live="polite">
+                {t.reply ?? <span className="inline-block animate-pulse text-muted">Looking…</span>}
+              </p>
+              {t.show.map((panel) => (
+                <div key={panel}>{props.draw(panel)}</div>
+              ))}
+            </div>
+          ))}
+        </div>
       )}
 
-      <JourneyLine jobs={jobs} serviceOpen={serviceOpen} />
-      <h2 className="mt-14 text-[15px] font-medium tracking-tight text-ink">Today</h2>
-      <YourDay jobs={jobs} today={today} serviceOpen={serviceOpen} />
-
-      <p className="mt-10 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-muted">
-        Look closer:
-        {OVERVIEW_VIEWS.map((v) => (
-          <button key={v.id} type="button" onClick={() => setView(v.id)} className="tap-area font-medium text-ink-2 hover:text-ink">
-            {v.label} <ArrowRight className="inline size-3.5" aria-hidden />
+      {/* The box, at the foot of the page whatever has been drawn above it. */}
+      <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-70% to-transparent pb-5 pt-6 print:hidden">
+        {turns.length === 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {CANVAS_STARTERS.map((st) => (
+              <button
+                key={st.label}
+                type="button"
+                onClick={() => send(st.question)}
+                className="h-9 rounded-full bg-surface px-4 text-[13px] text-ink-2 ring-1 ring-line hover:text-ink hover:ring-ink-2"
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            send(text);
+          }}
+          className="flex items-center gap-2 rounded-2xl bg-surface p-2 pl-4 shadow-[var(--shadow-soft)] ring-1 ring-line focus-within:ring-ink-2"
+        >
+          <label htmlFor="canvas-ask" className="sr-only">
+            Ask about your business
+          </label>
+          <input
+            id="canvas-ask"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={500}
+            autoComplete="off"
+            placeholder="Ask about your business, or what you'd like to see"
+            className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
+          />
+          <button
+            type="submit"
+            disabled={busy || text.trim().length < 2}
+            aria-label="Ask"
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+          >
+            <ArrowUp className="size-4" aria-hidden />
           </button>
-        ))}
-      </p>
+        </form>
+      </div>
     </div>
   );
 }

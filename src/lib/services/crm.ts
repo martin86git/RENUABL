@@ -6,6 +6,7 @@
  * was asked for, or a plain message to show.
  */
 import type { Activity, Customer, Job, JobStage, SavedPipeline } from "@/lib/domain/design/crm";
+import type { CanvasPanel } from "@/lib/domain/design/canvas";
 import { cleanExtras, defaultBill, defaultQuote, postcodeIn, type QuoteFields, type QuoteForm } from "@/lib/domain/design/quote";
 import { cleanDesignSet, type RoofDesign } from "@/lib/domain/design/roof-design";
 
@@ -193,3 +194,6 @@ export const saveJobPlaces = (places: import("@/lib/domain/design/job-map").JobP
 /** The map's picture for a view (fetched by the server in the map's style). */
 export const jobMapImage = (v: { lat: number; lng: number; zoom: number }) =>
   `/api/design/job-map/image?lat=${v.lat.toFixed(6)}&lng=${v.lng.toFixed(6)}&zoom=${v.zoom}`;
+/** The overview's canvas: a question about the business, answered in a few words with the panels to draw under it. */
+export const askCanvas = (question: string, history: { q: string; a: string }[]) =>
+  ask<{ reply: string; show: CanvasPanel[] }>("/api/design/canvas", { method: "POST", body: { question, history } });
