@@ -104,6 +104,10 @@
   --warning-soft: #fdf1dc;
   --danger: #d92d20;
   --focus: #ff5a1f;
+  /* The overview's sales rings (sales-rings.tsx), on the graphite card: the solar orange, a warm amber and a cool teal. */
+  --ring-sales: #ff5a1f;
+  --ring-deals: #ffb020;
+  --ring-kw: #2ec4b6;
   --shadow-soft: 0 0 0 1px rgb(11 11 12 / 0.04), 0 1px 2px rgb(11 11 12 / 0.04);
   --shadow-lift: 0 0 0 1px rgb(11 11 12 / 0.06), 0 12px 32px -12px rgb(11 11 12 / 0.22);
   background: var(--canvas);

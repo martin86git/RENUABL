@@ -17,7 +17,9 @@ import {
 } from "@/lib/domain/design/deal";
 import { greeting, todayInMarket } from "@/lib/domain/market";
 import type { ISODate } from "@/lib/domain/types";
-import { dollars, listJobs, loadOverview, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
+import { dollars, listJobs, loadOverview, loadTargets, shortDate, type JobLine, type Overview } from "@/lib/services/crm";
+import { NO_TARGETS, monthPace, monthRings, monthlyHistory, pipelineByStage, type SalesTargets } from "@/lib/domain/design/sales-rings";
+import { Dots, HalfDial, MonthBars, PipelineBar, RingsCard } from "./sales-rings";
 import { useDesignAccount } from "./design-account";
 import { CHAPTERS, CLOSE } from "@/lib/domain/design/landing";
 import { AfterSigningDemo, AutomationDemo, ConversationDemo, ThreeDesignsDemo } from "./designer-showcase";
@@ -272,38 +274,6 @@ function Greeting(props: { name: string | null; jobs: JobLine[] | null; today: I
 
 type ViewProps = { jobs: JobLine[] | null; data: Overview | null; today: ISODate };
 
-/** The dark strip of a view's two headline figures. */
-function Headline(props: { items: { label: string; value: string; under: React.ReactNode; signal?: boolean }[] }) {
-  return (
-    <section className="mt-6 grid overflow-hidden rounded-lg bg-ink text-white sm:grid-cols-2" aria-label="Headline">
-      {props.items.map((item, i) => (
-        <div key={item.label} className={clsx("px-5 py-4", i > 0 && "border-t border-white/15 sm:border-l sm:border-t-0")}>
-          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/60">{item.label}</p>
-          <p className={clsx("mt-2 text-[26px] font-medium leading-none tabular-nums tracking-tight", item.signal && "text-sun-line")}>
-            {item.value}
-          </p>
-          <div className="mt-2 text-[11.5px] text-white/60">{item.under}</div>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-/** A view's row of figures. */
-function Tiles({ tiles }: { tiles: [name: string, value: string, under: string][] }) {
-  return (
-    <section className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Figures">
-      {tiles.map(([name, value, under]) => (
-        <div key={name} className={clsx(ui.card, "px-4 py-3.5")}>
-          <p className={ui.eyebrow}>{name}</p>
-          <p className="mt-1.5 text-[20px] font-medium leading-none tabular-nums tracking-tight text-ink">{value}</p>
-          <p className="mt-1.5 text-[11.5px] text-muted">{under}</p>
-        </div>
-      ))}
-    </section>
-  );
-}
-
 /** The stages of one pipeline with how many deals are at each. */
 function PipelineCard({ id, data }: { id: string; data: Overview | null }) {
   const p = PIPELINES.find((x) => x.id === id) ?? PIPELINES[0];
@@ -335,49 +305,93 @@ function PipelineCard({ id, data }: { id: string; data: Overview | null }) {
 const monthOf = (today: ISODate) => new Date(`${today}T00:00:00Z`).toLocaleDateString("en-AU", { month: "long", timeZone: "UTC" });
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-/** Sales: the money sold, the month against last month and last year, and what is still being sold. */
+/**
+ * Sales, as Apple would show it (24 Oct 2026, Martin): the month as three rings (sales, deals sold, kW sold), each
+ * closing at the business's target or else its own 3-month average, with the pace the month is on; the financial year
+ * beside it with six months as bars; then small tiles that each draw their figure: conversion as a half-dial, the open
+ * pipeline as one bar split by stage, proposals out as dots.
+ */
 function SalesView({ jobs, data, today }: ViewProps) {
   const d = jobs ? dashboard(jobs, today) : null;
   const monthName = monthOf(today);
   const proposals = jobs?.filter((j) => j.stage === "proposal").length;
+  const [targets, setTargets] = useState<SalesTargets>(NO_TARGETS);
+  const [account] = useDesignAccount();
+  const canSetTargets = Boolean(account?.signedIn && (!account.may || account.may.prices));
+  useEffect(() => {
+    void loadTargets().then((res) => res.ok && setTargets(res.targets));
+  }, []);
+  const history = jobs ? monthlyHistory(jobs, today) : null;
+  const rings = history ? monthRings(history, targets) : null;
+  const pace = d ? monthPace(d.salesMonth, today) : null;
+  const tile = clsx(ui.card, "flex flex-col justify-between gap-3 px-4 py-3.5");
   return (
     <>
-      <Headline
-        items={[
-          {
-            label: `Sales · ${d?.yearLabel ?? "financial year"}`,
-            value: d ? dollars(d.salesYear) : "–",
-            under: d ? `${count(d.soldYear, "deal", "deals")} sold since 1 July, at their quoted prices` : "",
-          },
-          {
-            label: `Sales · ${monthName} to date`,
-            value: d ? dollars(d.salesMonth) : "–",
-            signal: true,
-            under: d && (
-              <span className="flex flex-wrap gap-x-4 gap-y-1.5">
-                <Delta value={d.vsLastMonth} against="on the same days last month" nothing="No sales" dark />
-                <Delta value={d.vsLastYear} against="on the same days last year" nothing="No sales" dark />
-              </span>
-            ),
-          },
-        ]}
-      />
-      <Tiles
-        tiles={[
-          ["New deals", d ? String(d.newDeals) : "–", `Leads started in ${monthName}`],
-          [
-            "Deals sold",
-            d ? String(d.sold) : "–",
-            d && d.conversion !== null
-              ? `${Math.round(d.conversion * 100)}% of ${monthName}'s new deals`
-              : `No new deals in ${monthName} to convert`,
-          ],
-          ["Solar sold", d ? power(d.kwMonth) : "–", d ? `${power(d.kwYear)} this financial year` : ""],
-          ["Open pipeline", d ? dollars(d.openValue) : "–", d ? `${count(d.openDeals, "deal", "deals")} still being sold` : ""],
-          ["Proposals out", proposals === undefined ? "–" : String(proposals), "With customers, waiting on an answer"],
-          ["Customers", data ? String(data.customers) : "–", "Everyone in your list"],
-        ]}
-      />
+      <div className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <RingsCard rings={rings} month={monthName} pace={pace} canSetTargets={canSetTargets} />
+        <section className={clsx(ui.card, "flex flex-col justify-between gap-4 p-5")} aria-label="The financial year">
+          <div>
+            <p className={ui.eyebrow}>Sales · {d?.yearLabel ?? "financial year"}</p>
+            <p className="mt-2 text-[26px] font-medium leading-none tabular-nums tracking-tight text-ink">
+              {d ? dollars(d.salesYear) : "–"}
+            </p>
+            <p className="mt-1.5 text-[11.5px] text-muted">
+              {d ? `${count(d.soldYear, "deal", "deals")} sold since 1 July · ${power(d.kwYear)}` : ""}
+            </p>
+          </div>
+          <MonthBars history={history} />
+          {d && (
+            <span className="flex flex-wrap gap-x-4 gap-y-1.5">
+              <Delta value={d.vsLastMonth} against="on the same days last month" nothing="No sales" />
+              <Delta value={d.vsLastYear} against="on the same days last year" nothing="No sales" />
+            </span>
+          )}
+        </section>
+      </div>
+      <section className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Figures">
+        <div className={tile}>
+          <div>
+            <p className={ui.eyebrow}>New deals</p>
+            <p className="mt-1.5 text-[20px] font-medium leading-none tabular-nums tracking-tight text-ink">{d ? d.newDeals : "–"}</p>
+          </div>
+          <div className="flex items-end gap-3">
+            <HalfDial share={d?.conversion ?? null} label="Share of this month's new deals sold" />
+            <p className="pb-1 text-[11.5px] text-muted">
+              {d && d.conversion !== null ? `${Math.round(d.conversion * 100)}% became sales` : `None started in ${monthName}`}
+            </p>
+          </div>
+        </div>
+        <div className={tile}>
+          <div>
+            <p className={ui.eyebrow}>Open pipeline</p>
+            <p className="mt-1.5 text-[20px] font-medium leading-none tabular-nums tracking-tight text-ink">
+              {d ? dollars(d.openValue) : "–"}
+            </p>
+            <p className="mt-1 text-[11.5px] text-muted">{d ? `${count(d.openDeals, "deal", "deals")} still being sold` : ""}</p>
+          </div>
+          <PipelineBar stages={jobs ? pipelineByStage(jobs) : null} />
+        </div>
+        <div className={tile}>
+          <div>
+            <p className={ui.eyebrow}>Proposals out</p>
+            <p className="mt-1.5 text-[20px] font-medium leading-none tabular-nums tracking-tight text-ink">{proposals ?? "–"}</p>
+            <p className="mt-1 text-[11.5px] text-muted">With customers, waiting on an answer</p>
+          </div>
+          <Dots n={proposals ?? null} />
+        </div>
+        <div className={tile}>
+          <div>
+            <p className={ui.eyebrow}>Customers</p>
+            <p className="mt-1.5 text-[20px] font-medium leading-none tabular-nums tracking-tight text-ink">
+              {data ? data.customers : "–"}
+            </p>
+            <p className="mt-1 text-[11.5px] text-muted">Everyone in your list</p>
+          </div>
+          <Link href={PATHS.customers} className={clsx(ui.link, "text-[12px]")}>
+            Open customers <ArrowRight className="inline size-3" aria-hidden />
+          </Link>
+        </div>
+      </section>
       <PipelineCard id={VIEW_PIPELINE.sales} data={data} />
       <p className="mt-2 text-xs text-muted">
         Sales count from when a deal is moved to Won, at its quoted price. Kilowatts count for deals whose design has been saved.

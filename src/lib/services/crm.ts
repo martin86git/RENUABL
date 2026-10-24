@@ -167,3 +167,8 @@ export const markNotificationsRead = (which: { ids?: string[]; jobId?: string; a
 /** Gives a deal to a member of the business (their email), or to no one (null). */
 export const setDealOwner = (jobId: string, owner: string | null) =>
   ask<{ job: Job }>(`/api/design/jobs/${encodeURIComponent(jobId)}`, { method: "PUT", body: { owner } });
+
+/** The business's monthly sales targets (the overview's rings close at them). */
+export const loadTargets = () => ask<{ targets: import("@/lib/domain/design/sales-rings").SalesTargets }>("/api/design/targets");
+export const saveTargets = (targets: { sales: string; deals: string; kw: string }) =>
+  ask<{ targets: import("@/lib/domain/design/sales-rings").SalesTargets }>("/api/design/targets", { method: "PUT", body: { targets } });
