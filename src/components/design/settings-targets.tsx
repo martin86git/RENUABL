@@ -3,18 +3,18 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { loadTargets, saveTargets } from "@/lib/services/crm";
-import { ActivityRings } from "./sales-rings";
+import { ArrayGauge } from "./solar-gauges";
 import { ui } from "./design-shell";
 
 const FIELDS = [
-  { key: "sales", label: "Sales a month", unit: "$", hint: "At quoted prices, inc. GST", colour: "var(--ring-sales)" },
-  { key: "deals", label: "Deals sold a month", unit: "", hint: "Deals moved to Won", colour: "var(--ring-deals)" },
-  { key: "kw", label: "Solar sold a month", unit: "kW", hint: "From the deals' designs", colour: "var(--ring-kw)" },
+  { key: "sales", label: "Sales a month", unit: "$", hint: "At quoted prices, inc. GST" },
+  { key: "deals", label: "Deals sold a month", unit: "", hint: "Deals moved to Won" },
+  { key: "kw", label: "Solar sold a month", unit: "kW", hint: "From the deals' designs" },
 ] as const;
 type Form = Record<(typeof FIELDS)[number]["key"], string>;
 
 /**
- * Settings → Sales targets: what the overview's rings close at each month. A blank target leaves that ring aiming at
+ * Settings → Sales targets: what the overview's panel arrays light up to each month. A blank target leaves that array aiming at
  * the business's own average of the three months before.
  */
 export function TargetsSettings() {
@@ -38,30 +38,27 @@ export function TargetsSettings() {
       deals: res.targets.deals?.toString() ?? "",
       kw: res.targets.kw?.toString() ?? "",
     });
-    setStatus({ ok: true, text: "Saved. The overview's rings now close at these." });
+    setStatus({ ok: true, text: "Saved. The overview's arrays now light up to these." });
   };
   return (
     <div className={clsx(ui.page, "max-w-3xl")}>
       <p className={ui.eyebrow}>Settings · CRM</p>
       <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">Sales targets</h1>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">
-        What the rings on your overview close at each month. Leave one blank and its ring aims at your own average of the three months
-        before.
+        What the panel arrays on your overview light up to each month. Leave one blank and its array aims at your own average of the three
+        months before.
       </p>
       <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start">
-        <div className="mx-auto shrink-0 rounded-xl bg-primary p-4 sm:mx-0">
-          <ActivityRings
-            size={140}
-            rings={FIELDS.map((f) => ({ key: f.key, value: 0, goal: null, basis: "none", share: form[f.key] ? 0.7 : 0.15 }))}
-          />
+        {/* Each target is an array on the overview, lit as the month gets there: a glimpse of how it reads. */}
+        <div className="mx-auto w-56 shrink-0 space-y-2.5 rounded-xl bg-primary p-4 sm:mx-0">
+          {FIELDS.map((f) => (
+            <ArrayGauge key={f.key} share={form[f.key] ? 0.62 : 0} cols={10} now={0.55} label={f.label} />
+          ))}
         </div>
         <div className="min-w-0 flex-1 space-y-4">
           {FIELDS.map((f) => (
             <label key={f.key} className="block">
-              <span className="flex items-center gap-2 text-[13px] font-medium text-ink">
-                <span className="size-2.5 rounded-full" style={{ background: f.colour }} aria-hidden />
-                {f.label}
-              </span>
+              <span className="flex items-center gap-2 text-[13px] font-medium text-ink">{f.label}</span>
               <span className="mt-1.5 flex items-center gap-2">
                 {f.unit === "$" && <span className="text-sm text-muted">$</span>}
                 <input

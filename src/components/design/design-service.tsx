@@ -21,6 +21,7 @@ import {
 import { listService, raiseService, shortDate, updateService } from "@/lib/services/crm";
 import type { ServiceLine } from "@/lib/server/design-service-repo";
 import { PATHS, PageHead, ui } from "./design-shell";
+import { PanelTally } from "./solar-gauges";
 
 const PILL: Record<ServiceState, string> = {
   open: "bg-danger/10 text-danger",
@@ -139,13 +140,23 @@ export function ServicePlanner() {
         Jobs flagged with something to put right after the sale. Flag one from its deal. Each change is written on the deal, and nothing is
         sent to the customer.
       </p>
-      <div className="mt-6 grid grid-cols-3 gap-3 sm:max-w-xl">
-        {(["open", "in-hand", "resolved"] as const).map((s) => (
-          <div key={s} className={clsx(ui.card, "px-4 py-3")}>
-            <p className={ui.eyebrow}>{SERVICE_STATE_LABEL[s]}</p>
-            <p className="mt-1 text-[22px] tabular-nums tracking-tight text-ink">{cases ? count(s) : "–"}</p>
-          </div>
-        ))}
+      <div className="mt-6 flex flex-wrap items-stretch gap-3">
+        <div className="grid flex-1 grid-cols-3 gap-3 sm:max-w-xl">
+          {(["open", "in-hand", "resolved"] as const).map((s) => (
+            <div key={s} className={clsx(ui.card, "px-4 py-3")}>
+              <p className={ui.eyebrow}>{SERVICE_STATE_LABEL[s]}</p>
+              <p className="mt-1 text-[22px] tabular-nums tracking-tight text-ink">{cases ? count(s) : "–"}</p>
+            </div>
+          ))}
+        </div>
+        {/* One panel a case: lit when resolved, half-lit in hand, dark while open. */}
+        <div className={clsx(ui.card, "flex flex-col justify-center gap-1.5 px-4 py-3")}>
+          <p className={ui.eyebrow}>Every case</p>
+          <PanelTally
+            states={cases ? cases.map((c) => (c.state === "resolved" ? "done" : c.state === "in-hand" ? "part" : "todo")) : null}
+            label="Every case: lit when resolved, half-lit when in hand"
+          />
+        </div>
       </div>
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <div className="flex gap-1 rounded-md bg-surface-2 p-1" role="group" aria-label="Show">

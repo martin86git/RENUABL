@@ -25,6 +25,8 @@ import type { ISODate } from "@/lib/domain/types";
 import { loadInstallExtras } from "@/lib/services/after-sale";
 import { dollars, listJobs, saveJob, shortDate, type JobLine } from "@/lib/services/crm";
 import { PATHS, PageHead, ui } from "./design-shell";
+import { PanelTally } from "./solar-gauges";
+import { installPanel, paperworkPanel, type PanelState } from "@/lib/domain/design/gauges";
 
 type ListProps = { jobs: JobLine[] | null; today: ISODate; onJob: (job: JobLine) => void };
 
@@ -44,7 +46,11 @@ function useExtras() {
 }
 
 /** The black banner: a view's few headline figures, side by side. */
-function Banner({ items }: { items: { label: string; value: string; under: string; signal?: boolean }[] }) {
+function Banner({
+  items,
+}: {
+  items: { label: string; value: string; under: string; signal?: boolean; tally?: { states: PanelState[] | null; label: string } }[];
+}) {
   return (
     <section
       className={clsx("mt-6 grid overflow-hidden rounded-lg bg-ink text-white", items.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}
@@ -56,6 +62,12 @@ function Banner({ items }: { items: { label: string; value: string; under: strin
             {item.value}
           </p>
           <p className="mt-2 text-[11.5px] text-white/60">{item.under}</p>
+          {/* One panel a job: lit when it's done, half-lit when partly. */}
+          {item.tally && (
+            <div className="mt-3">
+              <PanelTally states={item.tally.states} tone="dark" label={item.tally.label} />
+            </div>
+          )}
         </div>
       ))}
     </section>
@@ -154,6 +166,12 @@ function JobCell({ job }: { job: JobLine }) {
   );
 }
 
+/** How much of a job's paperwork is done: the customer's invoice paid, the STCs claimed, the grid connected. */
+const paperworkCount = (j: JobLine) =>
+  [j.details?.customerInvoice === "paid", j.details?.stcClaim === "claimed", j.details?.gridConnection === "completed"].filter(Boolean)
+    .length;
+const PAPERWORK_TALLY = "Each install: lit when its paperwork is all done, half-lit when some is";
+
 /** Upcoming installs: what is awaiting install, how many need a date, this month's install revenue, this week, and every job. */
 export function UpcomingInstallsView({ jobs, today, onJob }: ListProps) {
   const extras = useExtras();
@@ -164,7 +182,17 @@ export function UpcomingInstallsView({ jobs, today, onJob }: ListProps) {
     <>
       <Banner
         items={[
-          { label: "Awaiting install", value: u ? String(u.total) : "–", under: u ? `${dollars(u.value)} · ${power(u.kw)} sold` : "" },
+          {
+            label: "Awaiting install",
+            value: u ? String(u.total) : "–",
+            under: u ? `${dollars(u.value)} · ${power(u.kw)} sold` : "",
+            tally: {
+              states: list
+                ? list.map((j) => installPanel(installerBooked(j), Boolean(extras?.find((e) => e.jobId === j.id)?.ordered)))
+                : null,
+              label: "Each install: lit when its installer is booked and materials ordered, half-lit when one is",
+            },
+          },
           { label: "Need an installation date", value: u ? String(u.toBook) : "–", under: "Sold, no date booked yet" },
           {
             label: "Install revenue MTD",
@@ -319,7 +347,12 @@ export function CompletedInstallsView({ jobs, today, onJob, phase }: ListProps &
         items={
           works
             ? [
-                { label: "In the works", value: done ? String(done.length) : "–", under: "Installed or due, paperwork still to finish" },
+                {
+                  label: "In the works",
+                  value: done ? String(done.length) : "–",
+                  under: "Installed or due, paperwork still to finish",
+                  tally: { states: done ? done.map((j) => paperworkPanel(paperworkCount(j))) : null, label: PAPERWORK_TALLY },
+                },
                 {
                   label: "STCs not claimed",
                   value: done ? String(done.filter((j) => j.details?.stcClaim !== "claimed").length) : "–",
@@ -340,6 +373,7 @@ export function CompletedInstallsView({ jobs, today, onJob, phase }: ListProps &
                   label: `Completed installs · ${c?.yearLabel ?? "financial year"}`,
                   value: c ? String(c.yearCount) : "–",
                   under: c ? `${dollars(c.yearValue)} · ${power(c.yearKw)} since 1 July` : "",
+                  tally: { states: done ? done.map((j) => paperworkPanel(paperworkCount(j))) : null, label: PAPERWORK_TALLY },
                 },
                 {
                   label: "Paperwork open",
