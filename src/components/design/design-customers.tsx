@@ -24,6 +24,8 @@ import {
   type CustomerLine,
 } from "@/lib/services/crm";
 import { ACTIVITY_WORD, StageTag } from "./design-home";
+import { GroupEmail, HasMarks } from "./people";
+import { HAS_FILTERS, PEOPLE_TABS, matchesHas, stepFilter, type HasFilter, type PeopleTab } from "@/lib/domain/design/customers";
 import { PATHS, PageHead, ui } from "./design-shell";
 
 const BLANK: CustomerInput = {
@@ -154,6 +156,10 @@ export function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [find, setFind] = useState("");
+  // Customers (a job installed) or contacts (everyone else), what they have, and the group email box.
+  const [tab, setTab] = useState<PeopleTab>(params.get("tab") === "contacts" ? "contacts" : "customers");
+  const [has, setHas] = useState<HasFilter>({});
+  const [emailing, setEmailing] = useState(false);
   const [adding, setAdding] = useState(params.get("new") === "1");
   const [draft, setDraft] = useState<CustomerInput>(BLANK);
   const [saving, setSaving] = useState(false);
@@ -177,9 +183,15 @@ export function CustomersPage() {
 
   const shown = useMemo(() => {
     const q = find.trim().toLowerCase();
-    if (!q || !customers) return customers ?? [];
-    return customers.filter((c) => [c.name, c.email, c.phone, c.address].some((v) => v.toLowerCase().includes(q)));
-  }, [customers, find]);
+    return (customers ?? [])
+      .filter((c) => (tab === "customers" ? c.installed : !c.installed))
+      .filter((c) => matchesHas(c.has, has))
+      .filter((c) => !q || [c.name, c.email, c.phone, c.address].some((v) => v.toLowerCase().includes(q)));
+  }, [customers, find, tab, has]);
+  const counts = {
+    customers: (customers ?? []).filter((c) => c.installed).length,
+    contacts: (customers ?? []).filter((c) => !c.installed).length,
+  };
 
   const add = async () => {
     if (!(draft.firstName ?? "").trim()) return setAddProblem("Enter the customer's first name.");
@@ -191,7 +203,21 @@ export function CustomersPage() {
     setAddProblem(null);
     setAdding(false);
     setDraft(BLANK);
-    setCustomers((now) => (now ? [{ ...res.customer, jobs: 0, stage: null }, ...now] : now));
+    setCustomers((now) =>
+      now
+        ? [
+            {
+              ...res.customer,
+              jobs: 0,
+              stage: null,
+              installed: false,
+              has: { solar: false, battery: false, ev: false },
+              unsubscribed: false,
+            },
+            ...now,
+          ]
+        : now,
+    );
     const c = res.customer;
     setDeal({ customer: c, title: "Solar", address: c.address, lat: c.lat, lng: c.lng });
   };
@@ -294,7 +320,48 @@ export function CustomersPage() {
         </section>
       )}
 
-      <div className="mt-6 flex items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <div className="inline-flex gap-0.5 rounded-full bg-surface p-1 ring-1 ring-line" role="tablist" aria-label="Who">
+          {PEOPLE_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={clsx(
+                "rounded-full px-3.5 py-1.5 text-[13px] transition",
+                tab === t.id ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+              )}
+            >
+              {t.label} {customers && <span className="tabular-nums opacity-70">{counts[t.id]}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5" aria-label="What they have">
+          {HAS_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setHas(stepFilter(has, f.key))}
+              aria-pressed={has[f.key] !== undefined}
+              title="Press to show those with it, again for those without, again for everyone"
+              className={clsx(
+                "rounded-full px-3 py-1.5 text-[13px] ring-1",
+                has[f.key] === true
+                  ? "bg-positive-soft text-positive ring-positive/30"
+                  : has[f.key] === false
+                    ? "bg-surface-2 text-ink ring-ink-2 line-through"
+                    : "text-ink-2 ring-line hover:text-ink",
+              )}
+            >
+              {has[f.key] === false ? `No ${f.label.toLowerCase()}` : f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-3">
         <label className="relative block w-full max-w-sm">
           <span className="sr-only">Find a customer</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
@@ -306,7 +373,13 @@ export function CustomersPage() {
           />
         </label>
         {customers && <p className="text-xs tabular-nums text-muted">{shown.length} shown</p>}
+        {customers && shown.length > 0 && (
+          <button type="button" className={clsx(ui.quiet, "ml-auto")} onClick={() => setEmailing(true)}>
+            Email these {shown.length}
+          </button>
+        )}
       </div>
+      {emailing && <GroupEmail people={shown} onClose={() => setEmailing(false)} />}
 
       {problem && (
         <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
@@ -321,6 +394,7 @@ export function CustomersPage() {
               <th className="px-5 py-3 font-medium">Name</th>
               <th className="px-3 py-3 font-medium">Contact</th>
               <th className="px-3 py-3 font-medium">Address</th>
+              <th className="px-3 py-3 font-medium">Has</th>
               <th className="px-3 py-3 font-medium">Stage</th>
               <th className="px-5 py-3 text-right font-medium">Jobs</th>
             </tr>
@@ -328,15 +402,19 @@ export function CustomersPage() {
           <tbody>
             {!customers && !problem && (
               <tr>
-                <td colSpan={5} className="px-5 py-6 text-muted">
+                <td colSpan={6} className="px-5 py-6 text-muted">
                   Loading…
                 </td>
               </tr>
             )}
             {customers && shown.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-6 text-ink-2">
-                  {customers.length ? "Nobody matches that." : "No customers yet. Add your first with New customer."}
+                <td colSpan={6} className="px-5 py-6 text-ink-2">
+                  {!customers.length
+                    ? "No customers yet. Add your first with New customer."
+                    : tab === "customers" && !counts.customers
+                      ? "No customers yet: people become customers once a job of theirs is installed. Everyone else is under Contacts."
+                      : "Nobody matches that."}
                 </td>
               </tr>
             )}
@@ -365,6 +443,10 @@ export function CustomersPage() {
                   {c.phone && c.email && <span className="block text-xs text-muted">{c.email}</span>}
                 </td>
                 <td className="max-w-[18rem] truncate px-3 py-3 text-ink-2">{c.address || "–"}</td>
+                <td className="px-3 py-3">
+                  <HasMarks has={c.has} />
+                  {c.unsubscribed && <span className="mt-1 block text-[11px] text-muted">No group emails</span>}
+                </td>
                 <td className="px-3 py-3">{c.stage ? <StageTag stage={c.stage} /> : <span className="text-muted">–</span>}</td>
                 <td className="px-5 py-3 text-right tabular-nums text-ink-2">{c.jobs}</td>
               </tr>

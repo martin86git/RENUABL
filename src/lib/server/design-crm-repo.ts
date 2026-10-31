@@ -7,6 +7,7 @@
  * comes from the signed-in member (`design-context.ts`). A customer, job or
  * activity that belongs to another business reads as not there at all.
  */
+import { isCustomer, jobHas, together, type CustomerHas } from "@/lib/domain/design/customers";
 import { marketDateTime, todayInMarket } from "@/lib/domain/market";
 import { roofKey, type DealViewer } from "@/lib/domain/design/account";
 import {
@@ -174,23 +175,38 @@ export type CustomerLine = Customer & {
   jobs: number;
   /** The one stage shown beside them (`customerStage`), null with no jobs. */
   stage: JobStage | null;
+  /** A customer (a job installed), not only a contact (`isCustomer`). */
+  installed: boolean;
+  /** What their jobs put in (`jobHas`). */
+  has: CustomerHas;
+  /** They asked for no more group emails. */
+  unsubscribed: boolean;
 };
 
 /** The business's customers, whoever something last happened with first. */
 export async function listCustomers(businessId: string): Promise<CustomerLine[]> {
   await ensureSamples(businessId);
-  const rows = await query<Customer & { stages: JobStage[] }>(
-    `select ${CUSTOMER}, coalesce(j.stages, '{}') as stages
+  const rows = await query<
+    Customer & { stages: JobStage[]; parts: { kw: number | null; title: string; details: Record<string, string> }[]; unsubscribed: boolean }
+  >(
+    `select ${CUSTOMER}, coalesce(j.stages, '{}') as stages, coalesce(j.parts, '[]'::json) as parts, c.unsubscribed_at is not null as unsubscribed
        from design_customers c
-       left join lateral (select array_agg(stage order by created_at, id) as stages from design_jobs
-                           where business_id = $1 and customer_id = c.id) j on true
+       left join lateral (select array_agg(stage order by created_at, id) as stages,
+                                 json_agg(json_build_object('kw', kw, 'title', title, 'details', details)) filter (where stage <> 'lost') as parts
+                            from design_jobs where business_id = $1 and customer_id = c.id) j on true
        left join lateral (select max(at) as last from design_activity where business_id = $1 and customer_id = c.id) a on true
       where c.business_id = $1
       order by greatest(c.updated_at, coalesce(a.last, c.updated_at)) desc, c.id
       limit $2`,
     [businessId, MAX_CUSTOMERS],
   );
-  return rows.map(({ stages, ...customer }) => ({ ...customer, jobs: stages.length, stage: customerStage(stages) }));
+  return rows.map(({ stages, parts, ...customer }) => ({
+    ...customer,
+    jobs: stages.length,
+    stage: customerStage(stages),
+    installed: isCustomer(stages),
+    has: together(parts.map((p) => jobHas({ kw: p.kw === null ? null : Number(p.kw), title: p.title ?? "", details: p.details ?? {} }))),
+  }));
 }
 
 async function customerRow(q: Q | typeof query, businessId: string, id: string): Promise<Customer | null> {

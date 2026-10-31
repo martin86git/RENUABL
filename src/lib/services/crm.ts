@@ -28,7 +28,20 @@ export async function ask<T>(path: string, init?: { method: string; body?: unkno
   }
 }
 
-export type CustomerLine = Customer & { jobs: number; stage: JobStage | null };
+export type CustomerLine = Customer & {
+  jobs: number;
+  stage: JobStage | null;
+  /** A customer (a job installed), not only a contact. */
+  installed: boolean;
+  has: { solar: boolean; battery: boolean; ev: boolean };
+  unsubscribed: boolean;
+};
+export const groupEmailStatus = () => ask<{ canSend: boolean; replyTo: string }>("/api/design/customers/group-email");
+export const sendGroupEmail = (input: { subject: string; body: string; ids: string[] }) =>
+  ask<{ sent: number; noEmail: number; unsubscribed: number; over: number; failed: number }>("/api/design/customers/group-email", {
+    method: "POST",
+    body: input,
+  });
 export type JobLine = Job & { customerName: string };
 export type ActivityLine = Activity & { customerName: string };
 

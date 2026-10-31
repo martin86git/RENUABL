@@ -277,6 +277,10 @@ create index if not exists design_activity_recent on design_activity(business_id
 -- A customer's name in its two parts. Both empty on a customer kept before there were parts: read as the name split at its first space.
 alter table design_customers add column if not exists first_name text not null default '';
 alter table design_customers add column if not exists last_name text not null default '';
+-- Group emails (domain/design/customers.ts): each person's own link to stop them, and when they did.
+alter table design_customers add column if not exists unsub_token text;
+alter table design_customers add column if not exists unsubscribed_at timestamptz;
+create unique index if not exists design_customers_unsub on design_customers(unsub_token) where unsub_token is not null;
 -- A job's solar size from its design, and when it was sold and installed (for the overview's figures).
 alter table design_jobs add column if not exists kw numeric;
 -- Who a deal belongs to (a member's email), set to whoever made it; null = no one yet. A member who doesn't see every
