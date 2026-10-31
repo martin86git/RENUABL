@@ -21,6 +21,9 @@ import {
 import { NewDeal } from "./design-customers";
 import { useDesignAccount } from "./design-account";
 import { PATHS, PageHead, ui } from "./design-shell";
+import { PulseMarks } from "./deal-pulse";
+import { loadPulses } from "@/lib/services/deal-pulse";
+import type { DealPulse } from "@/lib/domain/design/deal-heat";
 
 /** Where this person's last way of looking at their deals is kept, on their device. */
 const CHOICE = "renuabl.design.pipeline";
@@ -56,6 +59,8 @@ export function PipelinesPage() {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<JobStage | null>(null);
   const [adding, setAdding] = useState(false);
+  // Each open deal's clock and temperature: its marks on the card, and the order to ring in its column.
+  const [pulses, setPulses] = useState<Record<string, DealPulse>>({});
 
   useEffect(() => {
     let gone = false;
@@ -71,6 +76,7 @@ export function PipelinesPage() {
       if (res.ok) setJobs(res.jobs);
       else setProblem(res.message);
     });
+    void loadPulses().then((res) => !gone && res.ok && setPulses(res.pulses));
     void listPipelines().then((res) => {
       if (!gone && res.ok) setSaved(res.pipelines);
     });
@@ -253,7 +259,10 @@ export function PipelinesPage() {
       {choice.view === "cards" ? (
         <div className="mt-4 flex gap-3 overflow-x-auto pb-4">
           {stages.map((stage) => {
-            const column = shown.filter((j) => j.stage === stage);
+            // Deals still being sold in the order to ring (as Primero's): the warmest and nearest their end first.
+            const column = shown
+              .filter((j) => j.stage === stage)
+              .sort((a, b) => (pulses[b.id]?.priority ?? -Infinity) - (pulses[a.id]?.priority ?? -Infinity));
             const sum = column.reduce((n, j) => n + (j.value ?? 0), 0);
             return (
               <section
@@ -314,6 +323,7 @@ export function PipelinesPage() {
                         {job.title}
                         {job.address ? ` · ${job.address.split(",")[0]}` : ""}
                       </p>
+                      <PulseMarks pulse={pulses[job.id]} />
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <span className="flex items-center gap-1.5 text-sm tabular-nums text-ink">
                           <Owner email={job.owner} />

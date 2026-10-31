@@ -4,6 +4,9 @@ import { addActivity, jobById } from "@/lib/server/design-crm-repo";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
 import { emailProvider, sendEmail } from "@/lib/server/email";
 import { allow } from "@/lib/server/rate-limit";
+import { openPixel, withPixel } from "@/lib/domain/design/email-opens";
+import { siteUrl } from "@/lib/domain/sms";
+import { newOpenToken, recordSent } from "@/lib/server/design-pulse-repo";
 
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
 const fail = (message: string, status: number) => Response.json({ ok: false, message }, { status });
@@ -21,7 +24,8 @@ export async function GET() {
 /**
  * POST { to, subject, body }: emails the deal's customer what the member wrote. It goes from RENUABL's sender in the
  * business's name (its trading name when it has one), with replies to the member who wrote it, and is written on the
- * deal's record as an email. Only the member's own words: nothing is added from the proposal.
+ * deal's record as an email. Only the member's own words: nothing is added from the proposal, but a one-pixel picture
+ * so the deal can say when it was opened (domain/design/email-opens.ts).
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs/[id]/email">) {
   return answer(async () => {
@@ -39,13 +43,26 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if (!clean.ok) return fail(clean.message, 422);
     const brand = await loadBrand(who.member.businessId, who.member.businessName);
     const business = brand.name || who.member.businessName;
-    await sendEmail({ to: clean.to, ...dealEmail({ business, subject: clean.subject, body: clean.body }), replyTo: who.member.email });
+    // A pixel of its own, so the deal can say when the customer opened it (only when the site's address is known).
+    const site = siteUrl();
+    const token = site ? newOpenToken() : null;
+    const email = dealEmail({ business, subject: clean.subject, body: clean.body });
+    await sendEmail({
+      to: clean.to,
+      ...email,
+      ...(token && site ? { html: withPixel(email.html, openPixel(site, token)) } : {}),
+      replyTo: who.member.email,
+    });
     const activity = await addActivity(
       who.member.businessId,
       found.customer.id,
       { kind: "email", text: emailRecord(clean.to, clean.subject, clean.body).slice(0, 2000), jobId: id },
       who.member.email,
     );
+    if (token)
+      await recordSent(who.member.businessId, token, id, typeof activity === "string" ? null : activity.id).catch(() =>
+        console.error("an email's open tracking couldn't be kept"),
+      );
     return Response.json({
       ok: true,
       message: `Sent to ${clean.to}. Replies go to ${who.member.email}.`,

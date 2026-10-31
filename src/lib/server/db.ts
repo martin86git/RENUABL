@@ -551,6 +551,33 @@ create table if not exists design_team_seen (
   seen_at timestamptz not null,
   primary key (business_id, email, room)
 );
+-- Emails sent from a deal and when the customer's mail app loaded their pixel (domain/design/email-opens.ts). The token
+-- alone opens the row (the pixel's address carries nothing else); gone with the deal.
+create table if not exists design_email_opens (
+  token text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  activity_id text,
+  sent_at timestamptz not null default now(),
+  opens jsonb not null default '[]',
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create index if not exists design_email_opens_job on design_email_opens(business_id, job_id);
+-- Files kept on a deal (its Attachments tab): bills, photos, signed forms. Gone with the deal.
+create table if not exists design_deal_files (
+  business_id text not null references businesses(id) on delete cascade,
+  id text not null,
+  job_id text not null,
+  name text not null,
+  type text not null,
+  size integer not null,
+  bytes bytea not null,
+  by_email text not null,
+  at timestamptz not null default now(),
+  primary key (business_id, id),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create index if not exists design_deal_files_job on design_deal_files(business_id, job_id, at desc);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

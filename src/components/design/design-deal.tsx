@@ -40,9 +40,14 @@ import { useDesignAccount } from "./design-account";
 import { ContactActions, DealEmail, DesignDrawer, SectionFieldLine } from "./deal-tools";
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
+import { DealFiles, DealPulseBadges } from "./deal-pulse";
+import { hasPulse, type DealPulse } from "@/lib/domain/design/deal-heat";
+import { openedWords } from "@/lib/domain/design/email-opens";
+import { LAUNCH_MARKET } from "@/lib/domain/market";
+import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
 
 type Written = "note" | "call" | "email";
-type Tab = "overview" | "activities" | "email" | "chat";
+type Tab = "overview" | "activities" | "email" | "chat" | "files";
 /** Whether this person keeps the deal's left column folded away, on their device. */
 const ABOUT_FOLDED = "renuabl.design.deal-about";
 const FILTERS: { key: "all" | ActivityKind; label: string }[] = [
@@ -161,6 +166,17 @@ export function DealPage({ id }: { id: string }) {
   const [fieldsConfig, setFieldsConfig] = useState<DealFieldsConfig | null>(null);
   // The business's people: who a deal can be given to, and who can be @mentioned in a note.
   const [members, setMembers] = useState<string[]>([]);
+  // The deal's clock and temperature while it is being sold, and when its emails were opened.
+  const [pulse, setPulse] = useState<DealPulse | null>(null);
+  const [opens, setOpens] = useState<Record<string, string[]>>({});
+  useEffect(() => {
+    let gone = false;
+    void loadPulses().then((r) => !gone && r.ok && setPulse(r.pulses[id] ?? null));
+    void loadOpens(id).then((r) => !gone && r.ok && setOpens(r.opens));
+    return () => {
+      gone = true;
+    };
+  }, [id, activity.length]);
   useEffect(() => {
     void loadMembers().then((m) => m && setMembers(m.map((x) => x.email.toLowerCase())));
     // Opening the deal reads any mention of this member on it.
@@ -366,6 +382,7 @@ export function DealPage({ id }: { id: string }) {
             <StageTag stage={job.stage} />
             <span className="text-sm tabular-nums text-ink">{dollars(job.value)}</span>
           </div>
+          {pulse && hasPulse(job.stage) && <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />}
           <ContactActions customer={customer} onEmail={() => setTab("email")} />
           {job.lat !== null ? (
             <button type="button" onClick={() => setDrawer(true)} className={clsx(ui.primary, "mt-4 w-full")}>
@@ -538,6 +555,9 @@ export function DealPage({ id }: { id: string }) {
           <button role="tab" aria-selected={tab === "chat"} className={pill(tab === "chat")} onClick={() => setTab("chat")}>
             Chat
           </button>
+          <button role="tab" aria-selected={tab === "files"} className={pill(tab === "files")} onClick={() => setTab("files")}>
+            Attachments
+          </button>
         </div>
 
         {tab === "email" ? (
@@ -547,6 +567,10 @@ export function DealPage({ id }: { id: string }) {
         ) : tab === "chat" ? (
           <div className="mt-5">
             <DealChat jobId={id} />
+          </div>
+        ) : tab === "files" ? (
+          <div className="mt-5">
+            <DealFiles jobId={id} />
           </div>
         ) : tab === "overview" ? (
           <div className="mt-5 space-y-5">
@@ -704,6 +728,11 @@ export function DealPage({ id }: { id: string }) {
                         </time>
                       </div>
                       <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
+                      {a.kind === "email" && opens[a.id] && (
+                        <p className={clsx("mt-1.5 text-xs", opens[a.id].length ? "font-medium text-positive" : "text-muted")}>
+                          {openedWords(opens[a.id], LAUNCH_MARKET.timeZone)}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ol>
