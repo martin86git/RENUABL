@@ -9,7 +9,6 @@ import {
   HardHat,
   MessageSquare,
   Phone,
-  Sparkles,
   Stamp,
   TrendingUp,
   Truck,
@@ -29,7 +28,7 @@ import {
   type SalesFigures,
 } from "@/lib/domain/design/pad";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
-import { nextHeadline, nextUp, type NextInput, type NextItem, type NextKind } from "@/lib/domain/design/next-up";
+import { nextUp, type NextInput, type NextItem, type NextKind } from "@/lib/domain/design/next-up";
 import { dueFollowUp } from "@/lib/domain/design/proposal-lists";
 import { listOrders, listProposals } from "@/lib/services/after-sale";
 import { loadMessages } from "@/lib/services/chat";
@@ -50,15 +49,11 @@ const KIND_ICONS: Record<NextKind, LucideIcon> = {
 };
 
 /**
- * The pad (25 Oct 2026, Martin): a large surface in the same look as the box beneath it, filling the space between the
- * greeting and the box. It opens on **Next up** (Martin: looking at it, he didn't know what to do): the things that
- * need the business now, most pressing first, each with the one thing to press (`nextUp`). Along its top, four rounds
- * each show one thing instead (new leads today, sales today and this month, installations today, sales closed this
- * month); pressing the open one again goes back to Next up.
+ * The numbers (25 Oct 2026, Martin; on Today's Pipeline tab since 1 Nov 2026): four rounds, each showing one thing (new
+ * leads today, sales today and this month, installations today, sales closed this month); sales opens first.
  */
-export function CanvasPad({ jobs, today, grow }: { jobs: JobLine[] | null; today: ISODate; grow: boolean }) {
-  const [open, setOpen] = useState<PadView | null>(null);
-  const items = useNextUp(jobs, today);
+export function Numbers({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
+  const [open, setOpen] = useState<PadView>("performance");
   const count: Record<PadView, number | null> = jobs
     ? {
         leads: newLeadsToday(jobs, today).length,
@@ -69,26 +64,8 @@ export function CanvasPad({ jobs, today, grow }: { jobs: JobLine[] | null; today
     : { leads: null, performance: null, installs: null, closed: null };
 
   return (
-    <section
-      aria-label="Your business at a glance"
-      className={clsx(
-        "flex flex-col rounded-3xl bg-surface p-5 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-8",
-        grow && "min-h-[22rem] flex-1",
-      )}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          aria-pressed={open === null}
-          onClick={() => setOpen(null)}
-          className={clsx(
-            "inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[13px] font-medium",
-            open === null ? "bg-primary text-primary-ink" : "text-ink-2 ring-1 ring-line hover:text-ink hover:ring-ink-2",
-          )}
-        >
-          <Sparkles className="size-4" aria-hidden /> Next up
-          {items && items.length > 0 && <span className="tabular-nums opacity-70">{items.length}</span>}
-        </button>
+    <section aria-label="Your numbers" className="flex flex-col">
+      <div className="flex flex-wrap items-center justify-center gap-2">
         {PAD_VIEWS.map((v) => {
           const Icon = ICONS[v];
           const on = open === v;
@@ -97,7 +74,7 @@ export function CanvasPad({ jobs, today, grow }: { jobs: JobLine[] | null; today
               key={v}
               type="button"
               aria-pressed={on}
-              onClick={() => setOpen(on ? null : v)}
+              onClick={() => setOpen(v)}
               className={clsx(
                 "inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[13px] font-medium",
                 on ? "bg-primary text-primary-ink" : "text-ink-2 ring-1 ring-line hover:text-ink hover:ring-ink-2",
@@ -112,9 +89,7 @@ export function CanvasPad({ jobs, today, grow }: { jobs: JobLine[] | null; today
       </div>
 
       <div className="mt-6 flex flex-1 flex-col border-t border-line pt-6">
-        {open === null ? (
-          <NextUp items={items} />
-        ) : !jobs ? (
+        {!jobs ? (
           <p className="animate-pulse text-[14px] text-muted">Looking…</p>
         ) : open === "performance" ? (
           <Performance jobs={jobs} today={today} />
@@ -143,7 +118,7 @@ export function CanvasPad({ jobs, today, grow }: { jobs: JobLine[] | null; today
 }
 
 /** What needs the business now, from its deals, its customers' messages, its proposals and its orders. */
-function useNextUp(jobs: JobLine[] | null, today: ISODate): NextItem[] | null {
+export function useNextUp(jobs: JobLine[] | null, today: ISODate): NextItem[] | null {
   const [found, setFound] = useState<Omit<NextInput, "jobs" | "today" | "now" | "paths"> | null>(null);
   useEffect(() => {
     let gone = false;
@@ -181,45 +156,8 @@ function useNextUp(jobs: JobLine[] | null, today: ISODate): NextItem[] | null {
   });
 }
 
-const SHOWN = 4;
-
-/** The headline, the most pressing thing large, the next few beneath it, and the rest a press away. */
-function NextUp({ items }: { items: NextItem[] | null }) {
-  const [all, setAll] = useState(false);
-  if (!items) return <p className="animate-pulse text-[14px] text-muted">Looking at your day…</p>;
-  const hour = Number(new Date().toLocaleString("en-AU", { hour: "numeric", hourCycle: "h23", timeZone: LAUNCH_MARKET.timeZone }));
-  const [first, ...rest] = items;
-  const shown = all ? rest : rest.slice(0, SHOWN - 1);
-  return (
-    <div>
-      <p className="text-[20px] font-light leading-snug tracking-[-0.01em] text-ink">{nextHeadline(items.length, hour)}</p>
-      {!first ? (
-        <p className="mt-2 text-[14px] text-ink-2">Everything is answered, followed up and booked. Pick one of the above to look closer.</p>
-      ) : (
-        <>
-          <NextCard item={first} lead />
-          {shown.length > 0 && (
-            <ul className="mt-2 divide-y divide-line">
-              {shown.map((i) => (
-                <li key={i.key}>
-                  <NextCard item={i} />
-                </li>
-              ))}
-            </ul>
-          )}
-          {rest.length > SHOWN - 1 && (
-            <button type="button" onClick={() => setAll(!all)} className="tap-area mt-3 text-[13px] font-medium text-ink-2 hover:text-ink">
-              {all ? "Show fewer" : `${rest.length - (SHOWN - 1)} more`}
-            </button>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
 /** One thing to do: what, why, and the one button. The most pressing is larger and lit. */
-function NextCard({ item, lead }: { item: NextItem; lead?: boolean }) {
+export function NextCard({ item, lead }: { item: NextItem; lead?: boolean }) {
   const Icon = KIND_ICONS[item.kind];
   return (
     <div className={clsx("flex items-center gap-4", lead ? "mt-5 rounded-2xl bg-surface-2 p-4 sm:p-5" : "py-3")}>

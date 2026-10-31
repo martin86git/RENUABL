@@ -7,6 +7,7 @@
  * comes from the signed-in member (`design-context.ts`). A customer, job or
  * activity that belongs to another business reads as not there at all.
  */
+import { marketDateTime, todayInMarket } from "@/lib/domain/market";
 import { roofKey, type DealViewer } from "@/lib/domain/design/account";
 import {
   INSTALLED_STAGES,
@@ -541,11 +542,14 @@ export interface Overview {
   customers: number;
   /** The latest 12 things that happened, across every customer. */
   recent: (Activity & { customerName: string })[];
+  /** What the member asking did today (the market's day), for Today's "Your day so far": each thing's kind and writer. */
+  mine: Pick<Activity, "kind" | "by">[];
 }
 
 export async function overview(businessId: string, viewer?: DealViewer): Promise<Overview> {
   await ensureSamples(businessId);
-  const [stages, customers, recent] = await Promise.all([
+  const dayStart = marketDateTime(todayInMarket(), 0);
+  const [stages, customers, recent, mine] = await Promise.all([
     query<{ stage: JobStage; n: string; value: number }>(
       `select stage, count(*) as n, coalesce(sum(value), 0)::float8 as value from design_jobs j where business_id = $1 and ${seen(viewer, 2)} group by stage`,
       [businessId, ...seenParams(viewer)],
@@ -557,6 +561,12 @@ export async function overview(businessId: string, viewer?: DealViewer): Promise
         where a.business_id = $1 order by a.at desc, a.id limit 12`,
       [businessId],
     ),
+    viewer
+      ? query<Pick<Activity, "kind" | "by">>(
+          `select kind, by_email as by from design_activity where business_id = $1 and lower(by_email) = $2 and at >= $3 limit 500`,
+          [businessId, viewer.email.toLowerCase(), dayStart],
+        )
+      : Promise.resolve([]),
   ]);
   const counts = Object.fromEntries(JOB_STAGES.map((s) => [s, 0])) as Record<JobStage, number>;
   let openValue = 0;
@@ -573,5 +583,6 @@ export async function overview(businessId: string, viewer?: DealViewer): Promise
     wonValue: Math.round(wonValue * 100) / 100,
     customers: Number(customers[0]?.n ?? 0),
     recent,
+    mine,
   };
 }
