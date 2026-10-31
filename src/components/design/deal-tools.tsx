@@ -8,6 +8,7 @@ import { DEAL_EMAIL_TEMPLATES, MAX_BODY, MAX_SUBJECT, fillTemplate, senderName }
 import type { SectionLine } from "@/lib/domain/design/deal-sections";
 import { dealEmailStatus, emailDeal } from "@/lib/services/crm";
 import { PATHS, ui } from "./design-shell";
+import { DRAFT_KEY } from "@/lib/services/sol";
 
 /**
  * The design tool as a drawer over the deal (Martin: not a new page; back and forth between the design and the deal's
@@ -125,6 +126,21 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
   const [sending, setSending] = useState(false);
   useEffect(() => {
     void dealEmailStatus(job.id).then((res) => res.ok && setStatus({ canSend: res.canSend, replyTo: res.replyTo }));
+  }, [job.id]);
+  // A draft Sol wrote for this deal ("Open in the deal's email") is put in the box once, to check and send.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      const d = raw ? (JSON.parse(raw) as { jobId?: string; subject?: string; body?: string }) : null;
+      if (d?.jobId !== job.id) return;
+      sessionStorage.removeItem(DRAFT_KEY);
+      queueMicrotask(() => {
+        setSubject(String(d.subject ?? "").slice(0, 200));
+        setBody(String(d.body ?? "").slice(0, 6000));
+      });
+    } catch {
+      // Nothing handed over, or storage refused.
+    }
   }, [job.id]);
 
   const use = (id: string) => {

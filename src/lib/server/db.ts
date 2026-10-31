@@ -505,6 +505,18 @@ create table if not exists design_reminders_sent (
   at timestamptz not null default now(),
   primary key (business_id, job_id, kind, install_date)
 );
+-- Each member's conversation with Sol (domain/design/sol.ts), with their own preferences and reminders: one row a
+-- member, kept apart from everyone else's, gone with the business.
+create table if not exists design_sol (
+  business_id text not null references businesses(id) on delete cascade,
+  email text not null,
+  turns jsonb not null default '[]',
+  prefs jsonb not null default '[]',
+  reminders jsonb not null default '[]',
+  seen_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (business_id, email)
+);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

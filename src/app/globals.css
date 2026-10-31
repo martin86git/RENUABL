@@ -151,6 +151,75 @@
   scrollbar-width: thin;
 }
 
+/* Sol's panel (sol-dock.tsx): on a wide screen the page narrows to make room for it rather than being covered. */
+:root {
+  --sol-w: 26rem;
+}
+body {
+  transition: padding-right 300ms ease;
+}
+@media (min-width: 1024px) {
+  html.sol-docked body {
+    padding-right: var(--sol-w);
+  }
+}
+/* The top bar fits in less room (a narrow wide screen, or Sol's panel open) by putting the day and weather away. */
+@media (max-width: 1279px) {
+  .studio-day-pill {
+    display: none;
+  }
+}
+@media (max-width: 1699px) {
+  html.sol-docked .studio-day-pill {
+    display: none;
+  }
+}
+/* A reply from Sol waiting: a ring of rays round his mark on the rail turns slowly, each ray brightening in turn, and
+   his count glows. */
+@keyframes sol-rays-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes sol-ray {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+@keyframes sol-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(255 90 31 / 0.5);
+  }
+  60% {
+    box-shadow: 0 0 0 6px rgb(255 90 31 / 0);
+  }
+}
+.sol-rays {
+  transform-origin: center;
+  animation: sol-rays-turn 9s linear infinite;
+}
+.sol-rays line {
+  animation: sol-ray 1.8s ease-in-out infinite;
+}
+.sol-glow {
+  animation: sol-glow 1.8s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sol-rays,
+  .sol-rays line,
+  .sol-glow {
+    animation: none;
+  }
+  .sol-rays line {
+    opacity: 0.8;
+  }
+}
+
 /* Figures read as instrument readouts: every number set in the monospace face. */
 .theme-studio .tabular-nums,
 .theme-studio input[type="number"] {

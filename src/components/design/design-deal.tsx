@@ -147,9 +147,10 @@ export function DealPage({ id }: { id: string }) {
   const [designed, setDesigned] = useState<Awaited<ReturnType<typeof loadDealDesign>>>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [status, setStatus] = useState("");
-  // "?tab=chat" (from Messages, and from the email about a new message) opens the deal on its conversation.
+  // "?tab=chat" (from Messages, and from the email about a new message) opens the deal on its conversation; "?tab=email"
+  // (a draft Sol wrote) on its Email tab.
   const asked = useSearchParams().get("tab");
-  const [tab, setTab] = useState<Tab>(asked === "chat" ? "chat" : "activities");
+  const [tab, setTab] = useState<Tab>(asked === "chat" ? "chat" : asked === "email" ? "email" : "activities");
   // The design tool as a drawer over the deal (?design=1 opens it), and the left column folded away.
   const [drawer, setDrawer] = useState(useSearchParams().get("design") === "1");
   const [folded, setFolded] = useState(false);

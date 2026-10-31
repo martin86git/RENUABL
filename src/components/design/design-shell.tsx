@@ -11,6 +11,7 @@ import { notificationCount, serviceCount } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
+import { SolDock, SolRail } from "./sol-dock";
 import { DayPill, GearMenu, MessagesMenu, NotificationsMenu, TopIcon } from "./shell-menus";
 
 /** Where everything in the product lives. */
@@ -25,6 +26,7 @@ export const PATHS = {
   messages: "/design/messages",
   service: "/design/service",
   notifications: "/design/notifications",
+  sol: "/design/sol",
   proposalsSent: "/design/sales/proposals",
   proposalsSigned: "/design/sales/signed",
   scheduler: "/design/procurement/scheduler",
@@ -178,7 +180,9 @@ function Shell({
               data-tour="icons"
               className="flex items-center gap-0.5 rounded-full bg-surface p-1 shadow-[0_8px_30px_rgba(11,11,12,0.08)] ring-1 ring-line"
             >
-              <DayPill />
+              <span className="studio-day-pill contents">
+                <DayPill />
+              </span>
               <MessagesMenu badge={unread} href={PATHS.messages} />
               <NotificationsMenu badge={mentions} full={PATHS.notifications} deal={(id) => `${PATHS.deals}/${id}`} />
               <TopIcon href={PATHS.designer} label="Design tool" icon={PenTool} on={path.startsWith(PATHS.designer)} />
@@ -327,6 +331,7 @@ function Shell({
             ))}
             <div className="mt-4 border-t border-line pt-2">
               {[
+                { label: "Sol", href: PATHS.sol, n: 0 },
                 { label: "Notifications", href: PATHS.notifications, n: mentions },
                 { label: "Settings", href: PATHS.settings, n: 0 },
                 { label: "Your account", href: PATHS.account, n: 0 },
@@ -355,6 +360,9 @@ function Shell({
         customer={(id) => `${PATHS.customers}/${id}`}
         deal={(id) => `${PATHS.deals}/${id}`}
       />
+      {/* Sol: the rail down the right (not over the design tool, which needs the room) and his panel. */}
+      {on && !tool && <SolRail />}
+      {on && <SolDock />}
     </div>
   );
 }
