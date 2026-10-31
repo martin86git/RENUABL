@@ -110,6 +110,47 @@
   color: var(--ink);
   color-scheme: light;
 }
+/*
+ * The frame of the signed-in screens (31 Oct 2026, Primero's layout in RENUABL's colours): a near-white page, the soft
+ * grey pad every page sits on (white cards on it), and slim rounded scroll bars with no arrows. Inside the pad the
+ * canvas token is the pad's own grey, so anything drawn in it (a fade, a chat tail) sits on the right ground.
+ */
+.studio-frame {
+  --canvas: #fafafa;
+}
+.studio-frame .studio-pad {
+  --canvas: #f0f0f2;
+}
+.studio-frame ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.studio-frame ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.studio-frame ::-webkit-scrollbar-button {
+  display: none;
+}
+.studio-frame ::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  background: rgb(11 11 12 / 0.18) padding-box;
+}
+.studio-frame ::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(11 11 12 / 0.32);
+}
+.studio-frame ::-webkit-scrollbar-thumb:active {
+  background-color: rgb(11 11 12 / 0.45);
+}
+/* Inside the frame the top bar carries the wordmark, so a screen's own (the design tool's, kept for signed-out use) goes. */
+.studio-frame .studio-own-mark {
+  display: none;
+}
+.studio-frame .staff-scroll {
+  scrollbar-width: thin;
+}
+
 /* Figures read as instrument readouts: every number set in the monospace face. */
 .theme-studio .tabular-nums,
 .theme-studio input[type="number"] {

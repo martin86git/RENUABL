@@ -47,6 +47,7 @@ import { FrontHero, Reveal } from "./front-hero";
 import { SignInForm } from "./sign-in-form";
 import { CompletedInstallsView, UpcomingInstallsView } from "./install-lists";
 import { CanvasPad } from "./canvas-pad";
+import { NewLook } from "./new-look";
 
 /** A stage as a small tag. Won and installed are the good news; lost is quiet. */
 export function StageTag({ stage }: { stage: JobStage }) {
@@ -323,8 +324,9 @@ function Canvas(props: {
   }, [turns.length]);
 
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-4.5rem)] w-full max-w-6xl flex-col px-5 lg:px-10">
+    <div className="mx-auto flex min-h-[calc(100dvh-13rem)] w-full max-w-6xl flex-col">
       <div className="pt-2">
+        <NewLook name={props.name} />
         <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{props.business || "Your business"}</p>
         <h1 className="mt-1.5 text-[clamp(24px,3.2vw,32px)] font-light leading-[1.1] tracking-[-0.02em] text-ink">
           {greeting()}

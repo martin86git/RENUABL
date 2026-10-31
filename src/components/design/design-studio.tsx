@@ -257,7 +257,7 @@ export function DesignStudio() {
           onUnsaved={noteUnsaved}
           bar={
             <>
-              <Link href="/design" aria-label="RENUABL">
+              <Link href="/design" aria-label="RENUABL" className="studio-own-mark">
                 <Wordmark className="text-[17px]" />
               </Link>
               {onJob && (
@@ -291,7 +291,7 @@ export function DesignStudio() {
 
   return (
     <div className="theme-studio flex min-h-dvh flex-col">
-      <header className="flex h-16 items-center px-5 lg:px-10">
+      <header className="studio-own-mark flex h-16 items-center px-5 lg:px-10">
         <Link href="/design" aria-label="RENUABL">
           <Wordmark />
         </Link>

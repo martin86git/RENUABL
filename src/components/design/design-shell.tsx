@@ -3,35 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import {
-  Bell,
-  CalendarClock,
-  CalendarDays,
-  CircleCheck,
-  FileSignature,
-  MessageSquare,
-  ReceiptText,
-  Send,
-  Truck,
-  HardHat,
-  LayoutDashboard,
-  MapPinned,
-  ChevronLeft,
-  ChevronRight,
-  PenTool,
-  SlidersHorizontal,
-  SquareKanban,
-  TrendingUp,
-  Users,
-  Wrench,
-  type LucideIcon,
-} from "lucide-react";
+import { LayoutDashboard, Menu, MessageCircle, PenTool, Search, SquareKanban, type LucideIcon } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
-import { LAUNCH_MARKET } from "@/lib/domain/market";
-import { loadWeather, notificationCount, serviceCount } from "@/lib/services/crm";
+import { pageAt, sectionAt, SECTIONS } from "@/lib/domain/design/sections";
+import { notificationCount, serviceCount } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
+import { PageSearch } from "./page-search";
+import { DayPill, GearMenu, MessagesMenu, NotificationsMenu, TopIcon } from "./shell-menus";
 
 /** Where everything in the product lives. */
 export const PATHS = {
@@ -59,79 +39,23 @@ export const PATHS = {
   signIn: "/design/sign-in",
 } as const;
 
-interface NavItem {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  /** Other places that belong to this section: a deal's own page is part of Sales. */
-  also?: string[];
-  /** The main tool: marked in the signal colour so it stands out from the sections. */
-  main?: boolean;
-  /** Its subsections, listed under it. */
-  under?: { href: string; label: string; icon: LucideIcon; also?: string[] }[];
-}
-
-const NAV: NavItem[] = [
-  { href: PATHS.home, label: "Overview", icon: LayoutDashboard },
-  {
-    href: PATHS.customers,
-    label: "CRM",
-    icon: Users,
-    also: [PATHS.deals, PATHS.pipelines],
-    under: [
-      { href: PATHS.customers, label: "Customers", icon: Users },
-      { href: PATHS.pipelines, label: "Deals", icon: SquareKanban, also: [PATHS.deals] },
-    ],
-  },
-  {
-    href: PATHS.proposalsSent,
-    label: "Sales",
-    icon: TrendingUp,
-    also: [PATHS.proposalsSigned],
-    under: [
-      { href: PATHS.proposalsSent, label: "Proposals Sent", icon: Send },
-      { href: PATHS.proposalsSigned, label: "Proposals Signed", icon: FileSignature },
-    ],
-  },
-  {
-    href: PATHS.scheduler,
-    label: "Procurement",
-    icon: Truck,
-    also: [PATHS.orders, PATHS.jobMap],
-    under: [
-      { href: PATHS.scheduler, label: "Install Scheduler", icon: CalendarDays },
-      { href: PATHS.orders, label: "Ordering Station", icon: Truck },
-      { href: PATHS.jobMap, label: "Job map", icon: MapPinned },
-    ],
-  },
-  {
-    href: PATHS.installations,
-    label: "Installations",
-    icon: HardHat,
-    under: [
-      { href: PATHS.installations, label: "Upcoming", icon: CalendarClock },
-      { href: PATHS.underway, label: "In the works", icon: HardHat },
-      { href: PATHS.completed, label: "Completed", icon: CircleCheck },
-      { href: PATHS.invoices, label: "Installer Invoices", icon: ReceiptText },
-    ],
-  },
-  { href: PATHS.service, label: "Service", icon: Wrench },
-  { href: PATHS.messages, label: "Messages", icon: MessageSquare },
-  { href: PATHS.notifications, label: "Notifications", icon: Bell },
-  { href: PATHS.designer, label: "Design tool", icon: PenTool, main: true },
+/** The phone's foot bar: the places used most, under the thumb; everything else is under More. */
+const PHONE_TABS: { label: string; href: string; icon: LucideIcon; match: (path: string) => boolean }[] = [
+  { label: "Today", href: PATHS.home, icon: LayoutDashboard, match: (p) => p === PATHS.home },
+  { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
+  { label: "Messages", href: PATHS.messages, icon: MessageCircle, match: (p) => p.startsWith(PATHS.messages) },
+  { label: "Design", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
 ];
 
 /**
- * The frame every signed-in screen sits in: the product's sections down the
- * left (Overview, CRM (Customers, Deals), Sales (the proposals), Procurement (scheduling and ordering),
- * Installations (upcoming, in the works, completed, installer invoices), and the
- * Design tool in orange, as the main tool), with the business's settings
- * and account at its foot. The sections can be folded down to icons and opened
- * out again (kept on the device). `compact` keeps only the icons, for the design
- * tool, where the roof needs the room. On a phone the sections run across the
- * top instead. Signed out, a screen that needs an account (`needsAccount`)
- * asks for one; the others (the design tool, its settings) are shown bare, as
- * they work on the device without one.
+ * The frame every signed-in screen sits in (31 Oct 2026, Martin: Primero's layout, in RENUABL's own colours and type).
+ * No bar down the left: across the top, the logo and Search on the left, the sections in one pill in the middle
+ * (`SECTIONS` in domain/design/sections.ts) with the section on show's own pages as quiet toggles under it, and on the
+ * right one floating card of round icons, each a window over the page (the day and weather, messages, notifications,
+ * the design tool, the gear). Every page sits on the soft rounded pad. On a phone, the places used most along the foot
+ * and the rest under More. `compact` is the design tool: the same top, no pad, so the roof has the room. `bare` drops
+ * the frame (a page shown inside another). Signed out, a screen that needs an account (`needsAccount`) asks for one;
+ * the others (the design tool, its settings) are shown bare, as they work on the device without one.
  */
 export function DesignShell(props: { children: React.ReactNode; compact?: boolean; needsAccount?: boolean; bare?: boolean }) {
   return (
@@ -141,11 +65,8 @@ export function DesignShell(props: { children: React.ReactNode; compact?: boolea
   );
 }
 
-/**
- * Whether this person keeps the sections folded down to icons, on their device. Folded unless they opened them out
- * (25 Oct 2026, Martin: the nav was competing with the page for attention).
- */
-const FOLDED = "renuabl.design.nav-folded";
+/** The pad every page sits on (Primero's `PAGE_PAD`): a soft grey ground with rounded corners, white cards on it. */
+const PAD = "studio-pad min-h-[calc(100dvh-10rem)] rounded-[28px] bg-canvas p-4 sm:p-6";
 
 function Shell({
   children,
@@ -156,41 +77,34 @@ function Shell({
   children: React.ReactNode;
   compact?: boolean;
   needsAccount?: boolean;
-  /** Without the sections: the page shown inside another, as the design tool is in a deal's drawer. */
+  /** Without the frame: the page shown inside another, as the design tool is in a deal's drawer. */
   bare?: boolean;
 }) {
-  // The sections can be folded down to their icons, as they always are on the design tool, and opened out again.
-  const [folded, setFolded] = useState(true);
-  useEffect(() => {
-    try {
-      // What was chosen last time is only known once the page is in the browser.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFolded(window.localStorage.getItem(FOLDED) !== "0");
-    } catch {
-      // Folded, then.
-    }
-  }, []);
-  const fold = (to: boolean) => {
-    setFolded(to);
-    try {
-      window.localStorage.setItem(FOLDED, to ? "1" : "0");
-    } catch {
-      // It still holds for this visit.
-    }
-  };
-  const compact = tool || folded;
   const [account] = useDesignAccount();
-  // How many of the customers' messages nobody has seen: the number on Messages. Asked only for a signed-in business.
-  const unread = useUnreadMessages(Boolean(account?.signedIn && account.business));
-  // How many service cases are still to put right: the number on Service.
-  const service = useServiceCount(Boolean(account?.signedIn && account.business));
-  // How many times this member has been @mentioned and not looked yet: the number on Notifications.
-  const mentions = useCount(Boolean(account?.signedIn && account.business), "renuabl:notifications", async () => {
+  const on = Boolean(account?.signedIn && account.business);
+  // How many of the customers' messages nobody has seen, the service cases to put right, and this member's unread mentions.
+  const unread = useUnreadMessages(on);
+  const service = useServiceCount(on);
+  const mentions = useCount(on, "renuabl:notifications", async () => {
     const res = await notificationCount();
     return res.ok ? res.unread : null;
   });
-  const counts: Record<string, number> = { [PATHS.messages]: unread, [PATHS.service]: service, [PATHS.notifications]: mentions };
+  const counts: Record<string, number> = { service };
   const path = usePathname();
+  const [searching, setSearching] = useState(false);
+  const [more, setMore] = useState(false);
+  // Ctrl K or ⌘K opens the search from anywhere.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearching(true);
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
+
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (!account.signedIn) {
     if (!needsAccount) return <>{children}</>;
@@ -211,208 +125,253 @@ function Shell({
       </div>
     );
   }
-
-  // The overview and the settings have pages beneath them that are their own entries here, so each is lit only on its own page.
-  const within = (href: string) => (href === PATHS.home ? path === href : path === href || path.startsWith(`${href}/`));
-  const active = (href: string, also: string[] = []) => [href, ...also].some(within);
-  /** The one subsection you are in: the most particular of those that hold this page (Installations' own list holds its others). */
-  const here = (under: NonNullable<NavItem["under"]>) =>
-    under.filter((u) => active(u.href, u.also)).sort((a, b) => b.href.length - a.href.length)[0];
-  const item = (href: string, label: string, Icon: LucideIcon, also?: string[], main?: boolean) => (
-    <Link
-      key={href}
-      href={href}
-      title={compact ? label : undefined}
-      aria-label={compact ? label : undefined}
-      aria-current={active(href, also) ? "page" : undefined}
-      className={clsx(
-        "flex h-10 shrink-0 items-center gap-3 rounded-md text-sm font-medium",
-        compact ? "w-10 justify-center lg:w-10" : "px-3",
-        main
-          ? // The main tool keeps its orange whether or not it is where you are; there it is ringed too.
-            clsx("bg-sun-line text-white hover:brightness-95", active(href, also) && "ring-2 ring-ink ring-offset-2 ring-offset-surface")
-          : active(href, also)
-            ? "bg-primary text-primary-ink"
-            : "text-ink-2 hover:bg-surface-2 hover:text-ink",
-      )}
-    >
-      <span className="relative shrink-0">
-        <Icon className="size-[18px]" aria-hidden />
-        {/* Folded down to icons, the count rides on the icon. */}
-        {compact && (counts[href] ?? 0) > 0 && (
-          <span className="absolute -right-2 -top-2 rounded-full bg-sun-line px-1 text-[10px] font-semibold leading-4 text-white">
-            {counts[href]}
-          </span>
-        )}
-      </span>
-      {!compact && <span className="truncate">{label}</span>}
-      {!compact && (counts[href] ?? 0) > 0 && (
-        <span
-          className="ml-auto rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white"
-          aria-label={href === PATHS.service ? `${counts[href]} to resolve` : `${counts[href]} unread`}
-        >
-          {counts[href]}
-        </span>
-      )}
-    </Link>
-  );
-
   if (bare) return <div className="theme-studio min-h-dvh">{children}</div>;
+
+  const here = pageAt(path);
+  const current = sectionAt(path);
+  const count = (pageId: string) => counts[pageId] ?? 0;
+  const settingsOn = path.startsWith(PATHS.settings) || path.startsWith(PATHS.account);
+
   return (
-    <div className="theme-studio flex min-h-dvh flex-col lg:flex-row">
-      <nav
-        aria-label="Sections"
-        className={clsx(
-          "z-40 flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2 print:hidden",
-          "lg:sticky lg:top-0 lg:h-dvh lg:flex-col lg:items-stretch lg:overflow-visible lg:border-b-0 lg:border-r lg:px-2.5 lg:py-4",
-          compact ? "lg:w-[3.75rem]" : "lg:w-56",
+    <div className="theme-studio studio-frame min-h-dvh pb-24 lg:pb-0">
+      {/* Across the top on a wide screen: logo and Search, the sections, and the card of icons. */}
+      <header className={clsx("z-[35] hidden bg-canvas/90 backdrop-blur print:hidden lg:block lg:px-14", !tool && "sticky top-0")}>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-4 px-2 pt-4">
+          <div className="flex min-w-0 items-start gap-5">
+            <Link href={PATHS.home} aria-label="RENUABL, today" className="mt-[1.45rem] shrink-0">
+              <Wordmark className="text-[17px]" />
+            </Link>
+            <button
+              type="button"
+              onClick={() => setSearching(true)}
+              aria-label="Search customers and deals"
+              title="Search customers and deals (Ctrl K)"
+              className="mt-4 flex h-9 min-w-0 max-w-56 flex-1 items-center gap-2 rounded-full bg-surface px-3.5 text-sm text-muted ring-1 ring-line hover:text-ink"
+            >
+              <Search className="size-4 shrink-0" aria-hidden />
+              <span className="hidden truncate xl:inline">Search</span>
+              <kbd className="ml-auto hidden rounded border border-line px-1 text-[10px] text-muted xl:inline">Ctrl K</kbd>
+            </button>
+          </div>
+          <nav aria-label="Sections" className="mt-4 flex items-center gap-0.5 rounded-full bg-surface-2 p-1">
+            {SECTIONS.map((sec) => {
+              const lit = sec.id === current.id;
+              const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);
+              return (
+                <Link
+                  key={sec.id}
+                  href={sec.pages[0].href}
+                  aria-current={lit ? "true" : undefined}
+                  className={clsx(
+                    "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
+                    lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                  )}
+                >
+                  {sec.label}
+                  {waiting > 0 && <span className="size-1.5 rounded-full bg-sun-line" aria-label={`${waiting} waiting`} />}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="mt-3 flex justify-end">
+            <div
+              data-tour="icons"
+              className="flex items-center gap-0.5 rounded-full bg-surface p-1 shadow-[0_8px_30px_rgba(11,11,12,0.08)] ring-1 ring-line"
+            >
+              <DayPill />
+              <MessagesMenu badge={unread} href={PATHS.messages} />
+              <NotificationsMenu badge={mentions} full={PATHS.notifications} deal={(id) => `${PATHS.deals}/${id}`} />
+              <TopIcon href={PATHS.designer} label="Design tool" icon={PenTool} on={path.startsWith(PATHS.designer)} />
+              <GearMenu email={account.email} settings={PATHS.settings} account={PATHS.account} on={settingsOn} />
+            </div>
+          </div>
+        </div>
+        {/* The section's own pages, quiet: only the one you are on stands out. Today has none over it. */}
+        {current.pages.length > 1 && (
+          <nav aria-label={current.label} className="flex justify-center gap-5 overflow-x-auto px-5 pb-2 pt-2.5">
+            {current.pages.map((p) => {
+              const lit = here?.page.id === p.id;
+              const n = count(p.id);
+              return (
+                <Link
+                  key={p.id}
+                  href={p.href}
+                  aria-current={lit ? "page" : undefined}
+                  className={clsx(
+                    "flex shrink-0 items-center gap-1.5 border-b-2 pb-1 text-[13px] transition-colors",
+                    lit ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink",
+                  )}
+                >
+                  {p.label}
+                  {n > 0 && (
+                    <span className="relative inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold leading-4 text-white">
+                      {!lit && (
+                        <span className="absolute inset-0 animate-ping rounded-full bg-sun-line/50 motion-reduce:hidden" aria-hidden />
+                      )}
+                      <span className="relative">{n}</span>
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
         )}
-      >
-        <Link
-          href={PATHS.home}
-          aria-label="RENUABL"
-          className={clsx("mr-3 shrink-0 lg:mb-5 lg:mr-0", compact ? "lg:text-center" : "lg:px-3")}
-        >
-          {compact ? (
-            <span className="hidden text-[17px] font-normal tracking-[0.1em] text-ink lg:inline">R</span>
-          ) : (
-            <Wordmark className="text-[16px]" />
-          )}
-          {compact && <Wordmark className="text-[16px] lg:hidden" />}
+      </header>
+
+      {/* On a phone: the wordmark, Search and the day across the top. */}
+      <div className="flex items-center gap-3 px-4 pb-1 pt-3 print:hidden lg:hidden">
+        <Link href={PATHS.home} aria-label="RENUABL, today">
+          <Wordmark className="text-[16px]" />
         </Link>
-        {/* The little arrow beside the wordmark, on the nav's edge: folds the sections down to icons, and opens them out. */}
-        {!tool && (
-          <button
-            onClick={() => fold(!folded)}
-            title={folded ? "Open out the sections" : "Fold the sections down to icons"}
-            aria-label={folded ? "Open out the sections" : "Fold the sections down to icons"}
-            aria-expanded={!folded}
-            className="absolute -right-3 top-[1.05rem] hidden size-6 items-center justify-center rounded-full bg-surface text-ink-2 shadow-[var(--shadow-soft)] ring-1 ring-line hover:text-ink hover:ring-ink-2 lg:flex"
-          >
-            {folded ? <ChevronRight className="size-3.5" aria-hidden /> : <ChevronLeft className="size-3.5" aria-hidden />}
-          </button>
-        )}
-        {NAV.map((n) =>
-          // A section with subsections is a heading over them: the subsection carries the mark of where you are.
-          n.under && !compact ? (
-            <div key={n.label} className="contents lg:block">
-              <Link
-                href={n.href}
-                className={clsx(
-                  "hidden h-10 shrink-0 items-center gap-3 rounded-md px-3 text-sm font-medium lg:flex",
-                  active(n.href, n.also) ? "text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+        <button
+          type="button"
+          onClick={() => setSearching(true)}
+          aria-label="Search"
+          className="ml-auto flex size-9 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line"
+        >
+          <Search className="size-4" aria-hidden />
+        </button>
+      </div>
+
+      {tool ? (
+        <div className="relative min-w-0">{children}</div>
+      ) : (
+        <div className="px-3 pb-20 pt-2 sm:px-6 lg:px-14">
+          <div data-tour="pad" className={PAD}>
+            {children}
+          </div>
+        </div>
+      )}
+
+      {/* On a phone: the places used most along the foot, and the rest in a sheet that comes up from More. */}
+      <nav
+        aria-label="Sections, on a phone"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden"
+      >
+        {PHONE_TABS.map((t) => {
+          const lit = !more && t.match(path);
+          const n = t.href === PATHS.messages ? unread : 0;
+          return (
+            <Link
+              key={t.label}
+              href={t.href}
+              onClick={() => setMore(false)}
+              aria-current={lit ? "page" : undefined}
+              className={clsx(
+                "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
+                lit ? "text-ink" : "text-muted",
+              )}
+            >
+              <span className={clsx("relative flex h-7 w-12 items-center justify-center rounded-full", lit && "bg-sun")}>
+                <t.icon className="size-[18px]" aria-hidden />
+                {n > 0 && (
+                  <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+                    {n}
+                  </span>
                 )}
-              >
-                <n.icon className="size-[18px] shrink-0" aria-hidden />
-                <span className="truncate">{n.label}</span>
-              </Link>
-              <div className="contents lg:ml-[1.3rem] lg:block lg:border-l lg:border-line lg:pl-2">
-                {n.under.map((u) => (
+              </span>
+              {t.label}
+            </Link>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => setMore(!more)}
+          aria-expanded={more}
+          className={clsx(
+            "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
+            more ? "text-ink" : "text-muted",
+          )}
+        >
+          <span className={clsx("flex h-7 w-12 items-center justify-center rounded-full", more && "bg-sun")}>
+            <Menu className="size-[18px]" aria-hidden />
+          </span>
+          More
+        </button>
+      </nav>
+      {more && (
+        <div className="fixed inset-0 z-30 lg:hidden" role="dialog" aria-label="Everything in RENUABL">
+          <button type="button" aria-label="Close" className="absolute inset-0 bg-ink/40" onClick={() => setMore(false)} />
+          <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-[2rem] bg-surface px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-3">
+            <span className="mx-auto block h-1 w-10 rounded-full bg-line" aria-hidden />
+            <button
+              type="button"
+              onClick={() => {
+                setMore(false);
+                setSearching(true);
+              }}
+              className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-xl border border-line px-3 text-base text-muted"
+            >
+              <Search className="size-5" aria-hidden /> Search customers and deals
+            </button>
+            {SECTIONS.map((sec) => (
+              <div key={sec.id}>
+                <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{sec.label}</p>
+                {sec.pages.map((p) => (
                   <Link
-                    key={u.label}
-                    href={u.href}
-                    aria-current={u === here(n.under!) ? "page" : undefined}
+                    key={p.id}
+                    href={p.href}
+                    onClick={() => setMore(false)}
                     className={clsx(
-                      "flex h-10 shrink-0 items-center gap-3 rounded-md px-3 text-sm font-medium lg:h-9 lg:gap-2.5 lg:text-[13px]",
-                      u === here(n.under!) ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+                      "flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium",
+                      here?.page.id === p.id ? "bg-ink text-white" : "text-ink",
                     )}
                   >
-                    <u.icon className="size-[18px] shrink-0 lg:size-4" aria-hidden />
-                    <span className="truncate">{u.label}</span>
+                    <span className="flex-1">{p.label}</span>
+                    {count(p.id) > 0 && (
+                      <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{count(p.id)}</span>
+                    )}
                   </Link>
                 ))}
               </div>
+            ))}
+            <div className="mt-4 border-t border-line pt-2">
+              {[
+                { label: "Notifications", href: PATHS.notifications, n: mentions },
+                { label: "Settings", href: PATHS.settings, n: 0 },
+                { label: "Your account", href: PATHS.account, n: 0 },
+              ].map((r) => (
+                <Link
+                  key={r.href}
+                  href={r.href}
+                  onClick={() => setMore(false)}
+                  className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium text-ink"
+                >
+                  <span className="flex-1">{r.label}</span>
+                  {r.n > 0 && <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{r.n}</span>}
+                </Link>
+              ))}
             </div>
-          ) : (
-            item(n.href, n.label, n.icon, n.also, n.main)
-          ),
-        )}
-        <span className="hidden flex-1 lg:block" aria-hidden />
-        {item(PATHS.settings, "Settings", SlidersHorizontal, [PATHS.account])}
-        {!compact && (
-          <div className="hidden px-3 pt-2 lg:block">
-            <p className="truncate text-[11px] text-muted">{account.email}</p>
-            <SignOut className="mt-1 text-[12px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink" />
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-line px-3 pt-4 text-sm text-muted">
+              <span className="truncate">{account.email}</span>
+              <SignOut className="font-medium text-ink-2" />
+            </div>
           </div>
-        )}
-      </nav>
-      <div className="relative min-w-0 flex-1">
-        {!tool && <NowWidget />}
-        {children}
-      </div>
+        </div>
+      )}
+      <PageSearch
+        open={searching}
+        onClose={() => setSearching(false)}
+        customer={(id) => `${PATHS.customers}/${id}`}
+        deal={(id) => `${PATHS.deals}/${id}`}
+      />
     </div>
   );
 }
 
-/**
- * The time, the date and the temperature, in the top right corner of every
- * main screen (never the design tool, where the roof has the room). The clock
- * is the market's own time whatever the device is set to. The temperature is
- * the market capital's for now, named beside it, and simply isn't shown when
- * it can't be had.
- */
-function NowWidget() {
-  const [now, setNow] = useState<Date | null>(null);
-  const [weather, setWeather] = useState<{ place: string; degrees: number | null } | null>(null);
-  useEffect(() => {
-    // The time is only known once the page is in the browser.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setNow(new Date());
-    const tick = window.setInterval(() => setNow(new Date()), 15_000);
-    let gone = false;
-    const read = () =>
-      void loadWeather().then((res) => {
-        if (!gone && res.ok) setWeather({ place: res.place, degrees: res.degrees });
-      });
-    read();
-    const again = window.setInterval(read, 900_000);
-    return () => {
-      gone = true;
-      window.clearInterval(tick);
-      window.clearInterval(again);
-    };
-  }, []);
-  if (!now) return null;
-  const zone = { timeZone: LAUNCH_MARKET.timeZone } as const;
-  const time = now.toLocaleTimeString("en-AU", { ...zone, hour: "numeric", minute: "2-digit" });
-  const date = now.toLocaleDateString("en-AU", { ...zone, weekday: "short", day: "numeric", month: "short" });
-  return (
-    <div className="flex justify-end px-5 pt-4 print:hidden lg:px-10" aria-label="Now">
-      <div className="inline-flex h-10 items-center gap-3 rounded-full bg-surface px-4 text-[13px] shadow-[var(--shadow-soft)] ring-1 ring-line">
-        {weather && weather.degrees !== null && (
-          <>
-            <span className="tabular-nums text-ink" title={`Temperature in ${weather.place} now`}>
-              {weather.degrees}°C <span className="text-muted">{weather.place}</span>
-            </span>
-            <span className="h-4 w-px bg-line" aria-hidden />
-          </>
-        )}
-        <time className="tabular-nums font-medium text-ink" dateTime={now.toISOString()}>
-          {time}
-        </time>
-        <span className="h-4 w-px bg-line" aria-hidden />
-        <span className="text-ink-2">{date}</span>
-      </div>
-    </div>
-  );
-}
-
-/** The heading every section's page opens with, and room for its main action. */
-export function PageHead({ eyebrow, title, children }: { eyebrow: string; title: string; children?: React.ReactNode }) {
+/** The heading every page opens with inside the pad (20px, as Primero's), and room for its main action. */
+export function PageHead({ title, children }: { eyebrow?: string; title: string; children?: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{eyebrow}</p>
-        <h1 className="mt-1 text-[22px] leading-tight tracking-tight text-ink">{title}</h1>
-      </div>
+      <h1 className="text-xl font-semibold leading-tight tracking-[-0.02em] text-ink">{title}</h1>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
   );
 }
 
-/** Shared looks for the sections' screens. */
+/** Shared looks for the sections' screens. A page sits inside the pad, which gives it its room. */
 export const ui = {
-  page: "mx-auto w-full max-w-6xl px-5 py-8 lg:px-10",
+  page: "mx-auto w-full max-w-6xl",
   card: "rounded-lg bg-surface shadow-[var(--shadow-soft)] ring-1 ring-line",
   primary:
     "inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted",
