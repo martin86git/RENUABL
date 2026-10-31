@@ -162,6 +162,18 @@ body {
   html.sol-docked body {
     padding-right: var(--sol-w);
   }
+  /* The rail and the team chat stay in reach beside the panel, not under it. */
+  html.sol-docked .sol-rail {
+    right: calc(var(--sol-w) + 1rem);
+  }
+  html.sol-docked .team-pop {
+    right: calc(var(--sol-w) + 5rem);
+    width: min(40rem, calc(100vw - var(--sol-w) - 7rem));
+  }
+}
+.sol-rail,
+.team-pop {
+  transition: right 300ms ease;
 }
 /* The top bar fits in less room (a narrow wide screen, or Sol's panel open) by putting the day and weather away. */
 @media (max-width: 1279px) {

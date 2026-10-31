@@ -12,6 +12,7 @@ import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
 import { SolDock, SolRail } from "./sol-dock";
+import { TeamChatButton } from "./team-chat";
 import { DayPill, GearMenu, MessagesMenu, NotificationsMenu, TopIcon } from "./shell-menus";
 
 /** Where everything in the product lives. */
@@ -27,6 +28,7 @@ export const PATHS = {
   service: "/design/service",
   notifications: "/design/notifications",
   sol: "/design/sol",
+  team: "/design/team",
   proposalsSent: "/design/sales/proposals",
   proposalsSigned: "/design/sales/signed",
   scheduler: "/design/procurement/scheduler",
@@ -332,6 +334,7 @@ function Shell({
             <div className="mt-4 border-t border-line pt-2">
               {[
                 { label: "Sol", href: PATHS.sol, n: 0 },
+                { label: "Team chat", href: PATHS.team, n: 0 },
                 { label: "Notifications", href: PATHS.notifications, n: mentions },
                 { label: "Settings", href: PATHS.settings, n: 0 },
                 { label: "Your account", href: PATHS.account, n: 0 },
@@ -361,7 +364,7 @@ function Shell({
         deal={(id) => `${PATHS.deals}/${id}`}
       />
       {/* Sol: the rail down the right (not over the design tool, which needs the room) and his panel. */}
-      {on && !tool && <SolRail />}
+      {on && !tool && <SolRail team={<TeamChatButton me={account.email} />} />}
       {on && <SolDock />}
     </div>
   );

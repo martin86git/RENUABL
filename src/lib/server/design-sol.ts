@@ -38,6 +38,8 @@ import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-r
 import { loadLists, type Member } from "./design-repo";
 import { casesToResolve } from "./design-service-repo";
 import { addSolTurns, newSolId, solState, withSol } from "./design-sol-repo";
+import { channelContext, solSaysInTeam } from "./design-team-repo";
+import { TEAM_CHANNELS, nameOf } from "@/lib/domain/design/team-chat";
 
 const MODEL = () => process.env.SOL_MODEL?.trim() || "claude-opus-5-5";
 const STEPS = 6;
@@ -410,4 +412,32 @@ export async function chooseReminderTime(member: Member, id: string, choice: Whe
     };
   });
   return found ? state : null;
+}
+
+/**
+ * Sol tagged in a team chat channel (as Primero's Lance): asked as the member who tagged him, so he sees only what they
+ * may see, with the channel's last lines for context; his answer is posted in the channel as Sol. The question and
+ * answer also land in that member's own conversation with him, where any email he writes waits as a card.
+ */
+export async function solAnswersInChannel(member: Member, room: string, asked: string, apiKey: string | null): Promise<void> {
+  const channel = TEAM_CHANNELS.find((c) => c.id === room);
+  if (!channel) return;
+  const before = (await channelContext(member.businessId, room)).filter((l) => l.text !== asked);
+  const context = before.map((l) => `${nameOf(l.by)}: ${l.text}`).join("\n");
+  const prompt =
+    `${nameOf(member.email)} tagged you in the team chat's ${channel.label} channel, which everyone in the business reads. ` +
+    `Answer them there, briefly, as a teammate would. Never put a customer's phone or email in the channel.\n\nTheir message: ${asked}` +
+    (context ? `\n\nThe channel's lines before it:\n${context}` : "");
+  let said: string;
+  try {
+    const state = await askSol(member, { text: prompt, files: [] }, apiKey);
+    const last = [...state.turns].reverse().find((t) => t.role === "sol");
+    said = last?.text?.trim() || "I couldn't answer that just now.";
+    if (last?.drafts?.length)
+      said += `\n\n(The email I wrote is in ${nameOf(member.email).split(" ")[0]}'s chat with me, to check and send.)`;
+  } catch (e) {
+    console.error("sol in the team chat failed", e instanceof Error ? e.message : e);
+    said = "I couldn't answer that just now. Try me again in a moment.";
+  }
+  await solSaysInTeam(member.businessId, room, said);
 }

@@ -517,6 +517,40 @@ create table if not exists design_sol (
   updated_at timestamptz not null default now(),
   primary key (business_id, email)
 );
+-- The team chat (domain/design/team-chat.ts): a business's members talking in its channels and in direct
+-- conversations, the files sent with lines, and when each member last had each room open. Gone with the business.
+create table if not exists design_team_lines (
+  business_id text not null references businesses(id) on delete cascade,
+  id text not null,
+  room text not null,
+  by_email text not null,
+  text text not null default '',
+  files jsonb not null default '[]',
+  deals jsonb not null default '[]',
+  reactions jsonb not null default '{}',
+  at timestamptz not null default now(),
+  edited_at timestamptz,
+  primary key (business_id, id)
+);
+create index if not exists design_team_lines_room on design_team_lines(business_id, room, at desc);
+create table if not exists design_team_files (
+  business_id text not null references businesses(id) on delete cascade,
+  id text not null,
+  name text not null,
+  type text not null,
+  size integer not null,
+  bytes bytea not null,
+  by_email text not null,
+  at timestamptz not null default now(),
+  primary key (business_id, id)
+);
+create table if not exists design_team_seen (
+  business_id text not null references businesses(id) on delete cascade,
+  email text not null,
+  room text not null,
+  seen_at timestamptz not null,
+  primary key (business_id, email, room)
+);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

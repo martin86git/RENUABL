@@ -156,7 +156,7 @@ export function SolRail({ team }: { team?: React.ReactNode }) {
   return (
     <aside
       aria-label="Sol and the team"
-      className="fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 flex-col items-center gap-1.5 rounded-full bg-surface p-1.5 shadow-[0_8px_30px_rgba(20,22,26,0.10)] ring-1 ring-line print:hidden lg:flex"
+      className="sol-rail fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 flex-col items-center gap-1.5 rounded-full bg-surface p-1.5 shadow-[0_8px_30px_rgba(20,22,26,0.10)] ring-1 ring-line print:hidden lg:flex"
     >
       {onSol ? (
         link("/design/sol", "Sol", SolIcon, true)
