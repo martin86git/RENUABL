@@ -38,11 +38,8 @@ import { NO_TARGETS, monthPace, monthRings, monthlyHistory, pipelineByStage, typ
 import { GoalLine, MonthCard, MonthBars, Tally, PipelineBar, SunArc } from "./gauges";
 import { newDealPanels } from "@/lib/domain/design/gauges";
 import { useDesignAccount } from "./design-account";
-import { CHAPTERS, CLOSE } from "@/lib/domain/design/landing";
-import { AfterSigningDemo, AutomationDemo, ConversationDemo, ThreeDesignsDemo } from "./designer-showcase";
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
-import { FrontHero, Reveal } from "./front-hero";
-import { SignInForm } from "./sign-in-form";
+import { SalesPage } from "./sales-page";
 import { CompletedInstallsView, UpcomingInstallsView } from "./install-lists";
 import { TodayPad } from "./today-pad";
 
@@ -97,48 +94,12 @@ export function DesignHome() {
   return <FrontPage unreachable={Boolean(account.unreachable)} />;
 }
 
+/**
+ * The page for a visitor who isn't signed in: the sign-up page that sells RENUABL (`SalesPage`; Martin, 1 Nov 2026).
+ * Signing in is in its top bar, and on /design/sign-in.
+ */
 function FrontPage({ unreachable }: { unreachable: boolean }) {
-  return (
-    <div className="theme-studio flex min-h-dvh flex-col bg-canvas">
-      <FrontHero
-        signInHref="#sign-in"
-        tryHref={PATHS.designer}
-        reveal={{ line: CHAPTERS[0].line, sub: CHAPTERS[0].sub, demo: <AutomationDemo /> }}
-      />
-
-      {/* A sentence a screen, each with the product doing it. */}
-      {CHAPTERS.filter((c) => c.live && c.key !== "prices").map((c, i) => (
-        <section key={c.key} className="px-5 py-24 lg:px-10 lg:py-36" aria-labelledby={`chapter-${c.key}`}>
-          <Reveal className="mx-auto w-full max-w-6xl">
-            <p className="text-center text-[12px] font-medium tabular-nums tracking-[0.3em] text-muted">0{i + 2}</p>
-            <h2
-              id={`chapter-${c.key}`}
-              className="mx-auto mt-5 max-w-4xl text-center text-[clamp(36px,6vw,76px)] font-light leading-[1.02] tracking-[-0.035em] text-ink"
-            >
-              {c.line}
-            </h2>
-            <p className="mx-auto mt-6 max-w-xl text-center text-[18px] leading-relaxed text-ink-2">{c.sub}</p>
-          </Reveal>
-          <Reveal className="mx-auto mt-16 w-full max-w-6xl">
-            {c.key === "three" ? <ThreeDesignsDemo /> : c.key === "proposal" ? <ConversationDemo /> : <AfterSigningDemo />}
-          </Reveal>
-        </section>
-      ))}
-
-      {/* The close, and the way in. */}
-      <section id="sign-in" className="px-5 py-28 lg:px-10 lg:py-40" aria-labelledby="close">
-        <Reveal className="mx-auto w-full max-w-3xl text-center">
-          <h2 id="close" className="text-[clamp(56px,10vw,120px)] font-light leading-[0.9] tracking-[-0.045em] text-ink">
-            {CLOSE.line}
-          </h2>
-          <p className="mt-6 text-[18px] text-ink-2">{CLOSE.sub}</p>
-          <div className={clsx(ui.card, "mx-auto mt-12 max-w-sm p-6 text-left sm:p-7")}>
-            <SignInForm next={PATHS.home} note={unreachable ? "We couldn't reach your account just now. Try again in a moment." : null} />
-          </div>
-        </Reveal>
-      </section>
-    </div>
-  );
+  return <SalesPage notice={unreachable ? "We couldn't reach your account just now. Try again in a moment." : null} />;
 }
 
 /** A change against an earlier period, as a small signed percentage: green up, red down, quiet when there is nothing to compare. */

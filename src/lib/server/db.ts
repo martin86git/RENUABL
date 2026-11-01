@@ -762,6 +762,47 @@ create table if not exists design_feedback_comments (
   by_email text not null,
   at timestamptz not null default now()
 );
+create table if not exists design_subscriptions (
+  id text primary key,
+  email text not null,
+  business_id text references businesses(id) on delete set null,
+  stripe_customer text,
+  stripe_subscription text unique,
+  checkout_session text unique,
+  status text not null,
+  billing_interval text not null,
+  seats integer not null,
+  trial_end timestamptz,
+  period_end timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists design_subscriptions_email on design_subscriptions(lower(email));
+create index if not exists design_subscriptions_business on design_subscriptions(business_id);
+create table if not exists design_tokens (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  change integer not null,
+  reason text not null,
+  stripe_session text unique,
+  project_id text,
+  by_email text,
+  at timestamptz not null default now()
+);
+create index if not exists design_tokens_business on design_tokens(business_id, at desc);
+create unique index if not exists design_tokens_one_trial on design_tokens(business_id) where reason = 'trial';
+create unique index if not exists design_tokens_one_job on design_tokens(business_id, project_id) where reason = 'job';
+create table if not exists design_leads (
+  id text primary key,
+  kind text not null,
+  email text not null,
+  name text,
+  business text,
+  mobile text,
+  users integer,
+  note text,
+  at timestamptz not null default now()
+);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

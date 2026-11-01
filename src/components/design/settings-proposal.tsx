@@ -27,6 +27,7 @@ import {
   saveBrand,
   uploadTerms,
 } from "@/lib/services/proposals";
+import { BillingPanel } from "./billing-page";
 import { ui } from "./design-shell";
 import { settingsPath } from "./settings-list";
 
@@ -917,26 +918,7 @@ export function BillingPage() {
         <p className={ui.eyebrow}>Settings</p>
         <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">Billing</h1>
       </div>
-      <section className={section}>
-        <dl className="space-y-3 text-sm">
-          <div className="flex justify-between gap-4 border-b border-line pb-3">
-            <dt className="text-ink-2">Plan</dt>
-            <dd className="text-ink">None: the product is in development</dd>
-          </div>
-          <div className="flex justify-between gap-4 border-b border-line pb-3">
-            <dt className="text-ink-2">What you pay</dt>
-            <dd className="text-ink">Nothing</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-ink-2">Payment method and invoices</dt>
-            <dd className="text-ink">None: we hold no card or bank details for billing you</dd>
-          </div>
-        </dl>
-        <p className="text-xs leading-relaxed text-muted">
-          There are no plans or prices yet, and you won&apos;t be charged without being told first and agreeing to it. When there is
-          something to pay for, it will be set out here.
-        </p>
-      </section>
+      <BillingPanel />
     </div>
   );
 }
