@@ -215,6 +215,40 @@ const SIDE_VIEWS: { id: SideView; label: string; hint: string }[] = [
 /** What the card says when the three designs were made by themselves as the roof opened. */
 const AUTO_DESIGNED = "Designed as the roof opened, from Google's roof data and your prices: check each against the photo before sending.";
 
+/** A key for each tool (2 Nov 2026, Martin: speed), as the shortcuts card lists them. */
+const TOOL_KEYS: Record<string, Tool> = {
+  v: "select",
+  p: "panel",
+  s: "string",
+  t: "trace",
+  e: "erase",
+  h: "pan",
+  g: "rule",
+  l: "label",
+  c: "comment",
+};
+const SHORTCUTS: [keys: string, does: string][] = [
+  ["V", "Select"],
+  ["P", "Add a panel (portrait, landscape or follow the roof)"],
+  ["S", "String panels"],
+  ["T", "Trace a roof face"],
+  ["E", "Erase"],
+  ["H", "Move the picture"],
+  ["G", "Guide line"],
+  ["L", "Add a label"],
+  ["C", "Comment"],
+  ["/", "Ask Sol to change it"],
+  ["Arrows", "Nudge what is picked 5 cm (Shift: 50 cm)"],
+  ["Ctrl A", "Pick every panel"],
+  ["Ctrl C · Ctrl V", "Copy and paste what is picked"],
+  ["Ctrl Z · Ctrl Y", "Undo and redo"],
+  ["Delete", "Take out what is picked"],
+  ["Q · D", "The Quote, or the Designer view"],
+  ["Ctrl + wheel", "Zoom"],
+  ["Esc", "Pick nothing, close what is open"],
+  ["?", "These shortcuts"],
+];
+
 const GLASS = "rounded-2xl border border-line bg-surface/90 shadow-lift backdrop-blur-md";
 
 /** A panel's outline before it is placed, with the edge it shares with the panel it clicks against. */
@@ -1827,6 +1861,27 @@ export function RoofDesigner(props: {
     }
   };
 
+  // Speed (2 Nov 2026, Martin: "it feels fast"): a key for each tool, the arrows nudge what is picked (5 cm, or 50 cm
+  // with Shift), Ctrl+A picks every panel, and ? shows them all.
+  const [keysOpen, setKeysOpen] = useState(false);
+  const nudge = (dx: number, dy: number) => {
+    if (!panelPicks.length) return;
+    const next = byHand(panelPicks);
+    setFaces(next.faces);
+    setStrings(next.strings);
+    setLoose(next.loose.map((p) => (next.ids.includes(p.id) ? { ...p, x: cm(p.x + dx), y: cm(p.y + dy) } : p)));
+    setPicks([...next.ids.map((id): Pick => ({ kind: "loose", id })), ...picks.filter((p) => p.kind === "label")]);
+    changed();
+  };
+  const pickEveryPanel = () =>
+    setPicks([
+      ...loose.map((p): Pick => ({ kind: "loose", id: p.id })),
+      ...faces.flatMap((fc) =>
+        panelPlaces(fc, size)
+          .filter((pl) => !fc.off.includes(pl.index))
+          .map((pl): Pick => ({ kind: "grid", face: fc.id, index: pl.index })),
+      ),
+    ]);
   // The keyboard: Delete or Backspace takes out whatever is picked, and Escape picks nothing. Not while typing in a box.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1860,10 +1915,36 @@ export function RoofDesigner(props: {
         if (!copied.current) return;
         e.preventDefault();
         paste();
+      } else if (command && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        pickTool("select");
+        pickEveryPanel();
+      } else if (e.key.startsWith("Arrow") && panelPicks.length && !command) {
+        e.preventDefault();
+        const step = e.shiftKey ? 0.5 : 0.05;
+        nudge(
+          e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0,
+          e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0,
+        );
+      } else if (!command && !e.altKey && TOOL_KEYS[e.key.toLowerCase()]) {
+        e.preventDefault();
+        const to = TOOL_KEYS[e.key.toLowerCase()];
+        if (to === "panel") {
+          pickTool("panel");
+          setFanOpen(true);
+        } else pickTool(to);
+      } else if (!command && e.key === "?") {
+        e.preventDefault();
+        setKeysOpen(!keysOpen);
+      } else if (!command && e.key.toLowerCase() === "q" && !costsHidden) {
+        showSide("quote");
+      } else if (!command && e.key.toLowerCase() === "d") {
+        showSide("designer");
       } else if ((e.key === "Delete" || e.key === "Backspace") && picks.length) {
         e.preventDefault();
         removePicked();
       } else if (e.key === "Escape") {
+        setKeysOpen(false);
         setPicks([]);
         setTracing([]);
         setThread(null);
@@ -3637,6 +3718,28 @@ export function RoofDesigner(props: {
                 } as React.CSSProperties
               }
             >
+              {keysOpen && (
+                <div
+                  className={clsx(GLASS, "absolute right-3 top-[4.5rem] z-50 w-80 p-3 text-[13px]")}
+                  role="dialog"
+                  aria-label="Keyboard shortcuts"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Keyboard shortcuts</p>
+                    <button type="button" onClick={() => setKeysOpen(false)} aria-label="Close" className="text-muted hover:text-ink">
+                      <X className="size-4" aria-hidden />
+                    </button>
+                  </div>
+                  <dl className="mt-2 space-y-1">
+                    {SHORTCUTS.map(([keys, does]) => (
+                      <div key={keys} className="flex items-baseline justify-between gap-3">
+                        <dt className="shrink-0 font-mono text-[11px] text-ink">{keys}</dt>
+                        <dd className="text-right text-ink-2">{does}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
               {commandOpen && (
                 <div className="absolute left-1/2 top-[4.5rem] z-50 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2">
                   <form
