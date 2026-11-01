@@ -44,9 +44,10 @@ import {
   type ProposalState,
   type ProposalStatus,
   type ProposalView,
+  type OptionKey,
 } from "@/lib/domain/design/proposal";
 import { cleanExtras, defaultBill, postcodeIn, type DesignExtras } from "@/lib/domain/design/quote";
-import { cleanDesignSet, type DesignGoal, type DesignSet } from "@/lib/domain/design/roof-design";
+import { cleanDesignSet, type DesignSet } from "@/lib/domain/design/roof-design";
 import type { ISODate } from "@/lib/domain/types";
 import { newId, query, transaction } from "./db";
 import { jobById, record, type Q } from "./design-crm-repo";
@@ -206,7 +207,7 @@ interface VersionRow {
   acceptedAt: string | null;
   acceptedName: string | null;
   /** The system chosen, when the proposal offered a choice. */
-  acceptedOption: DesignGoal | null;
+  acceptedOption: OptionKey | null;
   token: string;
   withdrawn: boolean;
   depositRef: string | null;
@@ -223,7 +224,7 @@ const VERSION = `v.version, v.view, ${moment("v.published_at")} as "publishedAt"
 
 /** An accepted version as it was agreed: the system the customer chose in place of the recommended one. */
 const asAgreed = <T extends { view: ProposalView; acceptedOption?: string | null }>(row: T): T =>
-  row.acceptedOption ? { ...row, view: viewForChoice(row.view, row.acceptedOption as DesignGoal) } : row;
+  row.acceptedOption ? { ...row, view: viewForChoice(row.view, row.acceptedOption as OptionKey) } : row;
 
 /** What is kept about a version's deposit, as the domain reads it. */
 const depositRecord = (row: VersionRow): DepositRecord => ({
@@ -367,7 +368,7 @@ export interface PublicProposal {
   /** Who to contact, always: the business's name and how to reach it, as it was when the proposal was sent. */
   business: Pick<ProposalView["business"], "name" | "phone" | "email" | "website">;
   /** Who went ahead, when, and on which system when there was a choice. */
-  accepted: { name: string; at: string; option?: DesignGoal | null } | null;
+  accepted: { name: string; at: string; option?: OptionKey | null } | null;
   /** The deposit, once the proposal is accepted and it asks for one: the amount, the reference to pay with, where it stands. */
   deposit: PublicDeposit | null;
 }
@@ -532,7 +533,7 @@ export async function acceptProposal(
     if (state !== "live") return state;
     // An indicative proposal is for the customer's thoughts: the final one, after the site visit, is the one accepted.
     if (found.view.indicative) return "indicative";
-    const chosen = found.view.options?.some((o) => o.goal === option) ? (option as DesignGoal) : recommendedGoal(found.view);
+    const chosen = found.view.options?.some((o) => o.goal === option) ? (option as OptionKey) : recommendedGoal(found.view);
     // From here on it is the proposal as agreed: the chosen system's price, and so its deposit.
     const row = { ...found, view: viewForChoice(found.view, chosen) };
     await q(

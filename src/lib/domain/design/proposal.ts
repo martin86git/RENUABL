@@ -201,9 +201,15 @@ export interface ProposalView {
   options?: ProposalOption[];
 }
 
+/**
+ * Which option a customer picks: a "Design it for me" goal, or one of the roof's designs by its place (`design-2`) when
+ * the business offered designs by hand. Kept as `accepted_option`.
+ */
+export type OptionKey = DesignGoal | `design-${number}`;
+
 /** One system a customer can choose, with everything that differs between them. Estimates throughout, as the rest. */
 export interface ProposalOption {
-  goal: DesignGoal;
+  goal: OptionKey;
   name: string;
   promise: string;
   recommended: boolean;
@@ -230,7 +236,7 @@ export interface ProposalInternal {
   /** Which of the roof's designs it is. */
   design: number;
   /** Each option's own side, when the customer chooses between options (`internalForChoice`). */
-  options?: { goal: DesignGoal; design: number; cost: number; margin: number; priceExGst: number; lines: ProposalInternal["lines"] }[];
+  options?: { goal: OptionKey; design: number; cost: number; margin: number; priceExGst: number; lines: ProposalInternal["lines"] }[];
 }
 
 /** What each goal is called on a proposal, and what it promises, in the customer's words. Never a figure. */
@@ -247,7 +253,7 @@ export const GOAL_WORDS: Record<DesignGoal, { name: string; promise: string }> =
  * The proposal as the customer sees it with one option chosen: that option's system, roof, price, estimates and
  * deposit in place of the recommended one's. Unchanged without options, or for a goal it doesn't offer.
  */
-export function viewForChoice(view: ProposalView, goal: DesignGoal | null | undefined): ProposalView {
+export function viewForChoice(view: ProposalView, goal: OptionKey | null | undefined): ProposalView {
   const o = view.options?.find((x) => x.goal === goal);
   if (!o) return view;
   return {
@@ -263,14 +269,53 @@ export function viewForChoice(view: ProposalView, goal: DesignGoal | null | unde
 }
 
 /** The business's side of the option chosen: its lines for the order and the installation allowance. */
-export function internalForChoice(internal: ProposalInternal, goal: DesignGoal | null | undefined): ProposalInternal {
+export function internalForChoice(internal: ProposalInternal, goal: OptionKey | null | undefined): ProposalInternal {
   const o = internal.options?.find((x) => x.goal === goal);
   return o ? { ...internal, cost: o.cost, margin: o.margin, priceExGst: o.priceExGst, lines: o.lines, design: o.design } : internal;
 }
 
 /** The option a customer would be choosing by default: the recommended one. */
-export const recommendedGoal = (view: Pick<ProposalView, "options">): DesignGoal | null =>
+export const recommendedGoal = (view: Pick<ProposalView, "options">): OptionKey | null =>
   view.options?.find((o) => o.recommended)?.goal ?? view.options?.[0]?.goal ?? null;
+
+/** The most options a customer is offered on one link (1 Nov 2026, as Primero's): the primary and up to four more. */
+export const MAX_PROPOSAL_OPTIONS = 5;
+
+/**
+ * The roof's designs that go to the customer as options, in order. When the business has offered designs by hand
+ * (`RoofDesign.offer`), the primary first and then those, up to `MAX_PROPOSAL_OPTIONS`, each called by its goal or
+ * "Option N" (never the designer's own label, which is theirs); otherwise the goal designs from "Design it for me",
+ * when there are two or more. None with fewer than two.
+ */
+export function offeredDesigns(
+  set: Pick<DesignSet, "designs" | "primary">,
+): { goal: OptionKey; at: number; name: string; promise: string }[] {
+  if (set.designs.some((d, i) => d.offer && i !== set.primary)) {
+    const picked = [set.primary, ...set.designs.flatMap((d, i) => (d.offer && i !== set.primary ? [i] : []))].slice(
+      0,
+      MAX_PROPOSAL_OPTIONS,
+    );
+    return picked.map((at, n) => {
+      const goal = set.designs[at].goal;
+      return {
+        goal: `design-${at}` as OptionKey,
+        at,
+        name: goal ? GOAL_WORDS[goal].name : `Option ${n + 1}`,
+        promise: goal ? GOAL_WORDS[goal].promise : "",
+      };
+    });
+  }
+  const goals = DESIGN_GOALS.flatMap((goal) => {
+    const at = set.designs.findIndex((d) => d.goal === goal);
+    return at >= 0 ? [{ goal: goal as OptionKey, at, name: GOAL_WORDS[goal].name, promise: GOAL_WORDS[goal].promise }] : [];
+  });
+  return goals.length >= 2 ? goals : [];
+}
+
+/** The offered design marked recommended, else the primary. */
+export function recommendedAt(set: Pick<DesignSet, "designs" | "primary">, offered: readonly { at: number }[]): number {
+  return offered.find((o) => set.designs[o.at].recommended)?.at ?? set.primary;
+}
 
 /**
  * Words that belong to the business's side of a quote. A test builds a
@@ -521,18 +566,16 @@ export function buildProposal(input: ProposalInputs): Built {
   const summary = designSummary(design, YIELD_PER_KW_DAY);
   const batteryKwh = batteryKwhOf(design);
 
-  // The roof's goal designs (Quickest payback, Maximum return, Maximum independence), when there are two or more:
-  // each becomes an option the customer chooses between. Every one is priced in full, or nothing is sent.
-  const goalDesigns = DESIGN_GOALS.flatMap((goal) => {
-    const at = project.set.designs.findIndex((d) => d.goal === goal);
-    return at >= 0 ? [{ goal, at }] : [];
-  });
-  const worked = goalDesigns.length >= 2 ? goalDesigns.map((g) => ({ ...g, out: workOut(input, g.at) })) : [];
+  // The options the customer chooses between (`offeredDesigns`): the designs offered by hand, else the goal designs.
+  // Every one is priced in full, or nothing is sent.
+  const offered = offeredDesigns(project.set);
+  const recommended = recommendedAt(project.set, offered);
+  const worked = offered.map((g) => ({ ...g, out: workOut(input, g.at) }));
   const failing = worked.filter((w) => !w.out.ok);
   if (failing.length)
     return {
       ok: false,
-      problems: failing.flatMap((w) => (w.out.ok ? [] : w.out.problems.map((p) => `${GOAL_WORDS[w.goal].name}: ${p}`))),
+      problems: failing.flatMap((w) => (w.out.ok ? [] : w.out.problems.map((p) => `${w.name}: ${p}`))),
     };
 
   const image = (kind: BrandImage["kind"]) => input.images.find((i) => i.kind === kind) ?? null;
@@ -635,15 +678,15 @@ export function buildProposal(input: ProposalInputs): Built {
       })),
     ...(worked.length
       ? {
-          options: worked.map(({ goal, at, out }) => {
+          options: worked.map(({ goal, at, out, name, promise }) => {
             if (!out.ok) throw new Error("unreachable");
             const d = project.set.designs[at];
             const quoteForm = project.extras.quotes[at].form;
             return {
               goal,
-              name: GOAL_WORDS[goal].name,
-              promise: GOAL_WORDS[goal].promise,
-              recommended: at === index,
+              name,
+              promise,
+              recommended: at === recommended,
               backup: Boolean(d.battery?.backup),
               system: {
                 panels: out.spec.panels,

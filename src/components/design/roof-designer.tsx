@@ -38,6 +38,7 @@ import {
   SunMedium,
   LayoutGrid,
   Send,
+  ThumbsUp,
   Trash2,
   X,
   ChevronDown,
@@ -72,6 +73,7 @@ import { suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
 import { billWith, usageFromAmount } from "@/lib/domain/design/design-bill";
+import { MAX_PROPOSAL_OPTIONS } from "@/lib/domain/design/proposal";
 import {
   DESIGN_GOALS,
   FACINGS,
@@ -1103,7 +1105,32 @@ export function RoofDesigner(props: {
     ...(msb ? { switchboard: msb } : {}),
     ...(battery ? { battery } : {}),
     ...(designLabel.trim() ? { label: designLabel.trim().slice(0, 40) } : {}),
+    // What the open design is for, kept as it is worked on: its goal, and whether it is offered or recommended.
+    ...(designs[active]?.goal ? { goal: designs[active].goal } : {}),
+    ...(designs[active]?.offer ? { offer: true as const } : {}),
+    ...(designs[active]?.recommended ? { recommended: true as const } : {}),
   });
+  /**
+   * Offered to the customer beside the primary, or not; and the one recommended among those offered (one at most).
+   * As Primero's (1 Nov 2026): the next proposal published carries them as options, up to five with the primary.
+   */
+  const flagDesign = (index: number, flag: "offer" | "recommended") => {
+    const list = everyDesign();
+    const on = !list[index][flag];
+    const offered = list.filter((d, i) => d.offer && i !== primary).length;
+    if (flag === "offer" && on && offered >= MAX_PROPOSAL_OPTIONS - 1) return;
+    setDesigns(
+      list.map((d, i) => {
+        const next = { ...d };
+        if (i === index) {
+          if (on) next[flag] = true;
+          else delete next[flag];
+        } else if (flag === "recommended" && on) delete next.recommended; // one recommended at most
+        return next;
+      }),
+    );
+    setSaved("changed");
+  };
   /** Every design, with the one being worked on as it stands now. */
   const everyDesign = () => designs.map((d, i) => (i === active ? working() : d));
   /** Puts a list of designs in place and opens one of them. Undo starts afresh: it doesn't reach across designs. */
@@ -2740,6 +2767,37 @@ export function RoofDesigner(props: {
                           >
                             <Star className={clsx("size-4", i === primary ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
                           </button>
+                          {designs.length > 1 && i !== primary && (
+                            <button
+                              onClick={() => flagDesign(i, "offer")}
+                              title={
+                                d.offer
+                                  ? "Offered to the customer as an option: press to stop"
+                                  : "Offer it to the customer as an option, beside the primary"
+                              }
+                              aria-pressed={Boolean(d.offer)}
+                              className={clsx(
+                                "h-8 rounded-full px-2.5 text-[11px] font-semibold",
+                                d.offer ? "bg-primary text-primary-ink" : "text-muted ring-1 ring-line hover:text-ink",
+                              )}
+                            >
+                              {d.offer ? "Offered" : "Offer"}
+                            </button>
+                          )}
+                          {designs.length > 1 && (d.offer || i === primary) && everyDesign().some((x, j) => x.offer && j !== primary) && (
+                            <button
+                              onClick={() => flagDesign(i, "recommended")}
+                              title={d.recommended ? "Recommended to the customer: press to stop" : "Recommend this one to the customer"}
+                              aria-label={d.recommended ? `Design ${i + 1} is recommended` : `Recommend design ${i + 1}`}
+                              aria-pressed={Boolean(d.recommended)}
+                              className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
+                            >
+                              <ThumbsUp
+                                className={clsx("size-4", d.recommended ? "fill-sun-line text-sun-line" : "text-muted")}
+                                aria-hidden
+                              />
+                            </button>
+                          )}
                           {designs.length > 1 && (
                             <button
                               onClick={() => setDoomed(doomed === i ? null : i)}
@@ -2787,7 +2845,10 @@ export function RoofDesigner(props: {
                     {designs.length} of {MAX_DESIGNS}
                   </span>
                 </div>
-                <p className="text-xs text-muted">The starred design is the primary: the one this roof opens on.</p>
+                <p className="text-xs text-muted">
+                  The starred design is the primary: the one this roof opens on. Offer up to {MAX_PROPOSAL_OPTIONS - 1} more to the customer
+                  as options on the next proposal published, and mark the one you recommend.
+                </p>
               </div>
             )}
           </div>

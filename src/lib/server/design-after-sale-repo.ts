@@ -44,7 +44,7 @@ import {
   type ProposalState,
   type ProposalView,
 } from "@/lib/domain/design/proposal";
-import type { DesignGoal } from "@/lib/domain/design/roof-design";
+import type { OptionKey } from "@/lib/domain/design/proposal";
 import type { CostLine } from "@/lib/domain/design/quote";
 import { readiness, type Check } from "@/lib/domain/design/schedule";
 import type { ISODate } from "@/lib/domain/types";
@@ -121,7 +121,7 @@ export async function listProposals(businessId: string, today: ISODate): Promise
     address: string;
     version: number;
     view: ProposalView;
-    option: DesignGoal | null;
+    option: OptionKey | null;
     token: string;
     withdrawn: boolean;
     publishedAt: string;
@@ -209,7 +209,7 @@ async function signedVersion(businessId: string, jobId: string): Promise<Signed 
     acceptedAt: string;
     version: number;
     received: boolean;
-    option: DesignGoal | null;
+    option: OptionKey | null;
   }>(
     `select v.internal, v.view, ${moment("v.accepted_at")} as "acceptedAt", v.version, v.deposit_received_at is not null as received,
             v.accepted_option as option
@@ -635,7 +635,7 @@ export async function bookedJobs(businessId: string, from: ISODate, to: ISODate)
     kw: number | null;
     order: OrderStatus | null;
     view: ProposalView | null;
-    option: DesignGoal | null;
+    option: OptionKey | null;
     received: boolean | null;
   }>(
     `select j.id as "jobId", c.name as customer, j.address, j.title, ${day("j.install_date")} as date, j.stage, j.kw::float8 as kw,
@@ -737,7 +737,7 @@ export interface InstallExtra {
 
 /** For each signed job: its battery, what is payable, the deposit received and whether its parts are ordered. */
 export async function installExtras(businessId: string): Promise<InstallExtra[]> {
-  const rows = await query<{ jobId: string; view: ProposalView; option: DesignGoal | null; received: boolean; status: string | null }>(
+  const rows = await query<{ jobId: string; view: ProposalView; option: OptionKey | null; received: boolean; status: string | null }>(
     `select distinct on (p.job_id) p.job_id as "jobId", v.view, v.accepted_option as option,
             v.deposit_received_at is not null as received, o.status
        from design_proposals p

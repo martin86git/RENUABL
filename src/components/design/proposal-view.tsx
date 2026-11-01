@@ -27,7 +27,7 @@ import {
   type ProposalState,
   type ProposalView,
 } from "@/lib/domain/design/proposal";
-import type { DesignGoal } from "@/lib/domain/design/roof-design";
+import type { OptionKey } from "@/lib/domain/design/proposal";
 import { money } from "@/lib/domain/design/deposit";
 import { ROOF_IMAGE, metresPerPixel } from "@/lib/domain/design/roof-design";
 
@@ -320,11 +320,11 @@ function Thoughts({
 }: {
   view: ProposalView;
   actions?: ProposalActions;
-  chosen: DesignGoal | null;
+  chosen: OptionKey | null;
   onOpenChat?: () => void;
 }) {
   const options = view.options && view.options.length > 1 ? view.options : [];
-  const [pick, setPick] = useState<DesignGoal | null>(null);
+  const [pick, setPick] = useState<OptionKey | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -447,7 +447,7 @@ export interface ProposalPageProps {
    * With options: which one the page shows, and how the customer changes it (left out once the choice is made, by
    * going ahead, and in the business's preview, where the cards still show the choice).
    */
-  choice?: { chosen: DesignGoal | null; onChoose?: (goal: DesignGoal) => void };
+  choice?: { chosen: OptionKey | null; onChoose?: (goal: OptionKey) => void };
   /** Opens the chat dock: the thank you after an indicative proposal's thoughts are sent offers it. */
   onOpenChat?: () => void;
 }
@@ -930,7 +930,10 @@ function ChooseSystem({ view, choice, locked }: { view: ProposalView; choice?: P
       </h2>
       <p className={clsx(fine, "mt-1")}>Each is priced in full. Savings and payback are estimates from your bill.</p>
       <div
-        className={clsx("mt-5 grid gap-3", options.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}
+        className={clsx(
+          "mt-5 grid gap-3",
+          options.length === 2 || options.length === 4 ? "sm:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3",
+        )}
         role="radiogroup"
         aria-label="Systems"
       >
@@ -966,6 +969,16 @@ function ChooseSystem({ view, choice, locked }: { view: ProposalView; choice?: P
               <span className="mt-4 text-[13.5px] text-ink">
                 {o.system.kw.toFixed(2)} kW solar{o.system.batteryKwh > 0 ? ` · ${o.system.batteryKwh} kWh battery` : ""}
               </span>
+              {/* What is in it, a line each (as Primero's: comparing options page by page was slow). */}
+              {o.system.details.length > 0 && (
+                <span className="mt-2 block space-y-0.5 text-[12.5px] text-muted">
+                  {o.system.details.slice(0, 4).map((x) => (
+                    <span key={x.label} className="block">
+                      {x.label}: <span className="text-ink">{x.value}</span>
+                    </span>
+                  ))}
+                </span>
+              )}
               <span className="mt-3 text-[24px] font-semibold tabular-nums tracking-tight text-ink">{dollars(o.price.youPay)}</span>
               <span className={fine}>You pay, after the federal rebate</span>
               {o.bill && (

@@ -154,6 +154,10 @@ export interface RoofDesign {
   label?: string;
   /** What "Design it for me" made it for (`self-design.ts`): kept even when the label is changed. */
   goal?: DesignGoal;
+  /** The design the business recommends among those offered (1 Nov 2026, as Primero's): marked "Recommended" for the customer. One at most. */
+  recommended?: true;
+  /** Offered to the customer as an option beside the primary on the next proposal published (as Primero's), up to five in all. */
+  offer?: true;
   /** Guide lines drawn along roof edges, to line panels up with and measure from. Never shown to the customer. */
   guides?: GuideLine[];
   /** Where the main switchboard (MSB) is, marked on the drawing like the inverter and battery (Martin). */
@@ -539,6 +543,8 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
     battery?: unknown;
     label?: unknown;
     goal?: unknown;
+    recommended?: unknown;
+    offer?: unknown;
   };
   const battery = cleanBattery(r.battery);
   const panel = cleanPanel(r.panel);
@@ -720,6 +726,8 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
     ...(battery ? { battery } : {}),
     ...(label ? { label } : {}),
     ...(DESIGN_GOALS.includes(r.goal as DesignGoal) ? { goal: r.goal as DesignGoal } : {}),
+    ...(r.recommended === true ? { recommended: true as const } : {}),
+    ...(r.offer === true ? { offer: true as const } : {}),
   };
 }
 
@@ -804,14 +812,14 @@ function cleanPanel(raw: unknown): PanelSpec | undefined {
 }
 
 /**
- * A roof's designs: up to five, with one marked primary. They are options for the same roof: each has its own
+ * A roof's designs: up to ten (five until 1 Nov 2026), with one marked primary. They are options for the same roof: each has its own
  * faces, panels, strings, labels and choice of panel. The discussion is pinned to the roof, not to a design,
  * so it shows on all of them.
  *
  * Packed (`packDesignSet`), the primary is written the way a single design is (so `parseDesign` reads it) and
  * the others beside it in `others`, `slot` being the primary's place in the order.
  */
-export const MAX_DESIGNS = 5;
+export const MAX_DESIGNS = 10;
 
 export interface DesignSet {
   designs: RoofDesign[];

@@ -11,7 +11,7 @@
  * The business decides: he answers only while its `solAnswers` setting is on, and stays quiet in a conversation for
  * `QUIET_HOURS` after someone from the team has written in it (the team has taken it over).
  */
-import { GOAL_WORDS, INDICATIVE_STEPS, PRODUCTION_NOTE, SAVING_NOTE, STC_NOTE, type ProposalView } from "./proposal";
+import { INDICATIVE_STEPS, PRODUCTION_NOTE, SAVING_NOTE, STC_NOTE, type ProposalView } from "./proposal";
 import { MAX_LINE, SOL_BY, type ChatLine } from "./chat";
 
 /** How the customer is shown who Sol is, over each of his answers. */
@@ -80,7 +80,7 @@ export function customerFacts(view: ProposalView): string {
     out.push("Systems on offer, each priced in full (you pay = after the federal rebate, GST included):");
     for (const o of view.options)
       out.push(
-        `- ${o.name}${o.recommended ? " (recommended)" : ""}: ${GOAL_WORDS[o.goal].promise} ${system(o.system)}${o.backup ? ", with blackout backup for chosen circuits" : ""}. ` +
+        `- ${o.name}${o.recommended ? " (recommended)" : ""}: ${o.promise} ${system(o.system)}${o.backup ? ", with blackout backup for chosen circuits" : ""}. ` +
           `Price ${dollars(o.price.incGst)}, less about ${dollars(o.price.stc)} federal rebate, you pay ${dollars(o.price.youPay)}.` +
           (o.bill ? ` Estimated saving about ${dollars(o.bill.saving)} a year.` : "") +
           (o.paybackYears !== null ? ` Estimated payback about ${o.paybackYears} years.` : "") +

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PublicDeposit } from "@/lib/domain/design/deposit";
 import { recommendedGoal, viewForChoice, type ProposalState, type ProposalView } from "@/lib/domain/design/proposal";
-import type { DesignGoal } from "@/lib/domain/design/roof-design";
+import type { OptionKey } from "@/lib/domain/design/proposal";
 import { acceptProposal, proposalUrls, sayPaid, tellOpened } from "@/lib/services/proposals";
 import { ChatDock, ChatGreeting, useCustomerChat } from "./chat-panel";
 import { PayDeposit } from "./deposit-panel";
@@ -21,7 +21,7 @@ export function CustomerProposal(props: {
   token: string;
   view: ProposalView;
   state: ProposalState;
-  accepted: { name: string; at: string; option?: DesignGoal | null } | null;
+  accepted: { name: string; at: string; option?: OptionKey | null } | null;
   deposit: PublicDeposit | null;
 }) {
   const { token, view } = props;
@@ -32,7 +32,7 @@ export function CustomerProposal(props: {
   useEffect(() => tellOpened(token), [token]);
   const chat = useCustomerChat({ token, business: view.business.name, phone: view.business.phone });
   // With a choice of systems: the one shown (the one chosen once they have gone ahead, else the recommended one to start).
-  const [chosen, setChosen] = useState<DesignGoal | null>(props.accepted?.option ?? recommendedGoal(view));
+  const [chosen, setChosen] = useState<OptionKey | null>(props.accepted?.option ?? recommendedGoal(view));
   const shown = viewForChoice(view, chosen);
 
   return (
