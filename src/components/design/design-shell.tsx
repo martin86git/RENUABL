@@ -1,5 +1,6 @@
 "use client";
 
+import { stopViewing } from "@/lib/services/design-account";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -158,6 +159,24 @@ function Shell({
 
   return (
     <div className="theme-studio studio-frame min-h-dvh pb-24 lg:pb-0">
+      {/* The owner viewing as someone else: whose view it is, that nothing can be changed, and the way back. */}
+      {account.viewedBy && (
+        <div className="sticky top-0 z-[45] flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-sun-line px-4 py-2 text-center text-sm text-white print:hidden">
+          <span>
+            Viewing as <strong className="font-semibold">{account.email}</strong>. Read only: nothing can be changed.
+          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              await stopViewing();
+              window.location.replace(PATHS.account);
+            }}
+            className="rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-ink"
+          >
+            Back to my own view
+          </button>
+        </div>
+      )}
       {/* Across the top on a wide screen: logo and Search, the sections, and the card of icons. */}
       <header className={clsx("z-[35] hidden bg-canvas/90 backdrop-blur print:hidden lg:block lg:px-14", !tool && "sticky top-0")}>
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-4 px-2 pt-4">

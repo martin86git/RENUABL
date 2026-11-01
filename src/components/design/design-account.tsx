@@ -17,6 +17,7 @@ import {
   removeMember,
   setMemberPermissions,
   setMemberRole,
+  viewAs,
   renameBusiness,
   setUpBusiness,
   type DesignAccount,
@@ -498,6 +499,20 @@ export function DesignAccountPage() {
                     </div>
                   )}
                 </div>
+                {owner && m.role !== "owner" && m.joined && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const problem = await viewAs(m.email);
+                      if (problem) setNote({ text: problem, error: true });
+                      else window.location.replace("/design");
+                    }}
+                    className="inline-flex h-9 items-center rounded-md border border-line px-3 text-xs font-medium text-ink hover:border-forest"
+                    title="Open RENUABL as they see it, read only"
+                  >
+                    View as
+                  </button>
+                )}
                 {owner && m.role !== "owner" && (
                   <button
                     onClick={() => void remove(m.email)}

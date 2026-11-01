@@ -229,3 +229,10 @@ export const updatesOpened = () => ask<{ unseen: number }>("/api/design/updates"
 type FeedbackAnswer = { items: import("@/lib/domain/design/feedback").FeedbackItem[]; owner: boolean };
 export const loadFeedback = () => ask<FeedbackAnswer>("/api/design/feedback");
 export const feedbackAction = (body: Record<string, unknown>) => ask<FeedbackAnswer>("/api/design/feedback", { method: "POST", body });
+
+/** The call note-taker (wave 7): what was heard of a call on a deal, written up by Claude; nothing heard is kept. */
+export const writeUpCall = (jobId: string, lines: import("@/lib/domain/design/call-notes").HeardLine[]) =>
+  ask<{ notes: import("@/lib/domain/design/call-notes").CallNotes; text: string }>(
+    `/api/design/jobs/${encodeURIComponent(jobId)}/call-notes`,
+    { method: "POST", body: { lines } },
+  );

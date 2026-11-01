@@ -23,6 +23,8 @@ export type DesignAccount =
       business: DesignBusiness | null;
       /** What this person may do, as the server enforces it. The screens use it only to show or hide. */
       may?: { costs: boolean; prices: boolean; publish: boolean; members: boolean } | null;
+      /** The owner viewing the product as this member (read only): the owner's email. */
+      viewedBy?: string;
     };
 
 /**
@@ -167,3 +169,12 @@ export async function savePassword(password: string): Promise<string | null> {
 
 /** Where "Continue with Google" goes. */
 export const GOOGLE_SIGN_IN = "/api/auth/google";
+
+/** View as (wave 7): the owner opens the product as another member sees it, read only; and goes back. */
+export async function viewAs(email: string): Promise<string | null> {
+  const res = await send<Answer>("/api/design/view-as", "POST", { email });
+  return res.ok ? null : (res.message ?? UNREACHABLE);
+}
+export async function stopViewing(): Promise<void> {
+  await fetch("/api/design/view-as", { method: "DELETE" }).catch(() => undefined);
+}

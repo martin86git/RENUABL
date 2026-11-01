@@ -25,6 +25,8 @@ export async function GET() {
         members: can(member.role, "members", member.permissions),
       },
       termsVersion: BUSINESS_TERMS_VERSION,
+      // The owner viewing as this member: whose own view it really is.
+      ...(member?.viewedBy ? { viewedBy: member.viewedBy } : {}),
     });
   });
 }

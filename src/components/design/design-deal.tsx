@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronLeft, ClipboardList, PanelLeftClose, PanelLeftOpen, PenTool, Search, Trash2, Wrench } from "lucide-react";
 import { JobCardDialog } from "./job-card";
+import { CallNotetaker } from "./call-notetaker";
 import clsx from "clsx";
 import {
   JOB_STAGES,
@@ -387,6 +388,9 @@ export function DealPage({ id }: { id: string }) {
           </div>
           {pulse && hasPulse(job.stage) && <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />}
           <ContactActions customer={customer} onEmail={() => setTab("email")} />
+          <div className="mt-2">
+            <CallNotetaker jobId={job.id} customerId={customer.id} onAdded={() => void load()} />
+          </div>
           {job.lat !== null ? (
             <button type="button" onClick={() => setDrawer(true)} className={clsx(ui.primary, "mt-4 w-full")}>
               <PenTool className="size-4" aria-hidden /> {job.projectId ? "Open design" : "Design this roof"}

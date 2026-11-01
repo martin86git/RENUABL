@@ -6,6 +6,8 @@
  * It is also the one place a member's role is checked (`can`).
  */
 import { BUSINESS_TERMS_VERSION, can, refusal, seesAllDeals, type DealViewer, type MemberAction } from "@/lib/domain/design/account";
+import { cookies } from "next/headers";
+import { VIEW_AS_COOKIE, mayViewAs } from "@/lib/domain/design/view-as";
 import { currentSession } from "./accounts";
 import { dbConfigured } from "./db";
 import { memberByEmail, type Member } from "./design-repo";
@@ -25,6 +27,13 @@ export async function designAccess(): Promise<DesignAccess> {
   const member = await memberByEmail(session.email);
   if (!member) return { state: "no-business", email: session.email };
   if (member.termsVersion !== BUSINESS_TERMS_VERSION) return { state: "needs-terms", email: session.email, member };
+  // The owner viewing as another member of their business (read only: the proxy refuses changes while it is set).
+  const viewing = (await cookies()).get(VIEW_AS_COOKIE)?.value;
+  if (viewing && member.role === "owner") {
+    const other = await memberByEmail(viewing);
+    if (other && mayViewAs(member, other) && other.termsVersion === BUSINESS_TERMS_VERSION)
+      return { state: "ready", email: other.email, member: { ...other, viewedBy: member.email } };
+  }
   return { state: "ready", email: session.email, member };
 }
 

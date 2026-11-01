@@ -39,6 +39,8 @@ export interface Member {
   termsVersion: string | null;
   /** What the owner lets this person do (`can`). The owner's own are never looked at. */
   permissions: MemberPermissions;
+  /** Set while the owner is viewing the product as this member (read only): the owner's email. */
+  viewedBy?: string;
 }
 
 /** The business this email belongs to, if any. An email is in one business at most. */
