@@ -53,6 +53,8 @@ import type { CatalogueBattery, CatalogueInverter, CataloguePanel } from "@/lib/
 import type { Workspace } from "@/lib/domain/design/pricing";
 import {
   costSystem,
+  editedLines,
+  solarVicBar,
   defaultQuote,
   undecidedLines,
   DAY,
@@ -75,6 +77,7 @@ import { suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
 import { billWith, usageFromAmount } from "@/lib/domain/design/design-bill";
+import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
 import { MAX_PROPOSAL_OPTIONS } from "@/lib/domain/design/proposal";
 import {
   DESIGN_GOALS,
@@ -93,6 +96,7 @@ import {
   freed,
   inverterSpot,
   inside,
+  clearOf,
   flushGhostAt,
   facingLike,
   looseCorners,
@@ -2545,10 +2549,48 @@ export function RoofDesigner(props: {
     () => systemSpecOf({ ...design, inverters: fitted, battery }, firstListed),
     [design, fitted, battery, firstListed],
   );
-  // The costs decided on each job that haven't been included or left out yet, for the reminder in the bar.
-  const undecidedNow = undecidedLines(costSystem(spec, quoteNow.form, props.workspace).lines, quoteNow.edits);
   // Panels beyond 133% of the inverters: a warning over the picture, unless a battery is on the design.
   const oversize = arrayOversize(summary.kw, fittedKw, Boolean(battery));
+  // Ready to install (1 Nov 2026, Martin): every check the design must clear before site, in one light in the bar.
+  const ready = (() => {
+    const costing = costSystem(spec, quoteNow.form, props.workspace);
+    const strung = new Set(strings.flatMap((x) => x.panels));
+    const keys = Object.keys(centres);
+    const clearance = clearanceFor(MOUNT_STANDOFF);
+    // Panels placed by hand on a traced face, checked against its edges at the wind clearance (or its own setback).
+    const tooClose = faces.length
+      ? loose.filter((panel) => {
+          const on = faces.find((fc) => inside({ x: panel.x, y: panel.y }, fc.points));
+          if (!on) return false;
+          const margin = Math.max(on.setback, clearance) - 0.01;
+          return looseCorners(panel, size).some((c) => !clearOf(c, on.points, margin));
+        }).length
+      : null;
+    return readiness({
+      panels: summary.panels,
+      inverters: fitted.length,
+      strings: checks.map((c) => c.verdict),
+      unstrung: strings.length ? keys.filter((k) => !strung.has(k)).length : 0,
+      ratio: oversize ? { percent: oversize.percent, limit: oversize.limit, over: oversize.over } : null,
+      tooClose,
+      pitchSet: Boolean(quoteNow.form.pitchSet),
+      undecided: costsHidden ? [] : undecidedLines(costing.lines, quoteNow.edits).map((l) => l.label),
+      missing: costsHidden ? 0 : editedLines(costing.lines, quoteNow.edits).filter((l) => l.missing).length,
+      solarVic: { on: Boolean(quoteNow.form.solarVicRebate), bar: solarVicBar(quoteNow.form, summary.panels, props.rates) },
+      phase: quoteNow.form.phase,
+      inverterKw: fittedKw,
+    });
+  })();
+  const light = readinessLight(ready);
+  const [readyOpen, setReadyOpen] = useState(false);
+  const goTo = (where: ReadinessItem["goTo"]) => {
+    setReadyOpen(false);
+    if (where === "strings") pickTool("string");
+    else if (where === "trace") pickTool("trace");
+    else if (where === "quote") showSide("quote");
+    else if (where === "kit") openMenu("inverters");
+    else if (where === "pitch") setPitchOpen(true);
+  };
   // A string that has been started and has no panel yet.
   const startedString = tool === "string" && wiring !== null && !strings.some((x) => x.id === wiring);
   /**
@@ -2755,17 +2797,57 @@ export function RoofDesigner(props: {
                   ? "Not saved yet"
                   : saved.error}
           </span>
-          {/* Costs decided on each job still to decide (as Primero's): said in the bar, since nothing publishes until they are. */}
-          {!props.costsHidden && undecidedNow.length > 0 && (
+          {/* Ready to install: green only when the design would pass; pressed, every check with what to fix. */}
+          <div className="relative" data-menu-host>
             <button
               type="button"
-              onClick={() => showSide("quote")}
-              className="whitespace-nowrap text-xs font-medium text-danger underline underline-offset-2"
-              title="Open the quote to include each, or leave it out"
+              onClick={() => setReadyOpen(!readyOpen)}
+              aria-expanded={readyOpen}
+              className={clsx(
+                "inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full px-3 text-xs font-semibold ring-1",
+                light.ready ? "bg-positive-soft text-positive ring-positive/30" : "bg-sun text-sun-ink ring-sun-line/40",
+              )}
+              title="Every check the design must clear before it goes to site"
             >
-              Decide on {undecidedNow.map((l) => l.label.toLowerCase()).join(" and ")} in the quote first
+              <span className={clsx("size-2 rounded-full", light.ready ? "bg-positive" : "bg-sun-line")} aria-hidden />
+              {light.ready ? "Ready to install" : `${light.fix} to fix`}
+              {light.check > 0 && <span className="font-normal opacity-80">· {light.check} to check</span>}
             </button>
-          )}
+            {readyOpen && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-[24rem] max-w-[85vw] rounded-lg bg-surface p-3 shadow-lift ring-1 ring-line">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Ready to install</p>
+                <ul className="mt-2 space-y-1.5">
+                  {ready.map((item) => (
+                    <li key={item.id} className="flex items-start gap-2 text-[13px]">
+                      <span
+                        className={clsx(
+                          "mt-1 size-2 shrink-0 rounded-full",
+                          item.state === "pass" ? "bg-positive" : item.state === "fix" ? "bg-danger" : "bg-sun-line",
+                        )}
+                        aria-label={item.state === "pass" ? "Passes" : item.state === "fix" ? "To fix" : "To check"}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="font-medium text-ink">{item.label}</span>{" "}
+                        <span className={item.state === "pass" ? "text-muted" : "text-ink-2"}>{item.words}</span>
+                      </span>
+                      {item.goTo && item.state !== "pass" && (
+                        <button
+                          type="button"
+                          onClick={() => goTo(item.goTo)}
+                          className="shrink-0 text-xs font-semibold text-ink underline underline-offset-2"
+                        >
+                          Fix
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2.5 text-[11px] leading-snug text-muted">
+                  A guide, not a site inspection: the installer&apos;s own design check and the network&apos;s approval still apply.
+                </p>
+              </div>
+            )}
+          </div>
           {/* Which of the roof's designs is open: here in the bar, off the picture. */}
           <div className="relative" data-menu-host>
             <button
