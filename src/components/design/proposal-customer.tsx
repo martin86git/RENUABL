@@ -7,6 +7,8 @@ import type { OptionKey } from "@/lib/domain/design/proposal";
 import { acceptProposal, proposalUrls, sayPaid, tellOpened } from "@/lib/services/proposals";
 import { ChatDock, ChatGreeting, useCustomerChat } from "./chat-panel";
 import { PayDeposit } from "./deposit-panel";
+import { PaySchedule } from "./pay-schedule";
+import type { PublicPayments } from "@/lib/services/proposals";
 import { ProposalPage } from "./proposal-view";
 
 /**
@@ -23,11 +25,13 @@ export function CustomerProposal(props: {
   state: ProposalState;
   accepted: { name: string; at: string; option?: OptionKey | null } | null;
   deposit: PublicDeposit | null;
+  payments: PublicPayments | null;
 }) {
   const { token, view } = props;
   const [state, setState] = useState(props.state);
   const [accepted, setAccepted] = useState(props.accepted);
   const [deposit, setDeposit] = useState(props.deposit);
+  const [payments, setPayments] = useState(props.payments);
   const urls = useMemo(() => proposalUrls(token), [token]);
   useEffect(() => tellOpened(token), [token]);
   const chat = useCustomerChat({ token, business: view.business.name, phone: view.business.phone });
@@ -44,17 +48,23 @@ export function CustomerProposal(props: {
       urls={urls}
       deposit={
         // Only once accepted, and only when this proposal asks for a deposit.
-        state === "accepted" && deposit ? (
-          <PayDeposit
-            view={shown}
-            deposit={deposit}
-            onPaid={async (way) => {
-              const res = await sayPaid(token, way);
-              if (!res.ok) return res.message;
-              setDeposit(res.deposit);
-              return null;
-            }}
-          />
+        state === "accepted" && (deposit || payments) ? (
+          <>
+            {payments && <PaySchedule token={token} business={view.business.name} payments={payments} />}
+            {deposit && (
+              <PayDeposit
+                view={shown}
+                deposit={deposit}
+                cardsHere={Boolean(payments?.cards)}
+                onPaid={async (way) => {
+                  const res = await sayPaid(token, way);
+                  if (!res.ok) return res.message;
+                  setDeposit(res.deposit);
+                  return null;
+                }}
+              />
+            )}
+          </>
         ) : null
       }
       onOpenChat={() => chat.show(true)}
@@ -67,6 +77,7 @@ export function CustomerProposal(props: {
           setState(res.state);
           setAccepted(res.accepted);
           setDeposit(res.deposit);
+          setPayments(res.payments);
           return null;
         },
         // On an indicative proposal their thoughts go to the business as a message, where they can be answered.

@@ -16,6 +16,7 @@ import { redactSecrets } from "./bill-reader";
 import { transaction } from "./db";
 import { addSolLine, chatLines } from "./design-chat-repo";
 import { record } from "./design-crm-repo";
+import { giveBackSolCredit, takeSolCredit } from "./sol-credits";
 import { loadBrand, proposalJob, publicProposal } from "./design-proposal-repo";
 
 const MODEL = () => process.env.SOL_MODEL?.trim() || "claude-opus-5-5";
@@ -40,6 +41,8 @@ export async function solAnswersCustomer(token: string): Promise<void> {
   const proposal = await publicProposal(token, todayInMarket());
   if (!proposal?.view) return;
   const asked = lines[lines.length - 1];
+  const credit = await takeSolCredit(found.businessId, "customer", null);
+  if (!credit) return;
 
   let raw = "";
   try {
@@ -57,6 +60,7 @@ export async function solAnswersCustomer(token: string): Promise<void> {
       .trim();
   } catch (e) {
     console.error("sol couldn't answer a customer", redactSecrets(e instanceof Anthropic.APIError ? `Claude API ${e.status}` : String(e)));
+    await giveBackSolCredit(found.businessId, credit);
     return;
   }
   const reply = readSolReply(raw);

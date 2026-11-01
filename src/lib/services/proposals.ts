@@ -7,6 +7,7 @@
  * of a proposal, never a cost. Each call answers with what was asked for, or
  * a plain message to show.
  */
+import type { PublicPayments } from "@/lib/domain/design/proposal-payments";
 import type { BrandImage, BrandKit, ImageKind } from "@/lib/domain/design/brand";
 import type { Job } from "@/lib/domain/design/crm";
 import type { PaidWay, PublicDeposit } from "@/lib/domain/design/deposit";
@@ -140,6 +141,8 @@ export const NEEDS_ACCOUNT = "The design is saved on this device. Sign in to you
 // ---------------------------------------------------------------------------
 
 /** What a private link opens: where the proposal stands, the customer's copy (null once withdrawn), and who to contact. */
+export type { PublicPayments };
+
 export interface OpenedProposal {
   state: ProposalState;
   view: ProposalView | null;
@@ -147,6 +150,8 @@ export interface OpenedProposal {
   accepted: { name: string; at: string } | null;
   /** The deposit, once the proposal is accepted and asks for one. */
   deposit: PublicDeposit | null;
+  /** What is due and paid once accepted, and whether it can be paid by card here. */
+  payments: PublicPayments | null;
 }
 
 const link = (token: string) => `/api/proposal/${encodeURIComponent(token)}`;

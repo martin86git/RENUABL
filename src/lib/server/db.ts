@@ -855,6 +855,51 @@ create table if not exists design_leads (
   note text,
   at timestamptz not null default now()
 );
+create table if not exists design_sol_credits (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  change integer not null,
+  source text not null,
+  month text not null,
+  use text,
+  stripe_session text unique,
+  by_email text,
+  at timestamptz not null default now()
+);
+create index if not exists design_sol_credits_business on design_sol_credits(business_id, month, at desc);
+create table if not exists design_billing_details (
+  business_id text primary key references businesses(id) on delete cascade,
+  legal_name text not null,
+  abn text not null default '',
+  email text not null,
+  address text not null default '',
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+create table if not exists design_connect (
+  business_id text primary key references businesses(id) on delete cascade,
+  stripe_account text not null unique,
+  charges_enabled boolean not null default false,
+  details_submitted boolean not null default false,
+  cards_on boolean not null default true,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists design_proposal_payments (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  version_id text not null,
+  due_key text not null,
+  name text not null,
+  amount_cents integer not null,
+  fee_cents integer not null,
+  stripe_account text not null,
+  stripe_session text not null unique,
+  stripe_payment text,
+  paid_at timestamptz not null default now()
+);
+create unique index if not exists design_proposal_payments_once on design_proposal_payments(business_id, version_id, due_key);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

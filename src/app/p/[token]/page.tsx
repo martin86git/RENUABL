@@ -37,5 +37,14 @@ export default async function ProposalLinkPage({ params }: PageProps<"/p/[token]
   const found = await publicProposal(token, todayInMarket()).catch(() => null);
   if (!found) notFound();
   if (!found.view) return <ProposalGone business={found.business} />;
-  return <CustomerProposal token={token} view={found.view} state={found.state} accepted={found.accepted} deposit={found.deposit} />;
+  return (
+    <CustomerProposal
+      token={token}
+      view={found.view}
+      state={found.state}
+      accepted={found.accepted}
+      deposit={found.deposit}
+      payments={found.payments}
+    />
+  );
 }

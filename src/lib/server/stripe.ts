@@ -2,6 +2,7 @@
 import Stripe from "stripe";
 import { DEPOSIT, depositCents } from "@/lib/domain/deposit";
 import { TRIAL_DAYS, packPriceCents, seatPriceCents, type BillingInterval, type TokenPack } from "@/lib/domain/design/plans";
+import { INVOICE_FOOTER, gstTaxRate, packInvoice } from "./stripe-billing";
 
 /** The API version and beta flag Stripe's embedded checkout form needs. */
 export const STRIPE_API_VERSION = "2026-03-25.dahlia; custom_checkout_payment_form_preview=v1";
@@ -95,6 +96,7 @@ export async function createTrialCheckout(
     line_items: [
       {
         quantity: opts.seats,
+        tax_rates: [await gstTaxRate(stripe)],
         price_data: {
           currency: "aud",
           unit_amount: seatPriceCents(opts.interval),
@@ -105,6 +107,7 @@ export async function createTrialCheckout(
     ],
     subscription_data: {
       trial_period_days: TRIAL_DAYS,
+      description: INVOICE_FOOTER,
       metadata: { kind: "design-plan", email: opts.email },
     },
     metadata: { kind: "design-plan", email: opts.email },
@@ -125,12 +128,13 @@ export async function createTokenCheckout(
 ): Promise<string> {
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
-    ...(opts.customer ? { customer: opts.customer } : { customer_email: opts.email }),
+    ...(opts.customer ? { customer: opts.customer } : { customer_email: opts.email, customer_creation: "always" as const }),
     automatic_tax: { enabled: false },
     locale: "en-GB",
     line_items: [
       {
         quantity: 1,
+        tax_rates: [await gstTaxRate(stripe)],
         price_data: {
           currency: "aud",
           unit_amount: packPriceCents(opts.pack),
@@ -138,6 +142,7 @@ export async function createTokenCheckout(
         },
       },
     ],
+    invoice_creation: packInvoice(opts.businessId),
     metadata: { kind: "design-tokens", business: opts.businessId, tokens: String(opts.pack), email: opts.email },
     success_url: `${opts.origin}/design/settings/billing?bought={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/design/settings/billing`,

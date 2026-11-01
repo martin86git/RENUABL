@@ -2,8 +2,18 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { PLAN_WORDS, TOKEN_PACKS, dollars, packPriceCents, priceFor, type TokenPack } from "@/lib/domain/design/plans";
-import { buyTokens, loadBilling, manageBilling, type BillingState } from "@/lib/services/billing";
+import { EMPTY_BILLING, INVOICE_STATUS, type BillingDetails } from "@/lib/domain/design/billing-invoice";
+import { PLAN_WORDS, SEAT_NOTE, TOKEN_PACKS, dollars, packPriceCents, priceFor, type TokenPack } from "@/lib/domain/design/plans";
+import { SOL_PACKS, SOL_USE_WORDS, SOL_WORDS, type SolUse } from "@/lib/domain/design/sol-credits";
+import {
+  buySolCredits,
+  buyTokens,
+  invoicePdfUrl,
+  loadBilling,
+  manageBilling,
+  saveBillingDetails,
+  type BillingState,
+} from "@/lib/services/billing";
 import { ui } from "./design-shell";
 
 const STATUS: Record<string, string> = {
@@ -68,13 +78,64 @@ export function BillingPanel() {
           </dl>
         ) : (
           <p className="text-sm text-ink-2">
-            No plan yet. Start the {PLAN_WORDS.trial} from the sign-up page: {PLAN_WORDS.seat}, {PLAN_WORDS.gst.toLowerCase()}
+            No plan yet. Start the {PLAN_WORDS.trial} from the sign-up page: {PLAN_WORDS.seat}. {PLAN_WORDS.gst}
           </p>
         )}
         {plan && state.payments && (
           <button className={ui.quiet} disabled={busy !== null} onClick={() => void go("portal", manageBilling)}>
-            {busy === "portal" ? "Opening Stripe…" : "Change users, card or plan, and see invoices"}
+            {busy === "portal" ? "Opening Stripe…" : "Change your card, billing period or cancel"}
           </button>
+        )}
+        {plan && <p className="text-xs leading-relaxed text-muted">{SEAT_NOTE}</p>}
+      </section>
+
+      <section className={clsx(ui.card, "space-y-4 p-5 sm:p-6")} aria-labelledby="sol-credits">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="sol-credits" className="text-base font-semibold text-ink">
+            Sol credits
+          </h2>
+          <p className="text-sm text-ink-2">
+            <span className="text-2xl font-semibold tabular-nums text-ink">{state.sol.left.toLocaleString("en-AU")}</span> left
+          </p>
+        </div>
+        <p className="text-sm leading-relaxed text-ink-2">{SOL_WORDS.explained}</p>
+        <dl className="space-y-3 text-sm">
+          <Row
+            k="This month's"
+            v={`${Math.min(state.sol.usedIncluded, state.sol.included).toLocaleString("en-AU")} of ${state.sol.included.toLocaleString("en-AU")} used`}
+          />
+          <Row k="Bought, never expire" v={state.sol.bought.toLocaleString("en-AU")} />
+        </dl>
+        {state.sol.included > 0 && (
+          <div className="h-1 overflow-hidden rounded-full bg-line" aria-hidden>
+            <div
+              className="h-full bg-primary"
+              style={{ width: `${Math.min(100, (state.sol.usedIncluded / state.sol.included) * 100)}%` }}
+            />
+          </div>
+        )}
+        <div className="grid gap-2 sm:grid-cols-3">
+          {SOL_PACKS.map((p) => (
+            <button
+              key={p.credits}
+              className={clsx(ui.quiet, "h-auto flex-col py-3")}
+              disabled={busy !== null || !state.payments}
+              onClick={() => void go(`sol-${p.credits}`, () => buySolCredits(p.credits))}
+            >
+              <span className="text-base font-semibold text-ink">{p.credits.toLocaleString("en-AU")} credits</span>
+              <span className="text-xs tabular-nums text-ink-2">{busy === `sol-${p.credits}` ? "Opening Stripe…" : dollars(p.cents)}</span>
+            </button>
+          ))}
+        </div>
+        {state.solUses.length > 0 && (
+          <ul className="divide-y divide-line text-sm">
+            {state.solUses.map((u) => (
+              <li key={u.use} className="flex justify-between gap-4 py-2">
+                <span className="text-ink-2">{SOL_USE_WORDS[u.use as SolUse] ?? u.use}</span>
+                <span className="tabular-nums text-ink">{u.count.toLocaleString("en-AU")} this month</span>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
@@ -123,11 +184,100 @@ export function BillingPanel() {
           </ul>
         )}
       </section>
+      <Invoices invoices={state.invoices} />
+      <DetailsForm saved={state.details} />
       {note && <p className="text-sm text-danger">{note}</p>}
       <p className="text-xs leading-relaxed text-muted">
         Payments are taken by Stripe. RENUABL never sees or keeps your card details. {PLAN_WORDS.gst}
       </p>
     </div>
+  );
+}
+
+/** RENUABL's invoices to the business, each as a tax invoice PDF and Stripe's own page. */
+function Invoices({ invoices }: { invoices: BillingState["invoices"] }) {
+  return (
+    <section className={clsx(ui.card, "space-y-3 p-5 sm:p-6")} aria-labelledby="invoices">
+      <h2 id="invoices" className="text-base font-semibold text-ink">
+        Invoices
+      </h2>
+      {invoices === null ? (
+        <p className="text-sm text-ink-2">Your invoices couldn&apos;t be loaded just now. Try again in a moment.</p>
+      ) : invoices.length === 0 ? (
+        <p className="text-sm text-ink-2">No invoices yet. Each payment to RENUABL will be here as a tax invoice.</p>
+      ) : (
+        <ul className="divide-y divide-line text-sm">
+          {invoices.map((inv) => (
+            <li key={inv.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5">
+              <span className="min-w-0 flex-1 text-ink">
+                {day(new Date(inv.created * 1000).toISOString())}
+                <span className="ml-2 text-xs text-muted">{inv.number ?? ""}</span>
+              </span>
+              <span className={clsx("text-xs", inv.status === "paid" ? "text-positive" : "text-ink-2")}>
+                {INVOICE_STATUS[inv.status] ?? inv.status}
+              </span>
+              <span className="w-20 text-right tabular-nums text-ink">{dollars(inv.totalCents)}</span>
+              <a className="tap-area text-xs text-ink underline underline-offset-2" href={invoicePdfUrl(inv.id)}>
+                Tax invoice
+              </a>
+              {inv.hostedUrl && (
+                <a
+                  className="tap-area text-xs text-ink-2 underline underline-offset-2"
+                  href={inv.hostedUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {inv.status === "open" ? "Pay" : "Receipt"}
+                </a>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** Who RENUABL bills: on every tax invoice, and given to Stripe for its own. */
+function DetailsForm({ saved }: { saved: BillingDetails | null }) {
+  const [form, setForm] = useState<BillingDetails>(saved ?? EMPTY_BILLING);
+  const [state, setState] = useState<{ busy: boolean; text: string | null; error: boolean }>({ busy: false, text: null, error: false });
+  const field = (key: keyof BillingDetails, label: string, extra: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
+    <label className="block space-y-1 text-sm">
+      <span className="text-ink-2">{label}</span>
+      <input className={ui.input} value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} {...extra} />
+    </label>
+  );
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setState({ busy: true, text: null, error: false });
+    const a = await saveBillingDetails(form);
+    if (a.ok) {
+      setForm(a.details);
+      setState({ busy: false, text: "Saved. They'll be on your next invoice.", error: false });
+    } else setState({ busy: false, text: a.message, error: true });
+  };
+  return (
+    <section className={clsx(ui.card, "space-y-4 p-5 sm:p-6")} aria-labelledby="billing-details">
+      <div>
+        <h2 id="billing-details" className="text-base font-semibold text-ink">
+          Billing details
+        </h2>
+        <p className="mt-1 text-sm text-ink-2">On every tax invoice from RENUABL. Your ABN is needed on invoices of $1,000 or more.</p>
+      </div>
+      <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
+        {field("legalName", "Business name for invoices", { maxLength: 120, autoComplete: "organization" })}
+        {field("abn", "ABN", { maxLength: 20, inputMode: "numeric" })}
+        {field("email", "Email for invoices and receipts", { type: "email", maxLength: 200, autoComplete: "email" })}
+        {field("address", "Address", { maxLength: 240, autoComplete: "street-address" })}
+        <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+          <button type="submit" className={ui.primary} disabled={state.busy}>
+            {state.busy ? "Saving…" : "Save billing details"}
+          </button>
+          {state.text && <p className={clsx("text-sm", state.error ? "text-danger" : "text-positive")}>{state.text}</p>}
+        </div>
+      </form>
+    </section>
   );
 }
 

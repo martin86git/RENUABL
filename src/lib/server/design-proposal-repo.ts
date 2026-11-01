@@ -51,6 +51,16 @@ import { cleanDesignSet, type DesignSet } from "@/lib/domain/design/roof-design"
 import type { ISODate } from "@/lib/domain/types";
 import { newId, query, transaction } from "./db";
 import { jobById, record, type Q } from "./design-crm-repo";
+import { connectOf, paymentsOn } from "./design-connect-repo";
+import {
+  nextDue,
+  paidByCard,
+  paymentsDue,
+  takesCards,
+  type Due,
+  type DueKey,
+  type PublicPayments,
+} from "@/lib/domain/design/proposal-payments";
 import { loadLists, loadSettings, projectById } from "./design-repo";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -371,6 +381,23 @@ export interface PublicProposal {
   accepted: { name: string; at: string; option?: OptionKey | null } | null;
   /** The deposit, once the proposal is accepted and it asks for one: the amount, the reference to pay with, where it stands. */
   deposit: PublicDeposit | null;
+  /** What the accepted proposal asks to be paid, in order, what is paid, and whether the next can be paid by card here. */
+  payments: PublicPayments | null;
+}
+
+/** The amounts due on an accepted version, what of them is paid (by card here, or the deposit marked received). */
+async function paymentsOf(row: Found): Promise<PublicPayments | null> {
+  const dues = paymentsDue(row.view.terms);
+  if (!dues.length) return null;
+  const [paid, connect] = await Promise.all([paymentsOn(row.businessId, row.versionId), connectOf(row.businessId)]);
+  const at = new Map(paid.map((p) => [p.dueKey, p.paidAt]));
+  if (row.receivedAt && !at.has("deposit")) at.set("deposit", row.receivedAt);
+  const next = nextDue(dues, new Set(at.keys()));
+  return {
+    dues: dues.map((d) => ({ ...d, paidAt: at.get(d.key) ?? null })),
+    next: next?.key ?? null,
+    cards: takesCards(connect, connect.cardsOn),
+  };
 }
 
 interface Found extends VersionRow {
@@ -411,7 +438,89 @@ export async function publicProposal(token: string, today: ISODate): Promise<Pub
     business: { name, phone, email, website },
     accepted: row.acceptedAt && row.acceptedName ? { name: row.acceptedName, at: row.acceptedAt, option: row.acceptedOption } : null,
     deposit: state === "accepted" ? publicDeposit(depositOn(row)) : null,
+    payments: state === "accepted" ? await paymentsOf(row) : null,
   };
+}
+
+/**
+ * What a customer is about to pay by card from their link: the next amount due on the accepted proposal, worked out
+ * here and nothing taken from the browser but which one they mean (which must be the next). Null for a link we never
+ * made; a reason when it can't be paid.
+ */
+export async function cardPaymentFor(
+  token: string,
+  dueKey: DueKey,
+  today: ISODate,
+): Promise<
+  | null
+  | { refuse: "not-accepted" | "nothing-due" | "cards-off" | "not-next" }
+  | { businessId: string; business: string; versionId: string; account: string; due: Due; reference: string | null }
+> {
+  const row = await behind(query, token);
+  if (!row) return null;
+  if (stateOf(row, today) !== "accepted") return { refuse: "not-accepted" };
+  const payments = await paymentsOf(row);
+  if (!payments?.next) return { refuse: "nothing-due" };
+  const connect = await connectOf(row.businessId);
+  if (!payments.cards || !connect.account) return { refuse: "cards-off" };
+  if (payments.next !== dueKey) return { refuse: "not-next" };
+  const due = payments.dues.find((d) => d.key === dueKey)!;
+  return {
+    businessId: row.businessId,
+    business: row.view.business.name,
+    versionId: row.versionId,
+    account: connect.account,
+    due: { key: due.key, name: due.name, amount: due.amount },
+    reference: row.depositRef,
+  };
+}
+
+/**
+ * A card payment Stripe says went through on a business's own account. Kept once a Checkout (Stripe may tell us twice)
+ * and once an amount due; a deposit is marked received by Stripe; written on the customer's record. Checked against the
+ * version it names: the business must own it, and the amount must be what that version asks for.
+ */
+export async function recordCardPayment(p: {
+  businessId: string;
+  versionId: string;
+  dueKey: DueKey;
+  amountCents: number;
+  feeCents: number;
+  account: string;
+  session: string;
+  payment: string | null;
+}): Promise<"kept" | "already" | "unknown"> {
+  return transaction(async (q) => {
+    const rows = await q<Found>(
+      `select ${VERSION}, v.id as "versionId", p.business_id as "businessId", p.job_id as "jobId", p.customer_id as "customerId", p.questions
+         from design_proposals p join design_proposal_versions v on v.business_id = p.business_id and v.proposal_id = p.id
+        where p.business_id = $1 and v.id = $2 for update of v`,
+      [p.businessId, p.versionId],
+    );
+    const row = rows[0] ? asAgreed(rows[0]) : null;
+    const due = row ? paymentsDue(row.view.terms).find((d) => d.key === p.dueKey) : null;
+    if (!row || !due || Math.round(due.amount * 100) !== p.amountCents) return "unknown";
+    const kept = await q(
+      `insert into design_proposal_payments (id, business_id, version_id, due_key, name, amount_cents, fee_cents, stripe_account, stripe_session, stripe_payment)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) on conflict do nothing returning 1`,
+      [newId("pay"), p.businessId, p.versionId, p.dueKey, due.name, p.amountCents, p.feeCents, p.account, p.session, p.payment],
+    );
+    if (!kept.length) return "already";
+    if (p.dueKey === "deposit")
+      await q(
+        `update design_proposal_versions set deposit_received_at = coalesce(deposit_received_at, now()),
+           deposit_received_by = coalesce(deposit_received_by, 'stripe') where business_id = $1 and id = $2`,
+        [p.businessId, p.versionId],
+      );
+    await record(q, p.businessId, {
+      customerId: row.customerId,
+      jobId: row.jobId,
+      kind: "proposal",
+      text: paidByCard(due, p.amountCents),
+      by: "Stripe",
+    });
+    return "kept";
+  });
 }
 
 /**

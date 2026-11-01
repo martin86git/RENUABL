@@ -14,6 +14,8 @@ import { readWithClaude } from "@/lib/server/claude-reader";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { allow } from "@/lib/server/rate-limit";
+import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
+import { withSolCredit } from "@/lib/server/sol-credits";
 
 export const maxDuration = 60;
 
@@ -41,12 +43,15 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);
     if (!apiKey) return Response.json({ ok: false, message: "Notes can't be written up here: Claude isn't set up." }, { status: 503 });
     try {
-      const raw = await readWithClaude<unknown>(
-        [],
-        CALL_NOTES_SCHEMA,
-        callNotesPrompt(who.member.businessName, found.customer.name, transcriptOf(lines)),
-        apiKey,
+      const raw = await withSolCredit(who.member.businessId, "call-notes", who.member.email, () =>
+        readWithClaude<unknown>(
+          [],
+          CALL_NOTES_SCHEMA,
+          callNotesPrompt(who.member.businessName, found.customer.name, transcriptOf(lines)),
+          apiKey,
+        ),
       );
+      if (raw === "out") return Response.json({ ok: false, message: SOL_OUT_SHORT }, { status: 402 });
       const notes = cleanCallNotes(raw);
       return Response.json({ ok: true, notes, text: callNotesText(notes), changes: callChanges(notes.system, found.job.details) });
     } catch (e) {

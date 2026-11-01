@@ -2,6 +2,7 @@
 
 import { SignInForm, signInNote } from "./sign-in-form";
 import { PASSWORD_MIN } from "@/lib/domain/design/password";
+import { SEAT_NOTE } from "@/lib/domain/design/plans";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
@@ -441,6 +442,7 @@ export function DesignAccountPage() {
             Everyone here can design roofs and work with customers and deals. What else each person may do is set below, by the owner, and
             is checked on the server each time: switching one off takes effect with that person&apos;s next click.
           </p>
+          {owner && <p className="mt-2 text-sm text-ink-2">{SEAT_NOTE}</p>}
           <ul className="mt-4 divide-y divide-line rounded-md border border-line">
             {(members ?? []).map((m) => (
               <li key={m.email} className="flex flex-wrap items-center gap-3 px-4 py-2.5">

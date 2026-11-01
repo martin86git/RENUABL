@@ -3,7 +3,9 @@
  * business's plan and design tokens, buying a pack, and the questions the sign-up page takes. All of it is asked of the
  * server; the browser never decides a price.
  */
+import type { BillingDetails } from "@/lib/domain/design/billing-invoice";
 import type { BillingInterval, TokenPack } from "@/lib/domain/design/plans";
+import type { SolBalance } from "@/lib/domain/design/sol-credits";
 
 type Answer = { ok: true; url?: string; message?: string } | { ok: false; message: string };
 
@@ -41,6 +43,12 @@ export interface BillingState {
   plan: { status: string; interval: BillingInterval; seats: number; trialEnd: string | null; periodEnd: string | null } | null;
   tokens: number;
   ledger: { change: number; reason: string; by: string | null; at: string }[];
+  sol: SolBalance;
+  solUses: { use: string; count: number }[];
+  solPacks: { credits: number; by: string | null; at: string }[];
+  details: BillingDetails | null;
+  /** Null when Stripe couldn't be asked just now. */
+  invoices: { id: string; number: string | null; created: number; status: string; totalCents: number; hostedUrl: string | null }[] | null;
   payments: boolean;
 }
 
@@ -62,3 +70,17 @@ export function buyTokens(pack: TokenPack) {
 export function manageBilling() {
   return post("/api/design/billing", { do: "portal" });
 }
+
+export function buySolCredits(credits: number) {
+  return post("/api/design/billing", { do: "sol", credits });
+}
+
+export async function saveBillingDetails(
+  details: BillingDetails,
+): Promise<{ ok: true; details: BillingDetails } | { ok: false; message: string }> {
+  const a = await post("/api/design/billing", { do: "details", ...details });
+  return a.ok ? { ok: true, details: a.details as BillingDetails } : { ok: false, message: a.message ?? "That didn't save." };
+}
+
+/** Where a tax invoice PDF is downloaded from. */
+export const invoicePdfUrl = (id: string) => `/api/design/billing/invoices/${encodeURIComponent(id)}`;

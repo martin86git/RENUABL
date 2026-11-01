@@ -4,7 +4,9 @@
  * first, and that id only ever comes from the signed-in member. A subscription made on the sign-up page is kept by the
  * email it was made for until that person's business exists, then attached to it (`claimSubscriptions`).
  */
+import type { BillingDetails } from "@/lib/domain/design/billing-invoice";
 import { TRIAL_JOBS, type BillingInterval } from "@/lib/domain/design/plans";
+import { creditSource, includedThisMonth, monthOf, solBalance, type SolBalance, type SolUse } from "@/lib/domain/design/sol-credits";
 import { newId, query, transaction } from "./db";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -197,4 +199,135 @@ export async function recordLead(
     lead.users ?? null,
     lead.note ?? null,
   ]);
+}
+
+/*
+ * Sol credits (`domain/design/sol-credits.ts`): the month's own, from the plan, are used first, then bought ones. Each
+ * answer is one row: source "included" or "bought" (change -1), or "free" (nothing taken: billing isn't enforced yet
+ * and none were left, so it is only counted). A pack bought is a row of its own (source "pack"), once a Checkout.
+ */
+
+/** Where the business's Sol credits stand this month. */
+export async function solBalanceOf(businessId: string, today: string): Promise<SolBalance> {
+  const [plan, rows] = await Promise.all([
+    subscriptionOf(businessId),
+    query<{ used: string | null; bought: string | null }>(
+      `select count(*) filter (where source = 'included' and month = $2) as used,
+              coalesce(sum(change) filter (where source in ('pack', 'bought')), 0) as bought
+         from design_sol_credits where business_id = $1`,
+      [businessId, monthOf(today)],
+    ),
+  ]);
+  return solBalance(includedThisMonth(plan), Number(rows[0]?.used ?? 0), Number(rows[0]?.bought ?? 0));
+}
+
+/**
+ * Takes one credit for an answer from Sol, under a lock on the business so two answers can't take the last one twice.
+ * Answers with the row's id (to give it back should the answer fail), or null when there is none to take and billing
+ * is enforced. Not enforced, an answer with none left is still counted ("free"), so the Billing page shows real use.
+ */
+export async function spendSolCredit(
+  businessId: string,
+  use: SolUse,
+  by: string | null,
+  today: string,
+  enforced: boolean,
+): Promise<string | null> {
+  return transaction(async (q) => {
+    await q(`select pg_advisory_xact_lock(hashtext('sol-credits:' || $1))`, [businessId]);
+    const plan =
+      (
+        await q<Subscription>(`select ${SUBSCRIPTION} from design_subscriptions where business_id = $1 order by created_at desc limit 1`, [
+          businessId,
+        ])
+      )[0] ?? null;
+    const row = (
+      await q<{ used: string | null; bought: string | null }>(
+        `select count(*) filter (where source = 'included' and month = $2) as used,
+                coalesce(sum(change) filter (where source in ('pack', 'bought')), 0) as bought
+           from design_sol_credits where business_id = $1`,
+        [businessId, monthOf(today)],
+      )
+    )[0];
+    const source = creditSource(solBalance(includedThisMonth(plan), Number(row?.used ?? 0), Number(row?.bought ?? 0)));
+    if (!source && enforced) return null;
+    const id = newId("sol");
+    await q(`insert into design_sol_credits (id, business_id, change, source, month, use, by_email) values ($1, $2, $3, $4, $5, $6, $7)`, [
+      id,
+      businessId,
+      source ? -1 : 0,
+      source ?? "free",
+      monthOf(today),
+      use,
+      by?.toLowerCase() ?? null,
+    ]);
+    return id;
+  });
+}
+
+/** Gives back a credit taken for an answer that never came (Claude failed). */
+export async function refundSolCredit(businessId: string, id: string): Promise<void> {
+  await query(`delete from design_sol_credits where business_id = $1 and id = $2 and source <> 'pack'`, [businessId, id]);
+}
+
+/** Adds a bought pack of Sol credits, once for each Stripe Checkout. */
+export async function creditSolPack(
+  businessId: string,
+  stripeSession: string,
+  credits: number,
+  by: string | null,
+  today: string,
+): Promise<void> {
+  await query(
+    `insert into design_sol_credits (id, business_id, change, source, month, stripe_session, by_email) values ($1, $2, $3, 'pack', $4, $5, $6)
+     on conflict (stripe_session) do nothing`,
+    [newId("sol"), businessId, credits, monthOf(today), stripeSession, by?.toLowerCase() ?? null],
+  );
+}
+
+export interface SolUseLine {
+  use: string;
+  count: number;
+}
+
+/** This month's answers by what they were for, most first. */
+export async function solUseThisMonth(businessId: string, today: string): Promise<SolUseLine[]> {
+  const rows = await query<{ use: string; n: string }>(
+    `select use, count(*) as n from design_sol_credits where business_id = $1 and month = $2 and use is not null group by use order by n desc`,
+    [businessId, monthOf(today)],
+  );
+  return rows.map((r) => ({ use: r.use, count: Number(r.n) }));
+}
+
+/** Packs bought, newest first. */
+export async function solPacksBought(businessId: string, limit = 12): Promise<{ credits: number; by: string | null; at: string }[]> {
+  return query(
+    `select change as credits, by_email as by, ${moment("at")} as at from design_sol_credits
+      where business_id = $1 and source = 'pack' order by at desc limit $2`,
+    [businessId, limit],
+  );
+}
+
+/** The people in a business: what its subscription's users should come to. */
+export async function memberCount(businessId: string): Promise<number> {
+  const rows = await query<{ n: string }>(`select count(*) as n from business_members where business_id = $1`, [businessId]);
+  return Number(rows[0]?.n ?? 0);
+}
+
+/** The billing details a business keeps for its invoices, or null before it has given any. */
+export async function billingDetailsOf(businessId: string): Promise<BillingDetails | null> {
+  const rows = await query<BillingDetails>(
+    `select legal_name as "legalName", abn, email, address from design_billing_details where business_id = $1`,
+    [businessId],
+  );
+  return rows[0] ?? null;
+}
+
+export async function saveBillingDetails(businessId: string, details: BillingDetails, by: string): Promise<void> {
+  await query(
+    `insert into design_billing_details (business_id, legal_name, abn, email, address, updated_by) values ($1, $2, $3, $4, $5, $6)
+     on conflict (business_id) do update set legal_name = excluded.legal_name, abn = excluded.abn, email = excluded.email,
+       address = excluded.address, updated_by = excluded.updated_by, updated_at = now()`,
+    [businessId, details.legalName, details.abn, details.email, details.address, by.toLowerCase()],
+  );
 }

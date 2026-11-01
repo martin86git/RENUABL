@@ -5,6 +5,8 @@ import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-c
 import { addEmailNote, emailFile, inboxFor, openEmail, sharedEmail, sharedWith } from "@/lib/server/design-inbox-repo";
 import { GmailOff, disconnectGmail, gmailAddress, gmailConfig, unreadCount } from "@/lib/server/gmail";
 import { allow } from "@/lib/server/rate-limit";
+import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
+import { withSolCredit } from "@/lib/server/sol-credits";
 
 export const maxDuration = 60;
 
@@ -123,7 +125,10 @@ export async function POST(request: Request) {
           `Subject: ${email.subject}`,
           words,
         ].join("\n");
-        const out = await readWithClaude<{ text: string }>([], SOL_SCHEMA, prompt, apiKey);
+        const out = await withSolCredit(member.businessId, "inbox", member.email, () =>
+          readWithClaude<{ text: string }>([], SOL_SCHEMA, prompt, apiKey),
+        );
+        if (out === "out") return json({ ok: false, message: SOL_OUT_SHORT }, 402);
         return json({ ok: true, text: String(out.text ?? "").slice(0, 4_000) });
       }
       return json({ ok: false, message: "That couldn't be read." }, 400);

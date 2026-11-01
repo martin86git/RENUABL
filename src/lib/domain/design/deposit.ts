@@ -6,7 +6,9 @@
  * customer pays the business, by bank transfer into the business's own
  * account or by card on the business's own payment page (a link the business
  * gives us; we only open it). So nothing here ever knows that a payment was
- * made. A customer can say they have paid, which is kept as exactly that,
+ * made. (A card payment through the business's own connected Stripe account
+ * is another matter: `proposal-payments.ts`, which marks the deposit received
+ * once Stripe says it was paid.) A customer can say they have paid, which is kept as exactly that,
  * said and not confirmed, and only the business, looking at its own account,
  * marks a deposit received.
  *

@@ -1,7 +1,12 @@
 import type Stripe from "stripe";
 import { addNote, contactIdByEmail, reservationNote, hubspotToken } from "@/lib/server/hubspot-crm";
-import { creditPack, recordSubscription, updateSubscription } from "@/lib/server/design-billing-repo";
+import { todayInMarket } from "@/lib/domain/market";
+import { creditPack, creditSolPack, recordSubscription, updateSubscription } from "@/lib/server/design-billing-repo";
 import { stripeClient, subscriptionFacts } from "@/lib/server/stripe";
+import { connectFacts } from "@/lib/server/stripe-billing";
+import { businessOfAccount, updateConnect } from "@/lib/server/design-connect-repo";
+import { recordCardPayment } from "@/lib/server/design-proposal-repo";
+import { isDueKey, platformFeeCents } from "@/lib/domain/design/proposal-payments";
 
 /**
  * Stripe → RENUABL. On a paid deposit, notes it on the customer's HubSpot
@@ -11,6 +16,11 @@ import { stripeClient, subscriptionFacts } from "@/lib/server/stripe";
  * cancelling) are followed. Configure in Stripe: Developers → Webhooks →
  * endpoint https://<site>/api/stripe/webhook, events checkout.session.completed,
  * customer.subscription.updated and customer.subscription.deleted.
+ *
+ * Businesses' own Stripe accounts (Stripe Connect, card payments on their proposals): a second endpoint at the same
+ * address listening to events on connected accounts, with its own signing secret in STRIPE_CONNECT_WEBHOOK_SECRET:
+ * events checkout.session.completed and account.updated. A paid amount is kept against its proposal (checked against
+ * what the proposal asks), and an account's readiness to take cards is followed.
  */
 export async function POST(request: Request) {
   const stripe = stripeClient();
@@ -18,12 +28,21 @@ export async function POST(request: Request) {
   const signature = request.headers.get("stripe-signature");
   if (!stripe || !secret || !signature) return new Response("Not configured", { status: 400 });
 
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(await request.text(), signature, secret);
-  } catch {
-    return new Response("Invalid signature", { status: 400 });
+  // Our own account's events are signed with one secret, the connected accounts' with another.
+  const body = await request.text();
+  const secrets = [secret, process.env.STRIPE_CONNECT_WEBHOOK_SECRET?.trim()].filter((x): x is string => Boolean(x));
+  let event: Stripe.Event | null = null;
+  for (const s of secrets) {
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, s);
+      break;
+    } catch {
+      // Try the next secret.
+    }
   }
+  if (!event) return new Response("Invalid signature", { status: 400 });
+
+  if (event.account) return connectedEvent(event);
 
   if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
     const sub = event.data.object;
@@ -68,6 +87,21 @@ export async function POST(request: Request) {
     return Response.json({ received: true });
   }
 
+  if (event.type === "checkout.session.completed" && event.data.object.metadata?.kind === "sol-credits") {
+    const session = event.data.object;
+    const business = session.metadata?.business;
+    const credits = Number(session.metadata?.credits);
+    if (business && Number.isInteger(credits) && credits > 0 && session.payment_status === "paid") {
+      try {
+        await creditSolPack(business, session.id, credits, session.metadata?.email ?? null, todayInMarket());
+      } catch (e) {
+        console.error("sol credits not added", session.id, e instanceof Error ? e.message : e);
+        return new Response("Not saved", { status: 500 });
+      }
+    }
+    return Response.json({ received: true });
+  }
+
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
     const reference = session.metadata?.reference ?? session.client_reference_id ?? "unknown";
@@ -92,6 +126,41 @@ export async function POST(request: Request) {
         return new Response("CRM update failed", { status: 500 });
       }
     }
+  }
+  return Response.json({ received: true });
+}
+
+/** An event on a business's own Stripe account. Only what we made is acted on; anything else is acknowledged and left. */
+async function connectedEvent(event: Stripe.Event): Promise<Response> {
+  const account = event.account!;
+  try {
+    if (event.type === "account.updated") {
+      await updateConnect(account, connectFacts(event.data.object));
+      return Response.json({ received: true });
+    }
+    if (event.type === "checkout.session.completed" && event.data.object.metadata?.kind === "proposal-payment") {
+      const session = event.data.object;
+      const meta = session.metadata ?? {};
+      const businessId = await businessOfAccount(account);
+      // The account must be the business's the payment names: one business can't record a payment on another's proposal.
+      if (session.payment_status !== "paid" || !businessId || businessId !== meta.business || !meta.version || !isDueKey(meta.due))
+        return Response.json({ received: true });
+      const intent = typeof session.payment_intent === "string" ? session.payment_intent : (session.payment_intent?.id ?? null);
+      const result = await recordCardPayment({
+        businessId,
+        versionId: meta.version,
+        dueKey: meta.due,
+        amountCents: session.amount_total ?? 0,
+        feeCents: platformFeeCents(session.amount_total ?? 0),
+        account,
+        session: session.id,
+        payment: intent,
+      });
+      if (result === "unknown") console.error("card payment didn't match its proposal", session.id);
+    }
+  } catch (e) {
+    console.error("connected account event not saved", event.id, e instanceof Error ? e.message : e);
+    return new Response("Not saved", { status: 500 });
   }
   return Response.json({ received: true });
 }

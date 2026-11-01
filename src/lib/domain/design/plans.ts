@@ -94,3 +94,6 @@ export const PLAN_WORDS = {
   trialExplained: `${TRIAL_DAYS} days free, with ${TRIAL_JOBS} design jobs on us. Your card is taken on Stripe's secure page and nothing is charged until the trial ends. Cancel any time before then and you pay nothing.`,
   enterprise: `${ENTERPRISE_FROM} users or more? Talk to us about Enterprise.`,
 } as const;
+
+/** Beside the people in a business: each is a paid user, and the plan follows the team. */
+export const SEAT_NOTE = `Each person here is a user on your plan (${dollars(SEAT_MONTHLY_CENTS)} a month, or the yearly price). Adding or removing someone changes your plan straight away, and the difference for the rest of the period is on your next invoice.`;

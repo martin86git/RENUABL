@@ -38,6 +38,8 @@ import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-r
 import { loadLists, type Member } from "./design-repo";
 import { casesToResolve } from "./design-service-repo";
 import { addSolTurns, newSolId, solState, withSol } from "./design-sol-repo";
+import { giveBackSolCredit, takeSolCredit } from "./sol-credits";
+import { SOL_OUT, type SolUse } from "@/lib/domain/design/sol-credits";
 import { channelContext, solSaysInTeam } from "./design-team-repo";
 import { listSheets } from "./design-datasheets-repo";
 import { listStandards } from "./design-standards-repo";
@@ -320,7 +322,12 @@ function fileBlocks(files: readonly SolFile[]): Anthropic.ContentBlockParam[] {
 }
 
 /** Sol answers what the member said (with any files) and both are kept in their conversation. */
-export async function askSol(member: Member, said: { text: string; files: SolFile[] }, apiKey: string | null): Promise<SolState> {
+export async function askSol(
+  member: Member,
+  said: { text: string; files: SolFile[] },
+  apiKey: string | null,
+  use: SolUse = "chat",
+): Promise<SolState> {
   const { businessId, email } = member;
   const named = said.files.map((f) => f.name);
   const text = (said.text || "Here's what I've attached.") + (named.length ? `\n(Attached: ${named.join(", ")})` : "");
@@ -336,6 +343,9 @@ export async function askSol(member: Member, said: { text: string; files: SolFil
       },
     ]);
   }
+  // One credit an answer, taken before Claude is asked and given back when no answer comes.
+  const credit = await takeSolCredit(businessId, use, email);
+  if (!credit) return addSolTurns(businessId, email, [you, { role: "sol", text: SOL_OUT, at: new Date().toISOString() }]);
   const viewer = viewerOf(member);
   const [state, jobs, customers, serviceOpen] = await Promise.all([
     solState(businessId, email),
@@ -400,6 +410,7 @@ export async function askSol(member: Member, said: { text: string; files: SolFil
     }
   } catch (e) {
     console.error("sol failed", redactSecrets(e instanceof Anthropic.APIError ? `Claude API ${e.status}: ${e.message}` : String(e)));
+    if (!answer) await giveBackSolCredit(businessId, credit);
     answer = answer || "Something went wrong reaching Claude just then. Try again in a moment.";
   }
   const sol: SolTurn = {
@@ -450,7 +461,7 @@ export async function solAnswersInChannel(member: Member, room: string, asked: s
   let said: string;
   let visuals: { charts?: unknown; diagrams?: unknown } = {};
   try {
-    const state = await askSol(member, { text: prompt, files: [] }, apiKey);
+    const state = await askSol(member, { text: prompt, files: [] }, apiKey, "channel");
     const last = [...state.turns].reverse().find((t) => t.role === "sol");
     said = last?.text?.trim() || "I couldn't answer that just now.";
     // His pictures go into the channel with his words.

@@ -2,6 +2,7 @@ import { normaliseEmail } from "@/lib/domain/accounts";
 import { MAX_MEMBERS, cleanPermissions, cleanRole } from "@/lib/domain/design/account";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { addMember, listMembers, removeMember, setPermissions, setRole } from "@/lib/server/design-repo";
+import { syncSeats } from "@/lib/server/design-seats";
 import { allow } from "@/lib/server/rate-limit";
 
 /** GET: the people in the signed-in member's business. */
@@ -34,6 +35,8 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, message: `A business can have up to ${MAX_MEMBERS} people for now.` }, { status: 422 });
     if (result === "taken")
       return Response.json({ ok: false, message: "That email can't be added. It may already be in a business." }, { status: 422 });
+    // A new person is a new paid user: the plan follows the team.
+    await syncSeats(who.member.businessId);
     return Response.json({ ok: true, members: await listMembers(who.member.businessId) });
   });
 }
@@ -71,6 +74,7 @@ export async function DELETE(request: Request) {
     if ("refuse" in read) return read.refuse;
     const email = normaliseEmail(read.body.email);
     if (!email || !(await removeMember(who.member.businessId, email))) return Response.json({ ok: false }, { status: 404 });
+    await syncSeats(who.member.businessId);
     return Response.json({ ok: true, members: await listMembers(who.member.businessId) });
   });
 }

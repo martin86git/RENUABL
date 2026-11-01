@@ -72,6 +72,8 @@ function CopyRow({ label, value, copy }: { label: string; value: string; copy?: 
 export function PayDeposit(props: {
   view: ProposalView;
   deposit: PublicDeposit;
+  /** The business takes cards through its own Stripe account: card payment is offered above, so this panel offers bank transfer only. */
+  cardsHere?: boolean;
   /** Tells the business the customer has paid, and how. Answers with what went wrong, or null. Left out in a preview. */
   onPaid?: (way: PaidWay) => Promise<string | null>;
 }) {
@@ -79,9 +81,9 @@ export function PayDeposit(props: {
   const business = view.business.name;
   const [busy, setBusy] = useState<PaidWay | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const ways = waysToPay(view);
+  const ways = waysToPay(view).filter((w) => !(props.cardsHere && w === "card"));
   const bank = view.terms?.bank ?? null;
-  const payLink = view.terms?.payLink ?? null;
+  const payLink = props.cardsHere ? null : (view.terms?.payLink ?? null);
   const said = customerStandingWords(deposit, business, day);
 
   const tell = async (way: PaidWay) => {
@@ -91,6 +93,8 @@ export function PayDeposit(props: {
     setBusy(null);
   };
 
+  // With cards taken here, the payments above show what is paid; this panel is then only for paying by transfer.
+  if (props.cardsHere && (deposit.standing === "received" || !bank)) return null;
   if (deposit.standing !== "due")
     return (
       <div id="deposit" className="rounded-xl border border-line bg-surface p-5 sm:p-7" role="status">
@@ -105,9 +109,14 @@ export function PayDeposit(props: {
   return (
     <div id="deposit" className="rounded-xl border border-line bg-surface p-5 sm:p-7">
       <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Next step</p>
-      <h3 className="mt-2 text-[20px] leading-tight text-ink">Pay your deposit of {money(deposit.amount)}</h3>
+      <h3 className="mt-2 text-[20px] leading-tight text-ink">
+        {props.cardsHere ? "Or pay your deposit by bank transfer" : `Pay your deposit of ${money(deposit.amount)}`}
+      </h3>
       <p className={clsx(fine, "mt-2")}>
-        {depositBasis(view)} You pay {business} directly: nothing is charged through this page.
+        {depositBasis(view)}{" "}
+        {props.cardsHere
+          ? `By transfer, it goes straight into ${business}'s account.`
+          : `You pay ${business} directly: nothing is charged through this page.`}
       </p>
 
       {ways.length === 0 && <p className="mt-4 text-[15px] text-ink">{noWayToPay(business)}</p>}
@@ -204,7 +213,11 @@ export function DepositLine(props: {
       <p className="mt-0.5 text-xs text-muted">
         {deposit.reference ? `Reference ${deposit.reference}` : "No reference yet"}
         {deposit.standing === "received" && deposit.way ? ` · the customer said ${WAY_WORDS[deposit.way]}` : ""}
-        {deposit.standing === "received" && deposit.receivedBy ? ` · marked by ${deposit.receivedBy}` : ""}
+        {deposit.standing === "received" && deposit.receivedBy
+          ? deposit.receivedBy === "stripe"
+            ? " · paid by card through Stripe"
+            : ` · marked by ${deposit.receivedBy}`
+          : ""}
       </p>
       {props.mayMark && (
         <div className="mt-2 flex flex-wrap gap-2">

@@ -3,7 +3,10 @@ import { todayInMarket } from "@/lib/domain/market";
 import { NO_DEPOSIT, NOT_ACCEPTED, PAID_WAY_WRONG, PAID_WAYS, type PaidWay } from "@/lib/domain/design/deposit";
 import { INDICATIVE_NOT_ACCEPTABLE, cleanAcceptance } from "@/lib/domain/design/proposal";
 import { answer, readBody } from "@/lib/server/design-context";
-import { acceptProposal, markOpened, proposalJob, publicProposal, sayPaid } from "@/lib/server/design-proposal-repo";
+import { CARDS_OFF, NOT_NEXT, NOTHING_DUE, isDueKey, platformFeeCents } from "@/lib/domain/design/proposal-payments";
+import { acceptProposal, cardPaymentFor, markOpened, proposalJob, publicProposal, sayPaid } from "@/lib/server/design-proposal-repo";
+import { stripeClient } from "@/lib/server/stripe";
+import { createProposalPaymentCheckout } from "@/lib/server/stripe-billing";
 import { afterSigning } from "@/lib/server/design-after-sale-repo";
 import { tellAccepted, tellPaid } from "@/lib/server/design-notify";
 import { allow } from "@/lib/server/rate-limit";
@@ -90,6 +93,35 @@ export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[t
       if (result === "no-such-way") return Response.json({ ok: false, message: PAID_WAY_WRONG }, { status: 422 });
       const found = await publicProposal(token, today);
       return Response.json({ ok: true, ...found }, { headers: PRIVATE });
+    }
+    if (read.body.action === "pay") {
+      if (!allow(request, "proposal-pay", 20)) return slowDown();
+      // Only which amount they mean is taken from what was sent; the amount, the account and the fee are worked out here.
+      if (!isDueKey(read.body.due)) return Response.json({ ok: false, message: NOT_NEXT }, { status: 422 });
+      const stripe = stripeClient();
+      if (!stripe) return Response.json({ ok: false, message: CARDS_OFF }, { status: 409 });
+      const target = await cardPaymentFor(token, read.body.due, today);
+      if (!target) return notFound();
+      if ("refuse" in target) {
+        const why = { "not-accepted": NOT_ACCEPTED, "nothing-due": NOTHING_DUE, "cards-off": CARDS_OFF, "not-next": NOT_NEXT }[
+          target.refuse
+        ];
+        return Response.json({ ok: false, message: why }, { status: 409 });
+      }
+      const amountCents = Math.round(target.due.amount * 100);
+      const url = await createProposalPaymentCheckout(stripe, {
+        account: target.account,
+        business: target.business,
+        businessId: target.businessId,
+        versionId: target.versionId,
+        due: target.due,
+        amountCents,
+        feeCents: platformFeeCents(amountCents),
+        reference: target.reference,
+        token,
+        origin: new URL(request.url).origin,
+      });
+      return Response.json({ ok: true, url }, { headers: PRIVATE });
     }
     return Response.json({ ok: false, message: "That can't be done here." }, { status: 400 });
   });

@@ -30,6 +30,17 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-01",
+    area: "Proposals",
+    words:
+      "Customers can pay their deposit and each payment milestone by card from their proposal, once you connect your own Stripe account.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Settings",
+    words: "Billing shows your Sol credits, every invoice as a tax invoice to download, and the business details printed on them.",
+  },
+  {
+    day: "2026-11-01",
     area: "Settings",
     words: "A Standards library: upload the standards you've bought (AS/NZS 3000, 3008, 5139 and more) for your whole team to download.",
   },

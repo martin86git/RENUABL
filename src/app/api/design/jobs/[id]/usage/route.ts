@@ -5,6 +5,8 @@ import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-c
 import { jobById } from "@/lib/server/design-crm-repo";
 import { findUsageInFile } from "@/lib/server/design-usage";
 import { allow } from "@/lib/server/rate-limit";
+import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
+import { withSolCredit } from "@/lib/server/sol-credits";
 
 export const maxDuration = 60;
 
@@ -33,7 +35,10 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if (!apiKey) return Response.json({ ok: false, message: "Sol can't read files here: Claude isn't set up." }, { status: 503 });
     const current = cleanExtras({ bill: read.body.current }, 1, { bill: EMPTY, postcode: "" }).bill;
     try {
-      const usage = await findUsageInFile(who.member.businessId, found.job, found.customer, apiKey);
+      const usage = await withSolCredit(who.member.businessId, "usage", who.member.email, () =>
+        findUsageInFile(who.member.businessId, found.job, found.customer, apiKey),
+      );
+      if (usage === "out") return Response.json({ ok: false, message: SOL_OUT_SHORT }, { status: 402 });
       return Response.json(billFieldsFromFile(usage, current));
     } catch (e) {
       console.error("usage from the customer's file failed", redactSecrets(e instanceof Error ? e.message : String(e)));
