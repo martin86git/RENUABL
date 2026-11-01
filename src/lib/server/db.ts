@@ -586,6 +586,34 @@ create table if not exists design_deal_files (
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
 create index if not exists design_deal_files_job on design_deal_files(business_id, job_id, at desc);
+-- A business's own licensed copies of the standards (domain/design/standards.ts), sent in parts under Vercel's request
+-- limit and read back part by part. ready once every part is in and the whole is a PDF.
+create table if not exists design_standards (
+  business_id text not null references businesses(id) on delete cascade,
+  id text not null,
+  code text not null,
+  title text not null,
+  edition text not null default '',
+  file_name text not null,
+  size integer not null,
+  parts integer not null,
+  ready boolean not null default false,
+  licence_by text not null,
+  by_email text not null,
+  at timestamptz not null default now(),
+  primary key (business_id, id)
+);
+create table if not exists design_standard_parts (
+  business_id text not null,
+  standard_id text not null,
+  n integer not null,
+  bytes bytea not null,
+  primary key (business_id, standard_id, n),
+  foreign key (business_id, standard_id) references design_standards(business_id, id) on delete cascade
+);
+-- A product datasheet's own file, kept with its checked figures so the team can open it again.
+alter table design_datasheets add column if not exists file_bytes bytea;
+alter table design_datasheets add column if not exists file_type text;
 -- The installation job card (domain/design/job-card.ts): each installer's private link to a job's card (one each,
 -- for good; sent_at when it was last emailed), and the card's thread of notes and the photos on them.
 create table if not exists design_job_links (

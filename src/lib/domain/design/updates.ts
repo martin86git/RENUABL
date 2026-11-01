@@ -15,6 +15,21 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-01",
+    area: "Settings",
+    words: "A Standards library: upload the standards you've bought (AS/NZS 3000, 3008, 5139 and more) for your whole team to download.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Sol",
+    words: "Sol helps with the electrical rules, names the clause to look up in your copy, and reads your datasheets' figures.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Settings",
+    words: "Product datasheets now keep the sheet itself, for anyone in your team to open again.",
+  },
+  {
+    day: "2026-11-01",
     area: "Sol",
     words: "Sol has a new mark and his own round at the end of the sections; the search asks him too, and on a phone he's mid-bar.",
   },

@@ -7,6 +7,7 @@ import { DesignSettings, type PricePart } from "@/components/design/design-setti
 import { DesignShell } from "@/components/design/design-shell";
 import { DealFieldsSettings } from "@/components/design/settings-deal-fields";
 import { DatasheetSettings } from "@/components/design/settings-datasheets";
+import { StandardsSettings } from "@/components/design/settings-standards";
 import { TargetsSettings } from "@/components/design/settings-targets";
 import { settingBySlug } from "@/components/design/settings-list";
 import { SettingSoon, SettingsFrame } from "@/components/design/settings-nav";
@@ -67,6 +68,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <TargetsSettings />
         ) : section === "datasheets" ? (
           <DatasheetSettings />
+        ) : section === "standards" ? (
+          <StandardsSettings />
         ) : section === "deal-fields" ? (
           <DealFieldsSettings />
         ) : section === "billing" ? (

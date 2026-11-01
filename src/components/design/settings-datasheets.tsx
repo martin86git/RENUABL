@@ -3,11 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileText, Plus, Trash2, Upload } from "lucide-react";
 import clsx from "clsx";
-import type { InverterForm, PanelForm, SavedSheet, SheetKind } from "@/lib/domain/design/datasheets";
+import { KEEP_SHEET_BYTES, type InverterForm, type PanelForm, type SavedSheet, type SheetKind } from "@/lib/domain/design/datasheets";
 import { INVERTER_ELECTRICAL, PANEL_ELECTRICAL, type InverterElectrical, type PanelElectrical } from "@/lib/domain/design/electrical";
 import { workspaceCatalogue } from "@/lib/domain/design/pricing";
 import { shortDate } from "@/lib/services/crm";
-import { deleteDatasheet, loadDatasheets, readDatasheet, saveDatasheet, type SheetForm } from "@/lib/services/datasheets";
+import {
+  datasheetFileHref,
+  deleteDatasheet,
+  keepDatasheetFile,
+  loadDatasheets,
+  readDatasheet,
+  saveDatasheet,
+  type SheetForm,
+} from "@/lib/services/datasheets";
 import { loadWorkspace } from "@/lib/services/design-store";
 import { ui } from "./design-shell";
 
@@ -46,7 +54,7 @@ export function DatasheetSettings() {
     panels: [],
     inverters: [],
   });
-  const [form, setForm] = useState<(SheetForm & { sku: string; fileName: string }) | null>(null);
+  const [form, setForm] = useState<(SheetForm & { sku: string; fileName: string; file?: File }) | null>(null);
   const [reading, setReading] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -83,7 +91,7 @@ export function DatasheetSettings() {
     const list = res.form.kind === "panel" ? products.panels : products.inverters;
     const model = res.form.model.toLowerCase();
     const guess = list.find((p) => model.includes(p.sku.toLowerCase()) || model.includes(p.name.toLowerCase()));
-    setForm({ ...res.form, sku: guess?.sku ?? "", fileName: res.fileName });
+    setForm({ ...res.form, sku: guess?.sku ?? "", fileName: res.fileName, file });
     setStatus({ ok: true, text: "Read. Check each figure against the datasheet before saving: blanks couldn't be read." });
   };
   const save = async () => {
@@ -98,7 +106,14 @@ export function DatasheetSettings() {
     if (!res.ok) return setStatus({ ok: false, text: res.message });
     setSheets(res.sheets);
     setForm(null);
-    setStatus({ ok: true, text: `Saved. The designer now checks strings for ${form.sku} with these figures.` });
+    const saved = `Saved. The designer now checks strings for ${form.sku} with these figures.`;
+    if (!form.file) return setStatus({ ok: true, text: saved });
+    if (form.file.size > KEEP_SHEET_BYTES) return setStatus({ ok: true, text: `${saved} The sheet is over 4 MB, so it isn't kept.` });
+    const kept = await keepDatasheetFile(form.kind, form.sku.trim(), form.file);
+    if (!kept.ok) return setStatus({ ok: true, text: `${saved} ${kept.message}` });
+    const again = await loadDatasheets();
+    if (again.ok) setSheets(again.sheets);
+    setStatus({ ok: true, text: `${saved} The sheet is kept too, for the team to open.` });
   };
 
   return (
@@ -107,8 +122,8 @@ export function DatasheetSettings() {
       <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">Product datasheets</h1>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">
         Upload a panel&apos;s or inverter&apos;s datasheet and its electrical figures are read for you. Check them against the sheet, then
-        save: the designer&apos;s string check, String automatically and Design it for me use them for that product code. The file itself
-        isn&apos;t kept.
+        save: the designer&apos;s string check, String automatically and Design it for me use them for that product code. The sheet is kept
+        with the figures (up to 4 MB) so your team can open it again, and Sol can give them the figures.
       </p>
 
       {missing.length > 0 && (
@@ -329,6 +344,16 @@ export function DatasheetSettings() {
                   {s.fileName && ` · from ${s.fileName}`}
                 </p>
               </div>
+              {s.hasFile && (
+                <a
+                  href={datasheetFileHref(s.kind, s.sku)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={clsx(ui.quiet, "h-8 px-3 text-xs")}
+                >
+                  <FileText className="size-3.5" aria-hidden /> Open the sheet
+                </a>
+              )}
               <button
                 className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-danger"
                 aria-label={`Remove ${s.sku}'s figures`}

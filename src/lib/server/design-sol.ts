@@ -39,6 +39,10 @@ import { loadLists, type Member } from "./design-repo";
 import { casesToResolve } from "./design-service-repo";
 import { addSolTurns, newSolId, solState, withSol } from "./design-sol-repo";
 import { channelContext, solSaysInTeam } from "./design-team-repo";
+import { listSheets } from "./design-datasheets-repo";
+import { listStandards } from "./design-standards-repo";
+import { libraryForSol } from "@/lib/domain/design/standards";
+import { datasheetFigures } from "@/lib/domain/design/datasheets";
 import { TEAM_CHANNELS, nameOf } from "@/lib/domain/design/team-chat";
 
 const MODEL = () => process.env.SOL_MODEL?.trim() || "claude-opus-5-5";
@@ -117,6 +121,18 @@ const TOOLS: Anthropic.Tool[] = [
     name: "remove_reminder",
     description: "Take one of this person's reminders off, by its id.",
     input_schema: { type: "object", properties: { reminder_id: { type: "string" } }, required: ["reminder_id"] },
+  },
+  {
+    name: "standards_on_file",
+    description:
+      "Which standards the business holds in its library (its own licensed copies, with their editions), which of the usual ones it doesn't, and the official free sources. It gives no standard's text: say which clause to look up in their copy.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "datasheet_lookup",
+    description:
+      "The checked electrical figures of panels and inverters from the business's own datasheets (Settings, Product datasheets) and RENUABL's, by product code or model words: panel Voc, Vmp, Isc, Imp and temperature coefficients; inverter max input voltage, MPPT range, start voltage and each MPPT's current and strings.",
+    input_schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
   },
   {
     name: "show_chart",
@@ -276,6 +292,8 @@ async function runTool(
     await withSol(businessId, email, (row) => ({ ...row, reminders: row.reminders.filter((r) => r.id !== s(input.reminder_id)) }));
     return "Taken off.";
   }
+  if (name === "standards_on_file") return libraryForSol(await listStandards(businessId));
+  if (name === "datasheet_lookup") return datasheetFigures(await listSheets(businessId), s(input.query));
   if (name === "show_chart") {
     const c = cleanChart(input);
     if (!c) return "That chart couldn't be drawn: it needs a title and rows of numbers.";

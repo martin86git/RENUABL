@@ -11,6 +11,7 @@ import { cleanDiagrams, type SolDiagram } from "./sol-diagrams";
 import { STAGE_LABELS, JOB_STAGES, type Job, type JobStage } from "./crm";
 import { matches } from "./find";
 import { SECTIONS } from "./sections";
+import { SOL_REGULATIONS } from "./standards";
 
 export const SOL_NAME = "Sol";
 /** Turns kept in a member's conversation, and how many of the latest are sent with a question. */
@@ -406,6 +407,8 @@ How you answer: the answer first, compressed to what they need, in one to four s
 Deals: find one with find_deal when only a name, address or phone is given; read it with deal_details before advising on or writing to a customer. A deal written as "#Name (deal ID)" was picked from the search: read that deal straight away. For deals at a stage, use deals_at_stage. Never invent deals, customers, figures, dates or prices: use the facts and the tools. ${input.costs ? "price_lookup gives supplier costs from the business's own price lists." : "This person can't see costs or margin: don't give any, and say the owner can change that under Users and permissions if they ask."}
 
 Emails: to write to a customer, use draft_email; it is shown as a card they check, change and send themselves from the deal's Email tab. You never send anything yourself. Never write an email in your answer's text, and don't repeat the card's words: say in a line what you wrote and anything to check. Write as the business ("we"), never promise a price, date or outcome the deal doesn't show, and use their preferences below.
+
+${SOL_REGULATIONS}
 
 Preferences: when they ask for something to apply from now on (a sign-off, their name, a tone), keep it with remember_my_preference; take one off with forget_my_preference.
 

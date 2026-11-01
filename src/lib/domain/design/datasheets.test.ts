@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkInverter, checkPanel, codeKey, formFromReading, sheetBasis, withDatasheets } from "./datasheets";
+import { checkInverter, checkPanel, codeKey, datasheetFigures, formFromReading, sheetBasis, withDatasheets } from "./datasheets";
 import { checkString } from "./electrical";
 
 const panel = { voc: "36.42", vmp: "31.11", isc: "15.86", imp: "15.27", vocPercent: "-0.24", iscPercent: "0.046", pmaxPercent: "-0.26" };
@@ -82,5 +82,30 @@ describe("codeKey", () => {
   it("finds a datasheet for a code written another way", () => {
     const out = withDatasheets([{ sku: "SGWSH10RT", electrical: undefined as unknown }], { "SGWSH10.0RT": { maxV: 1 } });
     expect(out[0].electrical).toEqual({ maxV: 1 });
+  });
+});
+
+describe("datasheetFigures, for Sol", () => {
+  const sheet = {
+    kind: "panel" as const,
+    sku: "ABC-440",
+    model: "Example 440 W",
+    figures: { voc: 40, vmp: 33, isc: 14, imp: 13.3, vocPerC: -0.0025, iscPerC: 0.0005, pmaxPerC: -0.003, basis: "x" },
+    checkedBy: "sam@example.com",
+    checkedAt: "2026-10-30T00:00:00.000Z",
+  };
+  it("finds the business's sheet by code or model words, saying who checked it", () => {
+    const got = datasheetFigures([sheet], "example 440");
+    expect(got).toContain("ABC-440");
+    expect(got).toContain("Voc 40 V");
+    expect(got).toContain("-0.25%/°C");
+    expect(got).toContain("checked by sam");
+  });
+  it("falls back to RENUABL's own figures, marked to check", () => {
+    expect(datasheetFigures([], "JKM475N")).toMatch(/RENUABL's figures .*check against the datasheet/);
+  });
+  it("says when nothing matches or nothing was asked", () => {
+    expect(datasheetFigures([sheet], "nothing-like-it")).toMatch(/No datasheet figures match/);
+    expect(datasheetFigures([sheet], "  ")).toMatch(/Say which product/);
   });
 });

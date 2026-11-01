@@ -23,6 +23,10 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
     ],
   },
   {
+    title: "Library",
+    items: [{ slug: "standards", label: "Standards and regulations" }],
+  },
+  {
     title: "Proposal defaults",
     items: [
       { slug: "electricity", label: "Electricity rates" },

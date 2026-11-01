@@ -34,3 +34,21 @@ export const saveDatasheet = (sheet: {
 
 export const deleteDatasheet = (kind: SheetKind, sku: string) =>
   ask<{ sheets: SavedSheet[] }>(`/api/design/datasheets?kind=${kind}&sku=${encodeURIComponent(sku)}`, { method: "DELETE" });
+
+/** Keeps the sheet itself with a product's saved figures, so the team can open it again. */
+export async function keepDatasheetFile(kind: SheetKind, sku: string, file: File): Promise<{ ok: true } | { ok: false; message: string }> {
+  const body = new FormData();
+  body.append("kind", kind);
+  body.append("sku", sku);
+  body.append("file", file);
+  try {
+    const res = await fetch("/api/design/datasheets/file", { method: "POST", body });
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
+    return res.ok && json?.ok ? { ok: true } : { ok: false, message: json?.message ?? "The sheet itself couldn't be kept." };
+  } catch {
+    return { ok: false, message: "The sheet itself couldn't be kept. Check your connection." };
+  }
+}
+
+export const datasheetFileHref = (kind: SheetKind, sku: string) =>
+  `/api/design/datasheets/file?kind=${kind}&sku=${encodeURIComponent(sku)}`;

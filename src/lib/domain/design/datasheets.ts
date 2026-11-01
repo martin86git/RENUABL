@@ -6,7 +6,7 @@
  * (`electrical.ts`). Nothing is taken as final from the reading: a figure that
  * is missing or out of range stops the save. Pure, tested.
  */
-import type { InverterElectrical, MpptInput, PanelElectrical } from "./electrical";
+import { INVERTER_ELECTRICAL, PANEL_ELECTRICAL, type InverterElectrical, type MpptInput, type PanelElectrical } from "./electrical";
 
 export type SheetKind = "panel" | "inverter";
 
@@ -26,7 +26,12 @@ export interface SavedSheet {
   checkedBy: string;
   checkedAt: string;
   figures: PanelElectrical | InverterElectrical;
+  /** Whether the sheet itself is kept with the figures, to open again. */
+  hasFile?: boolean;
 }
+
+/** A sheet is kept with its figures when it fits in one request to the host (under Vercel's 4.5 MB limit). */
+export const KEEP_SHEET_BYTES = 4 * 1024 * 1024;
 
 /** What Claude read from a datasheet: every figure null where it couldn't be read. Percentages as printed (-0.25). */
 export interface SheetReading {
@@ -189,4 +194,51 @@ export function codeKey(sku: string): string {
     .toUpperCase()
     .replace(/\.0(?=[A-Z])/g, "")
     .replace(/[\s_-]+/g, "");
+}
+
+/** A panel's or inverter's figures in one line, as Sol is given them. */
+export function figuresLine(kind: SheetKind, f: PanelElectrical | InverterElectrical): string {
+  const pct = (v: number) => `${(v * 100).toFixed(2)}%/°C`;
+  if (kind === "panel") {
+    const p = f as PanelElectrical;
+    return `Voc ${p.voc} V, Vmp ${p.vmp} V, Isc ${p.isc} A, Imp ${p.imp} A, Voc ${pct(p.vocPerC)}, Isc ${pct(p.iscPerC)}, Pmax ${pct(p.pmaxPerC)}`;
+  }
+  const i = f as InverterElectrical;
+  const mppts = i.mppts.map(
+    (m, n) => `MPPT ${n + 1}: ${m.maxCurrent} A, short-circuit ${m.maxShortCircuit} A, ${m.strings} string${m.strings === 1 ? "" : "s"}`,
+  );
+  return `max input ${i.maxVoltage} V, MPPT range ${i.mppMin}–${i.mppMax} V, start ${i.startVoltage} V; ${mppts.join("; ")}`;
+}
+
+/**
+ * The figures Sol answers with for a product code or model words: the business's checked sheets first, then RENUABL's
+ * own (each said where it came from), at most ten.
+ */
+export function datasheetFigures(
+  sheets: readonly Pick<SavedSheet, "kind" | "sku" | "model" | "figures" | "checkedBy" | "checkedAt">[],
+  query: string,
+  ours: { panels: Record<string, PanelElectrical>; inverters: Record<string, InverterElectrical> } = {
+    panels: PANEL_ELECTRICAL,
+    inverters: INVERTER_ELECTRICAL,
+  },
+): string {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return "Say which product to look up.";
+  const hit = (text: string) => words.every((w) => text.toLowerCase().includes(w));
+  const own = sheets
+    .filter((s) => hit(`${s.sku} ${s.model}`))
+    .map(
+      (s) =>
+        `${s.sku}${s.model ? ` (${s.model})` : ""} · ${s.kind}: ${figuresLine(s.kind, s.figures)} · from the business's datasheet, checked by ${s.checkedBy.split("@")[0]} ${s.checkedAt.slice(0, 10)}`,
+    );
+  const have = new Set(sheets.map((s) => `${s.kind}:${s.sku}`));
+  const renuabl = [
+    ...Object.entries(ours.panels).map(([sku, f]) => ({ kind: "panel" as const, sku, f })),
+    ...Object.entries(ours.inverters).map(([sku, f]) => ({ kind: "inverter" as const, sku, f })),
+  ]
+    .filter((p) => !have.has(`${p.kind}:${p.sku}`) && hit(`${p.sku} ${p.f.basis}`))
+    .map((p) => `${p.sku} · ${p.kind}: ${figuresLine(p.kind, p.f)} · RENUABL's figures (${p.f.basis}; check against the datasheet)`);
+  const all = [...own, ...renuabl];
+  if (!all.length) return "No datasheet figures match that. They can be added under Settings, Product datasheets.";
+  return all.slice(0, 10).join("\n");
 }
