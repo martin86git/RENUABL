@@ -74,6 +74,7 @@ export function DesignStudio() {
   const [account] = useDesignAccount();
   // Bumped after publishing, so the Proposal view's timeline reads again.
   const [published, setPublished] = useState(0);
+  const [theirs, setTheirs] = useState<{ jobId: string; address: string; lat: number; lng: number } | null>(null);
   const [job, setJob] = useState<{ id: string; customerId: string; customerName: string; lat: number; lng: number } | null>(null);
   // The business's price lists and settings; and the STC rules, today's when they can be had.
   const [workspace, setWorkspace] = useState<Workspace>(DEFAULT_WORKSPACE);
@@ -159,8 +160,12 @@ export function DesignStudio() {
         if (asked?.ok && forJob) {
           setJob({ id: asked.job.id, customerId: asked.customer.id, customerName: asked.customer.name, lat: forJob.lat, lng: forJob.lng });
           rememberRoof(forJob);
-        } else if (jobId)
+        } else if (jobId) {
           setProblem(asked && !asked.ok ? asked.message : "That job has no address on the map yet. Add one on the customer's page.");
+          // The deal has no place of its own, but its customer does: offered in one press (as Primero's).
+          if (asked?.ok && asked.customer.lat !== null && asked.customer.lng !== null && asked.customer.address)
+            setTheirs({ jobId: asked.job.id, address: asked.customer.address, lat: asked.customer.lat, lng: asked.customer.lng });
+        }
         setWorkspace(settings);
         if (last && loaded) {
           setRoof(last);
@@ -358,9 +363,22 @@ export function DesignStudio() {
     return (
       <div className="theme-studio">
         {problem && (
-          <p className="mb-3 rounded-md bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
-            {problem}
-          </p>
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
+            <span>{problem}</span>
+            {theirs && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await saveJob(theirs.jobId, { address: theirs.address, lat: theirs.lat, lng: theirs.lng });
+                  if (res.ok) window.location.reload();
+                  else setProblem(res.message);
+                }}
+                className="rounded-full bg-sun-line px-3 py-1.5 text-[13px] font-medium text-white hover:brightness-105"
+              >
+                Design it at the customer&apos;s address: {theirs.address}
+              </button>
+            )}
+          </div>
         )}
         {ready && <DesignToolHome onPick={pick} onOpen={open} />}
       </div>

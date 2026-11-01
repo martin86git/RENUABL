@@ -260,6 +260,8 @@ function Dial(props: {
   onClose: () => void;
   closeTitle: string;
   onRemove?: () => void;
+  /** Graphite with an orange ring (as Primero's, for what is picked), in place of the light plate. */
+  dark?: boolean;
   children: React.ReactNode;
 }) {
   // In rem: the dial's radius, and how far out from its centre (the middle of the picture's right edge) the rounds sit.
@@ -272,7 +274,10 @@ function Dial(props: {
     "absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-surface shadow-lift ring-1 ring-line hover:ring-ink-2";
   return (
     <div
-      className="absolute right-0 top-[56%] z-10 -translate-y-1/2 rounded-l-full border border-r-0 border-line bg-surface/90 shadow-lift backdrop-blur-md"
+      className={clsx(
+        "absolute right-0 top-[56%] z-10 -translate-y-1/2 rounded-l-full border border-r-0 shadow-lift backdrop-blur-md",
+        props.dark ? "border-sun-line bg-primary/95 text-white ring-2 ring-sun-line" : "border-line bg-surface/90",
+      )}
       style={{ width: `${R}rem`, height: `${R * 2}rem` }}
       role="group"
       aria-label={props.label}
@@ -746,6 +751,8 @@ export function RoofDesigner(props: {
   const [toolMenu, setToolMenu] = useState<{ x: number; y: number } | null>(null);
   // An array just laid (as Primero's): its tilt is offered beside the turn buttons, to change or keep, while it is picked.
   const [tiltPop, setTiltPop] = useState<string[]>([]);
+  // Faces traced this visit whose pitch nobody has looked at yet (as Primero's): their pitch pulses in orange until checked.
+  const [pitchDue, setPitchDue] = useState<string[]>([]);
   // Beside the picture, one view at a time (1 Nov 2026, Martin: Primero's Designer / Quote / Proposal): the home and the
   // deal's notes, the quote, or the proposal with its chat and timeline. As Primero's, the tabs sit at the top of the
   // column beside the picture, which always shows. The choice is kept on this device.
@@ -1531,6 +1538,7 @@ export function RoofDesigner(props: {
     setSelected(id);
     setPicks([]);
     setTool("select");
+    setPitchDue((due) => [...due, id]);
     void readSlope(id, points, false);
   };
 
@@ -2784,6 +2792,26 @@ export function RoofDesigner(props: {
             )}
           </div>
           <span className="hidden flex-1 lg:block" aria-hidden />
+          {/* The customer's chat (as Primero's): a round that lights orange with a count while they wait, opening the Proposal view. */}
+          {props.jobId && (
+            <button
+              type="button"
+              onClick={() => showSide("proposal")}
+              title={(props.waiting ?? 0) > 0 ? "The customer is waiting for a reply" : "The chat with the customer"}
+              aria-label={(props.waiting ?? 0) > 0 ? `Chat: ${props.waiting} waiting` : "Chat with the customer"}
+              className={clsx(
+                "relative flex size-10 items-center justify-center rounded-full ring-1 transition",
+                (props.waiting ?? 0) > 0 ? "bg-sun-line text-white ring-sun-line" : "bg-surface text-ink-2 ring-line hover:text-ink",
+              )}
+            >
+              <MessageCircle className="size-[18px]" aria-hidden />
+              {(props.waiting ?? 0) > 0 && (
+                <span className="absolute -right-1 -top-1 flex min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold leading-5 text-white ring-2 ring-surface">
+                  {props.waiting}
+                </span>
+              )}
+            </button>
+          )}
           {/* Publishing saves the design and makes (or brings up to date) its proposal. From a deal it opens a box for a note to the customer, sent with it. */}
           <div className="relative">
             <button
@@ -4448,19 +4476,42 @@ export function RoofDesigner(props: {
               ) : picks.length > 0 ? (
                 <Dial
                   label="What is picked"
+                  dark
                   onTurn={null}
                   onClose={() => setPicks([])}
                   closeTitle="Pick none (Esc)"
                   onRemove={removePicked}
                 >
-                  <p className="whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.12em] text-muted">
+                  <p className="whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">
                     {picks.length === 1 ? (picks[0].kind === "label" ? "Label" : "1 panel") : `${picks.length} picked`}
                   </p>
                   {pickedPanels.length > 0 && (
                     <>
+                      {/* Portrait or landscape for the picked panels, as two small drawn panels (as Primero's). */}
+                      <div className="mt-2 flex justify-end gap-1" role="radiogroup" aria-label="The picked panels' way round">
+                        {([false, true] as const).map((land) => {
+                          const on = pickedPanels.every((p) => Boolean(p.across) === land);
+                          return (
+                            <button
+                              key={String(land)}
+                              type="button"
+                              role="radio"
+                              aria-checked={on}
+                              title={land ? "Lay them landscape" : "Lay them portrait"}
+                              onClick={() => turnLandscape(land)}
+                              className={clsx(
+                                "flex size-9 items-center justify-center rounded-lg transition",
+                                on ? "bg-sun-line text-white" : "bg-white/10 text-white/75 hover:bg-white/20 hover:text-white",
+                              )}
+                            >
+                              <PanelDrawing landscape={land} size={20} />
+                            </button>
+                          );
+                        })}
+                      </div>
                       <label className="mt-2 block">
-                        <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-muted">Tilt</span>
-                        <span className="block text-[1.75rem] font-semibold leading-none tabular-nums text-ink">
+                        <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">Tilt</span>
+                        <span className="block text-[1.75rem] font-semibold leading-none tabular-nums text-white">
                           {pickedTilt === null ? "mixed" : `${pickedTilt}°`}
                         </span>
                         <input
@@ -4473,13 +4524,13 @@ export function RoofDesigner(props: {
                           className="mt-2 block w-full"
                         />
                       </label>
-                      <p className="mt-2.5 text-xs leading-snug text-ink-2">
+                      <p className="mt-2.5 text-xs leading-snug text-white/75">
                         {pickedFacing === null ? "Facing different ways" : `Facing ${compass(pickedFacing)} (${pickedFacing}°)`}
                       </p>
                       {pickedFacing !== null && pickedTilt !== null && (
                         <>
-                          <p className="text-xs font-semibold leading-snug text-ink">{besideFlat(pickedTilt, pickedFacing)}</p>
-                          <p className="text-xs leading-snug text-muted">
+                          <p className="text-xs font-semibold leading-snug text-white">{besideFlat(pickedTilt, pickedFacing)}</p>
+                          <p className="text-xs leading-snug text-white/60">
                             {bestTilt(pickedFacing) === 0 ? "Flat is best" : `${bestTilt(pickedFacing)}° is best`}
                           </p>
                         </>
@@ -5602,20 +5653,35 @@ export function RoofDesigner(props: {
                     className="mt-1 w-full"
                   />
                 </label>
-                <label className="block text-sm">
-                  <span className="flex justify-between">
-                    Roof pitch <span className="tabular-nums">{face.tilt ?? TILT.roof}°</span>
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={TILT.max}
-                    value={face.tilt ?? TILT.roof}
-                    onChange={(e) => update(face.id, { tilt: Number(e.target.value) })}
-                    {...slides}
-                    className="mt-1 w-full"
-                  />
-                </label>
+                <div className={clsx("rounded-md text-sm", pitchDue.includes(face.id) && "animate-pulse bg-sun p-2 ring-2 ring-sun-line")}>
+                  <label className="block">
+                    <span className="flex justify-between">
+                      {pitchDue.includes(face.id) ? "Check the roof pitch" : "Roof pitch"}{" "}
+                      <span className="tabular-nums">{face.tilt ?? TILT.roof}°</span>
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={TILT.max}
+                      value={face.tilt ?? TILT.roof}
+                      onChange={(e) => {
+                        update(face.id, { tilt: Number(e.target.value) });
+                        setPitchDue((due) => due.filter((x) => x !== face.id));
+                      }}
+                      {...slides}
+                      className="mt-1 w-full"
+                    />
+                  </label>
+                  {pitchDue.includes(face.id) && (
+                    <button
+                      type="button"
+                      onClick={() => setPitchDue((due) => due.filter((x) => x !== face.id))}
+                      className="mt-1.5 inline-flex h-7 items-center gap-1 rounded-full bg-primary px-2.5 text-[11px] font-semibold text-primary-ink"
+                    >
+                      <Check className="size-3.5" aria-hidden /> Keep {face.tilt ?? TILT.roof}°
+                    </button>
+                  )}
+                </div>
                 <p className="text-sm text-ink-2">
                   Its panels face {compass(faceFacing(face))} ({faceFacing(face)}°), square to the rows: the arrows.{" "}
                   <strong className="font-semibold text-ink">{besideFlat(face.tilt ?? TILT.roof, faceFacing(face))}</strong> over a year.

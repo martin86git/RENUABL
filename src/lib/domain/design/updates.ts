@@ -15,6 +15,21 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-01",
+    area: "Design tool",
+    words: "A new home: one bar for a deal or an address, the orange + for a new design, Up next on its roof, and the queue as roof cards.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Design tool",
+    words: "The bill box takes kWh as well as dollars, and Sol can find the customer's usage in their file.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Design tool",
+    words: "The customer's name in the bar opens their deal; a chat round lights orange while the customer is waiting.",
+  },
+  {
+    day: "2026-11-01",
     area: "Proposals",
     words: "Send a new lead an indicative proposal: systems to compare, a site visit, then the final one. They reply in the chat.",
   },
@@ -38,8 +53,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-01",
     area: "Design tool",
-    words:
-      "Opens zoomed in on the roof; the hand drags the picture at any zoom; model numbers in the panel, inverter and battery lists.",
+    words: "Opens zoomed in on the roof; the hand drags the picture at any zoom; model numbers in the panel, inverter and battery lists.",
   },
   {
     day: "2026-11-01",
