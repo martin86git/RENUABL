@@ -1,5 +1,6 @@
 "use client";
 
+import { tradeUnreadCount } from "@/lib/services/trade";
 import { inboxUnread } from "@/lib/services/inbox";
 import { stopViewing } from "@/lib/services/design-account";
 import Link from "next/link";
@@ -112,7 +113,12 @@ function Shell({
       window.removeEventListener("renuabl:approvals", look);
     };
   }, [on]);
-  const counts: Record<string, number> = { service, ...gates };
+  // Conversations about equipment with lines this business hasn't read (as seller or buyer).
+  const trade = useCount(on, "renuabl:trade", async () => {
+    const res = await tradeUnreadCount();
+    return res.ok ? res.unread : null;
+  });
+  const counts: Record<string, number> = { service, ...gates, "my-equipment": trade };
   // Gmail's own unread count on the envelope, asked each minute while the page is in view (0 until Gmail is connected).
   const mail = useCount(on, "renuabl:inbox", async () => {
     const res = await inboxUnread();

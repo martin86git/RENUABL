@@ -61,6 +61,8 @@ export const SECTIONS: readonly Section[] = [
       { id: "listings", label: "Job listings", href: "/design/marketplace" },
       { id: "my-listings", label: "My listings", href: "/design/marketplace/mine" },
       { id: "my-bids", label: "My bids", href: "/design/marketplace/bids" },
+      { id: "equipment", label: "Equipment", href: "/design/marketplace/equipment" },
+      { id: "my-equipment", label: "My equipment", href: "/design/marketplace/equipment/mine" },
     ],
   },
 ];

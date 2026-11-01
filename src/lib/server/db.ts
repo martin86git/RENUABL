@@ -706,6 +706,54 @@ create table if not exists design_bids (
   at timestamptz not null default now(),
   unique (listing_id, business_id)
 );
+-- The Marketplace's equipment trading (domain/design/trade.ts): spare stock a business puts up, its photos (redrawn,
+-- nothing but the picture kept), and the conversations between the seller and each business that asks about it.
+create table if not exists design_trade_items (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  category text not null,
+  title text not null,
+  make text not null default '',
+  model text not null default '',
+  qty integer not null,
+  condition text not null,
+  price numeric,
+  handover text not null,
+  description text not null default '',
+  suburb text not null default '',
+  near_lat double precision,
+  near_lng double precision,
+  status text not null default 'available',
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists design_trade_items_open on design_trade_items(status, created_at desc);
+create table if not exists design_trade_photos (
+  id text primary key,
+  item_id text not null references design_trade_items(id) on delete cascade,
+  bytes bytea not null,
+  content_type text not null,
+  position integer not null default 0,
+  at timestamptz not null default now()
+);
+create table if not exists design_trade_threads (
+  id text primary key,
+  item_id text not null references design_trade_items(id) on delete cascade,
+  buyer_id text not null references businesses(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (item_id, buyer_id)
+);
+create table if not exists design_trade_messages (
+  id text primary key,
+  thread_id text not null references design_trade_threads(id) on delete cascade,
+  from_business text not null references businesses(id) on delete cascade,
+  by_email text not null,
+  text text not null,
+  at timestamptz not null default now(),
+  read_at timestamptz
+);
+create index if not exists design_trade_messages_thread on design_trade_messages(thread_id, at);
 create table if not exists design_feedback_comments (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,
