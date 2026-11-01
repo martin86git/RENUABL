@@ -207,6 +207,9 @@ const SIDE_VIEWS: { id: SideView; label: string; hint: string }[] = [
   { id: "proposal", label: "Proposal", hint: "The proposal, the chat with the customer and what has been sent" },
 ];
 
+/** What the card says when the three designs were made by themselves as the roof opened. */
+const AUTO_DESIGNED = "Designed as the roof opened, from Google's roof data and your prices: check each against the photo before sending.";
+
 const GLASS = "rounded-2xl border border-line bg-surface/90 shadow-lift backdrop-blur-md";
 
 /** A panel's outline before it is placed, with the edge it shares with the panel it clicks against. */
@@ -2608,7 +2611,7 @@ export function RoofDesigner(props: {
    * independence (`self-design.ts`), from the traced faces (else Google's roof model), the customer's bill and the
    * business's prices. They replace the roof's designs (asked first), each with its goal, the best return the primary.
    */
-  const designForMe = async () => {
+  const designForMe = async (auto = false) => {
     setMineIntro(false);
     setMine("busy");
     let model: RoofModel | null = null;
@@ -2647,7 +2650,8 @@ export function RoofDesigner(props: {
       date: todayInMarket(),
       newId,
     });
-    setMine(result);
+    // Made by itself as the roof opened: said so on the card, to be checked against the photo.
+    setMine(auto ? { ...result, notes: [AUTO_DESIGNED, ...result.notes] } : result);
     setMineOpen(true);
     if (!result.options.length) return;
     const list = result.options.map((o) => o.design);
@@ -2660,6 +2664,20 @@ export function RoofDesigner(props: {
     show(list, lead);
     setSaved("changed");
   };
+  // The roof designs itself as it opens (1 Nov 2026, Martin: land on a finished first design, not a blank roof): once,
+  // only when nothing has been drawn on any of the roof's designs, and only for someone who sees costs (it prices them).
+  const autoDesigned = useRef(false);
+  useEffect(() => {
+    if (autoDesigned.current || costsHidden) return;
+    if (!props.set.designs.every((d) => !d.faces.length && !(d.loose ?? []).length)) return;
+    const t = window.setTimeout(() => {
+      autoDesigned.current = true;
+      void designForMe(true);
+    }, 400);
+    return () => window.clearTimeout(t);
+    // Once, as the roof opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const suggestions = suggesting
     ? suggestInverters({
         arrayKw: summary.kw,
