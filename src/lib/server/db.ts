@@ -637,6 +637,37 @@ create table if not exists design_feedback (
   done_by text
 );
 create index if not exists design_feedback_business on design_feedback(business_id, at desc);
+-- Email (domain/design/inbox.ts): each member's own Gmail, read only (the refresh token encrypted, never sent to a
+-- browser), and the notes on an email with whom it is shared (a copy of that one email, never the mailbox).
+create table if not exists design_gmail (
+  business_id text not null references businesses(id) on delete cascade,
+  email text not null,
+  address text not null,
+  token text not null,
+  access text,
+  expires_at timestamptz,
+  created_at timestamptz not null default now(),
+  primary key (business_id, email)
+);
+create table if not exists design_email_talks (
+  business_id text not null references businesses(id) on delete cascade,
+  owner_email text not null,
+  message_id text not null,
+  snapshot jsonb not null,
+  shared text[] not null default '{}',
+  created_at timestamptz not null default now(),
+  primary key (business_id, owner_email, message_id)
+);
+create table if not exists design_email_notes (
+  id text primary key,
+  business_id text not null,
+  owner_email text not null,
+  message_id text not null,
+  by_email text not null,
+  text text not null,
+  at timestamptz not null default now(),
+  foreign key (business_id, owner_email, message_id) references design_email_talks(business_id, owner_email, message_id) on delete cascade
+);
 create table if not exists design_feedback_comments (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,

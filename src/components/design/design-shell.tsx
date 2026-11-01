@@ -1,10 +1,11 @@
 "use client";
 
+import { inboxUnread } from "@/lib/services/inbox";
 import { stopViewing } from "@/lib/services/design-account";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LayoutDashboard, Menu, MessageCircle, PenTool, Search, SquareKanban, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Menu, MessageCircle, PenTool, Search, SquareKanban, type LucideIcon, Mail } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 import { pageAt, sectionAt, SECTIONS } from "@/lib/domain/design/sections";
@@ -31,6 +32,7 @@ export const PATHS = {
   sol: "/design/sol",
   team: "/design/team",
   updates: "/design/updates",
+  inbox: "/design/inbox",
   feedback: "/design/feedback",
   proposalsSent: "/design/sales/proposals",
   proposalsSigned: "/design/sales/signed",
@@ -110,6 +112,11 @@ function Shell({
     };
   }, [on]);
   const counts: Record<string, number> = { service, ...gates };
+  // Gmail's own unread count on the envelope, asked each minute while the page is in view (0 until Gmail is connected).
+  const mail = useCount(on, "renuabl:inbox", async () => {
+    const res = await inboxUnread();
+    return res.ok ? res.unread : null;
+  });
   // Updates since this member last opened them: a count on the gear (wave 7).
   const updates = useCount(on, "renuabl:updates", async () => {
     const res = await updatesUnseen();
@@ -224,6 +231,7 @@ function Shell({
               <span className="studio-day-pill contents">
                 <DayPill />
               </span>
+              <TopIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />
               <MessagesMenu badge={unread} href={PATHS.messages} />
               <NotificationsMenu badge={mentions} full={PATHS.notifications} deal={(id) => `${PATHS.deals}/${id}`} />
               <TopIcon href={PATHS.designer} label="Design tool" icon={PenTool} on={path.startsWith(PATHS.designer)} />
@@ -383,6 +391,7 @@ function Shell({
                 { label: "Sol", href: PATHS.sol, n: 0 },
                 { label: "Team chat", href: PATHS.team, n: 0 },
                 { label: "Notifications", href: PATHS.notifications, n: mentions },
+                { label: "Email", href: PATHS.inbox, n: mail },
                 { label: "Updates", href: PATHS.updates, n: updates },
                 { label: "Feedback", href: PATHS.feedback, n: 0 },
                 { label: "Settings", href: PATHS.settings, n: 0 },
