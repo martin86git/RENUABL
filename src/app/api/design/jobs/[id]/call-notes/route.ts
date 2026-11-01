@@ -8,6 +8,7 @@ import {
   transcriptOf,
   wordsIn,
 } from "@/lib/domain/design/call-notes";
+import { callChanges } from "@/lib/domain/design/prepared";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
@@ -17,10 +18,11 @@ import { allow } from "@/lib/server/rate-limit";
 export const maxDuration = 60;
 
 /**
- * POST { lines } → { notes, text }: the call note-taker (domain/design/call-notes.ts). What the microphone heard of the
+ * POST { lines } → { notes, text, changes }: the call note-taker (domain/design/call-notes.ts). What the microphone heard of the
  * member's side of a call on this deal, and the notes they added, distilled by Claude into what the follow-up email
  * and the design need. Nothing heard is kept: the write-up comes back to be checked, and goes on the deal only when
- * the member adds it as a note.
+ * the member adds it as a note. `changes` are the deal's fields the call fills in (prepared.ts), applied only when the
+ * member applies the write-up (./apply).
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs/[id]/call-notes">) {
   return answer(async () => {
@@ -46,7 +48,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
         apiKey,
       );
       const notes = cleanCallNotes(raw);
-      return Response.json({ ok: true, notes, text: callNotesText(notes) });
+      return Response.json({ ok: true, notes, text: callNotesText(notes), changes: callChanges(notes.system, found.job.details) });
     } catch (e) {
       console.error("call notes failed", redactSecrets(e instanceof Error ? e.message : String(e)));
       return Response.json(

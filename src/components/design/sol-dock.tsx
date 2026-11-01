@@ -72,7 +72,9 @@ export function SolDock() {
       aria-hidden={!open}
       className={clsx(
         "fixed inset-y-0 right-0 z-50 w-full border-l border-line bg-surface transition-transform duration-300 motion-reduce:transition-none print:hidden lg:z-40 lg:w-[var(--sol-w)]",
-        open ? "translate-x-0 shadow-2xl lg:shadow-[-8px_0_30px_rgba(20,22,26,0.06)]" : "pointer-events-none invisible translate-x-full",
+        open
+          ? "translate-x-0 shadow-2xl min-[1440px]:shadow-[-8px_0_30px_rgba(20,22,26,0.06)]"
+          : "pointer-events-none invisible translate-x-full",
       )}
     >
       {open && <SolChat side question={question} onClose={() => setOpen(false)} />}

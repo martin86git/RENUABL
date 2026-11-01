@@ -15,6 +15,21 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-01",
+    area: "Sol",
+    words: "Ready for you on Today: Sol drafts each proposal follow-up as it falls due, ready to check and send in one press.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Deals",
+    words: "After a call, one press adds the notes, fills in the deal's fields, sets your reminder and drafts the recap email.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Sol",
+    words: "Past conversations behind the clock in Sol's chat; after a while away he asks whether to carry on or start afresh.",
+  },
+  {
+    day: "2026-11-01",
     area: "Settings",
     words: "A Standards library: upload the standards you've bought (AS/NZS 3000, 3008, 5139 and more) for your whole team to download.",
   },

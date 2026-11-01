@@ -521,6 +521,24 @@ create table if not exists design_sol (
   updated_at timestamptz not null default now(),
   primary key (business_id, email)
 );
+-- Sol's past conversations (domain/design/sol-history.ts), newest first.
+alter table design_sol add column if not exists past jsonb not null default '[]';
+-- Ready for you (domain/design/prepared.ts): work Sol prepared for a business's deals (a follow-up drafted when it
+-- falls due, a call's recap email), each once by its key, waiting for a member to send it or put it aside.
+create table if not exists design_prepared (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  key text not null,
+  kind text not null,
+  status text not null,
+  item jsonb not null,
+  created_at timestamptz not null default now(),
+  done_at timestamptz,
+  done_by text,
+  unique (business_id, key),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
 -- The team chat (domain/design/team-chat.ts): a business's members talking in its channels and in direct
 -- conversations, the files sent with lines, and when each member last had each room open. Gone with the business.
 create table if not exists design_team_lines (

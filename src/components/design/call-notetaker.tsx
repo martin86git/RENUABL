@@ -1,11 +1,14 @@
 "use client";
 
 import clsx from "clsx";
-import { Loader2, Mic, NotebookPen, Square, X } from "lucide-react";
+import { Check, Loader2, Mic, NotebookPen, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MIN_WORDS, wordsIn, type HeardLine } from "@/lib/domain/design/call-notes";
-import { addActivity, writeUpCall } from "@/lib/services/crm";
+import { MIN_WORDS, wordsIn, type CallNotes, type HeardLine } from "@/lib/domain/design/call-notes";
+import { MAX_REMIND_DAYS, type DetailChange } from "@/lib/domain/design/prepared";
+import { writeUpCall } from "@/lib/services/crm";
+import { PREPARED_CHANGED, applyCall } from "@/lib/services/prepared";
+import { SolIcon } from "./sol-icon";
 import { recognitionClass, useSpeechSupported, type Recognition } from "./speech";
 
 const stamp = () => new Date().toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", timeZone: "Australia/Melbourne" });
@@ -17,7 +20,7 @@ const stamp = () => new Date().toLocaleTimeString("en-AU", { hour: "numeric", mi
  * A dark bar at the foot shows what is heard, with Add a note (what is said until Note done is marked as a note), a
  * box to type one, and End and write up: Claude distils it, the member checks the notes and adds them to the deal.
  */
-export function CallNotetaker({ jobId, customerId, onAdded }: { jobId: string; customerId: string; onAdded?: () => void }) {
+export function CallNotetaker({ jobId, onAdded }: { jobId: string; customerId: string; onAdded?: () => void }) {
   const supported = useSpeechSupported();
   const [on, setOn] = useState(false);
   const [lines, setLines] = useState<HeardLine[]>([]);
@@ -27,6 +30,14 @@ export function CallNotetaker({ jobId, customerId, onAdded }: { jobId: string; c
   const [state, setState] = useState<"listening" | "writing" | "ready" | "saved">("listening");
   const [notes, setNotes] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  // What Sol found beside the notes (prepared.ts): the deal's fields to fill in, a reminder, a recap email.
+  const [found, setFound] = useState<{ notes: CallNotes; changes: DetailChange[] } | null>(null);
+  const [ticks, setTicks] = useState<Record<string, boolean>>({});
+  const [remindOn, setRemindOn] = useState(false);
+  const [remindDays, setRemindDays] = useState(2);
+  const [recapOn, setRecapOn] = useState(false);
+  const [recapOpen, setRecapOpen] = useState(false);
+  const [done, setDone] = useState<string[]>([]);
   const rec = useRef<Recognition | null>(null);
   const live = useRef(false);
   const notingRef = useRef(noting);
@@ -108,12 +119,28 @@ export function CallNotetaker({ jobId, customerId, onAdded }: { jobId: string; c
       return;
     }
     setNotes(res.text);
+    setFound({ notes: res.notes, changes: res.changes ?? [] });
+    setTicks(Object.fromEntries((res.changes ?? []).map((c) => [c.key, c.tick])));
+    setRemindOn(res.notes.followUpDays > 0);
+    setRemindDays(res.notes.followUpDays > 0 ? Math.min(MAX_REMIND_DAYS, res.notes.followUpDays) : 2);
+    setRecapOn(Boolean(res.notes.recap.subject && res.notes.recap.body));
     setState("ready");
   };
   const save = async () => {
-    const res = await addActivity(customerId, { kind: "call", text: notes.trim().slice(0, 4000), jobId });
+    setProblem(null);
+    const details = Object.fromEntries((found?.changes ?? []).filter((c) => ticks[c.key]).map((c) => [c.key, c.value]));
+    const recap = found && recapOn && found.notes.recap.subject && found.notes.recap.body ? found.notes.recap : null;
+    const res = await applyCall(jobId, {
+      text: notes.trim().slice(0, 4000),
+      details,
+      remindDays: remindOn ? remindDays : 0,
+      nextStep: found?.notes.nextStep ?? "",
+      recap,
+    });
     if (!res.ok) return setProblem(res.message);
+    setDone(res.done);
     setState("saved");
+    if (recap) window.dispatchEvent(new Event(PREPARED_CHANGED));
     onAdded?.();
   };
 
@@ -225,6 +252,15 @@ export function CallNotetaker({ jobId, customerId, onAdded }: { jobId: string; c
                   onChange={(e) => setNotes(e.target.value)}
                   className="mt-3 block max-h-[45dvh] min-h-48 w-full rounded-lg bg-white px-3 py-2 text-sm text-ink outline-none"
                 />
+                {found && (
+                  <SolFound
+                    found={found}
+                    ticks={ticks}
+                    setTicks={setTicks}
+                    remind={{ on: remindOn, setOn: setRemindOn, days: remindDays, setDays: setRemindDays }}
+                    recap={{ on: recapOn, setOn: setRecapOn, open: recapOpen, setOpen: setRecapOpen }}
+                  />
+                )}
                 <div className="mt-3 flex justify-end gap-2">
                   <button type="button" onClick={close} className="h-9 rounded-md px-3 text-sm text-white/80 hover:bg-white/10">
                     Discard
@@ -235,12 +271,20 @@ export function CallNotetaker({ jobId, customerId, onAdded }: { jobId: string; c
                     disabled={!notes.trim()}
                     className="h-9 rounded-md bg-sun-line px-4 text-sm font-medium text-white"
                   >
-                    Add to the deal as a note
+                    {applyLabel(found, ticks, remindOn, recapOn)}
                   </button>
                 </div>
               </>
             )}
-            {state === "saved" && <p className="mt-2 text-sm text-white/70">The notes are on the deal&apos;s record as a call.</p>}
+            {state === "saved" && (
+              <ul className="mt-2 space-y-0.5 text-sm text-white/80">
+                {(done.length ? done : ["The notes are on the deal's record as a call."]).map((d) => (
+                  <li key={d} className="flex items-center gap-1.5">
+                    <Check className="size-3.5 text-sun-line" aria-hidden /> {d}
+                  </li>
+                ))}
+              </ul>
+            )}
             {problem && (
               <p className="mt-2 text-sm text-sun-line" role="alert">
                 {problem}
@@ -250,5 +294,99 @@ export function CallNotetaker({ jobId, customerId, onAdded }: { jobId: string; c
           document.body,
         )}
     </>
+  );
+}
+
+/** "Apply all" when Sol found more than the notes; else the plain words. */
+function applyLabel(found: { changes: DetailChange[] } | null, ticks: Record<string, boolean>, remind: boolean, recap: boolean) {
+  const more = (found?.changes.some((c) => ticks[c.key]) ?? false) || remind || recap;
+  return more ? "Apply all to the deal" : "Add to the deal as a note";
+}
+
+/**
+ * What Sol found in the call beside the notes (1 Nov 2026, Martin: the admin after a call in one press): the deal's
+ * fields it fills in (ticked only where nothing was typed, so nothing a person wrote is replaced unasked), a reminder
+ * to follow up when they said they would, and a recap email that waits in Ready for you to be checked and sent.
+ */
+function SolFound(props: {
+  found: { notes: CallNotes; changes: DetailChange[] };
+  ticks: Record<string, boolean>;
+  setTicks: (t: Record<string, boolean>) => void;
+  remind: { on: boolean; setOn: (b: boolean) => void; days: number; setDays: (n: number) => void };
+  recap: { on: boolean; setOn: (b: boolean) => void; open: boolean; setOpen: (b: boolean) => void };
+}) {
+  const { notes, changes } = props.found;
+  const hasRecap = Boolean(notes.recap.subject && notes.recap.body);
+  const box = "mt-0.5 size-4 shrink-0 accent-[var(--sun-line)]";
+  return (
+    <div className="mt-3 rounded-lg bg-white/5 px-3 py-2.5 text-sm">
+      <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
+        <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Sol also found
+      </p>
+      {changes.length > 0 && (
+        <fieldset className="mt-2">
+          <legend className="text-xs text-white/60">Fill in on the deal</legend>
+          <div className="mt-1 grid gap-1 sm:grid-cols-2">
+            {changes.map((c) => (
+              <label key={c.key} className="flex items-start gap-2 text-white/90">
+                <input
+                  type="checkbox"
+                  className={box}
+                  checked={Boolean(props.ticks[c.key])}
+                  onChange={(e) => props.setTicks({ ...props.ticks, [c.key]: e.target.checked })}
+                />
+                <span>
+                  {c.label}: <span className="font-medium text-white">{c.value}</span>
+                  {c.was && <span className="block text-xs text-white/50">Replaces &ldquo;{c.was}&rdquo;</span>}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      <label className="mt-2 flex flex-wrap items-center gap-2 text-white/90">
+        <input type="checkbox" className={box} checked={props.remind.on} onChange={(e) => props.remind.setOn(e.target.checked)} />
+        <span>Remind me to follow up</span>
+        <select
+          value={props.remind.days}
+          onChange={(e) => {
+            props.remind.setDays(Number(e.target.value));
+            props.remind.setOn(true);
+          }}
+          aria-label="When"
+          className="h-7 rounded-md bg-white/10 px-1.5 text-xs text-white outline-none"
+        >
+          {[1, 2, 3, 5, 10].map((d) => (
+            <option key={d} value={d} className="text-ink">
+              {d === 1 ? "tomorrow" : `in ${d} working days`}
+            </option>
+          ))}
+        </select>
+        {notes.nextStep && <span className="basis-full pl-6 text-xs text-white/50">{notes.nextStep}</span>}
+      </label>
+      {hasRecap && (
+        <div className="mt-2">
+          <label className="flex items-start gap-2 text-white/90">
+            <input type="checkbox" className={box} checked={props.recap.on} onChange={(e) => props.recap.setOn(e.target.checked)} />
+            <span>
+              A recap email to the customer, waiting in Ready for you to check and send
+              <button
+                type="button"
+                onClick={() => props.recap.setOpen(!props.recap.open)}
+                className="ml-2 text-xs text-sun-line underline-offset-2 hover:underline"
+              >
+                {props.recap.open ? "Hide" : "Read it"}
+              </button>
+            </span>
+          </label>
+          {props.recap.open && (
+            <div className="mt-1.5 max-h-48 overflow-y-auto rounded-md bg-white px-3 py-2 text-[13px] text-ink">
+              <p className="font-medium">{notes.recap.subject}</p>
+              <p className="mt-1 whitespace-pre-line text-ink-2">{notes.recap.body}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

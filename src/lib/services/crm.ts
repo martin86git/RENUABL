@@ -232,7 +232,11 @@ export const feedbackAction = (body: Record<string, unknown>) => ask<FeedbackAns
 
 /** The call note-taker (wave 7): what was heard of a call on a deal, written up by Claude; nothing heard is kept. */
 export const writeUpCall = (jobId: string, lines: import("@/lib/domain/design/call-notes").HeardLine[]) =>
-  ask<{ notes: import("@/lib/domain/design/call-notes").CallNotes; text: string }>(
+  ask<{
+    notes: import("@/lib/domain/design/call-notes").CallNotes;
+    text: string;
+    changes: import("@/lib/domain/design/prepared").DetailChange[];
+  }>(
     `/api/design/jobs/${encodeURIComponent(jobId)}/call-notes`,
     { method: "POST", body: { lines } },
   );

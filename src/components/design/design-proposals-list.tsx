@@ -17,7 +17,10 @@ import {
   type FollowUpDue,
 } from "@/lib/domain/design/proposal-lists";
 import { listProposals, markFollowUp, type ProposalLine } from "@/lib/services/after-sale";
+import type { PreparedItem } from "@/lib/domain/design/prepared";
 import { PATHS, PageHead, ui } from "./design-shell";
+import { PreparedCard, usePrepared } from "./ready-for-you";
+import { SolIcon } from "./sol-icon";
 
 /**
  * /design/sales/proposals and /design/sales/signed, laid out as Primero's are (Martin, 18 Oct 2026). Sent: each
@@ -114,6 +117,8 @@ function SentList({ rows, now }: { rows: ProposalLine[]; now: Date }) {
     setList((all) =>
       all.map((r) => (r.jobId === jobId ? { ...r, followUps: [...r.followUps, { day, how, at: new Date().toISOString() }] } : r)),
     );
+  // The follow-ups Sol has drafted (Ready for you), offered in each one's box.
+  const { items: drafts, drop } = usePrepared();
 
   return (
     <section className="mt-6">
@@ -151,7 +156,15 @@ function SentList({ rows, now }: { rows: ProposalLine[]; now: Date }) {
                     <Eye className="size-3.5" aria-hidden /> {r.openedAt ? `Opened ${sentStamp(r.openedAt, now).day}` : "Not opened yet"}
                   </span>
                 </div>
-                {r.due && <FollowUpBox line={r} due={r.due} onDone={(how) => marked(r.jobId, r.due!.day, how)} />}
+                {r.due && (
+                  <FollowUpBox
+                    line={r}
+                    due={r.due}
+                    onDone={(how) => marked(r.jobId, r.due!.day, how)}
+                    draft={drafts?.find((d) => d.kind === "follow-up" && d.jobId === r.jobId && d.day === r.due!.day) ?? null}
+                    onDraftGone={drop}
+                  />
+                )}
                 {!r.due && r.followUps.length > 0 && <Touches line={r} now={now} />}
               </div>
               <div className="flex items-start gap-3 sm:flex-col sm:items-end">
@@ -180,9 +193,25 @@ function Status({ state }: { state: ProposalLine["state"] }) {
   return <span className={clsx("rounded-full px-2.5 py-0.5 text-xs font-medium", tone)}>{words}</span>;
 }
 
-/** The follow-up due, marked called or emailed here, with what the customer has had so far beneath it. */
-function FollowUpBox({ line, due, onDone }: { line: SentLine; due: FollowUpDue; onDone: (how: "call" | "email") => void }) {
+/**
+ * The follow-up due, marked called or emailed here, with what the customer has had so far beneath it; and when Sol has
+ * drafted it (Ready for you), "Sol drafted it" opens his draft to check and send.
+ */
+function FollowUpBox({
+  line,
+  due,
+  onDone,
+  draft,
+  onDraftGone,
+}: {
+  line: SentLine;
+  due: FollowUpDue;
+  onDone: (how: "call" | "email") => void;
+  draft: PreparedItem | null;
+  onDraftGone: (id: string) => void;
+}) {
   const [state, setState] = useState<"idle" | "saving" | "error" | { how: "call" | "email" }>("idle");
+  const [reading, setReading] = useState(false);
   const mark = async (how: "call" | "email") => {
     setState("saving");
     const res = await markFollowUp(line.jobId, due.day, how);
@@ -203,6 +232,11 @@ function FollowUpBox({ line, due, onDone }: { line: SentLine; due: FollowUpDue; 
             <Bell className="size-4" aria-hidden /> {followUpLine(due)}
           </p>
           <div className="flex gap-1.5">
+            {draft && draft.status === "ready" && (
+              <button className={clsx(ui.primary, "h-7 px-2.5 text-xs")} onClick={() => setReading(!reading)} aria-expanded={reading}>
+                <SolIcon className="size-3.5" aria-hidden /> Sol drafted it
+              </button>
+            )}
             <button className={clsx(ui.quiet, "h-7 bg-surface px-2.5 text-xs")} onClick={() => mark("call")} disabled={state === "saving"}>
               <Phone className="size-3.5" aria-hidden /> Called
             </button>
@@ -213,6 +247,21 @@ function FollowUpBox({ line, due, onDone }: { line: SentLine; due: FollowUpDue; 
         </div>
       )}
       {state === "error" && <p className="mt-1 text-xs text-danger">Couldn&apos;t be saved. Try again.</p>}
+      {draft && reading && typeof state !== "object" && (
+        <div className="mt-2">
+          <PreparedCard
+            item={draft}
+            showDeal={false}
+            onGone={(sent) => {
+              onDraftGone(draft.id);
+              if (sent) {
+                setState({ how: "email" });
+                onDone("email");
+              }
+            }}
+          />
+        </div>
+      )}
       <Touches line={line} now={new Date()} />
     </div>
   );

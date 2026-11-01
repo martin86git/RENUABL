@@ -2,15 +2,25 @@ import { cleanSolInput, WHEN_LABELS, type WhenChoice, withPin } from "@/lib/doma
 import { parseApiKey } from "@/lib/server/bill-reader";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { askSol, chooseReminderTime } from "@/lib/server/design-sol";
-import { clearSol, markSolSeen, solState, withSol } from "@/lib/server/design-sol-repo";
+import {
+  clearSol,
+  forgetSolPast,
+  markSolSeen,
+  resumeSol,
+  solPast,
+  solPastOne,
+  solState,
+  startNewSol,
+  withSol,
+} from "@/lib/server/design-sol-repo";
 import { allow } from "@/lib/server/rate-limit";
 
 /**
  * Sol, the member's own conversation (domain/design/sol.ts). GET → { state }, saying any reminder now due first (the
  * rail asks every minute for its count). POST { do } → { state }: "chat" { text, files } asks Sol; "seen" marks the
  * conversation seen; "clear" clears it (preferences and reminders stay); "remind" { id, when } sets a reminder's time
- * from the card; "forget-reminder" { id } and "forget-pref" { id } take one off. Each member reads and changes only
- * their own.
+ * from the card; "forget-reminder" { id } and "forget-pref" { id } take one off; "past", "past-open" { id }, "new",
+ * "resume" { id } and "forget-past" { id } are the past conversations. Each member reads and changes only their own.
  */
 export async function GET() {
   return answer(async () => {
@@ -60,6 +70,24 @@ export async function POST(request: Request) {
       }
       case "forget-pref":
         return ok(await withSol(businessId, email, (row) => ({ ...row, prefs: row.prefs.filter((p) => p.id !== id) })));
+      // Past conversations (domain/design/sol-history.ts): the list, one to read, a new chat, one picked up again,
+      // one forgotten. Only ever the member's own.
+      case "past":
+        return Response.json({ ok: true, past: await solPast(businessId, email) });
+      case "past-open": {
+        const past = await solPastOne(businessId, email, id);
+        return past
+          ? Response.json({ ok: true, past })
+          : Response.json({ ok: false, message: "That conversation has gone." }, { status: 404 });
+      }
+      case "new":
+        return ok(await startNewSol(businessId, email));
+      case "resume": {
+        const state = await resumeSol(businessId, email, id);
+        return state ? ok(state) : Response.json({ ok: false, message: "That conversation has gone." }, { status: 404 });
+      }
+      case "forget-past":
+        return Response.json({ ok: true, past: await forgetSolPast(businessId, email, id) });
       default:
         return Response.json({ ok: false, message: "Unknown request." }, { status: 400 });
     }

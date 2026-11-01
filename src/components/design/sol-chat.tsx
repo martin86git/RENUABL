@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Bell, Copy, FileText, Mail, Plus, X, Pin } from "lucide-react";
+import { Bell, Copy, FileText, History, Mail, MessageSquarePlus, Plus, X, Pin } from "lucide-react";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { MORE_DETAIL_ASK, offersMore } from "@/lib/domain/design/sol-charts";
@@ -35,11 +35,18 @@ import {
   remindAt,
   solSeen,
   pinTurn,
+  newSolChat,
+  resumeSolChat,
 } from "@/lib/services/sol";
+import { askToStartAfresh, worthKeeping } from "@/lib/domain/design/sol-history";
 import { DictateButton, withSpoken } from "./dictate";
+import { SolHistory } from "./sol-history";
 import { SolMark } from "./sol-icon";
 import { SolThinking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
+
+/** The last message the member chose to carry on from after a while away (sessionStorage). */
+const CARRIED_KEY = "renuabl.design.sol-carried";
 
 const STARTERS = [
   "Which deals have sat at Proposal sent the longest?",
@@ -134,6 +141,26 @@ export function SolChat({
 
   const turns = state?.turns ?? [];
   const unread = state?.unread ?? 0;
+  // Past conversations, and the question after a while away (sol-history.ts): asked once for the last message there
+  // was, until it's answered (kept for the tab).
+  const [history, setHistory] = useState(false);
+  const [opened] = useState(() => new Date());
+  const [carried, setCarried] = useState<string | null>(() => {
+    try {
+      return typeof window === "undefined" ? null : sessionStorage.getItem(CARRIED_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const lastAt = turns[turns.length - 1]?.at ?? null;
+  const carryOn = (at: string) => {
+    setCarried(at);
+    try {
+      sessionStorage.setItem(CARRIED_KEY, at);
+    } catch {
+      // Storage refused: it is asked again next time the panel opens.
+    }
+  };
   // On screen, everything is seen; the rail's count follows.
   useEffect(() => {
     if (unread > 0) void run(solSeen());
@@ -233,6 +260,20 @@ export function SolChat({
           Sol {!side && <span className="font-normal text-muted">· your conversation is yours alone</span>}
         </p>
         <span className="ml-auto" />
+        {/* Past conversations (1 Nov 2026, Martin): the clock wound back, on the right. */}
+        <button
+          type="button"
+          onClick={() => setHistory(!history)}
+          aria-pressed={history}
+          aria-label="Past conversations"
+          title="Past conversations"
+          className={clsx(
+            "inline-flex size-7 items-center justify-center rounded-full transition-colors",
+            history ? "bg-ink text-sun-line" : "text-muted hover:bg-canvas hover:text-ink",
+          )}
+        >
+          <History className="size-4" aria-hidden />
+        </button>
         {side && (
           <a href="/design/sol" className="text-xs text-muted hover:text-ink">
             Full page
@@ -262,8 +303,30 @@ export function SolChat({
         )}
       </div>
 
+      {history && (
+        <SolHistory
+          current={worthKeeping(turns)}
+          busy={busy}
+          onBack={() => setHistory(false)}
+          onNew={() => void run(newSolChat()).then((ok) => ok && setHistory(false))}
+          onResume={(id) => void run(resumeSolChat(id)).then((ok) => ok && setHistory(false))}
+          renderTurns={(past) =>
+            past.map((t, i) => (
+              <div key={`${t.at}-${i}`} className="space-y-2">
+                <Bubble you={t.role === "you"} text={t.text} at={t.at} />
+                {t.charts?.map((c, k) => (
+                  <SolChartView key={k} chart={c} />
+                ))}
+                {t.diagrams?.map((d, k) => (
+                  <SolDiagramView key={k} diagram={d} />
+                ))}
+              </div>
+            ))
+          }
+        />
+      )}
       {/* Pinned messages (1 Nov 2026, Martin: as Primero's): a strip at the top; a press goes to the message, the cross unpins it. */}
-      {turns.some((t) => t.pinned) && (
+      {!history && turns.some((t) => t.pinned) && (
         <div className="max-h-28 shrink-0 overflow-y-auto border-b border-line bg-sun/40 px-5 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sun-ink">Pinned</p>
           <ul className="mt-1 space-y-1">
@@ -291,7 +354,7 @@ export function SolChat({
           </ul>
         </div>
       )}
-      <div className="staff-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 text-sm">
+      <div className={clsx("staff-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 text-sm", history && "hidden")}>
         {!state && !problem && <SolThinking say="Opening your conversation…" />}
         {state && turns.length === 0 && !pending && (
           <div className="space-y-2 text-ink-2">
@@ -365,12 +428,37 @@ export function SolChat({
         <div ref={end} />
       </div>
 
+      {/* Back after a while: carry on, or start a new chat with the one before kept in the past conversations. */}
+      {!history && state && pending === null && lastAt && carried !== lastAt && askToStartAfresh(turns, opened) && (
+        <div className="mx-3 mb-2 rounded-2xl bg-canvas p-3 text-sm ring-1 ring-line">
+          <p className="text-ink">Welcome back. Pick up where you left off, or start a new chat?</p>
+          <p className="mt-0.5 text-xs text-muted">This one stays in your past conversations either way.</p>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void run(newSolChat())}
+              disabled={busy}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-xs font-medium text-primary-ink hover:bg-forest"
+            >
+              <MessageSquarePlus className="size-3.5" aria-hidden /> Start a new chat
+            </button>
+            <button
+              type="button"
+              onClick={() => carryOn(lastAt)}
+              className="h-8 rounded-full px-3.5 text-xs font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+            >
+              Carry on here
+            </button>
+          </div>
+        </div>
+      )}
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void send();
         }}
-        className="border-t border-line p-3"
+        className={clsx("border-t border-line p-3", history && "hidden")}
       >
         {(files.length > 0 || fileProblem) && (
           <div className="mb-2 flex flex-wrap items-center gap-1.5 px-1">

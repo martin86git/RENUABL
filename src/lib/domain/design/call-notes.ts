@@ -46,6 +46,10 @@ export interface CallNotes {
   toCheck: string[];
   /** The system the call points to, field by field, as said ("" where nothing was said). */
   system: IntendedSystem;
+  /** A recap email to the customer from what was said ("" when there is nothing to recap). */
+  recap: { subject: string; body: string };
+  /** In how many working days the member said they'd follow up; 0 when they didn't say. */
+  followUpDays: number;
 }
 
 export const emptySystem = (): IntendedSystem => Object.fromEntries(INTENDED_FIELDS.map(([k]) => [k, ""])) as IntendedSystem;
@@ -89,8 +93,22 @@ export function cleanHeard(raw: unknown): HeardLine[] {
 export const CALL_NOTES_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "conversation", "forDesign", "forEmail", "nextStep", "toCheck", "system"],
+  required: [
+    "summary",
+    "conversation",
+    "forDesign",
+    "forEmail",
+    "nextStep",
+    "toCheck",
+    "system",
+    "recapSubject",
+    "recapBody",
+    "followUpDays",
+  ],
   properties: {
+    recapSubject: { type: "string" },
+    recapBody: { type: "string" },
+    followUpDays: { type: "integer" },
     system: {
       type: "object",
       additionalProperties: false,
@@ -119,6 +137,8 @@ export function callNotesPrompt(business: string, customer: string, transcript: 
     "- toCheck: what the salesperson said they would check, find out or wasn't sure of.",
     "- forDesign: everything that shapes the system that the fields below don't hold: products wanted or to avoid, where things go, shade, the switchboard, access.",
     "- system: each field a few words as it was said, or an empty string: solar (kW), panels, inverter, battery (kWh), phase, roof, storeys, existing (a system already there, and whether it stays), ev, switchboard, budget, timing. Where two choices were offered, say both.",
+    '- followUpDays: in how many working days the salesperson said they\'d follow up or send something ("tomorrow" is 1, "by Friday" counts the working days to it, "next week" is 5); 0 when they didn\'t say.',
+    `- recapSubject and recapBody: a short recap email to the customer from the business, thanking them for the call and reflecting back what was discussed and agreed, then what happens next. Australian English, warm and plain, 60 to 160 words. Start "Hi <their first name>,"; no sign-off (it is added after). Only what the salesperson said: a figure only if they said it, no price unless they said it, never a promise they didn't make, never a product they didn't name. Never say the call was listened to or noted. Empty strings when too little was said to recap.`,
     "Only what was said: never invent a figure, a product, a price, a date or a promise. Leave a list empty rather than guess. Don't repeat a point across lists. Don't name anyone but the customer.",
     "",
     "What was heard:",
@@ -150,6 +170,9 @@ export function cleanCallNotes(raw: unknown): CallNotes {
     nextStep: str(r.nextStep, 300),
     toCheck: lineList(r.toCheck),
     system,
+    recap: { subject: str(r.recapSubject, 120).replace(/\s+/g, " "), body: str(r.recapBody, 3_000).replace(/\r/g, "") },
+    followUpDays:
+      typeof r.followUpDays === "number" && Number.isFinite(r.followUpDays) ? Math.max(0, Math.min(30, Math.round(r.followUpDays))) : 0,
   };
 }
 

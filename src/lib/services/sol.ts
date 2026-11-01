@@ -3,6 +3,7 @@
  * panel from anywhere and keep the rail's count in step.
  */
 import type { SolFile, SolState, WhenChoice } from "@/lib/domain/design/sol";
+import type { SolPast, SolPastLine } from "@/lib/domain/design/sol-history";
 import { ask } from "./crm";
 
 export const loadSol = () => ask<{ state: SolState }>("/api/design/sol");
@@ -15,6 +16,13 @@ export const clearSolChat = () => post({ do: "clear" });
 export const remindAt = (id: string, when: WhenChoice) => post({ do: "remind", id, when });
 export const forgetReminder = (id: string) => post({ do: "forget-reminder", id });
 export const forgetPref = (id: string) => post({ do: "forget-pref", id });
+/** Past conversations (domain/design/sol-history.ts). */
+export const listSolPast = () => ask<{ past: SolPastLine[] }>("/api/design/sol", { method: "POST", body: { do: "past" } });
+export const openSolPast = (id: string) => ask<{ past: SolPast }>("/api/design/sol", { method: "POST", body: { do: "past-open", id } });
+export const newSolChat = () => post({ do: "new" });
+export const resumeSolChat = (id: string) => post({ do: "resume", id });
+export const forgetSolChat = (id: string) =>
+  ask<{ past: SolPastLine[] }>("/api/design/sol", { method: "POST", body: { do: "forget-past", id } });
 export const pinTurn = (at: string, role: "you" | "sol", pinned: boolean) => post({ do: "pin", at, role, pinned });
 
 /** Said on the window to open or shut Sol's panel from anywhere (the rail, a "#" link). */

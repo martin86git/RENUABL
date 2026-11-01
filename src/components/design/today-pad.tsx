@@ -25,6 +25,7 @@ import { SOL_CHANGED, SOL_TOGGLE, askSol, loadSol } from "@/lib/services/sol";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { NewLook } from "./new-look";
+import { ReadyForYou } from "./ready-for-you";
 import { SolIcon } from "./sol-icon";
 import { SolThinking } from "./sol-thinking";
 
@@ -166,6 +167,7 @@ function TodayView(props: {
         {props.name ? `, ${props.name}` : ""}.
       </h1>
       <p className="mt-1.5 text-[14px] text-ink-2">{props.items ? nextHeadline(props.items.length, hour) : "Looking at your day…"}</p>
+      <ReadyForYou />
 
       <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section aria-label="Up first" className="rounded-3xl bg-surface p-5 ring-1 ring-line sm:p-6">

@@ -158,7 +158,9 @@
 body {
   transition: padding-right 300ms ease;
 }
-@media (min-width: 1024px) {
+/* From 1440px the page narrows beside it; below that there isn't room for the top bar beside the panel, so it lies
+   over the page (1 Nov 2026). */
+@media (min-width: 1440px) {
   html.sol-docked body {
     padding-right: var(--sol-w);
   }
