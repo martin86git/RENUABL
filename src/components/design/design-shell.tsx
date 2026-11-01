@@ -5,12 +5,27 @@ import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import { inboxUnread } from "@/lib/services/inbox";
 import { stopViewing } from "@/lib/services/design-account";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LayoutDashboard, Menu, MessageCircle, PenTool, Search, SquareKanban, type LucideIcon, Mail } from "lucide-react";
+import {
+  ClipboardCheck,
+  LayoutDashboard,
+  Menu,
+  MessageCircle,
+  MessagesSquare,
+  PenTool,
+  Search,
+  SquareKanban,
+  Store,
+  Users,
+  Wrench,
+  type LucideIcon,
+  Mail,
+} from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
-import { pageAt, sectionAt, SECTIONS } from "@/lib/domain/design/sections";
+import { KIND_SECTIONS, designsRoofs, pageAt, sectionAt } from "@/lib/domain/design/sections";
+import { cleanKind, pageAllowed, type BusinessKind } from "@/lib/domain/design/business-kind";
 import { notificationCount, serviceCount, approvalCounts, updatesUnseen } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
@@ -57,6 +72,22 @@ type PhoneTab = { label: string; href: string; icon: LucideIcon; match: (path: s
  * The phone's foot bar: the places used most, under the thumb, with Sol raised in the middle (1 Nov 2026, Martin: Sol
  * was buried under More); everything else, the design tool first, is under More.
  */
+/** An installer's and an inspector's foot bar: their sections, then More (no Sol: his answers read the CRM). */
+const KIND_TABS: Record<Exclude<BusinessKind, "retailer">, PhoneTab[]> = {
+  installer: [
+    { label: "Today", href: "/design", icon: LayoutDashboard, match: (p) => p === "/design" },
+    { label: "Jobs", href: "/design/jobs", icon: Wrench, match: (p) => p.startsWith("/design/jobs") },
+    { label: "Marketplace", href: "/design/marketplace", icon: Store, match: (p) => p.startsWith("/design/marketplace") },
+    { label: "Connections", href: "/design/connections", icon: Users, match: (p) => p.startsWith("/design/connections") },
+  ],
+  inspector: [
+    { label: "Today", href: "/design", icon: LayoutDashboard, match: (p) => p === "/design" },
+    { label: "Inspections", href: "/design/inspections", icon: ClipboardCheck, match: (p) => p.startsWith("/design/inspections") },
+    { label: "Connections", href: "/design/connections", icon: Users, match: (p) => p.startsWith("/design/connections") },
+    { label: "Team", href: "/design/team", icon: MessagesSquare, match: (p) => p.startsWith("/design/team") },
+  ],
+};
+
 const PHONE_TABS: [PhoneTab, PhoneTab, PhoneTab] = [
   { label: "Today", href: PATHS.home, icon: LayoutDashboard, match: (p) => p === PATHS.home },
   { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
@@ -98,17 +129,22 @@ function Shell({
 }) {
   const [account] = useDesignAccount();
   const on = Boolean(account?.signedIn && account.business);
+  // What kind of business this login is (business-kind.ts): an installer or inspector has part of the product, and
+  // nothing of the CRM is asked for.
+  const kind: BusinessKind = cleanKind(account?.signedIn ? account.business?.kind : undefined);
+  const retail = on && kind === "retailer";
+  const sections = KIND_SECTIONS[kind];
   // How many of the customers' messages nobody has seen, the service cases to put right, and this member's unread mentions.
-  const unread = useUnreadMessages(on);
-  const service = useServiceCount(on);
-  const mentions = useCount(on, "renuabl:notifications", async () => {
+  const unread = useUnreadMessages(retail);
+  const service = useServiceCount(retail);
+  const mentions = useCount(retail, "renuabl:notifications", async () => {
     const res = await notificationCount();
     return res.ok ? res.unread : null;
   });
   // The approval gates' counts (Procurement), refreshed when a job is moved on from one.
   const [gates, setGates] = useState<Record<string, number>>({});
   useEffect(() => {
-    if (!on) return;
+    if (!retail) return;
     let gone = false;
     const look = () => void approvalCounts().then((res) => !gone && res.ok && setGates(res.counts));
     look();
@@ -117,15 +153,15 @@ function Shell({
       gone = true;
       window.removeEventListener("renuabl:approvals", look);
     };
-  }, [on]);
+  }, [retail]);
   // Conversations about equipment with lines this business hasn't read (as seller or buyer).
-  const trade = useCount(on && marketplaceOpen(), "renuabl:trade", async () => {
+  const trade = useCount(on && kind !== "inspector" && marketplaceOpen(), "renuabl:trade", async () => {
     const res = await tradeUnreadCount();
     return res.ok ? res.unread : null;
   });
   const counts: Record<string, number> = { service, ...gates, "my-equipment": trade };
   // Gmail's own unread count on the envelope, asked each minute while the page is in view (0 until Gmail is connected).
-  const mail = useCount(on, "renuabl:inbox", async () => {
+  const mail = useCount(retail, "renuabl:inbox", async () => {
     const res = await inboxUnread();
     return res.ok ? res.unread : null;
   });
@@ -135,6 +171,12 @@ function Shell({
     return res.ok ? res.unseen : null;
   });
   const path = usePathname();
+  const router = useRouter();
+  // A page that isn't part of this login (an installer following a link to a deal) goes back to its Today.
+  const away = on && !pageAllowed(kind, path);
+  useEffect(() => {
+    if (away) router.replace("/design");
+  }, [away, router]);
   const [searching, setSearching] = useState(false);
   const [more, setMore] = useState(false);
   // Ctrl K or ⌘K opens the search from anywhere.
@@ -171,8 +213,9 @@ function Shell({
   }
   if (bare) return <div className="theme-studio min-h-dvh">{children}</div>;
 
-  const here = pageAt(path);
-  const current = sectionAt(path);
+  if (away) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
+  const here = pageAt(path, kind);
+  const current = sectionAt(path, kind);
   const count = (pageId: string) => counts[pageId] ?? 0;
   const settingsOn = path.startsWith(PATHS.settings) || path.startsWith(PATHS.account);
 
@@ -211,11 +254,11 @@ function Shell({
           {/* 1 Nov 2026, Martin (as Primero's): the Search pill gave way to a round magnifier just right of the sections. */}
           <div className="mt-4 flex min-w-0 items-center justify-center-safe gap-2">
             <nav aria-label="Sections" className="studio-sections flex items-center gap-0.5 rounded-full bg-surface-2 p-1">
-              {SECTIONS.map((sec) => {
+              {sections.map((sec, i) => {
                 const lit = sec.id === current.id;
                 const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);
                 const design =
-                  sec.id === "crm" ? (
+                  i === 1 && designsRoofs(kind) ? (
                     // The design tool, the main tool, as an orange round between Today and CRM: larger than the pill (it
                     // stands out of it without making it taller), centred between Today's white pill and the word CRM.
                     <Link
@@ -250,19 +293,23 @@ function Shell({
                 ];
               })}
               {/* Sol, the other tool, as the graphite round at the far end: the two rounds frame the sections. */}
-              <span className="ml-1">
-                <SolNavButton />
-              </span>
+              {retail && (
+                <span className="ml-1">
+                  <SolNavButton />
+                </span>
+              )}
             </nav>
-            <button
-              type="button"
-              onClick={() => setSearching(true)}
-              aria-label="Search, or ask Sol"
-              title="Search, or ask Sol (Ctrl K)"
-              className="studio-search flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line hover:text-ink"
-            >
-              <Search className="size-4" aria-hidden />
-            </button>
+            {retail && (
+              <button
+                type="button"
+                onClick={() => setSearching(true)}
+                aria-label="Search, or ask Sol"
+                title="Search, or ask Sol (Ctrl K)"
+                className="studio-search flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line hover:text-ink"
+              >
+                <Search className="size-4" aria-hidden />
+              </button>
+            )}
           </div>
           <div className="mt-3 flex justify-end">
             <div
@@ -272,9 +319,15 @@ function Shell({
               <span className="studio-day-pill contents">
                 <DayPill />
               </span>
-              <TopIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />
-              <MessagesMenu badge={unread} href={PATHS.messages} />
-              <NotificationsMenu badge={mentions} full={PATHS.notifications} deal={(id) => `${PATHS.deals}/${id}`} />
+              {retail ? (
+                <>
+                  <TopIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />
+                  <MessagesMenu badge={unread} href={PATHS.messages} />
+                  <NotificationsMenu badge={mentions} full={PATHS.notifications} deal={(id) => `${PATHS.deals}/${id}`} />
+                </>
+              ) : (
+                <TopIcon href={PATHS.team} label="Team chat" icon={MessagesSquare} on={path.startsWith(PATHS.team)} badge={0} />
+              )}
               <GearMenu
                 email={account.email}
                 settings={PATHS.settings}
@@ -324,14 +377,16 @@ function Shell({
         <Link href={PATHS.home} aria-label="RENUABL, today">
           <Wordmark className="text-[16px]" />
         </Link>
-        <button
-          type="button"
-          onClick={() => setSearching(true)}
-          aria-label="Search, or ask Sol"
-          className="ml-auto flex size-9 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line"
-        >
-          <Search className="size-4" aria-hidden />
-        </button>
+        {retail && (
+          <button
+            type="button"
+            onClick={() => setSearching(true)}
+            aria-label="Search, or ask Sol"
+            className="ml-auto flex size-9 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line"
+          >
+            <Search className="size-4" aria-hidden />
+          </button>
+        )}
       </div>
 
       {tool ? (
@@ -349,10 +404,10 @@ function Shell({
         aria-label="Sections, on a phone"
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden"
       >
-        {PHONE_TABS.map((t, i) => {
+        {(retail ? PHONE_TABS : KIND_TABS[kind as Exclude<BusinessKind, "retailer">]).map((t, i) => {
           const lit = !more && t.match(path);
           const sol =
-            i === 2 ? (
+            retail && i === 2 ? (
               <div key="sol" className="flex min-h-14 flex-col items-center justify-end gap-0.5 pb-1 text-[10px] font-medium text-ink">
                 <span className="-mt-5">
                   <SolNavButton phone />
@@ -405,24 +460,28 @@ function Shell({
           <button type="button" aria-label="Close" className="absolute inset-0 bg-ink/40" onClick={() => setMore(false)} />
           <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-[2rem] bg-surface px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-3">
             <span className="mx-auto block h-1 w-10 rounded-full bg-line" aria-hidden />
-            <button
-              type="button"
-              onClick={() => {
-                setMore(false);
-                setSearching(true);
-              }}
-              className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-xl border border-line px-3 text-base text-muted"
-            >
-              <Search className="size-5" aria-hidden /> Search, or ask Sol
-            </button>
-            <Link
-              href={PATHS.designer}
-              onClick={() => setMore(false)}
-              className="mt-2 flex min-h-12 items-center gap-3 rounded-xl bg-sun-line px-3 text-base font-medium text-white"
-            >
-              <PenTool className="size-5" aria-hidden /> Design tool
-            </Link>
-            {SECTIONS.map((sec) => (
+            {retail && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMore(false);
+                  setSearching(true);
+                }}
+                className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-xl border border-line px-3 text-base text-muted"
+              >
+                <Search className="size-5" aria-hidden /> Search, or ask Sol
+              </button>
+            )}
+            {designsRoofs(kind) && (
+              <Link
+                href={PATHS.designer}
+                onClick={() => setMore(false)}
+                className="mt-2 flex min-h-12 items-center gap-3 rounded-xl bg-sun-line px-3 text-base font-medium text-white"
+              >
+                <PenTool className="size-5" aria-hidden /> Design tool
+              </Link>
+            )}
+            {sections.map((sec) => (
               <div key={sec.id}>
                 <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{sec.label}</p>
                 {sec.pages.map((p) => (
@@ -445,10 +504,14 @@ function Shell({
             ))}
             <div className="mt-4 border-t border-line pt-2">
               {[
-                { label: "Sol's page: reminders and preferences", href: PATHS.sol, n: 0 },
+                ...(retail ? [{ label: "Sol's page: reminders and preferences", href: PATHS.sol, n: 0 }] : []),
                 { label: "Team chat", href: PATHS.team, n: 0 },
-                { label: "Notifications", href: PATHS.notifications, n: mentions },
-                { label: "Email", href: PATHS.inbox, n: mail },
+                ...(retail
+                  ? [
+                      { label: "Notifications", href: PATHS.notifications, n: mentions },
+                      { label: "Email", href: PATHS.inbox, n: mail },
+                    ]
+                  : []),
                 { label: "Updates", href: PATHS.updates, n: updates },
                 { label: "Feedback", href: PATHS.feedback, n: 0 },
                 { label: "Settings", href: PATHS.settings, n: 0 },
@@ -472,15 +535,17 @@ function Shell({
           </div>
         </div>
       )}
-      <PageSearch
-        open={searching}
-        onClose={() => setSearching(false)}
-        customer={(id) => `${PATHS.customers}/${id}`}
-        deal={(id) => `${PATHS.deals}/${id}`}
-      />
+      {retail && (
+        <PageSearch
+          open={searching}
+          onClose={() => setSearching(false)}
+          customer={(id) => `${PATHS.customers}/${id}`}
+          deal={(id) => `${PATHS.deals}/${id}`}
+        />
+      )}
       {/* The rail down the right (team chat and the numbers; not over the design tool, which needs the room) and Sol's panel. */}
-      {on && !tool && <SolRail team={<TeamChatButton me={account.email} />} />}
-      {on && <SolDock />}
+      {retail && !tool && <SolRail team={<TeamChatButton me={account.email} />} />}
+      {retail && <SolDock />}
     </div>
   );
 }

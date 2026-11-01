@@ -5,6 +5,7 @@
  * Pure, tested: which section and which of its pages an address lights.
  */
 
+import type { BusinessKind } from "./business-kind";
 import { marketplaceOpen } from "./marketplace-launch";
 
 export interface SectionPage {
@@ -16,7 +17,7 @@ export interface SectionPage {
 }
 
 export interface Section {
-  id: "today" | "crm" | "procurement" | "installation" | "service" | "marketplace";
+  id: "today" | "crm" | "procurement" | "installation" | "service" | "marketplace" | "jobs" | "inspections" | "connections";
   label: string;
   pages: readonly SectionPage[];
 }
@@ -72,15 +73,41 @@ export const SECTIONS: readonly Section[] = [
   },
 ];
 
+const TODAY = SECTIONS[0];
+const MARKETPLACE = SECTIONS.find((s) => s.id === "marketplace")!;
+const CONNECTIONS: Section = {
+  id: "connections",
+  label: "Connections",
+  pages: [{ id: "connections", label: "Connections", href: "/design/connections" }],
+};
+
+/**
+ * The sections each kind of business has (business-kind.ts): a retailer all of the above; an installer its jobs, the
+ * Marketplace and its connections (the design tool is the orange round, as for everyone who designs); an inspector its
+ * inspections and its connections.
+ */
+export const KIND_SECTIONS: Record<BusinessKind, readonly Section[]> = {
+  retailer: SECTIONS,
+  installer: [TODAY, { id: "jobs", label: "Jobs", pages: [{ id: "jobs", label: "Jobs", href: "/design/jobs" }] }, MARKETPLACE, CONNECTIONS],
+  inspector: [
+    TODAY,
+    { id: "inspections", label: "Inspections", pages: [{ id: "inspections", label: "Inspections", href: "/design/inspections" }] },
+    CONNECTIONS,
+  ],
+};
+
+/** Whether this kind of business designs roofs (the design tool's round in the nav). */
+export const designsRoofs = (kind: BusinessKind) => kind !== "inspector";
+
 const under = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
 
 /**
  * The page an address is: the one whose address (or one of its others) holds it most closely, so
  * /design/installations/underway is In the works, not Upcoming. The overview itself only on its own address.
  */
-export function pageAt(path: string): { section: Section; page: SectionPage } | null {
+export function pageAt(path: string, kind: BusinessKind = "retailer"): { section: Section; page: SectionPage } | null {
   let best: { section: Section; page: SectionPage; length: number } | null = null;
-  for (const section of SECTIONS)
+  for (const section of KIND_SECTIONS[kind])
     for (const page of section.pages)
       for (const href of [page.href, ...(page.also ?? [])]) {
         const hit = href === "/design" ? path === href : under(path, href);
@@ -90,4 +117,4 @@ export function pageAt(path: string): { section: Section; page: SectionPage } | 
 }
 
 /** The section on show: the one holding the page, else Today (messages, notifications, settings, the design tool). */
-export const sectionAt = (path: string): Section => pageAt(path)?.section ?? SECTIONS[0];
+export const sectionAt = (path: string, kind: BusinessKind = "retailer"): Section => pageAt(path, kind)?.section ?? TODAY;

@@ -3,6 +3,7 @@
 import { SignInForm, signInNote } from "./sign-in-form";
 import { PASSWORD_MIN } from "@/lib/domain/design/password";
 import { SEAT_NOTE } from "@/lib/domain/design/plans";
+import { BUSINESS_KINDS, type BusinessKind } from "@/lib/domain/design/business-kind";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
@@ -91,6 +92,8 @@ export function SignOut({ className }: { className?: string }) {
 function SetUp({ account, onDone }: { account: Extract<DesignAccount, { signedIn: true }>; onDone: () => void }) {
   const naming = account.state === "no-business";
   const [name, setName] = useState("");
+  // What kind of business (business-kind.ts): a retailer has everything; an installer or inspector joins free.
+  const [kind, setKind] = useState<BusinessKind>("retailer");
   const [terms, setTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -98,7 +101,7 @@ function SetUp({ account, onDone }: { account: Extract<DesignAccount, { signedIn
     e.preventDefault();
     if (!terms) return setProblem(BUSINESS_TERMS_MISSING);
     setBusy(true);
-    const failed = await setUpBusiness({ ...(naming ? { name } : {}), terms });
+    const failed = await setUpBusiness({ ...(naming ? { name, kind } : {}), terms });
     setBusy(false);
     if (failed) return setProblem(failed);
     onDone();
@@ -115,6 +118,35 @@ function SetUp({ account, onDone }: { account: Extract<DesignAccount, { signedIn
           : "You've been added to this business. Its roofs, price lists and settings are shared with everyone in it."}
       </p>
       <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
+        {naming && (
+          <fieldset>
+            <legend className="text-sm font-medium text-ink">What does your business do?</legend>
+            <div className="mt-2 space-y-2">
+              {BUSINESS_KINDS.map((k) => (
+                <label
+                  key={k.kind}
+                  className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3.5 py-3 transition ${
+                    kind === k.kind ? "border-ink bg-surface" : "border-line bg-surface hover:border-ink-2"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="kind"
+                    value={k.kind}
+                    checked={kind === k.kind}
+                    onChange={() => setKind(k.kind)}
+                    className="mt-1 h-4 w-4 shrink-0 accent-[var(--primary)]"
+                  />
+                  <span>
+                    <span className="block text-[15px] font-medium text-ink">{k.label}</span>
+                    <span className="mt-0.5 block text-[13px] leading-snug text-ink-2">{k.about}</span>
+                    <span className="mt-1 block text-[12px] text-muted">{k.price}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
         {naming && (
           <label className="block text-sm font-medium text-ink">
             Business name

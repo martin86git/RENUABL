@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import { ui } from "./design-shell";
 import { SETTINGS, settingsPath } from "./settings-list";
+import { cleanKind, settingsFor } from "@/lib/domain/design/business-kind";
+import { useDesignAccount } from "./design-account";
 
 /**
  * The frame every settings page sits in: the settings' own nav down the left
@@ -13,6 +15,12 @@ import { SETTINGS, settingsPath } from "./settings-list";
  */
 export function SettingsFrame({ children }: { children: React.ReactNode }) {
   const path = usePathname();
+  // An installer or inspector has only the settings their login uses (business-kind.ts).
+  const [account] = useDesignAccount();
+  const only = settingsFor(cleanKind(account?.signedIn ? account.business?.kind : undefined));
+  const groups = only
+    ? SETTINGS.map((g) => ({ ...g, items: g.items.filter((i) => only.includes(i.slug)) })).filter((g) => g.items.length)
+    : SETTINGS;
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
       <nav
@@ -20,7 +28,7 @@ export function SettingsFrame({ children }: { children: React.ReactNode }) {
         className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2 lg:sticky lg:top-0 lg:h-dvh lg:w-64 lg:flex-col lg:gap-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-3 lg:py-5"
       >
         <p className="hidden px-3 text-[17px] tracking-tight text-ink lg:block">Settings</p>
-        {SETTINGS.map((group) => (
+        {groups.map((group) => (
           <div key={group.title} className="contents lg:mt-6 lg:block lg:first-of-type:mt-4">
             {/* Each section's name on a light band, its pages indented under a rule, so one section reads apart from the next. */}
             <p className="hidden rounded-md bg-surface-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink lg:block">

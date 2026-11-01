@@ -9,6 +9,7 @@
  * from the browser, so one business can't reach another's rows even by
  * guessing an id.
  */
+import { cleanKind, type BusinessKind } from "@/lib/domain/design/business-kind";
 import {
   MAX_MEMBERS,
   MAX_PROJECTS,
@@ -33,6 +34,8 @@ import { linkJobsToRoof } from "./design-crm-repo";
 export interface Member {
   businessId: string;
   businessName: string;
+  /** What kind of business it is: it decides what the member's login holds (business-kind.ts); none is a retailer. */
+  businessKind?: BusinessKind;
   email: string;
   role: MemberRole;
   /** The version of the terms this person accepted, or null when they haven't yet (someone added by the owner). */
@@ -48,12 +51,13 @@ export async function memberByEmail(email: string): Promise<Member | null> {
   const rows = await query<{
     business_id: string;
     name: string;
+    kind: string;
     email: string;
     role: MemberRole;
     terms_version: string | null;
     permissions: unknown;
   }>(
-    `select m.business_id, b.name, m.email, m.role, m.terms_version, m.permissions
+    `select m.business_id, b.name, b.kind, m.email, m.role, m.terms_version, m.permissions
        from business_members m join businesses b on b.id = m.business_id
       where m.email = $1`,
     [email.toLowerCase()],
@@ -63,6 +67,7 @@ export async function memberByEmail(email: string): Promise<Member | null> {
     ? {
         businessId: m.business_id,
         businessName: m.name,
+        businessKind: cleanKind(m.kind),
         email: m.email,
         role: m.role,
         termsVersion: m.terms_version,
@@ -76,12 +81,12 @@ export async function memberByEmail(email: string): Promise<Member | null> {
  * recorded with the server's time. Someone already in a business keeps the
  * one they have: nothing is made.
  */
-export async function createBusiness(email: string, name: string, termsVersion: string): Promise<Member> {
+export async function createBusiness(email: string, name: string, termsVersion: string, kind: BusinessKind = "retailer"): Promise<Member> {
   const who = email.toLowerCase();
   await transaction(async (q) => {
     const businessId = newId("biz");
     // The member row goes in first: its unique email is what stops two businesses for one person, even at the same moment.
-    await q(`insert into businesses (id, name, created_by) values ($1,$2,$3)`, [businessId, name, who]);
+    await q(`insert into businesses (id, name, created_by, kind) values ($1,$2,$3,$4)`, [businessId, name, who, kind]);
     const made = await q(
       `insert into business_members (id, business_id, email, role, terms_version, terms_accepted_at)
        values ($1,$2,$3,'owner',$4, now()) on conflict (email) do nothing returning id`,

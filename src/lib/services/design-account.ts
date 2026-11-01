@@ -5,11 +5,14 @@
  * (/api/design/…): the browser never decides which business it is.
  */
 import type { MemberPermissions, MemberRole } from "@/lib/domain/design/account";
+import type { BusinessKind } from "@/lib/domain/design/business-kind";
 
 export interface DesignBusiness {
   id: string;
   name: string;
   role: MemberRole;
+  /** Retailer, installer or inspector (business-kind.ts); older answers have none: a retailer. */
+  kind?: BusinessKind;
 }
 
 export type DesignAccount =
@@ -97,7 +100,7 @@ export async function requestSignInLink(email: string, next?: string): Promise<A
 }
 
 /** Names a new business and accepts the terms (or only accepts them, for someone added by the owner). Null when done. */
-export async function setUpBusiness(o: { name?: string; terms: boolean }): Promise<string | null> {
+export async function setUpBusiness(o: { name?: string; kind?: BusinessKind; terms: boolean }): Promise<string | null> {
   const res = await send<Answer>("/api/design/business", "POST", o);
   if (!res.ok) return res.message ?? UNREACHABLE;
   await designAccount(true);

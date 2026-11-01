@@ -23,6 +23,8 @@ import type { Address } from "@/lib/domain/types";
 import { resolveAddress, suggestAddresses } from "@/lib/services/consumer";
 import { attachSite, listJobs, loadDesignHome, saveJob, shortDate, type JobLine } from "@/lib/services/crm";
 import { loadPulses } from "@/lib/services/deal-pulse";
+import { cleanKind } from "@/lib/domain/design/business-kind";
+import { useDesignAccount } from "./design-account";
 import type { DesignRoof } from "@/lib/services/design-store";
 import type { DesignHomeData } from "@/lib/server/design-home-repo";
 import { ui } from "./design-shell";
@@ -57,19 +59,25 @@ export function DesignToolHome({ onPick, onOpen }: { onPick: (address: Address) 
   const [problem, setProblem] = useState<string | null>(null);
   const [asks, setAsks] = useState(0);
   const bar = useRef<HTMLInputElement>(null);
+  // An installer designs sites, not deals: it has no CRM to ask (business-kind.ts).
+  const [account] = useDesignAccount();
+  const deals = cleanKind(account?.signedIn ? account.business?.kind : undefined) === "retailer";
   useEffect(() => {
     let gone = false;
-    void Promise.all([loadDesignHome(), listJobs(), loadPulses()]).then(([home, list, pulse]) => {
-      if (gone) return;
-      if (home.ok) setData(home);
-      else setProblem(home.message);
-      setJobs(list.ok ? list.jobs : []);
-      if (pulse.ok) setPulses(pulse.pulses);
-    });
+    const none = { ok: false as const, message: "" };
+    void Promise.all([loadDesignHome(), deals ? listJobs() : Promise.resolve(none), deals ? loadPulses() : Promise.resolve(none)]).then(
+      ([home, list, pulse]) => {
+        if (gone) return;
+        if (home.ok) setData(home);
+        else setProblem(home.message);
+        setJobs(list.ok ? list.jobs : []);
+        if (pulse.ok) setPulses(pulse.pulses);
+      },
+    );
     return () => {
       gone = true;
     };
-  }, [asks]);
+  }, [asks, deals]);
   // "/" anywhere on the page goes to the bar, as in the tools people already know.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -125,7 +133,7 @@ export function DesignToolHome({ onPick, onOpen }: { onPick: (address: Address) 
       ) : next ? (
         <UpNext deal={next} pulse={pulses[next.id]} />
       ) : (
-        !rest.length && <AllDesigned />
+        !rest.length && <AllDesigned deals={deals} />
       )}
 
       {rest.length > 0 && (
@@ -420,13 +428,17 @@ function UpNext({ deal, pulse }: { deal: Waiting; pulse?: DealPulse }) {
   );
 }
 
-/** Every deal has a design: a calm sun, and nothing to do. */
-function AllDesigned() {
+/** Every deal has a design: a calm sun, and nothing to do. An installer, with no deals, is shown the way to start. */
+function AllDesigned({ deals = true }: { deals?: boolean }) {
   return (
     <section className="flex flex-col items-center rounded-[28px] bg-surface px-6 py-14 text-center ring-1 ring-line">
       <Sun className="size-10 text-sun-line" strokeWidth={1.4} aria-hidden />
-      <h2 className="mt-4 text-xl font-semibold tracking-tight text-ink">Every deal has a design.</h2>
-      <p className="mt-1 text-sm text-muted">New deals waiting for a roof show up here. Or press + to design a new site.</p>
+      <h2 className="mt-4 text-xl font-semibold tracking-tight text-ink">{deals ? "Every deal has a design." : "Design a site."}</h2>
+      <p className="mt-1 text-sm text-muted">
+        {deals
+          ? "New deals waiting for a roof show up here. Or press + to design a new site."
+          : "Press + and find the address. Each new site is one design job."}
+      </p>
     </section>
   );
 }

@@ -16,7 +16,7 @@ export async function GET() {
       signedIn: true,
       state: access.state,
       email: access.email,
-      business: member && { id: member.businessId, name: member.businessName, role: member.role },
+      business: member && { id: member.businessId, name: member.businessName, role: member.role, kind: member.businessKind },
       // What this person may do, as the server will enforce it: the screens only use it to show or hide.
       may: member && {
         costs: can(member.role, "costs", member.permissions),

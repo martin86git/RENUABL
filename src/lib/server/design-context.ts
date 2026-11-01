@@ -6,8 +6,9 @@
  * It is also the one place a member's role is checked (`can`).
  */
 import { BUSINESS_TERMS_VERSION, can, refusal, seesAllDeals, type DealViewer, type MemberAction } from "@/lib/domain/design/account";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { VIEW_AS_COOKIE, mayViewAs } from "@/lib/domain/design/view-as";
+import { KIND_REFUSAL, PATH_HEADER, apiAllowed, cleanKind } from "@/lib/domain/design/business-kind";
 import { currentSession } from "./accounts";
 import { dbConfigured } from "./db";
 import { memberByEmail, type Member } from "./design-repo";
@@ -48,6 +49,9 @@ export async function requireMember(action: MemberAction): Promise<{ member: Mem
   const access = await designAccess();
   if (access.state !== "ready") return { refuse: refused(401, "Sign in to your business to do this.") };
   if (!can(access.member.role, action, access.member.permissions)) return { refuse: refused(403, refusal(action)) };
+  // An installer's or inspector's login holds only part of the product: the proxy tells us the address asked for.
+  const path = (await headers()).get(PATH_HEADER);
+  if (path && !apiAllowed(cleanKind(access.member.businessKind), path)) return { refuse: refused(403, KIND_REFUSAL) };
   return { member: access.member };
 }
 

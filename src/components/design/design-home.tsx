@@ -1,5 +1,7 @@
 "use client";
 
+import { cleanKind } from "@/lib/domain/design/business-kind";
+import { KindToday } from "./kind-home";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -85,12 +87,19 @@ export const ACTIVITY_WORD = {
 export function DesignHome() {
   const [account] = useDesignAccount();
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
-  if (account.signedIn)
+  if (account.signedIn) {
+    // An installer's or inspector's Today is their own (business-kind.ts): no CRM to read.
+    const kind = cleanKind(account.business?.kind);
     return (
       <DesignShell needsAccount>
-        <OverviewPage business={account.business?.name ?? ""} email={account.email} />
+        {kind === "retailer" ? (
+          <OverviewPage business={account.business?.name ?? ""} email={account.email} />
+        ) : (
+          <KindToday kind={kind} business={account.business?.name ?? ""} />
+        )}
       </DesignShell>
     );
+  }
   return <FrontPage unreachable={Boolean(account.unreachable)} />;
 }
 

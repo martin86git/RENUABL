@@ -222,6 +222,8 @@ create table if not exists design_projects (
 -- The roof designer's CRM (server/design-crm-repo.ts): a business's own customers, their jobs, and what happened.
 -- Jobs and activity point at their customer together with the business, so a row can never hang off another business's customer.
 alter table businesses add column if not exists samples_added_at timestamptz;
+-- What kind of business (domain/design/business-kind.ts): retailer (everything), installer or inspector.
+alter table businesses add column if not exists kind text not null default 'retailer';
 create table if not exists design_customers (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,
