@@ -17,6 +17,12 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-01",
     area: "Design tool",
     words:
+      "Panels let go near a traced roof edge or guide line turn square to it and sit clear of it; a new array offers its tilt to change or keep.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Design tool",
+    words:
       "Opens zoomed in on the roof; the hand drags the picture even when all of it shows; model numbers under every panel, inverter and battery in the lists.",
   },
   {

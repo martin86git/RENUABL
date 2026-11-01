@@ -70,6 +70,7 @@ import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/
 import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
+import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
 import {
   DESIGN_GOALS,
   FACINGS,
@@ -708,6 +709,8 @@ export function RoofDesigner(props: {
   const [tool, setTool] = useState<Tool>("select");
   // The tools, opened by a right click where the pointer is (1 Nov 2026, Martin, as Primero's): in % of the picture.
   const [toolMenu, setToolMenu] = useState<{ x: number; y: number } | null>(null);
+  // An array just laid (as Primero's): its tilt is offered beside the turn buttons, to change or keep, while it is picked.
+  const [tiltPop, setTiltPop] = useState<string[]>([]);
   // Beside the picture, one view at a time (1 Nov 2026, Martin: Primero's Designer / Quote / Proposal): the home and the
   // deal's notes, the quote, or the proposal with its chat and timeline. As Primero's, the tabs sit at the top of the
   // column beside the picture, which always shows. The choice is kept on this device.
@@ -2169,6 +2172,34 @@ export function RoofDesigner(props: {
     changed();
   };
 
+  // The edges panels settle against when let go (as Primero's, `settleToEdges`): every traced face's sides and every
+  // guide line, each at the wind clearance (or the face's own setback when larger).
+  const wind = clearanceFor(MOUNT_STANDOFF);
+  const roofEdges: RoofEdge[] = [
+    ...faces.flatMap((face) =>
+      face.points.map((a, i) => ({
+        a,
+        b: face.points[(i + 1) % face.points.length],
+        setback: Math.max(face.setback, wind),
+        face: face.points,
+      })),
+    ),
+    ...rules.map((g) => ({ a: g.a, b: g.b, setback: wind })),
+  ];
+  /** Whether any of these panels sits against a panel outside them: a group joined to others stays where it joined. */
+  const joinedToOthers = (group: readonly LoosePanel[]) => {
+    const ids = new Set(group.map((p) => p.id));
+    const others = [
+      ...loose.filter((o) => !ids.has(o.id)),
+      ...faces.flatMap((fc) =>
+        panelPlaces(fc, size)
+          .filter((pl) => !fc.off.includes(pl.index))
+          .map((pl) => freed(fc, pl, "x")),
+      ),
+    ];
+    return group.some((p) => others.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < size.long + 0.1));
+  };
+
   const onPointerUp = (e: React.PointerEvent) => {
     const held = press.current;
     press.current = null;
@@ -2188,29 +2219,35 @@ export function RoofDesigner(props: {
     }
     if (held?.mode === "array") {
       // Everything outlined is placed, and picked, so the whole array can be nudged or turned straight away.
-      const placed = ghosts.map((g) => ({ ...g, id: newId("p") }));
+      let placed = ghosts.map((g) => ({ ...g, id: newId("p") }));
       if (placed.length) {
+        // Laid in the open, it settles square against the roof's edges; one joined onto other panels stays where it joined.
+        const settle = !e.altKey && !joinedToOthers(placed) ? settleToEdges(placed, roofEdges, size) : null;
+        if (settle) placed = applySettle(placed, settle);
         setLoose([...loose, ...placed]);
         setPicks(placed.map((g): Pick => ({ kind: "loose", id: g.id })));
         changed();
         // An array dragged out is done: the arrow takes over, with the whole array picked; so is one panel clicked
         // onto an array (as Primero's). A single panel placed in the open leaves the tool on, to go on adding.
-        const joined =
-          placed.length === 1 &&
-          [
-            ...loose,
-            ...faces.flatMap((f) =>
-              panelPlaces(f, size)
-                .filter((pl) => !f.off.includes(pl.index))
-                .map((pl) => freed(f, pl, "x")),
-            ),
-          ].some((o) => Math.hypot(o.x - placed[0].x, o.y - placed[0].y) < size.long + 0.1);
+        const joined = placed.length === 1 && joinedToOthers(placed);
+        if (placed.length > 1) setTiltPop(placed.map((g) => g.id));
         if (placed.length > 1 || joined) {
           setTool("select");
           setOnPanel(false);
         }
       }
       return setGhosts([]);
+    }
+    if (held?.mode === "move" && held.starts && !e.altKey) {
+      // Panels moved by hand settle square against the nearest roof edge or guide line, unless they joined other panels.
+      const starts = held.starts;
+      const group = loose.filter((p) => starts[`l:${p.id}`]);
+      const settle = group.length && !joinedToOthers(group) ? settleToEdges(group, roofEdges, size) : null;
+      if (settle) {
+        const moved = new Map(applySettle(group, settle).map((p) => [p.id, p]));
+        setLoose(loose.map((p) => moved.get(p.id) ?? p));
+      }
+      return;
     }
     if (held?.mode !== "band") return;
     if (!held.moved || !band) {
@@ -3971,16 +4008,51 @@ export function RoofDesigner(props: {
                   const ys = corners.map((c) => ((ROOF_IMAGE.height / 2 + c.y / scale - view.y) / view.h) * 100);
                   const middle = (Math.min(...xs) + Math.max(...xs)) / 2;
                   const low = Math.max(...ys) > 78;
+                  // The array just laid, and only it, is picked: its tilt sits at the start of the bar.
+                  const pickedIds = panelPicks.flatMap((p) => (p.kind === "loose" ? [p.id] : []));
+                  const tiltOn =
+                    tiltPop.length > 0 &&
+                    pickedIds.length === tiltPop.length &&
+                    tiltPop.every((id) => pickedIds.includes(id)) &&
+                    pickedTilt !== null;
+                  const half = tiltOn ? 13.5 : 7.5;
                   return (
                     <div
                       className={clsx(GLASS, "absolute z-20 flex items-center gap-0.5 p-0.5")}
                       style={{
-                        left: `clamp(0.5rem, calc(${middle}% - 7.5rem), calc(100% - 15.5rem))`,
+                        left: `clamp(0.5rem, calc(${middle}% - ${half}rem), calc(100% - ${half * 2 + 0.5}rem))`,
                         top: low ? `calc(${Math.min(...ys)}% - 2.6rem)` : `calc(${Math.max(...ys)}% + 0.6rem)`,
                       }}
                       role="toolbar"
                       aria-label="Turn what is picked"
                     >
+                      {tiltOn && (
+                        <>
+                          <span className="pl-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-sun-line">Tilt</span>
+                          <button
+                            onClick={() => amend((p) => ({ ...p, tilt: Math.max(0, (p.tilt ?? TILT.roof) - 1) }))}
+                            className="flex size-7 items-center justify-center rounded-full text-sm font-semibold hover:bg-surface"
+                            aria-label="Tilt down a degree"
+                          >
+                            −
+                          </button>
+                          <span className="min-w-[2.4rem] text-center text-xs font-semibold tabular-nums">{pickedTilt}°</span>
+                          <button
+                            onClick={() => amend((p) => ({ ...p, tilt: Math.min(TILT.max, (p.tilt ?? TILT.roof) + 1) }))}
+                            className="flex size-7 items-center justify-center rounded-full text-sm font-semibold hover:bg-surface"
+                            aria-label="Tilt up a degree"
+                          >
+                            +
+                          </button>
+                          <button
+                            onClick={() => setTiltPop([])}
+                            className="flex h-7 items-center gap-1 rounded-full bg-primary px-2.5 text-[11px] font-semibold text-primary-ink"
+                          >
+                            <Check className="size-3.5" aria-hidden /> Keep
+                          </button>
+                          <span className="mx-1 h-5 w-px bg-line" aria-hidden />
+                        </>
+                      )}
                       {([-5, -1, 90, 1, 5] as const).map((step) => (
                         <button
                           key={step}
