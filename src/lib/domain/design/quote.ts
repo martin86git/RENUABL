@@ -349,6 +349,8 @@ export interface BillFields {
   supplyPerDay: string;
   rate: string;
   feedIn: string;
+  /** The bill's usage in kWh, when it was typed that way: the amount is then worked out from it (`billWith`). */
+  usage?: string;
 }
 
 export interface DesignFinance {
@@ -467,6 +469,7 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
     supplyPerDay: figure(b.supplyPerDay, defaults.bill.supplyPerDay),
     rate: figure(b.rate, defaults.bill.rate),
     feedIn: figure(b.feedIn, defaults.bill.feedIn),
+    ...(typeof b.usage === "string" && /^\d{1,6}(\.\d{0,2})?$/.test(b.usage) && Number(b.usage) > 0 ? { usage: b.usage } : {}),
   };
   const given = Array.isArray(r.quotes) ? r.quotes : [];
   const quotes: QuoteFields[] = [];

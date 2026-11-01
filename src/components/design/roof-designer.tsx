@@ -71,6 +71,7 @@ import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
+import { billWith, usageFromAmount } from "@/lib/domain/design/design-bill";
 import {
   DESIGN_GOALS,
   FACINGS,
@@ -634,6 +635,8 @@ export function RoofDesigner(props: {
   proposal?: React.ReactNode;
   /** How many of the customer's lines wait for an answer: a count on the Proposal tab. */
   waiting?: number;
+  /** The deal this roof is on: Sol can look through its file for the customer's usage. */
+  jobId?: string;
 }) {
   // The design being worked on is held in the states below; the others wait in `designs`, whose entry for the
   // one being worked on is out of date until it is put away again (`everyDesign`).
@@ -666,6 +669,38 @@ export function RoofDesigner(props: {
   const [battery, setBattery] = useState<DesignBattery | undefined>(first.battery);
   // The customer's electricity bill, as typed in from it: what the summary's bill, saving and payback are worked out from.
   const [bill, setBillFields] = useState(props.extras.bill);
+  // Sol looking through the deal's file for the customer's usage (1 Nov 2026, as Primero's): the figures go into the box
+  // with the words he found them in, to check before saving; figures typed while he looked are kept.
+  const [usageRead, setUsageRead] = useState<{ busy: boolean; notes: string[]; error?: string } | null>(null);
+  const solLooked = useRef(false);
+  const billTouched = useRef(false);
+  const askSol = async () => {
+    if (!props.jobId) return;
+    solLooked.current = true;
+    billTouched.current = false;
+    setUsageRead({ busy: true, notes: [] });
+    try {
+      const res = await fetch(`/api/design/jobs/${encodeURIComponent(props.jobId)}/usage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ current: bill }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; fields?: typeof bill; notes?: string[] };
+      if (j.ok && j.fields) {
+        const kept = billTouched.current;
+        if (!kept) {
+          setBillFields(j.fields);
+          setSaved("changed");
+        }
+        setUsageRead({
+          busy: false,
+          notes: kept ? ["You changed the box while Sol looked, so yours are kept.", ...(j.notes ?? [])] : (j.notes ?? []),
+        });
+      } else setUsageRead({ busy: false, notes: [], error: j.message ?? "Sol couldn't find it." });
+    } catch {
+      setUsageRead({ busy: false, notes: [], error: "We couldn't reach the server." });
+    }
+  };
   // Each design's quote settings and hand changes, in the designs' order.
   const [quotes, setQuotes] = useState<QuoteFields[]>(props.extras.quotes);
   // The price after STCs, as the quote builder last worked it out; null when there is nothing to price.
@@ -1094,6 +1129,7 @@ export function RoofDesigner(props: {
     openMenu(false);
   };
   const setBill = (next: typeof bill) => {
+    billTouched.current = true;
     setBillFields(next);
     setSaved("changed");
   };
@@ -2874,7 +2910,10 @@ export function RoofDesigner(props: {
                   aria-expanded={menu === "bill"}
                   aria-label={finance ? "What it does for this home: open the customer's bill" : "Add the customer's electricity bill"}
                   title={finance ? "Open the customer's bill" : "Add the customer's electricity bill"}
-                  onClick={() => openMenu(menu === "bill" ? false : "bill")}
+                  onClick={() => {
+                    openMenu(menu === "bill" ? false : "bill");
+                    if (menu !== "bill" && props.jobId && !(Number(bill.amount) > 0) && !solLooked.current) void askSol();
+                  }}
                   onKeyDown={(e) => {
                     if (e.key !== "Enter" && e.key !== " ") return;
                     e.preventDefault();
@@ -2935,12 +2974,45 @@ export function RoofDesigner(props: {
                 {menu === "bill" && (
                   <div className="absolute right-0 top-full z-40 mt-2 max-h-[70vh] w-[22rem] max-w-[85vw] overflow-y-auto text-ink shadow-lift rounded-lg border border-line bg-surface p-3">
                     <p className={label}>The customer&apos;s electricity bill</p>
+                    {props.jobId && (
+                      <button
+                        type="button"
+                        onClick={() => void askSol()}
+                        disabled={usageRead?.busy}
+                        className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-md border border-line px-3 text-sm font-medium hover:border-forest disabled:bg-surface-2 disabled:text-muted"
+                      >
+                        <SolIcon className="size-4" />
+                        {usageRead?.busy ? "Sol is looking through their file…" : "Find it in the customer's file"}
+                      </button>
+                    )}
+                    {usageRead && !usageRead.busy && (
+                      <div
+                        className={clsx(
+                          "mt-2 rounded-md px-2.5 py-2 text-xs",
+                          usageRead.error ? "bg-warning-soft text-warning" : "bg-sun text-sun-ink",
+                        )}
+                        role="status"
+                      >
+                        {usageRead.error ? (
+                          <p>{usageRead.error}</p>
+                        ) : (
+                          <>
+                            <p className="font-medium">Sol found this in the customer&apos;s file: check it before saving.</p>
+                            <ul className="mt-1 grid gap-1">
+                              {usageRead.notes.map((n) => (
+                                <li key={n}>{n}</li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                      </div>
+                    )}
                     <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium">
                       <label>
                         Billed
                         <select
                           value={bill.interval}
-                          onChange={(e) => setBill({ ...bill, interval: e.target.value as BillInterval })}
+                          onChange={(e) => setBill(billWith(bill, { interval: e.target.value as BillInterval }))}
                           className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest appearance-auto"
                         >
                           <option value="annual">Yearly</option>
@@ -2957,8 +3029,22 @@ export function RoofDesigner(props: {
                           min="0"
                           step="10"
                           value={bill.amount}
-                          onChange={(e) => setBill({ ...bill, amount: e.target.value })}
+                          onChange={(e) => setBill(billWith(bill, { amount: e.target.value }))}
                           placeholder="e.g. 350"
+                          className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
+                        />
+                      </label>
+                      {/* kWh as well as dollars (as Primero's): typing kWh works the dollars out from it at the rate plus the supply
+                          charge, and typing dollars shows the kWh it comes to here, greyed. */}
+                      <label>
+                        Or usage (kWh)
+                        <input
+                          type="number"
+                          min="0"
+                          step="10"
+                          value={bill.usage ?? ""}
+                          onChange={(e) => setBill(billWith(bill, { usage: e.target.value }))}
+                          placeholder={usageFromAmount(bill) !== null ? `about ${usageFromAmount(bill)}` : "e.g. 1500"}
                           className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
                         />
                       </label>
@@ -2969,7 +3055,7 @@ export function RoofDesigner(props: {
                           min="0"
                           step="0.01"
                           value={bill.supplyPerDay}
-                          onChange={(e) => setBill({ ...bill, supplyPerDay: e.target.value })}
+                          onChange={(e) => setBill(billWith(bill, { supplyPerDay: e.target.value }))}
                           className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
                         />
                       </label>
@@ -2980,7 +3066,7 @@ export function RoofDesigner(props: {
                           min="0"
                           step="0.01"
                           value={bill.rate}
-                          onChange={(e) => setBill({ ...bill, rate: e.target.value })}
+                          onChange={(e) => setBill(billWith(bill, { rate: e.target.value }))}
                           className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
                         />
                       </label>

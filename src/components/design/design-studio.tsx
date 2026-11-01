@@ -261,6 +261,7 @@ export function DesignStudio() {
           }}
           proposalHref={onJob ? proposalScreen(onJob.id) : null}
           waiting={waiting}
+          jobId={onJob?.id}
           notes={onJob ? <DealNotes jobId={onJob.id} customerId={onJob.customerId} /> : null}
           proposal={
             onJob ? (
