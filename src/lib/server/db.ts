@@ -224,6 +224,33 @@ create table if not exists design_projects (
 alter table businesses add column if not exists samples_added_at timestamptz;
 -- What kind of business (domain/design/business-kind.ts): retailer (everything), installer or inspector.
 alter table businesses add column if not exists kind text not null default 'retailer';
+-- The directory and connections (domain/design/connections.ts): a business is listed only once it chooses to be, and
+-- known to others by its key, never its id. A connection is one row a pair (the lower id first), pending until the
+-- other accepts; declining, cancelling or disconnecting removes it.
+create table if not exists design_directory (
+  business_id text primary key references businesses(id) on delete cascade,
+  key text unique not null,
+  listed boolean not null default false,
+  suburb text not null default '',
+  state text not null default '',
+  abn text not null default '',
+  updated_at timestamptz not null default now(),
+  updated_by text
+);
+create table if not exists design_connections (
+  id text primary key,
+  a_business text not null references businesses(id) on delete cascade,
+  b_business text not null references businesses(id) on delete cascade,
+  asked_by_business text not null,
+  asked_by text not null,
+  status text not null default 'pending',
+  created_at timestamptz not null default now(),
+  answered_at timestamptz,
+  answered_by text,
+  check (a_business < b_business),
+  unique (a_business, b_business)
+);
+create index if not exists design_connections_b on design_connections(b_business);
 create table if not exists design_customers (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,

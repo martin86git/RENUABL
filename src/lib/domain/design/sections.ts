@@ -63,6 +63,8 @@ export const SECTIONS: readonly Section[] = [
       { id: "works", label: "In the works", href: "/design/installations/underway" },
       { id: "completed", label: "Completed", href: "/design/installations/completed" },
       { id: "invoices", label: "Installer invoices", href: "/design/installations/invoices" },
+      // The installers and inspectors this retailer works with (connections.ts).
+      { id: "connections", label: "Connections", href: "/design/connections" },
     ],
   },
   { id: "service", label: "Service", pages: [{ id: "service", label: "Service pipeline", href: "/design/service" }] },

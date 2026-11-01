@@ -1,6 +1,7 @@
 "use client";
 
 import { tradeUnreadCount } from "@/lib/services/trade";
+import { incomingRequests } from "@/lib/services/connections";
 import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import { inboxUnread } from "@/lib/services/inbox";
 import { stopViewing } from "@/lib/services/design-account";
@@ -159,7 +160,12 @@ function Shell({
     const res = await tradeUnreadCount();
     return res.ok ? res.unread : null;
   });
-  const counts: Record<string, number> = { service, ...gates, "my-equipment": trade };
+  // Requests to connect waiting for this business's answer (connections.ts), every kind of business.
+  const requests = useCount(on, "renuabl:connections", async () => {
+    const res = await incomingRequests();
+    return res.ok ? res.incoming : null;
+  });
+  const counts: Record<string, number> = { service, ...gates, "my-equipment": trade, connections: requests };
   // Gmail's own unread count on the envelope, asked each minute while the page is in view (0 until Gmail is connected).
   const mail = useCount(retail, "renuabl:inbox", async () => {
     const res = await inboxUnread();
