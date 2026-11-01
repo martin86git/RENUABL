@@ -15,6 +15,9 @@ import {
 } from "@/lib/server/design-sol-repo";
 import { allow } from "@/lib/server/rate-limit";
 
+// Sol may search and read a maker's manual before he answers.
+export const maxDuration = 180;
+
 /**
  * Sol, the member's own conversation (domain/design/sol.ts). GET → { state }, saying any reminder now due first (the
  * rail asks every minute for its count). POST { do } → { state }: "chat" { text, files } asks Sol; "seen" marks the

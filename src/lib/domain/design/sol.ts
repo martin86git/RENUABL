@@ -11,6 +11,7 @@ import { cleanDiagrams, type SolDiagram } from "./sol-diagrams";
 import { STAGE_LABELS, JOB_STAGES, type Job, type JobStage } from "./crm";
 import { matches } from "./find";
 import { SECTIONS } from "./sections";
+import { SOL_MAKER_DOCS } from "./maker-docs";
 import { SOL_NETWORKS } from "./networks";
 import { SOL_REGULATIONS } from "./standards";
 
@@ -412,6 +413,8 @@ Emails: to write to a customer, use draft_email; it is shown as a card they chec
 ${SOL_REGULATIONS}
 
 ${SOL_NETWORKS}
+
+${SOL_MAKER_DOCS}
 
 Preferences: when they ask for something to apply from now on (a sign-off, their name, a tone), keep it with remember_my_preference; take one off with forget_my_preference.
 

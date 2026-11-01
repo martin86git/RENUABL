@@ -45,10 +45,38 @@ import { listSheets } from "./design-datasheets-repo";
 import { listStandards } from "./design-standards-repo";
 import { libraryForSol } from "@/lib/domain/design/standards";
 import { datasheetFigures } from "@/lib/domain/design/datasheets";
+import { MAKER_FETCHES, MAKER_PAGE_TOKENS, MAKER_SEARCHES, MAKER_SITES, sourcesLine } from "@/lib/domain/design/maker-docs";
 import { TEAM_CHANNELS, nameOf } from "@/lib/domain/design/team-chat";
 
 const MODEL = () => process.env.SOL_MODEL?.trim() || "claude-opus-5-5";
 const STEPS = 6;
+/** Searches that end a step early (pause_turn) carry on; this many at most, so a long search can't loop. */
+const MAX_RESUMES = 3;
+
+/** Makers' documents online: search and read only their sites and the official ones (domain/design/maker-docs.ts). */
+const WEB_TOOLS: Anthropic.ToolUnion[] = [
+  { type: "web_search_20260209", name: "web_search", max_uses: MAKER_SEARCHES, allowed_domains: [...MAKER_SITES] },
+  {
+    type: "web_fetch_20260209",
+    name: "web_fetch",
+    max_uses: MAKER_FETCHES,
+    allowed_domains: [...MAKER_SITES],
+    max_content_tokens: MAKER_PAGE_TOKENS,
+    citations: { enabled: true },
+  },
+];
+
+/** The pages an answer drew on: its citations, and the documents it read. */
+function citedPages(content: readonly Anthropic.ContentBlock[]): { url: string; title?: string | null }[] {
+  const pages: { url: string; title?: string | null }[] = [];
+  for (const b of content) {
+    if (b.type === "text")
+      for (const c of b.citations ?? []) if (c.type === "web_search_result_location") pages.push({ url: c.url, title: c.title });
+    if (b.type === "web_fetch_tool_result" && b.content.type === "web_fetch_result")
+      pages.push({ url: b.content.url, title: b.content.content.title });
+  }
+  return pages;
+}
 
 const TOOLS: Anthropic.Tool[] = [
   {
@@ -363,7 +391,7 @@ export async function askSol(
     prefs: state.prefs,
     now: new Date(),
   });
-  const tools = can(member.role, "costs", member.permissions) ? [...TOOLS, PRICE_TOOL] : TOOLS;
+  const tools: Anthropic.ToolUnion[] = [...(can(member.role, "costs", member.permissions) ? [...TOOLS, PRICE_TOOL] : TOOLS), ...WEB_TOOLS];
   const blocks = fileBlocks(said.files);
   const messages: Anthropic.MessageParam[] = [
     ...state.turns
@@ -381,12 +409,23 @@ export async function askSol(
     else merged.push({ ...m });
   }
 
-  const client = new Anthropic({ apiKey, timeout: 60_000, maxRetries: 1 });
+  // A search and a manual read can take a while.
+  const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 1 });
   const shown: Turn = { charts: [], diagrams: [], drafts: [] };
   let answer = "";
+  const pages: { url: string; title?: string | null }[] = [];
+  let resumes = 0;
   try {
     for (let step = 0; step < STEPS; step++) {
       const m = await client.messages.create({ model: MODEL(), max_tokens: 8000, system, tools, messages: merged });
+      pages.push(...citedPages(m.content));
+      // The server paused its own search loop: send the turn back as it is and it carries on.
+      if (m.stop_reason === "pause_turn" && resumes < MAX_RESUMES) {
+        resumes++;
+        merged.push({ role: "assistant", content: m.content });
+        step--;
+        continue;
+      }
       answer =
         m.content
           .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -413,6 +452,12 @@ export async function askSol(
     if (!answer) await giveBackSolCredit(businessId, credit);
     answer = answer || "Something went wrong reaching Claude just then. Try again in a moment.";
   }
+  // What he read online, so the person can check it.
+  const sources = answer ? sourcesLine(pages) : "";
+  if (sources && !answer.includes("Sources:"))
+    answer = `${answer}
+
+${sources}`;
   const sol: SolTurn = {
     role: "sol",
     text: answer || (shown.drafts.length ? "Here's the draft." : shown.charts.length || shown.diagrams.length ? "Here it is." : "Done."),
