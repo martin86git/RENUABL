@@ -22,9 +22,11 @@ export function DesignDrawer(props: { jobId: string; open: boolean; onOpen: () =
   const [loaded, setLoaded] = useState(false);
   const [unsaved, setUnsaved] = useState(false);
   const saved = useRef(onSaved);
+  const fold = useRef(onFold);
   useEffect(() => {
     saved.current = onSaved;
-  }, [onSaved]);
+    fold.current = onFold;
+  }, [onSaved, onFold]);
   useEffect(() => {
     // Opening it is what loads it; from then on it stays.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -33,8 +35,10 @@ export function DesignDrawer(props: { jobId: string; open: boolean; onOpen: () =
   useEffect(() => {
     const hear = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
-      const news = (e.data as { renuablDesign?: { saved?: boolean; unsaved?: boolean } } | null)?.renuablDesign;
+      const news = (e.data as { renuablDesign?: { saved?: boolean; unsaved?: boolean; fold?: boolean } } | null)?.renuablDesign;
       if (!news) return;
+      // The customer's name in the designer: the deal underneath is shown.
+      if (news.fold) fold.current();
       if (typeof news.unsaved === "boolean") setUnsaved(news.unsaved);
       if (news.saved) {
         setUnsaved(false);

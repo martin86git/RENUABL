@@ -54,7 +54,7 @@ const STEPS = [
  * Opened inside a deal's design drawer (an iframe of this page), the deal is told when the design is saved or published,
  * so its system details fill in from it there and then, and whether there is work not yet saved. Same site only.
  */
-function tellDeal(news: { saved?: boolean; unsaved?: boolean }) {
+function tellDeal(news: { saved?: boolean; unsaved?: boolean; fold?: boolean }) {
   if (typeof window === "undefined" || window.parent === window) return;
   window.parent.postMessage({ renuablDesign: news }, window.location.origin);
 }
@@ -317,13 +317,21 @@ export function DesignStudio() {
                 Design home
               </Link>
               {onJob && (
-                <Link
-                  href={`/design/customers/${onJob.customerId}`}
-                  className="max-w-40 shrink-0 truncate rounded bg-surface-2 px-2.5 py-1.5 text-[13px] font-medium text-ink hover:bg-sage"
-                  title="Back to this customer"
+                // The customer's name opens their deal (1 Nov 2026, Martin, as Primero's): in the deal's own drawer it folds the
+                // designer away to show the deal underneath; on its own it goes to the deal.
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.parent !== window) return tellDeal({ fold: true });
+                    if (unsaved.current && !window.confirm("This design has changes that aren't saved. Leave it and lose them?")) return;
+                    router.push(`/design/deals/${onJob.id}`);
+                  }}
+                  className="inline-flex max-w-52 shrink-0 items-center gap-1.5 rounded-full bg-sun-line px-3 py-1.5 text-[13px] font-medium text-white hover:brightness-105"
+                  title="Open the deal"
                 >
-                  {onJob.customerName}
-                </Link>
+                  <span className="truncate">{onJob.customerName}</span>
+                  <span className="shrink-0 text-white/80">· Open deal</span>
+                </button>
               )}
               {/* Another roof, without leaving the designer. */}
               <div className="w-72 max-w-full shrink-0 xl:w-96 2xl:w-[30rem]">
