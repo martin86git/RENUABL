@@ -41,6 +41,10 @@ export interface QuoteForm {
   solarVicRebate?: boolean;
   /** The Solar Victoria interest-free loan too. It goes with the rebate, never without it. */
   solarVicLoan?: boolean;
+  /** The roof's pitch in degrees, one figure for the home (1 Nov 2026, Martin, as Primero's): new panels and traced faces start at it. */
+  pitch?: number;
+  /** A person has set the pitch for this home: until then the designer asks for it. */
+  pitchSet?: boolean;
 }
 
 /** The system on the drawing. */
@@ -495,6 +499,8 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
         postcode: start.form.postcode || (typeof f.postcode === "string" && /^\d{0,4}$/.test(f.postcode) ? f.postcode : ""),
         // The loan goes with the rebate, never without it.
         ...(f.solarVicRebate === true ? { solarVicRebate: true, ...(f.solarVicLoan === true ? { solarVicLoan: true } : {}) } : {}),
+        ...(typeof f.pitch === "number" && Number.isFinite(f.pitch) && f.pitch >= 0 && f.pitch <= 70 ? { pitch: Math.round(f.pitch) } : {}),
+        ...(f.pitchSet === true ? { pitchSet: true } : {}),
       },
       edits,
     });

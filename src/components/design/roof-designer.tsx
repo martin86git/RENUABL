@@ -357,6 +357,42 @@ function SwitchboardGlyph() {
 }
 
 /** A panel as the Landscape button draws it: a rectangle with a small triangle at one end, so its way round reads. */
+/** A panel drawn with its cells, upright or on its side: the card's two choices. */
+function PanelDrawing({ landscape, size = 14 }: { landscape: boolean; size?: number }) {
+  const w = landscape ? size : size * 0.64;
+  const h = landscape ? size * 0.64 : size;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden className="shrink-0">
+      <g transform={`translate(${(size - w) / 2} ${(size - h) / 2})`}>
+        <rect
+          x={0.5}
+          y={0.5}
+          width={w - 1}
+          height={h - 1}
+          rx={1}
+          fill="currentColor"
+          fillOpacity={0.18}
+          stroke="currentColor"
+          strokeWidth={1}
+        />
+        {landscape ? (
+          <>
+            <line x1={w / 3} y1={1} x2={w / 3} y2={h - 1} stroke="currentColor" strokeWidth={0.5} />
+            <line x1={(2 * w) / 3} y1={1} x2={(2 * w) / 3} y2={h - 1} stroke="currentColor" strokeWidth={0.5} />
+            <line x1={1} y1={h / 2} x2={w - 1} y2={h / 2} stroke="currentColor" strokeWidth={0.8} />
+          </>
+        ) : (
+          <>
+            <line x1={1} y1={h / 3} x2={w - 1} y2={h / 3} stroke="currentColor" strokeWidth={0.5} />
+            <line x1={1} y1={(2 * h) / 3} x2={w - 1} y2={(2 * h) / 3} stroke="currentColor" strokeWidth={0.5} />
+            <line x1={w / 2} y1={1} x2={w / 2} y2={h - 1} stroke="currentColor" strokeWidth={0.8} />
+          </>
+        )}
+      </g>
+    </svg>
+  );
+}
+
 function PanelGlyph(props: { across: boolean }) {
   return (
     <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" aria-hidden>
@@ -374,6 +410,146 @@ function PanelGlyph(props: { across: boolean }) {
     </svg>
   );
 }
+/** A roof's slope drawn at its pitch: a base line, the slope rising from its left end, and the angle between them in orange. */
+function RoofAngle({ pitch, size = 22 }: { pitch: number; size?: number }) {
+  const t = (Math.min(60, Math.max(0, pitch)) * Math.PI) / 180;
+  const x0 = 3;
+  const y0 = 19;
+  const x1 = x0 + 18 * Math.cos(t);
+  const y1 = y0 - 18 * Math.sin(t);
+  const r = 8;
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden>
+      <path d={`M${x0} ${y0} H21`} stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" opacity={0.45} />
+      <path d={`M${x0} ${y0} L${x1.toFixed(2)} ${y1.toFixed(2)}`} stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+      <path
+        d={`M${x0 + r} ${y0} A${r} ${r} 0 0 0 ${(x0 + r * Math.cos(t)).toFixed(2)} ${(y0 - r * Math.sin(t)).toFixed(2)}`}
+        className="stroke-sun-line"
+        strokeWidth={1.6}
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+const PITCH_PICKS = [10, 15, 20, 22, 25, 30, 35];
+
+function PitchStepper({ pitch, onPitch }: { pitch: number; onPitch: (pitch: number) => void }) {
+  return (
+    <div className="mt-2 flex items-center justify-center gap-3">
+      <button
+        onClick={() => onPitch(Math.max(0, pitch - 1))}
+        className="flex size-9 items-center justify-center rounded-full bg-surface-2 text-lg font-semibold hover:bg-line"
+        aria-label="Roof pitch down a degree"
+      >
+        −
+      </button>
+      <span className="min-w-[3.5rem] text-center text-2xl font-semibold tabular-nums">{pitch}°</span>
+      <button
+        onClick={() => onPitch(Math.min(70, pitch + 1))}
+        className="flex size-9 items-center justify-center rounded-full bg-surface-2 text-lg font-semibold hover:bg-line"
+        aria-label="Roof pitch up a degree"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+function PitchPicks({ pitch, onPitch }: { pitch: number; onPitch: (pitch: number) => void }) {
+  return (
+    <div className="mt-2 flex flex-wrap justify-center gap-1">
+      {PITCH_PICKS.map((p) => (
+        <button
+          key={p}
+          onClick={() => onPitch(p)}
+          className={clsx(
+            "rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
+            p === pitch ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-2 hover:bg-line",
+          )}
+        >
+          {p}°
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The roof pitch as a small mark on the picture's left edge: the angle and its degrees; pressed, a pad to change it. */
+function RoofPitchMark(props: { pitch: number; open: boolean; onOpen: (open: boolean) => void; onPitch: (pitch: number) => void }) {
+  const { pitch, open, onOpen, onPitch } = props;
+  return (
+    <div className="absolute left-3 top-1/2 z-30 -translate-y-1/2">
+      <button
+        onClick={() => onOpen(!open)}
+        className={clsx("flex flex-col items-center gap-0.5 px-2 py-1.5 text-ink", GLASS, open && "ring-2 ring-sun-line")}
+        title={`Roof pitch ${pitch}°: new panels and traced faces start at it. Press to change it.`}
+        aria-expanded={open}
+        aria-label={`Roof pitch ${pitch} degrees: change it`}
+      >
+        <RoofAngle pitch={pitch} />
+        <span className="text-xs font-semibold tabular-nums leading-none">{pitch}°</span>
+      </button>
+      {open && (
+        <div className="absolute left-full top-1/2 ml-2 w-56 -translate-y-1/2 rounded-2xl bg-surface p-3 text-ink shadow-lift ring-1 ring-line">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">Roof pitch</span>
+            <button onClick={() => onOpen(false)} className="text-xs font-medium text-muted hover:text-ink">
+              Done
+            </button>
+          </div>
+          <PitchStepper pitch={pitch} onPitch={onPitch} />
+          <PitchPicks pitch={pitch} onPitch={onPitch} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The roof's pitch, asked for on a new site (1 Nov 2026, Martin, as Primero's: so it isn't forgotten, above all on a
+ * flat roof left at the 22° start). It comes in after a moment, small and to the side, so the roof is seen first. Kept
+ * with the design's quote settings, so it asks again only if left unsaved.
+ */
+function PitchFirst(props: { pitch: number; flat: boolean; onSet: (pitch: number, roof?: "flat") => void }) {
+  const [pitch, setPitch] = useState(props.pitch);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setShown(true), 2500);
+    return () => window.clearTimeout(t);
+  }, []);
+  if (!shown) return null;
+  return (
+    <div className="absolute right-3 top-1/2 z-30 w-60 -translate-y-1/2">
+      <div className={clsx("p-3.5 text-ink", GLASS)} role="dialog" aria-label="Set the roof pitch">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">First, the roof</p>
+        <h3 className="mt-0.5 text-base font-semibold tracking-tight">What is the roof&apos;s pitch?</h3>
+        <div className="mt-1 flex justify-center text-ink">
+          <RoofAngle pitch={pitch} size={56} />
+        </div>
+        <PitchStepper pitch={pitch} onPitch={setPitch} />
+        <PitchPicks pitch={pitch} onPitch={setPitch} />
+        <p className="mt-2 text-center text-[11px] leading-snug text-muted">New panels and traced faces start at it.</p>
+        <button
+          onClick={() => props.onSet(pitch)}
+          className="mt-3 w-full rounded-full bg-primary py-2 text-sm font-semibold text-primary-ink hover:bg-forest"
+        >
+          Set {pitch}°
+        </button>
+        {props.flat ? (
+          <button onClick={() => props.onSet(pitch)} className="mt-2 w-full text-xs font-medium text-muted hover:text-ink">
+            It&apos;s set as a flat roof: carry on
+          </button>
+        ) : (
+          <button onClick={() => props.onSet(props.pitch, "flat")} className="mt-2 w-full text-xs font-medium text-muted hover:text-ink">
+            It&apos;s a flat roof
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
  * The widest the picture may be and still fit the window with the bar and the figures above it: the picture is
  * given all the room there is, since it is where the work is done.
@@ -499,7 +675,8 @@ export function RoofDesigner(props: {
   // (Martin: the check covered the roof as soon as the pointer crossed a string).
   const [checking, setChecking] = useState<string | null>(null);
   // Which way Add a panel lays new panels: chosen from the two bubbles beside the tool (Martin).
-  const [addLandscape, setAddLandscape] = useState(false);
+  // New panels' way round: portrait, landscape, or (null) following the roof face or the panel beside them.
+  const [addLandscape, setAddLandscape] = useState<boolean | null>(null);
   // The two bubbles fanned out of Add a panel, like a hand of cards: open from a press on the tool, gone once one is chosen.
   const [fanOpen, setFanOpen] = useState(false);
   // The battery or the inverter under the pointer: its details show beside it.
@@ -897,6 +1074,9 @@ export function RoofDesigner(props: {
   const stored = quotes[active] ?? defaultQuote(props.postcode);
   const quoteNow = props.postcode ? { ...stored, form: { ...stored.form, postcode: props.postcode } } : stored;
   const everyQuote = () => designs.map((_, i) => quotes[i] ?? defaultQuote(props.postcode));
+  // The roof's pitch, one figure for the home: new panels and traced faces start at it; a flat roof's lie flat.
+  const homePitch = quoteNow.form.roof === "flat" ? 0 : (quoteNow.form.pitch ?? TILT.roof);
+  const [pitchOpen, setPitchOpen] = useState(false);
   const setQuote = (next: QuoteFields) => {
     setQuotes(designs.map((_, i) => (i === active ? next : (quotes[i] ?? defaultQuote(props.postcode)))));
     setSaved("changed");
@@ -1160,7 +1340,7 @@ export function RoofDesigner(props: {
       ];
       for (const from of standingNow) {
         // Only beside panels laid the way chosen; a different way is placed freely and clicks flush when drawn.
-        if (Boolean(from.across) !== addLandscape) continue;
+        if (addLandscape !== null && Boolean(from.across) !== addLandscape) continue;
         const { stepX, stepY } = stepsOf(from);
         const away = Math.hypot(p.x - from.x, p.y - from.y);
         if (away > stepY * 1.6 || (beside && away >= beside.away)) continue;
@@ -1177,12 +1357,10 @@ export function RoofDesigner(props: {
         if (!standingNow.some((other) => Math.hypot(other.x - x, other.y - y) < 0.4)) return { ...beside.from, id: "ghost", x, y };
       }
       const on = [...faces].reverse().find((f) => inside(p, f.points));
-      return laidAs(
-        on
-          ? { ...freed(on, { index: 0, corners: [p, p, p, p] }, "ghost"), x: p.x, y: p.y }
-          : { id: "ghost", x: p.x, y: p.y, angle: 0, tilt: TILT.roof },
-        addLandscape,
-      );
+      const open: LoosePanel = on
+        ? { ...freed(on, { index: 0, corners: [p, p, p, p] }, "ghost"), x: p.x, y: p.y }
+        : { id: "ghost", x: p.x, y: p.y, angle: 0, tilt: homePitch };
+      return addLandscape === null ? open : laidAs(open, addLandscape);
     }
     const a = (base.angle * Math.PI) / 180;
     // The pointer in the panel's own frame: across its short side (lx) and along its long side (ly).
@@ -1284,7 +1462,7 @@ export function RoofDesigner(props: {
     setTracing([]);
     if (points.length < 3) return;
     const id = newId("f");
-    const made: Face = { id, points, angle: 0, landscape: false, setback: 0.3, facing: "N", tilt: TILT.roof, off: [], plan: true };
+    const made: Face = { id, points, angle: 0, landscape: false, setback: 0.3, facing: "N", tilt: homePitch, off: [], plan: true };
     setFaces([...faces, { ...made, angle: angleOfLongestEdge(made) }]);
     changed();
     setSelected(id);
@@ -3573,6 +3751,27 @@ export function RoofDesigner(props: {
                 </svg>
               </div>
 
+              {/* The roof's pitch (1 Nov 2026, Martin, as Primero's): until a person has set it for this home, a card asks for it
+                  (so a flat roof isn't left at the 22 degree start); then it is a small roof-angle mark on the left edge that opens to change it. */}
+              {quoteNow.form.roof !== "flat" && quoteNow.form.pitchSet && (
+                <RoofPitchMark
+                  pitch={homePitch}
+                  open={pitchOpen}
+                  onOpen={setPitchOpen}
+                  onPitch={(pitch) => setQuote({ ...quoteNow, form: { ...quoteNow.form, pitch, pitchSet: true } })}
+                />
+              )}
+              {!quoteNow.form.pitchSet && (
+                <PitchFirst
+                  key={active}
+                  pitch={quoteNow.form.pitch ?? TILT.roof}
+                  flat={quoteNow.form.roof === "flat"}
+                  onSet={(pitch, roof) =>
+                    setQuote({ ...quoteNow, form: { ...quoteNow.form, pitch, roof: roof ?? quoteNow.form.roof, pitchSet: true } })
+                  }
+                />
+              )}
+
               {/* The tools, where the right click was. */}
               {toolMenu && (
                 <>
@@ -4518,52 +4717,74 @@ export function RoofDesigner(props: {
                 >
                   <SquarePlus className="size-5" aria-hidden />
                 </button>
-                {/* Portrait or landscape (Martin): pressing Add a panel fans two bubbles out of it in an arc, like a hand of cards
-                    spread out; choosing one sets the way new panels are laid (and lays any picked panels that way, `turnLandscape`),
-                    and the fan folds away. Each starts at the tool's icon and swings out to its place. */}
-                {([false, true] as const).map((landscape, n) => {
-                  const name = landscape ? "Landscape" : "Portrait";
-                  // Turning picked panels (Select still on), the lit bubble is the way they all lie now.
-                  const turning = tool === "select" && pickedPanels.length > 0;
-                  const on = turning ? pickedPanels.every((p) => Boolean(p.across) === landscape) : addLandscape === landscape;
-                  // The icon of Add a panel, and each bubble's place on an arc around it (degrees clockwise from east).
-                  const icon = { x: 4.8, y: 1.875 };
-                  const angle = (n === 0 ? -8 : 48) * (Math.PI / 180);
-                  const reach = 3.5;
-                  const dx = Math.cos(angle) * reach;
-                  const dy = Math.sin(angle) * reach;
-                  return (
-                    <button
-                      key={name}
-                      onClick={() => {
-                        setAddLandscape(landscape);
-                        if (pickedPanels.length) turnLandscape(landscape);
-                        setFanOpen(false);
-                      }}
-                      tabIndex={fanOpen ? 0 : -1}
-                      aria-hidden={!fanOpen}
-                      title={`${name}: add panels this way${pickedPanels.length ? ", and lay the picked panels this way" : ""}`}
-                      aria-label={`Add panels ${name.toLowerCase()}`}
-                      aria-pressed={on}
-                      style={{
-                        left: `${icon.x - 1.3125}rem`,
-                        top: `${icon.y - 1.3125}rem`,
-                        transform: fanOpen
-                          ? `translate(${dx}rem, ${dy}rem) rotate(0deg) scale(1)`
-                          : `translate(0, 0) rotate(${n === 0 ? -40 : -80}deg) scale(0.4)`,
-                        opacity: fanOpen ? 1 : 0,
-                        transitionDelay: fanOpen ? `${n * 60}ms` : "0ms",
-                      }}
-                      className={clsx(
-                        "absolute flex size-[2.625rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] motion-reduce:transition-none",
-                        fanOpen ? "pointer-events-auto" : "pointer-events-none",
-                        on ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface/95 text-ink hover:bg-surface",
-                      )}
-                    >
-                      <PanelGlyph across={landscape} />
-                    </button>
-                  );
-                })}
+                {/* The way chosen, as a small mark on Add a panel while the card is shut. */}
+                {addLandscape !== null && !fanOpen && (
+                  <span
+                    aria-hidden
+                    className={clsx(
+                      "pointer-events-none absolute left-[5.4rem] top-[2.4rem] block rounded-[2px] border border-ink bg-surface",
+                      addLandscape ? "h-2 w-3" : "h-3 w-2",
+                    )}
+                  />
+                )}
+                {/* Portrait or landscape (1 Nov 2026, Martin, as Primero's: the bubbles were underwhelming): pressing Add a panel
+                    opens a card of two drawn panels with their names, and following the roof face. Choosing one sets the way
+                    new panels go down (and, with panels picked, lays them that way, `turnLandscape`), and the card closes. */}
+                {fanOpen && (
+                  <div
+                    className="absolute left-[2.375rem] top-[3.75rem] z-30 w-60 rounded-2xl bg-surface p-2 text-left text-ink shadow-lift ring-1 ring-line"
+                    role="radiogroup"
+                    aria-label={pickedPanels.length && tool === "select" ? "The picked panels" : "New panels"}
+                  >
+                    <span className="block px-1 pb-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-muted">
+                      {pickedPanels.length && tool === "select" ? "Lay the picked panels" : "New panels go down"}
+                    </span>
+                    <span className="grid grid-cols-2 gap-1.5">
+                      {([false, true] as const).map((land) => {
+                        const turning = tool === "select" && pickedPanels.length > 0;
+                        const on = turning ? pickedPanels.every((p) => Boolean(p.across) === land) : addLandscape === land;
+                        return (
+                          <button
+                            key={String(land)}
+                            type="button"
+                            role="radio"
+                            aria-checked={on}
+                            title={land ? "Landscape: on their side" : "Portrait: upright"}
+                            onClick={() => {
+                              setAddLandscape(land);
+                              if (pickedPanels.length) turnLandscape(land);
+                              setFanOpen(false);
+                            }}
+                            className={clsx(
+                              "flex flex-col items-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition",
+                              on ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-2 hover:text-ink hover:ring-1 hover:ring-ink",
+                            )}
+                          >
+                            <PanelDrawing landscape={land} size={34} />
+                            {land ? "Landscape" : "Portrait"}
+                          </button>
+                        );
+                      })}
+                    </span>
+                    {!(tool === "select" && pickedPanels.length) && (
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={addLandscape === null}
+                        onClick={() => {
+                          setAddLandscape(null);
+                          setFanOpen(false);
+                        }}
+                        className={clsx(
+                          "mt-1.5 w-full rounded-xl px-2 py-1.5 text-[11px] font-medium transition",
+                          addLandscape === null ? "bg-sun text-sun-ink" : "text-muted hover:text-ink",
+                        )}
+                      >
+                        Follow the roof face (or the panel beside it)
+                      </button>
+                    )}
+                  </div>
+                )}
                 <button
                   onClick={() => pickTool("erase")}
                   title="Erase"
