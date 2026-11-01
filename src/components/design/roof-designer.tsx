@@ -76,7 +76,8 @@ import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
-import { billWith, usageFromAmount } from "@/lib/domain/design/design-bill";
+import { billFieldsFromPhoto, billWith, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
+import { CaptureButtons } from "@/components/ui/capture";
 import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
 import { faces as facesWay, parseCommand, pickByQuery, type DesignCommand, type Facing as Way } from "@/lib/domain/design/design-commands";
 import { DictateButton } from "./dictate";
@@ -696,7 +697,28 @@ export function RoofDesigner(props: {
   const [bill, setBillFields] = useState(props.extras.bill);
   // Sol looking through the deal's file for the customer's usage (1 Nov 2026, as Primero's): the figures go into the box
   // with the words he found them in, to check before saving; figures typed while he looked are kept.
-  const [usageRead, setUsageRead] = useState<{ busy: boolean; notes: string[]; error?: string } | null>(null);
+  const [usageRead, setUsageRead] = useState<{ busy: boolean; notes: string[]; error?: string; photo?: boolean } | null>(null);
+  // A bill photo or PDF read into the box (2 Nov 2026, Martin), by the homeowner site's own reader: nothing kept.
+  const readBillPhoto = async (file: File) => {
+    billTouched.current = false;
+    setUsageRead({ busy: true, notes: [], photo: true });
+    try {
+      const form = new FormData();
+      form.append("bill", file);
+      form.append("address", props.address);
+      const res = await fetch("/api/design/bill", { method: "POST", body: form });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; read?: BillPhotoRead };
+      if (!j.ok || !j.read) return setUsageRead({ busy: false, notes: [], error: j.message ?? "That bill couldn't be read.", photo: true });
+      const out = billFieldsFromPhoto(j.read, bill);
+      if (!billTouched.current) {
+        setBillFields(out.fields);
+        setSaved("changed");
+      }
+      setUsageRead({ busy: false, notes: out.notes, photo: true });
+    } catch {
+      setUsageRead({ busy: false, notes: [], error: "We couldn't reach the server.", photo: true });
+    }
+  };
   const solLooked = useRef(false);
   const billTouched = useRef(false);
   const askSol = async () => {
@@ -3410,6 +3432,18 @@ export function RoofDesigner(props: {
                         {usageRead?.busy ? "Sol is looking through their file…" : "Find it in the customer's file"}
                       </button>
                     )}
+                    {/* A photo of the bill (or its PDF): read into the box, then one press sizes the system from it. */}
+                    <div className="mt-2">
+                      <CaptureButtons
+                        onFiles={(files) => files[0] && void readBillPhoto(files[0])}
+                        accept="application/pdf,image/jpeg,image/png,image/webp"
+                        busy={Boolean(usageRead?.busy && usageRead.photo)}
+                        photoLabel="Photo of the bill"
+                        fileLabel="Bill PDF"
+                        desktopLabel="Read it from the bill (photo or PDF)"
+                        size="sm"
+                      />
+                    </div>
                     {usageRead && !usageRead.busy && (
                       <div
                         className={clsx(
@@ -3422,12 +3456,25 @@ export function RoofDesigner(props: {
                           <p>{usageRead.error}</p>
                         ) : (
                           <>
-                            <p className="font-medium">Sol found this in the customer&apos;s file: check it before saving.</p>
+                            <p className="font-medium">
+                              {usageRead.photo
+                                ? "Read from the bill: check the figures below against it."
+                                : "Sol found this in the customer's file: check it before saving."}
+                            </p>
                             <ul className="mt-1 grid gap-1">
                               {usageRead.notes.map((n) => (
                                 <li key={n}>{n}</li>
                               ))}
                             </ul>
+                            {usageRead.photo && !costsHidden && (
+                              <button
+                                type="button"
+                                onClick={() => void designForMe()}
+                                className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3 text-xs font-semibold text-primary-ink"
+                              >
+                                Size the system to this bill: make the three designs
+                              </button>
+                            )}
                           </>
                         )}
                       </div>

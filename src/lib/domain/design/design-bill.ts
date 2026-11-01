@@ -137,3 +137,38 @@ export const FILE_USAGE_PROMPT = `You are Sol, a solar business's assistant. Abo
 - Never work a figure out or estimate one: give only figures written in the file, and quote the words they are in.
 - Ignore figures about solar sent to the grid, a system's size (kW), a battery's size (kWh of storage) or a price for a system.
 - If nothing is written, set found to false and every figure to null.`;
+
+/** What the bill reader gives the designer (the homeowner site's own reader): never the customer's personal details. */
+export interface BillPhotoRead {
+  periodDays: number;
+  dailyUsageKwh: number;
+  usageRate: number | null;
+  feedInRate: number | null;
+  exportedDailyKwh: number | null;
+}
+
+/**
+ * A bill photo or PDF into the bill box (2 Nov 2026, Martin): the usage in kWh for the bill's own length (the nearest
+ * interval), its price per kWh and feed-in tariff where it shows them; the supply charge stays as the box had it,
+ * since the reader doesn't take it. What was read is said, to check against the bill.
+ */
+export function billFieldsFromPhoto(read: BillPhotoRead, current: BillFields): { fields: BillFields; notes: string[] } {
+  const interval = nearestInterval(read.periodDays);
+  const span = BILL_INTERVALS[interval];
+  const notes = [
+    `About ${Math.round(read.dailyUsageKwh * 10) / 10} kWh a day over ${Math.round(read.periodDays)} days, put in as ${EVERY[interval]}.`,
+  ];
+  const rate = read.usageRate && read.usageRate > 0 && read.usageRate < 2 ? read.usageRate.toFixed(4).replace(/0+$/, "") : null;
+  const feedIn =
+    read.feedInRate !== null && read.feedInRate >= 0 && read.feedInRate < 1
+      ? read.feedInRate.toFixed(4).replace(/0+$/, "").replace(/\.$/, "")
+      : null;
+  if (rate) notes.push(`Price per kWh $${rate}.`);
+  else notes.push("The price per kWh wasn't clear on the bill: check it.");
+  if (feedIn) notes.push(`Feed-in $${feedIn} a kWh.`);
+  notes.push("The daily supply charge isn't read: check it against the bill.");
+  if (read.exportedDailyKwh)
+    notes.push(`It already exports about ${Math.round(read.exportedDailyKwh * 10) / 10} kWh a day: there's solar on the roof.`);
+  const withRates = { ...current, interval, ...(rate ? { rate } : {}), ...(feedIn ? { feedIn } : {}) };
+  return { fields: billWith(withRates, { usage: String(Math.round(read.dailyUsageKwh * span)) }), notes };
+}

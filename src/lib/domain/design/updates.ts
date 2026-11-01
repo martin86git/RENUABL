@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-02",
     area: "Design tool",
+    words: "The bill box reads a photo or PDF of the customer's bill, then one press sizes the system to it.",
+  },
+  {
+    day: "2026-11-02",
+    area: "Design tool",
     words:
       "Ask Sol to change it (press /): type or say “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”",
   },

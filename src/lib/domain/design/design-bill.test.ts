@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { billFieldsFromFile, billWith, nearestInterval, usageFromAmount } from "./design-bill";
+import { billFieldsFromFile, billFieldsFromPhoto, billWith, nearestInterval, usageFromAmount } from "./design-bill";
 import type { BillFields } from "./quote";
 
 const box: BillFields = { interval: "quarterly", amount: "", supplyPerDay: "1.00", rate: "0.30", feedIn: "0.05" };
@@ -55,5 +55,22 @@ describe("Sol's find in the customer's file", () => {
   it("finds the nearest bill interval", () => {
     expect(nearestInterval(30)).toBe("monthly");
     expect(nearestInterval(365)).toBe("annual");
+  });
+});
+
+describe("a bill photo into the bill box", () => {
+  it("puts the usage in for the bill's own length, with its rates, and says what wasn't read", () => {
+    const r = billFieldsFromPhoto({ periodDays: 61, dailyUsageKwh: 18, usageRate: 0.32, feedInRate: 0.05, exportedDailyKwh: null }, box);
+    expect(r.fields.interval).toBe("bimonthly");
+    expect(r.fields.usage).toBe(String(Math.round(18 * (365 / 6))));
+    expect(r.fields.rate).toBe("0.32");
+    expect(r.fields.feedIn).toBe("0.05");
+    expect(r.fields.supplyPerDay).toBe(box.supplyPerDay);
+    expect(r.notes.join(" ")).toContain("supply charge isn't read");
+  });
+  it("keeps the box's rate when the bill's isn't clear, and notes solar already on the roof", () => {
+    const r = billFieldsFromPhoto({ periodDays: 91, dailyUsageKwh: 10, usageRate: null, feedInRate: null, exportedDailyKwh: 6 }, box);
+    expect(r.fields.rate).toBe(box.rate);
+    expect(r.notes.join(" ")).toContain("solar on the roof");
   });
 });
