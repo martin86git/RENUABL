@@ -7,7 +7,7 @@ import { LayoutDashboard, Menu, MessageCircle, PenTool, Search, SquareKanban, ty
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 import { pageAt, sectionAt, SECTIONS } from "@/lib/domain/design/sections";
-import { notificationCount, serviceCount, approvalCounts } from "@/lib/services/crm";
+import { notificationCount, serviceCount, approvalCounts, updatesUnseen } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
@@ -29,6 +29,8 @@ export const PATHS = {
   notifications: "/design/notifications",
   sol: "/design/sol",
   team: "/design/team",
+  updates: "/design/updates",
+  feedback: "/design/feedback",
   proposalsSent: "/design/sales/proposals",
   proposalsSigned: "/design/sales/signed",
   scheduler: "/design/procurement/scheduler",
@@ -107,6 +109,11 @@ function Shell({
     };
   }, [on]);
   const counts: Record<string, number> = { service, ...gates };
+  // Updates since this member last opened them: a count on the gear (wave 7).
+  const updates = useCount(on, "renuabl:updates", async () => {
+    const res = await updatesUnseen();
+    return res.ok ? res.unseen : null;
+  });
   const path = usePathname();
   const [searching, setSearching] = useState(false);
   const [more, setMore] = useState(false);
@@ -201,7 +208,15 @@ function Shell({
               <MessagesMenu badge={unread} href={PATHS.messages} />
               <NotificationsMenu badge={mentions} full={PATHS.notifications} deal={(id) => `${PATHS.deals}/${id}`} />
               <TopIcon href={PATHS.designer} label="Design tool" icon={PenTool} on={path.startsWith(PATHS.designer)} />
-              <GearMenu email={account.email} settings={PATHS.settings} account={PATHS.account} on={settingsOn} />
+              <GearMenu
+                email={account.email}
+                settings={PATHS.settings}
+                account={PATHS.account}
+                updates={PATHS.updates}
+                feedback={PATHS.feedback}
+                unseen={updates}
+                on={settingsOn || path.startsWith(PATHS.updates) || path.startsWith(PATHS.feedback)}
+              />
             </div>
           </div>
         </div>
@@ -349,6 +364,8 @@ function Shell({
                 { label: "Sol", href: PATHS.sol, n: 0 },
                 { label: "Team chat", href: PATHS.team, n: 0 },
                 { label: "Notifications", href: PATHS.notifications, n: mentions },
+                { label: "Updates", href: PATHS.updates, n: updates },
+                { label: "Feedback", href: PATHS.feedback, n: 0 },
                 { label: "Settings", href: PATHS.settings, n: 0 },
                 { label: "Your account", href: PATHS.account, n: 0 },
               ].map((r) => (

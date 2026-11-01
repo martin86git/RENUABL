@@ -9,8 +9,10 @@ import {
   ExternalLink,
   LogOut,
   MessageCircle,
+  MessageSquarePlus,
   Settings,
   SlidersHorizontal,
+  Sparkles,
   UserRound,
   X,
   type LucideIcon,
@@ -260,11 +262,21 @@ export function NotificationsMenu({ badge, full, deal }: { badge: number; full: 
 }
 
 /** The gear: who is signed in, Settings, the account, and signing out. */
-export function GearMenu(props: { email: string; settings: string; account: string; on: boolean }) {
+export function GearMenu(props: {
+  email: string;
+  settings: string;
+  account: string;
+  updates: string;
+  feedback: string;
+  /** Updates since this member last opened them. */
+  unseen: number;
+  on: boolean;
+}) {
   const [open, setOpen, box] = useWindow();
-  const row = (label: string, href: string, Icon: LucideIcon) => (
+  const row = (label: string, href: string, Icon: LucideIcon, n = 0) => (
     <Link href={href} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-ink hover:bg-canvas">
-      <Icon className="size-4" aria-hidden /> {label}
+      <Icon className="size-4" aria-hidden /> <span className="flex-1">{label}</span>
+      {n > 0 && <span className="rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white">{n}</span>}
     </Link>
   );
   return (
@@ -278,12 +290,18 @@ export function GearMenu(props: { email: string; settings: string; account: stri
         className={clsx(ICON, iconLook(open || props.on))}
       >
         <Settings className="size-[18px]" aria-hidden />
+        {props.unseen > 0 && (
+          <span className="absolute right-1 top-1 size-2 rounded-full bg-sun-line" aria-label={`${props.unseen} new updates`} />
+        )}
       </button>
       {open && (
         <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl bg-surface p-2 shadow-2xl ring-1 ring-line">
           <p className="truncate px-3 pb-2 pt-1 text-xs text-muted">{props.email}</p>
           {row("Settings", props.settings, SlidersHorizontal)}
           {row("Your account", props.account, UserRound)}
+          <div className="my-1 border-t border-line" />
+          {row("Updates", props.updates, Sparkles, props.unseen)}
+          {row("Feedback", props.feedback, MessageSquarePlus)}
           <div className="mt-2 flex items-center gap-3 border-t border-line px-3 pt-3 text-sm">
             <LogOut className="size-4 text-muted" aria-hidden />
             <SignOut className="font-medium text-ink-2 hover:text-ink" />

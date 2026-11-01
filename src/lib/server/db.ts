@@ -618,6 +618,33 @@ create table if not exists design_job_files (
   at timestamptz not null default now()
 );
 create index if not exists design_job_files_note on design_job_files(business_id, note_id);
+-- Updates and Feedback (domain/design/updates.ts, feedback.ts): the day each member last opened Updates, and the
+-- business's own feedback items with their comments.
+create table if not exists design_updates_seen (
+  business_id text not null references businesses(id) on delete cascade,
+  email text not null,
+  day date not null,
+  primary key (business_id, email)
+);
+create table if not exists design_feedback (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  kind text not null,
+  text text not null,
+  by_email text not null,
+  at timestamptz not null default now(),
+  done_at timestamptz,
+  done_by text
+);
+create index if not exists design_feedback_business on design_feedback(business_id, at desc);
+create table if not exists design_feedback_comments (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  feedback_id text not null references design_feedback(id) on delete cascade,
+  text text not null,
+  by_email text not null,
+  at timestamptz not null default now()
+);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

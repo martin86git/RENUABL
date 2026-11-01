@@ -221,3 +221,11 @@ export const approvalCounts = () =>
 /** A deal's proposal timeline, newest first. */
 export const loadTimeline = (jobId: string) =>
   ask<{ events: import("@/lib/domain/design/timeline").TimelineEvent[] }>(`/api/design/jobs/${encodeURIComponent(jobId)}/timeline`);
+
+/** Updates (wave 7): how many came in since this member last opened them, and marking them opened. */
+export const updatesUnseen = () => ask<{ unseen: number }>("/api/design/updates");
+export const updatesOpened = () => ask<{ unseen: number }>("/api/design/updates", { method: "POST" });
+/** Feedback (wave 7): the business's items, and adding, commenting, ticking off and removing. */
+type FeedbackAnswer = { items: import("@/lib/domain/design/feedback").FeedbackItem[]; owner: boolean };
+export const loadFeedback = () => ask<FeedbackAnswer>("/api/design/feedback");
+export const feedbackAction = (body: Record<string, unknown>) => ask<FeedbackAnswer>("/api/design/feedback", { method: "POST", body });
