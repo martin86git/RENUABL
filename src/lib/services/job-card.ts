@@ -3,6 +3,7 @@
  * and an installer's, behind their private link (`/api/job/[token]`).
  */
 import type { JobNote } from "@/lib/domain/design/job-card";
+import type { AsBuilt, AsBuiltInput } from "@/lib/domain/design/as-built";
 import type { JobCardView } from "@/lib/server/design-job-card-repo";
 import { ask, type Answer } from "./crm";
 import { prepareBillFile } from "./consumer";
@@ -16,6 +17,11 @@ export const loadJobCard = (jobId: string) => ask<{ card: JobCardView }>(teamPat
 export const sendJobCard = (jobId: string, installerId: string) =>
   ask<{ to: string; card: JobCardView }>(teamPath(jobId), { method: "PUT", body: { send: installerId } });
 export const loadInstallerCard = (token: string) => ask<{ card: JobCardView; installer: string }>(linkPath(token));
+/** What was really installed: kept by the team, or by the installer through their link (named for them). */
+export const saveAsBuilt = (where: { jobId: string } | { token: string }, asBuilt: AsBuiltInput, person = "") =>
+  "jobId" in where
+    ? ask<{ asBuilt: AsBuilt }>(`/api/design/jobs/${encodeURIComponent(where.jobId)}/as-built`, { method: "PUT", body: { asBuilt } })
+    : ask<{ asBuilt: AsBuilt }>(`${linkPath(where.token)}/as-built`, { method: "PUT", body: { asBuilt, person } });
 
 /** Where a file on the card is served: the team's own way, or through the installer's link. */
 export const teamFileHref = (jobId: string, fileId: string) => `${teamPath(jobId)}/files/${encodeURIComponent(fileId)}`;

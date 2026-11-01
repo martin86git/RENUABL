@@ -712,6 +712,15 @@ create table if not exists design_job_files (
   at timestamptz not null default now()
 );
 create index if not exists design_job_files_note on design_job_files(business_id, note_id);
+-- What was really installed on a job (domain/design/as-built.ts), with its serial numbers: the warranty and service file.
+create table if not exists design_as_built (
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  data jsonb not null,
+  updated_by text not null,
+  updated_at timestamptz not null default now(),
+  primary key (business_id, job_id)
+);
 -- Updates and Feedback (domain/design/updates.ts, feedback.ts): the day each member last opened Updates, and the
 -- business's own feedback items with their comments.
 create table if not exists design_updates_seen (

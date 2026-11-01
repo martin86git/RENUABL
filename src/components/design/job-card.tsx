@@ -6,6 +6,15 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { isJobPicture, type JobDrawing, type JobNote } from "@/lib/domain/design/job-card";
+import {
+  asBuiltDifferences,
+  asBuiltFrom,
+  asBuiltMissing,
+  serialsOf,
+  type AsBuilt,
+  type AsBuiltInput,
+  type Designed,
+} from "@/lib/domain/design/as-built";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
 import {
   addNote,
@@ -16,6 +25,7 @@ import {
   sendJobCard,
   teamFileHref,
   type JobCardView,
+  saveAsBuilt,
 } from "@/lib/services/job-card";
 
 /**
@@ -59,18 +69,191 @@ function Drawing({ title, drawing, picture }: { title: string; drawing: JobDrawi
 }
 
 /** The card itself: everything but who is looking and how a note is sent. */
+/**
+ * As built (2 Nov 2026, Martin): what was really installed, with every serial number, started from the design and
+ * kept against the job, with how it differs and what is still to record. The job's warranty and service file.
+ */
+function AsBuiltPanel({
+  designed,
+  saved,
+  onSave,
+}: {
+  designed: Designed;
+  saved: AsBuilt | null;
+  onSave: (input: AsBuiltInput) => Promise<{ ok: true; asBuilt: AsBuilt } | { ok: false; message: string }>;
+}) {
+  const [kept, setKept] = useState<AsBuilt | null>(saved);
+  const [form, setForm] = useState<AsBuiltInput>(saved ?? asBuiltFrom(designed));
+  const [panelText, setPanelText] = useState((saved?.panelSerials ?? []).join("\n"));
+  const [batteryText, setBatteryText] = useState((saved?.battery?.serials ?? []).join("\n"));
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const current: AsBuiltInput = {
+    ...form,
+    panelSerials: serialsOf(panelText),
+    battery: form.battery ? { ...form.battery, serials: serialsOf(batteryText) } : null,
+  };
+  const differences = asBuiltDifferences(current, designed);
+  const missing = asBuiltMissing(current);
+  const field = "mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest";
+  return (
+    <section aria-label="As built" className="rounded-lg border border-line bg-surface p-4 lg:col-span-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className={head}>As built</p>
+        {kept && (
+          <span className="text-xs text-muted">
+            Kept by {kept.by.split("@")[0]}, {new Date(kept.at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+          </span>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-muted">What was really installed, with every serial number: the job&apos;s warranty and service file.</p>
+      <div className="mt-3 grid gap-3 text-xs font-medium sm:grid-cols-3">
+        <label>
+          Installed on
+          <input
+            type="date"
+            value={form.installedOn ?? ""}
+            onChange={(e) => setForm({ ...form, installedOn: e.target.value || null })}
+            className={field}
+          />
+        </label>
+        <label>
+          Panels installed
+          <input
+            type="number"
+            min="0"
+            value={form.panels.count}
+            onChange={(e) => setForm({ ...form, panels: { ...form.panels, count: Math.max(0, Math.round(Number(e.target.value) || 0)) } })}
+            className={field}
+          />
+        </label>
+        <label>
+          Panel model
+          <input
+            value={form.panels.model}
+            onChange={(e) => setForm({ ...form, panels: { ...form.panels, model: e.target.value } })}
+            className={field}
+          />
+        </label>
+        {form.inverters.map((inv, i) => (
+          <div key={i} className="contents">
+            <label className="sm:col-span-2">
+              Inverter {form.inverters.length > 1 ? i + 1 : ""}
+              <input
+                value={inv.model}
+                onChange={(e) =>
+                  setForm({ ...form, inverters: form.inverters.map((x, j) => (j === i ? { ...x, model: e.target.value } : x)) })
+                }
+                className={field}
+              />
+            </label>
+            <label>
+              Its serial
+              <input
+                value={inv.serial}
+                onChange={(e) =>
+                  setForm({ ...form, inverters: form.inverters.map((x, j) => (j === i ? { ...x, serial: e.target.value } : x)) })
+                }
+                className={clsx(field, "font-mono")}
+              />
+            </label>
+          </div>
+        ))}
+        {form.battery && (
+          <>
+            <label className="sm:col-span-2">
+              Battery
+              <input
+                value={form.battery.model}
+                onChange={(e) => setForm({ ...form, battery: { ...form.battery!, model: e.target.value } })}
+                className={field}
+              />
+            </label>
+            <label>
+              Modules
+              <input
+                type="number"
+                min="0"
+                value={form.battery.modules}
+                onChange={(e) =>
+                  setForm({ ...form, battery: { ...form.battery!, modules: Math.max(0, Math.round(Number(e.target.value) || 0)) } })
+                }
+                className={field}
+              />
+            </label>
+          </>
+        )}
+        <label className="sm:col-span-3">
+          Panel serials, one a line ({serialsOf(panelText).length} of {form.panels.count})
+          <textarea value={panelText} onChange={(e) => setPanelText(e.target.value)} rows={4} className={clsx(field, "py-2 font-mono")} />
+        </label>
+        {form.battery && (
+          <label className="sm:col-span-3">
+            Battery serials, one a line ({serialsOf(batteryText).length} of {form.battery.modules})
+            <textarea
+              value={batteryText}
+              onChange={(e) => setBatteryText(e.target.value)}
+              rows={2}
+              className={clsx(field, "py-2 font-mono")}
+            />
+          </label>
+        )}
+        <label className="sm:col-span-3">
+          Anything else about the installation
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            rows={2}
+            className={clsx(field, "py-2")}
+          />
+        </label>
+      </div>
+      {differences.length > 0 && (
+        <ul className="mt-3 space-y-0.5 rounded-md bg-sun p-2.5 text-xs text-sun-ink">
+          {differences.map((d) => (
+            <li key={d}>{d}</li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            const res = await onSave(current);
+            setBusy(false);
+            if (res.ok) {
+              setKept(res.asBuilt);
+              setNote(differences.length ? "Kept, with how it differs from the design." : "Kept: installed as designed.");
+            } else setNote(res.message);
+          }}
+          className="inline-flex h-10 items-center rounded-full bg-primary px-4 text-sm font-medium text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+        >
+          {busy ? "Keeping…" : "Keep the as-built"}
+        </button>
+        <span className="text-xs text-muted">{missing.length ? `Still to record: ${missing.join(", ")}.` : "Every serial recorded."}</span>
+        {note && <span className="text-xs font-medium text-ink">{note}</span>}
+      </div>
+    </section>
+  );
+}
+
 function CardBody({
   card,
   picture,
   fileHref,
   composer,
   aside,
+  onAsBuilt,
 }: {
   card: JobCardView;
   picture: string | null;
   fileHref: (id: string) => string;
   composer: React.ReactNode;
   aside?: React.ReactNode;
+  /** Keeps the as-built: the team's own way, or through the installer's link. */
+  onAsBuilt?: (input: AsBuiltInput) => Promise<{ ok: true; asBuilt: AsBuilt } | { ok: false; message: string }>;
 }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -142,6 +325,7 @@ function CardBody({
         )}
       </div>
 
+      {card.designed && onAsBuilt && <AsBuiltPanel designed={card.designed} saved={card.asBuilt} onSave={onAsBuilt} />}
       <section aria-label="Notes and photos" className="min-w-0">
         <p className={head}>Notes and photos</p>
         <div className="mt-2">{composer}</div>
@@ -369,6 +553,10 @@ export function JobCardDialog({ jobId, onClose, onEvent }: { jobId: string; onCl
               card={card}
               picture={picture}
               fileHref={(id) => teamFileHref(jobId, id)}
+              onAsBuilt={async (input) => {
+                const res = await saveAsBuilt({ jobId }, input);
+                return res.ok ? { ok: true, asBuilt: res.asBuilt } : { ok: false, message: res.message };
+              }}
               composer={
                 <Composer
                   placeholder="A note for the installer, or what was found on site"
@@ -486,6 +674,10 @@ export function InstallerJobCard({ token }: { token: string }) {
           card={card}
           picture={card.roof ? linkRoofHref(token) : null}
           fileHref={(id) => linkFileHref(token, id)}
+          onAsBuilt={async (input) => {
+            const res = await saveAsBuilt({ token }, input, person);
+            return res.ok ? { ok: true, asBuilt: res.asBuilt } : { ok: false, message: res.message };
+          }}
           composer={
             <div className="space-y-2">
               <input

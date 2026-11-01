@@ -119,6 +119,36 @@ describe.skipIf(!url)("the installation job card (database)", () => {
       .toBuffer();
     expect(png.subarray(1, 4).toString()).toBe("PNG");
   });
+
+  it("keeps the as-built on its own job, starts from the design, and writes how it differs on the record", async () => {
+    const card = await cards.jobCard({ businessId: a, businessName: "Alpha Solar" }, jobId);
+    expect(card?.designed?.panels).toBeGreaterThan(0);
+    expect(card?.asBuilt).toBeNull();
+    const designed = card!.designed!;
+    const built = await cards.saveAsBuilt(
+      a,
+      jobId,
+      {
+        installedOn: "2026-11-20",
+        panels: { model: designed.panelModel, count: designed.panels - 1 },
+        panelSerials: ["p1", "p2"],
+        inverters: [],
+        notes: "",
+      },
+      "Jo (Sparks)",
+      [`Panels: ${designed.panels} designed, ${designed.panels - 1} installed.`],
+    );
+    expect(built).toMatchObject({ installedOn: "2026-11-20", panelSerials: ["P1", "P2"], by: "Jo (Sparks)" });
+    expect((await cards.jobCard({ businessId: a, businessName: "Alpha Solar" }, jobId))?.asBuilt?.panels.count).toBe(designed.panels - 1);
+    const noted = await db.query<{ text: string }>(
+      `select text from design_activity where business_id = $1 and job_id = $2 and text like 'As built%'`,
+      [a, jobId],
+    );
+    expect(noted[0]?.text).toContain("installed");
+    // Another business can neither keep one on this job nor read it.
+    expect(await cards.saveAsBuilt(b, jobId, {}, "x", [])).toBeNull();
+    expect(await cards.asBuiltOf(b, jobId)).toBeNull();
+  });
 });
 
 function cleanJobInputValue() {

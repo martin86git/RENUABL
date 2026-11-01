@@ -7,7 +7,8 @@
 import { randomBytes } from "node:crypto";
 import { systemDetails } from "@/lib/domain/design/deal";
 import { jobDrawing, stringsInWords, type Installer, type JobDrawing, type JobNote } from "@/lib/domain/design/job-card";
-import type { RoofDesign } from "@/lib/domain/design/roof-design";
+import { designSummary, type RoofDesign } from "@/lib/domain/design/roof-design";
+import { cleanAsBuilt, type AsBuilt, type AsBuiltInput, type Designed } from "@/lib/domain/design/as-built";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { query, transaction } from "./db";
 import { loadPrefs } from "./design-after-sale-repo";
@@ -28,6 +29,9 @@ export interface JobCardView {
   strings: JobDrawing | null;
   stringWords: string[];
   notes: JobNote[];
+  /** What the design says to install, and what was really installed (null until recorded): the as-built. */
+  designed: Designed | null;
+  asBuilt: AsBuilt | null;
   /** For the business's own people: the installers on file, and when the card last went to each. */
   installers?: (Installer & { sentAt: string | null })[];
 }
@@ -62,7 +66,15 @@ export async function jobCard(
   const details = systemDetails(design, form, job.details)
     .filter((d) => d.value && d.value.trim() && d.value.trim() !== "--")
     .map((d) => ({ label: d.label, value: d.value!.trim() }));
-  const [notes, prefs, links] = await Promise.all([
+  const designed: Designed | null = design
+    ? {
+        panels: designSummary(design).panels,
+        panelModel: design.panel?.name ?? "",
+        inverters: (design.inverters ?? []).map((i) => i.name),
+        battery: design.battery ? { model: design.battery.name, modules: design.battery.qty } : null,
+      }
+    : null;
+  const [notes, prefs, links, built] = await Promise.all([
     jobNotes(member.businessId, jobId),
     loadPrefs(member.businessId),
     forInstaller
@@ -71,6 +83,7 @@ export async function jobCard(
           `select installer_id as installer, ${moment("sent_at")} as "sentAt" from design_job_links where business_id = $1 and job_id = $2`,
           [member.businessId, jobId],
         ),
+    asBuiltOf(member.businessId, jobId),
   ]);
   return {
     business: saved === NO_DESIGN ? member.businessName : saved.brand.name || member.businessName,
@@ -88,10 +101,51 @@ export async function jobCard(
     strings: design && (design.strings ?? []).some((s) => s.panels.length) ? jobDrawing(design, "strings") : null,
     stringWords: design ? stringsInWords(design) : [],
     notes,
+    designed,
+    asBuilt: built,
     ...(forInstaller
       ? {}
       : { installers: prefs.installers.map((i) => ({ ...i, sentAt: links.find((l) => l.installer === i.id)?.sentAt ?? null })) }),
   };
+}
+
+/** What was really installed on a job, or null until it is recorded. */
+export async function asBuiltOf(businessId: string, jobId: string): Promise<AsBuilt | null> {
+  const rows = await query<{ data: AsBuiltInput; by: string; at: string }>(
+    `select data, updated_by as by, ${moment("updated_at")} as at from design_as_built where business_id = $1 and job_id = $2`,
+    [businessId, jobId],
+  );
+  return rows[0] ? { ...rows[0].data, by: rows[0].by, at: rows[0].at } : null;
+}
+
+/**
+ * Keeps what was installed on a job (the installer from their card, or the business), cleaned, with who and the
+ * server's time, and writes it on the deal's record once with how it differs from the design. Null for a job that
+ * isn't the business's.
+ */
+export async function saveAsBuilt(
+  businessId: string,
+  jobId: string,
+  raw: unknown,
+  by: string,
+  differences: string[],
+): Promise<AsBuilt | null> {
+  const found = await jobById(businessId, jobId);
+  if (!found) return null;
+  const data = cleanAsBuilt(raw);
+  await query(
+    `insert into design_as_built (business_id, job_id, data, updated_by) values ($1, $2, $3, $4)
+       on conflict (business_id, job_id) do update set data = excluded.data, updated_by = excluded.updated_by, updated_at = now()`,
+    [businessId, jobId, JSON.stringify(data), by],
+  );
+  await record(query, businessId, {
+    customerId: found.customer.id,
+    jobId,
+    kind: "note",
+    text: `As built recorded by ${by}${differences.length ? `: ${differences.join(" ")}` : ": as designed."}`,
+    by,
+  }).catch(() => undefined);
+  return asBuiltOf(businessId, jobId);
 }
 
 /** The card's notes, newest first, each with its files (names and types only: the bytes are served one at a time). */
