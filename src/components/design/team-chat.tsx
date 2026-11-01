@@ -42,6 +42,7 @@ import {
   deleteTeamLine,
   editTeamLine,
   loadTeamRoom,
+  setSolJoinsIn,
   reactToTeamLine,
   sayInTeam,
   teamSeen,
@@ -328,16 +329,32 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
               {channel ? "Everyone in the business" : "Just the two of you"} · never seen by customers
             </p>
           </div>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close the team chat"
-              className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
-            >
-              <X className="size-4" aria-hidden />
-            </button>
-          )}
+          <div className="flex shrink-0 items-center gap-1">
+            {channel && view?.solJoinsIn !== undefined && (
+              <SolJoinsSwitch
+                on={view.solJoinsIn}
+                may={!!view.maySwitchSol}
+                onChange={async (on) => {
+                  setView((v) => (v ? { ...v, solJoinsIn: on } : v));
+                  const r = await setSolJoinsIn(on);
+                  if (!r.ok) {
+                    setView((v) => (v ? { ...v, solJoinsIn: !on } : v));
+                    setError(r.message);
+                  }
+                }}
+              />
+            )}
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close the team chat"
+                className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            )}
+          </div>
         </header>
 
         <div className="staff-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-3 pt-5">
@@ -767,6 +784,38 @@ function Quoted({ reply, mine, me, onShow }: { reply: TeamReply; mine: boolean; 
       <span className="min-w-0">
         <span className="font-semibold text-ink-2">{who}</span>
         <span className="line-clamp-2"> {reply.text}</span>
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Whether Sol steps in on the channels unasked: on, he answers a question nobody has after a moment; off, only when
+ * tagged. A business setting, switched here by someone who changes the settings; everyone else sees which it is.
+ */
+function SolJoinsSwitch({ on, may, onChange }: { on: boolean; may: boolean; onChange: (on: boolean) => void }) {
+  const words = on ? "Sol joins in" : "Sol when tagged";
+  const why = on
+    ? "Sol answers a question here when nobody has after a moment, if it's his to answer."
+    : "Sol answers here only when someone tags @Sol.";
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={!may}
+      onClick={() => onChange(!on)}
+      title={may ? `${why} Press to switch.` : `${why} Someone who changes the settings can switch it.`}
+      className={clsx(
+        "flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[11px] font-medium ring-1 transition-colors",
+        on ? "bg-sun/60 text-ink ring-sun-line/40" : "bg-canvas text-muted ring-line",
+        may ? "hover:ring-line-strong" : "cursor-default",
+      )}
+    >
+      <SolIcon className="size-3.5" />
+      {words}
+      <span aria-hidden className={clsx("relative ml-0.5 h-3.5 w-6 rounded-full transition-colors", on ? "bg-sun-line" : "bg-line-strong")}>
+        <span className={clsx("absolute top-0.5 size-2.5 rounded-full bg-surface transition-all", on ? "left-3" : "left-0.5")} />
       </span>
     </button>
   );

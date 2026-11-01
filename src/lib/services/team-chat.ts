@@ -12,6 +12,9 @@ export interface TeamRoomView {
   channels: { room: string; label: string; unread: number }[];
   people: { room: string; email: string; label: string; unread: number; last: string }[];
   unread: number;
+  /** Whether Sol answers a channel's questions nobody has, without being tagged; and whether this member may switch it. */
+  solJoinsIn?: boolean;
+  maySwitchSol?: boolean;
 }
 
 export const loadTeamRoom = (room: string) => ask<TeamRoomView>(`/api/design/team?room=${encodeURIComponent(room)}`);
@@ -23,6 +26,7 @@ export const teamSeen = (room: string) => post({ room, seen: true });
 export const editTeamLine = (id: string, text: string) => post({ edit: id, text });
 export const deleteTeamLine = (id: string) => post({ delete: id });
 export const reactToTeamLine = (id: string, emoji: string) => post({ react: id, emoji });
+export const setSolJoinsIn = (on: boolean) => post<{ solJoinsIn: boolean }>({ solJoinsIn: on });
 
 /** Says something: as JSON, or as a form when there are files. `replyTo` is the message it answers, when it is a reply. */
 export async function sayInTeam(

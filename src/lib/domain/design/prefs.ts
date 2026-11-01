@@ -42,6 +42,8 @@ export interface BusinessPrefs {
   installers: Installer[];
   /** How many installations the business can do in a week, for the install calendar's capacity. */
   weeklyCapacity: number;
+  /** Sol answers a question asked in a team channel when nobody has after a moment, without being tagged. */
+  solJoinsIn: boolean;
 }
 
 export const DEFAULT_PREFS: BusinessPrefs = {
@@ -55,6 +57,7 @@ export const DEFAULT_PREFS: BusinessPrefs = {
   places: NO_PLACES,
   installers: [],
   weeklyCapacity: DEFAULT_WEEKLY_CAPACITY,
+  solJoinsIn: true,
 };
 
 export const MAX_SUPPLIERS = 12;
@@ -100,6 +103,8 @@ export function cleanPrefs(raw: unknown, newId?: () => string): BusinessPrefs {
     places: cleanJobPlaces(r.places),
     installers: cleanInstallers(r.installers, newId),
     weeklyCapacity: cleanCapacity(r.weeklyCapacity),
+    // On unless switched off.
+    solJoinsIn: r.solJoinsIn !== false,
   };
 }
 

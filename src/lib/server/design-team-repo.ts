@@ -15,6 +15,7 @@ import {
   cleanReactions,
   cleanVisuals,
   isChannel,
+  isTeamLineId,
   replyQuote,
   mayUseRoom,
   roomLabel,
@@ -272,18 +273,21 @@ async function tellTagged(me: TeamMe, room: string, text: string, members: strin
     }).catch(() => console.error("a team chat tag email couldn't be sent"));
 }
 
-/** Sol's answer in a channel, written as Sol. */
-export async function solSaysInTeam(businessId: string, room: string, text: string, visuals?: unknown): Promise<void> {
+/** Sol's answer in a channel, written as Sol; `replyTo`, the line he answers (as a reply quotes it). */
+export async function solSaysInTeam(
+  businessId: string,
+  room: string,
+  text: string,
+  visuals?: unknown,
+  replyTo?: string | null,
+): Promise<void> {
   if (!isChannel(room)) return;
   const { charts, diagrams } = cleanVisuals(visuals);
-  await query(`insert into design_team_lines (business_id, id, room, by_email, text, visuals) values ($1,$2,$3,$4,$5,$6::jsonb)`, [
-    businessId,
-    newId("tl", 10),
-    room,
-    SOL_BY,
-    text.slice(0, 2000),
-    JSON.stringify({ charts, diagrams }),
-  ]);
+  const answering = isTeamLineId(replyTo) ? replyTo : null;
+  await query(
+    `insert into design_team_lines (business_id, id, room, by_email, text, visuals, reply_to) values ($1,$2,$3,$4,$5,$6::jsonb,$7)`,
+    [businessId, newId("tl", 10), room, SOL_BY, text.slice(0, 2000), JSON.stringify({ charts, diagrams }), answering],
+  );
 }
 
 /** A channel's last lines, as Sol reads them for context: who said what. */

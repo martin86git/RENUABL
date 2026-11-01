@@ -2,7 +2,10 @@ import { after } from "next/server";
 import { asksSol, cleanDealIds, cleanRoom, cleanWords, isTeamLineId } from "@/lib/domain/design/team-chat";
 import { parseApiKey } from "@/lib/server/bill-reader";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
+import { can } from "@/lib/domain/design/account";
+import { loadPrefs, savePrefs } from "@/lib/server/design-after-sale-repo";
 import { solAnswersInChannel } from "@/lib/server/design-sol";
+import { solStepsIn } from "@/lib/server/design-sol-joins";
 import {
   TeamChatRefusal,
   deleteTeamLine,
@@ -27,13 +30,20 @@ const refusal = (e: unknown): Response => {
 
 const meOf = (member: Member): TeamMe => ({ businessId: member.businessId, email: member.email, viewer: viewerOf(member) });
 
-/** "@Sol" in a channel: he answers there once the line is in, as the member who tagged him. */
-function askSolIfTagged(member: Member, room: string, text: string) {
-  if (!asksSol(room, text)) return;
+/**
+ * "@Sol" in a channel: he answers there once the line is in, as the member who tagged him. Untagged, a question nobody
+ * answers in a moment may still be his to take (`solStepsIn`), unless the business has switched that off.
+ */
+function solHears(member: Member, room: string, text: string, lineId: string) {
+  const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);
+  if (!asksSol(room, text)) {
+    after(() =>
+      solStepsIn(member, room, lineId, text, apiKey).catch((e) => console.error("sol joining in", e instanceof Error ? e.message : e)),
+    );
+    return;
+  }
   after(() =>
-    solAnswersInChannel(member, room, text, parseApiKey(process.env.ANTHROPIC_API_KEY)).catch((e) =>
-      console.error("sol in the team chat", e instanceof Error ? e.message : e),
-    ),
+    solAnswersInChannel(member, room, text, apiKey).catch((e) => console.error("sol in the team chat", e instanceof Error ? e.message : e)),
   );
 }
 
@@ -53,7 +63,9 @@ export async function GET(request: Request) {
     const room = cleanRoom(url.searchParams.get("room") ?? "deals");
     if (!room) return Response.json({ ok: false, message: "There's no such conversation." }, { status: 404 });
     try {
-      return Response.json({ ok: true, ...(await teamRoom(me, room)) });
+      const [view, prefs] = await Promise.all([teamRoom(me, room), loadPrefs(who.member.businessId)]);
+      const m = who.member;
+      return Response.json({ ok: true, ...view, solJoinsIn: prefs.solJoinsIn, maySwitchSol: can(m.role, "prices", m.permissions) });
     } catch (e) {
       return refusal(e);
     }
@@ -82,7 +94,7 @@ export async function POST(request: Request) {
           dealIds: cleanDealIds(form.getAll("deal")),
           replyTo: isTeamLineId(replyTo) ? replyTo : null,
         });
-        askSolIfTagged(who.member, room, text);
+        solHears(who.member, room, text, line.id);
         return Response.json({ ok: true, line });
       }
       const read = await readBody(request, 40_000);
@@ -101,6 +113,15 @@ export async function POST(request: Request) {
         await reactToTeamLine(me, id(b.react), typeof b.emoji === "string" ? b.emoji : "");
         return Response.json({ ok: true });
       }
+      if (typeof b.solJoinsIn === "boolean") {
+        // Whether Sol steps in on the channels unasked: a business setting, so for those who change settings.
+        const m = who.member;
+        if (!can(m.role, "prices", m.permissions))
+          return Response.json({ ok: false, message: "Only someone who changes the settings can switch this." }, { status: 403 });
+        const prefs = await loadPrefs(m.businessId);
+        const saved = await savePrefs(m.businessId, { ...prefs, solJoinsIn: b.solJoinsIn }, m.email);
+        return Response.json({ ok: true, solJoinsIn: saved.solJoinsIn });
+      }
       const room = cleanRoom(b.room);
       if (!room) return Response.json({ ok: false, message: "There's no such conversation." }, { status: 404 });
       if (b.seen === true) {
@@ -116,7 +137,7 @@ export async function POST(request: Request) {
         dealIds: cleanDealIds(b.deals),
         replyTo: isTeamLineId(b.replyTo) ? b.replyTo : null,
       });
-      askSolIfTagged(who.member, room, text);
+      solHears(who.member, room, text, line.id);
       return Response.json({ ok: true, line });
     } catch (e) {
       return refusal(e);
