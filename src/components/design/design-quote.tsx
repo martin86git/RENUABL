@@ -54,6 +54,8 @@ export function DesignQuote(props: {
    */
   compact?: boolean;
   onCompact?: (compact: boolean) => void;
+  /** The home's roof, storeys and phase are shown elsewhere (the design tool's Designer view), so not here. */
+  homeless?: boolean;
 }) {
   const { form, edits } = props.value;
   const { spec, workspace, rates } = props;
@@ -77,13 +79,6 @@ export function DesignQuote(props: {
   const { onNet } = props;
   useEffect(() => onNet(net), [onNet, net]);
 
-  // The three things about the home that change the price are easy to pass over: they sit in a pad that asks to be
-  // checked, and it settles once one of them has been set on this visit.
-  const [checked, setChecked] = useState(false);
-  const pick = (name: "roof" | "storeys" | "phase", value: string) => {
-    setChecked(true);
-    props.onChange({ form: { ...form, [name]: value } as QuoteFields["form"], edits });
-  };
   /** Changes a line by hand: a quantity and a cost typed over it sit together; null puts the line back as worked out. */
   const edit = (l: CostLine, to: LineEdit | null) => {
     const next = { ...edits };
@@ -182,76 +177,15 @@ export function DesignQuote(props: {
           </Link>
         </span>
       </div>
-      {/* The three things about the home that change the price, as toggles: one tap each. */}
-      <div
-        className={checked ? "mt-2.5 rounded-md border border-line bg-canvas p-2" : "mt-2.5 rounded-md border border-sun-line bg-sun p-2"}
-      >
-        <p
-          className={
-            checked
-              ? "text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2"
-              : "text-[10px] font-semibold uppercase tracking-[0.14em] text-sun-ink"
-          }
-        >
-          {checked ? "This home" : "This home · check these, they change the price"}
-        </p>
-        <div className="mt-1.5 grid grid-cols-[3.5rem_1fr] items-center gap-x-2 gap-y-1 text-[11px] font-medium text-ink-2">
-          {(
-            [
-              [
-                "roof",
-                "Roof",
-                form.roof,
-                [
-                  ["tile", "Tile"],
-                  ["tin", "Tin"],
-                  ["flat", "Flat"],
-                ],
-              ],
-              [
-                "storeys",
-                "Storeys",
-                form.storeys,
-                [
-                  ["single", "Single"],
-                  ["double", "Double"],
-                ],
-              ],
-              [
-                "phase",
-                "Phase",
-                form.phase,
-                [
-                  ["single", "Single"],
-                  ["three", "Three"],
-                ],
-              ],
-            ] as const
-          ).map(([name, title, value, choices]) => (
-            <div key={name} className="contents">
-              <span>{title}</span>
-              <div role="radiogroup" aria-label={title} className="flex rounded-md border border-line bg-surface p-0.5">
-                {choices.map(([v, text]) => (
-                  <button
-                    key={v}
-                    type="button"
-                    role="radio"
-                    aria-checked={value === v}
-                    onClick={() => pick(name, v)}
-                    className={
-                      value === v
-                        ? "flex-1 rounded-[5px] bg-ink px-2 py-0.5 text-canvas"
-                        : "flex-1 rounded-[5px] px-2 py-0.5 text-ink-2 hover:text-ink"
-                    }
-                  >
-                    {text}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
+      {/* The three things about the home that change the price; in the design tool they sit in its Designer view. */}
+      {!props.homeless && (
+        <div className="mt-2.5">
+          <HomeToggles
+            form={form}
+            onPick={(name, value) => props.onChange({ form: { ...form, [name]: value } as QuoteFields["form"], edits })}
+          />
         </div>
-      </div>
+      )}
 
       {/* Solar Victoria: switched on, the rebate (and loan) go on the quote and on its proposal, always as "if approved". */}
       <div className="mt-2 rounded-md border border-line bg-canvas px-2 py-1.5" role="group" aria-label="Solar Victoria">
@@ -483,5 +417,86 @@ export function DesignQuote(props: {
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * The three things about the home that change the price (roof, storeys, phase), each a choice between its options:
+ * one tap each. Easy to pass over, so the pad asks to be checked, and settles once one has been set on this visit.
+ */
+export function HomeToggles(props: { form: QuoteFields["form"]; onPick: (name: "roof" | "storeys" | "phase", value: string) => void }) {
+  const [checked, setChecked] = useState(false);
+  const pick = (name: "roof" | "storeys" | "phase", value: string) => {
+    setChecked(true);
+    props.onPick(name, value);
+  };
+  return (
+    <div className={checked ? "rounded-md border border-line bg-canvas p-2" : "rounded-md border border-sun-line bg-sun p-2"}>
+      <p
+        className={
+          checked
+            ? "text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2"
+            : "text-[10px] font-semibold uppercase tracking-[0.14em] text-sun-ink"
+        }
+      >
+        {checked ? "This home" : "This home · check these, they change the price"}
+      </p>
+      <div className="mt-1.5 grid grid-cols-[3.5rem_1fr] items-center gap-x-2 gap-y-1 text-[11px] font-medium text-ink-2">
+        {(
+          [
+            [
+              "roof",
+              "Roof",
+              props.form.roof,
+              [
+                ["tile", "Tile"],
+                ["tin", "Tin"],
+                ["flat", "Flat"],
+              ],
+            ],
+            [
+              "storeys",
+              "Storeys",
+              props.form.storeys,
+              [
+                ["single", "Single"],
+                ["double", "Double"],
+              ],
+            ],
+            [
+              "phase",
+              "Phase",
+              props.form.phase,
+              [
+                ["single", "Single"],
+                ["three", "Three"],
+              ],
+            ],
+          ] as const
+        ).map(([name, title, value, choices]) => (
+          <div key={name} className="contents">
+            <span>{title}</span>
+            <div role="radiogroup" aria-label={title} className="flex rounded-md border border-line bg-surface p-0.5">
+              {choices.map(([v, text]) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={value === v}
+                  onClick={() => pick(name, v)}
+                  className={
+                    value === v
+                      ? "flex-1 rounded-[5px] bg-ink px-2 py-0.5 text-canvas"
+                      : "flex-1 rounded-[5px] px-2 py-0.5 text-ink-2 hover:text-ink"
+                  }
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

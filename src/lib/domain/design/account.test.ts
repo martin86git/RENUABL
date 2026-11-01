@@ -7,6 +7,8 @@ import {
   BUSINESS_TERMS_VERSION,
   MAX_IMPORT_ROOFS,
   can,
+  cleanRole,
+  seesAllDeals,
   cleanBusinessName,
   cleanImportRoofs,
   cleanRoofPlace,
@@ -175,5 +177,18 @@ describe("how a sign-in link is delivered", () => {
     expect(signInDelivery({ ...dev, origin: "http://192.168.1.20:3000" }).by).toBe("none");
     expect(signInDelivery({ ...dev, origin: "http://localhost.evil.example" }).by).toBe("none");
     expect(signInDelivery({ ...dev, origin: "not a url" }).by).toBe("none");
+  });
+});
+
+describe("the designer role", () => {
+  it("designs, publishes and sees every deal, never settings or people, and sees costs as the owner sets", () => {
+    expect(can("designer", "design")).toBe(true);
+    expect(can("designer", "publish", { costs: true, prices: false, publish: false, allDeals: false })).toBe(true);
+    expect(can("designer", "prices")).toBe(false);
+    expect(can("designer", "members")).toBe(false);
+    expect(can("designer", "costs")).toBe(true);
+    expect(can("designer", "costs", { costs: false, prices: false, publish: true, allDeals: true })).toBe(false);
+    expect(seesAllDeals("designer", { costs: true, prices: true, publish: true, allDeals: false })).toBe(true);
+    expect([cleanRole("designer"), cleanRole("member"), cleanRole("owner"), cleanRole(1)]).toEqual(["designer", "member", null, null]);
   });
 });

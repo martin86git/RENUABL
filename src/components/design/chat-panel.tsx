@@ -557,15 +557,11 @@ export function useUnreadMessages(on: boolean): number {
   return on ? unread : 0;
 }
 
-/**
- * "Chat" on the design tool's top bar, for a roof opened from a deal: the
- * same conversation as on the deal, in a panel under the button, with a count
- * while the customer's latest lines are unanswered.
- */
-export function ChatButton({ jobId }: { jobId: string }) {
-  const [open, setOpen] = useState(false);
+/** How many of the customer's latest lines are unanswered on a job's conversation: asked each minute while in view. */
+export function useChatWaiting(jobId: string | null): number {
   const [waiting, setWaiting] = useState(0);
   useEffect(() => {
+    if (!jobId) return;
     let gone = false;
     const look = async () => {
       const res = await loadDealChat(jobId);
@@ -580,6 +576,17 @@ export function ChatButton({ jobId }: { jobId: string }) {
       window.removeEventListener(UNREAD_CHANGED, look);
     };
   }, [jobId]);
+  return jobId ? waiting : 0;
+}
+
+/**
+ * "Chat" on the design tool's top bar, for a roof opened from a deal: the
+ * same conversation as on the deal, in a panel under the button, with a count
+ * while the customer's latest lines are unanswered.
+ */
+export function ChatButton({ jobId }: { jobId: string }) {
+  const [open, setOpen] = useState(false);
+  const waiting = useChatWaiting(jobId);
   return (
     <div className="relative">
       <button

@@ -60,7 +60,9 @@ import {
   type SystemSpec,
 } from "@/lib/domain/design/quote";
 import type { RebateRates } from "@/lib/domain/rebates";
-import { DesignQuote } from "./design-quote";
+import { DesignQuote, HomeToggles } from "./design-quote";
+import { SOL_TOGGLE } from "@/lib/services/sol";
+import { SolIcon } from "./sol-icon";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset } from "@/lib/domain/design/suggest";
 import { shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
@@ -185,6 +187,14 @@ const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
  * The controls that float on the picture share one look: a soft, slightly see-through plate with rounded corners,
  * so they read as one family resting on the roof rather than as boxes stuck to it.
  */
+type SideView = "designer" | "quote" | "proposal";
+const SIDE_KEY = "renuabl.design.side";
+const SIDE_VIEWS: { id: SideView; label: string; hint: string }[] = [
+  { id: "designer", label: "Designer", hint: "The home's roof, storeys and phase, Sol, and the deal's notes" },
+  { id: "quote", label: "Quote", hint: "The quote, worked out as you draw" },
+  { id: "proposal", label: "Proposal", hint: "The proposal, the chat with the customer and what has been sent" },
+];
+
 const GLASS = "rounded-2xl border border-line bg-surface/90 shadow-lift backdrop-blur-md";
 
 /** Something picked on the drawing: a panel in a row, a panel placed by hand, or a label. */
@@ -408,8 +418,6 @@ export function RoofDesigner(props: {
   customerName?: string;
   /** Where this roof's proposal is, once there is one. */
   proposalHref?: string | null;
-  /** The conversation with the customer, for a roof opened from a deal: drawn by the page, shown beside View proposal. */
-  chat?: React.ReactNode;
   /**
    * The person may not see costs (the owner's setting, enforced on the server, which sends them no costs at all):
    * no quote and no price are shown, and no price is handed on when saving.
@@ -419,6 +427,12 @@ export function RoofDesigner(props: {
   onUnsaved?: (unsaved: boolean) => void;
   /** The start of the bar at the top of the page (the wordmark and the address), and the way out, drawn by the page. */
   bar?: React.ReactNode;
+  /** The Designer view's foot: the deal's notes, for a roof opened from a deal. */
+  notes?: React.ReactNode;
+  /** The Proposal view under its buttons: the chat with the customer and the timeline of what was sent, or for a site with no deal, why not. */
+  proposal?: React.ReactNode;
+  /** How many of the customer's lines wait for an answer: a count on the Proposal tab. */
+  waiting?: number;
 }) {
   // The design being worked on is held in the states below; the others wait in `designs`, whose entry for the
   // one being worked on is out of date until it is put away again (`everyDesign`).
@@ -491,15 +505,19 @@ export function RoofDesigner(props: {
   // The battery or the inverter under the pointer: its details show beside it.
   const [kit, setKit] = useState<"battery" | number | null>(null);
   const [tool, setTool] = useState<Tool>("select");
-  // Whether the quote is open beside the picture. Closed, the picture has the whole width; the choice is kept on this device.
-  const [quoteOpen, setQuoteOpen] = useState(false);
+  // Beside the picture, one view at a time (1 Nov 2026, Martin: Primero's Designer / Quote / Proposal): the home and the
+  // deal's notes, the quote, or the proposal with its chat and timeline. Pressing the open one folds the column away so
+  // the picture has the whole width. The choice is kept on this device.
+  const [side, setSide] = useState<SideView | null>("designer");
   useEffect(() => {
     try {
+      const kept = window.localStorage.getItem(SIDE_KEY);
       // Read once the page is in the browser.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (window.localStorage.getItem("renuabl.design.quote-open") === "1") setQuoteOpen(true);
+      if (kept === "none") setSide(null);
+      else if (kept === "quote" || kept === "proposal" || kept === "designer") setSide(kept);
     } catch {
-      // Storage is off: the quote starts closed.
+      // Storage is off: the Designer view opens.
     }
   }, []);
   // The quote's short view (smaller, group totals only), so the picture spreads out; kept on this device like the open state.
@@ -512,6 +530,7 @@ export function RoofDesigner(props: {
       // Storage is off: the full quote shows.
     }
   }, []);
+  const shown: SideView | null = side === "quote" && costsHidden ? "designer" : side;
   const shortQuote = (next: boolean) => {
     setQuoteShort(next);
     try {
@@ -520,11 +539,11 @@ export function RoofDesigner(props: {
       // Nothing to do: it still changes for this visit.
     }
   };
-  const toggleQuote = () => {
-    const next = !quoteOpen;
-    setQuoteOpen(next);
+  const showSide = (view: SideView) => {
+    const next = side === view ? null : view;
+    setSide(next);
     try {
-      window.localStorage.setItem("renuabl.design.quote-open", next ? "1" : "0");
+      window.localStorage.setItem(SIDE_KEY, next ?? "none");
     } catch {
       // Nothing to do: it still opens and closes for this visit.
     }
@@ -2317,7 +2336,7 @@ export function RoofDesigner(props: {
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
           and the address being designed; then which design this is and its quote on the left, and publishing it and
           its proposal on the right. A firmer line under it sets it off from the work below. */}
-      <header className="sticky top-0 z-40 -mx-4 border-b border-line-strong bg-canvas/95 px-4 text-ink backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <header className="relative z-40 rounded-lg bg-surface px-4 text-ink shadow-[var(--shadow-soft)] ring-1 ring-line">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-2.5 lg:flex-nowrap">
           {props.bar}
           <dl className="flex min-w-0 flex-1 basis-56 items-center gap-x-6 overflow-hidden border-line lg:border-l lg:pl-5">
@@ -2441,38 +2460,34 @@ export function RoofDesigner(props: {
               </div>
             )}
           </div>
-          <button
-            onClick={toggleQuote}
-            hidden={costsHidden}
-            aria-expanded={quoteOpen}
-            title={quoteOpen ? "Close the quote: the picture takes the whole width" : "Open the quote beside the picture"}
-            className={clsx(
-              "inline-flex h-10 items-center gap-2 rounded-md border px-4 text-sm font-medium tabular-nums",
-              quoteOpen ? "border-primary bg-surface-2 text-ink" : "border-line bg-surface text-ink hover:border-forest",
-            )}
-          >
-            <ReceiptText className="size-4" aria-hidden />
-            Quote{net !== null ? ` · ${dollars(net)}` : ""}
-          </button>
+          {/* One view at a time beside the picture: pressing the one open folds it away. */}
+          <div role="tablist" aria-label="Beside the picture" className="flex rounded-md border border-line bg-surface-2 p-0.5">
+            {SIDE_VIEWS.filter((v) => v.id !== "quote" || !costsHidden).map((v) => (
+              <button
+                key={v.id}
+                role="tab"
+                aria-selected={shown === v.id}
+                onClick={() => showSide(v.id)}
+                title={shown === v.id ? "Fold it away: the picture takes the whole width" : v.hint}
+                className={clsx(
+                  "inline-flex h-9 items-center gap-1.5 rounded-[5px] px-3 text-sm font-medium tabular-nums",
+                  shown === v.id ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                )}
+              >
+                {v.label}
+                {v.id === "quote" && net !== null ? <span className="text-ink-2">· {dollars(net)}</span> : null}
+                {v.id === "proposal" && (props.waiting ?? 0) > 0 && (
+                  <span
+                    className="rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white"
+                    aria-label={`${props.waiting} waiting`}
+                  >
+                    {props.waiting}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
           <span className="hidden flex-1 lg:block" aria-hidden />
-          {props.chat}
-          {/* The design's proposal, once it has been published. */}
-          {props.proposalHref ? (
-            <Link
-              href={props.proposalHref}
-              className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-surface px-4 text-sm font-medium text-ink hover:border-forest"
-            >
-              <FileText className="size-4" aria-hidden /> View proposal
-            </Link>
-          ) : (
-            <button
-              disabled
-              title="Publish the design first: that makes its proposal"
-              className="inline-flex h-10 items-center gap-2 rounded-md border border-line bg-surface-2 px-4 text-sm font-medium text-muted"
-            >
-              <FileText className="size-4" aria-hidden /> View proposal
-            </button>
-          )}
           {/* Publishing saves the design and makes (or brings up to date) its proposal. From a deal it opens a box for a note to the customer, sent with it. */}
           <div className="relative">
             <button
@@ -2533,9 +2548,10 @@ export function RoofDesigner(props: {
       <div
         className={clsx(
           "mt-5 grid items-start gap-5",
-          quoteOpen &&
-            !costsHidden &&
-            (quoteShort ? "xl:grid-cols-[minmax(0,1fr)_13rem]" : "xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]"),
+          shown &&
+            (shown === "quote" && quoteShort
+              ? "xl:grid-cols-[minmax(0,1fr)_13rem]"
+              : "xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]"),
         )}
       >
         <div className="min-w-0">
@@ -5122,24 +5138,62 @@ export function RoofDesigner(props: {
             )}
           </aside>
         </div>
-        {/* The quote stays worked out while it is closed (the figures above read its price); it is only out of sight. */}
-        <div
-          className={clsx(
-            "xl:sticky xl:top-[4.5rem] xl:max-h-[calc(100dvh-5.5rem)] xl:overflow-y-auto",
-            (!quoteOpen || costsHidden) && "hidden",
-          )}
-        >
-          <DesignQuote
-            design={`Design ${active + 1}${active === primary ? " (primary)" : ""}`}
-            spec={spec}
-            workspace={props.workspace}
-            rates={props.rates}
-            value={quoteNow}
-            onChange={setQuote}
-            onNet={onNet}
-            compact={quoteShort}
-            onCompact={shortQuote}
-          />
+        {/* Beside the picture, one view at a time. Every view stays on the page, only hidden, so the quote keeps working
+            out the figures above while another view (or none) is open. */}
+        <div className={clsx("space-y-3 xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100dvh-6.5rem)] xl:overflow-y-auto", !shown && "hidden")}>
+          <div className={clsx("space-y-3", shown !== "designer" && "hidden")}>
+            <section className="rounded-lg border border-line bg-surface p-3" aria-label="This home">
+              <HomeToggles
+                form={quoteNow.form}
+                onPick={(name, value) => setQuote({ ...quoteNow, form: { ...quoteNow.form, [name]: value } as QuoteFields["form"] })}
+              />
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event(SOL_TOGGLE))}
+                className="mt-3 flex w-full items-center gap-2 rounded-md border border-line px-3 py-2 text-left text-sm font-medium text-ink hover:border-forest"
+              >
+                <SolIcon className="size-5" />
+                Ask Sol about this design
+              </button>
+            </section>
+            {props.notes}
+          </div>
+          <div className={clsx(shown !== "quote" && "hidden")}>
+            <DesignQuote
+              design={`Design ${active + 1}${active === primary ? " (primary)" : ""}`}
+              spec={spec}
+              workspace={props.workspace}
+              rates={props.rates}
+              value={quoteNow}
+              onChange={setQuote}
+              onNet={onNet}
+              compact={quoteShort}
+              onCompact={shortQuote}
+              homeless
+            />
+          </div>
+          <div className={clsx("space-y-3", shown !== "proposal" && "hidden")}>
+            <section className="rounded-lg border border-line bg-surface p-3" aria-label="Proposal">
+              <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">Proposal</p>
+              <p className="mt-1 text-sm text-ink-2">
+                {props.proposalHref
+                  ? "Publish design brings the proposal up to date. Its link stays the same."
+                  : "Publish design makes the proposal from the starred design."}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {props.proposalHref ? (
+                  <Link href={props.proposalHref} className={button}>
+                    <FileText className="mr-1.5 size-4" aria-hidden /> View proposal
+                  </Link>
+                ) : (
+                  <button disabled title="Publish the design first: that makes its proposal" className={button}>
+                    <FileText className="mr-1.5 size-4" aria-hidden /> View proposal
+                  </button>
+                )}
+              </div>
+            </section>
+            {props.proposal}
+          </div>
         </div>
       </div>
     </div>

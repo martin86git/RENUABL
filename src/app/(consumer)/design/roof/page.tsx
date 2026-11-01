@@ -16,9 +16,16 @@ export const metadata: Metadata = {
 export default async function DesignRoofPage({ searchParams }: PageProps<"/design/roof">) {
   const embed = (await searchParams).embed === "1";
   return (
-    <DesignShell compact bare={embed}>
+    // In the frame and its pad like every other page (Primero's designer in the frame); bare inside a deal's drawer.
+    <DesignShell bare={embed}>
       <Suspense>
-        <DesignStudio />
+        {embed ? (
+          <div className="px-3 pt-3 sm:px-4">
+            <DesignStudio />
+          </div>
+        ) : (
+          <DesignStudio />
+        )}
       </Suspense>
     </DesignShell>
   );

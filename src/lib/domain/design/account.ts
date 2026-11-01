@@ -13,7 +13,25 @@ import { cleanDesignSet, packDesignSet } from "./roof-design";
 // Members and what they may do
 // ---------------------------------------------------------------------------
 
-export type MemberRole = "owner" | "member";
+export type MemberRole = "owner" | "member" | "designer";
+
+/**
+ * The roles the owner gives others (1 Nov 2026, Martin: Primero's Designer role, so dedicated designers are fed every
+ * deal waiting for a design). A **designer** opens every deal to design it, publishes its proposal and talks to its
+ * customer, and lands on the design tool; they never change prices or settings. Whether they see costs is the owner's
+ * "Sees costs and margin" as for anyone.
+ */
+export const ROLES: { role: Exclude<MemberRole, "owner">; label: string; about: string }[] = [
+  { role: "member", label: "Member", about: "Works with customers and deals and designs roofs; the rest as set below." },
+  {
+    role: "designer",
+    label: "Designer",
+    about: "Opens every deal to design it, publishes its proposal and talks to its customer. Lands on the design tool. No settings.",
+  },
+];
+
+/** A role as sent: only a designer or a member (the owner is never given or taken away). */
+export const cleanRole = (raw: unknown): Exclude<MemberRole, "owner"> | null => (raw === "designer" || raw === "member" ? raw : null);
 
 /** The things a member's role is checked for. */
 export type MemberAction = "design" | "costs" | "prices" | "publish" | "members";
@@ -74,6 +92,10 @@ export function cleanPermissions(raw: unknown): MemberPermissions {
  */
 export function can(role: MemberRole, action: MemberAction, permissions: MemberPermissions = ALL_PERMISSIONS): boolean {
   if (role === "owner") return true;
+  if (role === "designer") {
+    if (action === "design" || action === "publish") return true;
+    return action === "costs" && cleanPermissions(permissions).costs;
+  }
   if (role !== "member") return false;
   if (action === "design") return true;
   if (action === "members") return false;
@@ -268,7 +290,7 @@ export interface DealViewer {
 
 /** Whether this member sees every deal: the owner always; a member unless the owner has switched it off. */
 export function seesAllDeals(role: MemberRole, permissions: MemberPermissions = ALL_PERMISSIONS): boolean {
-  return role === "owner" || (role === "member" && cleanPermissions(permissions).allDeals);
+  return role === "owner" || role === "designer" || (role === "member" && cleanPermissions(permissions).allDeals);
 }
 
 /** Whether a viewer sees a deal, by its owner and whether they are mentioned on it. The server's queries say the same. */

@@ -1,7 +1,7 @@
 import { normaliseEmail } from "@/lib/domain/accounts";
-import { MAX_MEMBERS, cleanPermissions } from "@/lib/domain/design/account";
+import { MAX_MEMBERS, cleanPermissions, cleanRole } from "@/lib/domain/design/account";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
-import { addMember, listMembers, removeMember, setPermissions } from "@/lib/server/design-repo";
+import { addMember, listMembers, removeMember, setPermissions, setRole } from "@/lib/server/design-repo";
 import { allow } from "@/lib/server/rate-limit";
 
 /** GET: the people in the signed-in member's business. */
@@ -39,7 +39,8 @@ export async function POST(request: Request) {
 }
 
 /**
- * PUT { email, permissions: { costs, prices, publish } }: the owner sets what a member may do. Enforced on every
+ * PUT { email, permissions: { costs, prices, publish, allDeals } } or { email, role: "member" | "designer" }: the owner sets
+ * what a member may do, or their role. Enforced on every
  * request by `requireMember`, so it takes effect with their next one. The owner's own can't be changed.
  */
 export async function PUT(request: Request) {
@@ -49,8 +50,14 @@ export async function PUT(request: Request) {
     const read = await readBody(request, 2_000);
     if ("refuse" in read) return read.refuse;
     const email = normaliseEmail(read.body.email);
-    if (!email || !(await setPermissions(who.member.businessId, email, cleanPermissions(read.body.permissions))))
-      return Response.json({ ok: false, message: "That person isn't in your business." }, { status: 404 });
+    const role = "role" in read.body ? cleanRole(read.body.role) : undefined;
+    if (role === null) return Response.json({ ok: false, message: "That isn't a role." }, { status: 422 });
+    const done =
+      email &&
+      (role
+        ? await setRole(who.member.businessId, email, role)
+        : await setPermissions(who.member.businessId, email, cleanPermissions(read.body.permissions)));
+    if (!done) return Response.json({ ok: false, message: "That person isn't in your business." }, { status: 404 });
     return Response.json({ ok: true, members: await listMembers(who.member.businessId) });
   });
 }

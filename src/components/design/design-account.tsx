@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
-import { BUSINESS_TERMS_MISSING, BUSINESS_TERMS_PATH, PERMISSIONS, can, type MemberPermissions } from "@/lib/domain/design/account";
+import { BUSINESS_TERMS_MISSING, BUSINESS_TERMS_PATH, PERMISSIONS, ROLES, can, type MemberPermissions } from "@/lib/domain/design/account";
 import {
   addMember,
   designAccount,
@@ -16,6 +16,7 @@ import {
   savePassword,
   removeMember,
   setMemberPermissions,
+  setMemberRole,
   renameBusiness,
   setUpBusiness,
   type DesignAccount,
@@ -370,6 +371,12 @@ export function DesignAccountPage() {
     setMembers(res.members ?? members);
     setNote({ text: `Saved what ${who} may do.` });
   };
+  const giveRole = async (who: string, role: "member" | "designer") => {
+    const res = await setMemberRole(who, role);
+    if (res.problem) return setNote({ text: res.problem, error: true });
+    setMembers(res.members ?? members);
+    setNote({ text: role === "designer" ? `${who} is now a designer.` : `${who} is now a member.` });
+  };
   const remove = async (who: string) => {
     const res = await removeMember(who);
     if (res.problem) return setNote({ text: res.problem, error: true });
@@ -439,12 +446,40 @@ export function DesignAccountPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-ink">{m.email}</p>
                   <p className="text-xs text-muted">
-                    {m.role === "owner" ? "Owner: may do everything" : m.joined ? "Member" : "Added, hasn't signed in yet"}
+                    {m.role === "owner"
+                      ? "Owner: may do everything"
+                      : `${m.role === "designer" ? "Designer" : "Member"}${m.joined ? "" : ": added, hasn't signed in yet"}`}
                   </p>
                   {/* What a member may do. The owner sets it; a member sees their own, greyed. */}
                   {m.role !== "owner" && (
                     <div className="mt-2 flex flex-col gap-1.5">
-                      {PERMISSIONS.map((p) => (
+                      {/* A member or a designer: a designer opens every deal and publishes, and changes no settings. */}
+                      <div
+                        role="radiogroup"
+                        aria-label={`Role of ${m.email}`}
+                        className="flex w-fit rounded-md border border-line bg-surface p-0.5 text-xs"
+                      >
+                        {ROLES.map((r) => (
+                          <button
+                            key={r.role}
+                            type="button"
+                            role="radio"
+                            aria-checked={m.role === r.role}
+                            title={r.about}
+                            disabled={!owner}
+                            onClick={() => m.role !== r.role && void giveRole(m.email, r.role)}
+                            className={
+                              m.role === r.role
+                                ? "rounded-[5px] bg-ink px-2.5 py-1 text-canvas"
+                                : "rounded-[5px] px-2.5 py-1 text-ink-2 hover:text-ink"
+                            }
+                          >
+                            {r.label}
+                          </button>
+                        ))}
+                      </div>
+                      {m.role === "designer" && <p className="text-xs text-muted">{ROLES.find((r) => r.role === "designer")?.about}</p>}
+                      {PERMISSIONS.filter((p) => m.role !== "designer" || p.key === "costs").map((p) => (
                         <label
                           key={p.key}
                           className={`flex items-start gap-2 text-xs ${owner ? "cursor-pointer text-ink-2" : "text-muted"}`}

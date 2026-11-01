@@ -3,7 +3,7 @@
 import { withDatasheets, type Datasheets } from "@/lib/domain/design/datasheets";
 import { loadDatasheets } from "@/lib/services/datasheets";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddressEntry } from "@/components/consumer/address-entry";
 import { Wordmark } from "@/components/ui/primitives";
@@ -16,7 +16,6 @@ import { VERIFIED_RATES, type RebateRates } from "@/lib/domain/rebates";
 import { yieldPerKw } from "@/lib/domain/sunshine";
 import type { Address } from "@/lib/domain/types";
 import {
-  loadLastRoof,
   loadRoofWork,
   loadWorkspace,
   rememberRoof,
@@ -28,9 +27,11 @@ import {
 } from "@/lib/services/design-store";
 import { loadJob, saveJob } from "@/lib/services/crm";
 import { NEEDS_ACCOUNT, NO_DEAL, proposalScreen, publishFromDesigner } from "@/lib/services/proposals";
-import { ChatButton } from "./chat-panel";
+import { useChatWaiting } from "./chat-panel";
 import { sendReply, unreadChanged } from "@/lib/services/chat";
-import { DesignKeptNote, DesignRoofList } from "./design-account";
+import { DesignKeptNote, DesignRoofList, useDesignAccount } from "./design-account";
+import { DesignToolHome } from "./design-tool-home";
+import { DealNotes, ProposalSide } from "./designer-side";
 import { RoofDesigner } from "./roof-designer";
 
 /** What a kilowatt of panels makes in a day, from the same sunshine record the designer's months use. */
@@ -64,7 +65,15 @@ export function DesignStudio() {
   const [roof, setRoof] = useState<DesignRoof | null>(null);
   const [work, setWork] = useState<{ set: DesignSet; extras: DesignExtras } | null>(null);
   // The customer's job this roof is being designed for, when the designer was opened from one (/design/roof?job=…).
-  const jobId = useSearchParams().get("job");
+  const params = useSearchParams();
+  const jobId = params.get("job");
+  // A roof opened from the home is kept in the address (?at=lat,lng&address=…), so a reload opens it again.
+  const at = params.get("at");
+  const atAddress = params.get("address") ?? "";
+  const router = useRouter();
+  const [account] = useDesignAccount();
+  // Bumped after publishing, so the Proposal view's timeline reads again.
+  const [published, setPublished] = useState(0);
   const [job, setJob] = useState<{ id: string; customerId: string; customerName: string; lat: number; lng: number } | null>(null);
   // The business's price lists and settings; and the STC rules, today's when they can be had.
   const [workspace, setWorkspace] = useState<Workspace>(DEFAULT_WORKSPACE);
@@ -111,6 +120,10 @@ export function DesignStudio() {
   const open = (next: DesignRoof | null) => {
     setProblem(null);
     rememberRoof(next);
+    if (next && !jobId)
+      router.replace(`/design/roof?at=${next.lat.toFixed(6)},${next.lng.toFixed(6)}&address=${encodeURIComponent(next.address)}`, {
+        scroll: false,
+      });
     if (!next) {
       setRoof(null);
       setWork(null);
@@ -132,13 +145,15 @@ export function DesignStudio() {
     void (async () => {
       try {
         const settings = await loadWorkspace();
-        // A job's own address comes first; otherwise the roof last opened.
+        // A job's own address comes first; otherwise a roof named in the address. With neither, the home.
         const asked = jobId ? await loadJob(jobId) : null;
         const forJob =
           asked?.ok && asked.job.lat !== null && asked.job.lng !== null
             ? { address: asked.job.address, lat: asked.job.lat, lng: asked.job.lng }
             : null;
-        const last = forJob ?? loadLastRoof();
+        const [lat, lng] = (at ?? "").split(",").map(Number);
+        const named = !jobId && at && Number.isFinite(lat) && Number.isFinite(lng) ? { address: atAddress, lat, lng } : null;
+        const last = forJob ?? named;
         const loaded = last ? await loadRoofWork(last, settings) : null;
         if (gone) return;
         if (asked?.ok && forJob) {
@@ -159,6 +174,8 @@ export function DesignStudio() {
     return () => {
       gone = true;
     };
+    // The address read once, as the page opens; opening another roof changes it without reloading.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
   // The business's own checked datasheets (Settings → Product datasheets): signed out there are none.
@@ -202,10 +219,12 @@ export function DesignStudio() {
 
   // The job only counts while its own roof is the one open.
   const onJob = job && roof && job.lat === roof.lat && job.lng === roof.lng ? job : null;
+  const waiting = useChatWaiting(onJob?.id ?? null);
+  const signedIn = Boolean(account?.signedIn && account.business);
 
   if (roof && work && image)
     return (
-      <div className="theme-studio min-h-dvh px-4 pb-20 sm:px-6 lg:px-8">
+      <div className="theme-studio pb-10">
         <RoofDesigner
           // A different roof is a different designer: nothing from the last one carries over.
           key={`${roof.lat},${roof.lng}`}
@@ -237,10 +256,31 @@ export function DesignStudio() {
                 ? NO_DEAL
                 : NEEDS_ACCOUNT;
             tellDeal({ saved: true });
+            setPublished((n) => n + 1);
             return res;
           }}
           proposalHref={onJob ? proposalScreen(onJob.id) : null}
-          chat={onJob ? <ChatButton jobId={onJob.id} /> : null}
+          waiting={waiting}
+          notes={onJob ? <DealNotes jobId={onJob.id} customerId={onJob.customerId} /> : null}
+          proposal={
+            onJob ? (
+              <ProposalSide jobId={onJob.id} refresh={published} />
+            ) : (
+              <p className="rounded-lg border border-line bg-surface p-3 text-sm text-ink-2">
+                {signedIn ? (
+                  <>
+                    Not on a deal yet. This site is saved to your business: put it on a deal from the{" "}
+                    <Link href="/design/roof" className="font-medium text-ink underline underline-offset-4">
+                      design home
+                    </Link>
+                    , and its proposal, chat and timeline show here.
+                  </>
+                ) : (
+                  "Saved on this device. Sign in to your business to send proposals and talk to the customer."
+                )}
+              </p>
+            )
+          }
           customerName={onJob?.customerName.split(" ")[0]}
           onNote={
             onJob
@@ -259,6 +299,22 @@ export function DesignStudio() {
             <>
               <Link href="/design" aria-label="RENUABL" className="studio-own-mark">
                 <Wordmark className="text-[17px]" />
+              </Link>
+              <Link
+                href="/design/roof"
+                onClick={(e) => {
+                  if (unsaved.current && !window.confirm("This design has changes that aren't saved. Leave it and lose them?"))
+                    e.preventDefault();
+                  else {
+                    // The home, without a roof: the page's own state is cleared as the address changes.
+                    setRoof(null);
+                    setWork(null);
+                  }
+                }}
+                className="shrink-0 rounded px-2 py-1.5 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
+                title="The design home: deals waiting for a design, and recent designs"
+              >
+                Design home
               </Link>
               {onJob && (
                 <Link
@@ -286,6 +342,18 @@ export function DesignStudio() {
           A design aid. Output figures are rough: they leave out shade and aren&apos;t a site inspection. String checks don&apos;t replace
           the installer&apos;s own design check or the manufacturer&apos;s sizing tool.
         </p>
+      </div>
+    );
+
+  if (signedIn)
+    return (
+      <div className="theme-studio">
+        {problem && (
+          <p className="mb-3 rounded-md bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
+            {problem}
+          </p>
+        )}
+        {ready && <DesignToolHome onPick={pick} onOpen={open} />}
       </div>
     );
 

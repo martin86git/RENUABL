@@ -138,6 +138,11 @@ export async function setMemberPermissions(
   return res.ok ? { members: res.members } : { problem: res.message ?? UNREACHABLE };
 }
 
+export async function setMemberRole(email: string, role: "member" | "designer"): Promise<{ members?: MemberLine[]; problem?: string }> {
+  const res = await send<MembersAnswer>("/api/design/members", "PUT", { email, role });
+  return res.ok ? { members: res.members } : { problem: res.message ?? UNREACHABLE };
+}
+
 export async function removeMember(email: string): Promise<{ members?: MemberLine[]; problem?: string }> {
   const res = await send<MembersAnswer>("/api/design/members", "DELETE", { email });
   return res.ok ? { members: res.members } : { problem: res.message ?? "They couldn't be removed. Try again in a moment." };

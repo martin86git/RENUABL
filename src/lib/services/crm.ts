@@ -208,3 +208,11 @@ export const saveJobPlaces = (places: import("@/lib/domain/design/job-map").JobP
 /** The map's picture for a view (fetched by the server in the map's style). */
 export const jobMapImage = (v: { lat: number; lng: number; zoom: number }) =>
   `/api/design/job-map/image?lat=${v.lat.toFixed(6)}&lng=${v.lng.toFixed(6)}&zoom=${v.zoom}`;
+
+/** The design tool's home (wave 6): the deals waiting for a design, each deal's first proposal, and the roofs drawn. */
+export const loadDesignHome = () => ask<import("@/lib/server/design-home-repo").DesignHomeData>("/api/design/design-home");
+export const attachSite = (projectId: string, jobId: string) =>
+  ask<object>("/api/design/design-home", { method: "POST", body: { projectId, jobId } });
+/** A deal's proposal timeline, newest first. */
+export const loadTimeline = (jobId: string) =>
+  ask<{ events: import("@/lib/domain/design/timeline").TimelineEvent[] }>(`/api/design/jobs/${encodeURIComponent(jobId)}/timeline`);

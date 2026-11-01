@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { DesignHome } from "@/components/design/design-home";
+import { designAccess } from "@/lib/server/design-context";
 
 export const metadata: Metadata = {
   title: "For solar installers and retailers",
@@ -9,8 +12,24 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** The product's front page with the way in; signed in, the business's overview. */
-export default function DesignHomePage() {
+/**
+ * The product's front page with the way in; signed in, the business's overview. A designer arriving from outside
+ * (signing in, a bookmark, a new tab) lands on the design tool; Today is still a press away inside the app.
+ */
+export default async function DesignHomePage() {
+  const access = await designAccess();
+  if (access.state === "ready" && access.member.role === "designer") {
+    const from = (await headers()).get("referer") ?? "";
+    const inside = (() => {
+      try {
+        const path = new URL(from).pathname;
+        return path.startsWith("/design/") && !path.startsWith("/design/sign-in");
+      } catch {
+        return false;
+      }
+    })();
+    if (!inside) redirect("/design/roof");
+  }
   // The overview reads which view is open from the address.
   return (
     <Suspense>

@@ -385,13 +385,13 @@ export async function listJobs(businessId: string, viewer?: DealViewer): Promise
  * The deals a viewer sees, as a condition on design_jobs j: everyone's, or (not seeing every deal) their own, no one's,
  * and those they are mentioned on. The same rule as `seesDeal`. Its parameter is the viewer's email, at `at`.
  */
-function seen(viewer: DealViewer | undefined, at: number): string {
+export function seen(viewer: DealViewer | undefined, at: number): string {
   if (!viewer || viewer.all) return "true";
   const p = `$${at}`;
   return `(j.owner_email is null or j.owner_email = ${p} or exists (select 1 from design_notifications n
     where n.business_id = j.business_id and n.job_id = j.id and n.to_email = ${p}))`;
 }
-const seenParams = (viewer: DealViewer | undefined) => (viewer && !viewer.all ? [viewer.email.toLowerCase()] : []);
+export const seenParams = (viewer: DealViewer | undefined) => (viewer && !viewer.all ? [viewer.email.toLowerCase()] : []);
 
 /** Gives a deal to a member of the business (an email) or to no one (null), written on its record. Null: no such deal. */
 export async function setJobOwner(businessId: string, id: string, owner: string | null, by: string): Promise<Job | null> {

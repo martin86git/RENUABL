@@ -149,6 +149,16 @@ export async function addMember(businessId: string, email: string, invitedBy: st
   });
 }
 
+/** Gives a member a role (a member or a designer). Never the owner's. False when there's no such member. */
+export async function setRole(businessId: string, email: string, role: Exclude<MemberRole, "owner">): Promise<boolean> {
+  const rows = await query(`update business_members set role = $3 where business_id = $1 and email = $2 and role <> 'owner' returning id`, [
+    businessId,
+    email.toLowerCase(),
+    role,
+  ]);
+  return rows.length > 0;
+}
+
 /** Takes someone out of the business: their next request is refused. The owner can't be removed. */
 export async function removeMember(businessId: string, email: string): Promise<boolean> {
   const rows = await query(`delete from business_members where business_id = $1 and email = $2 and role <> 'owner' returning id`, [
