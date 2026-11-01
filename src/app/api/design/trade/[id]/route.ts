@@ -1,3 +1,4 @@
+import { marketClosed, marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import { ITEM_STATES, cleanItemInput, cleanMessage, type ItemState } from "@/lib/domain/design/trade";
 import { can } from "@/lib/domain/design/account";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
@@ -8,6 +9,7 @@ const missing = () => Response.json({ ok: false, message: "That item isn't there
 
 /** GET → { item, conversations }: the item as this business may see it; `?read=<thread>` marks that conversation read. */
 export async function GET(request: Request, ctx: RouteContext<"/api/design/trade/[id]">) {
+  if (!marketplaceOpen()) return marketClosed();
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
@@ -21,6 +23,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/design/trade
 
 /** PUT { item } | { status }: the seller changes its own item, or marks it pending, sold or taken down. */
 export async function PUT(request: Request, ctx: RouteContext<"/api/design/trade/[id]">) {
+  if (!marketplaceOpen()) return marketClosed();
   return answer(async () => {
     const who = await requireMember("publish");
     if ("refuse" in who) return who.refuse;
@@ -40,6 +43,7 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/trade
 
 /** POST { text, thread? }: a message about the item, to the seller (from a buyer) or to one buyer (from the seller). */
 export async function POST(request: Request, ctx: RouteContext<"/api/design/trade/[id]">) {
+  if (!marketplaceOpen()) return marketClosed();
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;

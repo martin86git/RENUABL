@@ -1,6 +1,7 @@
 "use client";
 
 import { tradeUnreadCount } from "@/lib/services/trade";
+import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import { inboxUnread } from "@/lib/services/inbox";
 import { stopViewing } from "@/lib/services/design-account";
 import Link from "next/link";
@@ -118,7 +119,7 @@ function Shell({
     };
   }, [on]);
   // Conversations about equipment with lines this business hasn't read (as seller or buyer).
-  const trade = useCount(on, "renuabl:trade", async () => {
+  const trade = useCount(on && marketplaceOpen(), "renuabl:trade", async () => {
     const res = await tradeUnreadCount();
     return res.ok ? res.unread : null;
   });

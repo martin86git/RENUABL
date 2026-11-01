@@ -15,3 +15,4 @@ export const loadListing = (id: string) => ask<ListingDetail>(`${BASE}/${encodeU
 export const listingAction = (id: string, body: Record<string, unknown>) =>
   ask<ListingDetail>(`${BASE}/${encodeURIComponent(id)}`, { method: "POST", body });
 export const marketplacePath = (id: string) => `/design/marketplace/${encodeURIComponent(id)}`;
+export const listingPicturePath = (id: string) => `${BASE}/${encodeURIComponent(id)}/picture`;

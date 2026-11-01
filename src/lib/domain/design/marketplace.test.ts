@@ -34,6 +34,7 @@ const listing = (id: string, more: Partial<Listing> = {}): Listing => ({
   closesOn: "2026-11-10",
   createdAt: "2026-11-01T00:00:00Z",
   bids: 0,
+  picture: false,
   mine: false,
   myBid: null,
   ...more,

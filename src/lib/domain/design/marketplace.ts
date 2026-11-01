@@ -36,6 +36,64 @@ export interface ListingSystem {
   storeys: string;
   roof: string;
   phases: string;
+  /** Added 1 Nov 2026 (Martin: what any installer wants to know before bidding); older listings have none. */
+  battery?: string;
+  arrays?: number | null;
+  strings?: number | null;
+  tiltFrames?: boolean | null;
+  /** From the quote: the switchboard upgrade included, left out (it may still apply), or not decided. */
+  switchboard?: SwitchboardWork;
+}
+
+export const SWITCHBOARD_WORK = ["included", "excluded", "to-confirm"] as const;
+export type SwitchboardWork = (typeof SWITCHBOARD_WORK)[number];
+
+/** The switchboard upgrade from the quote line as it was decided (LineEdit: on, removed, or neither). */
+export const switchboardWork = (edit: { on?: boolean; removed?: boolean } | undefined): SwitchboardWork =>
+  edit?.on ? "included" : edit?.removed ? "excluded" : "to-confirm";
+
+export interface BreakdownRow {
+  label: string;
+  value: string;
+  /** Yes or no at a glance for what is either there or not; null for a plain fact. */
+  has: boolean | null;
+}
+
+/**
+ * What an installer wants to know before pricing a job, row by row, in the same order on every listing: panels,
+ * inverter, battery, EV charger, switchboard upgrade, then the site. A row with nothing known says so rather than
+ * disappearing, so two listings read alike.
+ */
+export function listingBreakdown(s: ListingSystem): BreakdownRow[] {
+  const unknown = "Not given";
+  const panels = s.panels ? `${s.panels} × ${s.panel || "panels"}` : s.panel || unknown;
+  const rows: BreakdownRow[] = [
+    { label: "System", value: s.kw ? `${s.kw.toFixed(2)} kW` : unknown, has: null },
+    { label: "Panels", value: panels, has: null },
+    { label: "Inverter", value: s.inverter || unknown, has: null },
+    {
+      label: "Battery",
+      value: s.batteryKwh ? [`${s.batteryKwh} kWh`, s.battery].filter(Boolean).join(" · ") : "No battery",
+      has: Boolean(s.batteryKwh),
+    },
+    { label: "EV charger", value: s.ev ? "Included" : "No EV charger", has: s.ev },
+    {
+      label: "Switchboard upgrade",
+      value: s.switchboard === "included" ? "Included" : s.switchboard === "excluded" ? "Not included" : "To confirm on site",
+      has: s.switchboard === "included" ? true : s.switchboard === "excluded" ? false : null,
+    },
+    { label: "Arrays", value: s.arrays ? String(s.arrays) : unknown, has: null },
+    { label: "Strings", value: s.strings ? String(s.strings) : unknown, has: null },
+    {
+      label: "Tilt frames",
+      value: s.tiltFrames === true ? "Yes" : s.tiltFrames === false ? "No" : unknown,
+      has: s.tiltFrames ?? null,
+    },
+    { label: "Storeys", value: s.storeys || unknown, has: null },
+    { label: "Roof", value: s.roof || unknown, has: null },
+    { label: "Phase", value: s.phases || unknown, has: null },
+  ];
+  return rows;
 }
 
 export interface Listing {
@@ -59,6 +117,8 @@ export interface Listing {
   closesOn: ISODate;
   createdAt: string;
   bids: number;
+  /** Whether the roof design was drawn for it (listing-picture.ts): served at /api/design/marketplace/<id>/picture. */
+  picture: boolean;
   /** Set for the business that posted it. */
   mine: boolean;
   /** This business's own bid on it, if any. */

@@ -1,9 +1,11 @@
+import { marketClosed, marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import { answer, requireMember } from "@/lib/server/design-context";
 import { addPhotos, itemDetail, removePhoto } from "@/lib/server/design-trade-repo";
 import { allow } from "@/lib/server/rate-limit";
 
 /** POST (a form of files): photos for the seller's own item, each redrawn before it is kept (nothing but the picture). */
 export async function POST(request: Request, ctx: RouteContext<"/api/design/trade/[id]/photos">) {
+  if (!marketplaceOpen()) return marketClosed();
   return answer(async () => {
     const who = await requireMember("publish");
     if ("refuse" in who) return who.refuse;
@@ -29,6 +31,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/trad
 
 /** DELETE ?photo=<id>: takes a photo off the seller's own item. */
 export async function DELETE(request: Request, ctx: RouteContext<"/api/design/trade/[id]/photos">) {
+  if (!marketplaceOpen()) return marketClosed();
   return answer(async () => {
     const who = await requireMember("publish");
     if ("refuse" in who) return who.refuse;

@@ -1,3 +1,4 @@
+import { marketClosed, marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import { cleanBidInput } from "@/lib/domain/design/marketplace";
 import { todayInMarket } from "@/lib/domain/market";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
@@ -8,6 +9,7 @@ const missing = () => Response.json({ ok: false, message: "That listing isn't th
 
 /** GET → the listing as this business may see it: the poster gets every bid, and once awarded both get the handover. */
 export async function GET(_request: Request, ctx: RouteContext<"/api/design/marketplace/[id]">) {
+  if (!marketplaceOpen()) return marketClosed();
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
@@ -22,6 +24,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/mark
  * Bidding and choosing a bid commit the business, so they need the publish permission.
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/design/marketplace/[id]">) {
+  if (!marketplaceOpen()) return marketClosed();
   return answer(async () => {
     const who = await requireMember("publish");
     if ("refuse" in who) return who.refuse;

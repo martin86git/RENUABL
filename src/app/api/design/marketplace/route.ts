@@ -1,3 +1,4 @@
+import { marketClosed, marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import { cleanListingInput } from "@/lib/domain/design/marketplace";
 import { todayInMarket } from "@/lib/domain/market";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
@@ -7,6 +8,7 @@ import { allow } from "@/lib/server/rate-limit";
 
 /** GET → { listings, base }: every open listing, this business's own and those it bid on; and its base, for distance. */
 export async function GET() {
+  if (!marketplaceOpen()) return marketClosed();
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
@@ -24,6 +26,7 @@ export async function GET() {
  * built on the server from the job (suburb, system, dates); the words are scrubbed of contact details and addresses.
  */
 export async function POST(request: Request) {
+  if (!marketplaceOpen()) return marketClosed();
   return answer(async () => {
     const who = await requireMember("publish");
     if ("refuse" in who) return who.refuse;

@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowLeft, Battery, Car, MapPin, Store, X } from "lucide-react";
+import { ArrowLeft, Battery, Car, Check, Circle, MapPin, Store, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -13,6 +13,7 @@ import {
   bidRefusal,
   browse,
   closesWords,
+  listingBreakdown,
   systemLine,
   windowWords,
   type Distance,
@@ -20,7 +21,15 @@ import {
 } from "@/lib/domain/design/marketplace";
 import { todayInMarket } from "@/lib/domain/market";
 import { jobMapImage } from "@/lib/services/crm";
-import { createListing, listingAction, loadListing, loadListings, marketplacePath, type ListingDetail } from "@/lib/services/marketplace";
+import {
+  createListing,
+  listingAction,
+  listingPicturePath,
+  loadListing,
+  loadListings,
+  marketplacePath,
+  type ListingDetail,
+} from "@/lib/services/marketplace";
 import { PATHS, PageHead, ui } from "./design-shell";
 
 const money = (n: number) => `$${n.toLocaleString("en-AU")}`;
@@ -137,15 +146,26 @@ function ListingCard({ listing: l, km, today }: { listing: Listing; km: number |
   return (
     <Link href={marketplacePath(l.id)} className="group block">
       <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-gradient-to-br from-sun via-surface to-surface-2 ring-1 ring-line transition group-hover:ring-forest">
-        {/* The area, never the home: the point is rounded to about a kilometre and the map is at suburb zoom. */}
-        {l.near && (
+        {/* The roof design, everything round the roof blurred (listing-picture.ts); else the area, never the home: the
+            point is rounded to about a kilometre and the map is at suburb zoom. */}
+        {l.picture ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={jobMapImage({ ...l.near, zoom: AREA_ZOOM })}
-            alt=""
+            src={listingPicturePath(l.id)}
+            alt={`The roof design for the job in ${l.suburb}`}
             loading="lazy"
             className="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-105"
           />
+        ) : (
+          l.near && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={jobMapImage({ ...l.near, zoom: AREA_ZOOM })}
+              alt=""
+              loading="lazy"
+              className="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-105"
+            />
+          )
         )}
         <span className="absolute inset-0 bg-gradient-to-t from-surface via-surface/50 to-transparent" aria-hidden />
         <span className="absolute left-3 top-3 rounded-full bg-surface/90 px-2.5 py-1 text-[11px] font-medium text-ink shadow-sm">
@@ -228,15 +248,9 @@ export function ListingPage({ id }: { id: string }) {
     );
   const l = d.listing;
   const facts = [
-    ["System", systemLine(l.system)],
-    ["Panels", l.system.panel],
-    ["Inverter", l.system.inverter],
-    ["Storeys", l.system.storeys],
-    ["Roof", l.system.roof],
-    ["Phase", l.system.phases],
     ["When", windowWords(l.from, l.to)],
     ["Guide price", l.guide ? `${money(l.guide)} ex GST` : "Open to offers"],
-  ].filter(([, v]) => v);
+  ];
   return (
     <div className={clsx(ui.page, "space-y-5")}>
       <Link
@@ -247,7 +261,20 @@ export function ListingPage({ id }: { id: string }) {
       </Link>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <section className={clsx(ui.card, "overflow-hidden")}>
-          {l.near && (
+          {l.picture && (
+            <figure className="relative bg-ink">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={listingPicturePath(l.id)}
+                alt={`The roof design for the job in ${l.suburb}`}
+                className="aspect-[4/3] w-full object-cover"
+              />
+              <figcaption className="absolute bottom-3 left-3 rounded-full bg-surface/90 px-2.5 py-1 text-[11px] text-ink-2">
+                The roof design · everything round the roof blurred
+              </figcaption>
+            </figure>
+          )}
+          {l.near && !l.picture && (
             <div className="relative h-56 bg-surface-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -273,7 +300,8 @@ export function ListingPage({ id }: { id: string }) {
             <p className="mt-1 text-sm text-ink-2">
               Listed by {l.business} · {closesWords(l, today)} · {l.bids} {l.bids === 1 ? "bid" : "bids"}
             </p>
-            <dl className="mt-5 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+            <Breakdown listing={l} />
+            <dl className="mt-5 grid gap-x-6 gap-y-2 border-t border-line pt-4 text-sm sm:grid-cols-[auto_1fr]">
               {facts.map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt className="text-muted">{k}</dt>
@@ -317,6 +345,28 @@ export function ListingPage({ id }: { id: string }) {
           )}
         </aside>
       </div>
+    </div>
+  );
+}
+
+/** What an installer wants to know before pricing the job, row by row, each piece of work a clear yes or no. */
+export function Breakdown({ listing: l, narrow }: { listing: Pick<Listing, "system">; narrow?: boolean }) {
+  return (
+    <div className="mt-5">
+      <p className={ui.eyebrow}>What&apos;s to install</p>
+      <dl className={clsx("mt-2 grid gap-px overflow-hidden rounded-lg bg-line ring-1 ring-line", !narrow && "sm:grid-cols-2")}>
+        {listingBreakdown(l.system).map((r) => (
+          <div key={r.label} className="flex items-center justify-between gap-3 bg-surface px-3.5 py-2.5 text-sm">
+            <dt className="text-muted">{r.label}</dt>
+            <dd className={clsx("flex items-center gap-1.5 text-right", r.has === false ? "text-muted" : "text-ink")}>
+              {r.has === true && <Check className="size-4 text-sun-line" aria-hidden />}
+              {r.has === false && <X className="size-3.5" aria-hidden />}
+              {r.has === null && r.label === "Switchboard upgrade" && <Circle className="size-3 text-muted" aria-hidden />}
+              <span className="font-medium">{r.value}</span>
+            </dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
@@ -516,9 +566,10 @@ export function ListOnMarketplace({ jobId, suburb }: { jobId: string; suburb: st
               ) : (
                 <div className="mt-4 space-y-3">
                   <p className="rounded-md bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-ink-2">
-                    Other businesses see the suburb ({suburb || "from the deal's address"}), the system and the dates, your business name
-                    and your guide price. Never the customer&apos;s name, phone, email or street, and never your costs. The address goes
-                    only to the installer whose bid you accept.
+                    Other businesses see the roof design (everything round the roof blurred), the suburb (
+                    {suburb || "from the deal's address"}), the system and the dates, your business name and your guide price. Never the
+                    customer&apos;s name, phone, email or street, and never your costs. The address goes only to the installer whose bid you
+                    accept.
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <label className={ui.label}>

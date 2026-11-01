@@ -26,7 +26,10 @@ import { query, transaction } from "./db";
 import { jobById, record } from "./design-crm-repo";
 import { NO_DESIGN, savedFor } from "./design-proposal-repo";
 import { emailProvider, sendEmail } from "./email";
-import { newBidEmail, awardedEmail } from "@/lib/domain/design/marketplace";
+import { newBidEmail, awardedEmail, switchboardWork } from "@/lib/domain/design/marketplace";
+import { lineKey } from "@/lib/domain/design/quote";
+import type { RoofDesign } from "@/lib/domain/design/roof-design";
+import { listingPicture } from "./design-listing-picture";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 const day = (column: string) => `to_char(${column}, 'YYYY-MM-DD')`;
@@ -37,8 +40,11 @@ const num = (v: string | null | undefined) => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-/** What a listing says of a job's system, from the deal and its design: words and sizes only, nothing of the customer. */
-async function systemOf(member: Who, jobId: string): Promise<ListingSystem | null> {
+/**
+ * What a listing says of a job's system, from the deal and its design: words and sizes only, nothing of the customer;
+ * and the primary design itself, for the roof picture.
+ */
+async function systemOf(member: Who, jobId: string): Promise<{ system: ListingSystem; design: RoofDesign | null } | null> {
   const saved = await savedFor(member.businessId, member.businessName, jobId);
   if (!saved) return null;
   const found = saved === NO_DESIGN ? await jobById(member.businessId, jobId) : saved;
@@ -47,9 +53,12 @@ async function systemOf(member: Who, jobId: string): Promise<ListingSystem | nul
   const design = set ? set.designs[set.primary] : null;
   const form = set && saved !== NO_DESIGN ? (saved.project.extras.quotes[set.primary]?.form ?? null) : null;
   const d = Object.fromEntries(systemDetails(design, form, found.job.details).map((x) => [x.key, x.value ?? ""])) as Record<string, string>;
-  return {
+  const edits = set && saved !== NO_DESIGN ? (saved.project.extras.quotes[set.primary]?.edits ?? {}) : {};
+  const tilt = (d.tiltFrames ?? "").trim();
+  const panels = num(d.panelQty);
+  const system: ListingSystem = {
     kw: found.job.kw ?? num(d.systemSize),
-    panels: num(d.panelQty),
+    panels,
     panel: (d.panel ?? "").slice(0, 80),
     inverter: (d.inverter ?? "").slice(0, 80),
     batteryKwh: num(d.batteryStorage),
@@ -57,7 +66,13 @@ async function systemOf(member: Who, jobId: string): Promise<ListingSystem | nul
     storeys: (d.storeys ?? "").slice(0, 30),
     roof: (d.roofType ?? "").slice(0, 30),
     phases: (d.phases ?? "").slice(0, 30),
+    battery: (d.battery ?? "").slice(0, 80),
+    arrays: num(d.arrays),
+    strings: num(d.strings),
+    tiltFrames: tilt ? !/^(no|none|0)/i.test(tilt) : panels ? false : null,
+    switchboard: switchboardWork(edits[lineKey({ group: "Switchboard", label: "Switchboard upgrade" })]),
   };
+  return { system, design };
 }
 
 /** Lists one of the business's sold jobs. Refused for a job not sold, one already installing, or one already listed. */
@@ -71,8 +86,9 @@ export async function createListing(
   const { job, customer } = found;
   if (!PRE_INSTALL_STAGES.includes(job.stage))
     return { ok: false, status: 409, message: "Only a sold job not yet installed can be listed." };
-  const system = await systemOf(member, jobId);
-  if (!system) return { ok: false, status: 404, message: "There's no such deal." };
+  const spec = await systemOf(member, jobId);
+  if (!spec) return { ok: false, status: 404, message: "There's no such deal." };
+  const { system, design } = spec;
   const address = job.address || customer.address;
   const suburb = suburbAlone(address);
   if (!suburb) return { ok: false, status: 409, message: "Give the deal an address first: a listing shows its suburb." };
@@ -80,11 +96,13 @@ export async function createListing(
   const postcode = address.match(/\b(\d{4})\b(?!.*\b\d{4}\b)/)?.[1] ?? "";
   const near = job.lat !== null && job.lng !== null ? roughPlace({ lat: job.lat, lng: job.lng }) : null;
   const id = `lst_${randomBytes(10).toString("hex")}`;
+  // The roof design as other businesses will see it: drawn now, kept as it was listed.
+  const picture = design ? await listingPicture(design, address) : null;
   try {
     await query(
       `insert into design_listings (id, business_id, job_id, title, suburb, state, postcode, near_lat, near_lng, system, notes,
-         from_day, to_day, guide, closes_on, created_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+         from_day, to_day, guide, closes_on, created_by, picture)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
       [
         id,
         member.businessId,
@@ -102,6 +120,7 @@ export async function createListing(
         input.guide,
         closesOn(todayInMarket(), input.openFor),
         member.email.toLowerCase(),
+        picture,
       ],
     );
   } catch (e) {
@@ -112,7 +131,7 @@ export async function createListing(
     customerId: customer.id,
     jobId,
     kind: "note",
-    text: "Listed on the marketplace for installers to bid on (suburb, system and dates only).",
+    text: "Listed on the marketplace for installers to bid on (the roof design, suburb, system and dates only).",
     by: member.email.toLowerCase(),
   }).catch(() => undefined);
   return { ok: true, id };
@@ -120,7 +139,7 @@ export async function createListing(
 
 const LISTING = `l.id, b.name as business, l.title, l.suburb, l.state, l.postcode, l.near_lat, l.near_lng, l.system, l.notes,
   ${day("l.from_day")} as "from", ${day("l.to_day")} as "to", l.guide, l.status, ${day("l.closes_on")} as "closesOn",
-  ${moment("l.created_at")} as "createdAt", (l.business_id = $1) as mine,
+  ${moment("l.created_at")} as "createdAt", (l.business_id = $1) as mine, (l.picture is not null) as picture,
   (select count(*) from design_bids x where x.listing_id = l.id and x.status in ('open','accepted')) as bids`;
 
 type ListingRow = Omit<Listing, "near" | "bids" | "myBid"> & { near_lat: number | null; near_lng: number | null; bids: string };
@@ -328,4 +347,14 @@ export async function withdrawListing(businessId: string, id: string): Promise<b
     await q(`update design_bids set status = 'declined' where listing_id = $1 and status = 'open'`, [id]);
     return true;
   });
+}
+
+/** A listing's roof picture, for a business that may see the listing (the same rule as listingDetail); null otherwise. */
+export async function listingPictureFor(businessId: string, id: string): Promise<Buffer | null> {
+  const rows = await query<{ picture: Buffer | null }>(
+    `select l.picture from design_listings l
+      where l.id = $2 and (l.status = 'open' or l.business_id = $1 or exists (select 1 from design_bids x where x.listing_id = l.id and x.business_id = $1))`,
+    [businessId, id],
+  );
+  return rows[0]?.picture ?? null;
 }

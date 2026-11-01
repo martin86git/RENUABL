@@ -5,6 +5,8 @@
  * Pure, tested: which section and which of its pages an address lights.
  */
 
+import { marketplaceOpen } from "./marketplace-launch";
+
 export interface SectionPage {
   id: string;
   label: string;
@@ -18,6 +20,15 @@ export interface Section {
   label: string;
   pages: readonly SectionPage[];
 }
+
+/** The Marketplace's pages once it opens; until then it is one page, the launch (marketplace-launch.ts). */
+export const MARKETPLACE_PAGES: readonly SectionPage[] = [
+  { id: "listings", label: "Job listings", href: "/design/marketplace" },
+  { id: "my-listings", label: "My listings", href: "/design/marketplace/mine" },
+  { id: "my-bids", label: "My bids", href: "/design/marketplace/bids" },
+  { id: "equipment", label: "Equipment", href: "/design/marketplace/equipment" },
+  { id: "my-equipment", label: "My equipment", href: "/design/marketplace/equipment/mine" },
+];
 
 export const SECTIONS: readonly Section[] = [
   { id: "today", label: "Today", pages: [{ id: "home", label: "Today", href: "/design" }] },
@@ -57,13 +68,7 @@ export const SECTIONS: readonly Section[] = [
   {
     id: "marketplace",
     label: "Marketplace",
-    pages: [
-      { id: "listings", label: "Job listings", href: "/design/marketplace" },
-      { id: "my-listings", label: "My listings", href: "/design/marketplace/mine" },
-      { id: "my-bids", label: "My bids", href: "/design/marketplace/bids" },
-      { id: "equipment", label: "Equipment", href: "/design/marketplace/equipment" },
-      { id: "my-equipment", label: "My equipment", href: "/design/marketplace/equipment/mine" },
-    ],
+    pages: marketplaceOpen() ? MARKETPLACE_PAGES : [{ id: "launch", label: "Coming soon", href: "/design/marketplace" }],
   },
 ];
 

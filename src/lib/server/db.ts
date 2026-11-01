@@ -726,6 +726,8 @@ create table if not exists design_listings (
 );
 create unique index if not exists design_listings_open_job on design_listings(business_id, job_id) where status = 'open';
 create index if not exists design_listings_open on design_listings(status, closes_on);
+-- The roof design as the listing shows it (listing-picture.ts): a PNG drawn when listed, everything round the roof blurred.
+alter table design_listings add column if not exists picture bytea;
 create table if not exists design_bids (
   id text primary key,
   listing_id text not null references design_listings(id) on delete cascade,

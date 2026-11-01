@@ -8,6 +8,7 @@ import { JobCardDialog } from "./job-card";
 import { CallNotetaker } from "./call-notetaker";
 import { ListOnMarketplace } from "./marketplace";
 import { suburbAlone } from "@/lib/domain/design/marketplace";
+import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import clsx from "clsx";
 import {
   JOB_STAGES,
@@ -412,7 +413,7 @@ export function DealPage({ id }: { id: string }) {
             <Wrench className="size-4" aria-hidden /> Job card
           </button>
           {card && <JobCardDialog jobId={job.id} onClose={() => setCard(false)} />}
-          {PRE_INSTALL_STAGES.includes(job.stage) && (
+          {marketplaceOpen() && PRE_INSTALL_STAGES.includes(job.stage) && (
             <ListOnMarketplace jobId={job.id} suburb={suburbAlone(job.address || customer.address)} />
           )}
         </div>

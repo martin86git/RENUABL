@@ -1117,3 +1117,45 @@ export function ThreeDesignsDemo() {
     </figure>
   );
 }
+
+/**
+ * The made-up home as a Marketplace listing shows a roof (marketplace-launch.tsx): everything round the roof blurred
+ * and darkened, the house and garage roofs sharp with the design on them. Drawn, not photographed: no real home.
+ */
+export function ListingRoofExample({ className }: { className?: string }) {
+  const roofs = (
+    <>
+      <rect x="116" y="56" width="328" height="208" />
+      <rect x="451" y="176" width="163" height="108" />
+    </>
+  );
+  return (
+    <svg
+      viewBox="80 20 580 330"
+      className={className}
+      role="img"
+      aria-label="An example listing's roof design, everything round the roof blurred"
+    >
+      <defs>
+        <filter id="lst-blur" x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur stdDeviation="10" />
+        </filter>
+        <clipPath id="lst-roof">{roofs}</clipPath>
+      </defs>
+      <g filter="url(#lst-blur)">
+        <AerialScene />
+      </g>
+      <rect x="0" y="0" width="640" height="400" fill="#0b0b0c" fillOpacity="0.4" />
+      <g clipPath="url(#lst-roof)">
+        <AerialScene />
+      </g>
+      <g fill="none" stroke="#fff" strokeOpacity="0.5" strokeWidth="0.8">
+        {roofs}
+      </g>
+      <PanelDefs />
+      {ARRAYS.flatMap((a) => a.spots).map((p, i) => (
+        <SolarPanel key={i} x={p.x} y={p.y} w={p.w} h={p.h} />
+      ))}
+    </svg>
+  );
+}
