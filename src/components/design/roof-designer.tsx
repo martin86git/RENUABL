@@ -2619,7 +2619,6 @@ export function RoofDesigner(props: {
       />
     );
   };
-  const top = Math.max(1, ...year);
 
   return (
     <div>
@@ -2825,73 +2824,50 @@ export function RoofDesigner(props: {
               style={{ maxWidth: fit }}
               aria-label="This design in figures"
             >
-              {(
-                [
-                  {
-                    step: "1 · Solar",
-                    value: summary.kw.toFixed(2),
-                    unit: "kW",
-                    under: `${summary.panels} ${summary.panels === 1 ? "panel" : "panels"} of ${panelOf(design).watts} W`,
-                    gold: true,
-                  },
-                  {
-                    step: "2 · Makes",
-                    value: String(summary.kwhPerDay),
-                    unit: "kWh a day",
-                    under: `${year.reduce((n, kwh) => n + kwh, 0).toLocaleString("en-AU")} kWh a year`,
-                    chart: true,
-                  },
-                  {
-                    step: "3 · Stores",
-                    value: battery ? String(batteryKwh) : "–",
-                    unit: battery ? "kWh battery" : "no battery",
-                    under: fitted.length
-                      ? `${fittedKw} kW of inverter${oversize ? ` · panels ${oversize.percent}%` : ""}`
-                      : "no inverter chosen",
-                    warn: Boolean(oversize?.over),
-                  },
-                ] as { step: string; value: string; unit: string; under: string; gold?: boolean; chart?: boolean; warn?: boolean }[]
-              ).map((g) => (
-                <div key={g.step} className="relative flex items-center gap-3 border-r border-white/15 px-3.5 py-1.5">
-                  <div>
-                    <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/60">{g.step}</p>
-                    <p className="whitespace-nowrap leading-tight">
-                      <span className={clsx("text-xl font-medium tabular-nums tracking-[-0.02em]", g.gold && "text-sun-bright")}>
-                        {g.value}
-                      </span>
-                      <span className="ml-1.5 text-xs text-white/60">{g.unit}</span>
-                    </p>
-                    <p className={clsx("whitespace-nowrap text-xs tabular-nums", g.warn ? "font-medium text-sun-bright" : "text-white/60")}>
-                      {g.under}
-                    </p>
-                  </div>
-                  {g.chart && (
-                    <div
-                      className="flex w-32 shrink-0 items-end gap-0.5"
-                      role="img"
-                      aria-label={`Monthly output, from ${year[0]} kWh in January to ${year[5]} in June`}
-                    >
-                      {year.map((kwh, m) => (
-                        <div key={m} className="flex min-w-0 flex-1 flex-col items-center" title={`${kwh.toLocaleString("en-AU")} kWh`}>
-                          <div className="flex h-6 w-full items-end justify-center gap-[2px] border-b border-white/40">
-                            {[0.6, 1].map((strength, n) => (
-                              <span
-                                key={n}
-                                className="w-px bg-sun-bright"
-                                style={{ height: `${Math.max(6, (kwh / top) * 100)}%`, opacity: strength }}
-                              />
-                            ))}
-                          </div>
-                          <span className="mt-0.5 text-[8px] leading-none text-white/60">{"JFMAMJJASOND"[m]}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              {/* Three boxes (1 Nov 2026, Martin, as Primero's): Solar (kW and panels, with the daily yield beside them), Battery
+                  (kWh and modules), then what it does for this home on white, so the money reads apart from the system. */}
+              <div className="relative flex flex-[1.2] items-center justify-around gap-6 border-r border-white/15 px-5 py-1">
+                <div>
+                  <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-sun-bright">Solar</p>
+                  <p className="whitespace-nowrap leading-tight">
+                    <span className="text-xl font-semibold tabular-nums tracking-[-0.02em] text-sun-bright">{summary.kw.toFixed(2)}</span>
+                    <span className="ml-1 text-xs text-white/60">kW</span>
+                  </p>
+                  <p className="whitespace-nowrap text-xs leading-tight tabular-nums text-white/60">
+                    {summary.panels} {summary.panels === 1 ? "panel" : "panels"} of {panelOf(design).watts} W
+                  </p>
                 </div>
-              ))}
+                <div>
+                  <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/60">Daily yield</p>
+                  <p className="whitespace-nowrap leading-tight">
+                    <span className="text-xl font-semibold tabular-nums tracking-[-0.02em]">{summary.kwhPerDay}</span>
+                    <span className="ml-1 text-xs text-white/60">kWh</span>
+                  </p>
+                  <p
+                    className={clsx(
+                      "whitespace-nowrap text-xs tabular-nums",
+                      oversize?.over ? "font-medium text-sun-bright" : "text-white/60",
+                    )}
+                  >
+                    {fitted.length ? `${fittedKw} kW of inverter${oversize ? ` · panels ${oversize.percent}%` : ""}` : "no inverter chosen"}
+                  </p>
+                </div>
+              </div>
+              <div className="relative flex flex-[0.6] flex-col justify-center border-r border-white/15 px-4 py-1">
+                <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-sun-bright">Battery</p>
+                <p className="whitespace-nowrap leading-tight">
+                  <span className="text-xl font-semibold tabular-nums tracking-[-0.02em]">{battery ? batteryKwh : "–"}</span>
+                  <span className="ml-1 text-xs text-white/60">{battery ? "kWh" : "no battery"}</span>
+                </p>
+                {battery && (
+                  <p className="whitespace-nowrap text-xs leading-tight tabular-nums text-white/60">
+                    {battery.qty} {battery.qty === 1 ? "module" : "modules"}
+                  </p>
+                )}
+              </div>
               {/* What it does for this home. Until the customer's bill is in, this part asks for it; once it is, the part
                   shows what the bill works out to, and a press on it opens the bill again. */}
-              <div className="relative min-w-0 flex-1" data-menu-host>
+              <div className="relative min-w-0 flex-[2.4] rounded-r-lg bg-surface text-ink" data-menu-host>
                 <div
                   role="button"
                   tabIndex={0}
@@ -2904,25 +2880,37 @@ export function RoofDesigner(props: {
                     e.preventDefault();
                     openMenu(menu === "bill" ? false : "bill");
                   }}
-                  className="h-full cursor-pointer rounded-r-lg px-3.5 py-1.5 hover:bg-white/5"
+                  className={clsx(
+                    "h-full cursor-pointer rounded-r-lg px-3.5 py-1.5",
+                    // Red until the bill is in (as Primero's: it was easy to skip past), since saving and payback wait on it.
+                    finance ? "hover:bg-surface-2" : "bg-danger/10 ring-2 ring-inset ring-danger hover:bg-danger/15",
+                  )}
                 >
-                  <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/60">4 · For this home</p>
+                  <p
+                    className={clsx(
+                      "flex items-center gap-1.5 text-[9px] font-medium uppercase tracking-[0.2em]",
+                      finance ? "text-muted" : "text-danger",
+                    )}
+                  >
+                    {!finance && <span className="size-1.5 animate-ping rounded-full bg-danger" aria-hidden />}
+                    For this home{!finance && " · Needed"}
+                  </p>
                   {finance ? (
                     <dl className="mt-0.5 flex gap-x-4">
                       {(
                         [
-                          // What sells it, in one row. The home's use, how much it runs on its own and the bill before and after are in the bill panel.
+                          ["Home uses", `${finance.dailyKwh} kWh a day`, false],
+                          ["Bill", `${dollars(finance.billNow)} → ${dollars(finance.billAfter)}`, false],
                           ["Saves a year", dollars(finance.saving), true],
-                          ["After STCs", net !== null ? dollars(net) : "–", false],
                           ["Payback", net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–", false],
                         ] as const
                       ).map(([name, value, gold]) => (
                         <div key={name}>
-                          <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.14em] text-white/60">{name}</dt>
+                          <dt className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.14em] text-muted">{name}</dt>
                           <dd
                             className={clsx(
-                              "whitespace-nowrap text-lg font-semibold tabular-nums leading-tight",
-                              gold && "text-sun-bright",
+                              "whitespace-nowrap text-[15px] font-semibold tabular-nums leading-tight",
+                              gold && "text-positive",
                             )}
                           >
                             {value}
@@ -2932,10 +2920,9 @@ export function RoofDesigner(props: {
                     </dl>
                   ) : (
                     <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3 text-[13px] font-medium text-white">
-                        <ReceiptText className="size-4" aria-hidden /> Add bill
-                      </span>
-                      <span className="text-xs text-white/60">
+                      <ReceiptText className="size-6 shrink-0 text-danger" aria-hidden />
+                      <span className="text-base font-semibold leading-tight text-ink">Add the customer&apos;s bill</span>
+                      <span className="text-xs text-muted">
                         {Number(bill.amount) > 0
                           ? "That bill is no more than its supply charge: check the figures."
                           : net !== null

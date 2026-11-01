@@ -17,6 +17,12 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-01",
     area: "Design tool",
     words:
+      "The figures over the picture are three boxes: Solar, Battery, and For this home, which stays red until the customer's bill is in.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Design tool",
+    words:
       "Panels let go near a traced roof edge or guide line turn square to it and sit clear of it; a new array offers its tilt to change or keep.",
   },
   {
