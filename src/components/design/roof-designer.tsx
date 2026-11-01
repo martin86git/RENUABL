@@ -142,7 +142,7 @@ const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
     tool: "pan",
     icon: Hand,
     name: "Move the picture",
-    hint: "Zoom in with the mouse wheel or the + button, then press and drag the picture to move around it.",
+    hint: "Zoom in with Ctrl (⌘ on a Mac) and the mouse wheel, a pinch, or the + button, then press and drag the picture to move around it.",
   },
   {
     tool: "trace",
@@ -505,17 +505,18 @@ export function RoofDesigner(props: {
   // The battery or the inverter under the pointer: its details show beside it.
   const [kit, setKit] = useState<"battery" | number | null>(null);
   const [tool, setTool] = useState<Tool>("select");
+  // The tools, opened by a right click where the pointer is (1 Nov 2026, Martin, as Primero's): in % of the picture.
+  const [toolMenu, setToolMenu] = useState<{ x: number; y: number } | null>(null);
   // Beside the picture, one view at a time (1 Nov 2026, Martin: Primero's Designer / Quote / Proposal): the home and the
-  // deal's notes, the quote, or the proposal with its chat and timeline. Pressing the open one folds the column away so
-  // the picture has the whole width. The choice is kept on this device.
+  // deal's notes, the quote, or the proposal with its chat and timeline. As Primero's, the tabs sit at the top of the
+  // column beside the picture, which always shows. The choice is kept on this device.
   const [side, setSide] = useState<SideView | null>("designer");
   useEffect(() => {
     try {
       const kept = window.localStorage.getItem(SIDE_KEY);
       // Read once the page is in the browser.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (kept === "none") setSide(null);
-      else if (kept === "quote" || kept === "proposal" || kept === "designer") setSide(kept);
+      if (kept === "quote" || kept === "proposal" || kept === "designer") setSide(kept);
     } catch {
       // Storage is off: the Designer view opens.
     }
@@ -540,10 +541,9 @@ export function RoofDesigner(props: {
     }
   };
   const showSide = (view: SideView) => {
-    const next = side === view ? null : view;
-    setSide(next);
+    setSide(view);
     try {
-      window.localStorage.setItem(SIDE_KEY, next ?? "none");
+      window.localStorage.setItem(SIDE_KEY, view);
     } catch {
       // Nothing to do: it still opens and closes for this visit.
     }
@@ -557,6 +557,7 @@ export function RoofDesigner(props: {
   /** Takes up a tool, leaving behind anything half-drawn with the last one. */
   const pickTool = (t: Tool) => {
     setTool(t);
+    setToolMenu(null);
     setFanOpen(false);
     setTracing([]);
     setRuling(null);
@@ -721,6 +722,30 @@ export function RoofDesigner(props: {
   const { onUnsaved } = props;
   useEffect(() => onUnsaved?.(saved !== "saved"), [onUnsaved, saved]);
   const svg = useRef<SVGSVGElement>(null);
+  // The whole picture in the first fold (1 Nov 2026, Martin: its foot was cut off): measured from where the figures
+  // strip starts on the page to the foot of the window, since the bar above it changes height with what it holds.
+  // The strip may arrive after the designer mounts, so it is watched from its own ref.
+  const [fitPx, setFitPx] = useState<number | null>(null);
+  const stripBox = useCallback((strip: HTMLElement | null) => {
+    if (!strip) return;
+    const measure = () => {
+      const box = strip.getBoundingClientRect();
+      const top = box.top + window.scrollY;
+      const room = window.innerHeight - top - box.height - 8 - 16;
+      setFitPx(Math.max(360, Math.round(room * (ROOF_IMAGE.width / ROOF_IMAGE.height))));
+    };
+    // Measured at once too: a tab in the background gets no resize callbacks until it is shown.
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(strip);
+    watch.observe(document.body);
+    window.addEventListener("resize", measure);
+    return () => {
+      watch.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+  const fit = fitPx ? `${fitPx}px` : FIT;
   // A press that may turn into a drag: of what is picked, of a box to pick with, or of the picture itself.
   const press = useRef<
     | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point> | null; others?: LoosePanel[] }
@@ -1062,11 +1087,21 @@ export function RoofDesigner(props: {
     return { x: cm((x - ROOF_IMAGE.width / 2) * scale), y: cm((y - ROOF_IMAGE.height / 2) * scale) };
   };
 
-  // The mouse wheel zooms in and out about the pointer, so the spot under it stays put.
+  // Ctrl (or ⌘) with the mouse wheel, or a trackpad pinch (which the browser sends as a wheel with Ctrl), zooms in and
+  // out about the pointer, so the spot under it stays put. The wheel alone scrolls the page (1 Nov 2026, Martin, as
+  // Primero's: scrolling the page kept zooming the picture), and says how to zoom.
+  const [wheelHint, setWheelHint] = useState(false);
+  const wheelHintOff = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const el = svg.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) {
+        setWheelHint(true);
+        if (wheelHintOff.current) clearTimeout(wheelHintOff.current);
+        wheelHintOff.current = setTimeout(() => setWheelHint(false), 1400);
+        return;
+      }
       e.preventDefault();
       const box = el.getBoundingClientRect();
       const fx = (e.clientX - box.left) / box.width;
@@ -1083,7 +1118,10 @@ export function RoofDesigner(props: {
       });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      if (wheelHintOff.current) clearTimeout(wheelHintOff.current);
+    };
   }, []);
 
   /** A picked panel as one placed by hand would be: where its middle is and how it is turned, whichever kind it is. */
@@ -1550,6 +1588,9 @@ export function RoofDesigner(props: {
   const onArrayHint = (p: Point) => arrayHint !== null && Math.hypot(p.x - arrayHint.at.x, p.y - arrayHint.at.y) < 8 * u * scale;
 
   const onPointerDown = (e: React.PointerEvent) => {
+    // The right button opens the tool menu (onContextMenu); it presses nothing.
+    if (e.button === 2) return;
+    setToolMenu(null);
     // A press puts the string check away: it would sit over what is being dragged.
     setHover(null);
     // Working on the picture takes the keyboard with it: a slider or button used a moment ago lets go of it.
@@ -2347,9 +2388,7 @@ export function RoofDesigner(props: {
               </dd>
             </div>
           </dl>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 border-t border-line py-2">
-          <span className="order-last ml-auto text-xs text-muted lg:order-none lg:ml-0" role="status">
+          <span className="whitespace-nowrap text-xs text-muted" role="status">
             {saved === "saved"
               ? (props.savedLabel ?? "Saved")
               : saved === "saving"
@@ -2460,33 +2499,6 @@ export function RoofDesigner(props: {
               </div>
             )}
           </div>
-          {/* One view at a time beside the picture: pressing the one open folds it away. */}
-          <div role="tablist" aria-label="Beside the picture" className="flex rounded-md border border-line bg-surface-2 p-0.5">
-            {SIDE_VIEWS.filter((v) => v.id !== "quote" || !costsHidden).map((v) => (
-              <button
-                key={v.id}
-                role="tab"
-                aria-selected={shown === v.id}
-                onClick={() => showSide(v.id)}
-                title={shown === v.id ? "Fold it away: the picture takes the whole width" : v.hint}
-                className={clsx(
-                  "inline-flex h-9 items-center gap-1.5 rounded-[5px] px-3 text-sm font-medium tabular-nums",
-                  shown === v.id ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                {v.label}
-                {v.id === "quote" && net !== null ? <span className="text-ink-2">· {dollars(net)}</span> : null}
-                {v.id === "proposal" && (props.waiting ?? 0) > 0 && (
-                  <span
-                    className="rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white"
-                    aria-label={`${props.waiting} waiting`}
-                  >
-                    {props.waiting}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
           <span className="hidden flex-1 lg:block" aria-hidden />
           {/* Publishing saves the design and makes (or brings up to date) its proposal. From a deal it opens a box for a note to the customer, sent with it. */}
           <div className="relative">
@@ -2559,8 +2571,9 @@ export function RoofDesigner(props: {
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
                   that does to this home's bill. Each has one large figure in the same place every time, with its detail under it. */}
             <section
+              ref={stripBox}
               className="relative z-30 mx-auto mb-2 flex flex-wrap items-stretch rounded-lg bg-primary text-white"
-              style={{ maxWidth: FIT }}
+              style={{ maxWidth: fit }}
               aria-label="This design in figures"
             >
               {(
@@ -2778,7 +2791,7 @@ export function RoofDesigner(props: {
             {oversize?.over && (
               <p
                 className="mx-auto mb-2 flex items-start gap-2.5 rounded-lg border border-sun-line bg-sun px-4 py-2.5 text-sm text-sun-ink"
-                style={{ maxWidth: FIT }}
+                style={{ maxWidth: fit }}
                 role="alert"
               >
                 <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -2791,7 +2804,15 @@ export function RoofDesigner(props: {
                 </span>
               </p>
             )}
-            <div className="relative mx-auto" style={{ maxWidth: FIT }}>
+            <div className="relative mx-auto" style={{ maxWidth: fit }}>
+              {wheelHint && (
+                <p
+                  role="status"
+                  className="pointer-events-none absolute left-1/2 top-1/2 z-40 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/90 px-4 py-2 text-sm font-medium text-white shadow-lg"
+                >
+                  Hold Ctrl (⌘ on a Mac) and scroll to zoom
+                </p>
+              )}
               <div className="overflow-hidden rounded-lg bg-surface-2">
                 <svg
                   ref={svg}
@@ -2800,6 +2821,16 @@ export function RoofDesigner(props: {
                     "block w-full touch-none select-none",
                     tool === "pan" ? "cursor-grab" : tool === "select" || onPanel ? "cursor-default" : "cursor-crosshair",
                   )}
+                  onContextMenu={(e) => {
+                    // A right click opens the tools here, where the pointer is. On a panel not already picked it picks
+                    // it, so the menu's first items turn it round.
+                    e.preventDefault();
+                    const at = pointAt(e);
+                    const hit = at ? hitAt(at) : null;
+                    if (hit && hit.pick.kind !== "label" && !hit.empty && !isPicked(hit.pick)) setPicks([hit.pick]);
+                    const box = e.currentTarget.getBoundingClientRect();
+                    setToolMenu({ x: ((e.clientX - box.left) / box.width) * 100, y: ((e.clientY - box.top) / box.height) * 100 });
+                  }}
                   onPointerDown={onPointerDown}
                   onPointerMove={onPointerMove}
                   onPointerUp={onPointerUp}
@@ -3541,6 +3572,82 @@ export function RoofDesigner(props: {
                   </g>
                 </svg>
               </div>
+
+              {/* The tools, where the right click was. */}
+              {toolMenu && (
+                <>
+                  <div
+                    className="absolute inset-0 z-40"
+                    onPointerDown={() => setToolMenu(null)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setToolMenu(null);
+                    }}
+                  />
+                  <div
+                    className="absolute z-50 w-56 overflow-hidden rounded-xl bg-surface p-1 text-sm text-ink shadow-[var(--shadow-lift)] ring-1 ring-line"
+                    style={{ left: `min(${toolMenu.x}%, calc(100% - 14.5rem))`, top: `min(${toolMenu.y}%, calc(100% - 27rem))` }}
+                    role="menu"
+                    onKeyDown={(e) => e.key === "Escape" && setToolMenu(null)}
+                  >
+                    {/* First, with panels picked: turn them portrait or landscape. */}
+                    {pickedPanels.length > 0 && (
+                      <>
+                        {([false, true] as const)
+                          .filter((land) => !pickedPanels.every((p) => Boolean(p.across) === land))
+                          .map((land) => (
+                            <button
+                              key={land ? "to-landscape" : "to-portrait"}
+                              role="menuitem"
+                              onClick={() => {
+                                turnLandscape(land);
+                                setToolMenu(null);
+                              }}
+                              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left font-semibold hover:bg-canvas"
+                            >
+                              <PanelGlyph across={land} />
+                              {land ? "Make landscape" : "Make portrait"}
+                              {pickedPanels.length > 1 && (
+                                <span className="ml-auto text-xs font-normal text-muted">{pickedPanels.length}</span>
+                              )}
+                            </button>
+                          ))}
+                        <div className="mx-2 my-1 h-px bg-line" aria-hidden />
+                      </>
+                    )}
+                    {TOOLS.filter((t) => t.tool === "select")
+                      .concat(TOOLS.filter((t) => t.tool === "panel"))
+                      .concat(TOOLS.filter((t) => t.tool !== "panel" && t.tool !== "select"))
+                      .flatMap((def) => {
+                        const Icon = def.icon;
+                        const rows =
+                          def.tool === "panel"
+                            ? [
+                                { label: "Add panels: portrait", land: false as boolean | undefined },
+                                { label: "Add panels: landscape", land: true as boolean | undefined },
+                              ]
+                            : [{ label: def.name, land: undefined as boolean | undefined }];
+                        return rows.map((row) => (
+                          <button
+                            key={row.label}
+                            role="menuitem"
+                            onClick={() => {
+                              pickTool(def.tool);
+                              if (row.land !== undefined) setAddLandscape(row.land);
+                            }}
+                            className={clsx(
+                              "flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left hover:bg-canvas",
+                              tool === def.tool && (row.land === undefined || row.land === addLandscape) && "bg-surface-2 font-semibold",
+                            )}
+                          >
+                            <Icon className="size-4 shrink-0" aria-hidden />
+                            {row.label}
+                          </button>
+                        ));
+                      })}
+                  </div>
+                </>
+              )}
 
               {/* The battery or the inverter under the pointer: what it is, beside it. */}
               {kit !== null &&
@@ -5141,6 +5248,34 @@ export function RoofDesigner(props: {
         {/* Beside the picture, one view at a time. Every view stays on the page, only hidden, so the quote keeps working
             out the figures above while another view (or none) is open. */}
         <div className={clsx("space-y-3 xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100dvh-6.5rem)] xl:overflow-y-auto", !shown && "hidden")}>
+          {/* One view at a time, chosen at the top of the column (as Primero's). */}
+          <div role="tablist" aria-label="Beside the picture" className="flex rounded-lg border border-line bg-surface-2 p-1">
+            {SIDE_VIEWS.filter((v) => v.id !== "quote" || !costsHidden).map((v) => (
+              <button
+                key={v.id}
+                role="tab"
+                aria-selected={shown === v.id}
+                onClick={() => showSide(v.id)}
+                title={v.hint}
+                className={clsx(
+                  "inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium tabular-nums",
+                  shown === v.id ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                )}
+              >
+                {v.label}
+                {v.id === "quote" && net !== null ? <span className="text-ink-2">· {dollars(net)}</span> : null}
+                {v.id === "proposal" && (props.waiting ?? 0) > 0 && (
+                  <span
+                    className="rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white"
+                    aria-label={`${props.waiting} waiting`}
+                  >
+                    {props.waiting}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
           <div className={clsx("space-y-3", shown !== "designer" && "hidden")}>
             <section className="rounded-lg border border-line bg-surface p-3" aria-label="This home">
               <HomeToggles

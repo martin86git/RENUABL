@@ -13,6 +13,16 @@ export interface Update {
 }
 
 export const UPDATES: readonly Update[] = [
+  {
+    day: "2026-11-01",
+    area: "Design tool",
+    words: "The whole roof picture fits on the screen, and scrolling moves the page: hold Ctrl (⌘ on a Mac) to zoom.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Design tool",
+    words: "Designer, Quote and Proposal sit at the top of the column beside the picture; right click the picture for every tool.",
+  },
   { day: "2026-11-01", area: "Sol", words: "Copy or pin any message in Sol's chat; pinned ones stay at the top and through Clear." },
   {
     day: "2026-11-01",
