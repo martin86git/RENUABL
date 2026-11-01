@@ -213,6 +213,11 @@ export const jobMapImage = (v: { lat: number; lng: number; zoom: number }) =>
 export const loadDesignHome = () => ask<import("@/lib/server/design-home-repo").DesignHomeData>("/api/design/design-home");
 export const attachSite = (projectId: string, jobId: string) =>
   ask<object>("/api/design/design-home", { method: "POST", body: { projectId, jobId } });
+/** Sold jobs at the approval gates (Procurement → Pre-approvals, Solar Victoria, Book an installation). */
+export const loadApprovals = () =>
+  ask<{ counts: Record<import("@/lib/domain/design/approvals").Gate, number>; jobs: JobLine[] }>("/api/design/approvals");
+export const approvalCounts = () =>
+  ask<{ counts: Record<import("@/lib/domain/design/approvals").Gate, number> }>("/api/design/approvals?count=1");
 /** A deal's proposal timeline, newest first. */
 export const loadTimeline = (jobId: string) =>
   ask<{ events: import("@/lib/domain/design/timeline").TimelineEvent[] }>(`/api/design/jobs/${encodeURIComponent(jobId)}/timeline`);

@@ -35,6 +35,9 @@ export const SECTIONS: readonly Section[] = [
     id: "procurement",
     label: "Procurement",
     pages: [
+      { id: "preapproval", label: "Pre-approvals", href: "/design/procurement/pre-approvals" },
+      { id: "solarvic", label: "Solar Victoria", href: "/design/procurement/solar-victoria" },
+      { id: "book", label: "Book an installation", href: "/design/procurement/book" },
       { id: "orders", label: "Ordering station", href: "/design/procurement/orders" },
       { id: "map", label: "Job map", href: "/design/procurement/map" },
     ],

@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Bell } from "lucide-react";
 import clsx from "clsx";
 import { GET_READY, installReminderEmail } from "@/lib/domain/design/schedule";
 import { REMINDER_DAY_CHOICES, rankedLists, type BusinessPrefs } from "@/lib/domain/design/prefs";
+import { MAX_WEEKLY_CAPACITY } from "@/lib/domain/design/approvals";
 import { MAX_INSTALLERS } from "@/lib/domain/design/job-card";
 import { loadPrefs, savePrefs } from "@/lib/services/after-sale";
 import { loadWorkspace } from "@/lib/services/design-store";
@@ -226,6 +227,22 @@ function Installers({ prefs, onChange }: { prefs: BusinessPrefs; onChange: (p: B
         Add an installer
       </button>
       <p className="mt-3 text-xs text-muted">An installer needs a name and an email to be kept. Up to {MAX_INSTALLERS}.</p>
+      <label className={clsx(ui.label, "mt-6 max-w-xs border-t border-line pt-5")}>
+        Installations you can do in a week
+        <input
+          type="number"
+          min={1}
+          max={MAX_WEEKLY_CAPACITY}
+          className={clsx(ui.input, "mt-1.5 tabular-nums")}
+          value={prefs.weeklyCapacity}
+          onChange={(e) =>
+            onChange({ ...prefs, weeklyCapacity: Math.max(1, Math.min(MAX_WEEKLY_CAPACITY, Math.round(Number(e.target.value) || 1))) })
+          }
+        />
+        <span className="mt-1 block text-xs font-normal text-muted">
+          The install calendar shows each of the next six weeks booked against this.
+        </span>
+      </label>
     </section>
   );
 }

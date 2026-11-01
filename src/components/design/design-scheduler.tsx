@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Bell, ChevronLeft, ChevronRight } from "lucide-react";
 import clsx from "clsx";
+import { CAPACITY_WEEKS, capacityWeeks, type CapacityWeek } from "@/lib/domain/design/approvals";
 import { calendarDays, holidayOn, isWeekend, type CalendarView } from "@/lib/domain/design/schedule";
+import { addDaysISO } from "@/lib/domain/scheduling";
 import { todayInMarket } from "@/lib/domain/market";
 import { loadPrefs, loadSchedule, type BookedJob } from "@/lib/services/after-sale";
 import { PATHS, PageHead, ui } from "./design-shell";
@@ -48,10 +50,25 @@ export function SchedulerPage() {
       gone = true;
     };
   }, [first, last]);
+  // The next six weeks' capacity: installations booked against what the business can do in a week.
+  const [capacity, setCapacity] = useState<CapacityWeek[] | null>(null);
   useEffect(() => {
-    void loadPrefs().then(
-      (res) => res.ok && setReminders({ on: res.prefs.automations.installReminders, days: res.prefs.reminderDaysBefore }),
-    );
+    void (async () => {
+      const prefs = await loadPrefs();
+      if (!prefs.ok) return;
+      setReminders({ on: prefs.prefs.automations.installReminders, days: prefs.prefs.reminderDaysBefore });
+      const now = new Date();
+      const from = capacityWeeks([], 1, now)[0].monday;
+      const booked = await loadSchedule(from, addDaysISO(from, CAPACITY_WEEKS * 7 - 1));
+      if (booked.ok)
+        setCapacity(
+          capacityWeeks(
+            booked.jobs.map((j) => j.date),
+            prefs.prefs.weeklyCapacity,
+            now,
+          ),
+        );
+    })();
   }, []);
 
   const on = (d: string) => (jobs ?? []).filter((j) => j.date === d);
@@ -106,6 +123,49 @@ export function SchedulerPage() {
             {reminders.on ? "Change" : "Switch reminders on"}
           </Link>
         </p>
+      )}
+      {capacity && (
+        <div className="mt-3 flex flex-wrap items-stretch gap-2" aria-label="Capacity, booked against what you can do">
+          <p className="flex flex-col justify-center pr-1 text-[11px] leading-tight text-muted">
+            Capacity
+            <span>booked / can do</span>
+          </p>
+          {capacity.map((w) => {
+            const shown = cal.days.includes(w.monday);
+            return (
+              <button
+                key={w.monday}
+                type="button"
+                onClick={() => {
+                  setView("week");
+                  setDate(w.monday);
+                }}
+                title={`${w.label}: ${w.booked} booked, room for ${Math.max(0, w.canDo - w.booked)} more`}
+                className={clsx(
+                  "min-w-[5.5rem] flex-1 rounded-md bg-surface px-2.5 py-1.5 text-left ring-1 hover:ring-forest",
+                  shown ? "ring-ink" : "ring-line",
+                )}
+              >
+                <span className="block text-[11px] text-muted">{w.label}</span>
+                <span className={clsx("block text-sm font-medium tabular-nums", w.full ? "text-positive" : "text-ink")}>
+                  {w.booked} / {w.canDo}
+                </span>
+                <span className="mt-1 block h-1 overflow-hidden rounded-full bg-surface-2">
+                  <span
+                    className={clsx("block h-full rounded-full", w.full ? "bg-positive" : "bg-ink")}
+                    style={{ width: `${Math.min(100, (w.booked / w.canDo) * 100)}%` }}
+                  />
+                </span>
+              </button>
+            );
+          })}
+          <Link
+            href={`${PATHS.settings}/installers`}
+            className="self-center text-xs text-muted underline underline-offset-4 hover:text-ink"
+          >
+            Change
+          </Link>
+        </div>
       )}
       {problem && (
         <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">

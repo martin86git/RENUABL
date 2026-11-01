@@ -7,7 +7,7 @@ import { LayoutDashboard, Menu, MessageCircle, PenTool, Search, SquareKanban, ty
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 import { pageAt, sectionAt, SECTIONS } from "@/lib/domain/design/sections";
-import { notificationCount, serviceCount } from "@/lib/services/crm";
+import { notificationCount, serviceCount, approvalCounts } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
@@ -93,7 +93,20 @@ function Shell({
     const res = await notificationCount();
     return res.ok ? res.unread : null;
   });
-  const counts: Record<string, number> = { service };
+  // The approval gates' counts (Procurement), refreshed when a job is moved on from one.
+  const [gates, setGates] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!on) return;
+    let gone = false;
+    const look = () => void approvalCounts().then((res) => !gone && res.ok && setGates(res.counts));
+    look();
+    window.addEventListener("renuabl:approvals", look);
+    return () => {
+      gone = true;
+      window.removeEventListener("renuabl:approvals", look);
+    };
+  }, [on]);
+  const counts: Record<string, number> = { service, ...gates };
   const path = usePathname();
   const [searching, setSearching] = useState(false);
   const [more, setMore] = useState(false);

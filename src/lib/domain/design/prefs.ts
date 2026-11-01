@@ -5,6 +5,7 @@
  * its own switch, off until the business turns it on). Kept as one record a
  * business (`design_prefs`), always through `cleanPrefs`. Pure, tested.
  */
+import { DEFAULT_WEEKLY_CAPACITY, cleanCapacity } from "./approvals";
 import { cleanInstallers, type Installer } from "./job-card";
 import { cleanDealFields, type DealFieldsConfig } from "./deal-sections";
 import { NO_TARGETS, cleanTargets, type SalesTargets } from "./sales-rings";
@@ -39,6 +40,8 @@ export interface BusinessPrefs {
   places: JobPlaces;
   /** The installers the business sends job cards to (Settings → Installers). */
   installers: Installer[];
+  /** How many installations the business can do in a week, for the install calendar's capacity. */
+  weeklyCapacity: number;
 }
 
 export const DEFAULT_PREFS: BusinessPrefs = {
@@ -51,6 +54,7 @@ export const DEFAULT_PREFS: BusinessPrefs = {
   targets: NO_TARGETS,
   places: NO_PLACES,
   installers: [],
+  weeklyCapacity: DEFAULT_WEEKLY_CAPACITY,
 };
 
 export const MAX_SUPPLIERS = 12;
@@ -95,6 +99,7 @@ export function cleanPrefs(raw: unknown, newId?: () => string): BusinessPrefs {
     targets: cleanTargets(r.targets),
     places: cleanJobPlaces(r.places),
     installers: cleanInstallers(r.installers, newId),
+    weeklyCapacity: cleanCapacity(r.weeklyCapacity),
   };
 }
 
