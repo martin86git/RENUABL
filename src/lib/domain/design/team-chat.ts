@@ -15,6 +15,7 @@ export const TEAM_CHANNELS = [
   { id: "deals", label: "Deals" },
   { id: "installations", label: "Installations" },
   { id: "service", label: "Service" },
+  { id: "grid", label: "Grid connections" },
 ] as const;
 export type TeamChannel = (typeof TEAM_CHANNELS)[number]["id"];
 const CHANNEL_IDS = new Set<string>(TEAM_CHANNELS.map((c) => c.id));
@@ -46,7 +47,7 @@ export interface TeamDeal {
 
 export interface TeamLine {
   id: string;
-  /** A channel ("deals", "installations", "service") or a direct conversation (`dmRoom`). */
+  /** A channel ("deals", "installations", "service", "grid") or a direct conversation (`dmRoom`). */
   room: string;
   /** The writer's email, or `SOL_BY`. */
   by: string;

@@ -11,6 +11,7 @@ import { cleanDiagrams, type SolDiagram } from "./sol-diagrams";
 import { STAGE_LABELS, JOB_STAGES, type Job, type JobStage } from "./crm";
 import { matches } from "./find";
 import { SECTIONS } from "./sections";
+import { SOL_NETWORKS } from "./networks";
 import { SOL_REGULATIONS } from "./standards";
 
 export const SOL_NAME = "Sol";
@@ -409,6 +410,8 @@ Deals: find one with find_deal when only a name, address or phone is given; read
 Emails: to write to a customer, use draft_email; it is shown as a card they check, change and send themselves from the deal's Email tab. You never send anything yourself. Never write an email in your answer's text, and don't repeat the card's words: say in a line what you wrote and anything to check. Write as the business ("we"), never promise a price, date or outcome the deal doesn't show, and use their preferences below.
 
 ${SOL_REGULATIONS}
+
+${SOL_NETWORKS}
 
 Preferences: when they ask for something to apply from now on (a sign-off, their name, a tone), keep it with remember_my_preference; take one off with forget_my_preference.
 
