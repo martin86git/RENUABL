@@ -56,6 +56,7 @@ import {
   editedLines,
   solarVicBar,
   defaultQuote,
+  lineKey,
   undecidedLines,
   DAY,
   designFinance,
@@ -78,6 +79,7 @@ import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt"
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
 import { billFieldsFromPhoto, billWith, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
 import { CaptureButtons } from "@/components/ui/capture";
+import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
 import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
 import { faces as facesWay, parseCommand, pickByQuery, type DesignCommand, type Facing as Way } from "@/lib/domain/design/design-commands";
 import { DictateButton } from "./dictate";
@@ -698,6 +700,33 @@ export function RoofDesigner(props: {
   // Sol looking through the deal's file for the customer's usage (1 Nov 2026, as Primero's): the figures go into the box
   // with the words he found them in, to check before saving; figures typed while he looked are kept.
   const [usageRead, setUsageRead] = useState<{ busy: boolean; notes: string[]; error?: string; photo?: boolean } | null>(null);
+  // The switchboard from a photo (2 Nov 2026, Martin): what Sol reads on it, and the suggestions for the lines decided
+  // on each job, applied to the quote in one press (and changed there like any decision).
+  const [board, setBoard] = useState<{ busy: boolean; advice?: SwitchboardAdvice; error?: string; applied?: boolean } | null>(null);
+  const readBoard = async (file: File) => {
+    setBoard({ busy: true });
+    try {
+      const form = new FormData();
+      form.append("photo", file);
+      const res = await fetch("/api/design/switchboard", { method: "POST", body: form });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; read?: SwitchboardRead };
+      if (!j.ok || !j.read) return setBoard({ busy: false, error: j.message ?? "The photo couldn't be read." });
+      setBoard({ busy: false, advice: switchboardAdvice(j.read, { battery: Boolean(battery), ev: false }) });
+    } catch {
+      setBoard({ busy: false, error: "We couldn't reach the server." });
+    }
+  };
+  const applyBoard = (advice: SwitchboardAdvice) => {
+    const edits = { ...quoteNow.edits };
+    const decide = (label: string, include: boolean | null) => {
+      if (include === null) return;
+      edits[lineKey({ group: "Switchboard", label })] = include ? { on: true } : { removed: true };
+    };
+    decide("Switchboard upgrade", advice.upgrade);
+    decide("RCBO", advice.rcbo);
+    setQuote({ form: advice.phase ? { ...quoteNow.form, phase: advice.phase } : quoteNow.form, edits });
+    setBoard({ busy: false, advice, applied: true });
+  };
   // A bill photo or PDF read into the box (2 Nov 2026, Martin), by the homeowner site's own reader: nothing kept.
   const readBillPhoto = async (file: File) => {
     billTouched.current = false;
@@ -6272,6 +6301,53 @@ export function RoofDesigner(props: {
                 <SolIcon className="size-5" />
                 Ask Sol about this design
               </button>
+            </section>
+            {/* The switchboard from a photo: Sol reads it, a rule suggests the upgrade and RCBO, one press puts them on the quote. */}
+            <section className="rounded-lg border border-line bg-surface p-3" aria-label="The switchboard">
+              <p className="text-sm font-medium text-ink">The switchboard</p>
+              <p className="mt-0.5 text-xs text-muted">
+                A photo of the board, cover open: Sol reads its phases, spare spaces and safety switches.
+              </p>
+              <div className="mt-2">
+                <CaptureButtons
+                  onFiles={(files) => files[0] && void readBoard(files[0])}
+                  accept="image/jpeg,image/png,image/webp"
+                  busy={Boolean(board?.busy)}
+                  photoLabel="Photo of the board"
+                  fileLabel="Choose a photo"
+                  desktopLabel="Read a switchboard photo"
+                  size="sm"
+                />
+              </div>
+              {board?.error && <p className="mt-2 rounded-md bg-warning-soft px-2.5 py-2 text-xs text-warning">{board.error}</p>}
+              {board?.advice && (
+                <div className="mt-2 rounded-md bg-surface-2 p-2.5 text-xs text-ink">
+                  <ul className="space-y-1">
+                    {board.advice.reasons.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-ink-2">
+                    Suggests: switchboard upgrade{" "}
+                    <strong>{board.advice.upgrade === null ? "to check" : board.advice.upgrade ? "included" : "left out"}</strong>, RCBO{" "}
+                    <strong>{board.advice.rcbo === null ? "to check" : board.advice.rcbo ? "included" : "left out"}</strong>
+                    {board.advice.phase ? `, ${board.advice.phase}-phase` : ""}.
+                  </p>
+                  {!costsHidden &&
+                    (board.applied ? (
+                      <p className="mt-2 font-medium text-positive">On the quote: change it there like any decision.</p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => applyBoard(board.advice!)}
+                        className="mt-2 inline-flex h-8 items-center rounded-full bg-primary px-3 text-xs font-semibold text-primary-ink"
+                      >
+                        Put this on the quote
+                      </button>
+                    ))}
+                  <p className="mt-2 text-[11px] text-muted">A guide from a photo, not the electrician&apos;s assessment of the board.</p>
+                </div>
+              )}
             </section>
             {props.notes}
           </div>

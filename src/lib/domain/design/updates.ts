@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-02",
     area: "Design tool",
+    words: "A photo of the switchboard: Sol reads it and suggests the switchboard upgrade and RCBO, put on the quote in one press.",
+  },
+  {
+    day: "2026-11-02",
+    area: "Design tool",
     words: "The bill box reads a photo or PDF of the customer's bill, then one press sizes the system to it.",
   },
   {
