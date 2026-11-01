@@ -52,7 +52,9 @@ import { DESIGN_TEMPERATURES, HOT_CELL, checkString, type StringCheck } from "@/
 import type { CatalogueBattery, CatalogueInverter, CataloguePanel } from "@/lib/domain/design/catalogue";
 import type { Workspace } from "@/lib/domain/design/pricing";
 import {
+  costSystem,
   defaultQuote,
+  undecidedLines,
   DAY,
   designFinance,
   type BillInterval,
@@ -2508,6 +2510,8 @@ export function RoofDesigner(props: {
     () => systemSpecOf({ ...design, inverters: fitted, battery }, firstListed),
     [design, fitted, battery, firstListed],
   );
+  // The costs decided on each job that haven't been included or left out yet, for the reminder in the bar.
+  const undecidedNow = undecidedLines(costSystem(spec, quoteNow.form, props.workspace).lines, quoteNow.edits);
   // Panels beyond 133% of the inverters: a warning over the picture, unless a battery is on the design.
   const oversize = arrayOversize(summary.kw, fittedKw, Boolean(battery));
   // A string that has been started and has no panel yet.
@@ -2716,6 +2720,17 @@ export function RoofDesigner(props: {
                   ? "Not saved yet"
                   : saved.error}
           </span>
+          {/* Costs decided on each job still to decide (as Primero's): said in the bar, since nothing publishes until they are. */}
+          {!props.costsHidden && undecidedNow.length > 0 && (
+            <button
+              type="button"
+              onClick={() => showSide("quote")}
+              className="whitespace-nowrap text-xs font-medium text-danger underline underline-offset-2"
+              title="Open the quote to include each, or leave it out"
+            >
+              Decide on {undecidedNow.map((l) => l.label.toLowerCase()).join(" and ")} in the quote first
+            </button>
+          )}
           {/* Which of the roof's designs is open: here in the bar, off the picture. */}
           <div className="relative" data-menu-host>
             <button

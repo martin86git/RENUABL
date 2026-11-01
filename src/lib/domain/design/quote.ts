@@ -15,7 +15,16 @@ import { zoneRating } from "../zone-ratings";
 import { GST, commissionFor, componentCost, listed, marginFor, type ComponentKey, type Workspace } from "./pricing";
 import { MAX_DESIGNS } from "./roof-design";
 
-export const COST_GROUPS = ["Panels", "Inverters", "Battery", "Racking", "Electrical", "Installation", "Commission"] as const;
+export const COST_GROUPS = [
+  "Panels",
+  "Inverters",
+  "Battery",
+  "Racking",
+  "Electrical",
+  "Switchboard",
+  "Installation",
+  "Commission",
+] as const;
 export type CostGroup = (typeof COST_GROUPS)[number];
 
 export interface CostLine {
@@ -29,6 +38,11 @@ export interface CostLine {
   sku?: string;
   /** No cost is on file for it: the line is $0 until one is set. */
   missing?: boolean;
+  /**
+   * A cost that sometimes applies (as Primero's): decided on each job, outside the price until included (`LineEdit.on`),
+   * and nothing is published until it is included or left out (`undecidedLines`).
+   */
+  confirm?: true;
 }
 
 /** What the quote needs to know about the home that the drawing doesn't show. */
@@ -163,6 +177,15 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
     if (r.inspection) install("Electrical inspection", r.inspection);
     if (r.smartMeter) install("Smart meter installation", r.smartMeter);
     if (r.fallProtection) install("Fall protection", r.fallProtection);
+    // Costs that sometimes apply, decided on each job (as Primero's): the switchboard on every quote, the rest with a battery.
+    const decide = (group: CostGroup, label: string, amount: number) => lines.push({ group, label, amount, confirm: true });
+    decide("Switchboard", "Switchboard upgrade", r.switchboardUpgrade ?? 1000);
+    decide("Switchboard", "RCBO", r.rcbo ?? 100);
+    if (spec.battery) {
+      decide("Battery", "Protective bollard", r.bollard ?? 220);
+      decide("Battery", "Fireproofing (sheeting)", r.fireSheeting ?? 200);
+      decide("Battery", "Shade awning", r.sunshade ?? 220);
+    }
   }
 
   const commission = panels ? commissionFor(pvKw, batteryKwh, workspace.settings.commission) : 0;
@@ -174,10 +197,11 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
     });
 
   const rounded = lines.map((l) => ({ ...l, amount: Math.round(l.amount * 100) / 100 }));
+  // A cost decided on each job stays outside the totals until it is included (`editedLines` puts it in).
   const sum = (groups: readonly CostGroup[]) =>
-    Math.round(rounded.filter((l) => groups.includes(l.group)).reduce((s, l) => s + l.amount, 0));
+    Math.round(rounded.filter((l) => groups.includes(l.group) && !l.confirm).reduce((s, l) => s + l.amount, 0));
   const hardware = sum(["Panels", "Inverters", "Battery", "Racking", "Electrical"]);
-  const install = sum(["Installation"]);
+  const install = sum(["Switchboard", "Installation"]);
   const cost = hardware + install + commission;
   const margin = panels ? marginFor(pvKw, batteryKwh, workspace.settings.margin) : 0;
   const priceExGst = cost + margin;
@@ -203,6 +227,8 @@ export interface LineEdit {
   /** How many, typed over the worked-out count: the line is priced again at its cost each, unless a cost is typed too. */
   qty?: number;
   removed?: boolean;
+  /** A cost decided on each job (`CostLine.confirm`), included. Left out is `removed`. */
+  on?: boolean;
 }
 
 /** The most a quantity typed over a line may be. */
@@ -225,7 +251,7 @@ export function lineKey(line: Pick<CostLine, "group" | "label">): string {
 /** The lines as they stand: the worked-out ones with any hand changes laid over them, and those taken out left out. */
 export function editedLines(lines: readonly CostLine[], edits: Record<string, LineEdit>): CostLine[] {
   return lines
-    .filter((l) => !edits[lineKey(l)]?.removed)
+    .filter((l) => !edits[lineKey(l)]?.removed && (!l.confirm || edits[lineKey(l)]?.on))
     .map((l) => {
       const edit = edits[lineKey(l)];
       let line = l;
@@ -238,6 +264,32 @@ export function editedLines(lines: readonly CostLine[], edits: Record<string, Li
       return edit?.amount === undefined ? line : { ...line, amount: edit.amount, missing: undefined };
     });
 }
+
+/** The costs decided on each job that haven't been included or left out yet: nothing is published while there are any. */
+export function undecidedLines(lines: readonly CostLine[], edits: Record<string, LineEdit>): CostLine[] {
+  return lines.filter((l) => l.confirm && !edits[lineKey(l)]?.on && !edits[lineKey(l)]?.removed);
+}
+
+/**
+ * The costs a quote carries that sometimes apply, and the words a proposal names them by when they are left out
+ * (as Primero's): "Not included in this price, but they may apply" (`VARIATIONS_NOTE`).
+ */
+export const VARIATIONS: [line: RegExp, words: string][] = [
+  [/^Switchboard upgrade/i, "Switchboard upgrade"],
+  [/^RCBO/i, "RCBO switches"],
+  [/^Shade awning/i, "Shade awning"],
+  [/^Protective bollard/i, "Protective bollards"],
+  [/^Fireproofing/i, "Fire sheeting"],
+];
+
+/** The costs decided on each job that were left out, in the customer's words: what a proposal says may apply. */
+export function variationsOf(lines: readonly CostLine[], edits: Record<string, LineEdit>): string[] {
+  const out = lines.filter((l) => l.confirm && edits[lineKey(l)]?.removed);
+  return VARIATIONS.filter(([line]) => out.some((l) => line.test(l.label))).map(([, words]) => words);
+}
+
+export const VARIATIONS_NOTE =
+  "Not included in this price, but they may apply. Whether they do is found at the site inspection, and any that do would be a variation to this proposal, agreed with you first.";
 
 /**
  * A costing's totals for lines changed by hand: the cost is what the lines now come to, the margin is as it was
@@ -480,18 +532,19 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
     const edits: Record<string, LineEdit> = {};
     for (const [key, value] of Object.entries(q.edits && typeof q.edits === "object" ? q.edits : {}).slice(0, 60)) {
       if (key.length > 160 || !value || typeof value !== "object") continue;
-      const v = value as { amount?: unknown; qty?: unknown; removed?: unknown };
+      const v = value as { amount?: unknown; qty?: unknown; removed?: unknown; on?: unknown };
       if (v.removed === true) {
         edits[key] = { removed: true };
         continue;
       }
+      const on = v.on === true;
       const amount =
         typeof v.amount === "number" && Number.isFinite(v.amount) && v.amount >= 0 && v.amount <= 1_000_000
           ? Math.round(v.amount * 100) / 100
           : undefined;
       const qty = typeof v.qty === "number" && Number.isInteger(v.qty) && v.qty >= 0 && v.qty <= MAX_LINE_QTY ? v.qty : undefined;
-      if (amount !== undefined || qty !== undefined)
-        edits[key] = { ...(amount !== undefined ? { amount } : {}), ...(qty !== undefined ? { qty } : {}) };
+      if (amount !== undefined || qty !== undefined || on)
+        edits[key] = { ...(amount !== undefined ? { amount } : {}), ...(qty !== undefined ? { qty } : {}), ...(on ? { on: true } : {}) };
     }
     quotes.push({
       form: {

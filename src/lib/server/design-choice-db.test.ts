@@ -40,6 +40,8 @@ describe.skipIf(!url)("a proposal with a choice of systems (database)", () => {
       const edits: Record<string, LineEdit> = {};
       for (const line of editedLines(costSystem(systemSpecOf(d), form, solar.workspace).lines, {}))
         if (line.missing) edits[lineKey(line)] = { amount: 100 };
+      for (const line of costSystem(systemSpecOf(d), form, solar.workspace).lines)
+        if (line.confirm) edits[lineKey(line)] = { removed: true };
       return { form, edits };
     });
     const extras = { ...solar.project.extras, quotes };

@@ -86,6 +86,8 @@ export function sampleInputs(over: Partial<ProposalInputs> & { withBattery?: boo
   const costing = costSystem(systemSpecOf(set.designs[0]), blank.quotes[0].form, workspace);
   const edits: Record<string, LineEdit> = {};
   if (!unpriced) for (const line of editedLines(costing.lines, {})) if (line.missing) edits[lineKey(line)] = { amount: 100 };
+  // The costs decided on each job, decided: left out, as a business would until the site inspection says otherwise.
+  for (const line of costing.lines) if (line.confirm) edits[lineKey(line)] = { removed: true };
   const extras = {
     bill: { ...blank.bill, interval: "quarterly" as const, amount: "600" },
     quotes: [{ form: blank.quotes[0].form, edits }],

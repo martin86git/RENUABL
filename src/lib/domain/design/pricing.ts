@@ -205,6 +205,12 @@ export const INSTALL_RATES = [
   { key: "inspection", label: "Electrical inspection", unit: "$", step: 10, max: 5000 },
   { key: "smartMeter", label: "Smart meter installation", unit: "$", step: 10, max: 5000 },
   { key: "fallProtection", label: "Fall protection", unit: "$", step: 10, max: 5000 },
+  // Costs that sometimes apply (as Primero's): each is decided on each job in the quote, outside the price until included.
+  { key: "switchboardUpgrade", label: "Switchboard upgrade (decided on each job)", unit: "$", step: 10, max: 10000 },
+  { key: "rcbo", label: "RCBO (decided on each job)", unit: "$", step: 5, max: 2000 },
+  { key: "bollard", label: "Protective bollard for a battery (decided on each job)", unit: "$", step: 5, max: 2000 },
+  { key: "fireSheeting", label: "Fire sheeting for a battery (decided on each job)", unit: "$", step: 5, max: 2000 },
+  { key: "sunshade", label: "Shade awning for a battery (decided on each job)", unit: "$", step: 5, max: 2000 },
 ] as const;
 export type InstallKey = (typeof INSTALL_RATES)[number]["key"];
 export type InstallRates = Record<InstallKey, number>;
@@ -314,6 +320,11 @@ export const DEFAULT_WORKSPACE: Workspace = {
     inspection: 0,
     smartMeter: 0,
     fallProtection: 0,
+    switchboardUpgrade: 1000,
+    rcbo: 100,
+    bollard: 220,
+    fireSheeting: 200,
+    sunshade: 220,
   },
   settings: {
     margin: { base: 2000, solarOnlyBase: 1000, baseKw: 6.6, perKwAbove: 100, perBatteryKwh: 60 },

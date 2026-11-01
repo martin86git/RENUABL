@@ -7,6 +7,7 @@ import {
   COST_GROUPS,
   costSystem,
   editedLines,
+  undecidedLines,
   lineKey,
   MAX_LINE_QTY,
   repriced,
@@ -65,9 +66,13 @@ export function DesignQuote(props: {
 
   const all = costing.lines;
   const lines = editedLines(all, edits);
-  const changed = all.filter((l) => edits[lineKey(l)]).length;
-  const removed = all.filter((l) => edits[lineKey(l)]?.removed).length;
-  const totals = changed ? repriced(costing, lines) : costing;
+  // Hand changes, not counting the costs decided on each job (those are decisions, not changes).
+  const changed = all.filter((l) => edits[lineKey(l)] && !l.confirm).length;
+  const removed = all.filter((l) => edits[lineKey(l)]?.removed && !l.confirm).length;
+  const touched = all.some((l) => edits[lineKey(l)]);
+  const totals = touched ? repriced(costing, lines) : costing;
+  // Costs that sometimes apply, not yet included or left out: nothing is published until each is decided.
+  const undecided = undecidedLines(all, edits);
   const missing = lines.filter((l) => l.missing).length;
   const net = empty ? null : totals.priceIncGst - stc;
   // Solar Victoria, when it has been put on this quote: always "if approved".
@@ -85,7 +90,11 @@ export function DesignQuote(props: {
     const key = lineKey(l);
     if (!to) delete next[key];
     else if (to.removed) next[key] = { removed: true };
-    else next[key] = { ...next[key], ...to };
+    else {
+      next[key] = { ...next[key], ...to };
+      // Included again after being left out.
+      if (to.on) delete next[key].removed;
+    }
     props.onChange({ form, edits: next });
   };
 
@@ -109,6 +118,14 @@ export function DesignQuote(props: {
           <p className="mt-2 text-ink-2">Put panels on the roof and they appear here, costed as you go.</p>
         ) : (
           <>
+            {undecided.length > 0 && (
+              <button
+                className="mt-2 block w-full rounded-md bg-sun px-2 py-1.5 text-left text-sun-ink"
+                onClick={() => props.onCompact?.(false)}
+              >
+                {undecided.length} {undecided.length === 1 ? "cost" : "costs"} to decide on: open every line
+              </button>
+            )}
             {missing > 0 && (
               <button
                 className="mt-2 block w-full rounded-md bg-warning-soft px-2 py-1.5 text-left text-warning"
@@ -238,8 +255,16 @@ export function DesignQuote(props: {
               .
             </p>
           )}
+          {undecided.length > 0 && (
+            <p className="mb-3 rounded-md bg-sun p-2.5 text-xs text-sun-ink" role="status">
+              <strong className="font-semibold">Decide on {undecided.map((l) => l.label.toLowerCase()).join(", ")}.</strong> Each sometimes
+              applies: include it in the price, or leave it out and the proposal says it may apply, found at the site inspection. Nothing is
+              published until each is decided.
+            </p>
+          )}
           {COST_GROUPS.map((group) => {
-            const rows = all.filter((l) => l.group === group && !edits[lineKey(l)]?.removed);
+            // A cost decided on each job stays in the list when left out, so it can be included again.
+            const rows = all.filter((l) => l.group === group && (l.confirm || !edits[lineKey(l)]?.removed));
             if (!rows.length) return null;
             return (
               <table key={group} className="mt-4 w-full table-fixed text-sm first:mt-0">
@@ -258,18 +283,62 @@ export function DesignQuote(props: {
                     // The line as it stands with any hand changes: a quantity typed over it prices it again.
                     const shown = editedLines([l], edits)[0] ?? l;
                     const unset = l.missing && typed === undefined;
+                    const on = Boolean(edits[lineKey(l)]?.on);
+                    const out = Boolean(edits[lineKey(l)]?.removed);
                     return (
                       <tr
                         key={`${l.label}${i}`}
                         className={
-                          unset
-                            ? // A line with no cost asks to be dealt with: priced, or knowingly left at nothing.
-                              "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
-                            : "group border-b border-line align-top last:border-0"
+                          l.confirm && !on && !out
+                            ? "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
+                            : l.confirm && out
+                              ? "group border-b border-line align-top text-muted last:border-0"
+                              : unset
+                                ? // A line with no cost asks to be dealt with: priced, or knowingly left at nothing.
+                                  "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
+                                : "group border-b border-line align-top last:border-0"
                         }
                       >
-                        <td className={unset ? "py-1.5 pl-2.5 pr-2" : "py-1.5 pr-2"}>
+                        <td className={unset || (l.confirm && !on && !out) ? "py-1.5 pl-2.5 pr-2" : "py-1.5 pr-2"}>
                           {l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label}
+                          {l.confirm && (
+                            <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
+                              {on ? (
+                                <>
+                                  <span className="font-medium text-positive">Included</span>
+                                  <button
+                                    className="underline underline-offset-2 hover:text-ink"
+                                    onClick={() => edit(l, { removed: true })}
+                                  >
+                                    leave it out
+                                  </button>
+                                </>
+                              ) : out ? (
+                                <>
+                                  <span>Left out: the proposal says it may apply</span>
+                                  <button className="underline underline-offset-2 hover:text-ink" onClick={() => edit(l, { on: true })}>
+                                    include it
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-sun-ink">Decided on each job:</span>
+                                  <button
+                                    className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-ink"
+                                    onClick={() => edit(l, { on: true })}
+                                  >
+                                    Include
+                                  </button>
+                                  <button
+                                    className="rounded-full px-2 py-0.5 font-semibold text-ink ring-1 ring-line hover:ring-ink-2"
+                                    onClick={() => edit(l, { removed: true })}
+                                  >
+                                    Leave out
+                                  </button>
+                                </>
+                              )}
+                            </span>
+                          )}
                           {l.sku && <span className="block text-xs text-muted">{l.sku}</span>}
                           {unset && (
                             <span className="mt-0.5 block text-xs text-sun-ink">
@@ -335,6 +404,7 @@ export function DesignQuote(props: {
                         </td>
                         <td className="py-1.5 text-right">
                           <button
+                            hidden={Boolean(l.confirm)}
                             className="text-base leading-none text-muted hover:text-danger"
                             onClick={() => edit(l, { removed: true })}
                             aria-label={`Take out ${l.label}`}

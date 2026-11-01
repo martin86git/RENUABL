@@ -45,6 +45,8 @@ import {
   costSystem,
   designFinance,
   editedLines,
+  undecidedLines,
+  variationsOf,
   lineKey,
   repriced,
   solarVicFor,
@@ -199,6 +201,11 @@ export interface ProposalView {
    * with one design. The customer picks one when going ahead (`viewForChoice`).
    */
   options?: ProposalOption[];
+  /**
+   * The costs decided on each job that were left out, in the customer's words (`variationsOf`), shown with
+   * `VARIATIONS_NOTE`: they may apply, found at the site inspection. Absent on proposals published before 1 Nov 2026.
+   */
+  variations?: string[];
 }
 
 /**
@@ -223,6 +230,7 @@ export interface ProposalOption {
   paybackYears: number | null;
   deposit: number | null;
   milestones: { name: string; percent: number; amount: number }[];
+  variations?: string[];
 }
 
 /** The business's own record of a published proposal. Never sent to the customer. */
@@ -264,6 +272,7 @@ export function viewForChoice(view: ProposalView, goal: OptionKey | null | undef
     bill: o.bill,
     price: { ...view.price, ...o.price },
     paybackYears: o.paybackYears,
+    ...(o.variations ? { variations: o.variations } : {}),
     ...(view.terms ? { terms: { ...view.terms, deposit: o.deposit, milestones: o.milestones } } : {}),
   };
 }
@@ -562,7 +571,7 @@ export function buildProposal(input: ProposalInputs): Built {
 
   const main = workOut(input, index);
   if (!main.ok) return { ok: false, problems: main.problems };
-  const { spec, lines, totals, costing, stc, youPay, solarVic, monthlyKwh, finance, saving, b, entered, selfUseShare } = main;
+  const { spec, lines, totals, costing, stc, youPay, solarVic, monthlyKwh, finance, saving, b, entered, selfUseShare, variations } = main;
   const summary = designSummary(design, YIELD_PER_KW_DAY);
   const batteryKwh = batteryKwhOf(design);
 
@@ -668,6 +677,7 @@ export function buildProposal(input: ProposalInputs): Built {
             terms: fillTerms({ seller: brand.name, customer: input.customer.name }),
           }
         : null,
+    ...(variations.length ? { variations } : {}),
     blocks: brand.blocks
       .filter((block) => block.on)
       .map((block) => ({
@@ -718,6 +728,7 @@ export function buildProposal(input: ProposalInputs): Built {
               paybackYears: out.saving > 0 ? Math.round((out.youPay / out.saving) * 10) / 10 : null,
               deposit: depositOf(brand.deposit, out.youPay),
               milestones: milestoneAmounts(brand.milestones, out.youPay),
+              variations: out.variations,
             };
           }),
         }
@@ -788,9 +799,11 @@ function workOut(input: ProposalInputs, at: number) {
   const solarVic = solarVicFor(form, spec.panels, totals.priceIncGst, stc, input.rates);
 
   const problems: string[] = [];
+  const undecided = undecidedLines(costing.lines, quote.edits);
   if (spec.panels === 0 && !spec.battery) problems.push(NOTHING_DRAWN);
   else {
     if (missing) problems.push(missingCosts(missing));
+    if (undecided.length) problems.push(undecidedCosts(undecided.map((l) => l.label)));
     if (!(youPay > 0)) problems.push(NO_PRICE);
   }
   if (problems.length) return { ok: false as const, problems };
@@ -808,8 +821,35 @@ function workOut(input: ProposalInputs, at: number) {
   const selfUseShare = workspace.settings.bill.selfUseShare;
   const finance = monthlyKwh ? designFinance({ interval: b.interval, ...entered }, monthlyKwh, batteryKwh, selfUseShare) : null;
   const saving = finance ? shownSaving(finance.billNow, finance.billAfter) : 0;
-  return { ok: true as const, spec, costing, lines, totals, stc, youPay, solarVic, monthlyKwh, finance, saving, b, entered, selfUseShare };
+  const variations = variationsOf(costing.lines, quote.edits);
+  return {
+    ok: true as const,
+    spec,
+    costing,
+    lines,
+    totals,
+    stc,
+    youPay,
+    solarVic,
+    monthlyKwh,
+    finance,
+    saving,
+    b,
+    entered,
+    selfUseShare,
+    variations,
+  };
 }
+
+/** The line over the costs that may apply, for the customer's page and the PDF. */
+export { VARIATIONS_NOTE } from "./quote";
+
+/** What stops a proposal while costs decided on each job haven't been included or left out. */
+export const undecidedCosts = (labels: readonly string[]) =>
+  `Decide on ${labels
+    .join(", ")
+    .replace(/, ([^,]*)$/, " and $1")
+    .toLowerCase()} in the quote first: include each, or leave it out.`;
 
 // ---------------------------------------------------------------------------
 // Choices, links and what a customer sends back

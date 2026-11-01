@@ -32,6 +32,7 @@ import {
   ROOF_NOTE,
   SAVING_NOTE,
   STC_NOTE,
+  VARIATIONS_NOTE,
   TIMING_NOTE,
   warrantyNote,
   type ProposalView,
@@ -314,6 +315,11 @@ function ProposalDocument({
             Covers: {view.price.includes.join(", ")}. {STC_NOTE} The price stands until {day(view.validUntil)}.
             {view.indicative ? ` ${INDICATIVE_PRICE_NOTE}` : ""}
           </Text>
+          {view.variations && view.variations.length > 0 ? (
+            <Text style={[s.small, { marginTop: 6 }]}>
+              May apply: {view.variations.join(", ")}. {VARIATIONS_NOTE}
+            </Text>
+          ) : null}
         </View>
         {view.price.solarVic ? (
           <View style={{ marginTop: 14 }} wrap={false}>

@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-01",
+    area: "Quotes",
+    words:
+      "Switchboard, RCBO and a battery's bollard, fire sheeting and awning are decided on each job; left out, the proposal says they may apply.",
+  },
+  {
+    day: "2026-11-01",
     area: "Proposals",
     words: "Up to ten designs a roof; offer up to four beside the primary as options, and mark the one you recommend.",
   },

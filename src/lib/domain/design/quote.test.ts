@@ -31,6 +31,8 @@ import {
   solarVicNote,
   stcValue,
   type SystemSpec,
+  undecidedLines,
+  variationsOf,
 } from "./quote";
 
 // A wholesaler's real price list (AWM Clayton), as a business would upload it.
@@ -164,9 +166,11 @@ describe("the quote that follows a design", () => {
     expect(lineKey(bigger.lines.find((l) => /^Rails/.test(l.label))!)).toBe(lineKey(rails));
     const mc4 = c.lines.find((l) => l.label === "MC4 connectors")!;
     const lines = editedLines(c.lines, { [lineKey(rails)]: { amount: 250 }, [lineKey(mc4)]: { removed: true } });
-    expect(lines.length).toBe(c.lines.length - 1);
+    // The costs decided on each job stay out until included.
+    const decided = c.lines.filter((l) => !l.confirm);
+    expect(lines.length).toBe(decided.length - 1);
     const totals = repriced(c, lines);
-    expect(totals.cost).toBe(Math.round(c.lines.reduce((s, l) => s + l.amount, 0) - rails.amount + 250 - mc4.amount));
+    expect(totals.cost).toBe(Math.round(decided.reduce((s, l) => s + l.amount, 0) - rails.amount + 250 - mc4.amount));
     expect(totals.priceExGst).toBe(totals.cost + c.margin);
     // A cost typed over a line with none on file settles it.
     const short = costSystem(system, form, DEFAULT_WORKSPACE);
@@ -317,5 +321,32 @@ describe("quantities typed over a line", () => {
       { bill: defaultBill(DEFAULT_WORKSPACE.settings.bill), postcode: "3150" },
     );
     expect(kept.quotes[0].edits).toEqual({ a: { qty: 5 }, b: { amount: 99.5, qty: 5 } });
+  });
+});
+
+describe("costs decided on each job", () => {
+  it("puts the switchboard on every quote and the battery ones with a battery, outside the price", () => {
+    const solar = costSystem(system, form, withList);
+    expect(solar.lines.filter((l) => l.confirm).map((l) => l.label)).toEqual(["Switchboard upgrade", "RCBO"]);
+    const withBattery = costSystem({ ...system, battery: { sku: "B", name: "Battery", kwh: 8, qty: 1 } }, form, withList);
+    expect(withBattery.lines.filter((l) => l.confirm).map((l) => l.label)).toEqual([
+      "Switchboard upgrade",
+      "RCBO",
+      "Protective bollard",
+      "Fireproofing (sheeting)",
+      "Shade awning",
+    ]);
+    expect(solar.cost).toBe(Math.round(solar.lines.filter((l) => !l.confirm).reduce((n, l) => n + l.amount, 0)));
+  });
+  it("includes one switched on, leaves one left out, and names it as a possible variation", () => {
+    const c = costSystem(system, form, withList);
+    const board = c.lines.find((l) => l.label === "Switchboard upgrade")!;
+    const rcbo = c.lines.find((l) => l.label === "RCBO")!;
+    const edits = { [lineKey(board)]: { on: true }, [lineKey(rcbo)]: { removed: true } };
+    expect(editedLines(c.lines, edits).some((l) => l.label === "Switchboard upgrade")).toBe(true);
+    expect(undecidedLines(c.lines, edits)).toEqual([]);
+    expect(undecidedLines(c.lines, {}).length).toBe(2);
+    expect(variationsOf(c.lines, edits)).toEqual(["RCBO switches"]);
+    expect(repriced(c, editedLines(c.lines, edits)).cost).toBe(c.cost + board.amount);
   });
 });

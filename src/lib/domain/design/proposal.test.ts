@@ -465,6 +465,7 @@ describe("the customer's link", () => {
         "theme",
         "title",
         "validUntil",
+        "variations",
         "version",
       ].sort(),
     );

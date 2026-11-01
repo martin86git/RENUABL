@@ -21,6 +21,7 @@ import {
   ROOF_NOTE,
   SAVING_NOTE,
   STC_NOTE,
+  VARIATIONS_NOTE,
   TIMING_NOTE,
   warrantyNote,
   recommendedGoal,
@@ -609,6 +610,13 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
           <p className="mt-4 text-[14px] text-ink">Covers: {view.price.includes.join(", ")}.</p>
           <p className={clsx(fine, "mt-2")}>{STC_NOTE}</p>
           {view.indicative && <p className="mt-2 text-[13.5px] font-medium text-ink">{INDICATIVE_PRICE_NOTE}</p>}
+          {/* The costs decided on each job that were left out: they may apply, found at the site inspection (as Primero's). */}
+          {view.variations && view.variations.length > 0 && (
+            <div className="mt-4 rounded-lg border border-line p-3">
+              <p className="text-[13.5px] font-medium text-ink">May apply: {view.variations.join(", ")}</p>
+              <p className={clsx(fine, "mt-1")}>{VARIATIONS_NOTE}</p>
+            </div>
+          )}
         </div>
         {b.extra && <p className="mt-5 max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-ink">{b.extra}</p>}
       </>

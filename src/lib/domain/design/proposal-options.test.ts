@@ -27,6 +27,7 @@ function twoGoals() {
     const edits: Record<string, LineEdit> = {};
     for (const line of editedLines(costSystem(systemSpecOf(d), form, solar.workspace).lines, {}))
       if (line.missing) edits[lineKey(line)] = { amount: 100 };
+    for (const line of costSystem(systemSpecOf(d), form, solar.workspace).lines) if (line.confirm) edits[lineKey(line)] = { removed: true };
     return { form, edits };
   });
   return sampleInputs({
@@ -156,5 +157,21 @@ describe("a proposal with designs offered by hand", () => {
     expect(recommendedGoal(built.view)).toBe("design-0");
     expect(internalForChoice(built.internal, "design-0").design).toBe(0);
     expect(viewForChoice(built.view, "design-0").price.youPay).toBe(built.view.options?.[1].price.youPay);
+  });
+});
+
+describe("costs decided on each job on a proposal", () => {
+  it("stops while one is undecided, and names those left out as possible variations", () => {
+    const base = sampleInputs();
+    const q = base.project.extras.quotes[0];
+    const undecided = Object.fromEntries(Object.entries(q.edits).filter(([k]) => !k.startsWith("Switchboard|")));
+    const stopped = buildProposal({
+      ...base,
+      project: { ...base.project, extras: { ...base.project.extras, quotes: [{ ...q, edits: undecided }] } },
+    });
+    expect(stopped.ok).toBe(false);
+    expect(!stopped.ok && stopped.problems.join(" ")).toContain("Decide on switchboard upgrade and rcbo");
+    const built = buildProposal(base);
+    expect(built.ok && built.view.variations).toEqual(["Switchboard upgrade", "RCBO switches"]);
   });
 });
