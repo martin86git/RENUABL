@@ -13,6 +13,8 @@ import {
   startNewSol,
   withSol,
 } from "@/lib/server/design-sol-repo";
+import { cleanKnowledgeInput, guessTopic } from "@/lib/domain/design/sol-knowledge";
+import { forgetKnowledge, listKnowledge, saveKnowledge } from "@/lib/server/design-sol-knowledge-repo";
 import { allow } from "@/lib/server/rate-limit";
 
 // Sol may search and read a maker's manual before he answers.
@@ -88,6 +90,48 @@ export async function POST(request: Request) {
       case "resume": {
         const state = await resumeSol(businessId, email, id);
         return state ? ok(state) : Response.json({ ok: false, message: "That conversation has gone." }, { status: 404 });
+      }
+      // Sol's memory (domain/design/sol-knowledge.ts), shared by the business: what he knows, one forgotten, and one of
+      // his answers kept by hand (only an answer with pages under it, saved with those pages).
+      case "knowledge":
+        return Response.json({ ok: true, knowledge: await listKnowledge(businessId) });
+      case "forget-knowledge":
+        await forgetKnowledge(businessId, id);
+        return Response.json({ ok: true, knowledge: await listKnowledge(businessId) });
+      case "remember": {
+        const at = typeof body.at === "string" ? body.at.slice(0, 40) : "";
+        const state = await solState(businessId, email);
+        const i = state.turns.findIndex((t) => t.role === "sol" && t.at === at);
+        const turn = state.turns[i];
+        const asked = [...state.turns.slice(0, Math.max(0, i))].reverse().find((t) => t.role === "you");
+        if (!turn?.sources?.length || !asked)
+          return Response.json({ ok: false, message: "Only an answer with sources under it can be kept." }, { status: 422 });
+        const clean = cleanKnowledgeInput(
+          {
+            topic: guessTopic(`${asked.text} ${turn.text}`),
+            question: asked.text,
+            answer: turn.text,
+            sources: turn.sources.map((x) => x.url),
+          },
+          new Set(turn.sources.map((x) => x.url)),
+        );
+        if (!clean.ok) return Response.json({ ok: false, message: clean.message }, { status: 422 });
+        const titles = new Map(turn.sources.map((x) => [x.url, x.title]));
+        const kept = await saveKnowledge(
+          businessId,
+          { ...clean.value, sources: clean.value.sources.map((x) => ({ ...x, title: titles.get(x.url) ?? x.title })) },
+          email,
+        );
+        return ok(
+          await withSol(businessId, email, (row) => ({
+            ...row,
+            turns: row.turns.map((t) =>
+              t.role === "sol" && t.at === at
+                ? { ...t, remembered: [...(t.remembered ?? []), { id: kept.id, question: kept.question }].slice(0, 5) }
+                : t,
+            ),
+          })),
+        );
       }
       case "forget-past":
         return Response.json({ ok: true, past: await forgetSolPast(businessId, email, id) });

@@ -14,6 +14,7 @@ import { SECTIONS } from "./sections";
 import { SOL_MAKER_DOCS } from "./maker-docs";
 import { SOL_NETWORKS } from "./networks";
 import { SOL_REGULATIONS } from "./standards";
+import { SOL_ORACLE, cleanSources, type SolSource } from "./sol-knowledge";
 
 export const SOL_NAME = "Sol";
 /** Turns kept in a member's conversation, and how many of the latest are sent with a question. */
@@ -55,6 +56,10 @@ export interface SolTurn {
   reminder?: SolReminderAsk;
   /** Pinned by the member: shown in the Pinned strip, kept past the history trim, and kept through Clear. */
   pinned?: boolean;
+  /** The pages an answer came from, on the web or in his memory (sol-knowledge.ts), shown as a sources icon. */
+  sources?: SolSource[];
+  /** What he kept in the business's memory with this answer: each saved answer's id and question. */
+  remembered?: { id: string; question: string }[];
 }
 
 /** The turns kept: the latest `CHAT_KEPT`, and any pinned before them (1 Nov 2026, Martin: as Primero's). */
@@ -137,6 +142,12 @@ export function cleanTurns(raw: unknown): SolTurn[] {
           ? { id: str(r.id, 40), what: str(r.what, 500), ...(isTime(r.dueAt) ? { dueAt: r.dueAt } : {}) }
           : undefined;
       if (!text && !charts.length && !diagrams.length && !drafts.length) return null;
+      const sources = cleanSources(t.sources);
+      const remembered = (Array.isArray(t.remembered) ? t.remembered : [])
+        .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object")
+        .map((x) => ({ id: str(x.id, 40), question: str(x.question, 300) }))
+        .filter((x) => x.id && x.question)
+        .slice(0, 5);
       return {
         role,
         text,
@@ -146,6 +157,8 @@ export function cleanTurns(raw: unknown): SolTurn[] {
         ...(drafts.length ? { drafts } : {}),
         ...(reminder ? { reminder } : {}),
         ...(t.pinned === true ? { pinned: true } : {}),
+        ...(sources.length ? { sources } : {}),
+        ...(remembered.length ? { remembered } : {}),
       };
     })
     .filter((t): t is SolTurn => t !== null);
@@ -415,6 +428,8 @@ ${SOL_REGULATIONS}
 ${SOL_NETWORKS}
 
 ${SOL_MAKER_DOCS}
+
+${SOL_ORACLE}
 
 Preferences: when they ask for something to apply from now on (a sign-off, their name, a tone), keep it with remember_my_preference; take one off with forget_my_preference.
 

@@ -568,6 +568,21 @@ create table if not exists design_prepared (
   unique (business_id, key),
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
+-- Sol's memory (domain/design/sol-knowledge.ts): answers he found on the web, kept for the whole business with the
+-- pages they came from. Never the business's own customers, deals or costs.
+create table if not exists design_sol_knowledge (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  topic text not null,
+  question text not null,
+  answer text not null,
+  sources jsonb not null default '[]',
+  saved_by text not null,
+  saved_at timestamptz not null default now(),
+  uses integer not null default 0,
+  used_at timestamptz
+);
+create index if not exists design_sol_knowledge_business on design_sol_knowledge(business_id, saved_at desc);
 -- The team chat (domain/design/team-chat.ts): a business's members talking in its channels and in direct
 -- conversations, the files sent with lines, and when each member last had each room open. Gone with the business.
 create table if not exists design_team_lines (

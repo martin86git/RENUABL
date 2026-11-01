@@ -1,9 +1,9 @@
 /**
  * Sol searching makers' own documents online: datasheets, installation manuals and tech notes, to confirm a product's
- * technical points (supported grid types, MPPT inputs, maximum DC voltage, whether it may sit in the sun). His web
- * search and fetch reach only these sites: makers of the panels, inverters, batteries, EV chargers and racking sold in
- * Australia, and the official bodies and networks. A maker not listed can't be searched; add its site here. VERIFY the
- * list as makers change their sites.
+ * technical points (supported grid types, MPPT inputs, maximum DC voltage, whether it may sit in the sun). These are
+ * the sites of the makers of the panels, inverters, batteries, EV chargers and racking sold in Australia, and the
+ * official bodies and networks, named to him so he goes to the maker first. Since 1 Nov 2026 his search reaches the
+ * whole web bar the sites in `BLOCKED_SITES` (sol-knowledge.ts). VERIFY the list as makers change their sites.
  */
 
 export const MAKER_SITES: readonly string[] = [
@@ -65,8 +65,11 @@ export const MAKER_FETCHES = 3;
 /** The most of one fetched page or PDF Sol reads, in tokens. */
 export const MAKER_PAGE_TOKENS = 30_000;
 
+/** The makers' sites, named to him so a search can go straight to the maker (since 1 Nov 2026 his search isn't limited to them). */
+const MAKER_HINT = `the makers' sites include ${MAKER_SITES.slice(0, 40).join(", ")}`;
+
 /** Sol's rules for checking a product against its maker's documents. */
-export const SOL_MAKER_DOCS = `Makers' documents: to confirm a product's technical points (supported grid types and phases, MPPT inputs and their currents, maximum DC input voltage, start-up voltage, battery compatibility, IP rating and whether it may be installed in direct sun, clearances and mounting, operating temperatures, warranty conditions), look first at the business's checked figures with datasheet_lookup; when they don't settle it, or the person asks, use web_search on the maker's own site (and web_fetch to read a datasheet, installation manual or tech note it found). Searches only reach makers' and official sites. Name the exact model the figure is for, and the document it came from with its date or version where shown; prefer the maker's Australian documents and the latest version. When documents disagree, or you can't find it, say so plainly; never fill a gap with a figure from another model or a guess. Say that the installer confirms it against the manual on the day. Don't search for what you can answer from the facts here or the business's own records.`;
+export const SOL_MAKER_DOCS = `Makers' documents: to confirm a product's technical points (supported grid types and phases, MPPT inputs and their currents, maximum DC input voltage, start-up voltage, battery compatibility, IP rating and whether it may be installed in direct sun, clearances and mounting, operating temperatures, warranty conditions), look first at the business's checked figures with datasheet_lookup; when they don't settle it, or the person asks, use web_search on the maker's own site (and web_fetch to read a datasheet, installation manual or tech note it found). For these, search the maker's own site first (${MAKER_HINT}). Name the exact model the figure is for, and the document it came from with its date or version where shown; prefer the maker's Australian documents and the latest version. When documents disagree, or you can't find it, say so plainly; never fill a gap with a figure from another model or a guess. Say that the installer confirms it against the manual on the day. Don't search for what you can answer from the facts here or the business's own records.`;
 
 /** The cited pages under an answer: each once, in the order first cited, at most `max`. */
 export function sourcesLine(cited: readonly { url: string; title?: string | null }[], max = 4): string {

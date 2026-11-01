@@ -37,10 +37,14 @@ import {
   pinTurn,
   newSolChat,
   resumeSolChat,
+  rememberAnswer,
 } from "@/lib/services/sol";
 import { askToStartAfresh, worthKeeping } from "@/lib/domain/design/sol-history";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolHistory } from "./sol-history";
+import { SolSources } from "./sol-sources";
+import { SolKnows } from "./sol-knows";
+import { STARTER_QUESTIONS } from "@/lib/domain/design/sol-knowledge";
 import { SolMark } from "./sol-icon";
 import { SolThinking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
@@ -48,11 +52,11 @@ import { SolChartView, SolDiagramView } from "./sol-visuals";
 /** The last message the member chose to carry on from after a while away (sessionStorage). */
 const CARRIED_KEY = "renuabl.design.sol-carried";
 
+/** Two about the business's own work, then the oracle's (sol-knowledge.ts): networks, rebates, technical, wholesalers. */
 const STARTERS = [
   "Which deals have sat at Proposal sent the longest?",
-  "How are sales going this month?",
   "Write a friendly follow-up email to my newest lead.",
-  "Remind me to call the bank at 3pm.",
+  ...STARTER_QUESTIONS.filter((_, i) => [0, 2, 3, 5].includes(i)),
 ];
 
 const when = (iso: string) =>
@@ -314,6 +318,7 @@ export function SolChat({
             past.map((t, i) => (
               <div key={`${t.at}-${i}`} className="space-y-2">
                 <Bubble you={t.role === "you"} text={t.text} at={t.at} />
+                {t.role === "sol" && t.sources?.length ? <SolSources sources={t.sources} remembered={t.remembered} /> : null}
                 {t.charts?.map((c, k) => (
                   <SolChartView key={k} chart={c} />
                 ))}
@@ -386,6 +391,9 @@ export function SolChat({
               pinned={t.pinned}
               onPin={() => void run(pinTurn(t.at, t.role, !t.pinned))}
             />
+            {t.role === "sol" && t.sources?.length ? (
+              <SolSources sources={t.sources} remembered={t.remembered} onRemember={() => run(rememberAnswer(t.at))} />
+            ) : null}
             {t.charts?.map((c, k) => (
               <SolChartView key={k} chart={c} />
             ))}
@@ -648,6 +656,7 @@ export function SolChat({
             </ul>
           )}
         </div>
+        <SolKnows />
       </aside>
     </div>
   );
@@ -663,7 +672,7 @@ function Bubble({ you, text, at, pinned, onPin }: { you: boolean; text: string; 
     <div className={clsx("flex flex-col", you ? "items-end" : "items-start")}>
       <div
         className={clsx(
-          "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2",
+          "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 [overflow-wrap:anywhere]",
           you ? "bg-sun-line text-white" : "bg-canvas text-ink",
           pinned && "ring-2 ring-sun-line/50",
         )}

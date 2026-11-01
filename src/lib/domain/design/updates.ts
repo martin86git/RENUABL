@@ -20,6 +20,16 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-01",
+    area: "Sol",
+    words: "Sol searches the web for networks, rebates, approvals, products and wholesalers, with a sources icon under each answer.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Sol",
+    words: "Sol keeps what he finds for the whole team, with its sources: see What Sol knows on his page, or press Remember this.",
+  },
+  {
+    day: "2026-11-01",
     area: "Design tool",
     words: "A Ready to install light in the bar: green only when the design would pass, with what to fix and a button to each.",
   },

@@ -45,7 +45,24 @@ import { listSheets } from "./design-datasheets-repo";
 import { listStandards } from "./design-standards-repo";
 import { libraryForSol } from "@/lib/domain/design/standards";
 import { datasheetFigures } from "@/lib/domain/design/datasheets";
-import { MAKER_FETCHES, MAKER_PAGE_TOKENS, MAKER_SEARCHES, MAKER_SITES, sourcesLine } from "@/lib/domain/design/maker-docs";
+import { sourcesLine } from "@/lib/domain/design/maker-docs";
+import {
+  BLOCKED_SITES,
+  KNOWLEDGE_TOPICS,
+  SEARCH_FROM,
+  SOL_PAGE_TOKENS,
+  SOL_WEB_FETCHES,
+  SOL_WEB_SEARCHES,
+  answerSources,
+  cleanKnowledgeInput,
+  memoryUsed,
+  recallLines,
+  reliedOn,
+  takeSourcesList,
+  urlKey,
+  type KnowledgeEntry,
+} from "@/lib/domain/design/sol-knowledge";
+import { recall, saveKnowledge } from "./design-sol-knowledge-repo";
 import { TEAM_CHANNELS, nameOf } from "@/lib/domain/design/team-chat";
 
 const MODEL = () => process.env.SOL_MODEL?.trim() || "claude-opus-5-5";
@@ -53,15 +70,24 @@ const STEPS = 6;
 /** Searches that end a step early (pause_turn) carry on; this many at most, so a long search can't loop. */
 const MAX_RESUMES = 3;
 
-/** Makers' documents online: search and read only their sites and the official ones (domain/design/maker-docs.ts). */
+/**
+ * The web, searched from Melbourne (1 Nov 2026, Martin: Sol the oracle; it was makers' and official sites only): every
+ * site but social media and question sites (`BLOCKED_SITES`), with his rules on which to prefer (sol-knowledge.ts).
+ */
 const WEB_TOOLS: Anthropic.ToolUnion[] = [
-  { type: "web_search_20260209", name: "web_search", max_uses: MAKER_SEARCHES, allowed_domains: [...MAKER_SITES] },
+  {
+    type: "web_search_20260209",
+    name: "web_search",
+    max_uses: SOL_WEB_SEARCHES,
+    blocked_domains: [...BLOCKED_SITES],
+    user_location: SEARCH_FROM,
+  },
   {
     type: "web_fetch_20260209",
     name: "web_fetch",
-    max_uses: MAKER_FETCHES,
-    allowed_domains: [...MAKER_SITES],
-    max_content_tokens: MAKER_PAGE_TOKENS,
+    max_uses: SOL_WEB_FETCHES,
+    blocked_domains: [...BLOCKED_SITES],
+    max_content_tokens: SOL_PAGE_TOKENS,
     citations: { enabled: true },
   },
 ];
@@ -75,6 +101,15 @@ function citedPages(content: readonly Anthropic.ContentBlock[]): { url: string; 
     if (b.type === "web_fetch_tool_result" && b.content.type === "web_fetch_result")
       pages.push({ url: b.content.url, title: b.content.content.title });
   }
+  return pages;
+}
+
+/** Every page a search turned up in an answer (cited or not), with its title: what he may save an answer from. */
+function searchedPages(content: readonly Anthropic.ContentBlock[]): { url: string; title?: string | null }[] {
+  const pages: { url: string; title?: string | null }[] = [];
+  for (const b of content)
+    if (b.type === "web_search_tool_result" && Array.isArray(b.content))
+      for (const r of b.content) if (r.type === "web_search_result") pages.push({ url: r.url, title: r.title });
   return pages;
 }
 
@@ -197,6 +232,27 @@ const TOOLS: Anthropic.Tool[] = [
       required: ["title", "svg"],
     },
   },
+  {
+    name: "recall_knowledge",
+    description:
+      "Look in the business's memory: answers found on the web before (networks, approvals, rebates, products, wholesalers, technical rules), each with its pages, when it was saved and whether it is old enough to check again. Call it before searching the web for any such question.",
+    input_schema: { type: "object", properties: { question: { type: "string" } }, required: ["question"] },
+  },
+  {
+    name: "save_knowledge",
+    description:
+      "Keep an answer in the business's memory, for everyone in it, after answering from pages you read in this answer. The question in a line, the answer as you'd give it again (with any figure's date), the topic, and the addresses of the pages it came from (only pages read in this answer). Never anything about the business's own customers, deals, prices or costs.",
+    input_schema: {
+      type: "object",
+      properties: {
+        topic: { type: "string", enum: [...KNOWLEDGE_TOPICS] },
+        question: { type: "string" },
+        answer: { type: "string" },
+        sources: { type: "array", items: { type: "string" } },
+      },
+      required: ["topic", "question", "answer", "sources"],
+    },
+  },
 ];
 
 /** Only for a member who may see costs. */
@@ -212,6 +268,14 @@ interface Turn {
   diagrams: SolDiagram[];
   drafts: SolDraft[];
   reminder?: SolReminderAsk;
+  /** The pages the answer drew on (cited, or read whole): shown under it. */
+  pages: { url: string; title?: string | null }[];
+  /** Every page seen on the web in this answer, searched or read: only these may be saved as an answer's sources. */
+  seen: { url: string; title?: string | null }[];
+  /** The saved answers recalled from memory in this answer, shown among its sources. */
+  recalled: KnowledgeEntry[];
+  /** What was kept in memory with this answer. */
+  remembered: { id: string; question: string }[];
 }
 
 const s = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -226,6 +290,28 @@ async function runTool(
 ): Promise<string> {
   const { businessId, email } = member;
   const viewer = viewerOf(member);
+  if (name === "recall_knowledge") {
+    const found = await recall(businessId, s(input.question));
+    for (const e of found) if (!shown.recalled.some((r) => r.id === e.id)) shown.recalled.push(e);
+    return recallLines(found, new Date());
+  }
+  if (name === "save_knowledge") {
+    // Only pages read in this answer, or already in memory: nothing is kept without a page it came from.
+    const read = [...shown.pages, ...shown.seen, ...shown.recalled.flatMap((e) => e.sources)];
+    // His addresses matched to the pages he saw, written as those pages' own addresses.
+    const asked = (Array.isArray(input.sources) ? input.sources : []).map((u) => (typeof u === "string" ? u : ""));
+    const matched = reliedOn(asked, read).map((p) => p.url);
+    const clean = cleanKnowledgeInput({ ...input, sources: matched }, new Set(read.map((p) => p.url)));
+    if (!clean.ok) return clean.message;
+    const titles = new Map(read.filter((p) => p.title).map((p) => [urlKey(p.url), p.title ?? ""]));
+    const kept = await saveKnowledge(
+      businessId,
+      { ...clean.value, sources: clean.value.sources.map((x) => ({ ...x, title: titles.get(urlKey(x.url)) || x.title })) },
+      email,
+    );
+    shown.remembered.push({ id: kept.id, question: kept.question });
+    return `Kept in memory as ${kept.id}.`;
+  }
   if (name === "find_deal") {
     const found = findDeals(jobs, s(input.query), (c) => phones.get(c) ?? "");
     return found.length ? found.map(dealLine).join("\n") : "No deal matches that.";
@@ -411,14 +497,16 @@ export async function askSol(
 
   // A search and a manual read can take a while.
   const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 1 });
-  const shown: Turn = { charts: [], diagrams: [], drafts: [] };
+  const shown: Turn = { charts: [], diagrams: [], drafts: [], pages: [], seen: [], recalled: [], remembered: [] };
   let answer = "";
-  const pages: { url: string; title?: string | null }[] = [];
+  /** The answer given just before he only kept it in memory: his next words add to it rather than replace it. */
+  let keptAfter = "";
   let resumes = 0;
   try {
     for (let step = 0; step < STEPS; step++) {
       const m = await client.messages.create({ model: MODEL(), max_tokens: 8000, system, tools, messages: merged });
-      pages.push(...citedPages(m.content));
+      shown.pages.push(...citedPages(m.content));
+      shown.seen.push(...searchedPages(m.content));
       // The server paused its own search loop: send the turn back as it is and it carries on.
       if (m.stop_reason === "pause_turn" && resumes < MAX_RESUMES) {
         resumes++;
@@ -426,13 +514,14 @@ export async function askSol(
         step--;
         continue;
       }
-      answer =
-        m.content
-          .filter((b): b is Anthropic.TextBlock => b.type === "text")
-          .map((b) => b.text)
-          .join("")
-          .trim() || answer;
+      const said = m.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("")
+        .trim();
+      answer = keptAfter && said ? `${keptAfter}\n\n${said}` : said || answer;
       const uses = m.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+      keptAfter = uses.length && uses.every((u) => u.name === "save_knowledge") ? answer : "";
       if (m.stop_reason !== "tool_use" || !uses.length) break;
       merged.push({ role: "assistant", content: m.content });
       const results: Anthropic.ToolResultBlockParam[] = [];
@@ -452,12 +541,12 @@ export async function askSol(
     if (!answer) await giveBackSolCredit(businessId, credit);
     answer = answer || "Something went wrong reaching Claude just then. Try again in a moment.";
   }
-  // What he read online, so the person can check it.
-  const sources = answer ? sourcesLine(pages) : "";
-  if (sources && !answer.includes("Sources:"))
-    answer = `${answer}
-
-${sources}`;
+  // What he read online or recalled from memory, shown under the answer as its sources so the person can check it:
+  // his own list taken off the words, kept only where he really saw the page, with any pages cited or read whole.
+  const listed = takeSourcesList(answer);
+  answer = listed.text;
+  const web = [...shown.pages, ...reliedOn(listed.urls, [...shown.pages, ...shown.seen])];
+  const sources = answer ? answerSources(web, memoryUsed(listed.urls, shown.recalled)) : [];
   const sol: SolTurn = {
     role: "sol",
     text: answer || (shown.drafts.length ? "Here's the draft." : shown.charts.length || shown.diagrams.length ? "Here it is." : "Done."),
@@ -466,6 +555,8 @@ ${sources}`;
     ...(shown.diagrams.length ? { diagrams: shown.diagrams } : {}),
     ...(shown.drafts.length ? { drafts: shown.drafts } : {}),
     ...(shown.reminder ? { reminder: shown.reminder } : {}),
+    ...(sources.length ? { sources } : {}),
+    ...(shown.remembered.length ? { remembered: shown.remembered } : {}),
   };
   return addSolTurns(businessId, email, [you, sol]);
 }
@@ -509,6 +600,9 @@ export async function solAnswersInChannel(member: Member, room: string, asked: s
     const state = await askSol(member, { text: prompt, files: [] }, apiKey, "channel");
     const last = [...state.turns].reverse().find((t) => t.role === "sol");
     said = last?.text?.trim() || "I couldn't answer that just now.";
+    // A channel line is words only: his sources go under them as a short list.
+    const sources = sourcesLine(last?.sources ?? []);
+    if (sources) said += `\n\n${sources}`;
     // His pictures go into the channel with his words.
     visuals = { charts: last?.charts ?? [], diagrams: last?.diagrams ?? [] };
     if (last?.drafts?.length)
