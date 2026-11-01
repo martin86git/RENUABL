@@ -357,6 +357,16 @@ function SwitchboardGlyph() {
 }
 
 /** A panel as the Landscape button draws it: a rectangle with a small triangle at one end, so its way round reads. */
+/** A product's model number (its code on the price list) under its name in the panel, inverter and battery lists (as Primero's). */
+function ModelNo({ sku }: { sku: string }) {
+  if (!sku) return null;
+  return (
+    <span className="block font-mono text-[11px] leading-tight text-ink-2" title="Model number (the code on the price list)">
+      {sku}
+    </span>
+  );
+}
+
 /** A panel drawn with its cells, upright or on its side: the card's two choices. */
 function PanelDrawing({ landscape, size = 14 }: { landscape: boolean; size?: number }) {
   const w = landscape ? size : size * 0.64;
@@ -556,6 +566,20 @@ function PitchFirst(props: { pitch: number; flat: boolean; onSet: (pitch: number
  */
 const FIT = `calc((100dvh - 14rem) * ${ROOF_IMAGE.width / ROOF_IMAGE.height})`;
 const WHOLE: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: ROOF_IMAGE.width, h: ROOF_IMAGE.height };
+/** How far in the designer opens on the roof (1 Nov 2026, as Primero's): the middle of the picture, this many times closer than the whole of it. */
+const OPEN_ZOOM = 1.6;
+const OPENED: typeof WHOLE = {
+  x: (ROOF_IMAGE.width - ROOF_IMAGE.width / OPEN_ZOOM) / 2,
+  y: (ROOF_IMAGE.height - ROOF_IMAGE.height / OPEN_ZOOM) / 2,
+  w: ROOF_IMAGE.width / OPEN_ZOOM,
+  h: ROOF_IMAGE.height / OPEN_ZOOM,
+};
+/**
+ * Where the view may sit: up to half of it past any edge of the picture (as Primero's: a view held inside the picture
+ * can't move at all while the whole picture is showing, so the hand did nothing). A roof near an edge can be dragged to
+ * the middle, and at least half the view always shows the picture.
+ */
+const within = (at: number, size: number, whole: number) => Math.min(Math.max(-size / 2, at), whole - size / 2);
 
 /**
  * The roof designer: the roof from above, to scale, with a bar of tools down
@@ -741,7 +765,7 @@ export function RoofDesigner(props: {
     setArrayHint(null);
     setOnPanel(false);
   };
-  const [view, setView] = useState(WHOLE);
+  const [view, setView] = useState(OPENED);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
   const [picks, setPicks] = useState<Pick[]>([]);
   // Drawing mode: the photo put away and the roof drawn plainly in its place. Kept on the device.
@@ -1290,8 +1314,8 @@ export function RoofDesigner(props: {
         const w = Math.min(ROOF_IMAGE.width, Math.max(40, v.w * (e.deltaY > 0 ? 1.15 : 1 / 1.15)));
         const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
         return {
-          x: Math.min(Math.max(0, v.x + fx * v.w - fx * w), ROOF_IMAGE.width - w),
-          y: Math.min(Math.max(0, v.y + fy * v.h - fy * h), ROOF_IMAGE.height - h),
+          x: within(v.x + fx * v.w - fx * w, w, ROOF_IMAGE.width),
+          y: within(v.y + fy * v.h - fy * h, h, ROOF_IMAGE.height),
           w,
           h,
         };
@@ -1451,8 +1475,8 @@ export function RoofDesigner(props: {
     const cx = view.x + view.w / 2;
     const cy = view.y + view.h / 2;
     setView({
-      x: Math.min(Math.max(0, cx - w / 2), ROOF_IMAGE.width - w),
-      y: Math.min(Math.max(0, cy - h / 2), ROOF_IMAGE.height - h),
+      x: within(cx - w / 2, w, ROOF_IMAGE.width),
+      y: within(cy - h / 2, h, ROOF_IMAGE.height),
       w,
       h,
     });
@@ -2092,8 +2116,8 @@ export function RoofDesigner(props: {
       const dy = ((e.clientY - held.y) / box.height) * held.from.h;
       return setView({
         ...held.from,
-        x: Math.min(Math.max(0, held.from.x - dx), ROOF_IMAGE.width - held.from.w),
-        y: Math.min(Math.max(0, held.from.y - dy), ROOF_IMAGE.height - held.from.h),
+        x: within(held.from.x - dx, held.from.w, ROOF_IMAGE.width),
+        y: within(held.from.y - dy, held.from.h, ROOF_IMAGE.height),
       });
     }
     const p = pointAt(e);
@@ -2169,9 +2193,19 @@ export function RoofDesigner(props: {
         setLoose([...loose, ...placed]);
         setPicks(placed.map((g): Pick => ({ kind: "loose", id: g.id })));
         changed();
-        // An array dragged out is done: the arrow takes over, with the whole array picked. A single panel placed
-        // leaves the tool on, to go on adding.
-        if (placed.length > 1) {
+        // An array dragged out is done: the arrow takes over, with the whole array picked; so is one panel clicked
+        // onto an array (as Primero's). A single panel placed in the open leaves the tool on, to go on adding.
+        const joined =
+          placed.length === 1 &&
+          [
+            ...loose,
+            ...faces.flatMap((f) =>
+              panelPlaces(f, size)
+                .filter((pl) => !f.off.includes(pl.index))
+                .map((pl) => freed(f, pl, "x")),
+            ),
+          ].some((o) => Math.hypot(o.x - placed[0].x, o.y - placed[0].y) < size.long + 0.1);
+        if (placed.length > 1 || joined) {
           setTool("select");
           setOnPanel(false);
         }
@@ -2982,7 +3016,16 @@ export function RoofDesigner(props: {
                 </span>
               </p>
             )}
-            <div className="relative mx-auto" style={{ maxWidth: fit }}>
+            {/* The picture's height as a variable, so the kit lists that open on it scroll inside it, clear of the tools at its foot. */}
+            <div
+              className="relative mx-auto"
+              style={
+                {
+                  maxWidth: fit,
+                  ...(fitPx ? { "--pic-h": `${Math.round((fitPx * ROOF_IMAGE.height) / ROOF_IMAGE.width)}px` } : {}),
+                } as React.CSSProperties
+              }
+            >
               {wheelHint && (
                 <p
                   role="status"
@@ -4354,7 +4397,7 @@ export function RoofDesigner(props: {
                     <span className="mt-0.5 text-[11px] font-medium leading-none">{summary.panels}</span>
                   </button>
                   {menu === "panels" && (
-                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2">
+                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2">
                       <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
                       {[
                         ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
@@ -4374,6 +4417,7 @@ export function RoofDesigner(props: {
                           <Check className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")} aria-hidden />
                           <span className="min-w-0">
                             <span className="block text-sm font-semibold">{p.name}</span>
+                            <ModelNo sku={p.sku} />
                             <span className="block text-xs tabular-nums text-muted">
                               {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
                               {p.gone ? " · no longer in our range" : ""}
@@ -4403,7 +4447,7 @@ export function RoofDesigner(props: {
                     <Zap className="size-5" aria-hidden />
                   </button>
                   {menu === "inverters" && (
-                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
                       <p className={clsx(label, "px-2 py-1")}>On this design</p>
                       {fitted.length === 0 && (
                         <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
@@ -4416,6 +4460,7 @@ export function RoofDesigner(props: {
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-semibold">{spec.name}</span>
+                              <ModelNo sku={spec.sku} />
                               <span className="block text-xs tabular-nums text-muted">
                                 {spec.kw} kW ·{" "}
                                 {fittedItems[n]
@@ -4461,6 +4506,7 @@ export function RoofDesigner(props: {
                                 {sug.count > 1 ? `${sug.count} × ` : ""}
                                 {sug.inverter.name}
                               </p>
+                              <ModelNo sku={sug.inverter.sku} />
                               <p className="mt-0.5 text-xs text-ink-2">{sug.why}</p>
                               <button
                                 className="mt-1.5 text-sm font-semibold underline underline-offset-4"
@@ -4511,6 +4557,7 @@ export function RoofDesigner(props: {
                                   <Plus className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
                                   <span className="min-w-0">
                                     <span className="block text-sm font-semibold">{i.name}</span>
+                                    <ModelNo sku={i.sku} />
                                     <span className="block text-xs tabular-nums text-muted">
                                       {i.kw} kW ·{" "}
                                       {i.electrical
@@ -4567,11 +4614,12 @@ export function RoofDesigner(props: {
                     <BatteryCharging className="size-6" aria-hidden />
                   </button>
                   {menu === "batteries" && (
-                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[60vh] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
                       <p className={clsx(label, "px-2 py-1")}>On this design</p>
                       {battery ? (
                         <div className="rounded-md bg-canvas px-2 py-2">
                           <p className="truncate text-sm font-semibold">{battery.name}</p>
+                          <ModelNo sku={battery.sku} />
                           <div className="mt-1.5 flex items-center gap-2 text-sm">
                             <button
                               className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface font-semibold disabled:bg-surface-2 disabled:text-muted"
@@ -4640,6 +4688,7 @@ export function RoofDesigner(props: {
                                 {sug.qty > 1 ? `${sug.qty} × ` : ""}
                                 {sug.battery.name}
                               </p>
+                              <ModelNo sku={sug.battery.sku} />
                               <p className="mt-0.5 text-xs text-ink-2">{sug.why}</p>
                               <button
                                 className="mt-1 text-sm font-semibold underline underline-offset-4"
@@ -4687,6 +4736,7 @@ export function RoofDesigner(props: {
                               />
                               <span className="min-w-0">
                                 <span className="block text-sm font-semibold">{b.name}</span>
+                                <ModelNo sku={b.sku} />
                                 <span className="block text-xs tabular-nums text-muted">{b.kwh} kWh each</span>
                               </span>
                             </button>

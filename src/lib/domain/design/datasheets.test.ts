@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkInverter, checkPanel, formFromReading, sheetBasis, withDatasheets } from "./datasheets";
+import { checkInverter, checkPanel, codeKey, formFromReading, sheetBasis, withDatasheets } from "./datasheets";
 import { checkString } from "./electrical";
 
 const panel = { voc: "36.42", vmp: "31.11", isc: "15.86", imp: "15.27", vocPercent: "-0.24", iscPercent: "0.046", pmaxPercent: "-0.26" };
@@ -71,5 +71,16 @@ describe("a product's datasheet", () => {
     expect(check.basis.join(" ")).toContain("read and checked by sam");
     // Twenty would be over the 600 V input on a cold morning.
     expect(checkString({ panels: 20, panel: p.value, inverter: i.value, mppt: 0, sharing: 1 }).verdict).toBe("bad");
+  });
+});
+
+describe("codeKey", () => {
+  it("reads codes written differently as the same product", () => {
+    expect(codeKey("SG-WSH10.0RT")).toBe(codeKey("sgwsh10rt"));
+    expect(codeKey("JKM 475N_54HL4")).toBe("JKM475N54HL4");
+  });
+  it("finds a datasheet for a code written another way", () => {
+    const out = withDatasheets([{ sku: "SGWSH10RT", electrical: undefined as unknown }], { "SGWSH10.0RT": { maxV: 1 } });
+    expect(out[0].electrical).toEqual({ maxV: 1 });
   });
 });

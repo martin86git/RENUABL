@@ -172,5 +172,21 @@ export function withDatasheets<T extends { sku: string; electrical?: unknown }>(
   sheets: Record<string, T["electrical"]> | undefined,
 ): T[] {
   if (!sheets) return [...products];
-  return products.map((p) => (sheets[p.sku] ? { ...p, electrical: sheets[p.sku] } : p));
+  // Matched by `codeKey`, so a code written another way on the price list still finds its datasheet (as Primero's).
+  const byKey = new Map(Object.entries(sheets).map(([k, v]) => [codeKey(k), v]));
+  return products.map((p) => {
+    const sheet = sheets[p.sku] ?? byKey.get(codeKey(p.sku));
+    return sheet ? { ...p, electrical: sheet } : p;
+  });
+}
+
+/**
+ * A product code as it is compared: case, spaces, dashes and underscores ignored, and ".0" before a letter dropped, so
+ * a price list's "SGWSH10RT" and the "SGWSH10.0RT" on a datasheet are the same inverter.
+ */
+export function codeKey(sku: string): string {
+  return sku
+    .toUpperCase()
+    .replace(/\.0(?=[A-Z])/g, "")
+    .replace(/[\s_-]+/g, "");
 }

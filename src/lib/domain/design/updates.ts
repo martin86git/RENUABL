@@ -16,6 +16,12 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-01",
     area: "Design tool",
+    words:
+      "Opens zoomed in on the roof; the hand drags the picture even when all of it shows; model numbers under every panel, inverter and battery in the lists.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Design tool",
     words: "A new site asks for the roof pitch first (or that it is flat), then keeps it as a small mark on the picture to change.",
   },
   { day: "2026-11-01", area: "Design tool", words: "Add a panel opens a card: portrait, landscape, or follow the roof face." },
