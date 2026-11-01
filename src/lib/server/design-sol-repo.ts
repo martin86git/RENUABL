@@ -100,9 +100,9 @@ export async function solUnread(businessId: string, email: string): Promise<numb
 export const markSolSeen = (businessId: string, email: string) =>
   withSol(businessId, email, (row) => ({ ...row, seenAt: new Date().toISOString() }));
 
-/** Clears the member's conversation; their preferences and reminders stay. */
+/** Clears the member's conversation; their pinned messages, preferences and reminders stay. */
 export const clearSol = (businessId: string, email: string) =>
-  withSol(businessId, email, (row) => ({ ...row, turns: [], seenAt: new Date().toISOString() }));
+  withSol(businessId, email, (row) => ({ ...row, turns: row.turns.filter((t) => t.pinned), seenAt: new Date().toISOString() }));
 
 /** Adds a question and its answer; the answer counts as unread until the conversation is next on screen. */
 export const addSolTurns = (businessId: string, email: string, turns: SolTurn[]) =>

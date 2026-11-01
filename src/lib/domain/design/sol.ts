@@ -50,6 +50,25 @@ export interface SolTurn {
   diagrams?: SolDiagram[];
   drafts?: SolDraft[];
   reminder?: SolReminderAsk;
+  /** Pinned by the member: shown in the Pinned strip, kept past the history trim, and kept through Clear. */
+  pinned?: boolean;
+}
+
+/** The turns kept: the latest `CHAT_KEPT`, and any pinned before them (1 Nov 2026, Martin: as Primero's). */
+export function keptTurns(turns: readonly SolTurn[]): SolTurn[] {
+  const from = Math.max(0, turns.length - CHAT_KEPT);
+  return turns.filter((t, i) => i >= from || t.pinned);
+}
+
+/** Pins or unpins the turn said at that moment by that side; nothing else changes. */
+export function withPin(turns: readonly SolTurn[], at: string, role: SolTurn["role"], pinned: boolean): SolTurn[] {
+  return turns.map((t) => {
+    if (t.at !== at || t.role !== role) return t;
+    if (pinned) return { ...t, pinned: true };
+    const rest = { ...t };
+    delete rest.pinned;
+    return rest;
+  });
 }
 
 export interface SolPref {
@@ -100,7 +119,7 @@ export function cleanDrafts(raw: unknown): SolDraft[] {
 
 /** A conversation as kept: every turn checked again, the latest `CHAT_KEPT`. */
 export function cleanTurns(raw: unknown): SolTurn[] {
-  return (Array.isArray(raw) ? raw : [])
+  const turns = (Array.isArray(raw) ? raw : [])
     .filter((t): t is Record<string, unknown> => Boolean(t) && typeof t === "object")
     .map((t): SolTurn | null => {
       const role = t.role === "you" ? "you" : t.role === "sol" ? "sol" : null;
@@ -123,10 +142,11 @@ export function cleanTurns(raw: unknown): SolTurn[] {
         ...(diagrams.length ? { diagrams } : {}),
         ...(drafts.length ? { drafts } : {}),
         ...(reminder ? { reminder } : {}),
+        ...(t.pinned === true ? { pinned: true } : {}),
       };
     })
-    .filter((t): t is SolTurn => t !== null)
-    .slice(-CHAT_KEPT);
+    .filter((t): t is SolTurn => t !== null);
+  return keptTurns(turns);
 }
 
 /** How many of Sol's lines came after the member last saw the conversation. */

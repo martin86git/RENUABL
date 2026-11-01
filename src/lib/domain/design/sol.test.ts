@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   CHAT_KEPT,
+  keptTurns,
+  withPin,
   cleanSolInput,
   cleanTurns,
   dealMention,
@@ -178,5 +180,23 @@ describe("Sol's tools", () => {
     expect(solSystem({ ...base, costs: false })).toContain("can't see costs");
     expect(solSystem({ ...base, costs: true })).toContain("price_lookup gives supplier costs");
     expect(solSystem({ ...base, costs: true })).toContain("CRM: Deals, Customers");
+  });
+});
+
+describe("pinned messages", () => {
+  it("pins and unpins a message by when it was said and by whom, and keeps pinned ones past the trim", () => {
+    const turns = Array.from({ length: CHAT_KEPT + 3 }, (_, i) => ({
+      role: (i % 2 ? "sol" : "you") as "you" | "sol",
+      text: `${i}`,
+      at: `2026-11-01T00:${String(Math.floor(i / 60)).padStart(2, "0")}:${String(i % 60).padStart(2, "0")}.000Z`,
+    }));
+    const pinned = withPin(turns, turns[0].at, "you", true);
+    expect(pinned[0].pinned).toBe(true);
+    expect(withPin(turns, turns[0].at, "sol", true)[0].pinned).toBeUndefined();
+    const kept = keptTurns(pinned);
+    expect(kept).toHaveLength(CHAT_KEPT + 1);
+    expect(kept[0].text).toBe("0");
+    expect(withPin(pinned, turns[0].at, "you", false)[0]).not.toHaveProperty("pinned");
+    expect(cleanTurns(pinned)[0]).toMatchObject({ text: "0", pinned: true });
   });
 });

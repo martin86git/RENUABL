@@ -13,6 +13,12 @@ export interface Update {
 }
 
 export const UPDATES: readonly Update[] = [
+  { day: "2026-11-01", area: "Sol", words: "Copy or pin any message in Sol's chat; pinned ones stay at the top and through Clear." },
+  {
+    day: "2026-11-01",
+    area: "Everywhere",
+    words: "The design tool is an orange button in the top bar, and search is the round magnifier beside it.",
+  },
   {
     day: "2026-11-01",
     area: "Marketplace",

@@ -191,45 +191,66 @@ function Shell({
           </button>
         </div>
       )}
-      {/* Across the top on a wide screen: logo and Search, the sections, and the card of icons. */}
+      {/* Across the top on a wide screen: the logo, the sections (with the design tool in orange) and a round search, and the card of icons. */}
       <header className={clsx("z-[35] hidden bg-canvas/90 backdrop-blur print:hidden lg:block lg:px-14", !tool && "sticky top-0")}>
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-4 px-2 pt-4">
           <div className="flex min-w-0 items-start gap-5">
             <Link href={PATHS.home} aria-label="RENUABL, today" className="mt-[1.45rem] shrink-0">
               <Wordmark className="text-[17px]" />
             </Link>
+          </div>
+          {/* 1 Nov 2026, Martin (as Primero's): the Search pill gave way to a round magnifier just right of the sections. */}
+          <div className="mt-4 flex items-center gap-2">
+            <nav aria-label="Sections" className="flex items-center gap-0.5 rounded-full bg-surface-2 p-1">
+              {SECTIONS.map((sec) => {
+                const lit = sec.id === current.id;
+                const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);
+                const design =
+                  sec.id === "crm" ? (
+                    // The design tool, the main tool, as an orange round between Today and CRM: larger than the pill (it
+                    // stands out of it without making it taller), centred between Today's white pill and the word CRM.
+                    <Link
+                      key="design"
+                      href={PATHS.designer}
+                      aria-label="Design tool"
+                      title="Design tool"
+                      aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
+                      className={clsx(
+                        "-my-2 flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
+                        current.id === "today" ? "ml-3.5" : "mx-0",
+                        path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface-2",
+                      )}
+                    >
+                      <PenTool className="size-5" aria-hidden />
+                    </Link>
+                  ) : null;
+                return [
+                  design,
+                  <Link
+                    key={sec.id}
+                    href={sec.pages[0].href}
+                    aria-current={lit ? "true" : undefined}
+                    className={clsx(
+                      "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
+                      lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                    )}
+                  >
+                    {sec.label}
+                    {waiting > 0 && <span className="size-1.5 rounded-full bg-sun-line" aria-label={`${waiting} waiting`} />}
+                  </Link>,
+                ];
+              })}
+            </nav>
             <button
               type="button"
               onClick={() => setSearching(true)}
               aria-label="Search customers and deals"
               title="Search customers and deals (Ctrl K)"
-              className="mt-4 flex h-9 min-w-0 max-w-56 flex-1 items-center gap-2 rounded-full bg-surface px-3.5 text-sm text-muted ring-1 ring-line hover:text-ink"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line hover:text-ink"
             >
-              <Search className="size-4 shrink-0" aria-hidden />
-              <span className="hidden truncate xl:inline">Search</span>
-              <kbd className="ml-auto hidden rounded border border-line px-1 text-[10px] text-muted xl:inline">Ctrl K</kbd>
+              <Search className="size-4" aria-hidden />
             </button>
           </div>
-          <nav aria-label="Sections" className="mt-4 flex items-center gap-0.5 rounded-full bg-surface-2 p-1">
-            {SECTIONS.map((sec) => {
-              const lit = sec.id === current.id;
-              const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);
-              return (
-                <Link
-                  key={sec.id}
-                  href={sec.pages[0].href}
-                  aria-current={lit ? "true" : undefined}
-                  className={clsx(
-                    "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
-                    lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
-                  )}
-                >
-                  {sec.label}
-                  {waiting > 0 && <span className="size-1.5 rounded-full bg-sun-line" aria-label={`${waiting} waiting`} />}
-                </Link>
-              );
-            })}
-          </nav>
           <div className="mt-3 flex justify-end">
             <div
               data-tour="icons"
@@ -241,7 +262,6 @@ function Shell({
               <TopIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />
               <MessagesMenu badge={unread} href={PATHS.messages} />
               <NotificationsMenu badge={mentions} full={PATHS.notifications} deal={(id) => `${PATHS.deals}/${id}`} />
-              <TopIcon href={PATHS.designer} label="Design tool" icon={PenTool} on={path.startsWith(PATHS.designer)} />
               <GearMenu
                 email={account.email}
                 settings={PATHS.settings}

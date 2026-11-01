@@ -1,4 +1,4 @@
-import { cleanSolInput, WHEN_LABELS, type WhenChoice } from "@/lib/domain/design/sol";
+import { cleanSolInput, WHEN_LABELS, type WhenChoice, withPin } from "@/lib/domain/design/sol";
 import { parseApiKey } from "@/lib/server/bill-reader";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { askSol, chooseReminderTime } from "@/lib/server/design-sol";
@@ -52,6 +52,12 @@ export async function POST(request: Request) {
       }
       case "forget-reminder":
         return ok(await withSol(businessId, email, (row) => ({ ...row, reminders: row.reminders.filter((r) => r.id !== id) })));
+      case "pin": {
+        // A message pinned or unpinned, found by when it was said and by whom.
+        const at = typeof body.at === "string" ? body.at.slice(0, 40) : "";
+        const role = body.role === "you" ? "you" : "sol";
+        return ok(await withSol(businessId, email, (row) => ({ ...row, turns: withPin(row.turns, at, role, body.pinned !== false) })));
+      }
       case "forget-pref":
         return ok(await withSol(businessId, email, (row) => ({ ...row, prefs: row.prefs.filter((p) => p.id !== id) })));
       default:

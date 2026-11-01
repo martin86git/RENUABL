@@ -15,6 +15,7 @@ export const clearSolChat = () => post({ do: "clear" });
 export const remindAt = (id: string, when: WhenChoice) => post({ do: "remind", id, when });
 export const forgetReminder = (id: string) => post({ do: "forget-reminder", id });
 export const forgetPref = (id: string) => post({ do: "forget-pref", id });
+export const pinTurn = (at: string, role: "you" | "sol", pinned: boolean) => post({ do: "pin", at, role, pinned });
 
 /** Said on the window to open or shut Sol's panel from anywhere (the rail, a "#" link). */
 export const SOL_TOGGLE = "renuabl:sol-toggle";

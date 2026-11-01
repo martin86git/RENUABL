@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Bell, Copy, FileText, Mail, Plus, X } from "lucide-react";
+import { Bell, Copy, FileText, Mail, Plus, X, Pin } from "lucide-react";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { MORE_DETAIL_ASK, offersMore } from "@/lib/domain/design/sol-charts";
@@ -24,7 +24,18 @@ import {
   type WhenChoice,
 } from "@/lib/domain/design/sol";
 import { listJobs, type JobLine } from "@/lib/services/crm";
-import { DRAFT_KEY, SOL_CHANGED, askSol, clearSolChat, forgetPref, forgetReminder, loadSol, remindAt, solSeen } from "@/lib/services/sol";
+import {
+  DRAFT_KEY,
+  SOL_CHANGED,
+  askSol,
+  clearSolChat,
+  forgetPref,
+  forgetReminder,
+  loadSol,
+  remindAt,
+  solSeen,
+  pinTurn,
+} from "@/lib/services/sol";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolIcon } from "./sol-icon";
 import { SolThinking } from "./sol-thinking";
@@ -235,6 +246,35 @@ export function SolChat({ side = false, onClose }: { side?: boolean; onClose?: (
         )}
       </div>
 
+      {/* Pinned messages (1 Nov 2026, Martin: as Primero's): a strip at the top; a press goes to the message, the cross unpins it. */}
+      {turns.some((t) => t.pinned) && (
+        <div className="max-h-28 shrink-0 overflow-y-auto border-b border-line bg-sun/40 px-5 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sun-ink">Pinned</p>
+          <ul className="mt-1 space-y-1">
+            {turns
+              .filter((t) => t.pinned)
+              .map((t) => (
+                <li key={`pin-${t.role}-${t.at}`} className="flex items-center gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById(turnId(t))?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                    className="min-w-0 flex-1 truncate text-left text-ink hover:underline"
+                  >
+                    {t.text || "(a chart or drawing)"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void run(pinTurn(t.at, t.role, false))}
+                    aria-label="Unpin"
+                    className="text-muted hover:text-ink"
+                  >
+                    <X className="size-3.5" aria-hidden />
+                  </button>
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
       <div className="staff-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 text-sm">
         {!state && !problem && <SolThinking say="Opening your conversation…" />}
         {state && turns.length === 0 && !pending && (
@@ -259,8 +299,14 @@ export function SolChat({ side = false, onClose }: { side?: boolean; onClose?: (
           </div>
         )}
         {turns.map((t, i) => (
-          <div key={`${t.at}-${i}`} className="space-y-2">
-            <Bubble you={t.role === "you"} text={t.text} at={t.at} />
+          <div key={`${t.at}-${i}`} id={turnId(t)} className="group/turn space-y-2">
+            <Bubble
+              you={t.role === "you"}
+              text={t.text}
+              at={t.at}
+              pinned={t.pinned}
+              onPin={() => void run(pinTurn(t.at, t.role, !t.pinned))}
+            />
             {t.charts?.map((c, k) => (
               <SolChartView key={k} chart={c} />
             ))}
@@ -503,14 +549,54 @@ export function SolChat({ side = false, onClose }: { side?: boolean; onClose?: (
   );
 }
 
-function Bubble({ you, text, at }: { you: boolean; text: string; at: string }) {
+const turnId = (t: { role: string; at: string }) => `sol-turn-${t.role}-${t.at.replace(/[^0-9a-z]/gi, "")}`;
+
+/** One message, with Copy and Pin beside it (1 Nov 2026, Martin: as Primero's) once it has been said. */
+function Bubble({ you, text, at, pinned, onPin }: { you: boolean; text: string; at: string; pinned?: boolean; onPin?: () => void }) {
+  const [copied, setCopied] = useState(false);
   if (!text) return null;
   return (
-    <div className={clsx("flex", you ? "justify-end" : "justify-start")}>
-      <div className={clsx("max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2", you ? "bg-sun-line text-white" : "bg-canvas text-ink")}>
+    <div className={clsx("flex flex-col", you ? "items-end" : "items-start")}>
+      <div
+        className={clsx(
+          "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2",
+          you ? "bg-sun-line text-white" : "bg-canvas text-ink",
+          pinned && "ring-2 ring-sun-line/50",
+        )}
+      >
         {text}
         {at && <span className={clsx("mt-1 block text-[10px]", you ? "text-white/70" : "text-muted")}>{when(at)}</span>}
       </div>
+      {at && (
+        <div
+          className={clsx(
+            "mt-0.5 flex gap-2 px-1 text-[11px] text-muted transition-opacity",
+            pinned ? "opacity-100" : "opacity-0 group-hover/turn:opacity-100 focus-within:opacity-100",
+          )}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard?.writeText(text).then(() => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1500);
+              });
+            }}
+            className="inline-flex items-center gap-1 hover:text-ink"
+          >
+            <Copy className="size-3" aria-hidden /> {copied ? "Copied" : "Copy"}
+          </button>
+          {onPin && (
+            <button
+              type="button"
+              onClick={onPin}
+              className={clsx("inline-flex items-center gap-1 hover:text-ink", pinned && "text-sun-ink")}
+            >
+              <Pin className="size-3" aria-hidden /> {pinned ? "Unpin" : "Pin"}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
