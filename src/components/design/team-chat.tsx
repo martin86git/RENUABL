@@ -48,6 +48,7 @@ import {
   type TeamRoomView,
 } from "@/lib/services/team-chat";
 import { useDesignAccount } from "./design-account";
+import { DictateButton, withSpoken } from "./dictate";
 import { SolIcon } from "./sol-icon";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolThinking } from "./sol-thinking";
@@ -93,6 +94,8 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
   /** The message being answered, with the room it is in: a reply is only offered in that room. */
   const [replying, setReplying] = useState<{ room: string; reply: TeamReply } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  /** What the microphone is hearing, shown at the end of the box until the phrase is finished. */
+  const [heard, setHeard] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -655,7 +658,7 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
             )}
             <textarea
               ref={box}
-              value={text}
+              value={heard ? withSpoken(text, heard) : text}
               rows={1}
               maxLength={TEAM_LINE_MAX}
               onChange={(e) => {
@@ -705,6 +708,13 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
               aria-label="Your message"
               className="max-h-40 min-h-[2.75rem] w-full min-w-0 flex-1 resize-none bg-transparent px-1.5 py-2.5 text-left text-sm outline-none [field-sizing:content] placeholder:text-muted"
             />
+            <div className="mb-1.5">
+              <DictateButton
+                label="Speak your message"
+                onHearing={setHeard}
+                onWords={(w) => setText((t) => withSpoken(t, w).slice(0, TEAM_LINE_MAX))}
+              />
+            </div>
             <button
               type="submit"
               disabled={sending || (!text.trim() && !files.length && !deals.length)}
