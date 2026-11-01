@@ -33,6 +33,7 @@ export const PATHS = {
   team: "/design/team",
   updates: "/design/updates",
   inbox: "/design/inbox",
+  marketplace: "/design/marketplace",
   feedback: "/design/feedback",
   proposalsSent: "/design/sales/proposals",
   proposalsSigned: "/design/sales/signed",

@@ -14,7 +14,7 @@ export interface SectionPage {
 }
 
 export interface Section {
-  id: "today" | "crm" | "procurement" | "installation" | "service";
+  id: "today" | "crm" | "procurement" | "installation" | "service" | "marketplace";
   label: string;
   pages: readonly SectionPage[];
 }
@@ -54,6 +54,15 @@ export const SECTIONS: readonly Section[] = [
     ],
   },
   { id: "service", label: "Service", pages: [{ id: "service", label: "Service pipeline", href: "/design/service" }] },
+  {
+    id: "marketplace",
+    label: "Marketplace",
+    pages: [
+      { id: "listings", label: "Job listings", href: "/design/marketplace" },
+      { id: "my-listings", label: "My listings", href: "/design/marketplace/mine" },
+      { id: "my-bids", label: "My bids", href: "/design/marketplace/bids" },
+    ],
+  },
 ];
 
 const under = (path: string, href: string) => path === href || path.startsWith(`${href}/`);

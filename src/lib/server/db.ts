@@ -668,6 +668,44 @@ create table if not exists design_email_notes (
   at timestamptz not null default now(),
   foreign key (business_id, owner_email, message_id) references design_email_talks(business_id, owner_email, message_id) on delete cascade
 );
+-- The Marketplace's job listings (domain/design/marketplace.ts): what one business shows others of a job (suburb,
+-- system, window, guide; never the customer's details), and the bids businesses place on it, one each.
+create table if not exists design_listings (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  title text not null,
+  suburb text not null,
+  state text not null default '',
+  postcode text not null default '',
+  near_lat double precision,
+  near_lng double precision,
+  system jsonb not null,
+  notes text not null default '',
+  from_day date,
+  to_day date,
+  guide integer,
+  status text not null default 'open',
+  closes_on date not null,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  awarded_bid text,
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create unique index if not exists design_listings_open_job on design_listings(business_id, job_id) where status = 'open';
+create index if not exists design_listings_open on design_listings(status, closes_on);
+create table if not exists design_bids (
+  id text primary key,
+  listing_id text not null references design_listings(id) on delete cascade,
+  business_id text not null references businesses(id) on delete cascade,
+  by_email text not null,
+  amount integer not null,
+  start_day date,
+  note text not null default '',
+  status text not null default 'open',
+  at timestamptz not null default now(),
+  unique (listing_id, business_id)
+);
 create table if not exists design_feedback_comments (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,

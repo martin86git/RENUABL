@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronLeft, ClipboardList, PanelLeftClose, PanelLeftOpen, PenTool, Search, Trash2, Wrench } from "lucide-react";
 import { JobCardDialog } from "./job-card";
 import { CallNotetaker } from "./call-notetaker";
+import { ListOnMarketplace } from "./marketplace";
+import { suburbAlone } from "@/lib/domain/design/marketplace";
 import clsx from "clsx";
 import {
   JOB_STAGES,
@@ -15,6 +17,7 @@ import {
   type Customer,
   type Job,
   type JobStage,
+  PRE_INSTALL_STAGES,
 } from "@/lib/domain/design/crm";
 import { systemDetails, type DealDetail, type JobExtra } from "@/lib/domain/design/deal";
 import { fieldLine, resolveDealFields, type DealFieldsConfig } from "@/lib/domain/design/deal-sections";
@@ -409,6 +412,9 @@ export function DealPage({ id }: { id: string }) {
             <Wrench className="size-4" aria-hidden /> Job card
           </button>
           {card && <JobCardDialog jobId={job.id} onClose={() => setCard(false)} />}
+          {PRE_INSTALL_STAGES.includes(job.stage) && (
+            <ListOnMarketplace jobId={job.id} suburb={suburbAlone(job.address || customer.address)} />
+          )}
         </div>
 
         {/* The proposal worked out from this deal's design: whether one is out, and the way to preview and send it. */}
