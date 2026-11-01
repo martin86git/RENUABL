@@ -8,6 +8,8 @@
  * nothing here reaches a customer. Pure, tested.
  */
 import { handleOf } from "./mentions";
+import { cleanCharts, type SolChart } from "./sol-charts";
+import { cleanDiagrams, type SolDiagram } from "./sol-diagrams";
 
 export const TEAM_CHANNELS = [
   { id: "deals", label: "Deals" },
@@ -55,6 +57,64 @@ export interface TeamLine {
   deals?: TeamDeal[];
   /** Each emoji with the emails of those who reacted with it, in the order they did. */
   reactions?: Record<string, string[]>;
+  /** The message this line answers, as iMessage shows it: who wrote it and a line of it. */
+  replyTo?: TeamReply;
+  /** Sol's charts and diagrams with his answer (a battery's clearances, how strings run), drawn under his words. */
+  charts?: SolChart[];
+  diagrams?: SolDiagram[];
+}
+
+/**
+ * Sol's pictures as kept with a line, cleaned again whenever read (a diagram is rebuilt from its allowlist, so nothing
+ * stored can carry script). Only Sol's lines have them; anything else is empty.
+ */
+export function cleanVisuals(v: unknown): { charts: SolChart[]; diagrams: SolDiagram[] } {
+  const r = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  return { charts: cleanCharts(r.charts), diagrams: cleanDiagrams(r.diagrams) };
+}
+
+/**
+ * The message a reply answers, as shown above the reply: its id (to jump to it), who wrote it and a short line of it
+ * (`replyQuote`), read fresh each time so an edit shows. `gone` once it has been deleted.
+ */
+export interface TeamReply {
+  id: string;
+  by: string;
+  text: string;
+  gone?: boolean;
+}
+
+/** The longest quote of a message shown above a reply. */
+export const REPLY_QUOTE_MAX = 140;
+const LINE_ID = /^tl_[a-f0-9]{8,64}$/;
+export const isTeamLineId = (id: unknown): id is string => typeof id === "string" && LINE_ID.test(id);
+
+/**
+ * A message in a line, to show above a reply to it: its words on one line, cut at a word near `REPLY_QUOTE_MAX`;
+ * with no words, what it carried ("A picture", "2 files", "A deal"). A deal is never named here: a reply's quote is
+ * shown to everyone in the room, who may not all see that deal.
+ */
+export function replyQuote(line: {
+  text: string;
+  files?: readonly TeamFile[];
+  deals?: readonly unknown[];
+  diagrams?: readonly unknown[];
+  charts?: readonly unknown[];
+}): string {
+  const words = line.text.replace(/\s+/g, " ").trim();
+  if (words) {
+    if (words.length <= REPLY_QUOTE_MAX) return words;
+    const cut = words.slice(0, REPLY_QUOTE_MAX);
+    const space = cut.lastIndexOf(" ");
+    return `${(space > REPLY_QUOTE_MAX * 0.6 ? cut.slice(0, space) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
+  }
+  const files = line.files ?? [];
+  if (files.length === 1) return isTeamPicture(files[0].type) ? "A picture" : files[0].name;
+  if (files.length > 1) return files.every((f) => isTeamPicture(f.type)) ? `${files.length} pictures` : `${files.length} files`;
+  if (line.deals?.length) return line.deals.length === 1 ? "A deal" : `${line.deals.length} deals`;
+  if (line.diagrams?.length) return "A diagram";
+  if (line.charts?.length) return "A chart";
+  return "A message";
 }
 
 /** The emojis offered, to type into a line and to react with; a reaction must be one of these. The first six are quick. */

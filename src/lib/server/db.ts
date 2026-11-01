@@ -537,6 +537,10 @@ create table if not exists design_team_lines (
   primary key (business_id, id)
 );
 create index if not exists design_team_lines_room on design_team_lines(business_id, room, at desc);
+-- The message a line answers (a reply, as iMessage's), in the same room. Kept if that message is deleted: the reply then says so.
+alter table design_team_lines add column if not exists reply_to text;
+-- Sol's charts and diagrams with his answer in a channel ({ charts, diagrams }), cleaned again whenever read.
+alter table design_team_lines add column if not exists visuals jsonb not null default '{}';
 create table if not exists design_team_files (
   business_id text not null references businesses(id) on delete cascade,
   id text not null,

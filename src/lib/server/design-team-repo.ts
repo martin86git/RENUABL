@@ -13,7 +13,9 @@ import {
   cleanDeals,
   cleanFiles,
   cleanReactions,
+  cleanVisuals,
   isChannel,
+  replyQuote,
   mayUseRoom,
   roomLabel,
   tags,
@@ -26,6 +28,7 @@ import {
   type TeamDeal,
   type TeamFile,
   type TeamLine,
+  type TeamReply,
 } from "@/lib/domain/design/team-chat";
 import type { DealViewer } from "@/lib/domain/design/account";
 import { siteUrl } from "@/lib/domain/sms";
@@ -65,14 +68,18 @@ interface Row {
   reactions: unknown;
   at: string;
   edited: string | null;
+  reply_to: string | null;
+  visuals: unknown;
 }
 
-const LINE = `id, room, by_email as by, text, files, deals, reactions, ${moment("at")} as at, ${moment("edited_at")} as edited`;
+const LINE = `id, room, by_email as by, text, files, deals, reactions, ${moment("at")} as at, ${moment("edited_at")} as edited, reply_to, visuals`;
 
-function lineOf(r: Row, seeDeal: (id: string) => boolean): TeamLine {
+function lineOf(r: Row, seeDeal: (id: string) => boolean, replies: ReadonlyMap<string, TeamReply> = new Map()): TeamLine {
   const files = cleanFiles(r.files);
   const deals = cleanDeals(r.deals).filter((d) => seeDeal(d.id));
   const reactions = cleanReactions(r.reactions);
+  // Pictures only ever on Sol's lines.
+  const { charts, diagrams } = r.by === SOL_BY ? cleanVisuals(r.visuals) : { charts: [], diagrams: [] };
   return {
     id: r.id,
     room: r.room,
@@ -83,7 +90,30 @@ function lineOf(r: Row, seeDeal: (id: string) => boolean): TeamLine {
     ...(files.length ? { files } : {}),
     ...(deals.length ? { deals } : {}),
     ...(Object.keys(reactions).length ? { reactions } : {}),
+    ...(charts.length ? { charts } : {}),
+    ...(diagrams.length ? { diagrams } : {}),
+    ...(r.reply_to ? { replyTo: replies.get(r.reply_to) ?? { id: r.reply_to, by: "", text: "", gone: true } } : {}),
   };
+}
+
+/** The messages some lines answer, as their quotes: read fresh (so an edit shows), only from the same room. One missing has been deleted. */
+async function quotesFor(businessId: string, room: string, rows: readonly Row[]): Promise<Map<string, TeamReply>> {
+  const ids = [...new Set(rows.map((r) => r.reply_to).filter((id): id is string => Boolean(id)))];
+  if (!ids.length) return new Map();
+  const found = await query<{ id: string; by: string; text: string; files: unknown; deals: unknown; visuals: unknown }>(
+    `select id, by_email as by, text, files, deals, visuals from design_team_lines where business_id = $1 and room = $2 and id = any($3)`,
+    [businessId, room, ids],
+  );
+  return new Map(
+    found.map((q) => [
+      q.id,
+      {
+        id: q.id,
+        by: q.by,
+        text: replyQuote({ text: q.text, files: cleanFiles(q.files), deals: cleanDeals(q.deals), ...cleanVisuals(q.visuals) }),
+      },
+    ]),
+  );
 }
 
 /** The deals this member may see, for showing deal cards: every deal when they see them all. */
@@ -137,7 +167,8 @@ export async function teamRoom(me: TeamMe, room: string) {
     roomsFor(me, members),
     dealSight(me),
   ]);
-  return { room, lines: rows.reverse().map((r) => lineOf(r, sees)), members, ...rooms };
+  const replies = await quotesFor(me.businessId, room, rows);
+  return { room, lines: rows.reverse().map((r) => lineOf(r, sees, replies)), members, ...rooms };
 }
 
 /** How many lines from others this member hasn't seen, across every room they may read. */
@@ -179,13 +210,23 @@ async function dealCards(me: TeamMe, ids: readonly string[]): Promise<TeamDeal[]
 export async function sayInTeam(
   me: TeamMe,
   room: string,
-  said: { text: string; files: readonly File[]; dealIds: readonly string[] },
+  said: { text: string; files: readonly File[]; dealIds: readonly string[]; replyTo?: string | null },
 ): Promise<TeamLine> {
   const members = await allowed(me, room);
   const problem = said.files.length ? teamFilesProblem(said.files) : null;
   if (problem) throw new TeamChatRefusal(problem);
   const deals = await dealCards(me, said.dealIds);
   if (!said.text && !said.files.length && !deals.length) throw new TeamChatRefusal("Write something first.");
+  // A reply answers a message still in this room; anything else is sent as an ordinary line.
+  const replyTo = said.replyTo
+    ? ((
+        await query<{ id: string }>(`select id from design_team_lines where business_id = $1 and room = $2 and id = $3`, [
+          me.businessId,
+          room,
+          said.replyTo,
+        ])
+      )[0]?.id ?? null)
+    : null;
   const id = newId("tl", 10);
   const by = me.email.toLowerCase();
   const files: TeamFile[] = [];
@@ -204,8 +245,8 @@ export async function sayInTeam(
       files.push(file);
     }
     await q(
-      `insert into design_team_lines (business_id, id, room, by_email, text, files, deals) values ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb)`,
-      [me.businessId, id, room, by, said.text, JSON.stringify(files), JSON.stringify(deals)],
+      `insert into design_team_lines (business_id, id, room, by_email, text, files, deals, reply_to) values ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8)`,
+      [me.businessId, id, room, by, said.text, JSON.stringify(files), JSON.stringify(deals), replyTo],
     );
     await q(
       `insert into design_team_seen (business_id, email, room, seen_at) values ($1, $2, $3, now())
@@ -215,7 +256,7 @@ export async function sayInTeam(
   });
   if (isChannel(room) && said.text) await tellTagged(me, room, said.text, members);
   const rows = await query<Row>(`select ${LINE} from design_team_lines where business_id = $1 and id = $2`, [me.businessId, id]);
-  return lineOf(rows[0], () => true);
+  return lineOf(rows[0], () => true, await quotesFor(me.businessId, room, rows));
 }
 
 async function tellTagged(me: TeamMe, room: string, text: string, members: string[]): Promise<void> {
@@ -232,14 +273,16 @@ async function tellTagged(me: TeamMe, room: string, text: string, members: strin
 }
 
 /** Sol's answer in a channel, written as Sol. */
-export async function solSaysInTeam(businessId: string, room: string, text: string): Promise<void> {
+export async function solSaysInTeam(businessId: string, room: string, text: string, visuals?: unknown): Promise<void> {
   if (!isChannel(room)) return;
-  await query(`insert into design_team_lines (business_id, id, room, by_email, text) values ($1,$2,$3,$4,$5)`, [
+  const { charts, diagrams } = cleanVisuals(visuals);
+  await query(`insert into design_team_lines (business_id, id, room, by_email, text, visuals) values ($1,$2,$3,$4,$5,$6::jsonb)`, [
     businessId,
     newId("tl", 10),
     room,
     SOL_BY,
     text.slice(0, 2000),
+    JSON.stringify({ charts, diagrams }),
   ]);
 }
 

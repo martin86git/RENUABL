@@ -24,14 +24,21 @@ export const editTeamLine = (id: string, text: string) => post({ edit: id, text 
 export const deleteTeamLine = (id: string) => post({ delete: id });
 export const reactToTeamLine = (id: string, emoji: string) => post({ react: id, emoji });
 
-/** Says something: as JSON, or as a form when there are files. */
-export async function sayInTeam(room: string, text: string, deals: string[], files: File[]): Promise<Answer<{ line: TeamLine }>> {
-  if (!files.length) return post<{ line: TeamLine }>({ room, text, deals });
+/** Says something: as JSON, or as a form when there are files. `replyTo` is the message it answers, when it is a reply. */
+export async function sayInTeam(
+  room: string,
+  text: string,
+  deals: string[],
+  files: File[],
+  replyTo?: string | null,
+): Promise<Answer<{ line: TeamLine }>> {
+  if (!files.length) return post<{ line: TeamLine }>({ room, text, deals, ...(replyTo ? { replyTo } : {}) });
   const form = new FormData();
   form.set("room", room);
   form.set("text", text);
   for (const d of deals) form.append("deal", d);
   for (const f of files) form.append("file", f);
+  if (replyTo) form.set("replyTo", replyTo);
   try {
     const res = await fetch("/api/design/team", { method: "POST", body: form, cache: "no-store" });
     const json = (await res.json().catch(() => null)) as

@@ -426,18 +426,22 @@ export async function solAnswersInChannel(member: Member, room: string, asked: s
   const context = before.map((l) => `${nameOf(l.by)}: ${l.text}`).join("\n");
   const prompt =
     `${nameOf(member.email)} tagged you in the team chat's ${channel.label} channel, which everyone in the business reads. ` +
-    `Answer them there, briefly, as a teammate would. Never put a customer's phone or email in the channel.\n\nTheir message: ${asked}` +
+    `Answer them there, briefly, as a teammate would. Never put a customer's phone or email in the channel. ` +
+    `The channel shows your charts and diagrams under your words: when a picture shows it more clearly (a battery's clearances, a roof's setbacks, how strings run), draw one, labelled with the figures you give.\n\nTheir message: ${asked}` +
     (context ? `\n\nThe channel's lines before it:\n${context}` : "");
   let said: string;
+  let visuals: { charts?: unknown; diagrams?: unknown } = {};
   try {
     const state = await askSol(member, { text: prompt, files: [] }, apiKey);
     const last = [...state.turns].reverse().find((t) => t.role === "sol");
     said = last?.text?.trim() || "I couldn't answer that just now.";
+    // His pictures go into the channel with his words.
+    visuals = { charts: last?.charts ?? [], diagrams: last?.diagrams ?? [] };
     if (last?.drafts?.length)
       said += `\n\n(The email I wrote is in ${nameOf(member.email).split(" ")[0]}'s chat with me, to check and send.)`;
   } catch (e) {
     console.error("sol in the team chat failed", e instanceof Error ? e.message : e);
     said = "I couldn't answer that just now. Try me again in a moment.";
   }
-  await solSaysInTeam(member.businessId, room, said);
+  await solSaysInTeam(member.businessId, room, said, visuals);
 }

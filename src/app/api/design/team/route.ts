@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { asksSol, cleanDealIds, cleanRoom, cleanWords } from "@/lib/domain/design/team-chat";
+import { asksSol, cleanDealIds, cleanRoom, cleanWords, isTeamLineId } from "@/lib/domain/design/team-chat";
 import { parseApiKey } from "@/lib/server/bill-reader";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { solAnswersInChannel } from "@/lib/server/design-sol";
@@ -75,7 +75,13 @@ export async function POST(request: Request) {
         if (!room) return Response.json({ ok: false, message: "There's no such conversation." }, { status: 404 });
         const text = cleanWords(form.get("text"));
         const files = form.getAll("file").filter((f): f is File => f instanceof File);
-        const line = await sayInTeam(me, room, { text, files, dealIds: cleanDealIds(form.getAll("deal")) });
+        const replyTo = form.get("replyTo");
+        const line = await sayInTeam(me, room, {
+          text,
+          files,
+          dealIds: cleanDealIds(form.getAll("deal")),
+          replyTo: isTeamLineId(replyTo) ? replyTo : null,
+        });
         askSolIfTagged(who.member, room, text);
         return Response.json({ ok: true, line });
       }
@@ -104,7 +110,12 @@ export async function POST(request: Request) {
       if (!allow(request, "design-team", 600))
         return Response.json({ ok: false, message: "That's a lot of messages this hour: try again shortly." }, { status: 429 });
       const text = cleanWords(b.text);
-      const line = await sayInTeam(me, room, { text, files: [], dealIds: cleanDealIds(b.deals) });
+      const line = await sayInTeam(me, room, {
+        text,
+        files: [],
+        dealIds: cleanDealIds(b.deals),
+        replyTo: isTeamLineId(b.replyTo) ? b.replyTo : null,
+      });
       askSolIfTagged(who.member, room, text);
       return Response.json({ ok: true, line });
     } catch (e) {

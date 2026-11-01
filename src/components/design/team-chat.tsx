@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { AtSign, FileText, Hash, MessagesSquare, Paperclip, Pencil, SmilePlus, SquareKanban, Trash2, X } from "lucide-react";
+import { AtSign, FileText, Hash, MessagesSquare, Paperclip, Pencil, Reply, SmilePlus, SquareKanban, Trash2, X } from "lucide-react";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { handleOf } from "@/lib/domain/design/mentions";
@@ -22,6 +22,7 @@ import {
   initialsOf,
   isTeamPicture,
   nameOf,
+  replyQuote,
   roomLabel,
   tagsIn,
   teamFilesProblem,
@@ -30,6 +31,7 @@ import {
   type TeamDeal,
   type TeamFile,
   type TeamLine,
+  type TeamReply,
 } from "@/lib/domain/design/team-chat";
 import { listJobs, type JobLine } from "@/lib/services/crm";
 import {
@@ -47,6 +49,7 @@ import {
 } from "@/lib/services/team-chat";
 import { useDesignAccount } from "./design-account";
 import { SolIcon } from "./sol-icon";
+import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolThinking } from "./sol-thinking";
 
 const when = (iso: string) =>
@@ -57,7 +60,8 @@ const SOL_WAIT_MS = 120_000;
 
 /**
  * The team chat (1 Nov 2026, as Primero's): channels and the people down the left, the room on the right. Lines run
- * oldest first, your own on the right; hover one to react, or to change or delete your own. In a channel, @ tags a
+ * oldest first, your own on the right; hover one to reply to it (as iMessage: the reply carries a quote of it, which
+ * jumps back to it), to react, or to change or delete your own. In a channel, @ tags a
  * member (or Sol, who answers there), # drops a deal in as a card; files and pictures go with a line (the paperclip,
  * pasting a screenshot, or dropping them on the room). It asks for new lines every ten seconds while open; whatever is
  * on screen counts as read.
@@ -86,6 +90,9 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
   const [tagAt, setTagAt] = useState<{ start: number; query: string } | null>(null);
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [hi, setHi] = useState(0);
+  /** The message being answered, with the room it is in: a reply is only offered in that room. */
+  const [replying, setReplying] = useState<{ room: string; reply: TeamReply } | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -213,21 +220,41 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
     const words = text.trim();
     if ((!words && !files.length && !deals.length) || sending) return;
     setSending(true);
+    const answering = replying?.room === room ? replying.reply.id : null;
     const r = await sayInTeam(
       room,
       words,
       deals.map((d) => d.id),
       files,
+      answering,
     );
     setSending(false);
     if (!r.ok) return setError(r.message);
     setText("");
+    setReplying(null);
     setFiles([]);
     setDeals([]);
     setEmojis(false);
     if (asksSol(room, words)) setSolSince(Date.now());
     setView((v) => (v ? { ...v, lines: [...v.lines, r.line] } : v));
   };
+
+  /** Answer this message: it waits over the box, and the box is ready to type in. */
+  const replyTo = (l: TeamLine) => {
+    setReacting(null);
+    setEditing(null);
+    setReplying({ room, reply: { id: l.id, by: l.by, text: replyQuote(l) } });
+    requestAnimationFrame(() => box.current?.focus());
+  };
+  /** Back to the message a reply answers: scrolled into the middle and lit for a moment. */
+  const showLine = (id: string) => {
+    const el = document.getElementById(`tl-${id}`);
+    if (!el) return setError("That message is further back than this chat shows.");
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    setFlash(id);
+    window.setTimeout(() => setFlash((f) => (f === id ? null : f)), 1600);
+  };
+  const answering = replying?.room === room ? replying.reply : null;
 
   const react = async (id: string, emoji: string) => {
     setReacting(null);
@@ -324,13 +351,22 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
             const head = lines[i - 1]?.by !== l.by || Date.parse(l.at) - Date.parse(lines[i - 1]?.at ?? "") > 15 * 60_000;
             const isEditing = editing?.id === l.id;
             return (
-              <div key={l.id} className={clsx("group/line relative flex flex-col", mine ? "items-end" : "items-start")}>
+              <div
+                key={l.id}
+                id={`tl-${l.id}`}
+                className={clsx(
+                  "group/line relative flex scroll-my-6 flex-col rounded-2xl transition-colors duration-700",
+                  mine ? "items-end" : "items-start",
+                  flash === l.id && "bg-sun/70",
+                )}
+              >
                 {head && (
                   <p className={clsx("mb-0.5 mt-2 flex items-center gap-1.5 px-1 text-[11px] text-muted", mine && "flex-row-reverse")}>
                     {!mine && <Round email={l.by} small />}
                     <span className="font-medium text-ink-2">{mine ? "You" : nameOf(l.by)}</span> · {when(l.at)}
                   </p>
                 )}
+                {l.replyTo && <Quoted reply={l.replyTo} mine={mine} me={me} onShow={showLine} />}
                 {l.files?.length ? <Files files={l.files} mine={mine} /> : null}
                 {isEditing ? (
                   <div className="flex w-[85%] flex-col items-end gap-1">
@@ -370,6 +406,16 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
                   )
                 )}
                 {l.edited && !isEditing && <p className="px-1 text-[10px] text-muted">edited</p>}
+                {(l.diagrams?.length || l.charts?.length) && (
+                  <div className="mt-1 w-full max-w-[85%] space-y-2">
+                    {l.diagrams?.map((d, k) => (
+                      <SolDiagramView key={`d${k}`} diagram={d} />
+                    ))}
+                    {l.charts?.map((c, k) => (
+                      <SolChartView key={`c${k}`} chart={c} />
+                    ))}
+                  </div>
+                )}
                 {l.deals?.length ? <Deals deals={l.deals} /> : null}
                 {l.reactions && (
                   <div className={clsx("mt-1 flex max-w-[85%] flex-wrap gap-1", mine && "justify-end")}>
@@ -401,6 +447,16 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
                         : "pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/line:pointer-events-auto group-hover/line:opacity-100",
                     )}
                   >
+                    <button
+                      type="button"
+                      onClick={() => replyTo(l)}
+                      aria-label="Reply"
+                      title="Reply"
+                      className="flex size-7 items-center justify-center rounded-full text-ink-2 hover:bg-canvas hover:text-ink"
+                    >
+                      <Reply className="size-3.5" aria-hidden />
+                    </button>
+                    <span className="mx-0.5 h-4 w-px bg-line" aria-hidden />
                     {TEAM_QUICK_REACTIONS.map((e) => (
                       <button
                         key={e}
@@ -504,6 +560,26 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
           }}
           className="border-t border-line p-3"
         >
+          {answering && (
+            <div className="mb-2 flex items-start gap-2 rounded-xl border-l-[3px] border-sun-line bg-canvas py-1.5 pl-2.5 pr-1">
+              <Reply className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold text-ink-2">
+                  Replying to {answering.by === me.toLowerCase() ? "yourself" : nameOf(answering.by)}
+                </p>
+                <p className="truncate text-xs text-muted">{answering.text}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplying(null)}
+                aria-label="Don't reply to this message"
+                title="Don't reply (Esc)"
+                className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink"
+              >
+                <X className="size-3.5" aria-hidden />
+              </button>
+            </div>
+          )}
           {(files.length > 0 || deals.length > 0) && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {deals.map((d) => (
@@ -615,6 +691,11 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
                     return;
                   }
                 }
+                if (e.key === "Escape" && answering) {
+                  e.stopPropagation();
+                  setReplying(null);
+                  return;
+                }
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   void send();
@@ -647,6 +728,37 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
         </form>
       </div>
     </div>
+  );
+}
+
+/**
+ * The message a reply answers, small and quiet above it, as iMessage shows it: who wrote it and a line of it, with a
+ * fine bar on the side the reply is on. Pressing it goes back to that message. A deleted one says so.
+ */
+function Quoted({ reply, mine, me, onShow }: { reply: TeamReply; mine: boolean; me: string; onShow: (id: string) => void }) {
+  const who = reply.by === SOL_BY ? "Sol" : reply.by === me.toLowerCase() ? "You" : nameOf(reply.by);
+  if (reply.gone)
+    return (
+      <p className={clsx("mb-0.5 max-w-[75%] rounded-xl px-2.5 py-1 text-[11px] italic text-muted", mine ? "mr-2" : "ml-2")}>
+        Replying to a deleted message
+      </p>
+    );
+  return (
+    <button
+      type="button"
+      onClick={() => onShow(reply.id)}
+      title="Go to this message"
+      className={clsx(
+        "mb-0.5 flex max-w-[75%] items-start gap-1.5 rounded-xl bg-canvas/80 px-2.5 py-1 text-left text-[12px] text-muted ring-1 ring-line hover:text-ink-2",
+        mine ? "mr-2 flex-row-reverse border-r-2 border-line-strong text-right" : "ml-2 border-l-2 border-line-strong",
+      )}
+    >
+      <Reply className={clsx("mt-0.5 size-3 shrink-0", mine && "-scale-x-100")} aria-hidden />
+      <span className="min-w-0">
+        <span className="font-semibold text-ink-2">{who}</span>
+        <span className="line-clamp-2"> {reply.text}</span>
+      </span>
+    </button>
   );
 }
 
