@@ -365,6 +365,145 @@ export function looseCorners(panel: LoosePanel, size: PanelSize = PANEL): Placed
 }
 
 /**
+ * A panel lying exactly where it lies, but facing `facing` (as Primero's: a panel turned on its side with the 90°
+ * button and clicked onto a portrait array kept its turned arrow, so one array faced two ways). Its long edge stays
+ * put: along the facing it is upright, square to it it is on its side. Null when it lies neither way to the facing.
+ */
+export function facingLike(panel: Pick<LoosePanel, "angle">, facing: number, within = 3): Pick<LoosePanel, "angle" | "across"> | null {
+  const turn = squareTurn(panel, { angle: facing }, within);
+  if (turn === null) return null;
+  return turn === 0 ? { angle: turn360(facing), across: false } : { angle: turn360(facing + 270), across: true };
+}
+
+/** Whether two panels lie square to each other: the same way round (0), or a quarter turn apart (90). Null otherwise. */
+export function squareTurn(a: Pick<LoosePanel, "angle">, b: Pick<LoosePanel, "angle">, within = 3): 0 | 90 | null {
+  const turn = (((a.angle - b.angle) % 180) + 180) % 180;
+  if (Math.min(turn, 180 - turn) <= within) return 0;
+  if (Math.abs(turn - 90) <= within) return 90;
+  return null;
+}
+
+/** Where a panel can sit flush against another, in the other's own frame (x across its short side, y along its long side). */
+export interface FlushSpot {
+  x: number;
+  y: number;
+  /** The edge the two share, in the same frame: where the join is drawn. */
+  join: [Point, Point];
+}
+
+/**
+ * Every place `mover` can sit flush against `from` (as Primero's: a landscape panel clicks against a portrait one like a
+ * magnet), each drawn at its true size from above (`planSize`): beside it, against its long sides, or a row on,
+ * against its short sides, a gap apart, its edge lined up with the other's end or middle; and, when both lie the same
+ * way round, at its corners. `mover` lies the way it will be laid: the same way round as `from`, or a quarter turn.
+ */
+export function flushSpots(
+  from: Pick<LoosePanel, "across" | "tilt">,
+  mover: Pick<LoosePanel, "across" | "tilt">,
+  size: PanelSize = PANEL,
+): FlushSpot[] {
+  const quarter = Boolean(from.across) !== Boolean(mover.across);
+  const op = planSize(from, size);
+  const mp = planSize(mover, size);
+  const ow = op.w / 2;
+  const oh = op.h / 2;
+  const mw = (quarter ? mp.h : mp.w) / 2;
+  const mh = (quarter ? mp.w : mp.h) / 2;
+  const out: FlushSpot[] = [];
+  const add = (x: number, y: number, join: [Point, Point]) => {
+    if (!out.some((p) => Math.abs(p.x - x) < 1e-6 && Math.abs(p.y - y) < 1e-6)) out.push({ x, y, join });
+  };
+  for (const side of [-1, 1]) {
+    const bx = side * (ow + mw + size.gap);
+    for (const y of [0, oh - mh, mh - oh])
+      add(bx, y, [
+        { x: side * (ow + size.gap / 2), y: Math.max(-oh, y - mh) },
+        { x: side * (ow + size.gap / 2), y: Math.min(oh, y + mh) },
+      ]);
+    const ry = side * (oh + mh + size.gap);
+    for (const x of [0, ow - mw, mw - ow])
+      add(x, ry, [
+        { x: Math.max(-ow, x - mw), y: side * (oh + size.gap / 2) },
+        { x: Math.min(ow, x + mw), y: side * (oh + size.gap / 2) },
+      ]);
+  }
+  if (!quarter)
+    for (const sx of [-1, 1])
+      for (const sy of [-1, 1]) {
+        const c = { x: sx * (ow + size.gap / 2), y: sy * (oh + size.gap / 2) };
+        add(sx * (2 * ow + size.gap), sy * (2 * oh + size.gap), [c, c]);
+      }
+  return out;
+}
+
+/**
+ * Where a new panel laid `landscape` (or not) clicks flush against a panel near the pointer that lies the other way
+ * (as Primero's): the nearest flush spot within `reach` metres of the pointer that overlaps nothing, facing the way that
+ * panel faces, with the edge they share for drawing. Null when there is none, or the panels near lie the same way.
+ */
+export function flushGhostAt(
+  p: Point,
+  standing: readonly LoosePanel[],
+  landscape: boolean,
+  size: PanelSize = PANEL,
+  reach = 1.2,
+): { ghost: LoosePanel; join: [Point, Point]; away: number } | null {
+  let best: { ghost: LoosePanel; join: [Point, Point]; away: number } | null = null;
+  for (const from of standing) {
+    if (Boolean(from.across) === landscape) continue;
+    const facing = panelFacing(from);
+    const local = toPanelFrame(from, p);
+    for (const spot of flushSpots(from, { across: landscape, tilt: from.tilt }, size)) {
+      const away = Math.hypot(local.x - spot.x, local.y - spot.y);
+      if (away > reach || (best && away >= best.away)) continue;
+      const at = fromPanelFrame(from, spot);
+      const { across: _was, ...rest } = from;
+      void _was;
+      const ghost: LoosePanel = {
+        ...rest,
+        id: "ghost",
+        x: Math.round(at.x * 100) / 100,
+        y: Math.round(at.y * 100) / 100,
+        angle: landscape ? turn360(facing + 270) : turn360(facing),
+        ...(landscape ? { across: true } : {}),
+      };
+      if (standing.some((other) => panelsOverlap(ghost, other, size))) continue;
+      best = { ghost, join: [fromPanelFrame(from, spot.join[0]), fromPanelFrame(from, spot.join[1])], away };
+    }
+  }
+  return best;
+}
+
+/** A point in a panel's own frame, on the roof. */
+export function fromPanelFrame(panel: Pick<LoosePanel, "x" | "y" | "angle">, local: Point): Point {
+  const turned = rotate(local, panel.angle);
+  return { x: turned.x + panel.x, y: turned.y + panel.y };
+}
+
+/** A point on the roof, in a panel's own frame. */
+export function toPanelFrame(panel: Pick<LoosePanel, "x" | "y" | "angle">, p: Point): Point {
+  return rotate({ x: p.x - panel.x, y: p.y - panel.y }, -panel.angle);
+}
+
+/** Whether two panels overlap (touching or a gap apart doesn't count), whichever way each is turned. */
+export function panelsOverlap(a: LoosePanel, b: LoosePanel, size: PanelSize = PANEL): boolean {
+  const pa = looseCorners(a, size);
+  const pb = looseCorners(b, size);
+  const slack = size.gap / 2;
+  for (const poly of [pa, pb])
+    for (let i = 0; i < 4; i++) {
+      const e = { x: poly[(i + 1) % 4].x - poly[i].x, y: poly[(i + 1) % 4].y - poly[i].y };
+      const n = Math.hypot(e.x, e.y) || 1;
+      const axis = { x: -e.y / n, y: e.x / n };
+      const on = (pts: readonly Point[]) => pts.map((p) => p.x * axis.x + p.y * axis.y);
+      const ra = on(pa);
+      const rb = on(pb);
+      if (Math.max(...ra) <= Math.min(...rb) + slack || Math.max(...rb) <= Math.min(...ra) + slack) return false;
+    }
+  return true;
+}
+
+/**
  * A grid panel as one placed by hand, exactly where it stands: what it becomes when someone moves or turns
  * it. The caller also switches its place in the grid off.
  */

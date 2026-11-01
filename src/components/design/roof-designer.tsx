@@ -93,6 +93,8 @@ import {
   freed,
   inverterSpot,
   inside,
+  flushGhostAt,
+  facingLike,
   looseCorners,
   ARRAY_GAP,
   panelGap,
@@ -202,6 +204,11 @@ const SIDE_VIEWS: { id: SideView; label: string; hint: string }[] = [
 ];
 
 const GLASS = "rounded-2xl border border-line bg-surface/90 shadow-lift backdrop-blur-md";
+
+/** A panel's outline before it is placed, with the edge it shares with the panel it clicks against. */
+type Ghost = LoosePanel & { join?: [Point, Point] };
+/** A ghost as the panel it becomes: the join is only for drawing. */
+const bare = ({ join, ...panel }: Ghost): LoosePanel => (void join, panel);
 
 /** Something picked on the drawing: a panel in a row, a panel placed by hand, or a label. */
 type Pick = { kind: "grid"; face: string; index: number } | { kind: "loose"; id: string } | { kind: "label"; id: string };
@@ -947,7 +954,7 @@ export function RoofDesigner(props: {
   // The box being dragged out to pick several things.
   const [band, setBand] = useState<{ a: Point; b: Point } | null>(null);
   // The outline of the panel the "place a panel" tool would put down.
-  const [ghosts, setGhosts] = useState<LoosePanel[]>([]);
+  const [ghosts, setGhosts] = useState<Ghost[]>([]);
   // Which way a picked group's turn handle points, in degrees from straight up: it follows the pointer while the group is spun.
   const [spinAt, setSpinAt] = useState(0);
   // The discussion: saved the moment something is said, apart from the drawing.
@@ -1417,7 +1424,7 @@ export function RoofDesigner(props: {
    * one along: beside it on the side the pointer is nearest, at the same angle, a panel's gap away. Anywhere
    * else it is a panel under the pointer, turned the way the face under it runs.
    */
-  const ghostAt = (p: Point): LoosePanel | null => {
+  const ghostAt = (p: Point): Ghost | null => {
     const hit = hitAt(p);
     const base = hit && !hit.empty && hit.pick.kind !== "label" ? standing(hit.pick) : null;
     if (!base) {
@@ -1448,6 +1455,10 @@ export function RoofDesigner(props: {
         const j = Math.round((-(p.x - from.x) * Math.sin(t) + (p.y - from.y) * Math.cos(t)) / stepY);
         if ((i || j) && Math.abs(i) <= 1 && Math.abs(j) <= 1) beside = { from, i, j, away };
       }
+      // Laid the other way from the panel near it (as Primero's): it clicks flush against it like a magnet, beside it or a
+      // row on, facing the same way, with the edge they share lit (`flushSpots`).
+      const turned = addLandscape !== null ? flushGhostAt(p, standingNow, addLandscape, size) : null;
+      if (turned && (!beside || turned.away < beside.away)) return { ...turned.ghost, join: turned.join };
       if (beside) {
         const { stepX, stepY } = stepsOf(beside.from);
         const t = (beside.from.angle * Math.PI) / 180;
@@ -2292,7 +2303,7 @@ export function RoofDesigner(props: {
     }
     if (held?.mode === "array") {
       // Everything outlined is placed, and picked, so the whole array can be nudged or turned straight away.
-      let placed = ghosts.map((g) => ({ ...g, id: newId("p") }));
+      let placed = ghosts.map((g) => ({ ...bare(g), id: newId("p") }));
       if (placed.length) {
         // Laid in the open, it settles square against the roof's edges; one joined onto other panels stays where it joined.
         const settle = !e.altKey && !joinedToOthers(placed) ? settleToEdges(placed, roofEdges, size) : null;
@@ -2315,7 +2326,31 @@ export function RoofDesigner(props: {
       // Panels moved by hand settle square against the nearest roof edge or guide line, unless they joined other panels.
       const starts = held.starts;
       const group = loose.filter((p) => starts[`l:${p.id}`]);
-      const settle = group.length && !joinedToOthers(group) ? settleToEdges(group, roofEdges, size) : null;
+      if (group.length && joinedToOthers(group)) {
+        // Joined to other panels, each faces the way the panel it joined does (as Primero's: one array, one direction).
+        const ids = new Set(group.map((p) => p.id));
+        const others = [
+          ...loose.filter((o) => !ids.has(o.id)),
+          ...faces.flatMap((fc) =>
+            panelPlaces(fc, size)
+              .filter((pl) => !fc.off.includes(pl.index))
+              .map((pl) => freed(fc, pl, "x")),
+          ),
+        ];
+        const turnedTo = new Map(
+          group.map((p) => {
+            const near = others
+              .map((o) => ({ o, d: Math.hypot(o.x - p.x, o.y - p.y) }))
+              .filter((n) => n.d < size.long + 0.1)
+              .sort((x, y) => x.d - y.d)[0]?.o;
+            const like = near ? facingLike(p, panelFacing(near)) : null;
+            return [p.id, like ? { ...p, angle: like.angle, across: like.across || undefined } : p];
+          }),
+        );
+        setLoose(loose.map((p) => turnedTo.get(p.id) ?? p));
+        return;
+      }
+      const settle = group.length ? settleToEdges(group, roofEdges, size) : null;
       if (settle) {
         const moved = new Map(applySettle(group, settle).map((p) => [p.id, p]));
         setLoose(loose.map((p) => moved.get(p.id) ?? p));
@@ -3836,6 +3871,18 @@ export function RoofDesigner(props: {
                           strokeDasharray={`${3 * u} ${2 * u}`}
                         />
                         {aspect(ghost, panelFacing(ghost), ghost.tilt ?? TILT.roof, "#ffffff")}
+                        {/* The edge it shares with the panel it clicks against, lit. */}
+                        {ghost.join && ghosts.length === 1 && (
+                          <line
+                            x1={px(ghost.join[0])[0]}
+                            y1={px(ghost.join[0])[1]}
+                            x2={px(ghost.join[1])[0]}
+                            y2={px(ghost.join[1])[1]}
+                            stroke="var(--sun-line)"
+                            strokeWidth={2.5 * u}
+                            strokeLinecap="round"
+                          />
+                        )}
                       </g>
                     ))}
                   {/* Shade analysis: each panel tinted by how open it is to the sun over a year, with the figure on it. */}
