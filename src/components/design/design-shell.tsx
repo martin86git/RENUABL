@@ -14,7 +14,7 @@ import { notificationCount, serviceCount, approvalCounts, updatesUnseen } from "
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
-import { SolDock, SolRail } from "./sol-dock";
+import { SolDock, SolNavButton, SolRail } from "./sol-dock";
 import { TeamChatButton } from "./team-chat";
 import { DayPill, GearMenu, MessagesMenu, NotificationsMenu, TopIcon } from "./shell-menus";
 
@@ -50,12 +50,16 @@ export const PATHS = {
   signIn: "/design/sign-in",
 } as const;
 
-/** The phone's foot bar: the places used most, under the thumb; everything else is under More. */
-const PHONE_TABS: { label: string; href: string; icon: LucideIcon; match: (path: string) => boolean }[] = [
+type PhoneTab = { label: string; href: string; icon: LucideIcon; match: (path: string) => boolean };
+
+/**
+ * The phone's foot bar: the places used most, under the thumb, with Sol raised in the middle (1 Nov 2026, Martin: Sol
+ * was buried under More); everything else, the design tool first, is under More.
+ */
+const PHONE_TABS: [PhoneTab, PhoneTab, PhoneTab] = [
   { label: "Today", href: PATHS.home, icon: LayoutDashboard, match: (p) => p === PATHS.home },
   { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
   { label: "Messages", href: PATHS.messages, icon: MessageCircle, match: (p) => p.startsWith(PATHS.messages) },
-  { label: "Design", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
 ];
 
 /**
@@ -192,16 +196,20 @@ function Shell({
         </div>
       )}
       {/* Across the top on a wide screen: the logo, the sections (with the design tool in orange) and a round search, and the card of icons. */}
-      <header className={clsx("z-[35] hidden bg-canvas/90 backdrop-blur print:hidden lg:block lg:px-14", !tool && "sticky top-0")}>
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-4 px-2 pt-4">
+      <header
+        className={clsx("studio-top z-[35] hidden bg-canvas/90 backdrop-blur print:hidden lg:block lg:px-14", !tool && "sticky top-0")}
+      >
+        {/* The sections centre in the room between the logo and the icons, so the three never overlap (1 Nov 2026: with Sol's
+            round and the Marketplace the pill no longer fitted the page's middle third at 1440px). */}
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-4 px-2 pt-4">
           <div className="flex min-w-0 items-start gap-5">
             <Link href={PATHS.home} aria-label="RENUABL, today" className="mt-[1.45rem] shrink-0">
               <Wordmark className="text-[17px]" />
             </Link>
           </div>
           {/* 1 Nov 2026, Martin (as Primero's): the Search pill gave way to a round magnifier just right of the sections. */}
-          <div className="mt-4 flex items-center gap-2">
-            <nav aria-label="Sections" className="flex items-center gap-0.5 rounded-full bg-surface-2 p-1">
+          <div className="mt-4 flex min-w-0 items-center justify-center-safe gap-2">
+            <nav aria-label="Sections" className="studio-sections flex items-center gap-0.5 rounded-full bg-surface-2 p-1">
               {SECTIONS.map((sec) => {
                 const lit = sec.id === current.id;
                 const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);
@@ -240,13 +248,17 @@ function Shell({
                   </Link>,
                 ];
               })}
+              {/* Sol, the other tool, as the graphite round at the far end: the two rounds frame the sections. */}
+              <span className="ml-1">
+                <SolNavButton />
+              </span>
             </nav>
             <button
               type="button"
               onClick={() => setSearching(true)}
-              aria-label="Search customers and deals"
-              title="Search customers and deals (Ctrl K)"
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line hover:text-ink"
+              aria-label="Search, or ask Sol"
+              title="Search, or ask Sol (Ctrl K)"
+              className="studio-search flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line hover:text-ink"
             >
               <Search className="size-4" aria-hidden />
             </button>
@@ -314,7 +326,7 @@ function Shell({
         <button
           type="button"
           onClick={() => setSearching(true)}
-          aria-label="Search"
+          aria-label="Search, or ask Sol"
           className="ml-auto flex size-9 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line"
         >
           <Search className="size-4" aria-hidden />
@@ -336,10 +348,20 @@ function Shell({
         aria-label="Sections, on a phone"
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden"
       >
-        {PHONE_TABS.map((t) => {
+        {PHONE_TABS.map((t, i) => {
           const lit = !more && t.match(path);
+          const sol =
+            i === 2 ? (
+              <div key="sol" className="flex min-h-14 flex-col items-center justify-end gap-0.5 pb-1 text-[10px] font-medium text-ink">
+                <span className="-mt-5">
+                  <SolNavButton phone />
+                </span>
+                Sol
+              </div>
+            ) : null;
           const n = t.href === PATHS.messages ? unread : 0;
-          return (
+          return [
+            sol,
             <Link
               key={t.label}
               href={t.href}
@@ -359,8 +381,8 @@ function Shell({
                 )}
               </span>
               {t.label}
-            </Link>
-          );
+            </Link>,
+          ];
         })}
         <button
           type="button"
@@ -390,8 +412,15 @@ function Shell({
               }}
               className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-xl border border-line px-3 text-base text-muted"
             >
-              <Search className="size-5" aria-hidden /> Search customers and deals
+              <Search className="size-5" aria-hidden /> Search, or ask Sol
             </button>
+            <Link
+              href={PATHS.designer}
+              onClick={() => setMore(false)}
+              className="mt-2 flex min-h-12 items-center gap-3 rounded-xl bg-sun-line px-3 text-base font-medium text-white"
+            >
+              <PenTool className="size-5" aria-hidden /> Design tool
+            </Link>
             {SECTIONS.map((sec) => (
               <div key={sec.id}>
                 <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{sec.label}</p>
@@ -415,7 +444,7 @@ function Shell({
             ))}
             <div className="mt-4 border-t border-line pt-2">
               {[
-                { label: "Sol", href: PATHS.sol, n: 0 },
+                { label: "Sol's page: reminders and preferences", href: PATHS.sol, n: 0 },
                 { label: "Team chat", href: PATHS.team, n: 0 },
                 { label: "Notifications", href: PATHS.notifications, n: mentions },
                 { label: "Email", href: PATHS.inbox, n: mail },
@@ -448,7 +477,7 @@ function Shell({
         customer={(id) => `${PATHS.customers}/${id}`}
         deal={(id) => `${PATHS.deals}/${id}`}
       />
-      {/* Sol: the rail down the right (not over the design tool, which needs the room) and his panel. */}
+      {/* The rail down the right (team chat and the numbers; not over the design tool, which needs the room) and Sol's panel. */}
       {on && !tool && <SolRail team={<TeamChatButton me={account.email} />} />}
       {on && <SolDock />}
     </div>

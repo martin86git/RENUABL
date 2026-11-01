@@ -30,3 +30,18 @@ export function matches(item: Findable, typed: string): boolean {
   const hay = item.words.join(" ").toLowerCase();
   return q.split(/\s+/).every((w) => hay.includes(w));
 }
+
+/** Words that start a question or a request to Sol rather than a name ("draft", "show", "who"). */
+const ASKING =
+  /^(who|what|which|when|where|why|how|can|could|should|would|is|are|do|does|did|will|draft|write|show|tell|find me|remind|summarise|summarize|give|list|chart|explain|help)\b/;
+
+/**
+ * Whether what was typed in the search reads as something to ask Sol (1 Nov 2026, Martin: search and Sol are one box):
+ * a question mark, a word that starts a question or a request, or five words or more. A number never is. Then "Ask Sol"
+ * comes first and Enter asks him; otherwise the customers and deals found come first.
+ */
+export function looksLikeQuestion(typed: string): boolean {
+  const q = typed.trim().toLowerCase();
+  if (q.length < 2 || looksLikePhone(q)) return false;
+  return q.endsWith("?") || ASKING.test(q) || q.split(/\s+/).length >= 5;
+}

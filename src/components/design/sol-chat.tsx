@@ -37,7 +37,7 @@ import {
   pinTurn,
 } from "@/lib/services/sol";
 import { DictateButton, withSpoken } from "./dictate";
-import { SolIcon } from "./sol-icon";
+import { SolMark } from "./sol-icon";
 import { SolThinking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 
@@ -101,9 +101,17 @@ function useSol() {
  * their reminders and preferences beside it) and in the panel down the right of every page (`side`). The box takes
  * words, dictation, a PDF or a picture (up to three), and "#" to pull in a deal. What he draws (charts, diagrams),
  * the emails he writes (as draft cards to send from the deal) and reminder times show under his answer. Whatever is
- * on screen counts as seen.
+ * on screen counts as seen. `question` is one asked from elsewhere (the search's "Ask Sol"), asked here once.
  */
-export function SolChat({ side = false, onClose }: { side?: boolean; onClose?: () => void }) {
+export function SolChat({
+  side = false,
+  onClose,
+  question,
+}: {
+  side?: boolean;
+  onClose?: () => void;
+  question?: { id: number; text: string } | null;
+}) {
   const router = useRouter();
   const { state, problem, run } = useSol();
   const [text, setText] = useState("");
@@ -178,6 +186,14 @@ export function SolChat({ side = false, onClose }: { side?: boolean; onClose?: (
     }
   };
 
+  // A question from elsewhere is asked once, as soon as the panel is open (`asked` keeps a second render from asking again).
+  const asked = useRef<number | null>(null);
+  useEffect(() => {
+    if (!question || asked.current === question.id) return;
+    asked.current = question.id;
+    void send(question.text);
+  }, [question]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const pickDeal = (j: JobLine) => {
     if (!dealAt) return;
     const before = text.slice(0, dealAt.start);
@@ -211,8 +227,8 @@ export function SolChat({ side = false, onClose }: { side?: boolean; onClose?: (
     >
       <div className="flex items-center gap-3 border-b border-line px-5 py-3">
         <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-          <span className="inline-flex size-7 items-center justify-center rounded-full bg-sun text-sun-line">
-            <SolIcon className="size-4" aria-hidden />
+          <span className="sol-orb inline-flex size-8 items-center justify-center rounded-full">
+            <SolMark className="size-5" glow={false} />
           </span>
           Sol {!side && <span className="font-normal text-muted">· your conversation is yours alone</span>}
         </p>

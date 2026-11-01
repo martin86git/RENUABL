@@ -176,13 +176,36 @@ body {
   transition: right 300ms ease;
 }
 /* The top bar fits in less room (a narrow wide screen, or Sol's panel open) by putting the day and weather away. */
-@media (max-width: 1279px) {
+@media (max-width: 1535px) {
   .studio-day-pill {
     display: none;
   }
 }
-@media (max-width: 1699px) {
+@media (max-width: 1919px) {
   html.sol-docked .studio-day-pill {
+    display: none;
+  }
+}
+/* Shorter still (a laptop, or Sol's panel open beside the page): the sections closer together and the frame's sides
+   narrower; with the panel open the magnifier goes too (Sol is open to ask, and Ctrl K still searches). */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .studio-top {
+    padding-inline: 1.5rem;
+  }
+  .studio-sections > a {
+    padding-inline: 0.6rem;
+    font-size: 13px;
+  }
+}
+@media (min-width: 1024px) and (max-width: 1919px) {
+  html.sol-docked .studio-top {
+    padding-inline: 1.5rem;
+  }
+  html.sol-docked .studio-sections > a {
+    padding-inline: 0.6rem;
+    font-size: 13px;
+  }
+  html.sol-docked .studio-search {
     display: none;
   }
 }
@@ -211,6 +234,32 @@ body {
     box-shadow: 0 0 0 6px rgb(255 90 31 / 0);
   }
 }
+/* Sol's round in the nav (sol-dock.tsx `SolNavButton`): graphite lit from above, his mark breathing slowly inside,
+   warming to the signal orange on hover. The design tool's round is the orange one; his is the dark one. */
+.sol-orb {
+  background: radial-gradient(circle at 50% 30%, #3b3e45 0%, #1d1f23 68%, #141518 100%);
+  box-shadow:
+    0 4px 14px rgb(20 22 26 / 0.28),
+    inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+.sol-orb:hover,
+.sol-orb:focus-visible {
+  box-shadow:
+    0 4px 20px rgb(255 90 31 / 0.4),
+    inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+@keyframes sol-breathe {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgb(255 138 61 / 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 4px rgb(255 138 61 / 0.75));
+  }
+}
+.sol-breathe {
+  animation: sol-breathe 4s ease-in-out infinite;
+}
 .sol-rays {
   transform-origin: center;
   animation: sol-rays-turn 9s linear infinite;
@@ -224,6 +273,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .sol-rays,
   .sol-rays line,
+  .sol-breathe,
   .sol-glow {
     animation: none;
   }

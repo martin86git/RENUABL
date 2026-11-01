@@ -19,6 +19,8 @@ export const pinTurn = (at: string, role: "you" | "sol", pinned: boolean) => pos
 
 /** Said on the window to open or shut Sol's panel from anywhere (the rail, a "#" link). */
 export const SOL_TOGGLE = "renuabl:sol-toggle";
+/** Said on the window with a question (`detail`, the words): opens Sol's panel and asks him (the search, "Ask Sol"). */
+export const SOL_ASK = "renuabl:sol-ask";
 /** Said back whenever the panel opens or shuts, so the rail can light its button. */
 export const SOL_STATE = "renuabl:sol-state";
 /** Said whenever Sol's conversation changes here, so the rail's count follows. */

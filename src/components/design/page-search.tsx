@@ -5,21 +5,25 @@ import { useEffect, useRef, useState } from "react";
 import { CornerDownLeft, Phone, Search, SquareKanban, UserRound } from "lucide-react";
 import clsx from "clsx";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
-import { PHONE_FROM, digitsOf, looksLikePhone, matches } from "@/lib/domain/design/find";
+import { PHONE_FROM, digitsOf, looksLikePhone, looksLikeQuestion, matches } from "@/lib/domain/design/find";
 import { listCustomers, listJobs, type CustomerLine, type JobLine } from "@/lib/services/crm";
+import { SOL_ASK } from "@/lib/services/sol";
+import { SolIcon } from "./sol-icon";
 
 interface Hit {
   key: string;
-  kind: "customer" | "deal";
+  kind: "customer" | "deal" | "sol";
   title: string;
   line: string;
   href: string;
 }
 
 /**
- * Search (31 Oct 2026, as Primero's): Ctrl K or ⌘K anywhere, or the pill top left. Who's calling, matched as each digit
- * of their number goes in (`matches` in find.ts), or by name, email or address; then their deals. Arrows and Enter
- * choose; a customer opens their page, a deal its own. The business's customers and deals are read once when it opens.
+ * Search, or ask Sol (31 Oct 2026, as Primero's; 1 Nov 2026, Martin: one box for both): Ctrl K or ⌘K anywhere, or the
+ * round magnifier. Who's calling, matched as each digit of their number goes in (`matches` in find.ts), or by name,
+ * email or address; then their deals. Anything typed that isn't a number can also be asked of Sol: "Ask Sol" comes
+ * first when it reads as a question (`looksLikeQuestion`), else after what was found, and opens his panel with it
+ * asked. Arrows and Enter choose. The business's customers and deals are read once when it opens.
  */
 export function PageSearch(props: { open: boolean; onClose: () => void; customer: (id: string) => string; deal: (id: string) => string }) {
   const router = useRouter();
@@ -76,6 +80,12 @@ export function PageSearch(props: { open: boolean; onClose: () => void; customer
               href: props.deal(j.id),
             })),
         ];
+  // Sol is offered for anything that isn't a number: first when it reads as a question, else after what was found.
+  if (typed.length >= 2 && !phone) {
+    const sol: Hit = { key: "sol", kind: "sol", title: `Ask Sol: “${typed}”`, line: "Opens Sol beside this page", href: "" };
+    if (looksLikeQuestion(typed) || hits.length === 0) hits.unshift(sol);
+    else hits.push(sol);
+  }
   const chosen = Math.min(at, Math.max(0, hits.length - 1));
   const close = () => {
     setQ("");
@@ -84,7 +94,8 @@ export function PageSearch(props: { open: boolean; onClose: () => void; customer
   };
   const go = (h: Hit) => {
     close();
-    router.push(h.href);
+    if (h.kind === "sol") window.dispatchEvent(new CustomEvent(SOL_ASK, { detail: typed }));
+    else router.push(h.href);
   };
 
   return (
@@ -118,8 +129,8 @@ export function PageSearch(props: { open: boolean; onClose: () => void; customer
                 go(hits[chosen]);
               }
             }}
-            placeholder="Who's calling? Type their number as it rings, or a name"
-            aria-label="Find a customer or deal by phone number, name, email or address"
+            placeholder="Search a name or number, or ask Sol anything"
+            aria-label="Find a customer or deal by phone number, name, email or address, or ask Sol"
             className="h-14 min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-muted"
           />
           <kbd className="hidden rounded border border-line px-1.5 text-xs text-muted sm:inline">Esc</kbd>
@@ -133,7 +144,7 @@ export function PageSearch(props: { open: boolean; onClose: () => void; customer
                 phone ? (
                   "Keep typing the number: it starts matching from the fourth digit."
                 ) : (
-                  "Type their phone number as it rings, or their name, email or address."
+                  "Type their number as it rings, their name, email or address, or a question for Sol."
                 )
               ) : !data ? (
                 <span className="animate-pulse">Searching…</span>
@@ -145,7 +156,7 @@ export function PageSearch(props: { open: boolean; onClose: () => void; customer
             </li>
           )}
           {hits.map((h, n) => {
-            const Icon = h.kind === "customer" ? UserRound : SquareKanban;
+            const Icon = h.kind === "customer" ? UserRound : h.kind === "deal" ? SquareKanban : SolIcon;
             const on = n === chosen;
             return (
               <li key={h.key} role="option" aria-selected={on}>
@@ -158,7 +169,7 @@ export function PageSearch(props: { open: boolean; onClose: () => void; customer
                     on ? "bg-ink text-white" : "text-ink hover:bg-canvas",
                   )}
                 >
-                  <Icon className="size-4 shrink-0" aria-hidden />
+                  <Icon className={clsx("size-4 shrink-0", h.kind === "sol" && !on && "text-sun-line")} aria-hidden />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{h.title}</span>
                     {h.line && <span className={clsx("block truncate text-xs", on ? "text-white/70" : "text-muted")}>{h.line}</span>}
