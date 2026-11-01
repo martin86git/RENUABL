@@ -5,17 +5,23 @@ import { ArrowDown, ArrowUp, Bell } from "lucide-react";
 import clsx from "clsx";
 import { GET_READY, installReminderEmail } from "@/lib/domain/design/schedule";
 import { REMINDER_DAY_CHOICES, rankedLists, type BusinessPrefs } from "@/lib/domain/design/prefs";
+import { MAX_INSTALLERS } from "@/lib/domain/design/job-card";
 import { loadPrefs, savePrefs } from "@/lib/services/after-sale";
 import { loadWorkspace } from "@/lib/services/design-store";
 import { ui } from "./design-shell";
 
-export type AfterSalePart = "suppliers" | "invoices" | "automations";
+export type AfterSalePart = "suppliers" | "installers" | "invoices" | "automations";
 
 const TITLES: Record<AfterSalePart, { title: string; intro: string }> = {
   suppliers: {
     title: "Suppliers and ordering",
     intro:
       "Each price list you upload is a supplier. Put them in your order of preference: a product on more than one list is ordered from the first. Add each supplier's email to send its purchase orders from the Ordering Station.",
+  },
+  installers: {
+    title: "Installers",
+    intro:
+      "The installers you send job cards to. Each gets the card by email with the panel layout, the string design and a private link to it on their phone, where they add notes and photos. Taking someone off this list closes their links.",
   },
   invoices: {
     title: "Installer invoices",
@@ -79,6 +85,7 @@ export function AfterSaleSettings({ part }: { part: AfterSalePart }) {
         </label>
       )}
       {prefs && part === "automations" && <Automations prefs={prefs} onChange={setPrefs} />}
+      {prefs && part === "installers" && <Installers prefs={prefs} onChange={setPrefs} />}
       {prefs && (
         <div className="mt-8 flex items-center gap-3">
           <button type="button" className={ui.primary} disabled={busy} onClick={() => void save()}>
@@ -161,6 +168,65 @@ function Suppliers({ prefs, lists, onChange }: { prefs: BusinessPrefs; lists: st
         </li>
       ))}
     </ol>
+  );
+}
+
+/** The installers on file: a name, the email the job card goes to, and a phone. New ones get their id when saved. */
+function Installers({ prefs, onChange }: { prefs: BusinessPrefs; onChange: (p: BusinessPrefs) => void }) {
+  const set = (i: number, field: "name" | "email" | "phone", value: string) =>
+    onChange({ ...prefs, installers: prefs.installers.map((x, k) => (k === i ? { ...x, [field]: value } : x)) });
+  return (
+    <section className={clsx(ui.card, "mt-6 p-5")}>
+      {prefs.installers.length ? (
+        <ul className="space-y-3">
+          {prefs.installers.map((x, i) => (
+            <li key={x.id || i} className="grid gap-2 sm:grid-cols-[1fr_1.3fr_0.9fr_auto]">
+              <input
+                className={ui.input}
+                value={x.name}
+                placeholder="Name"
+                aria-label="Installer's name"
+                onChange={(e) => set(i, "name", e.target.value)}
+              />
+              <input
+                className={ui.input}
+                type="email"
+                value={x.email}
+                placeholder="Email"
+                aria-label="Installer's email"
+                onChange={(e) => set(i, "email", e.target.value)}
+              />
+              <input
+                className={ui.input}
+                value={x.phone}
+                placeholder="Phone"
+                aria-label="Installer's phone"
+                onChange={(e) => set(i, "phone", e.target.value)}
+              />
+              <button
+                type="button"
+                className={ui.quiet}
+                onClick={() => onChange({ ...prefs, installers: prefs.installers.filter((_, k) => k !== i) })}
+                aria-label={`Take ${x.name || "this installer"} off the list`}
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-ink-2">No installers on file yet.</p>
+      )}
+      <button
+        type="button"
+        className={clsx(ui.quiet, "mt-4")}
+        disabled={prefs.installers.length >= MAX_INSTALLERS}
+        onClick={() => onChange({ ...prefs, installers: [...prefs.installers, { id: "", name: "", email: "", phone: "" }] })}
+      >
+        Add an installer
+      </button>
+      <p className="mt-3 text-xs text-muted">An installer needs a name and an email to be kept. Up to {MAX_INSTALLERS}.</p>
+    </section>
   );
 }
 

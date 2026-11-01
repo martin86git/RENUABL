@@ -33,7 +33,12 @@ const PROPOSAL: Record<string, ProposalPart> = {
   customiser: "customiser",
 };
 
-const AFTER_SALE: Record<string, AfterSalePart> = { suppliers: "suppliers", "installer-invoices": "invoices", automations: "automations" };
+const AFTER_SALE: Record<string, AfterSalePart> = {
+  suppliers: "suppliers",
+  installers: "installers",
+  "installer-invoices": "invoices",
+  automations: "automations",
+};
 
 /** One page of a business's settings, beside the settings' own nav. */
 export default async function DesignSettingPage({ params }: PageProps<"/design/settings/[section]">) {

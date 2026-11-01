@@ -10,7 +10,7 @@ export interface Email {
   subject: string;
   html: string;
   text: string;
-  attachments?: { filename: string; content: string; contentType?: string }[];
+  attachments?: { filename: string; content: string | Buffer; contentType?: string }[];
   /** Where a reply goes, when not the site's own reply address: e.g. the member who sent a purchase order. */
   replyTo?: string;
 }

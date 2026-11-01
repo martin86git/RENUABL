@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, ChevronLeft, ClipboardList, PanelLeftClose, PanelLeftOpen, PenTool, Search, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ClipboardList, PanelLeftClose, PanelLeftOpen, PenTool, Search, Trash2, Wrench } from "lucide-react";
+import { JobCardDialog } from "./job-card";
 import clsx from "clsx";
 import {
   JOB_STAGES,
@@ -158,6 +159,8 @@ export function DealPage({ id }: { id: string }) {
   const [tab, setTab] = useState<Tab>(asked === "chat" ? "chat" : asked === "email" ? "email" : "activities");
   // The design tool as a drawer over the deal (?design=1 opens it), and the left column folded away.
   const [drawer, setDrawer] = useState(useSearchParams().get("design") === "1");
+  // The installation's job card, over the page (wave 7).
+  const [card, setCard] = useState(false);
   const [folded, setFolded] = useState(false);
   const [account] = useDesignAccount();
   // Which of the deal's tabs of fields is showing, and the signed proposal's figures for Financials.
@@ -398,6 +401,10 @@ export function DealPage({ id }: { id: string }) {
               <ClipboardList className="size-4" aria-hidden /> Materials order
             </Link>
           )}
+          <button type="button" onClick={() => setCard(true)} className={clsx(ui.quiet, "mt-2 w-full")}>
+            <Wrench className="size-4" aria-hidden /> Job card
+          </button>
+          {card && <JobCardDialog jobId={job.id} onClose={() => setCard(false)} />}
         </div>
 
         {/* The proposal worked out from this deal's design: whether one is out, and the way to preview and send it. */}

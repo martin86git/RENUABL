@@ -582,6 +582,42 @@ create table if not exists design_deal_files (
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
 create index if not exists design_deal_files_job on design_deal_files(business_id, job_id, at desc);
+-- The installation job card (domain/design/job-card.ts): each installer's private link to a job's card (one each,
+-- for good; sent_at when it was last emailed), and the card's thread of notes and the photos on them.
+create table if not exists design_job_links (
+  token text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  installer_id text not null,
+  sent_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (business_id, job_id, installer_id),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create table if not exists design_job_notes (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  side text not null,
+  by_name text not null,
+  by_email text,
+  text text not null default '',
+  at timestamptz not null default now(),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create index if not exists design_job_notes_job on design_job_notes(business_id, job_id, at desc);
+create table if not exists design_job_files (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  note_id text not null references design_job_notes(id) on delete cascade,
+  name text not null,
+  type text not null,
+  size integer not null,
+  bytes bytea not null,
+  at timestamptz not null default now()
+);
+create index if not exists design_job_files_note on design_job_files(business_id, note_id);
 create table if not exists sessions (
   id_hash text primary key,
   email text not null,

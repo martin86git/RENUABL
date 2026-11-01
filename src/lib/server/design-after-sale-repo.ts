@@ -8,6 +8,7 @@
  * signed-in member (or, for what a signature sets going, from the proposal's
  * own record).
  */
+import { randomBytes } from "node:crypto";
 import { INSTALLED_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import { materialsOrder } from "@/lib/domain/design/deal";
 import { todayInMarket } from "@/lib/domain/market";
@@ -65,7 +66,7 @@ export async function loadPrefs(businessId: string): Promise<BusinessPrefs> {
 }
 
 export async function savePrefs(businessId: string, raw: unknown, by: string): Promise<BusinessPrefs> {
-  const prefs = cleanPrefs(raw);
+  const prefs = cleanPrefs(raw, () => `ins_${randomBytes(8).toString("hex")}`);
   await query(
     `insert into design_prefs (business_id, prefs, updated_by) values ($1, $2, $3)
      on conflict (business_id) do update set prefs = excluded.prefs, updated_by = excluded.updated_by, updated_at = now()`,

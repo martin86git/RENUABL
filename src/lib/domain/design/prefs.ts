@@ -5,6 +5,7 @@
  * its own switch, off until the business turns it on). Kept as one record a
  * business (`design_prefs`), always through `cleanPrefs`. Pure, tested.
  */
+import { cleanInstallers, type Installer } from "./job-card";
 import { cleanDealFields, type DealFieldsConfig } from "./deal-sections";
 import { NO_TARGETS, cleanTargets, type SalesTargets } from "./sales-rings";
 import { NO_PLACES, cleanJobPlaces, type JobPlaces } from "./job-map";
@@ -36,6 +37,8 @@ export interface BusinessPrefs {
   targets: SalesTargets;
   /** The job map's base and each wholesaler's collection point (Procurement → Job map). */
   places: JobPlaces;
+  /** The installers the business sends job cards to (Settings → Installers). */
+  installers: Installer[];
 }
 
 export const DEFAULT_PREFS: BusinessPrefs = {
@@ -47,6 +50,7 @@ export const DEFAULT_PREFS: BusinessPrefs = {
   dealFields: null,
   targets: NO_TARGETS,
   places: NO_PLACES,
+  installers: [],
 };
 
 export const MAX_SUPPLIERS = 12;
@@ -63,7 +67,7 @@ const text = (v: unknown, max: number) =>
     : "";
 
 /** Whatever was sent, as a whole and valid set of preferences: anything unknown or out of range falls back to the default. */
-export function cleanPrefs(raw: unknown): BusinessPrefs {
+export function cleanPrefs(raw: unknown, newId?: () => string): BusinessPrefs {
   const r = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const suppliers: Record<string, SupplierContact> = {};
   const given = r.suppliers && typeof r.suppliers === "object" ? (r.suppliers as Record<string, unknown>) : {};
@@ -90,6 +94,7 @@ export function cleanPrefs(raw: unknown): BusinessPrefs {
     dealFields: r.dealFields && typeof r.dealFields === "object" ? cleanDealFields(r.dealFields) : null,
     targets: cleanTargets(r.targets),
     places: cleanJobPlaces(r.places),
+    installers: cleanInstallers(r.installers, newId),
   };
 }
 

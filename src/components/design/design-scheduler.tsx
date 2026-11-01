@@ -9,6 +9,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import { loadPrefs, loadSchedule, type BookedJob } from "@/lib/services/after-sale";
 import { PATHS, PageHead, ui } from "./design-shell";
 import { EventCard } from "./event-card";
+import { JobCardDialog } from "./job-card";
 
 const ARROW = "inline-flex size-9 items-center justify-center rounded-md border border-line bg-surface text-ink hover:border-forest";
 const TONE = { ready: "border-positive bg-positive-soft", partly: "border-sun-line bg-sun", not: "border-line bg-surface-2" } as const;
@@ -27,8 +28,9 @@ export function SchedulerPage() {
   const [jobs, setJobs] = useState<BookedJob[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [reminders, setReminders] = useState<{ on: boolean; days: number } | null>(null);
-  /** The job whose event card is open. */
+  /** The job whose job card is open (Primero's: an installation opens its job card), and whose calendar event. */
   const [open, setOpen] = useState<string | null>(null);
+  const [event, setEvent] = useState<string | null>(null);
   const cal = calendarDays(view, date);
   const first = cal.days[0];
   const last = cal.days.at(-1)!;
@@ -185,7 +187,17 @@ export function SchedulerPage() {
           .
         </span>
       </p>
-      {open && <EventCard jobId={open} onClose={() => setOpen(null)} />}
+      {open && (
+        <JobCardDialog
+          jobId={open}
+          onClose={() => setOpen(null)}
+          onEvent={() => {
+            setEvent(open);
+            setOpen(null);
+          }}
+        />
+      )}
+      {event && <EventCard jobId={event} onClose={() => setEvent(null)} />}
     </div>
   );
 }
