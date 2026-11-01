@@ -14,6 +14,12 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-02",
+    area: "Design tool",
+    words:
+      "Ask Sol to change it (press /): type or say “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”",
+  },
+  {
     day: "2026-11-01",
     area: "Design tool",
     words: "A new roof designs itself as it opens: the three designs are ready to check, unless Google's roof data is out of date.",

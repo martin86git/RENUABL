@@ -4,7 +4,7 @@ import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
 import { loadTerrain } from "@/lib/services/terrain";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
-import { MOUNT_STANDOFF, clearanceFor, laidAs, reorient } from "@/lib/domain/design/pack";
+import { MOUNT_STANDOFF, clearanceFor, laidAs, packFaces, reorient } from "@/lib/domain/design/pack";
 import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
 import { NO_BILL_KW, SELF_DESIGN_AIMS, SELF_DESIGN_LABELS, selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
@@ -69,7 +69,7 @@ import { DesignQuote, HomeToggles } from "./design-quote";
 import { SOL_TOGGLE } from "@/lib/services/sol";
 import { SolIcon } from "./sol-icon";
 import type { RoofModel } from "@/lib/domain/roof-layout";
-import { mismatchNote, modelOffset } from "@/lib/domain/design/suggest";
+import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
 import { autoStringDesign } from "@/lib/domain/design/auto-string";
@@ -78,6 +78,8 @@ import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt"
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
 import { billWith, usageFromAmount } from "@/lib/domain/design/design-bill";
 import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
+import { faces as facesWay, parseCommand, pickByQuery, type DesignCommand, type Facing as Way } from "@/lib/domain/design/design-commands";
+import { DictateButton } from "./dictate";
 import { MAX_PROPOSAL_OPTIONS } from "@/lib/domain/design/proposal";
 import {
   DESIGN_GOALS,
@@ -2715,6 +2717,176 @@ export function RoofDesigner(props: {
     setWiring(null);
     changed();
   };
+  // Sol drives the designer (1 Nov 2026, Martin): a request typed or spoken in the command bar, read at once when it is
+  // a common one (`parseCommand`), else read by Sol against the design described in words (`/api/design/command`),
+  // and carried out here as one change that undoes like any other.
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandText, setCommandText] = useState("");
+  const [commandBusy, setCommandBusy] = useState(false);
+  const [commandReply, setCommandReply] = useState<string | null>(null);
+  const commandBox = useRef<HTMLInputElement>(null);
+  const letterOf = (i: number) => String.fromCharCode(65 + i);
+  const designInWords = () =>
+    [
+      `Address: ${props.address}`,
+      `Panels: ${summary.panels} × ${panel?.name ?? chosenPanel?.name ?? "panel"} (${summary.kw.toFixed(2)} kW), ${faces.length} traced roof faces${faces.length ? ` facing ${faces.map((fc) => compass(faceFacing(fc))).join(", ")}` : ""}.`,
+      `Inverters: ${fitted.map((x) => `${x.name} (${x.kw} kW)`).join(", ") || "none"}. Battery: ${battery ? `${battery.qty} × ${battery.name} (${batteryKwh} kWh)` : "none"}.`,
+      `Home: ${quoteNow.form.roof} roof, ${quoteNow.form.storeys} storey, ${quoteNow.form.phase} phase, pitch ${homePitch}°.`,
+      strings.length
+        ? `Strings: ${strings.map((x, i) => `${letterOf(i)} (${x.panels.length} panels): ${checks[i]?.words ?? ""}`).join(" | ")}`
+        : "No strings yet.",
+      `Ready to install: ${ready.map((r) => `${r.label} ${r.state}: ${r.words}`).join(" | ")}`,
+      finance
+        ? `Bill: about ${finance.dailyKwh} kWh a day; bill ${finance.billNow} → ${finance.billAfter} a year; saving ${finance.saving}.`
+        : "No bill entered.",
+      `Panels on the lists: ${props.catalogue
+        .slice(0, 30)
+        .map((p) => p.name)
+        .join("; ")}`,
+      `Inverters on the lists: ${props.inverters
+        .slice(0, 40)
+        .map((x) => x.name)
+        .join("; ")}`,
+      `Batteries on the lists: ${props.batteries
+        .slice(0, 30)
+        .map((x) => x.name)
+        .join("; ")}`,
+    ].join("\n");
+  /** Fills the roof to about so many kW: on the traced faces (those looking the way asked), else Google's roof model. */
+  const fillTo = async (kw: number, facing?: Way): Promise<string> => {
+    const watts = panelOf(design).watts || 475;
+    const n = Math.max(1, Math.ceil((kw * 1000) / watts));
+    if (faces.length) {
+      const chosen = facing ? faces.filter((fc) => facesWay(facing, faceFacing(fc))) : faces;
+      if (!chosen.length) return `No traced roof face looks ${{ N: "north", E: "east", S: "south", W: "west" }[facing!]}.`;
+      const packed = packFaces(chosen, size, n, () => newId("p"));
+      const ids = new Set(chosen.map((fc) => fc.id));
+      setFaces(faces.map((fc) => (ids.has(fc.id) ? (packed.faces.find((x) => x.id === fc.id) ?? fc) : fc)));
+      setLoose(packed.loose);
+      setStrings([]);
+      changed();
+      return `${packed.loose.length} panels, ${((packed.loose.length * watts) / 1000).toFixed(2)} kW${packed.loose.length < n ? `: only that many fit` : ""}. Strings cleared: string them again.`;
+    }
+    const found = await googleModelInPlace();
+    if ("note" in found) return found.note;
+    let laid = suggestPanels(found.model, spot, n, size, () => newId("p"), found.offset);
+    if (facing) laid = laid.filter((p) => facesWay(facing, panelFacing(p)));
+    if (!laid.length) return "Nothing fits that way round on Google's roof data: trace the roof faces and ask again.";
+    setLoose(laid);
+    setStrings([]);
+    changed();
+    return `${laid.length} panels, ${((laid.length * watts) / 1000).toFixed(2)} kW from Google's roof data${laid.length < n ? ": only that many fit" : ""}. Check it against the photo.`;
+  };
+  const runCommand = async (command: DesignCommand): Promise<string> => {
+    switch (command.do) {
+      case "targetKw":
+        return fillTo(command.kw, command.facing);
+      case "battery": {
+        const to = pickByQuery(props.batteries, command.query);
+        if (!to) return `No battery on your lists matches “${command.query}”.`;
+        chooseBattery(to);
+        return `Battery: ${to.name}.`;
+      }
+      case "noBattery":
+        setBattery(undefined);
+        changed();
+        return "Battery taken off.";
+      case "inverter": {
+        const to = pickByQuery(props.inverters, command.query);
+        if (!to) return `No inverter on your lists matches “${command.query}”.`;
+        setFitted([
+          {
+            sku: to.sku,
+            name: to.name,
+            kw: to.kw,
+            x: fitted[0]?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
+            y: fitted[0]?.y ?? cm((view.y + view.h * 0.36 - ROOF_IMAGE.height / 2) * scale),
+          },
+        ]);
+        setStrings(strings.map((x) => ({ id: x.id, panels: x.panels, mppt: 0 })));
+        changed();
+        return `Inverter: ${to.name}.`;
+      }
+      case "panel": {
+        const to = pickByQuery(props.catalogue, command.query);
+        if (!to) return `No panel on your lists matches “${command.query}”.`;
+        choosePanel(to.sku);
+        return `Panel: ${to.name}.`;
+      }
+      case "explainString": {
+        const i = command.letter.charCodeAt(0) - 65;
+        const x = strings[i];
+        if (!x) return `There's no string ${command.letter}.`;
+        pickTool("string");
+        setChecking(x.id);
+        return `String ${command.letter}: ${checks[i]?.words ?? "no check yet."}`;
+      }
+      case "stringAuto":
+        stringForMe();
+        return "Strung by rule: see the note on the picture.";
+      case "designForMe":
+        void designForMe();
+        return "Making the three designs.";
+      case "pitch":
+        setQuote({ ...quoteNow, form: { ...quoteNow.form, pitch: command.degrees, pitchSet: true } });
+        return `Roof pitch ${command.degrees}°.`;
+      case "flat":
+        setQuote({ ...quoteNow, form: { ...quoteNow.form, roof: "flat", pitchSet: true } });
+        return "A flat roof: new panels lie flat.";
+      case "phase":
+        setQuote({ ...quoteNow, form: { ...quoteNow.form, phase: command.phase } });
+        return `${command.phase === "three" ? "Three" : "Single"}-phase power.`;
+      case "storeys":
+        setQuote({ ...quoteNow, form: { ...quoteNow.form, storeys: command.storeys } });
+        return `${command.storeys === "double" ? "Double" : "Single"} storey.`;
+      case "tilt":
+        if (!pickedPanels.length) return "Pick the panels to tilt first.";
+        amend((p) => ({ ...p, tilt: Math.min(TILT.max, command.degrees) }));
+        return `Tilted ${pickedPanels.length} panels to ${command.degrees}°.`;
+      case "undo":
+        undo();
+        return "Undone.";
+      case "redo":
+        redo();
+        return "Redone.";
+      case "answer":
+        return command.words;
+    }
+  };
+  const sendCommand = async (raw: string) => {
+    const text = raw.trim();
+    if (!text || commandBusy) return;
+    setCommandBusy(true);
+    setCommandReply(null);
+    try {
+      const quick = parseCommand(text);
+      if (quick) setCommandReply(await runCommand(quick));
+      else {
+        const res = await fetch("/api/design/command", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text, design: designInWords() }),
+        });
+        const j = (await res.json().catch(() => ({}))) as { ok?: boolean; command?: DesignCommand; message?: string };
+        setCommandReply(j.ok && j.command ? await runCommand(j.command) : (j.message ?? "Sol couldn't read that."));
+      }
+      setCommandText("");
+    } finally {
+      setCommandBusy(false);
+    }
+  };
+  // "/" opens the command bar, as on the design home; Escape closes it.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || t?.closest("input, textarea, select, [contenteditable]")) return;
+      e.preventDefault();
+      setCommandOpen(true);
+      requestAnimationFrame(() => commandBox.current?.focus());
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
   // Lining panels up with the roof: while panels are being added, or are picked, every traced face's outline is
   // lit in gold, and the face they stand on shows how far they are from each of its edges.
   const guide = tool === "panel" || tool === "rule" || pickedPanels.length > 0;
@@ -2815,6 +2987,20 @@ export function RoofDesigner(props: {
                   ? "Not saved yet"
                   : saved.error}
           </span>
+          {/* Sol drives the designer: the command bar, opened here or with "/". */}
+          <button
+            type="button"
+            onClick={() => {
+              setCommandOpen(!commandOpen);
+              requestAnimationFrame(() => commandBox.current?.focus());
+            }}
+            className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full bg-surface px-3 text-xs font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+            title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
+          >
+            <SolIcon className="size-4" />
+            Ask Sol to change it
+            <kbd className="rounded border border-line px-1 text-[10px] text-muted">/</kbd>
+          </button>
           {/* Ready to install: green only when the design would pass; pressed, every check with what to fix. */}
           <div className="relative" data-menu-host>
             <button
@@ -3375,6 +3561,50 @@ export function RoofDesigner(props: {
                 } as React.CSSProperties
               }
             >
+              {commandOpen && (
+                <div className="absolute left-1/2 top-[4.5rem] z-50 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void sendCommand(commandText);
+                    }}
+                    className={clsx(GLASS, "flex items-center gap-2 p-1.5 pl-3")}
+                  >
+                    <SolIcon className="size-5 shrink-0" />
+                    <input
+                      ref={commandBox}
+                      value={commandText}
+                      onChange={(e) => setCommandText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          setCommandOpen(false);
+                          setCommandReply(null);
+                        }
+                      }}
+                      placeholder="Fit 8 kW on the north face · use the Sigenergy battery · why is string B failing?"
+                      aria-label="Tell Sol what to change in the design"
+                      className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
+                    />
+                    <DictateButton
+                      onWords={(words) => void sendCommand(words)}
+                      onHearing={(words) => setCommandText(words)}
+                      label="Say it"
+                    />
+                    <button
+                      type="submit"
+                      disabled={commandBusy || !commandText.trim()}
+                      className="h-9 rounded-full bg-primary px-4 text-sm font-medium text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+                    >
+                      {commandBusy ? "…" : "Go"}
+                    </button>
+                  </form>
+                  {commandReply && (
+                    <p className={clsx(GLASS, "mt-2 px-4 py-2.5 text-sm text-ink")} role="status">
+                      {commandReply}
+                    </p>
+                  )}
+                </div>
+              )}
               {wheelHint && (
                 <p
                   role="status"
