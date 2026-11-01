@@ -28,12 +28,14 @@ import {
   type ReplyEmail,
 } from "@/lib/domain/design/chat";
 import { FROM_CUSTOMER, proposalPath } from "@/lib/domain/design/proposal";
+import { solActive } from "@/lib/domain/design/sol-customer";
 import { chatMessageEmail, chatReplyEmail } from "@/lib/domain/emails";
 import { siteUrl } from "@/lib/domain/sms";
 import { query, transaction } from "./db";
 import { addCustomerLine, addReply, chatLines } from "./design-chat-repo";
 import { jobById, record } from "./design-crm-repo";
 import { canNotify } from "./design-notify";
+import { solAnswersCustomer, solAnswersFor } from "./design-sol-customer";
 import { loadBrand, proposalJob, tokenForJob } from "./design-proposal-repo";
 import type { Member } from "./design-repo";
 import { emailProvider, sendEmail } from "./email";
@@ -54,7 +56,10 @@ export async function publicChat(token: string): Promise<PublicChat | null> {
   const names = { customer: firstNameOf({ name: found.customerName }), business: teamName(found.businessName) };
   // A withdrawn proposal shows nothing of itself, its conversation included.
   if (found.withdrawn) return { open: false, messages: [], names };
-  return { open: true, messages: publicMessages(await chatLines(found.businessId, found.jobId)), names };
+  const lines = await chatLines(found.businessId, found.jobId);
+  // Whether Sol is answering here now, so the page can show him writing: switched on, and not taken over by the team.
+  const assistant = solActive(await solAnswersFor(found.businessId, found.businessName).catch(() => false), lines, new Date());
+  return { open: true, messages: publicMessages(lines), names, assistant };
 }
 
 /**
@@ -87,6 +92,8 @@ export async function customerSays(
     ),
   );
   later(() => quietly("telling the business", () => tellBusiness(found, line)));
+  // Sol answers while the customer is on the page, when the business has him on and the team hasn't taken over.
+  later(() => quietly("Sol answering", () => solAnswersCustomer(token)));
   const chat = await publicChat(token);
   return chat ? { chat } : null;
 }

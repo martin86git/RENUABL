@@ -57,7 +57,7 @@ describe.skipIf(!url)("roof designer proposals (database)", () => {
       rates: VERIFIED_RATES,
       brand: saved.brand,
       images: saved.images,
-      choice: { template: saved.brand.template, validDays: saved.brand.validDays, note: "", ...over },
+      choice: { template: saved.brand.template, validDays: saved.brand.validDays, note: "", indicative: false, ...over },
     });
     if (!built.ok) throw new Error(built.problems.join(" "));
     return built;
@@ -238,6 +238,17 @@ describe.skipIf(!url)("roof designer proposals (database)", () => {
     ]);
     expect((await proposals.publicProposal(token, TODAY))!.view!.note).toBe("Third go.");
     expect((await history())[0]).toBe(`proposal: Proposal (version 2) sent (${A})`);
+  });
+
+  it("never lets an indicative proposal be accepted: the final one, after the visit, is", async () => {
+    const indicative = await build(a, "Alpha Solar", jobId, { note: "Third go.", indicative: true });
+    expect(await proposals.publishProposal(a, jobId, indicative, A)).toEqual({ token });
+    expect((await proposals.proposalVersions(a, jobId, TODAY))[0].indicative).toBe(true);
+    expect(await proposals.acceptProposal(token, "Alex Example", TODAY)).toBe("indicative");
+    expect((await crm.jobById(a, jobId))?.job.stage).toBe("proposal");
+    // Sent final in its place (the customer hasn't opened it), it can be.
+    expect(await proposals.publishProposal(a, jobId, await build(a, "Alpha Solar", jobId, { note: "Third go." }), A)).toEqual({ token });
+    expect((await proposals.proposalVersions(a, jobId, TODAY))[0].indicative).toBe(false);
   });
 
   it("lets the customer go ahead once, while the price stands, and moves the job to won", async () => {

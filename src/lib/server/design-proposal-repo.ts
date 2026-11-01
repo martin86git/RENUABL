@@ -246,6 +246,7 @@ const statusOf = (row: VersionRow, today: ISODate): ProposalStatus => ({
   openedAt: row.openedAt,
   acceptedAt: row.acceptedAt,
   acceptedName: row.acceptedName,
+  indicative: Boolean(row.view.indicative),
   deposit: depositOn(row),
 });
 
@@ -323,7 +324,8 @@ export async function publishProposal(
       moves ? "proposal" : job.stage,
     ]);
     const line = { customerId: job.customer_id, jobId, by: who };
-    if (made[0].fresh) await record(q, businessId, { ...line, kind: "proposal", text: published(built.view.version) });
+    if (made[0].fresh)
+      await record(q, businessId, { ...line, kind: "proposal", text: published(built.view.version, built.view.indicative) });
     if (moves) await record(q, businessId, { ...line, kind: "stage", text: stageMoveText("proposal") });
     return { token: kept[0].token };
   }).catch((e) => {
@@ -522,12 +524,14 @@ export async function acceptProposal(
   today: ISODate,
   /** The system the customer chose, when the proposal offers a choice; the recommended one when it isn't one on offer. */
   option: string | null = null,
-): Promise<"accepted-now" | ProposalState | null> {
+): Promise<"accepted-now" | "indicative" | ProposalState | null> {
   return transaction(async (q) => {
     const found = await behind(q, token, true);
     if (!found) return null;
     const state = stateOf(found, today);
     if (state !== "live") return state;
+    // An indicative proposal is for the customer's thoughts: the final one, after the site visit, is the one accepted.
+    if (found.view.indicative) return "indicative";
     const chosen = found.view.options?.some((o) => o.goal === option) ? (option as DesignGoal) : recommendedGoal(found.view);
     // From here on it is the proposal as agreed: the chosen system's price, and so its deposit.
     const row = { ...found, view: viewForChoice(found.view, chosen) };

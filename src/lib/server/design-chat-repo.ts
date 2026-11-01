@@ -8,7 +8,7 @@
  * their proposal's private link into that one job: a link can read and add
  * to its own job's conversation and no other.
  */
-import { MAX_CUSTOMER_LINES, type ChatLine, type ChatThread } from "@/lib/domain/design/chat";
+import { MAX_CUSTOMER_LINES, SOL_BY, type ChatLine, type ChatThread } from "@/lib/domain/design/chat";
 import { newId, query, transaction } from "./db";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -69,6 +69,31 @@ export async function addReply(businessId: string, jobId: string, text: string, 
     const rows = await q<ChatLine>(
       `insert into design_messages as m (id, business_id, job_id, customer_id, from_customer, text, by_email) values ($2,$1,$3,$4,false,$5,$6) returning ${LINE}`,
       [businessId, newId("msg"), jobId, jobs[0].customer_id, text, by.toLowerCase()],
+    );
+    return rows[0];
+  });
+}
+
+/**
+ * Keeps an answer Sol gave the customer, on the business's side and marked as his. Unlike a member's reply it marks
+ * nothing read: the customer's lines still wait for someone at the business to see them. Null when the business has
+ * no such job, or when anyone has written since the customer's line he answered (`after`): his answer is then late.
+ */
+export async function addSolLine(businessId: string, jobId: string, text: string, after: string): Promise<ChatLine | null> {
+  return transaction(async (q) => {
+    const jobs = await q<{ customer_id: string }>(`select customer_id from design_jobs where business_id = $1 and id = $2 for update`, [
+      businessId,
+      jobId,
+    ]);
+    if (!jobs[0]) return null;
+    const since = await q<{ n: string }>(
+      `select count(*) as n from design_messages where business_id = $1 and job_id = $2 and not from_customer and at > $3::timestamptz`,
+      [businessId, jobId, after],
+    );
+    if (Number(since[0]?.n ?? 0) > 0) return null;
+    const rows = await q<ChatLine>(
+      `insert into design_messages as m (id, business_id, job_id, customer_id, from_customer, text, by_email) values ($2,$1,$3,$4,false,$5,$6) returning ${LINE}`,
+      [businessId, newId("msg"), jobId, jobs[0].customer_id, text, SOL_BY],
     );
     return rows[0];
   });

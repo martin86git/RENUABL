@@ -7,7 +7,7 @@
  */
 import { todayInMarket } from "@/lib/domain/market";
 import { buildProposal, cleanChoice, type Built, type ProposalChoice } from "@/lib/domain/design/proposal";
-import { NO_DESIGN, savedFor, type Saved } from "./design-proposal-repo";
+import { NO_DESIGN, proposalVersions, savedFor, type Saved } from "./design-proposal-repo";
 import type { Member } from "./design-repo";
 import { getRebateRates } from "./rebate-rates";
 
@@ -22,7 +22,11 @@ export async function workOutProposal(member: Member, jobId: string, choice: unk
   const saved = await savedFor(member.businessId, member.businessName, jobId);
   if (!saved || saved === NO_DESIGN) return saved;
   const now = new Date();
-  const chosen = cleanChoice(choice, saved.brand);
+  // Unless chosen: as the last one sent (so the design tool publishing on every save never turns an indicative
+  // proposal final), and with none sent yet, indicative for a lead or a designed roof: their thoughts before a visit.
+  const latest = (await proposalVersions(member.businessId, jobId, todayInMarket(now)))[0];
+  const usual = latest ? latest.indicative : saved.job.stage === "lead" || saved.job.stage === "designed";
+  const chosen = cleanChoice(choice, saved.brand, usual);
   const { rates } = await getRebateRates();
   const built = buildProposal({
     now: now.toISOString(),

@@ -294,6 +294,12 @@ export interface BrandKit {
   notify: string[];
   /** Whether the customer is emailed when someone at the business replies in a job's conversation. On until the business says otherwise. */
   emailReplies: boolean;
+  /**
+   * Whether Sol, RENUABL's AI assistant, answers the business's customers in their proposal's chat as they write,
+   * from the proposal they were sent (never a cost), naming himself as an AI and passing anything he can't answer to
+   * the team. Off until the business turns it on.
+   */
+  solAnswers: boolean;
   /** Whether every proposal carries RENUABL's standard terms and conditions (`standard-terms.ts`). On until the business says otherwise. */
   standardTerms: boolean;
   /** Which terms go with a proposal: ours (the default), the business's own uploaded PDF, or none. `standardTerms` follows it. */
@@ -339,6 +345,7 @@ export function defaultBrand(businessName: string): BrandKit {
     installTime: "",
     notify: [],
     emailReplies: true,
+    solAnswers: false,
     standardTerms: true,
     terms: "standard",
     ownTerms: null,
@@ -611,6 +618,7 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
       notify: notify.value,
       // A switch is only ever moved by an explicit true or false.
       emailReplies: typeof r.emailReplies === "boolean" ? r.emailReplies : current.emailReplies,
+      solAnswers: typeof r.solAnswers === "boolean" ? r.solAnswers : current.solAnswers,
       standardTerms: terms.value === "standard",
       terms: terms.value,
       ownTerms: current.ownTerms,

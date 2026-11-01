@@ -8,7 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BUSINESS_TERMS_VERSION } from "@/lib/domain/design/account";
-import { CHAT_CLOSED, CHAT_FULL, MAX_CUSTOMER_LINES } from "@/lib/domain/design/chat";
+import { CHAT_CLOSED, CHAT_FULL, MAX_CUSTOMER_LINES, SOL_BY } from "@/lib/domain/design/chat";
 import { cleanCustomerInput, cleanJobInput } from "@/lib/domain/design/crm";
 import { COST_WORDS, buildProposal } from "@/lib/domain/design/proposal";
 import { ADDRESS, PLACE, sampleInputs } from "@/lib/domain/design/proposal-fixture";
@@ -103,7 +103,13 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
   });
 
   it("opens empty, under the two names each side is shown as", async () => {
-    expect(await chat.publicChat(token)).toEqual({ open: true, messages: [], names: { customer: "Alex", business: "Alpha Solar team" } });
+    // Sol isn't on until the business turns him on (and Claude isn't set up in a test).
+    expect(await chat.publicChat(token)).toEqual({
+      open: true,
+      messages: [],
+      names: { customer: "Alex", business: "Alpha Solar team" },
+      assistant: false,
+    });
     for (const bad of ["", "nope", "f".repeat(48), token.slice(0, 47), token.toUpperCase()]) expect(await chat.publicChat(bad)).toBeNull();
   });
 
@@ -112,9 +118,10 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
     if (!said || "problem" in said) throw new Error("unexpected");
     expect(said.chat.messages).toHaveLength(1);
     expect(said.chat.messages[0]).toMatchObject({ from: "customer", text: "Can it go on the garage?" });
-    // Telling the business was put off until after the answer, and does nothing harmful with no email service.
-    expect(later).toHaveLength(1);
-    await later.pop()!();
+    // Telling the business, and Sol's answer, were put off until after the answer, and do nothing harmful with no
+    // email service and Sol switched off.
+    expect(later).toHaveLength(2);
+    while (later.length) await later.pop()!();
 
     const lines = await chats.chatLines(a, jobId);
     expect(lines).toEqual([
@@ -193,6 +200,7 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
     const banned = [...COST_WORDS, "by", "read", "email", "businessId", "jobId", "customerId"].map((word) => word.toLowerCase());
     expect(banned.filter((word) => keys.has(word))).toEqual([]);
     expect([...keys].filter((key) => !/^\d*$/.test(key)).sort()).toEqual([
+      "assistant",
       "at",
       "business",
       "customer",
@@ -226,6 +234,24 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
     expect(await chat.customerSays(token, "Too many", defer)).toEqual({ problem: CHAT_FULL, status: 429 });
     // A member can still write.
     expect((await chat.memberReplies(owner(), jobId, "Call us"))?.lines.at(-1)?.text).toBe("Call us");
+  });
+
+  it("keeps Sol's answers as his: shown to the customer as Sol's, never read for the business, and never late", async () => {
+    // The conversation is full from the customer's side by now: Sol answers as of this moment, after the team's reply.
+    const before = (await chats.chatLines(a, jobId))[0].at;
+    const at = new Date().toISOString();
+    const unread = await chats.unreadCount(a);
+    const kept = await chats.addSolLine(a, jobId, "Only the Maximum independence system keeps chosen circuits on.", at);
+    expect(kept).toMatchObject({ from: "business", by: SOL_BY, read: true });
+    const shown = (await chat.publicChat(token))!.messages;
+    expect(shown.at(-1)).toMatchObject({ from: "business", sol: true });
+    expect(JSON.stringify(shown)).not.toContain(A);
+    // Unlike a member's reply, his answer marks nothing read: the customer's lines wait for someone at the business.
+    expect(await chats.unreadCount(a)).toBe(unread);
+    // Someone has written since the line he would be answering: his answer is late, and dropped.
+    expect(await chats.addSolLine(a, jobId, "Late", at)).toBeNull();
+    expect(await chats.addSolLine(a, jobId, "Later still", before)).toBeNull();
+    expect(await chats.addSolLine(b, jobId, "Not theirs", new Date().toISOString())).toBeNull();
   });
 
   it("carries on when the proposal is published again or its price lapses, and closes when it is withdrawn", async () => {

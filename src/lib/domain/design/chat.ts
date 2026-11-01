@@ -22,7 +22,7 @@ export interface ChatLine {
   from: "customer" | "business";
   text: string;
   at: string;
-  /** The member who wrote it (their sign-in email). Null on the customer's lines. Never sent to the customer. */
+  /** The member who wrote it (their sign-in email), or `SOL_BY` for Sol's answers. Null on the customer's lines. Never sent to the customer. */
   by: string | null;
   /** For the customer's lines: whether someone at the business has seen it. Always true on the business's own. */
   read: boolean;
@@ -34,7 +34,12 @@ export interface PublicLine {
   from: "customer" | "business";
   text: string;
   at: string;
+  /** On the business's side, an answer from Sol, the AI assistant, shown as his so nobody takes it for a person. */
+  sol?: true;
 }
+
+/** Who wrote a line that Sol wrote, kept where a member's email would be. Never an email, so never a member. */
+export const SOL_BY = "sol";
 
 /** What the customer's side of the conversation is sent: the lines, and the two names they are shown under. */
 export interface PublicChat {
@@ -43,6 +48,8 @@ export interface PublicChat {
   /** Called messages, not lines: "lines" is a word for a quote's costed lines, which a test keeps out of everything a customer is sent. */
   messages: PublicLine[];
   names: { customer: string; business: string };
+  /** Whether Sol answers in this conversation now: the page then shows him writing and looks for his answer sooner. */
+  assistant?: boolean;
 }
 
 /** The longest line, and the most lines a customer can add to one job's conversation. */
@@ -72,7 +79,13 @@ export function cleanLine(raw: unknown): Cleaned<{ text: string }> {
 
 /** The lines as the customer may see them: the side, the words and the time. Never who at the business wrote one, or what has been read. */
 export function publicMessages(lines: readonly ChatLine[]): PublicLine[] {
-  return lines.map(({ id, from, text, at }) => ({ id, from, text, at }));
+  return lines.map(({ id, from, text, at, by }) => ({
+    id,
+    from,
+    text,
+    at,
+    ...(from === "business" && by === SOL_BY ? { sol: true as const } : {}),
+  }));
 }
 
 /** The name the business's lines are shown under: the business, never a person. */
@@ -120,3 +133,5 @@ export function replyOutcome(email: ReplyEmail): string {
 /** What goes on the customer's record. */
 export const customerWrote = (text: string) => `Message from the customer: ${text.slice(0, 300)}`;
 export const businessReplied = (text: string) => `Reply sent: ${text.slice(0, 300)}`;
+export const solReplied = (text: string) => `Sol answered: ${text.slice(0, 300)}`;
+export const SOL_HANDED_OVER = "Sol passed the customer's question to the team: it needs an answer from someone at the business.";

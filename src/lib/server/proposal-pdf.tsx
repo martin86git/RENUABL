@@ -21,6 +21,9 @@ import { contrast, inkOn, lookOf, shownAbn, shownBsb, shownWebsite, type ChartSt
 import { money } from "@/lib/domain/design/deposit";
 import {
   BANK_NOTE,
+  INDICATIVE_LABEL,
+  INDICATIVE_PRICE_NOTE,
+  INDICATIVE_STEPS,
   acceptLine,
   contractDetails,
   ESTIMATE_NOTE,
@@ -191,7 +194,7 @@ function ProposalDocument({
   /** The proposal's title, in the colours it sits on. */
   const titleBlock = (ink: string, soft: string, size?: number) => (
     <>
-      <Text style={[s.eyebrow, { color: soft }]}>Proposal</Text>
+      <Text style={[s.eyebrow, { color: soft }]}>{view.indicative ? INDICATIVE_LABEL : "Proposal"}</Text>
       <Text style={[s.h1, { color: ink, fontFamily: headingFace }, size ? { fontSize: size } : {}]}>
         {view.title} for {view.customer.name}
       </Text>
@@ -309,6 +312,7 @@ function ProposalDocument({
           </View>
           <Text style={[s.small, { marginTop: 8 }]}>
             Covers: {view.price.includes.join(", ")}. {STC_NOTE} The price stands until {day(view.validUntil)}.
+            {view.indicative ? ` ${INDICATIVE_PRICE_NOTE}` : ""}
           </Text>
         </View>
         {view.price.solarVic ? (
@@ -395,6 +399,11 @@ function ProposalDocument({
               on {day(accepted.at)}: &ldquo;{acceptLine(view)}&rdquo;
             </Text>
           </View>
+        ) : view.indicative ? (
+          <Text>
+            How we work: {INDICATIVE_STEPS.map((step, i) => `${i + 1}. ${step.name}: ${step.words}`).join(" ")} Tell us what you think in
+            the chat on your proposal online, or get in touch: {contact || b.name}.
+          </Text>
         ) : (
           <Text>
             To go ahead, open your proposal online and choose &ldquo;I&apos;d like to go ahead&rdquo;, or get in touch: {contact || b.name}.

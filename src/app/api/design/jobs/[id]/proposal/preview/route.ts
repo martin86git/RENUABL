@@ -26,6 +26,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       problems: built.ok ? [] : built.problems,
       choice,
       projectVersion: saved.project.version,
+      // Whether Sol answers this business's customers: the indicative message says so when he does.
+      assistant: saved.brand.solAnswers,
     });
   });
 }

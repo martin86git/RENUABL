@@ -57,6 +57,7 @@ export function CustomerProposal(props: {
           />
         ) : null
       }
+      onOpenChat={() => chat.show(true)}
       greeting={<ChatGreeting chat={chat} />}
       chat={<ChatDock chat={chat} />}
       actions={{
@@ -68,6 +69,8 @@ export function CustomerProposal(props: {
           setDeposit(res.deposit);
           return null;
         },
+        // On an indicative proposal their thoughts go to the business as a message, where they can be answered.
+        feedback: async (text) => ((await chat.send(text)) ? null : "That didn't send. Try again, or write to us in the chat."),
       }}
     />
   );

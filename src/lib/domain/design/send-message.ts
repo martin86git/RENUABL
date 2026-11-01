@@ -16,7 +16,7 @@
  */
 import type { PublicLine } from "./chat";
 
-export type SendTemplateId = "hello" | "short" | "after-visit" | "updated";
+export type SendTemplateId = "indicative" | "hello" | "short" | "after-visit" | "updated";
 
 export interface SendTemplate {
   id: SendTemplateId;
@@ -32,10 +32,30 @@ export interface SendFill {
   business: string;
   /** "31 October 2026": the day the price stands until. */
   until: string;
+  /** Whether Sol answers the customer's questions in the chat (the business's setting): the indicative draft then says so. */
+  assistant?: boolean;
 }
+
+/** What the indicative draft says about Sol when the business has him answering its customers. */
+export const ASSISTANT_SENTENCE =
+  " Our assistant, Sol, answers most questions straight away (Sol is an AI, so the team reads everything and follows up).";
 
 /** The drafts, in the order they are offered. `{first}`, `{business}` and `{until}` are filled in. */
 export const SEND_TEMPLATES: readonly SendTemplate[] = [
+  {
+    id: "indicative",
+    name: "Indicative proposal",
+    text:
+      "Hi {first},\n\n" +
+      "Thanks for getting in touch with {business}. We've put together an indicative proposal for your home, with three systems to " +
+      "compare: one for the quickest payback, one for the most back over the years, and one for the most independence, with a " +
+      "battery that keeps chosen circuits on in a blackout.\n\n" +
+      "How we work: we design your system from your roof seen from above and your power bill. Then we visit your home to check the " +
+      "roof, the switchboard and where everything goes, and send you a final proposal. Nothing is agreed until you accept that one. " +
+      "These prices stand until {until}.\n\n" +
+      "There's a chat box on your proposal: leave us notes and questions there, and tell us which system suits you.{assistant}\n\n" +
+      "The {business} team",
+  },
   {
     id: "hello",
     name: "Friendly hello",
@@ -81,17 +101,25 @@ export function fillTemplate(id: SendTemplateId, fill: SendFill): string {
     .replaceAll("{first}", first)
     .replaceAll("{business}", business)
     .replaceAll("{until}", fill.until.trim() || "the date on the proposal")
+    .replaceAll("{assistant}", fill.assistant ? ASSISTANT_SENTENCE : "")
     .replaceAll("The us team", "The team");
 }
 
-/** The draft offered first: "Updated proposal" when the customer has already had one, else the friendly hello. */
-export function firstTemplate(sentBefore: boolean): SendTemplateId {
-  return sentBefore ? "updated" : "hello";
+/**
+ * The draft offered first: "Updated proposal" when the customer has already had one; for an indicative proposal sent
+ * for the first time, the indicative draft; else the friendly hello.
+ */
+export function firstTemplate(sentBefore: boolean, indicative = false): SendTemplateId {
+  if (sentBefore) return "updated";
+  return indicative ? "indicative" : "hello";
 }
 
-/** The business's latest message: shown at the top of the customer's proposal as its greeting. Null before the business has written. */
+/**
+ * The business's latest message: shown at the top of the customer's proposal as its greeting. Its team's own, never
+ * one of Sol's answers. Null before the business has written.
+ */
 export function greetingOf(lines: readonly PublicLine[]): PublicLine | null {
-  for (let i = lines.length - 1; i >= 0; i--) if (lines[i].from === "business") return lines[i];
+  for (let i = lines.length - 1; i >= 0; i--) if (lines[i].from === "business" && !lines[i].sol) return lines[i];
   return null;
 }
 

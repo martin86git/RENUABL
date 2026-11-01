@@ -83,7 +83,15 @@ function CopyLink({ path, className }: { path: string; className?: string }) {
  * business has that on. The panel stays open on the conversation, saying
  * whether the email went.
  */
-function SendToCustomer(props: { jobId: string; view: ProposalView; latest: ProposalStatus; sentBefore: boolean; onClose: () => void }) {
+function SendToCustomer(props: {
+  jobId: string;
+  view: ProposalView;
+  latest: ProposalStatus;
+  sentBefore: boolean;
+  /** Whether Sol answers this business's customers in the chat: the indicative message then says so. */
+  assistant: boolean;
+  onClose: () => void;
+}) {
   const { view, latest } = props;
   const first = view.customer.name.trim().split(/\s+/)[0] ?? "";
   useEffect(() => {
@@ -123,8 +131,8 @@ function SendToCustomer(props: { jobId: string; view: ProposalView; latest: Prop
             jobId={props.jobId}
             compact
             drafts={{
-              fill: { first, business: view.business.name, until: shortDate(latest.validUntil) },
-              start: firstTemplate(props.sentBefore),
+              fill: { first, business: view.business.name, until: shortDate(latest.validUntil), assistant: props.assistant },
+              start: firstTemplate(props.sentBefore, latest.indicative),
             }}
           />
         </div>
@@ -162,6 +170,7 @@ export function DealProposal({ jobId, hasDesign }: { jobId: string; hasDesign: b
       {latest ? (
         <>
           <p className="mt-1.5 text-sm text-ink">
+            {latest.indicative ? "Indicative · " : ""}
             {STATE_WORDS[latest.state]} <span className="tabular-nums text-ink-2">· {dollars(latest.youPay)}</span>
           </p>
           <p className="mt-0.5 text-xs text-muted">{standing(latest)}</p>
@@ -205,6 +214,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   const [account] = useDesignAccount();
   const mayMark = Boolean(account?.signedIn && (account.may?.publish ?? true));
   const [sending, setSending] = useState(false);
+  const [assistant, setAssistant] = useState(false);
   // The preview's conversation: empty, taking nothing, so the business sees where its message will show.
   const previewChat = useCustomerChat({ business: view?.business.name ?? "", phone: view?.business.phone });
 
@@ -220,6 +230,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
       setView(res.view);
       setProblems(res.problems);
       setProjectVersion(res.projectVersion);
+      setAssistant(Boolean(res.assistant));
       if (res.choice) setChoice((current) => ({ ...res.choice, ...current }));
     },
     [jobId],
@@ -293,6 +304,44 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
               </Link>
             </div>
           )}
+
+          <fieldset>
+            <legend className={ui.label}>What it is</legend>
+            <div className="mt-1.5 space-y-1.5" role="radiogroup">
+              {[
+                {
+                  on: true,
+                  name: "Indicative",
+                  blurb: "For a new lead: the systems to compare, their thoughts in the chat, then a site visit. It can't be accepted.",
+                },
+                {
+                  on: false,
+                  name: "Final",
+                  blurb: "After the site visit: the customer can accept it, with your payment terms and conditions.",
+                },
+              ].map((kind) => (
+                <label
+                  key={kind.name}
+                  className={clsx(
+                    "flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2.5",
+                    Boolean(choice.indicative) === kind.on ? "border-ink bg-surface-2" : "border-line hover:border-line-strong",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="kind"
+                    className="mt-1 accent-[var(--primary)]"
+                    checked={Boolean(choice.indicative) === kind.on}
+                    onChange={() => change({ indicative: kind.on })}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-ink">{kind.name}</span>
+                    <span className="block text-xs text-muted">{kind.blurb}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
 
           <fieldset>
             <legend className={ui.label}>Template</legend>
@@ -442,7 +491,14 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
         )}
       </div>
       {sending && view && latest && out && (
-        <SendToCustomer jobId={jobId} view={view} latest={latest} sentBefore={versions.length > 1} onClose={() => setSending(false)} />
+        <SendToCustomer
+          jobId={jobId}
+          view={view}
+          latest={latest}
+          sentBefore={versions.length > 1}
+          assistant={assistant}
+          onClose={() => setSending(false)}
+        />
       )}
     </div>
   );

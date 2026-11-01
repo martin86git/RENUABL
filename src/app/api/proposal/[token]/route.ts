@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { todayInMarket } from "@/lib/domain/market";
 import { NO_DEPOSIT, NOT_ACCEPTED, PAID_WAY_WRONG, PAID_WAYS, type PaidWay } from "@/lib/domain/design/deposit";
-import { cleanAcceptance } from "@/lib/domain/design/proposal";
+import { INDICATIVE_NOT_ACCEPTABLE, cleanAcceptance } from "@/lib/domain/design/proposal";
 import { answer, readBody } from "@/lib/server/design-context";
 import { acceptProposal, markOpened, proposalJob, publicProposal, sayPaid } from "@/lib/server/design-proposal-repo";
 import { afterSigning } from "@/lib/server/design-after-sale-repo";
@@ -58,6 +58,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[t
       const option = typeof read.body.option === "string" ? read.body.option.slice(0, 20) : null;
       const result = await acceptProposal(token, input.value.name, today, option);
       if (!result) return notFound();
+      if (result === "indicative") return Response.json({ ok: false, message: INDICATIVE_NOT_ACCEPTABLE }, { status: 409 });
       // Told once, when it is first accepted, and not waited for: an email that can't be sent never holds the customer up.
       if (result === "accepted-now")
         after(async () => {

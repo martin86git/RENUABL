@@ -259,7 +259,7 @@ describe("a proposal worked out from what is saved", () => {
     expect(view.paybackYears).toBe(Math.round((view.price.youPay / view.bill!.saving) * 10) / 10);
   });
   it("says who it is from and for, and when the price stands until", () => {
-    const { view } = built({ choice: { template: "bold", validDays: 30, note: "See you Tuesday." } });
+    const { view } = built({ choice: { template: "bold", validDays: 30, note: "See you Tuesday.", indicative: false } });
     expect(view).toMatchObject({
       version: 1,
       publishedAt: "2026-10-12T01:00:00.000Z",
@@ -394,13 +394,24 @@ describe("choices, links and what a customer sends back", () => {
       template: "compact",
       validDays: 7,
       note: "Hello\n\nthere",
+      indicative: false,
     });
     expect(cleanChoice({ template: "x", validDays: 90, note: 5, price: 1, youPay: 1 }, brand)).toEqual({
       template: "classic",
       validDays: 14,
       note: "",
+      indicative: false,
     });
-    expect(cleanChoice(null, { template: "bold", validDays: 30 })).toEqual({ template: "bold", validDays: 30, note: "" });
+    expect(cleanChoice(null, { template: "bold", validDays: 30 })).toEqual({
+      template: "bold",
+      validDays: 30,
+      note: "",
+      indicative: false,
+    });
+    // Indicative: only an explicit true or false moves it; otherwise the default the server gives from the deal.
+    expect(cleanChoice({ indicative: true }, brand).indicative).toBe(true);
+    expect(cleanChoice({ indicative: "yes" }, brand, true).indicative).toBe(true);
+    expect(cleanChoice({ indicative: false }, brand, true).indicative).toBe(false);
     expect(cleanChoice({ note: "n".repeat(5000) }, brand).note).toHaveLength(1200);
   });
   it("knows a link we could have made", () => {

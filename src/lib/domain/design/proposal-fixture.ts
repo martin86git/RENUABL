@@ -101,7 +101,7 @@ export function sampleInputs(over: Partial<ProposalInputs> & { withBattery?: boo
     rates: VERIFIED_RATES,
     brand: sampleBrand(),
     images: SAMPLE_IMAGES,
-    choice: { template: "classic", validDays: 14, note: "Thanks for having us out." },
+    choice: { template: "classic", validDays: 14, note: "Thanks for having us out.", indicative: false },
     ...rest,
   };
 }

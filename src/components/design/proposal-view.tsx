@@ -7,7 +7,13 @@ import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/do
 import { lookOf, lookVars, shownAbn, shownBsb, shownWebsite, themeVars, type ChartStyle } from "@/lib/domain/design/brand";
 import {
   BANK_NOTE,
+  FEEDBACK_MISSING,
+  INDICATIVE_INTRO,
+  INDICATIVE_LABEL,
+  INDICATIVE_PRICE_NOTE,
+  INDICATIVE_STEPS,
   acceptLine,
+  feedbackMessage,
   contractDetails,
   ESTIMATE_NOTE,
   NO_SUNSHINE_NOTE,
@@ -67,6 +73,8 @@ export interface ProposalUrls {
 /** What the customer can do from the page. Left out in the business's preview, where the buttons are shown but do nothing. */
 export interface ProposalActions {
   accept: (name: string, agree: boolean) => Promise<string | null>;
+  /** On an indicative proposal: the customer's thoughts, sent as a message in the chat. Answers with what went wrong, or null. */
+  feedback?: (text: string) => Promise<string | null>;
 }
 
 /** The roof from above with the panels where they were placed: the same picture and scale the design was drawn on. */
@@ -300,6 +308,125 @@ function GoAhead({ view, state, accepted, actions }: Pick<ProposalPageProps, "vi
   );
 }
 
+/**
+ * In place of going ahead on an indicative proposal: which system suits them best (with options) and a note, sent to
+ * the business as a message in the chat, where it can be answered. Then a thank you, and the chat to carry on in.
+ */
+function Thoughts({
+  view,
+  actions,
+  chosen,
+  onOpenChat,
+}: {
+  view: ProposalView;
+  actions?: ProposalActions;
+  chosen: DesignGoal | null;
+  onOpenChat?: () => void;
+}) {
+  const options = view.options && view.options.length > 1 ? view.options : [];
+  const [pick, setPick] = useState<DesignGoal | null>(null);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+  const b = view.business;
+  // What they are looking at above is where the choice starts, until they pick here.
+  const goal = pick ?? (options.some((o) => o.goal === chosen) ? chosen : null);
+  if (sent)
+    return (
+      <div className={card}>
+        <p className={eyebrow}>Sent</p>
+        <p className="mt-2 text-[18px] text-ink">Thanks. {b.name} has your thoughts.</p>
+        <p className="mt-2 text-sm text-muted">We&apos;ll be in touch to arrange a visit to your home. Ask anything else in the chat.</p>
+        {onOpenChat && (
+          <button type="button" onClick={onOpenChat} className={clsx(button, "mt-4")}>
+            Open the chat
+          </button>
+        )}
+      </div>
+    );
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!actions?.feedback) return;
+    const option = options.find((o) => o.goal === goal);
+    const text = feedbackMessage(option ? { name: option.name } : null, note);
+    if (!text) return setProblem(FEEDBACK_MISSING);
+    setBusy(true);
+    const wrong = await actions.feedback(text);
+    setBusy(false);
+    setProblem(wrong);
+    if (!wrong) setSent(true);
+  };
+  return (
+    <form onSubmit={submit} className={card}>
+      <h3 className="text-[18px] text-ink">What do you think?</h3>
+      <p className="mt-1 text-sm text-muted">
+        Tell us which system suits you, and anything we should know before we visit. It goes to {b.name} in the chat.
+      </p>
+      {options.length > 0 && (
+        <div className="mt-4 grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="The system that suits you best">
+          {options.map((o) => (
+            <button
+              key={o.goal}
+              type="button"
+              role="radio"
+              aria-checked={goal === o.goal}
+              onClick={() => setPick(o.goal)}
+              className={clsx(
+                "min-h-11 rounded-md border px-3 py-2 text-left text-[14px]",
+                goal === o.goal ? "border-[var(--primary)] font-medium text-ink shadow-[0_0_0_1px_var(--primary)]" : "border-line text-ink",
+              )}
+            >
+              {o.name}
+            </button>
+          ))}
+        </div>
+      )}
+      <label className="mt-4 block text-[13px] font-medium text-ink">
+        A note or a question (optional)
+        <textarea
+          className={clsx(field, "mt-1.5 min-h-24 py-2")}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={1500}
+          placeholder="Where the battery could go, when suits for a visit, anything you're wondering about"
+        />
+      </label>
+      {problem && (
+        <p className="mt-3 text-[13px] text-danger" role="alert">
+          {problem}
+        </p>
+      )}
+      <button type="submit" className={clsx(button, "mt-4 w-full")} disabled={busy || !actions?.feedback}>
+        {busy ? "Sending…" : "Send my thoughts"}
+      </button>
+      <p className={clsx(fine, "mt-2")}>
+        {actions?.feedback
+          ? "Nothing is agreed here: the final proposal comes after our visit."
+          : "A preview: your customer uses this from their own link."}
+      </p>
+    </form>
+  );
+}
+
+/** How the business works from an indicative proposal, in three steps, the first lit. */
+function HowWeWork() {
+  return (
+    <ol className="grid gap-3 sm:grid-cols-3" aria-label="How we work">
+      {INDICATIVE_STEPS.map((step, i) => (
+        <li key={step.name} className={clsx(card, "sm:p-5", i === 0 && "shadow-[0_0_0_1px_var(--primary)]")}>
+          <p className={clsx("text-[12px] font-medium tracking-[0.16em]", i === 0 ? "text-[color:var(--primary)]" : "text-muted")}>
+            {String(i + 1).padStart(2, "0")}
+            {i === 0 ? " · You are here" : ""}
+          </p>
+          <p className="mt-1.5 text-[16px] font-medium text-ink">{step.name}</p>
+          <p className="mt-1 text-[13.5px] leading-snug text-muted">{step.words}</p>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export interface ProposalPageProps {
   view: ProposalView;
   state: ProposalState;
@@ -321,6 +448,8 @@ export interface ProposalPageProps {
    * going ahead, and in the business's preview, where the cards still show the choice).
    */
   choice?: { chosen: DesignGoal | null; onChoose?: (goal: DesignGoal) => void };
+  /** Opens the chat dock: the thank you after an indicative proposal's thoughts are sent offers it. */
+  onOpenChat?: () => void;
 }
 
 /**
@@ -341,7 +470,7 @@ export interface ProposalPageProps {
  * the design tool's monospace face, and the preview must look as the
  * customer's page does.
  */
-export function ProposalPage({ view, state, accepted, urls, actions, greeting, chat, deposit, choice }: ProposalPageProps) {
+export function ProposalPage({ view, state, accepted, urls, actions, greeting, chat, deposit, choice, onOpenChat }: ProposalPageProps) {
   const b = view.business;
   const look = lookOf(view.template);
   const bold = look.cover === "colour";
@@ -349,7 +478,9 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
   const contact = [b.phone, b.email, b.website && shownWebsite(b.website)].filter(Boolean);
   const title = (
     <>
-      <p className={clsx(eyebrow, bold && "text-[color:var(--primary-ink)] opacity-80")}>Proposal · {day(view.publishedAt)}</p>
+      <p className={clsx(eyebrow, bold && "text-[color:var(--primary-ink)] opacity-80")}>
+        {view.indicative ? INDICATIVE_LABEL : "Proposal"} · {day(view.publishedAt)}
+      </p>
       <h1
         className={clsx(
           "mt-3 leading-[1.1] tracking-tight [font-family:var(--proposal-heading)]",
@@ -477,6 +608,7 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
           )}
           <p className="mt-4 text-[14px] text-ink">Covers: {view.price.includes.join(", ")}.</p>
           <p className={clsx(fine, "mt-2")}>{STC_NOTE}</p>
+          {view.indicative && <p className="mt-2 text-[13.5px] font-medium text-ink">{INDICATIVE_PRICE_NOTE}</p>}
         </div>
         {b.extra && <p className="mt-5 max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-ink">{b.extra}</p>}
       </>
@@ -566,7 +698,11 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
     "custom-3": () => null,
     accept: () => (
       <>
-        <GoAhead view={view} state={state} accepted={accepted} actions={actions} />
+        {view.indicative ? (
+          <Thoughts view={view} actions={actions} chosen={choice?.chosen ?? null} onOpenChat={onOpenChat} />
+        ) : (
+          <GoAhead view={view} state={state} accepted={accepted} actions={actions} />
+        )}
         {deposit && <div className="mt-4">{deposit}</div>}
       </>
     ),
@@ -701,6 +837,14 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
           {greeting && <div className="mt-6">{greeting}</div>}
           {view.note && <p className="mt-6 max-w-2xl whitespace-pre-line text-[16px] leading-relaxed text-ink">{view.note}</p>}
           {cover && (cover.words || cover.image) && <div className="mt-6">{own(cover)}</div>}
+          {view.indicative && (
+            <div className="mt-8">
+              <p className="max-w-2xl text-[16px] leading-relaxed text-ink">{INDICATIVE_INTRO}</p>
+              <div className="mt-4">
+                <HowWeWork />
+              </div>
+            </div>
+          )}
           <div className="mt-8">
             <Headline view={view} />
           </div>
@@ -726,7 +870,11 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
           .map((block) => ({ block, inner: content[block.id](), hasOwn: Boolean(block.words || block.image) }))
           .filter(({ inner, hasOwn }) => inner || hasOwn)
           .map(({ block, inner, hasOwn }, i) => {
-            const heading = blockHeading(block, block.id === "about" ? `About ${b.name}` : "");
+            // On an indicative proposal the business's "going ahead" block asks for their thoughts instead.
+            const heading =
+              view.indicative && block.id === "accept" && !block.heading
+                ? "Your thoughts"
+                : blockHeading(block, block.id === "about" ? `About ${b.name}` : "");
             const side = look.headings === "side";
             return (
               <section
@@ -778,7 +926,7 @@ function ChooseSystem({ view, choice, locked }: { view: ProposalView; choice?: P
   return (
     <section aria-labelledby="choose-system">
       <h2 id="choose-system" className={h2}>
-        {locked ? "The system you chose" : "Choose your system"}
+        {locked ? "The system you chose" : view.indicative ? "Compare your systems" : "Choose your system"}
       </h2>
       <p className={clsx(fine, "mt-1")}>Each is priced in full. Savings and payback are estimates from your bill.</p>
       <div

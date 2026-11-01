@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-01",
+    area: "Proposals",
+    words: "Send a new lead an indicative proposal: systems to compare, a site visit, then the final one. They reply in the chat.",
+  },
+  {
+    day: "2026-11-01",
+    area: "Proposals",
+    words: "Sol can answer customers in their proposal's chat as they write, saying he's an AI (Settings, Emails).",
+  },
+  {
+    day: "2026-11-01",
     area: "Design tool",
     words:
       "The figures over the picture are three boxes: Solar, Battery, and For this home, which stays red until the customer's bill is in.",
@@ -29,7 +39,7 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-01",
     area: "Design tool",
     words:
-      "Opens zoomed in on the roof; the hand drags the picture even when all of it shows; model numbers under every panel, inverter and battery in the lists.",
+      "Opens zoomed in on the roof; the hand drags the picture at any zoom; model numbers in the panel, inverter and battery lists.",
   },
   {
     day: "2026-11-01",

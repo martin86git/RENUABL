@@ -685,6 +685,27 @@ function Emails({ brand, save, emailReady }: PartProps & { emailReady: boolean }
         </label>
       </section>
       <section className={section}>
+        <h2 className={h2}>Sol in your customers&apos; chat</h2>
+        <label className="flex cursor-pointer items-start gap-2.5 text-sm text-ink">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 accent-[var(--primary)]"
+            checked={brand.solAnswers}
+            onChange={(e) => void save({ solAnswers: e.target.checked })}
+          />
+          <span>
+            <span className="block font-medium">Let Sol answer customers as they write</span>
+            <span className="block text-xs text-muted">
+              Sol answers questions in a proposal&apos;s chat within seconds, from that proposal alone: the systems, the price they pay, the
+              estimates and what you&apos;ve written about your business. He never sees your costs or margin. He says he is an AI, never
+              promises a price, discount, date or saving, and passes anything else to your team. You still get every message, his answers
+              are marked as his in the deal&apos;s chat, and when someone from your team replies he stays quiet in that conversation for the
+              day.
+            </span>
+          </span>
+        </label>
+      </section>
+      <section className={section}>
         <h2 className={h2}>When a customer accepts or writes to you</h2>
         <label className={ui.label}>
           Also tell these addresses

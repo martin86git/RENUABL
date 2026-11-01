@@ -177,9 +177,19 @@ export const USUAL_BLOCKS: ViewBlock[] = defaultBlocks()
   .filter((b) => b.on)
   .map((b) => ({ id: b.id, heading: "", words: "", image: null }));
 
-/** The blocks a proposal shows, in order: its own, or the usual ones for one published before they could be arranged. */
-export function viewBlocks(view: { blocks?: ViewBlock[] }): ViewBlock[] {
-  return view.blocks?.length ? view.blocks : USUAL_BLOCKS;
+/**
+ * What an indicative proposal leaves out: how to pay, and the conditions and terms that going ahead accepts. They
+ * come with the final proposal, after the site visit, which is the one a customer accepts.
+ */
+export const NOT_ON_INDICATIVE: readonly BlockId[] = ["payment", "conditions", "terms"];
+
+/**
+ * The blocks a proposal shows, in order: its own, or the usual ones for one published before they could be arranged.
+ * An indicative proposal leaves out `NOT_ON_INDICATIVE`.
+ */
+export function viewBlocks(view: { blocks?: ViewBlock[]; indicative?: boolean }): ViewBlock[] {
+  const blocks = view.blocks?.length ? view.blocks : USUAL_BLOCKS;
+  return view.indicative ? blocks.filter((b) => !NOT_ON_INDICATIVE.includes(b.id)) : blocks;
 }
 
 /** A block's heading as it is shown: the business's own, else the usual one (`fallback` for a block whose usual heading depends on the proposal). */

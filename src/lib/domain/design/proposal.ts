@@ -101,6 +101,12 @@ export interface ProposalView {
   title: string;
   /** A few words from the business to this customer. */
   note: string;
+  /**
+   * An indicative proposal: the systems worked out from the roof from above and the bill, sent to a new lead for
+   * their thoughts before anyone visits. It can't be accepted: the customer tells the business which suits them and
+   * leaves notes, the home is visited to confirm, and a final proposal follows. Left out on a final proposal.
+   */
+  indicative?: boolean;
   system: {
     panels: number;
     kw: number;
@@ -299,6 +305,30 @@ export const ROOF_NOTE = "The layout is a design. It is checked on site before a
 export const ACCEPT_LINE = "I'd like to go ahead with this proposal.";
 export const ACCEPT_WITH_TERMS = "I'd like to go ahead with this proposal, and I accept the terms and conditions set out with it.";
 export const ACCEPT_WITH_CONDITIONS = "I'd like to go ahead with this proposal, and I accept the conditions set out with it.";
+// An indicative proposal: what it is, how the business works from it, and what the customer does with it in place of
+// going ahead. Never a promise: everything on it is confirmed at the site visit.
+export const INDICATIVE_LABEL = "Indicative proposal";
+export const INDICATIVE_INTRO =
+  "These systems are worked out from your roof seen from above and your power bill. We'd love your thoughts before we visit.";
+export const INDICATIVE_PRICE_NOTE = "An indicative price. We confirm it, and the design, when we visit your home.";
+export const INDICATIVE_STEPS: readonly { name: string; words: string }[] = [
+  { name: "Indicative proposal", words: "We design your system from above and price it from your bill. This is that step." },
+  { name: "Site visit", words: "We visit your home to check the roof, the switchboard and where everything goes." },
+  { name: "Final proposal", words: "We send the final design and price. Nothing is agreed until you accept it." },
+];
+export const INDICATIVE_NOT_ACCEPTABLE =
+  "This is an indicative proposal, so it can't be accepted yet. Tell us what you think in the chat and we'll arrange a visit.";
+export const FEEDBACK_MISSING = "Choose a system, or write a note, first.";
+
+/**
+ * The customer's thoughts on an indicative proposal as one message in the chat: the system that suits them best (by
+ * its name on the proposal) and their note. Empty with neither.
+ */
+export function feedbackMessage(choice: { name: string } | null, note: string): string {
+  const words = note.trim();
+  return [choice ? `${choice.name} suits us best.` : "", words].filter(Boolean).join("\n\n");
+}
+
 /** When the business sends its own terms: they are named, so the customer knows which document they accept. */
 export const acceptWithOwnTerms = (business: string) =>
   `I'd like to go ahead with this proposal, and I accept ${business}'s terms and conditions attached to it.`;
@@ -461,6 +491,8 @@ export interface ProposalChoice {
   template: TemplateId;
   validDays: (typeof VALID_DAYS)[number];
   note: string;
+  /** Sent as an indicative proposal, for the customer's thoughts before a site visit (`ProposalView.indicative`). */
+  indicative: boolean;
 }
 
 export const NOTHING_DRAWN = "There are no panels and no battery on the design yet. Draw the system first.";
@@ -532,6 +564,7 @@ export function buildProposal(input: ProposalInputs): Built {
     customer: { name: input.customer.name, address: project.address || input.customer.address },
     title: input.job.title,
     note: input.choice.note,
+    ...(input.choice.indicative ? { indicative: true } : {}),
     system: {
       panels: spec.panels,
       kw: summary.kw,
@@ -739,10 +772,15 @@ function workOut(input: ProposalInputs, at: number) {
 // Choices, links and what a customer sends back
 // ---------------------------------------------------------------------------
 
-/** What was chosen when publishing, as sent: a template we have, a validity we offer, a short note. */
-export function cleanChoice(raw: unknown, brand: Pick<BrandKit, "template" | "validDays">): ProposalChoice {
+/**
+ * What was chosen when publishing, as sent: a template we have, a validity we offer, a short note, and whether it is
+ * indicative. Only an explicit true or false moves that; otherwise it is `indicative`, which the server works out from
+ * the deal's stage (a lead or a designed roof goes out indicative to start).
+ */
+export function cleanChoice(raw: unknown, brand: Pick<BrandKit, "template" | "validDays">, indicative = false): ProposalChoice {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   return {
+    indicative: typeof r.indicative === "boolean" ? r.indicative : indicative,
     template: TEMPLATES.some((t) => t.id === r.template) ? (r.template as TemplateId) : brand.template,
     validDays: VALID_DAYS.includes(r.validDays as (typeof VALID_DAYS)[number])
       ? (r.validDays as (typeof VALID_DAYS)[number])
@@ -804,7 +842,8 @@ export function cleanAcceptance(raw: unknown): Cleaned<{ name: string }> {
 }
 
 // What goes in the customer's history.
-export const published = (version: number) => `Proposal ${version === 1 ? "" : `(version ${version}) `}sent`;
+export const published = (version: number, indicative = false) =>
+  `${indicative ? "Indicative proposal" : "Proposal"} ${version === 1 ? "" : `(version ${version}) `}sent`;
 export const PROPOSAL_OPENED = "Proposal opened by the customer";
 export const PROPOSAL_WITHDRAWN = "Proposal withdrawn";
 export const accepted = (name: string) => `Proposal accepted by ${name}`;
@@ -827,6 +866,8 @@ export interface ProposalStatus {
   openedAt: string | null;
   acceptedAt: string | null;
   acceptedName: string | null;
+  /** Sent as an indicative proposal: for the customer's thoughts, not to accept. */
+  indicative: boolean;
   /** The deposit on this version, once it is accepted: what is asked and where it stands. Null with no deposit, or not accepted. */
   deposit: DepositStatus | null;
 }

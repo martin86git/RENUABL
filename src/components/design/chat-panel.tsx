@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, MessageSquare, X } from "lucide-react";
 import clsx from "clsx";
-import { MAX_LINE, POLL_SECONDS, teamName, type ChatThread, type PublicLine } from "@/lib/domain/design/chat";
+import { MAX_LINE, POLL_SECONDS, SOL_BY, teamName, type ChatThread, type PublicLine } from "@/lib/domain/design/chat";
+import { solLabel } from "@/lib/domain/design/sol-customer";
+
+/** How long the customer's page waits for Sol's answer, looking every couple of seconds, before going back to its usual pace. */
+const SOL_WAIT = 45_000;
 import {
   SEND_TEMPLATES,
   fillTemplate,
@@ -49,13 +53,17 @@ function Bubbles(props: {
   empty: string;
   /** The list's height, in place of the usual. */
   className?: string;
+  /** What Sol's answers are headed with ("Sol · Example Solar's AI assistant"), so nobody takes them for a person. */
+  solName?: string;
+  /** Sol is writing an answer: three dots where it will come. */
+  thinking?: boolean;
 }) {
   const list = useRef<HTMLDivElement>(null);
   const count = props.lines.length;
   useEffect(() => {
     // The newest line at the foot of the list. The list is scrolled, never the page it sits on.
     if (list.current) list.current.scrollTop = list.current.scrollHeight;
-  }, [count]);
+  }, [count, props.thinking]);
   const breaks = timeBreaks(props.lines);
   const lastOwn = props.lines.findLastIndex((line) => line.from === props.mine);
   return (
@@ -75,6 +83,9 @@ function Bubbles(props: {
         return (
           <div key={line.id} className={clsx("flex flex-col", own ? "items-end" : "items-start", runStarts ? "mt-2.5" : "mt-0.5")}>
             {breaks.has(i) && <p className="w-full pb-1.5 pt-2 text-center text-[11px] font-medium text-muted">{lineTime(line.at)}</p>}
+            {line.sol && (runStarts || !props.lines[i - 1]?.sol) && (
+              <p className="px-3 pb-1 text-[11px] font-medium text-muted">{props.solName ?? "Sol · AI assistant"}</p>
+            )}
             <p
               title={lineTime(line.at)}
               className={clsx(
@@ -96,6 +107,21 @@ function Bubbles(props: {
           </div>
         );
       })}
+      {props.thinking && (
+        <div className="mt-2.5 flex flex-col items-start" role="status">
+          <p className="px-3 pb-1 text-[11px] font-medium text-muted">{props.solName ?? "Sol · AI assistant"}</p>
+          <p className="flex gap-1 rounded-[18px] bg-surface-2 px-3.5 py-3" aria-label="Sol is writing">
+            {[0, 1, 2].map((n) => (
+              <span
+                key={n}
+                className="size-1.5 rounded-full bg-muted motion-safe:animate-pulse"
+                style={{ animationDelay: `${n * 180}ms` }}
+                aria-hidden
+              />
+            ))}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -228,6 +254,8 @@ export interface CustomerConversation {
   show: (shown: boolean) => void;
   problem: string | null;
   send: (text: string) => Promise<boolean>;
+  /** Sol is writing an answer to what the customer just sent. */
+  thinking: boolean;
 }
 
 export function useCustomerChat({ token, business, phone }: { token?: string; business: string; phone?: string }): CustomerConversation {
@@ -236,6 +264,25 @@ export function useCustomerChat({ token, business, phone }: { token?: string; bu
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
   const [shown, show] = useState(false);
+  // When the customer has just written and Sol is answering here: when they sent it, so the page looks for his answer
+  // every couple of seconds (for up to `SOL_WAIT`) and shows him writing until it comes.
+  const [asked, setAsked] = useState<number | null>(null);
+  useEffect(() => {
+    if (!token || asked === null) return;
+    let gone = false;
+    const timer = window.setInterval(async () => {
+      if (Date.now() - asked > SOL_WAIT) return setAsked(null);
+      const res = await loadCustomerChat(token);
+      if (gone || !res.ok) return;
+      setLines(res.messages);
+      const last = res.messages[res.messages.length - 1];
+      if (!res.assistant || (last && last.from === "business")) setAsked(null);
+    }, 2500);
+    return () => {
+      gone = true;
+      window.clearInterval(timer);
+    };
+  }, [token, asked]);
   useEffect(() => {
     if (!token) return;
     let gone = false;
@@ -274,11 +321,12 @@ export function useCustomerChat({ token, business, phone }: { token?: string; bu
     setProblem(null);
     setLines(res.messages);
     setNames(res.names);
+    if (res.assistant) setAsked(Date.now());
     return true;
   };
   // In the business's preview nothing is asked of the server: the names follow the business as the preview loads.
   const shownNames = token ? names : { customer: "You", business: teamName(business) };
-  return { token, business, phone, lines, names: shownNames, open, shown, show, problem, send };
+  return { token, business, phone, lines, names: shownNames, open, shown, show, problem, send, thinking: asked !== null };
 }
 
 /**
@@ -374,6 +422,8 @@ export function ChatDock({ chat }: { chat: CustomerConversation }) {
                 names={chat.names}
                 empty="Ask anything about your proposal, or leave a note."
                 className="h-full max-h-[22rem] min-h-40"
+                solName={solLabel(chat.business)}
+                thinking={chat.thinking}
               />
             </div>
             <div ref={field} className="bg-canvas px-3 pb-3 pt-1">
@@ -464,7 +514,9 @@ export function DealChat({
       )}
       <div className="rounded-xl bg-canvas">
         <Bubbles
-          lines={chat.lines}
+          // Sol's answers marked as his, so the team can tell them from its own.
+          lines={chat.lines.map((line) => (line.by === SOL_BY ? { ...line, sol: true as const } : line))}
+          solName="Sol · answered for you"
           mine="business"
           names={names}
           empty="No messages yet. The customer can write to you from their proposal, and you can write first from here."
