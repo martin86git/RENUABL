@@ -68,6 +68,32 @@ const covered = (p: Pt, spots: Footprint[], reach = 0.03) =>
     return Math.abs(dot(d, s.down)) <= s.halfDown + reach && Math.abs(dot(d, s.side)) <= s.halfSide + reach;
   });
 
+/**
+ * `covered` for one set of spots, answered from a grid of `CELL` metre squares so each point looks only at the spots
+ * near it: the packer asks millions of times, and a big roof has hundreds of spots (2 Nov 2026: a commercial roof
+ * of 400 froze the designer). Same answer as `covered`.
+ */
+const CELL = 2;
+function coverer(spots: Footprint[], reach: number): (p: Pt) => boolean {
+  const cells = new Map<number, Footprint[]>();
+  const cell = (i: number, j: number) => (i + 50_000) * 100_000 + (j + 50_000);
+  for (const s of spots) {
+    // The farthest a covered point can be from the spot's centre.
+    const r = Math.hypot(s.halfDown + reach, s.halfSide + reach);
+    for (let i = Math.floor((s.centre.x - r) / CELL); i <= Math.floor((s.centre.x + r) / CELL); i++)
+      for (let j = Math.floor((s.centre.y - r) / CELL); j <= Math.floor((s.centre.y + r) / CELL); j++) {
+        const key = cell(i, j);
+        const list = cells.get(key);
+        if (list) list.push(s);
+        else cells.set(key, [s]);
+      }
+  }
+  return (p) => {
+    const near = cells.get(cell(Math.floor(p.x / CELL), Math.floor(p.y / CELL)));
+    return near ? covered(p, near, reach) : false;
+  };
+}
+
 /** The direction of the longer side of a scatter of points, as a bearing (0 to 180). */
 function longAxis(points: Pt[]): number {
   const n = points.length;
@@ -180,13 +206,37 @@ function areaOf(group: Group, others: Group[]): Area {
       ),
     ),
   );
+  const onThis = coverer(group.spots, FACE_EDGE);
+  const onOthers = others.map((o) => coverer(o.spots, 0));
   return {
     facing: group.facing,
     pitch: group.pitch,
-    covers: (p) => covered(p, group.spots, FACE_EDGE) && !others.some((o) => covered(p, o.spots, 0)),
+    covers: (p) => onThis(p) && !onOthers.some((on) => on(p)),
     outline,
     sun: group.spots.reduce((t, s) => t + s.kwh, 0) / group.spots.length,
   };
+}
+
+/**
+ * The faces to pack for a model where it sits, made once and kept with the model: Design it for me lays every count
+ * from a handful to the whole roof on the same faces, and the packer keeps what it learns about each (`pack.ts`).
+ */
+const madeAreas = new WeakMap<RoofModel, Map<string, Area[]>>();
+function areasFor(model: RoofModel, centre: { lat: number; lng: number }, offset: Pt): Area[] {
+  const key = `${centre.lat},${centre.lng},${offset.x},${offset.y}`;
+  const byPlace = madeAreas.get(model) ?? new Map<string, Area[]>();
+  madeAreas.set(model, byPlace);
+  const kept = byPlace.get(key);
+  if (kept) return kept;
+  const groups = groupsOf(model, centre, offset);
+  const areas = groups.map((g) =>
+    areaOf(
+      g,
+      groups.filter((o) => o !== g),
+    ),
+  );
+  byPlace.set(key, areas);
+  return areas;
 }
 
 export function suggestPanels(
@@ -199,19 +249,7 @@ export function suggestPanels(
   /** Where Google's model sits on the picture, in metres east and south: from lining it up with today's photo. */
   offset: Pt = { x: 0, y: 0 },
 ): LoosePanel[] {
-  const groups = groupsOf(model, centre, offset);
-  return packAreas(
-    groups.map((g) =>
-      areaOf(
-        g,
-        groups.filter((o) => o !== g),
-      ),
-    ),
-    Math.min(MAX_SUGGESTED, count),
-    size,
-    newId,
-    MAX_SUGGESTED,
-  );
+  return packAreas(areasFor(model, centre, offset), Math.min(MAX_SUGGESTED, count), size, newId, MAX_SUGGESTED);
 }
 
 /**

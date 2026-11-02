@@ -50,6 +50,8 @@ export function clearanceFor(standoff: number = MOUNT_STANDOFF): number {
 }
 /** The fewest panels a row is laid with: one on its own is a straggler. */
 export const MIN_ROW = 2;
+/** The most steps the row search takes on one face before it lays the rest row by row (see `packArea`). */
+export const SEARCH_BUDGET = 4000;
 /** Faces steeper than this are walls or gables, never a place for panels. */
 export const STEEPEST = 45;
 /** A face gets at least this share of the sunniest face's sun to be used. */
@@ -84,6 +86,17 @@ export interface Area {
  * portrait or on its side as fits the most panels on the face (portrait when it fits as many), every panel at least
  * the clearance inside the face.
  */
+/** Where rows fit on a face, kept with the face for each panel size and clearance (`packArea`). */
+type Runs = { a: number; b: number; count: number }[];
+const rowsKept = new WeakMap<Area, Map<string, Map<string, Runs>>>();
+function rowsFound(area: Area, sizeKey: string): Map<string, Runs> {
+  const bySize = rowsKept.get(area) ?? new Map<string, Map<string, Runs>>();
+  rowsKept.set(area, bySize);
+  const found = bySize.get(sizeKey) ?? new Map<string, Runs>();
+  bySize.set(sizeKey, found);
+  return found;
+}
+
 export function packArea(area: Area, n: number, size: PanelSize, newId: () => string): LoosePanel[] {
   const want = Math.max(0, Math.floor(n));
   if (!want || area.outline.length < 3) return [];
@@ -131,7 +144,8 @@ export function packArea(area: Area, n: number, size: PanelSize, newId: () => st
   // more brackets and rail on tile), then fewer rows. Each row is no longer, in metres, than the one below it.
   type Row = { landscape: boolean; along: number; across: number; v: number; run: { a: number; b: number }; room: number };
   type Below = { width: number; lo: number; hi: number } | null;
-  const found = new Map<string, ReturnType<typeof runs>>();
+  // Kept with the face, so laying another count on it doesn't measure the same rows again.
+  const found = rowsFound(area, `${size.long}|${size.short}|${size.gap}|${edge}|${tilt}`);
   const tryWay = (lowerEdge: number, below: Below, landscape: boolean): Row | null => {
     // Down the slope, as seen from above: shorter by the cosine of the pitch, as the designer draws it (`planSize`).
     const along = (landscape ? size.short : size.long) * Math.cos((tilt * Math.PI) / 180);
@@ -170,12 +184,17 @@ export function packArea(area: Area, n: number, size: PanelSize, newId: () => st
     if (x.onSide !== y.onSide) return x.onSide < y.onSide;
     return x.rows < y.rows;
   };
+  // The search takes at most `SEARCH_BUDGET` steps a face: past it, each row is laid portrait where it fits, else on its side, so a
+  // large flat roof (hundreds of places, dozens of rows) can never hold the page up (2 Nov 2026: a commercial roof
+  // froze the designer for minutes).
   const planned = new Map<string, Row[]>();
+  let steps = 0;
   const plan = (lowerEdge: number, below: Below, depth: number): Row[] => {
     if (lowerEdge <= v0 || depth >= 40) return [];
     const key = `${lowerEdge.toFixed(3)}|${below ? `${below.width.toFixed(2)}|${below.lo.toFixed(2)}|${below.hi.toFixed(2)}` : "-"}`;
     const known = planned.get(key);
     if (known) return known;
+    const searching = ++steps <= SEARCH_BUDGET;
     let best: Row[] = [];
     for (const landscape of [false, true]) {
       const row = tryWay(lowerEdge, below, landscape);
@@ -185,6 +204,7 @@ export function packArea(area: Area, n: number, size: PanelSize, newId: () => st
       const next: Below = { width, lo: middle - width / 2, hi: middle + width / 2 };
       const candidate = [row, ...plan(row.v - row.along / 2 - size.gap, next, depth + 1)];
       if (!best.length || better(candidate, best)) best = candidate;
+      if (!searching) break;
     }
     planned.set(key, best);
     return best;
