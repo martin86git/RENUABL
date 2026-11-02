@@ -754,6 +754,24 @@ create table if not exists design_job_files (
   at timestamptz not null default now()
 );
 create index if not exists design_job_files_note on design_job_files(business_id, note_id);
+-- Live co-design (domain/design/live.ts): a private link the customer watches the design on during the call, with
+-- what they may see (the snapshot) and the design they chose.
+create table if not exists design_live (
+  token text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text,
+  lat double precision not null,
+  lng double precision not null,
+  snapshot jsonb,
+  choice integer,
+  choice_at timestamptz,
+  seen_at timestamptz,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  ends_at timestamptz not null,
+  ended_at timestamptz
+);
+create index if not exists design_live_business on design_live(business_id, lat, lng);
 -- What was really installed on a job (domain/design/as-built.ts), with its serial numbers: the warranty and service file.
 create table if not exists design_as_built (
   business_id text not null references businesses(id) on delete cascade,

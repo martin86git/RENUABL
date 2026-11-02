@@ -90,6 +90,16 @@ export async function designHome(businessId: string, viewer: DealViewer): Promis
   return { waiting, firstSent, sites };
 }
 
+/** The business's site at a roof (one a place per business), by where it is: null when it hasn't been saved. */
+export async function siteIdAt(businessId: string, lat: number, lng: number): Promise<string | null> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const rows = await query<{ id: string }>(
+    `select id from design_projects where business_id = $1 and abs(lat - $2) < 1e-6 and abs(lng - $3) < 1e-6 limit 1`,
+    [businessId, lat, lng],
+  );
+  return rows[0]?.id ?? null;
+}
+
 /**
  * Puts a site drawn with no deal onto a deal that has no design and no place yet: the deal takes the site's address,
  * and so finds its roof (`linkJobsToRoof`, which moves a lead to designed). Written on the deal's record. Refused when

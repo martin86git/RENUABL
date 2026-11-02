@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-02",
+    area: "Design tool",
+    words: "Share live: the customer watches their roof designed on their phone during the call, switches designs and picks one.",
+  },
+  {
+    day: "2026-11-02",
+    area: "Design tool",
+    words: "Publishing a site with no deal now says why and puts the design on a deal from the Publish button.",
+  },
+  {
+    day: "2026-11-02",
     area: "Marketplace",
     words: "Installers bid on job listings and inspectors trade equipment; a bid won by an installer lands in its Jobs as the job card.",
   },

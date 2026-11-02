@@ -37,6 +37,7 @@ import {
   Layers,
   SunMedium,
   LayoutGrid,
+  Radio,
   Send,
   ThumbsUp,
   Trash2,
@@ -53,6 +54,7 @@ import type { CatalogueBattery, CatalogueInverter, CataloguePanel } from "@/lib/
 import type { Workspace } from "@/lib/domain/design/pricing";
 import {
   costSystem,
+  stcValue,
   editedLines,
   solarVicBar,
   defaultQuote,
@@ -68,6 +70,15 @@ import {
 import type { RebateRates } from "@/lib/domain/rebates";
 import { DesignQuote, HomeToggles } from "./design-quote";
 import { SOL_TOGGLE } from "@/lib/services/sol";
+import {
+  endLive as endLiveLink,
+  liveLink,
+  liveStatus as liveStatusOf,
+  pushLive as pushLiveSnapshot,
+  startLive as startLiveLink,
+  type LiveStatus,
+} from "@/lib/services/live";
+import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@/lib/domain/design/live";
 import { SolIcon } from "./sol-icon";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
@@ -678,6 +689,8 @@ export function RoofDesigner(props: {
   onPublish?: () => Promise<string | null>;
   /** For a roof opened from a deal: sends a note to the customer in the job's conversation, with the proposal just published. Answers what happened. */
   onNote?: (text: string) => Promise<{ ok: boolean; message: string }>;
+  /** A site with no deal: what Publish opens instead (the way to put it on a deal), since a proposal needs a customer. */
+  noDeal?: React.ReactNode;
   /** Who the note goes to, for the box's wording. */
   customerName?: string;
   /** Where this roof's proposal is, once there is one. */
@@ -2548,6 +2561,7 @@ export function RoofDesigner(props: {
   };
   /** Publish design, with a note: the box beneath the button for a roof opened from a deal. */
   const [sending, setSending] = useState(false);
+  const [noDealOpen, setNoDealOpen] = useState(false);
   const [note, setNote] = useState("");
   const [sent, setSent] = useState<{ ok: boolean; message: string } | null>(null);
   const save = async () => {
@@ -2728,6 +2742,122 @@ export function RoofDesigner(props: {
     else if (where === "kit") openMenu("inverters");
     else if (where === "pitch") setPitchOpen(true);
   };
+  /**
+   * Live co-design (2 Nov 2026, Martin): a private link the customer opens on their phone during the call, showing the
+   * designs as they are drawn, with the live figures, to switch between and choose (domain/design/live.ts). Only what
+   * the customer may see goes: never a cost, margin or product code, and no price for a member who can't see costs.
+   */
+  const [live, setLive] = useState<LiveStatus | null>(null);
+  const [liveOpen, setLiveOpen] = useState(false);
+  const [liveCopied, setLiveCopied] = useState(false);
+  const [liveProblem, setLiveProblem] = useState<string | null>(null);
+  const liveSnapshot = (): LiveSnapshot => {
+    const billNow = {
+      interval: bill.interval,
+      amount: Number(bill.amount) || 0,
+      supplyPerDay: Number(bill.supplyPerDay) || 0,
+      rate: Number(bill.rate) || 0,
+      feedIn: Number(bill.feedIn) || 0,
+    };
+    const postcode = /^\d{4}$/.test(quoteNow.form.postcode) ? quoteNow.form.postcode : null;
+    return {
+      active,
+      designs: everyDesign().map((d, i) => {
+        const sum = designSummary(d, props.yieldPerKwDay);
+        const costing = costSystem(systemSpecOf(d, firstListed), quoteNow.form, props.workspace);
+        const stc = stcValue(costing, postcode, todayInMarket(), props.rates, props.workspace.settings.stcPrice);
+        // The open design's price is the quote's own (with its hand changes); the others as the quote would make them.
+        const youPay =
+          costsHidden || costing.missing > 0 || sum.panels === 0
+            ? null
+            : i === active && net !== null
+              ? net
+              : Math.max(0, Math.round(costing.priceIncGst - stc));
+        const f =
+          sum.panels > 0
+            ? designFinance(
+                billNow,
+                monthlyProduction(d, props.yieldPerKwDay),
+                shiftingKwhOf(d),
+                props.workspace.settings.bill.selfUseShare,
+              )
+            : null;
+        return {
+          at: i,
+          name: d.label || (d.goal ? SELF_DESIGN_LABELS[d.goal] : `Option ${i + 1}`),
+          kw: sum.kw,
+          panels: sum.panels,
+          panelName: d.panel?.name ?? firstListed?.name ?? "",
+          batteryKwh: d.battery ? Math.round(d.battery.kwh * d.battery.qty * 10) / 10 : 0,
+          youPay,
+          billNow: f?.billNow ?? null,
+          billAfter: f?.billAfter ?? null,
+          saving: f?.saving ?? null,
+          payback: f && youPay !== null && f.saving > 0 ? Math.round((youPay / f.saving) * 10) / 10 : null,
+          outlines: designPanels(d)
+            .slice(0, LIVE_LIMITS.panels)
+            .map((p) => p.corners.map((c) => [...px(c)].map((v) => Math.round(v * 10) / 10) as [number, number])),
+        };
+      }),
+    };
+  };
+  // Worked out only while a link is open; sent once it has stood still for a moment.
+  const liveKey = live ? JSON.stringify(liveSnapshot()) : "";
+  const liveToken = live?.token ?? null;
+  useEffect(() => {
+    if (!liveToken || !liveKey) return;
+    const timer = window.setTimeout(() => void pushLiveSnapshot(liveToken, JSON.parse(liveKey) as LiveSnapshot), 500);
+    return () => window.clearTimeout(timer);
+  }, [liveToken, liveKey]);
+  // Whether the customer is watching, and what they chose.
+  useEffect(() => {
+    if (!liveToken) return;
+    const timer = window.setInterval(() => {
+      void liveStatusOf(liveToken).then((res) => {
+        if (res.ok) setLive(res.status);
+        else setLive(null);
+      });
+    }, LIVE_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [liveToken]);
+  const shareLive = async () => {
+    setLiveOpen(true);
+    setLiveProblem(null);
+    if (live) return;
+    const res = await startLiveLink({ lat: spot.lat, lng: spot.lng, jobId: props.jobId ?? null });
+    if (res.ok) setLive(res.status);
+    else setLiveProblem(res.message);
+  };
+  const copyLive = async () => {
+    if (!live) return;
+    try {
+      await navigator.clipboard.writeText(liveLink(live.token));
+      setLiveCopied(true);
+      window.setTimeout(() => setLiveCopied(false), 2000);
+    } catch {
+      setLiveProblem("Copy the link from the box.");
+    }
+  };
+  const stopLive = async () => {
+    if (live) await endLiveLink(live.token);
+    setLive(null);
+    setLiveOpen(false);
+  };
+  const liveChoice = live?.choice ?? null;
+  const liveWords = live
+    ? liveStatusWords(
+        {
+          seenAt: live.seenAt,
+          choice: liveChoice,
+          choiceName:
+            liveChoice === null
+              ? null
+              : (designs[liveChoice]?.label ??
+                (designs[liveChoice]?.goal ? SELF_DESIGN_LABELS[designs[liveChoice].goal!] : `Option ${liveChoice + 1}`)),
+        },
+        new Date(),
+      )
+    : null;
   // A string that has been started and has no panel yet.
   const startedString = tool === "string" && wiring !== null && !strings.some((x) => x.id === wiring);
   /**
@@ -3321,6 +3451,78 @@ export function RoofDesigner(props: {
             )}
           </div>
           <span className="hidden flex-1 lg:block" aria-hidden />
+          {/* Share live: the customer watches the design on their phone during the call, and says which they'd like. */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => (liveOpen ? setLiveOpen(false) : void shareLive())}
+              aria-expanded={liveOpen}
+              title={liveWords ?? "Share live: the customer watches the design on their phone"}
+              aria-label={live ? `Live with the customer: ${liveWords}` : "Share the design live with the customer"}
+              className={clsx(
+                "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full text-sm ring-1 transition",
+                live ? "px-3.5" : "w-10",
+                live ? "bg-sun-line/10 text-ink ring-sun-line" : "bg-surface text-ink-2 ring-line hover:text-ink",
+              )}
+            >
+              <Radio className={clsx("size-4", live && "animate-pulse text-sun-line")} aria-hidden />
+              {live ? (liveChoice !== null ? "Chosen" : "Live") : null}
+            </button>
+            {liveOpen && (
+              <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-medium text-ink">Design it live with the customer</p>
+                  <button type="button" onClick={() => setLiveOpen(false)} aria-label="Close" className="text-muted hover:text-ink">
+                    <X className="size-4" aria-hidden />
+                  </button>
+                </div>
+                <p className="mt-0.5 text-xs text-muted">
+                  Send them this link during the call. They see every design on this roof as you draw it, with the price after STCs and the
+                  saving, can switch between them, and tell you which they&apos;d like. Nothing else of yours is shown. It closes after a
+                  few hours, or when you end it.
+                </p>
+                {live ? (
+                  <>
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        readOnly
+                        value={liveLink(live.token)}
+                        onFocus={(e) => e.currentTarget.select()}
+                        className="min-w-0 flex-1 rounded-md bg-surface-2 px-2.5 py-2 text-xs text-ink ring-1 ring-line"
+                        aria-label="The customer's live link"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLive()}
+                        className="rounded-md bg-primary px-3 text-xs font-medium text-primary-ink hover:bg-forest"
+                      >
+                        {liveCopied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <p className="mt-3 inline-flex items-center gap-2 text-sm text-ink">
+                      <span className={clsx("size-2 rounded-full", live.seenAt ? "bg-positive" : "bg-line")} aria-hidden />
+                      {liveWords}
+                    </p>
+                    {costsHidden && (
+                      <p className="mt-1 text-xs text-muted">Prices aren&apos;t shown: you don&apos;t see costs on this account.</p>
+                    )}
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => void stopLive()}
+                        className="text-xs text-ink-2 underline-offset-2 hover:underline"
+                      >
+                        End the live link
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-3 text-sm text-ink-2">{liveProblem ?? "Opening a link…"}</p>
+                )}
+                {live && liveProblem && <p className="mt-2 text-xs text-danger">{liveProblem}</p>}
+              </div>
+            )}
+          </div>
           {/* The customer's chat (as Primero's): a round that lights orange with a count while they wait, opening the Proposal view. */}
           {props.jobId && (
             <button
@@ -3343,14 +3545,34 @@ export function RoofDesigner(props: {
           )}
           {/* Publishing saves the design and makes (or brings up to date) its proposal. From a deal it opens a box for a note to the customer, sent with it. */}
           <div className="relative">
-            <button
-              onClick={() => (props.onNote ? setSending(!sending) : void publish())}
-              aria-expanded={props.onNote ? sending : undefined}
-              disabled={saved === "saving" || publishing}
-              className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
-            >
-              <Send className="size-4" aria-hidden /> {publishing ? "Publishing…" : "Publish design"}
-            </button>
+            {props.noDeal ? (
+              // No deal, no customer to send a proposal to: Publish says so, and opens the way to put the design on a deal.
+              <button
+                type="button"
+                onClick={() => {
+                  if (!noDealOpen && saved === "changed") void save();
+                  setNoDealOpen(!noDealOpen);
+                }}
+                aria-expanded={noDealOpen}
+                className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md bg-surface-2 px-4 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+              >
+                <Send className="size-4" aria-hidden /> Publish · put it on a deal first
+              </button>
+            ) : (
+              <button
+                onClick={() => (props.onNote ? setSending(!sending) : void publish())}
+                aria-expanded={props.onNote ? sending : undefined}
+                disabled={saved === "saving" || publishing}
+                className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+              >
+                <Send className="size-4" aria-hidden /> {publishing ? "Publishing…" : "Publish design"}
+              </button>
+            )}
+            {noDealOpen && props.noDeal && (
+              <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line">
+                {props.noDeal}
+              </div>
+            )}
             {sending && props.onNote && (
               <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line">
                 <p className="text-sm font-medium text-ink">Send the proposal{props.customerName ? ` to ${props.customerName}` : ""}</p>

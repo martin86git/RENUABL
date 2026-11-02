@@ -211,6 +211,9 @@ export const jobMapImage = (v: { lat: number; lng: number; zoom: number }) =>
 
 /** The design tool's home (wave 6): the deals waiting for a design, each deal's first proposal, and the roofs drawn. */
 export const loadDesignHome = () => ask<import("@/lib/server/design-home-repo").DesignHomeData>("/api/design/design-home");
+/** The roof open in the designer onto a deal, found by where it is. */
+export const attachSiteAt = (place: { lat: number; lng: number }, jobId: string) =>
+  ask<object>("/api/design/design-home", { method: "POST", body: { ...place, jobId } });
 export const attachSite = (projectId: string, jobId: string) =>
   ask<object>("/api/design/design-home", { method: "POST", body: { projectId, jobId } });
 /** Sold jobs at the approval gates (Procurement → Pre-approvals, Solar Victoria, Book an installation). */
@@ -236,7 +239,4 @@ export const writeUpCall = (jobId: string, lines: import("@/lib/domain/design/ca
     notes: import("@/lib/domain/design/call-notes").CallNotes;
     text: string;
     changes: import("@/lib/domain/design/prepared").DetailChange[];
-  }>(
-    `/api/design/jobs/${encodeURIComponent(jobId)}/call-notes`,
-    { method: "POST", body: { lines } },
-  );
+  }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call-notes`, { method: "POST", body: { lines } });

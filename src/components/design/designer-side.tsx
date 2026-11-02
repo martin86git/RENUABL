@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Activity } from "@/lib/domain/design/crm";
 import type { TimelineEvent } from "@/lib/domain/design/timeline";
-import { addActivity, dollars, loadCustomer, loadTimeline } from "@/lib/services/crm";
+import { addActivity, attachSiteAt, dollars, listJobs, loadCustomer, loadTimeline, type JobLine } from "@/lib/services/crm";
+import { attachable } from "@/lib/domain/design/design-home";
 import { UNREAD_CHANGED } from "@/lib/services/chat";
 import { DealChat } from "./chat-panel";
 
@@ -212,5 +213,103 @@ export function ProposalSide({ jobId, refresh }: { jobId: string; refresh?: numb
       </section>
       <ProposalTimeline jobId={jobId} refresh={refresh} />
     </>
+  );
+}
+
+/** The first part of an address, for matching a deal to a site: "8 Example Court". */
+const streetOf = (address: string) => address.split(",")[0].trim().toLowerCase();
+
+/**
+ * Publish for a site with no deal (2 Nov 2026, from the same glitch found in Primero's): a proposal goes to a deal's
+ * customer, so the panel says so and puts the design on a deal there and then (`attachable`: still being sold, no
+ * design and no address of its own), a deal at this address first. A deal here that already has its own design is
+ * named with the way to open that instead.
+ */
+export function PutOnDeal({
+  place,
+  onAttached,
+}: {
+  place: { lat: number; lng: number; address: string };
+  onAttached: (jobId: string) => void;
+}) {
+  const [jobs, setJobs] = useState<JobLine[] | null>(null);
+  const [to, setTo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => {
+    let gone = false;
+    void listJobs().then((res) => {
+      if (!gone) setJobs(res.ok ? res.jobs : []);
+    });
+    return () => {
+      gone = true;
+    };
+  }, []);
+  const street = streetOf(place.address);
+  const here = (j: JobLine) => Boolean(street) && streetOf(j.address) === street;
+  const choices = jobs ? [...attachable(jobs)].sort((a, b) => Number(here(b)) - Number(here(a))) : [];
+  const elsewhere = jobs?.find((j) => here(j) && !choices.includes(j) && j.stage !== "lost");
+  const picked = to || (choices[0] && here(choices[0]) ? choices[0].id : "");
+  const attach = async () => {
+    if (!picked) return;
+    setBusy(true);
+    setProblem(null);
+    const res = await attachSiteAt({ lat: place.lat, lng: place.lng }, picked);
+    setBusy(false);
+    if (res.ok) onAttached(picked);
+    else setProblem(res.message);
+  };
+  return (
+    <div>
+      <p className="text-sm font-medium text-ink">Not on a deal yet: put it on a deal to publish it</p>
+      <p className="mt-0.5 text-xs text-muted">
+        A proposal goes to a deal&apos;s customer. The design is saved; choose the deal it&apos;s for and it opens there, ready to publish.
+      </p>
+      {elsewhere && (
+        <p className="mt-3 rounded-md bg-surface-2 p-2.5 text-xs text-ink-2">
+          {elsewhere.customerName}&apos;s deal ({elsewhere.title}) is at this address with a design of its own.{" "}
+          <Link href={`/design/roof?job=${elsewhere.id}`} className="font-medium text-ink underline underline-offset-2">
+            Open its design instead
+          </Link>
+        </p>
+      )}
+      {jobs === null ? (
+        <p className="mt-3 text-xs text-muted">Finding your deals…</p>
+      ) : choices.length ? (
+        <div className="mt-3 flex gap-2">
+          <select
+            value={picked}
+            onChange={(e) => setTo(e.target.value)}
+            className="min-w-0 flex-1 rounded-md bg-surface px-2 py-2 text-sm text-ink ring-1 ring-line"
+            aria-label="The deal to put this design on"
+          >
+            <option value="">Choose a deal…</option>
+            {choices.map((j) => (
+              <option key={j.id} value={j.id}>
+                {j.customerName} · {j.title}
+                {here(j) ? " (this address)" : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => void attach()}
+            disabled={!picked || busy}
+            className="rounded-md bg-primary px-3 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+          >
+            {busy ? "Putting it on…" : "Put it on this deal"}
+          </button>
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-ink-2">
+          No deal is waiting for a design.{" "}
+          <Link href="/design/sales/pipelines" className="font-medium text-ink underline underline-offset-2">
+            Make a new deal
+          </Link>{" "}
+          for this customer, then come back.
+        </p>
+      )}
+      {problem && <p className="mt-2 text-xs text-danger">{problem}</p>}
+    </div>
   );
 }

@@ -22,6 +22,7 @@ export default function robots(): MetadataRoute.Robots {
         "/pickup/",
         "/u/",
         "/job/",
+        "/live/",
       ],
     },
     sitemap: `${publicSiteUrl()}/sitemap.xml`,
