@@ -14,5 +14,5 @@ const BASE = "/api/design/installer-jobs";
 export const loadInstallerJobs = () => ask<{ jobs: SharedJobLine[] }>(BASE);
 export const answerInstallerJob = (id: string, action: "accept" | "decline") =>
   ask<{ jobs: SharedJobLine[] }>(BASE, { method: "POST", body: { id, do: action } });
-export const openInstallerJob = (id: string) => ask<{ token: string; from: string }>(`${BASE}/${encodeURIComponent(id)}`);
+export const openInstallerJob = (id: string) => ask<{ token: string; from: string; person: string }>(`${BASE}/${encodeURIComponent(id)}`);
 export const waitingJobs = () => ask<{ waiting: number }>(`${BASE}?count=1`);

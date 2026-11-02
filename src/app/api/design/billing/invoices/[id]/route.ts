@@ -1,6 +1,7 @@
 import { EMPTY_BILLING, taxInvoice } from "@/lib/domain/design/billing-invoice";
 import { answer, requireMember } from "@/lib/server/design-context";
-import { billingDetailsOf, subscriptionOf } from "@/lib/server/design-billing-repo";
+import { billingDetailsOf } from "@/lib/server/design-billing-repo";
+import { billingCustomer } from "@/lib/server/design-billing-customer";
 import { stripeClient } from "@/lib/server/stripe";
 import { invoiceOf } from "@/lib/server/stripe-billing";
 import { taxInvoicePdf } from "@/lib/server/tax-invoice-pdf";
@@ -15,8 +16,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/bill
     if ("refuse" in who) return who.refuse;
     const { id } = await ctx.params;
     const stripe = stripeClient();
-    const plan = await subscriptionOf(who.member.businessId);
-    const found = stripe && plan?.stripeCustomer && /^in_[A-Za-z0-9]+$/.test(id) ? await invoiceOf(stripe, plan.stripeCustomer, id) : null;
+    const customer = await billingCustomer(who.member.businessId);
+    const found = stripe && customer && /^in_[A-Za-z0-9]+$/.test(id) ? await invoiceOf(stripe, customer, id) : null;
     if (!found) return Response.json({ ok: false, message: "That invoice isn't here." }, { status: 404 });
     const details = (await billingDetailsOf(who.member.businessId)) ?? { ...EMPTY_BILLING, legalName: who.member.businessName };
     const pdf = await taxInvoicePdf(taxInvoice(found, details));

@@ -3,9 +3,32 @@
 import clsx from "clsx";
 import { ArrowRight, BookOpen, ClipboardCheck, PenTool, Store, Users, Wrench, type LucideIcon } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { kindLabel, type BusinessKind } from "@/lib/domain/design/business-kind";
 import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
+import { incomingRequests } from "@/lib/services/connections";
+import { nominatedInspections } from "@/lib/services/inspections";
+import { waitingJobs } from "@/lib/services/job-shares";
 import { PageHead, PATHS, ui } from "./design-shell";
+
+/** What waits on an installer or inspector now, for its Today: jobs to answer, inspections to book, requests to connect. */
+function useWaiting(kind: Exclude<BusinessKind, "retailer">) {
+  const [waiting, setWaiting] = useState<{ work: number; requests: number }>({ work: 0, requests: 0 });
+  useEffect(() => {
+    let gone = false;
+    void Promise.all([kind === "installer" ? waitingJobs() : nominatedInspections(), incomingRequests()]).then(([work, asked]) => {
+      if (gone) return;
+      setWaiting({
+        work: work.ok ? ("waiting" in work ? work.waiting : work.nominated) : 0,
+        requests: asked.ok ? asked.incoming : 0,
+      });
+    });
+    return () => {
+      gone = true;
+    };
+  }, [kind]);
+  return waiting;
+}
 
 /**
  * An installer's and an inspector's Today (1 Nov 2026, Martin: their login holds no CRM or procurement). What their
@@ -15,6 +38,7 @@ import { PageHead, PATHS, ui } from "./design-shell";
 export function KindToday({ kind, business }: { kind: Exclude<BusinessKind, "retailer">; business: string }) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const waiting = useWaiting(kind);
   const tiles: Tile[] =
     kind === "installer"
       ? [
@@ -23,6 +47,8 @@ export function KindToday({ kind, business }: { kind: Exclude<BusinessKind, "ret
             title: "Jobs",
             body: "The jobs retailers send you, each with its design, strings, the day and who to call on site.",
             href: "/design/jobs",
+            count: waiting.work,
+            countWords: "waiting for your answer",
           },
           {
             icon: Store,
@@ -44,6 +70,8 @@ export function KindToday({ kind, business }: { kind: Exclude<BusinessKind, "ret
             title: "Connections",
             body: "The retailers you install for and the inspectors you use. Connect once, then jobs pass between you.",
             href: "/design/connections",
+            count: waiting.requests,
+            countWords: "asking to connect",
           },
         ]
       : [
@@ -52,12 +80,16 @@ export function KindToday({ kind, business }: { kind: Exclude<BusinessKind, "ret
             title: "Inspections",
             body: "The jobs installers send you to inspect, with the design, the string drawing and their installation photos.",
             href: "/design/inspections",
+            count: waiting.work,
+            countWords: "to book",
           },
           {
             icon: Users,
             title: "Connections",
             body: "The installers you inspect for. Connect once, then they can send you their jobs.",
             href: "/design/connections",
+            count: waiting.requests,
+            countWords: "asking to connect",
           },
           {
             icon: Store,
@@ -99,7 +131,14 @@ export function KindToday({ kind, business }: { kind: Exclude<BusinessKind, "ret
               >
                 <t.icon className="size-[18px]" aria-hidden />
               </span>
-              <span className="mt-4 text-lg font-semibold tracking-tight text-ink">{t.title}</span>
+              <span className="mt-4 flex flex-wrap items-baseline gap-x-2.5 text-lg font-semibold tracking-tight text-ink">
+                {t.title}
+                {t.count ? (
+                  <span className="text-[13px] font-medium tracking-normal text-sun-line">
+                    {t.count} {t.countWords}
+                  </span>
+                ) : null}
+              </span>
               <span className="mt-1.5 flex-1 text-[14.5px] leading-relaxed text-ink-2">{t.body}</span>
               <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-ink">
                 Open <ArrowRight className="size-4 transition group-hover:translate-x-0.5" aria-hidden />
@@ -112,7 +151,7 @@ export function KindToday({ kind, business }: { kind: Exclude<BusinessKind, "ret
   );
 }
 
-type Tile = { icon: LucideIcon; title: string; body: string; href: string; lit?: boolean };
+type Tile = { icon: LucideIcon; title: string; body: string; href: string; lit?: boolean; count?: number; countWords?: string };
 
 /** A page whose working half comes in the next step: what will be here, said plainly, and nothing pretending to work. */
 export function ComingNext({ title, lead, points }: { title: string; lead: string; points: string[] }) {

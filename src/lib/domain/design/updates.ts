@@ -15,6 +15,22 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-02",
+    area: "Settings",
+    words:
+      "An installer's Billing is design jobs only: the jobs left, buying a pack, its tax invoices and billing details, no plan or users.",
+  },
+  {
+    day: "2026-11-02",
+    area: "Today",
+    words: "An installer's and an inspector's Today now says what waits: jobs to answer, inspections to book and requests to connect.",
+  },
+  {
+    day: "2026-11-02",
+    area: "Design tool",
+    words: "For installers the design tool is for sites: no deal search, publishing or proposals, and a job card no longer asks your name.",
+  },
+  {
+    day: "2026-11-02",
     area: "Design tool",
     words: "Share live: the customer watches their roof designed on their phone during the call, switches designs and picks one.",
   },

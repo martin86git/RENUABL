@@ -989,6 +989,12 @@ create table if not exists design_billing_details (
   updated_by text,
   updated_at timestamptz not null default now()
 );
+-- A business with no plan (an installer buying design jobs) has a Stripe customer of its own, so its invoices are found.
+create table if not exists design_stripe_customers (
+  business_id text primary key references businesses(id) on delete cascade,
+  stripe_customer text not null,
+  created_at timestamptz not null default now()
+);
 create table if not exists design_connect (
   business_id text primary key references businesses(id) on delete cascade,
   stripe_account text not null unique,

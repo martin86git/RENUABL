@@ -631,13 +631,15 @@ const NAME_KEY = "renuabl.job.name";
 
 /**
  * The installer's job card, on their phone at /job/<token>: the same card without the customer's email. `framed`
- * shows it inside an installer's own RENUABL login (job-shares.ts), where the frame gives it its page.
+ * shows it inside an installer's own RENUABL login (job-shares.ts), where the frame gives it its page and the member
+ * is known (`known`, their handle), so it doesn't ask for a name.
  */
-export function InstallerJobCard({ token, framed }: { token: string; framed?: boolean }) {
+export function InstallerJobCard({ token, framed, person: known }: { token: string; framed?: boolean; person?: string }) {
   const [card, setCard] = useState<JobCardView | null>(null);
   const [installer, setInstaller] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
-  const [person, setPerson] = useState("");
+  const [typed, setPerson] = useState("");
+  const person = known || typed;
   useEffect(() => {
     try {
       // The person's own name, given once on this phone.
@@ -693,13 +695,15 @@ export function InstallerJobCard({ token, framed }: { token: string; framed?: bo
           }}
           composer={
             <div className="space-y-2">
-              <input
-                value={person}
-                onChange={(e) => keepName(e.target.value.slice(0, 60))}
-                placeholder="Your name"
-                aria-label="Your name"
-                className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-              />
+              {!known && (
+                <input
+                  value={person}
+                  onChange={(e) => keepName(e.target.value.slice(0, 60))}
+                  placeholder="Your name"
+                  aria-label="Your name"
+                  className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                />
+              )}
               <Composer
                 placeholder="A note or photos from site: before, arrays, inverter, switchboard, commissioning"
                 send={async (text, files) => {

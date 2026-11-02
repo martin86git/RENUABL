@@ -689,6 +689,8 @@ export function RoofDesigner(props: {
   onPublish?: () => Promise<string | null>;
   /** For a roof opened from a deal: sends a note to the customer in the job's conversation, with the proposal just published. Answers what happened. */
   onNote?: (text: string) => Promise<{ ok: boolean; message: string }>;
+  /** An installer's designer (business-kind.ts): sites only, so no Publish, no Proposal view and no Sol panel to open. */
+  sitesOnly?: boolean;
   /** A site with no deal: what Publish opens instead (the way to put it on a deal), since a proposal needs a customer. */
   noDeal?: React.ReactNode;
   /** Who the note goes to, for the box's wording. */
@@ -3543,80 +3545,82 @@ export function RoofDesigner(props: {
               )}
             </button>
           )}
-          {/* Publishing saves the design and makes (or brings up to date) its proposal. From a deal it opens a box for a note to the customer, sent with it. */}
-          <div className="relative">
-            {props.noDeal ? (
-              // No deal, no customer to send a proposal to: Publish says so, and opens the way to put the design on a deal.
-              <button
-                type="button"
-                onClick={() => {
-                  if (!noDealOpen && saved === "changed") void save();
-                  setNoDealOpen(!noDealOpen);
-                }}
-                aria-expanded={noDealOpen}
-                className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md bg-surface-2 px-4 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink"
-              >
-                <Send className="size-4" aria-hidden /> Publish · put it on a deal first
-              </button>
-            ) : (
-              <button
-                onClick={() => (props.onNote ? setSending(!sending) : void publish())}
-                aria-expanded={props.onNote ? sending : undefined}
-                disabled={saved === "saving" || publishing}
-                className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
-              >
-                <Send className="size-4" aria-hidden /> {publishing ? "Publishing…" : "Publish design"}
-              </button>
-            )}
-            {noDealOpen && props.noDeal && (
-              <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line">
-                {props.noDeal}
-              </div>
-            )}
-            {sending && props.onNote && (
-              <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line">
-                <p className="text-sm font-medium text-ink">Send the proposal{props.customerName ? ` to ${props.customerName}` : ""}</p>
-                <p className="mt-0.5 text-xs text-muted">
-                  Your note goes in their chat on the proposal, and by email when replies are emailed. It is kept on the deal.
-                </p>
-                <textarea
-                  autoFocus
-                  value={note}
-                  maxLength={2000}
-                  onChange={(e) => setNote(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void publish(note);
+          {/* Publishing saves the design and makes (or brings up to date) its proposal. From a deal it opens a box for a note to the customer, sent with it. An installer has none to publish. */}
+          {!props.sitesOnly && (
+            <div className="relative">
+              {props.noDeal ? (
+                // No deal, no customer to send a proposal to: Publish says so, and opens the way to put the design on a deal.
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!noDealOpen && saved === "changed") void save();
+                    setNoDealOpen(!noDealOpen);
                   }}
-                  placeholder="Hi, here's your design with the battery we spoke about. Any questions, just reply on the proposal."
-                  className="mt-3 block min-h-24 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-forest"
-                />
-                {sent && (
-                  <p
-                    className={clsx(
-                      "mt-2 rounded-md px-2.5 py-2 text-xs",
-                      sent.ok ? "bg-positive-soft text-positive" : "bg-warning-soft text-warning",
-                    )}
-                    role="status"
-                  >
-                    {sent.message}
-                  </p>
-                )}
-                <div className="mt-3 flex justify-end gap-2">
-                  <button type="button" className={button} onClick={() => void publish()} disabled={publishing}>
-                    Publish only
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void publish(note)}
-                    disabled={publishing || !note.trim()}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
-                  >
-                    <Send className="size-4" aria-hidden /> {publishing ? "Sending…" : "Publish and send"}
-                  </button>
+                  aria-expanded={noDealOpen}
+                  className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md bg-surface-2 px-4 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+                >
+                  <Send className="size-4" aria-hidden /> Publish · put it on a deal first
+                </button>
+              ) : (
+                <button
+                  onClick={() => (props.onNote ? setSending(!sending) : void publish())}
+                  aria-expanded={props.onNote ? sending : undefined}
+                  disabled={saved === "saving" || publishing}
+                  className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+                >
+                  <Send className="size-4" aria-hidden /> {publishing ? "Publishing…" : "Publish design"}
+                </button>
+              )}
+              {noDealOpen && props.noDeal && (
+                <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line">
+                  {props.noDeal}
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+              {sending && props.onNote && (
+                <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line">
+                  <p className="text-sm font-medium text-ink">Send the proposal{props.customerName ? ` to ${props.customerName}` : ""}</p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    Your note goes in their chat on the proposal, and by email when replies are emailed. It is kept on the deal.
+                  </p>
+                  <textarea
+                    autoFocus
+                    value={note}
+                    maxLength={2000}
+                    onChange={(e) => setNote(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void publish(note);
+                    }}
+                    placeholder="Hi, here's your design with the battery we spoke about. Any questions, just reply on the proposal."
+                    className="mt-3 block min-h-24 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-forest"
+                  />
+                  {sent && (
+                    <p
+                      className={clsx(
+                        "mt-2 rounded-md px-2.5 py-2 text-xs",
+                        sent.ok ? "bg-positive-soft text-positive" : "bg-warning-soft text-warning",
+                      )}
+                      role="status"
+                    >
+                      {sent.message}
+                    </p>
+                  )}
+                  <div className="mt-3 flex justify-end gap-2">
+                    <button type="button" className={button} onClick={() => void publish()} disabled={publishing}>
+                      Publish only
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void publish(note)}
+                      disabled={publishing || !note.trim()}
+                      className="inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+                    >
+                      <Send className="size-4" aria-hidden /> {publishing ? "Sending…" : "Publish and send"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -6586,7 +6590,7 @@ export function RoofDesigner(props: {
         <div className={clsx("space-y-3 xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100dvh-6.5rem)] xl:overflow-y-auto", !shown && "hidden")}>
           {/* One view at a time, chosen at the top of the column (as Primero's). */}
           <div role="tablist" aria-label="Beside the picture" className="flex rounded-lg border border-line bg-surface-2 p-1">
-            {SIDE_VIEWS.filter((v) => v.id !== "quote" || !costsHidden).map((v) => (
+            {SIDE_VIEWS.filter((v) => (v.id !== "quote" || !costsHidden) && (v.id !== "proposal" || !props.sitesOnly)).map((v) => (
               <button
                 key={v.id}
                 role="tab"
@@ -6618,14 +6622,16 @@ export function RoofDesigner(props: {
                 form={quoteNow.form}
                 onPick={(name, value) => setQuote({ ...quoteNow, form: { ...quoteNow.form, [name]: value } as QuoteFields["form"] })}
               />
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new Event(SOL_TOGGLE))}
-                className="mt-3 flex w-full items-center gap-2 rounded-md border border-line px-3 py-2 text-left text-sm font-medium text-ink hover:border-forest"
-              >
-                <SolIcon className="size-5" />
-                Ask Sol about this design
-              </button>
+              {!props.sitesOnly && (
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event(SOL_TOGGLE))}
+                  className="mt-3 flex w-full items-center gap-2 rounded-md border border-line px-3 py-2 text-left text-sm font-medium text-ink hover:border-forest"
+                >
+                  <SolIcon className="size-5" />
+                  Ask Sol about this design
+                </button>
+              )}
             </section>
             {/* The switchboard from a photo: Sol reads it, a rule suggests the upgrade and RCBO, one press puts them on the quote. */}
             <section className="rounded-lg border border-line bg-surface p-3" aria-label="The switchboard">

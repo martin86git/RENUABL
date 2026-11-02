@@ -84,12 +84,14 @@ export async function updateSubscription(facts: Omit<SubscriptionFacts, "email">
 
 /**
  * Attaches the subscriptions made for this email to its business (once), and gives the business its free trial jobs
- * the first time it has a subscription. Safe to call again: nothing is attached or given twice.
+ * the first time it has a subscription. Safe to call again: nothing is attached or given twice. Only a retailer has a
+ * plan (business-kind.ts): a subscription is never attached to an installer or inspector.
  */
 export async function claimSubscriptions(businessId: string, email: string): Promise<void> {
   const claimed = await query<{ id: string }>(
     `update design_subscriptions set business_id = $1, updated_at = now()
-      where business_id is null and lower(email) = lower($2) returning id`,
+      where business_id is null and lower(email) = lower($2)
+        and exists (select 1 from businesses where id = $1 and coalesce(kind, 'retailer') = 'retailer') returning id`,
     [businessId, email],
   );
   const any = claimed.length
@@ -330,4 +332,21 @@ export async function saveBillingDetails(businessId: string, details: BillingDet
        address = excluded.address, updated_by = excluded.updated_by, updated_at = now()`,
     [businessId, details.legalName, details.abn, details.email, details.address, by.toLowerCase()],
   );
+}
+
+/** The Stripe customer a business with no plan was given for its packs (`billingCustomer`), if any. */
+export async function ownCustomerOf(businessId: string): Promise<string | null> {
+  const rows = await query<{ stripe_customer: string }>(`select stripe_customer from design_stripe_customers where business_id = $1`, [
+    businessId,
+  ]);
+  return rows[0]?.stripe_customer ?? null;
+}
+
+/** Keeps a business's own Stripe customer; when two were made at once, the first kept wins and is answered. */
+export async function keepOwnCustomer(businessId: string, customer: string): Promise<string> {
+  await query(`insert into design_stripe_customers (business_id, stripe_customer) values ($1, $2) on conflict (business_id) do nothing`, [
+    businessId,
+    customer,
+  ]);
+  return (await ownCustomerOf(businessId)) ?? customer;
 }

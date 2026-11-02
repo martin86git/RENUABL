@@ -22,6 +22,8 @@ import { BriefSender } from "@/components/admin/brief-sender";
 import { SCORE_LABELS, cleanBriefAnswers, scoreBrief } from "@/lib/domain/brief";
 import { listBriefs } from "@/lib/server/briefs-repo";
 import { noteUnfinishedBriefs } from "@/lib/server/brief-hubspot";
+import { BUSINESS_KINDS, countByKind, kindLabel } from "@/lib/domain/design/business-kind";
+import { listDesignBusinesses } from "@/lib/server/design-admin-repo";
 
 export const metadata = { title: "Partners and jobs" };
 
@@ -46,14 +48,16 @@ export default async function AdminPage() {
   await processOffersSoon();
   // Briefs left partway for a few hours get their "not finished" note when staff look (and from the daily cron).
   await noteUnfinishedBriefs();
-  const [partners, jobs, uploads, claims, checks, briefs] = await Promise.all([
+  const [partners, jobs, uploads, claims, checks, briefs, businesses] = await Promise.all([
     listPartners(),
     listAllJobs(),
     listPriceUploads(),
     listWhoopClaims(),
     allHealthAnswers(),
     listBriefs(),
+    listDesignBusinesses(),
   ]);
+  const kinds = countByKind(businesses);
   const tallies = interestSummary(checks);
   const held = claims.filter((c) => c.status !== "released").length;
   const names = new Map(partners.map((p) => [p.id, p.business_name]));
@@ -266,6 +270,31 @@ export default async function AdminPage() {
                   </span>
                 </span>
                 <WhoopActions reference={c.job_reference} status={c.status} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      {/* The design tool's own customers (solar businesses) by kind: read only, for staff. Not installation partners. */}
+      <Panel className="mt-6" title={`Design tool businesses · ${businesses.length}`}>
+        <p className="px-5 pt-3 text-[13px] text-muted">
+          {BUSINESS_KINDS.map((k) => `${kinds[k.kind]} ${k.label.toLowerCase()}${kinds[k.kind] === 1 ? "" : "s"}`).join(" · ")}
+        </p>
+        {businesses.length === 0 ? (
+          <p className="px-5 py-4 text-[14px] text-muted">No business has signed up to the design tool yet.</p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {businesses.map((b) => (
+              <li key={b.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-[14px]">
+                <span className="min-w-0">
+                  <span className="font-medium">{b.name}</span>
+                  <span className="block text-[13px] text-muted">
+                    Joined {formatDate(b.createdAt, { day: "numeric", month: "short", year: "numeric" })} · {b.members}{" "}
+                    {b.members === 1 ? "person" : "people"}
+                  </span>
+                </span>
+                <Badge tone={b.kind === "retailer" ? "info" : "neutral"}>{kindLabel(b.kind)}</Badge>
               </li>
             ))}
           </ul>

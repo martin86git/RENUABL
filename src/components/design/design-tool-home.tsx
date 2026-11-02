@@ -61,8 +61,10 @@ export function DesignToolHome({ onPick, onOpen }: { onPick: (address: Address) 
   const bar = useRef<HTMLInputElement>(null);
   // An installer designs sites, not deals: it has no CRM to ask (business-kind.ts).
   const [account] = useDesignAccount();
-  const deals = cleanKind(account?.signedIn ? account.business?.kind : undefined) === "retailer";
+  // Null until the account is known, so nothing is asked of the CRM before it is clear this business has one.
+  const deals = account ? cleanKind(account.signedIn ? account.business?.kind : undefined) === "retailer" : null;
   useEffect(() => {
+    if (deals === null) return;
     let gone = false;
     const none = { ok: false as const, message: "" };
     void Promise.all([loadDesignHome(), deals ? listJobs() : Promise.resolve(none), deals ? loadPulses() : Promise.resolve(none)]).then(
@@ -113,14 +115,14 @@ export function DesignToolHome({ onPick, onOpen }: { onPick: (address: Address) 
               RENUABL <span className="font-light text-ink-2">Design</span>
             </h1>
             <p className="mt-1 text-sm text-muted">
-              Draw the roof, price it, send it.
+              {deals === false ? "Draw the roof, string it, price it." : "Draw the roof, price it, send it."}
               {done && done.weekTotal > 0 ? ` · ${done.weekTotal} designed this week` : ""}
             </p>
           </div>
         </div>
       </header>
 
-      <FindBar inputRef={bar} jobs={jobs} onPick={onPick} />
+      <FindBar inputRef={bar} jobs={jobs} deals={deals !== false} onPick={onPick} />
 
       {problem && (
         <p className="rounded-md bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
@@ -133,7 +135,7 @@ export function DesignToolHome({ onPick, onOpen }: { onPick: (address: Address) 
       ) : next ? (
         <UpNext deal={next} pulse={pulses[next.id]} />
       ) : (
-        !rest.length && <AllDesigned deals={deals} />
+        !rest.length && <AllDesigned deals={deals !== false} />
       )}
 
       {rest.length > 0 && (
@@ -158,11 +160,13 @@ export function DesignToolHome({ onPick, onOpen }: { onPick: (address: Address) 
           <h2 id="carry-on" className={head}>
             Carry on
           </h2>
-          <p className="mt-0.5 text-xs text-muted">Designs started and not sent yet, newest first.</p>
+          <p className="mt-0.5 text-xs text-muted">
+            {deals === false ? "Designs started, newest first." : "Designs started and not sent yet, newest first."}
+          </p>
           <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {carryOn.map((s) => (
               <li key={s.id}>
-                <SiteCard site={s} jobs={jobs ?? []} onOpen={onOpen} onAttached={() => setAsks((n) => n + 1)} />
+                <SiteCard site={s} jobs={jobs ?? []} deals={deals !== false} onOpen={onOpen} onAttached={() => setAsks((n) => n + 1)} />
               </li>
             ))}
           </ul>
@@ -179,10 +183,13 @@ export function DesignToolHome({ onPick, onOpen }: { onPick: (address: Address) 
 function FindBar({
   inputRef,
   jobs,
+  deals: hasDeals,
   onPick,
 }: {
   inputRef: React.RefObject<HTMLInputElement | null>;
   jobs: JobLine[] | null;
+  /** False for an installer: no deals to find, only addresses. */
+  deals: boolean;
   onPick: (a: Address) => void;
 }) {
   const router = useRouter();
@@ -255,8 +262,14 @@ function FindBar({
               if (deals[0]) openDeal(deals[0]);
               else if (found[0]) void openPlace(found[0]);
             }}
-            placeholder={newSite ? "The new site's street address" : "Find a deal, or type an address to design"}
-            aria-label={newSite ? "The new site's street address" : "Find a deal or an address"}
+            placeholder={
+              newSite
+                ? "The new site's street address"
+                : hasDeals
+                  ? "Find a deal, or type an address to design"
+                  : "Type an address to design"
+            }
+            aria-label={newSite ? "The new site's street address" : hasDeals ? "Find a deal or an address" : "An address to design"}
             className="h-14 min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-muted"
           />
           {newSite ? (
@@ -504,11 +517,14 @@ function QueueCard({ deal, pulse, onPlaced }: { deal: Waiting; pulse?: DealPulse
 function SiteCard({
   site,
   jobs,
+  deals,
   onOpen,
   onAttached,
 }: {
   site: SiteLine;
   jobs: JobLine[];
+  /** False for an installer, which has no deals to put a site on. */
+  deals: boolean;
   onOpen: (roof: DesignRoof) => void;
   onAttached: () => void;
 }) {
@@ -565,6 +581,7 @@ function SiteCard({
         </button>
       )}
       {!site.jobId &&
+        deals &&
         (attaching ? (
           <div className="mt-2 space-y-1.5">
             {choices.length ? (

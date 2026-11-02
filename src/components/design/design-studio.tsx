@@ -11,6 +11,7 @@ import { batteryCatalogue, inverterCatalogue, panelCatalogue } from "@/lib/domai
 import { MONTHLY_SUN } from "@/lib/domain/design/tilt";
 import { DEFAULT_WORKSPACE, workspaceCatalogue, type Workspace } from "@/lib/domain/design/pricing";
 import { postcodeIn, type DesignExtras } from "@/lib/domain/design/quote";
+import { cleanKind } from "@/lib/domain/design/business-kind";
 import { ROOF_IMAGE, designSummary, type DesignSet } from "@/lib/domain/design/roof-design";
 import { VERIFIED_RATES, type RebateRates } from "@/lib/domain/rebates";
 import { yieldPerKw } from "@/lib/domain/sunshine";
@@ -308,6 +309,7 @@ export function DesignStudio() {
               : undefined
           }
           costsHidden={costsHidden()}
+          sitesOnly={signedIn && cleanKind(account?.signedIn ? account.business?.kind : undefined) !== "retailer"}
           savedLabel={kept}
           onUnsaved={noteUnsaved}
           bar={

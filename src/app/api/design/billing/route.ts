@@ -1,4 +1,5 @@
 import { cleanBillingDetails } from "@/lib/domain/design/billing-invoice";
+import { KIND_REFUSAL, billingParts, billsFor, cleanKind } from "@/lib/domain/design/business-kind";
 import { cleanPack } from "@/lib/domain/design/plans";
 import { cleanSolPack } from "@/lib/domain/design/sol-credits";
 import { todayInMarket } from "@/lib/domain/market";
@@ -14,6 +15,7 @@ import {
   tokenBalance,
   tokenLedger,
 } from "@/lib/server/design-billing-repo";
+import { billingCustomer, ensureBillingCustomer } from "@/lib/server/design-billing-customer";
 import { syncSeats } from "@/lib/server/design-seats";
 import { billingPortalUrl, createTokenCheckout, stripeClient } from "@/lib/server/stripe";
 import { createSolCheckout, invoicesOf, syncBillingCustomer } from "@/lib/server/stripe-billing";
@@ -21,36 +23,44 @@ import { createSolCheckout, invoicesOf, syncBillingCustomer } from "@/lib/server
 /**
  * GET: the business's plan, its Sol credits and design tokens with what used them, its billing details and its
  * invoices from RENUABL. The owner only. Opening it also brings the plan's users into line with the team, should an
- * earlier change not have reached Stripe.
+ * earlier change not have reached Stripe. An installer (business-kind.ts) is answered its design jobs, invoices and
+ * details only: no plan, users or Sol credits (`parts` says which the page shows).
  */
 export async function GET() {
   return answer(async () => {
     const who = await requireMember("members");
     if ("refuse" in who) return who.refuse;
     const { businessId, email } = who.member;
-    await claimSubscriptions(businessId, email);
-    await syncSeats(businessId);
+    const kind = cleanKind(who.member.businessKind);
+    const withPlan = billsFor(kind, "plan");
+    const withSol = billsFor(kind, "sol");
+    if (withPlan) {
+      await claimSubscriptions(businessId, email);
+      await syncSeats(businessId);
+    }
     const today = todayInMarket();
-    const [plan, tokens, ledger, sol, solUses, solPacks, details] = await Promise.all([
-      subscriptionOf(businessId),
+    const [plan, tokens, ledger, sol, solUses, solPacks, details, customer] = await Promise.all([
+      withPlan ? subscriptionOf(businessId) : null,
       tokenBalance(businessId),
       tokenLedger(businessId),
-      solBalanceOf(businessId, today),
-      solUseThisMonth(businessId, today),
-      solPacksBought(businessId),
+      withSol ? solBalanceOf(businessId, today) : null,
+      withSol ? solUseThisMonth(businessId, today) : [],
+      withSol ? solPacksBought(businessId) : [],
       billingDetailsOf(businessId),
+      billingCustomer(businessId),
     ]);
     const stripe = stripeClient();
     // Invoices come from Stripe as they are; Stripe being slow or down never stops the rest of the page.
     const invoices =
-      stripe && plan?.stripeCustomer
-        ? await invoicesOf(stripe, plan.stripeCustomer).catch((e) => {
+      stripe && customer
+        ? await invoicesOf(stripe, customer).catch((e) => {
             console.error("invoices not read", e instanceof Error ? e.message : e);
             return null;
           })
         : [];
     return Response.json({
       ok: true,
+      parts: billingParts(kind),
       plan: plan && { status: plan.status, interval: plan.interval, seats: plan.seats, trialEnd: plan.trialEnd, periodEnd: plan.periodEnd },
       tokens,
       ledger,
@@ -84,27 +94,31 @@ export async function POST(request: Request) {
     const read = await readBody(request, 4000);
     if ("refuse" in read) return read.refuse;
     const { businessId, email } = who.member;
+    const kind = cleanKind(who.member.businessKind);
     const stripe = stripeClient();
-    const plan = await subscriptionOf(businessId);
+    const plan = billsFor(kind, "plan") ? await subscriptionOf(businessId) : null;
+    const customer = await billingCustomer(businessId);
 
     if (read.body.do === "details") {
       const details = cleanBillingDetails(read.body);
       if (!details.ok) return Response.json({ ok: false, message: details.message }, { status: 422 });
       await saveBillingDetails(businessId, details.value, email);
-      if (stripe && plan?.stripeCustomer)
-        await syncBillingCustomer(stripe, plan.stripeCustomer, details.value).catch((e) =>
+      if (stripe && customer)
+        await syncBillingCustomer(stripe, customer, details.value).catch((e) =>
           console.error("billing details not given to Stripe", e instanceof Error ? e.message : e),
         );
       return Response.json({ ok: true, details: details.value });
     }
 
-    if (!stripe) return Response.json({ ok: false, message: "Payments aren't set up yet." }, { status: 503 });
     const origin = new URL(request.url).origin;
+    // A business with no plan (an installer) has no plan to manage and no Sol to buy for: refused here, not only hidden.
+    if ((read.body.do === "portal" && !billsFor(kind, "plan")) || (read.body.do === "sol" && !billsFor(kind, "sol")))
+      return Response.json({ ok: false, message: KIND_REFUSAL }, { status: 403 });
+    if (!stripe) return Response.json({ ok: false, message: "Payments aren't set up yet." }, { status: 503 });
     if (read.body.do === "portal") {
       if (!plan?.stripeCustomer) return Response.json({ ok: false, message: "There's no plan to manage yet." }, { status: 404 });
       return Response.json({ ok: true, url: await billingPortalUrl(stripe, plan.stripeCustomer, origin) });
     }
-    const customer = plan?.stripeCustomer ?? null;
     if (read.body.do === "sol") {
       const pack = cleanSolPack(read.body.credits);
       if (!pack) return Response.json({ ok: false }, { status: 400 });
@@ -112,6 +126,8 @@ export async function POST(request: Request) {
     }
     const pack = cleanPack(read.body.pack);
     if (read.body.do !== "tokens" || !pack) return Response.json({ ok: false }, { status: 400 });
-    return Response.json({ ok: true, url: await createTokenCheckout(stripe, { businessId, email, pack, customer, origin }) });
+    // With no plan, packs go on a Stripe customer of the business's own, so its invoices can be listed.
+    const buyer = customer ?? (await ensureBillingCustomer(stripe, { businessId, email, name: who.member.businessName }));
+    return Response.json({ ok: true, url: await createTokenCheckout(stripe, { businessId, email, pack, customer: buyer, origin }) });
   });
 }

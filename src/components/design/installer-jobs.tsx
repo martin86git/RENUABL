@@ -127,7 +127,7 @@ function Line({ job: j }: { job: SharedJobLine }) {
 
 /** One accepted job's card, inside the installer's login (the same card as their private link). */
 export function InstallerJobPage({ id }: { id: string }) {
-  const [open, setOpen] = useState<{ token: string; from: string } | null>(null);
+  const [open, setOpen] = useState<{ token: string; from: string; person: string } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
     void openInstallerJob(id).then((res) => (res.ok ? setOpen(res) : setProblem(res.message)));
@@ -143,7 +143,7 @@ export function InstallerJobPage({ id }: { id: string }) {
         <p className="text-sm text-muted">Loading…</p>
       ) : (
         <>
-          <InstallerJobCard token={open.token} framed />
+          <InstallerJobCard token={open.token} framed person={open.person} />
           <NominateInspector shareId={id} />
         </>
       )}

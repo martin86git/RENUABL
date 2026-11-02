@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BUSINESS_KINDS, apiAllowed, cleanKind, joinsFree, pageAllowed, settingsFor } from "./business-kind";
+import {
+  BUSINESS_KINDS,
+  apiAllowed,
+  billingParts,
+  billsFor,
+  cleanKind,
+  countByKind,
+  joinsFree,
+  pageAllowed,
+  settingsFor,
+} from "./business-kind";
 import { KIND_SECTIONS, designsRoofs, sectionAt } from "./sections";
 
 describe("kinds of business", () => {
@@ -100,5 +110,36 @@ describe("the Marketplace for each kind", () => {
     expect(pages("inspector")).toEqual(["equipment", "my-equipment"]);
     expect(kinds.pageAllowed("inspector", "/design/marketplace")).toBe(false);
     expect(kinds.pageAllowed("installer", "/design/marketplace")).toBe(true);
+  });
+});
+
+describe("what each kind is billed for", () => {
+  it("gives a retailer its plan, Sol credits and design-job packs", () => {
+    expect(billingParts("retailer")).toEqual(["plan", "sol", "packs"]);
+  });
+
+  it("bills an installer for design jobs only: no plan, no users, no Sol", () => {
+    expect(billingParts("installer")).toEqual(["packs"]);
+    expect(billsFor("installer", "plan")).toBe(false);
+    expect(billsFor("installer", "sol")).toBe(false);
+    expect(billsFor("installer", "packs")).toBe(true);
+    expect(settingsFor("installer")).toContain("billing");
+  });
+
+  it("bills an inspector for nothing, and gives it no Billing", () => {
+    expect(billingParts("inspector")).toEqual([]);
+    expect(settingsFor("inspector")).not.toContain("billing");
+    expect(apiAllowed("inspector", "/api/design/billing")).toBe(false);
+  });
+});
+
+describe("staff's count of kinds", () => {
+  it("counts every kind, none left out", () => {
+    expect(countByKind([{ kind: "installer" }, { kind: "retailer" }, { kind: "installer" }])).toEqual({
+      retailer: 1,
+      installer: 2,
+      inspector: 0,
+    });
+    expect(countByKind([])).toEqual({ retailer: 0, installer: 0, inspector: 0 });
   });
 });

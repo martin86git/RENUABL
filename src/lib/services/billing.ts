@@ -3,6 +3,7 @@
  * business's plan and design tokens, buying a pack, and the questions the sign-up page takes. All of it is asked of the
  * server; the browser never decides a price.
  */
+import type { BillingPart } from "@/lib/domain/design/business-kind";
 import type { BillingDetails } from "@/lib/domain/design/billing-invoice";
 import type { BillingInterval, TokenPack } from "@/lib/domain/design/plans";
 import type { SolBalance } from "@/lib/domain/design/sol-credits";
@@ -40,10 +41,13 @@ export function askSales(o: { name: string; business: string; email: string; mob
 }
 
 export interface BillingState {
+  /** What this kind of business is billed for (business-kind.ts): an installer, design-job packs only. */
+  parts: BillingPart[];
   plan: { status: string; interval: BillingInterval; seats: number; trialEnd: string | null; periodEnd: string | null } | null;
   tokens: number;
   ledger: { change: number; reason: string; by: string | null; at: string }[];
-  sol: SolBalance;
+  /** Null for a business with no Sol (an installer). */
+  sol: SolBalance | null;
   solUses: { use: string; count: number }[];
   solPacks: { credits: number; by: string | null; at: string }[];
   details: BillingDetails | null;

@@ -142,3 +142,28 @@ export const PATH_HEADER = "x-renuabl-design-path";
 
 /** What a member is told when their kind of business doesn't use something. */
 export const KIND_REFUSAL = "That isn't part of your RENUABL account.";
+
+/**
+ * What a kind's Billing holds (2 Nov 2026): a retailer has its plan (users, trial, Stripe's page for the card and
+ * cancelling), Sol credits and design-job packs; an installer, which pays no user fee and has no Sol, only design-job
+ * packs; an inspector nothing (it has no Billing). Read by the Billing page and enforced by its route and sign-up.
+ */
+export type BillingPart = "plan" | "sol" | "packs";
+const BILLING: Record<BusinessKind, readonly BillingPart[]> = {
+  retailer: ["plan", "sol", "packs"],
+  installer: ["packs"],
+  inspector: [],
+};
+export const billingParts = (kind: BusinessKind): readonly BillingPart[] => BILLING[kind];
+export const billsFor = (kind: BusinessKind, part: BillingPart) => BILLING[kind].includes(part);
+
+/** Said when a business that pays no user fee (an installer or inspector) tries to start a plan. */
+export const NO_PLAN_FOR_KIND =
+  "Your business joined RENUABL free, so there's no plan to sign up for. Buy design jobs under Settings, Billing.";
+
+/** How many businesses there are of each kind, every kind listed (staff's list on /admin). */
+export function countByKind(businesses: readonly { kind: BusinessKind }[]): Record<BusinessKind, number> {
+  const counts = Object.fromEntries(BUSINESS_KINDS.map((k) => [k.kind, 0])) as Record<BusinessKind, number>;
+  for (const b of businesses) counts[b.kind] += 1;
+  return counts;
+}
