@@ -2,6 +2,7 @@
 
 import { tradeUnreadCount } from "@/lib/services/trade";
 import { incomingRequests } from "@/lib/services/connections";
+import { waitingJobs } from "@/lib/services/job-shares";
 import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import { inboxUnread } from "@/lib/services/inbox";
 import { stopViewing } from "@/lib/services/design-account";
@@ -165,7 +166,12 @@ function Shell({
     const res = await incomingRequests();
     return res.ok ? res.incoming : null;
   });
-  const counts: Record<string, number> = { service, ...gates, "my-equipment": trade, connections: requests };
+  // Jobs connected retailers have sent an installer, waiting for its answer (job-shares.ts).
+  const sentJobs = useCount(on && kind === "installer", "renuabl:installer-jobs", async () => {
+    const res = await waitingJobs();
+    return res.ok ? res.waiting : null;
+  });
+  const counts: Record<string, number> = { service, ...gates, "my-equipment": trade, connections: requests, jobs: sentJobs };
   // Gmail's own unread count on the envelope, asked each minute while the page is in view (0 until Gmail is connected).
   const mail = useCount(retail, "renuabl:inbox", async () => {
     const res = await inboxUnread();

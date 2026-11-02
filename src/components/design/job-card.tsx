@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import { CalendarDays, Camera, FileText, MapPin, Paperclip, Phone, Send, X } from "lucide-react";
+import { ShareJob } from "./share-job";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -106,7 +107,9 @@ function AsBuiltPanel({
           </span>
         )}
       </div>
-      <p className="mt-1 text-xs text-muted">What was really installed, with every serial number: the job&apos;s warranty and service file.</p>
+      <p className="mt-1 text-xs text-muted">
+        What was really installed, with every serial number: the job&apos;s warranty and service file.
+      </p>
       <div className="mt-3 grid gap-3 text-xs font-medium sm:grid-cols-3">
         <label>
           Installed on
@@ -569,45 +572,48 @@ export function JobCardDialog({ jobId, onClose, onEvent }: { jobId: string; onCl
                 />
               }
               aside={
-                <div>
-                  <p className={head}>Email the job card</p>
-                  {card.installers?.length ? (
-                    <>
-                      <div className="mt-1 flex gap-2">
-                        <select
-                          value={to}
-                          onChange={(e) => setTo(e.target.value)}
-                          aria-label="Installer"
-                          className="min-h-9 min-w-0 flex-1 rounded-md border border-line bg-surface px-2 text-sm"
-                        >
-                          <option value="">Choose an installer…</option>
-                          {card.installers.map((i) => (
-                            <option key={i.id} value={i.id}>
-                              {i.name}
-                              {i.sentAt ? ` (sent ${when(i.sentAt)})` : ""}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          disabled={!to || sending}
-                          onClick={() => void send()}
-                          className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
-                        >
-                          <Send className="size-3.5" aria-hidden /> {sending ? "Sending…" : "Email"}
-                        </button>
-                      </div>
-                      {sent && <p className={clsx("mt-1 text-xs", sent.ok ? "text-positive" : "text-warning")}>{sent.message}</p>}
-                    </>
-                  ) : (
-                    <p className="mt-1 text-sm text-ink-2">
-                      No installers on file yet.{" "}
-                      <Link href="/design/settings/installers" className="font-medium text-ink underline underline-offset-4">
-                        Add them in Settings
-                      </Link>
-                      .
-                    </p>
-                  )}
+                <div className="space-y-5">
+                  <ShareJob jobId={jobId} />
+                  <div>
+                    <p className={head}>Email the job card</p>
+                    {card.installers?.length ? (
+                      <>
+                        <div className="mt-1 flex gap-2">
+                          <select
+                            value={to}
+                            onChange={(e) => setTo(e.target.value)}
+                            aria-label="Installer"
+                            className="min-h-9 min-w-0 flex-1 rounded-md border border-line bg-surface px-2 text-sm"
+                          >
+                            <option value="">Choose an installer…</option>
+                            {card.installers.map((i) => (
+                              <option key={i.id} value={i.id}>
+                                {i.name}
+                                {i.sentAt ? ` (sent ${when(i.sentAt)})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={!to || sending}
+                            onClick={() => void send()}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+                          >
+                            <Send className="size-3.5" aria-hidden /> {sending ? "Sending…" : "Email"}
+                          </button>
+                        </div>
+                        {sent && <p className={clsx("mt-1 text-xs", sent.ok ? "text-positive" : "text-warning")}>{sent.message}</p>}
+                      </>
+                    ) : (
+                      <p className="mt-1 text-sm text-ink-2">
+                        No installers on file yet.{" "}
+                        <Link href="/design/settings/installers" className="font-medium text-ink underline underline-offset-4">
+                          Add them in Settings
+                        </Link>
+                        .
+                      </p>
+                    )}
+                  </div>
                 </div>
               }
             />
@@ -621,8 +627,11 @@ export function JobCardDialog({ jobId, onClose, onEvent }: { jobId: string; onCl
 
 const NAME_KEY = "renuabl.job.name";
 
-/** The installer's job card, on their phone at /job/<token>: the same card without the customer's email. */
-export function InstallerJobCard({ token }: { token: string }) {
+/**
+ * The installer's job card, on their phone at /job/<token>: the same card without the customer's email. `framed`
+ * shows it inside an installer's own RENUABL login (job-shares.ts), where the frame gives it its page.
+ */
+export function InstallerJobCard({ token, framed }: { token: string; framed?: boolean }) {
   const [card, setCard] = useState<JobCardView | null>(null);
   const [installer, setInstaller] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
@@ -655,6 +664,7 @@ export function InstallerJobCard({ token }: { token: string }) {
       // Kept for this visit only.
     }
   };
+  if (problem && framed) return <p className="text-sm text-ink-2">This job card isn&apos;t open to you any more. Ask the retailer.</p>;
   if (problem)
     return (
       <main className="theme-studio mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-6 text-center">
@@ -662,9 +672,10 @@ export function InstallerJobCard({ token }: { token: string }) {
         <p className="mt-2 text-sm text-ink-2">The link may have changed. Ask the business that sent it for a new one.</p>
       </main>
     );
-  if (!card) return <main className="theme-studio min-h-dvh" aria-busy="true" />;
+  if (!card) return framed ? <p className="text-sm text-muted">Loading…</p> : <main className="theme-studio min-h-dvh" aria-busy="true" />;
+  const Wrap = framed ? "div" : "main";
   return (
-    <main className="theme-studio mx-auto min-h-dvh w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6">
+    <Wrap className={framed ? "w-full" : "theme-studio mx-auto min-h-dvh w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6"}>
       <p className={head}>
         Job card from {card.business} · for {installer}
       </p>
@@ -700,7 +711,7 @@ export function InstallerJobCard({ token }: { token: string }) {
           }
         />
       </div>
-      <p className="mt-10 text-center text-xs text-muted">This link is for you: please don&apos;t pass it on.</p>
-    </main>
+      {!framed && <p className="mt-10 text-center text-xs text-muted">This link is for you: please don&apos;t pass it on.</p>}
+    </Wrap>
   );
 }

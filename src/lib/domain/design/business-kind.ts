@@ -81,6 +81,7 @@ const COMMON_API = [
 const API: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
   installer: [
     ...COMMON_API,
+    "installer-jobs",
     "roof",
     "projects",
     "workspace",

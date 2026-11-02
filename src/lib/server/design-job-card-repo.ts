@@ -2,7 +2,7 @@
  * Server only. The installation job card (domain/design/job-card.ts): read from the job, its customer, its roof design
  * and the business's installers on file, with the card's own thread of notes and photos. Under the designer's tenant
  * rule: the business id first, from the signed-in member, or from an installer's private link, which opens only its
- * own job and only while that installer is still on file.
+ * own job and only while that installer is still on file (or, for a connected installer, while the job is accepted).
  */
 import { randomBytes } from "node:crypto";
 import { systemDetails } from "@/lib/domain/design/deal";
@@ -14,6 +14,8 @@ import { query, transaction } from "./db";
 import { loadPrefs } from "./design-after-sale-repo";
 import { jobById, record } from "./design-crm-repo";
 import { NO_DESIGN, savedFor } from "./design-proposal-repo";
+import { linkedBusiness } from "./design-job-shares-repo";
+import { BUSINESS_LINK } from "@/lib/domain/design/job-shares";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
@@ -263,6 +265,9 @@ export async function cardByToken(
   );
   const link = rows[0];
   if (!link) return null;
-  const installer = (await loadPrefs(link.businessId)).installers.find((i) => i.id === link.installerId);
+  // A connected installer's link (job-shares.ts) lasts while the job is accepted and the two are connected.
+  const installer = link.installerId.startsWith(BUSINESS_LINK)
+    ? await linkedBusiness(link.businessId, link.jobId, link.installerId)
+    : (await loadPrefs(link.businessId)).installers.find((i) => i.id === link.installerId);
   return installer ? { businessId: link.businessId, businessName: link.businessName, jobId: link.jobId, installer } : null;
 }

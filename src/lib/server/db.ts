@@ -251,6 +251,25 @@ create table if not exists design_connections (
   unique (a_business, b_business)
 );
 create index if not exists design_connections_b on design_connections(b_business);
+-- Jobs a retailer sends to a connected installer (domain/design/job-shares.ts): one live a job at a time, opened in
+-- the installer's login through the job card's own installer link (token, installer id "biz:<business>").
+create table if not exists design_job_shares (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  installer_business text not null references businesses(id) on delete cascade,
+  token text not null,
+  state text not null default 'sent',
+  suburb text not null default '',
+  system text not null default '',
+  sent_by text not null,
+  sent_at timestamptz not null default now(),
+  answered_at timestamptz,
+  answered_by text,
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create unique index if not exists design_job_shares_live on design_job_shares(business_id, job_id) where state in ('sent','accepted');
+create index if not exists design_job_shares_installer on design_job_shares(installer_business, state);
 create table if not exists design_customers (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,

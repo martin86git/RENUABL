@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-02",
+    area: "Installation",
+    words: "Send a job to an installer you're connected with: it waits in their Jobs, and once they accept they see its job card.",
+  },
+  {
+    day: "2026-11-02",
+    area: "Connections",
+    words: "Find the installers and inspectors you work with and connect, like a friend request. Listing your business is up to you.",
+  },
+  {
+    day: "2026-11-02",
     area: "Design tool",
     words: "Keyboard shortcuts: a key for each tool, arrows to nudge, Ctrl+A for every panel, and ? to see them all.",
   },
