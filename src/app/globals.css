@@ -177,6 +177,17 @@ body {
 .team-pop {
   transition: right 300ms ease;
 }
+/* While the panel's edge is dragged (sol-dock.tsx), everything follows the pointer at once and no text is picked. */
+html.sol-resizing,
+html.sol-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+html.sol-resizing body,
+html.sol-resizing .sol-rail,
+html.sol-resizing .team-pop {
+  transition: none;
+}
 /* The top bar fits in less room (a narrow wide screen, or Sol's panel open) by putting the day and weather away. */
 @media (max-width: 1535px) {
   .studio-day-pill {

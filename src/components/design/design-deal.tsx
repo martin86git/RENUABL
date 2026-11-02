@@ -51,6 +51,7 @@ import { hasPulse, type DealPulse } from "@/lib/domain/design/deal-heat";
 import { openedWords } from "@/lib/domain/design/email-opens";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
+import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
 type Written = "note" | "call" | "email";
 type Tab = "overview" | "activities" | "email" | "chat" | "files";
@@ -257,6 +258,22 @@ export function DealPage({ id }: { id: string }) {
     setText("");
     if (res.mentioned?.length) setStatus(`Told ${res.mentioned.map(handleOf).join(", ")}`);
   };
+
+  // What Sol's side panel sees of this page (page-context.ts): the deal in a line; its fields and record are the words
+  // on show. With the design drawer open, he looks at the design in it instead.
+  usePageAbout(
+    "Deal",
+    job && customer
+      ? [
+          `Deal: ${customer.name}, ${job.title} at ${job.address || "no address yet"}.`,
+          `Stage: ${STAGE_LABELS[job.stage]}${job.kw ? `; ${job.kw} kW` : ""}${job.value != null ? `; value $${Math.round(job.value).toLocaleString("en-AU")}` : ""}${job.installDate ? `; installing ${job.installDate}` : ""}.`,
+        ].join("\n")
+      : null,
+  );
+  useEffect(() => {
+    setFrameInFront(drawer);
+    return () => setFrameInFront(false);
+  }, [drawer]);
 
   if (problem)
     return (

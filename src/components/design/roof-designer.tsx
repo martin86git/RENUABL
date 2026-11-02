@@ -94,6 +94,7 @@ import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from 
 import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
 import { faces as facesWay, parseCommand, pickByQuery, type DesignCommand, type Facing as Way } from "@/lib/domain/design/design-commands";
 import { DictateButton } from "./dictate";
+import { usePageAbout } from "@/lib/services/page-context";
 import { MAX_PROPOSAL_OPTIONS } from "@/lib/domain/design/proposal";
 import {
   DESIGN_GOALS,
@@ -3016,6 +3017,23 @@ export function RoofDesigner(props: {
         .map((x) => x.name)
         .join("; ")}`,
     ].join("\n");
+  // What Sol's side panel sees of this page (page-context.ts): the open design in words, which of the roof's designs it
+  // is, the customer, and its price only for someone who may see it.
+  usePageAbout(
+    "Design tool",
+    [
+      `Design open: ${designs[active]?.label || `Design ${active + 1}`} (${active + 1} of ${designs.length}${
+        designs.length > 1
+          ? `; the others: ${designs
+              .map((d, i) => d.label || `Design ${i + 1}`)
+              .filter((_, i) => i !== active)
+              .join(", ")}`
+          : ""
+      })${props.customerName ? ` for ${props.customerName}` : ""}.`,
+      designInWords(),
+      ...(net != null && !costsHidden ? [`Price after STCs (the quote's own): $${Math.round(net).toLocaleString("en-AU")} inc GST.`] : []),
+    ].join("\n"),
+  );
   /** Fills the roof to about so many kW: on the traced faces (those looking the way asked), else Google's roof model. */
   const fillTo = async (kw: number, facing?: Way): Promise<string> => {
     const watts = panelOf(design).watts || 475;

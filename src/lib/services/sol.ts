@@ -5,13 +5,16 @@
 import type { SolFile, SolState, WhenChoice } from "@/lib/domain/design/sol";
 import type { SolPast, SolPastLine } from "@/lib/domain/design/sol-history";
 import type { KnowledgeEntry } from "@/lib/domain/design/sol-knowledge";
+import type { PageContext } from "@/lib/domain/design/page-context";
 import { ask } from "./crm";
 
 export const loadSol = () => ask<{ state: SolState }>("/api/design/sol");
 
 const post = (body: Record<string, unknown>) => ask<{ state: SolState }>("/api/design/sol", { method: "POST", body });
 
-export const askSol = (text: string, files: SolFile[]) => post({ do: "chat", text, files });
+/** A question, with what their screen shows when asked from the side panel (page-context.ts). */
+export const askSol = (text: string, files: SolFile[], page?: PageContext | null) =>
+  post({ do: "chat", text, files, ...(page ? { page } : {}) });
 export const solSeen = () => post({ do: "seen" });
 export const clearSolChat = () => post({ do: "clear" });
 export const remindAt = (id: string, when: WhenChoice) => post({ do: "remind", id, when });

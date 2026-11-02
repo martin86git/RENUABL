@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { CircleDollarSign, TrendingUp, type LucideIcon } from "lucide-react";
 import type { SolState } from "@/lib/domain/design/sol";
 import { SOL_ASK, SOL_CHANGED, SOL_STATE, SOL_TOGGLE, loadSol } from "@/lib/services/sol";
+import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
 import { SolMark } from "./sol-icon";
 
@@ -66,6 +67,7 @@ export function SolDock() {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [open]);
+  const width = useSolWidth();
   return (
     <aside
       aria-label="Sol"
@@ -77,9 +79,99 @@ export function SolDock() {
           : "pointer-events-none invisible translate-x-full",
       )}
     >
+      {open && (
+        // The left edge drags the panel wider or narrower (desktop only); a double press puts it back.
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Drag to change Sol's width"
+          aria-valuenow={width.px}
+          aria-valuemin={SOL_PANEL.min}
+          aria-valuemax={SOL_PANEL.max}
+          tabIndex={0}
+          title="Drag to change the width. Double-click to reset."
+          onPointerDown={width.startDrag}
+          onDoubleClick={width.reset}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowLeft") width.set(width.px + 32);
+            else if (e.key === "ArrowRight") width.set(width.px - 32);
+          }}
+          className="group absolute inset-y-0 -left-1.5 z-10 hidden w-3 cursor-col-resize touch-none lg:block"
+        >
+          <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-sun-line group-focus-visible:bg-sun-line" />
+          <span className="absolute left-1/2 top-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-line transition-colors group-hover:bg-sun-line" />
+        </div>
+      )}
       {open && <SolChat side question={question} onClose={() => setOpen(false)} />}
     </aside>
   );
+}
+
+const WIDTH_KEY = "renuabl.design.sol-width";
+
+/**
+ * The panel's width (sol-panel.ts), kept on the device and set as `--sol-w`, which the page, the rail and team chat's
+ * window already make room by. Only on a wide screen: on a phone the panel covers the page.
+ */
+function useSolWidth() {
+  const [px, setPx] = useState<number>(SOL_PANEL.standard);
+  const apply = (asked: number, keep: boolean) => {
+    const next = solPanelWidth(asked, window.innerWidth);
+    setPx(next);
+    document.documentElement.style.setProperty("--sol-w", `${next}px`);
+    if (keep) {
+      try {
+        localStorage.setItem(WIDTH_KEY, String(next));
+      } catch {
+        // Storage refused: it lasts for this page only.
+      }
+    }
+  };
+  useEffect(() => {
+    let kept = NaN;
+    try {
+      kept = Number(localStorage.getItem(WIDTH_KEY) ?? NaN);
+    } catch {
+      // As above.
+    }
+    const fit = () => apply(Number.isFinite(kept) ? kept : SOL_PANEL.standard, false);
+    fit();
+    // A narrower window keeps room for the page.
+    window.addEventListener("resize", fit);
+    return () => {
+      window.removeEventListener("resize", fit);
+      document.documentElement.style.removeProperty("--sol-w");
+    };
+  }, []);
+  const startDrag = (e: React.PointerEvent) => {
+    e.preventDefault();
+    // Held by the handle, so a frame under the pointer (the design drawer) can't take the drag.
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const root = document.documentElement;
+    root.classList.add("sol-resizing");
+    const move = (m: PointerEvent) => apply(window.innerWidth - m.clientX, false);
+    const up = (m: PointerEvent) => {
+      apply(window.innerWidth - m.clientX, true);
+      root.classList.remove("sol-resizing");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+  return {
+    px,
+    startDrag,
+    set: (n: number) => apply(n, true),
+    reset: () => {
+      try {
+        localStorage.removeItem(WIDTH_KEY);
+      } catch {
+        // As above.
+      }
+      apply(SOL_PANEL.standard, false);
+    },
+  };
 }
 
 /** How many of Sol's lines are unread, asked every minute and kept in step with any Sol on screen. */

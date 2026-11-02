@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-02",
+    area: "Sol",
+    words: "Sol's side panel sees the page beside it: ask about the design or deal you have open. Press Looking at to leave it out.",
+  },
+  { day: "2026-11-02", area: "Sol", words: "Drag the left edge of Sol's panel to make it wider or narrower; double-click it to reset." },
+  {
+    day: "2026-11-02",
     area: "Settings",
     words:
       "An installer's Billing is design jobs only: the jobs left, buying a pack, its tax invoices and billing details, no plan or users.",

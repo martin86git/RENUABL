@@ -63,6 +63,7 @@ import {
   type KnowledgeEntry,
 } from "@/lib/domain/design/sol-knowledge";
 import { recall, saveKnowledge } from "./design-sol-knowledge-repo";
+import { pageContextBlock, type PageContext } from "@/lib/domain/design/page-context";
 import { TEAM_CHANNELS, nameOf } from "@/lib/domain/design/team-chat";
 
 const MODEL = () => process.env.SOL_MODEL?.trim() || "claude-opus-5-5";
@@ -438,7 +439,7 @@ function fileBlocks(files: readonly SolFile[]): Anthropic.ContentBlockParam[] {
 /** Sol answers what the member said (with any files) and both are kept in their conversation. */
 export async function askSol(
   member: Member,
-  said: { text: string; files: SolFile[] },
+  said: { text: string; files: SolFile[]; page?: PageContext },
   apiKey: string | null,
   use: SolUse = "chat",
 ): Promise<SolState> {
@@ -479,11 +480,13 @@ export async function askSol(
   });
   const tools: Anthropic.ToolUnion[] = [...(can(member.role, "costs", member.permissions) ? [...TOOLS, PRICE_TOOL] : TOOLS), ...WEB_TOOLS];
   const blocks = fileBlocks(said.files);
+  // What their screen shows goes with this question only, ahead of it; the conversation keeps just what they said.
+  const asking = said.page ? `${pageContextBlock(said.page)}\n\n${text}` : text;
   const messages: Anthropic.MessageParam[] = [
     ...state.turns
       .slice(-HISTORY_SENT)
       .map((t) => ({ role: t.role === "you" ? ("user" as const) : ("assistant" as const), content: t.text || "(drawn)" })),
-    { role: "user", content: blocks.length ? [...blocks, { type: "text" as const, text }] : text },
+    { role: "user", content: blocks.length ? [...blocks, { type: "text" as const, text: asking }] : asking },
   ];
   // The API wants the conversation to start with the person and to alternate.
   while (messages.length && messages[0].role !== "user") messages.shift();

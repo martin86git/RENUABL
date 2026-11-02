@@ -421,10 +421,12 @@ function Shell({
       </div>
 
       {tool ? (
-        <div className="relative min-w-0">{children}</div>
+        <div data-sol-page className="relative min-w-0">
+          {children}
+        </div>
       ) : (
         <div className="px-3 pb-20 pt-2 sm:px-6 lg:px-14">
-          <div data-tour="pad" className={PAD}>
+          <div data-tour="pad" data-sol-page className={PAD}>
             {children}
           </div>
         </div>

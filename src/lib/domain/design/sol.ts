@@ -15,6 +15,7 @@ import { SOL_MAKER_DOCS } from "./maker-docs";
 import { SOL_NETWORKS } from "./networks";
 import { SOL_REGULATIONS } from "./standards";
 import { SOL_ORACLE, cleanSources, type SolSource } from "./sol-knowledge";
+import { SOL_ON_SCREEN, cleanPageContext, type PageContext } from "./page-context";
 
 export const SOL_NAME = "Sol";
 /** Turns kept in a member's conversation, and how many of the latest are sent with a question. */
@@ -313,7 +314,7 @@ export interface SolFile {
 }
 
 /** A message from the browser: its words (to `MAX_SAID`) and up to three files, or null when there is nothing. */
-export function cleanSolInput(raw: unknown): { text: string; files: SolFile[] } | null {
+export function cleanSolInput(raw: unknown): { text: string; files: SolFile[]; page?: PageContext } | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const text = typeof r.text === "string" ? r.text.trim().slice(0, MAX_SAID) : "";
@@ -328,7 +329,9 @@ export function cleanSolInput(raw: unknown): { text: string; files: SolFile[] } 
     .slice(0, MAX_FILES);
   if (files.reduce((n, f) => n + f.data.length, 0) > MAX_FILE_CHARS) return null;
   if (!text && !files.length) return null;
-  return { text, files };
+  // What their screen shows, sent from Sol's side panel (page-context.ts).
+  const page = cleanPageContext(r.page);
+  return { text, files, ...(page ? { page } : {}) };
 }
 
 /** "#" in the box finds a deal, as in Primero: the "#" and what follows it, up to the caret, or null. */
@@ -430,6 +433,8 @@ ${SOL_NETWORKS}
 ${SOL_MAKER_DOCS}
 
 ${SOL_ORACLE}
+
+${SOL_ON_SCREEN}
 
 Preferences: when they ask for something to apply from now on (a sign-off, their name, a tone), keep it with remember_my_preference; take one off with forget_my_preference.
 

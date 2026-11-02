@@ -1,9 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Bell, Copy, FileText, History, Mail, MessageSquarePlus, Plus, X, Pin } from "lucide-react";
+import { Bell, Copy, Eye, EyeOff, FileText, History, Mail, MessageSquarePlus, Plus, X, Pin } from "lucide-react";
+import { lookingAt } from "@/lib/domain/design/page-context";
+import { pageAt } from "@/lib/domain/design/sections";
+import { PAGE_ABOUT_CHANGED, currentPageContext, pageAboutNow } from "@/lib/services/page-context";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { MORE_DETAIL_ASK, offersMore } from "@/lib/domain/design/sol-charts";
@@ -138,6 +141,26 @@ export function SolChat({
   const [dealAt, setDealAt] = useState<{ start: number; query: string } | null>(null);
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [hi, setHi] = useState(0);
+  // In the side panel he sees the page it lies beside (page-context.ts): what the page says it shows and the words on
+  // it, sent with each question unless the member switches it off for this page.
+  const path = usePathname();
+  const pageName = path === "/design/roof" ? "Design tool" : (pageAt(path)?.page.label ?? "This page");
+  const [about, setAbout] = useState(() => (side ? pageAboutNow() : null));
+  const [seePage, setSeePage] = useState(true);
+  useEffect(() => {
+    if (!side) return;
+    const changed = () => setAbout(pageAboutNow());
+    window.addEventListener(PAGE_ABOUT_CHANGED, changed);
+    changed();
+    return () => window.removeEventListener(PAGE_ABOUT_CHANGED, changed);
+  }, [side]);
+  // A new page is seen again, whatever was switched off on the last.
+  const [seenPath, setSeenPath] = useState(path);
+  if (seenPath !== path) {
+    setSeenPath(path);
+    setSeePage(true);
+  }
+  const seeing = side ? lookingAt({ title: about?.title || pageName, about: about?.about ?? "" }) : null;
   const hits =
     dealAt && jobs && dealAt.query.trim().length >= 2
       ? jobs.filter((j) => matches({ words: [j.customerName, j.title, j.address] }, dealAt.query)).slice(0, 6)
@@ -207,7 +230,7 @@ export function SolChat({
     setDealAt(null);
     setBusy(true);
     setPending(said + (sending.length ? `${said ? "\n" : ""}(Attached: ${sending.map((f) => f.name).join(", ")})` : ""));
-    const ok = await run(askSol(said, encoded));
+    const ok = await run(askSol(said, encoded, side && seePage ? currentPageContext(pageName) : null));
     setPending(null);
     setBusy(false);
     if (ok) void run(solSeen());
@@ -488,6 +511,25 @@ export function SolChat({
               </span>
             ))}
             {fileProblem && <span className="text-xs text-danger">{fileProblem}</span>}
+          </div>
+        )}
+        {seeing && (
+          <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px]">
+            <button
+              type="button"
+              onClick={() => setSeePage(!seePage)}
+              aria-pressed={seePage}
+              title={
+                seePage ? "Sol sees this page with your question. Press to ask without it." : "Sol won't see this page. Press to let him."
+              }
+              className={clsx(
+                "inline-flex h-6 min-w-0 items-center gap-1.5 rounded-full px-2.5 ring-1 transition",
+                seePage ? "bg-sun text-sun-ink ring-sun-line/30" : "bg-surface text-muted ring-line line-through",
+              )}
+            >
+              {seePage ? <Eye className="size-3 shrink-0" aria-hidden /> : <EyeOff className="size-3 shrink-0" aria-hidden />}
+              <span className="truncate">{seePage ? `Looking at ${seeing}` : seeing}</span>
+            </button>
           </div>
         )}
         <div className="relative">
