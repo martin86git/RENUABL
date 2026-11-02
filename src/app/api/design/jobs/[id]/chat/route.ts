@@ -5,6 +5,7 @@ import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-c
 import { jobById } from "@/lib/server/design-crm-repo";
 import { tokenForJob } from "@/lib/server/design-proposal-repo";
 import { allow } from "@/lib/server/rate-limit";
+import { formFiles } from "@/lib/server/email-parts";
 
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
 const notFound = () => Response.json({ ok: false, message: "That job isn't here." }, { status: 404 });
@@ -47,12 +48,26 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if ("refuse" in who) return who.refuse;
     if (!allow(request, "design-chat-reply", 300))
       return Response.json({ ok: false, message: "Try again in a little while." }, { status: 429 });
-    const read = await readBody(request, 10_000);
-    if ("refuse" in read) return read.refuse;
-    const line = cleanLine(read.body);
+    // JSON, or a form when pictures or files go with it (they travel only in the email to the customer).
+    let raw: Record<string, unknown>;
+    let files: File[] = [];
+    if ((request.headers.get("content-type") ?? "").startsWith("multipart/form-data")) {
+      const form = await request.formData().catch(() => null);
+      if (!form) return Response.json({ ok: false, message: "That couldn't be read." }, { status: 400 });
+      raw = { text: form.get("text") };
+      const got = formFiles(form);
+      if ("problem" in got) return Response.json({ ok: false, message: got.problem }, { status: 422 });
+      files = got.files;
+    } else {
+      const read = await readBody(request, 10_000);
+      if ("refuse" in read) return read.refuse;
+      raw = read.body;
+    }
+    const line = cleanLine(raw);
     if (!line.ok) return Response.json({ ok: false, message: line.message }, { status: 422 });
-    const replied = validId(id) ? await memberReplies(who.member, id, line.value.text) : null;
+    const replied = validId(id) ? await memberReplies(who.member, id, line.value.text, files) : null;
     if (!replied) return notFound();
+    if ("refused" in replied) return Response.json({ ok: false, message: replied.refused }, { status: 422 });
     return Response.json({ ok: true, lines: replied.lines, unanswered: 0, email: replied.email, outcome: replyOutcome(replied.email) });
   });
 }

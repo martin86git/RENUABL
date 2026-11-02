@@ -8,6 +8,8 @@
  * added by us. Pure, tested.
  */
 
+import { messageHtml } from "./email-compose";
+
 export interface DealEmailContext {
   firstName: string;
   lastName: string;
@@ -94,18 +96,23 @@ export function cleanDealEmail(raw: unknown): CleanDealEmail {
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** The email as sent: the member's words, as they wrote them, and a line saying replies reach the business. */
-export function dealEmail(input: { business: string; subject: string; body: string }): { subject: string; text: string; html: string } {
+/**
+ * The email as sent: the member's words, as they wrote them (their lists as real lists in the HTML), any pictures
+ * under them, and a line saying replies reach the business. `pictures` is built on the server (`picturesHtml`).
+ */
+export function dealEmail(input: { business: string; subject: string; body: string; pictures?: string; attached?: string }): {
+  subject: string;
+  text: string;
+  html: string;
+} {
   const foot = `Sent by ${input.business} using RENUABL. Reply to this email to reach ${input.business}.`;
   return {
     subject: input.subject,
-    text: `${input.body}\n\n--\n${foot}`,
-    html: `<div style="font:14px/1.6 Arial,sans-serif;color:#111">${esc(input.body)
-      .split(/\n{2,}/)
-      .map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`)
-      .join("\n")}<p style="margin-top:24px;color:#888;font-size:12px">${esc(foot)}</p></div>`,
+    text: `${input.body}${input.attached ? `\n\n${input.attached}` : ""}\n\n--\n${foot}`,
+    html: `<div style="font:14px/1.6 Arial,sans-serif;color:#111">${messageHtml(input.body)}${input.pictures ? `\n${input.pictures}` : ""}<p style="margin-top:24px;color:#888;font-size:12px">${esc(foot)}</p></div>`,
   };
 }
 
-/** How the email is written on the deal's record. */
-export const emailRecord = (to: string, subject: string, body: string) => `Email to ${to}: ${subject}\n\n${body}`;
+/** How the email is written on the deal's record, with what went with it before the words (so a long email can't cut it off). */
+export const emailRecord = (to: string, subject: string, body: string, files: readonly string[] = []) =>
+  `Email to ${to}: ${subject}${files.length ? `\nAttached (kept in the deal's Attachments): ${files.join(", ")}` : ""}\n\n${body}`;

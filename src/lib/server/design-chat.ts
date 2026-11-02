@@ -20,6 +20,7 @@ import {
   CHAT_FULL,
   businessReplied,
   customerWrote,
+  filesNeedEmail,
   firstNameOf,
   publicMessages,
   teamName,
@@ -39,6 +40,8 @@ import { solAnswersCustomer, solAnswersFor } from "./design-sol-customer";
 import { loadBrand, proposalJob, tokenForJob } from "./design-proposal-repo";
 import type { Member } from "./design-repo";
 import { emailProvider, sendEmail } from "./email";
+import { emailParts } from "./email-parts";
+import { addDealFiles } from "./design-pulse-repo";
 
 /** Runs one of the things that follow a message. A failure is logged in a word and goes no further. */
 async function quietly(what: string, work: () => Promise<unknown>): Promise<void> {
@@ -124,12 +127,37 @@ async function tellBusiness(found: NonNullable<Awaited<ReturnType<typeof proposa
  * A member's reply from the deal: kept (which marks the customer's lines as
  * read), written on the customer's record, and emailed to the customer when
  * that can be done. The answer says whether the email went, and why not.
- * Null when the business has no such job.
+ * Pictures and files (already checked, `formFiles`) go only with the email, so
+ * a reply carrying them is refused before anything is kept when it can't be
+ * emailed; once sent they are kept in the deal's Attachments and the line says
+ * they went by email. Null when the business has no such job.
  */
-export async function memberReplies(member: Member, jobId: string, text: string): Promise<{ lines: ChatLine[]; email: ReplyEmail } | null> {
+export async function memberReplies(
+  member: Member,
+  jobId: string,
+  text: string,
+  files: readonly File[] = [],
+): Promise<
+  { lines: ChatLine[]; email: ReplyEmail; refused?: undefined } | { refused: string; lines?: undefined; email?: undefined } | null
+> {
   const found = await jobById(member.businessId, jobId);
   if (!found) return null;
-  const line = await addReply(member.businessId, jobId, text, member.email);
+  const brand = await loadBrand(member.businessId, member.businessName);
+  const token = await tokenForJob(member.businessId, jobId);
+  const site = siteUrl();
+  // Without a proposal out there is nowhere for the customer to read or answer it.
+  const block: "switched-off" | "no-address" | "not-set-up" | null = !brand.emailReplies
+    ? "switched-off"
+    : !found.customer.email
+      ? "no-address"
+      : !canNotify() || !site || !token
+        ? "not-set-up"
+        : null;
+  if (files.length && block) return { refused: filesNeedEmail(block) };
+  const parts = await emailParts(files);
+  // The chat on the proposal shows words only, so the line says what went with the email.
+  const kept = parts.textLine ? `${text}\n\n${parts.textLine.replace(" attached.)", " attached to the email.)")}` : text;
+  const line = await addReply(member.businessId, jobId, kept, member.email);
   if (!line) return null;
 
   await quietly("writing it on the customer's record", () =>
@@ -138,33 +166,29 @@ export async function memberReplies(member: Member, jobId: string, text: string)
         customerId: found.customer.id,
         jobId,
         kind: "message",
-        text: businessReplied(text),
+        text:
+          businessReplied(text) +
+          (parts.kept.length ? `\n(Emailed with ${parts.kept.map((f) => f.name).join(", ")}, kept in the deal's Attachments.)` : ""),
         by: member.email.toLowerCase(),
       }),
     ),
   );
 
-  let email: ReplyEmail = "failed";
-  await quietly("emailing the customer", async () => {
-    const brand = await loadBrand(member.businessId, member.businessName);
-    const token = await tokenForJob(member.businessId, jobId);
-    const site = siteUrl();
-    if (!brand.emailReplies) email = "switched-off";
-    else if (!found.customer.email) email = "no-address";
-    // Without a proposal out there is nowhere for the customer to read or answer it.
-    else if (!canNotify() || !site || !token) email = "not-set-up";
-    else {
-      await sendEmail({
-        to: found.customer.email,
-        ...chatReplyEmail({
-          business: brand.name,
-          customer: firstNameOf(found.customer),
-          text,
-          link: `${site}${proposalPath(token)}#chat`,
-        }),
+  let email = (block ?? "failed") as ReplyEmail;
+  if (!block)
+    await quietly("emailing the customer", async () => {
+      const message = chatReplyEmail({
+        business: brand.name,
+        customer: firstNameOf(found.customer),
+        text,
+        link: `${site}${proposalPath(token!)}#chat`,
+        pictures: parts.picturesHtml,
+        attached: parts.textLine,
       });
+      await sendEmail({ to: found.customer.email, ...message, ...(parts.attachments.length ? { attachments: parts.attachments } : {}) });
       email = "emailed";
-    }
-  });
+    });
+  if (email === "emailed" && parts.kept.length)
+    await quietly("keeping the files on the deal", () => addDealFiles(member.businessId, jobId, parts.kept, member.email));
   return { lines: await chatLines(member.businessId, jobId), email };
 }

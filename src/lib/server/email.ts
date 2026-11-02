@@ -10,7 +10,8 @@ export interface Email {
   subject: string;
   html: string;
   text: string;
-  attachments?: { filename: string; content: string | Buffer; contentType?: string }[];
+  /** With a `contentId`, a picture shown inside the email (`<img src="cid:…">`) rather than listed as an attachment. */
+  attachments?: { filename: string; content: string | Buffer; contentType?: string; contentId?: string }[];
   /** Where a reply goes, when not the site's own reply address: e.g. the member who sent a purchase order. */
   replyTo?: string;
 }
@@ -48,7 +49,7 @@ async function viaSendGrid(email: Email, key: string, from: string) {
               filename: a.filename,
               content: Buffer.from(a.content).toString("base64"),
               type: a.contentType ?? "application/octet-stream",
-              disposition: "attachment",
+              ...(a.contentId ? { disposition: "inline", content_id: a.contentId } : { disposition: "attachment" }),
             })),
           }
         : {}),
@@ -73,6 +74,7 @@ async function viaResend(email: Email, key: string, from: string) {
         filename: a.filename,
         content: Buffer.from(a.content).toString("base64"),
         content_type: a.contentType,
+        ...(a.contentId ? { content_id: a.contentId } : {}),
       })),
     }),
     signal: AbortSignal.timeout(10_000),

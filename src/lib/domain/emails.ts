@@ -1,5 +1,6 @@
 import { WHOOP_COPY } from "./whoop-offer";
 import { PROVISIONAL_DATE_NOTE } from "./scheduling";
+import { messageHtml } from "./design/email-compose";
 /** Customer emails, as subject + HTML + plain text. Pure and tested; sending is in src/lib/server/email.ts. */
 
 export interface OrderEmail {
@@ -268,6 +269,10 @@ function simpleEmail(o: {
   /** A second, outlined button with a line of its own above it. */
   second?: { line: string; label: string; href: string };
   footer?: string;
+  /** Someone's own words after `lines`: HTML built on the server (escaped, with its lists), and as plain text. */
+  message?: { html: string; text: string };
+  /** Lines after the message. */
+  after?: string[];
 }) {
   const btn =
     (o.button
@@ -280,6 +285,7 @@ function simpleEmail(o: {
 <p style="letter-spacing:.28em;font-size:14px;margin:0 0 24px">RENUABL</p>
 <h1 style="font-weight:400;font-size:26px;margin:0 0 12px">${esc(o.heading)}</h1>
 ${o.lines.map((l) => `<p style="margin:0 0 10px">${esc(l)}</p>`).join("\n")}
+${o.message ? `<div style="margin:0 0 10px">${o.message.html}</div>\n` : ""}${(o.after ?? []).map((l) => `<p style="margin:0 0 10px">${esc(l)}</p>`).join("\n")}
 ${btn}
 <p style="color:#6B6B6B;font-size:12px;margin-top:24px">${esc(o.footer ?? "Questions? Just reply to this email.")}</p>
 </div></body></html>`;
@@ -287,6 +293,8 @@ ${btn}
     o.heading,
     "",
     ...o.lines,
+    ...(o.message ? [o.message.text] : []),
+    ...(o.after ?? []),
     ...(o.button ? ["", `${o.button.label}: ${o.button.href}`] : []),
     ...(o.second ? ["", o.second.line, `${o.second.label}: ${o.second.href}`] : []),
     "",
@@ -395,16 +403,34 @@ export function chatMessageEmail(o: { business: string; customer: string; title:
  * message and the way back to their proposal, and asks them to answer there: a reply by email isn't read.
  * DRAFT wording: review before launch.
  */
-export function chatReplyEmail(o: { business: string; customer: string; text: string; link: string }) {
+export function chatReplyEmail(o: {
+  business: string;
+  customer: string;
+  text: string;
+  link: string;
+  /** The pictures sent with it, as `<img src="cid:…">` tags built on the server (`picturesHtml`). */
+  pictures?: string;
+  /** "(A picture and a file are attached.)" for the plain text. */
+  attached?: string;
+}) {
   const business = plainText(o.business, 80) || "Your solar business";
+  // Each line cleaned as before (no links or addresses), but the lines and lists kept as the member wrote them.
+  const words = o.text
+    .slice(0, 2000)
+    .split("\n")
+    .map((l) => plainText(l, 2000))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   return simpleEmail({
     subject: `A message from ${business} about your proposal`,
     heading: `${business} sent you a message`,
-    lines: [
-      `Hi ${plainText(o.customer, 40) || "there"},`,
-      plainText(o.text, 2000),
-      "To answer, open your proposal and write back there. A reply to this email isn't read.",
-    ],
+    lines: [`Hi ${plainText(o.customer, 40) || "there"},`],
+    message: {
+      html: messageHtml(words).replace(/<p>/g, '<p style="margin:0 0 10px">') + (o.pictures ? `\n${o.pictures}` : ""),
+      text: words + (o.attached ? `\n\n${o.attached}` : ""),
+    },
+    after: ["To answer, open your proposal and write back there. A reply to this email isn't read."],
     button: { label: "Open my proposal", href: o.link },
     footer: `Sent for ${business} by RENUABL, the software they use for proposals. You are getting this because you were sent a proposal by ${business}.`,
   });

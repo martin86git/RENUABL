@@ -20,6 +20,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-02",
+    area: "Deals",
+    words: "Emails to customers take bullets, numbering, symbols, pictures and files. Paste a screenshot or drop it on the box.",
+  },
+  {
+    day: "2026-11-02",
     area: "Sol",
     words: "Sol's side panel sees the page beside it: ask about the design or deal you have open. Press Looking at to leave it out.",
   },

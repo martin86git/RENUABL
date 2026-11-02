@@ -130,6 +130,20 @@ export function replyOutcome(email: ReplyEmail): string {
   return "Sent. The email to the customer couldn't be sent.";
 }
 
+/**
+ * Why pictures and files can't go with a reply: they travel only in the email to the customer (the chat on their
+ * proposal shows words), so a reply that won't be emailed can't carry them.
+ */
+export function filesNeedEmail(why: "no-address" | "not-set-up" | "switched-off"): string {
+  const reason =
+    why === "no-address"
+      ? "there's no email address on file for this customer"
+      : why === "switched-off"
+        ? "emailing replies is switched off in your settings"
+        : "email isn't set up here yet";
+  return `Pictures and files go with the email to the customer, and ${reason}. Take them off to send the message.`;
+}
+
 /** What goes on the customer's record. */
 export const customerWrote = (text: string) => `Message from the customer: ${text.slice(0, 300)}`;
 export const businessReplied = (text: string) => `Reply sent: ${text.slice(0, 300)}`;

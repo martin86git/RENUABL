@@ -5,6 +5,7 @@
  * version, so these need a signed-in business. Each call answers with what
  * was asked for, or a plain message to show.
  */
+import { withFiles } from "./form";
 import type { Activity, Customer, Job, JobStage, SavedPipeline } from "@/lib/domain/design/crm";
 import { cleanExtras, defaultBill, defaultQuote, postcodeIn, type QuoteFields, type QuoteForm } from "@/lib/domain/design/quote";
 import { cleanDesignSet, type RoofDesign } from "@/lib/domain/design/roof-design";
@@ -17,7 +18,12 @@ export async function ask<T>(path: string, init?: { method: string; body?: unkno
   try {
     const res = await fetch(path, {
       method: init?.method ?? "GET",
-      ...(init?.body !== undefined ? { headers: { "content-type": "application/json" }, body: JSON.stringify(init.body) } : {}),
+      // A form (an email with files) goes as it is, so the browser sets its own multipart header.
+      ...(init?.body instanceof FormData
+        ? { body: init.body }
+        : init?.body !== undefined
+          ? { headers: { "content-type": "application/json" }, body: JSON.stringify(init.body) }
+          : {}),
       cache: "no-store",
     });
     const json = (await res.json().catch(() => null)) as (Record<string, unknown> & { ok?: boolean; message?: string }) | null;
@@ -141,10 +147,10 @@ export async function loadDealDesign(
 export const dealEmailStatus = (jobId: string) =>
   ask<{ canSend: boolean; replyTo: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/email`);
 /** Emails a deal's customer: sent in the business's name, replies to the member, written on the deal's record. */
-export const emailDeal = (jobId: string, email: { to: string; subject: string; body: string }) =>
+export const emailDeal = (jobId: string, email: { to: string; subject: string; body: string }, files: readonly File[] = []) =>
   ask<{ message: string; activity: Activity | null }>(`/api/design/jobs/${encodeURIComponent(jobId)}/email`, {
     method: "POST",
-    body: email,
+    body: files.length ? withFiles(email, files) : email,
   });
 
 /** The business's arrangement of a deal's fields (Settings → Deal fields), and whether it is its own. */

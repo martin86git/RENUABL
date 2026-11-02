@@ -6,6 +6,7 @@ import { ArrowUp, MessageSquare, X } from "lucide-react";
 import clsx from "clsx";
 import { MAX_LINE, POLL_SECONDS, SOL_BY, teamName, type ChatThread, type PublicLine } from "@/lib/domain/design/chat";
 import { solLabel } from "@/lib/domain/design/sol-customer";
+import { EmailFileChips, EmailFormatBar, listKey, useEmailFiles } from "./email-compose";
 
 /** How long the customer's page waits for Sol's answer, looking every couple of seconds, before going back to its usual pace. */
 const SOL_WAIT = 45_000;
@@ -126,9 +127,12 @@ function Bubbles(props: {
   );
 }
 
-/** Where a message is typed: Enter sends it, Shift+Enter starts a new line. A rounded box with the send arrow inside it. */
+/**
+ * Where a message is typed: Enter sends it, Shift+Enter starts a new line. A rounded box with the send arrow inside it.
+ * Tall (sending a proposal), it is an email composer: lists, symbols, and pictures and files that go with the email.
+ */
 function Compose(props: {
-  onSend: (text: string) => Promise<boolean>;
+  onSend: (text: string, files: readonly File[]) => Promise<boolean>;
   placeholder: string;
   disabled?: boolean;
   /** A draft to start with (give the box a new `key` to start again with another). */
@@ -140,16 +144,23 @@ function Compose(props: {
 }) {
   const [text, setText] = useState(props.initial ?? "");
   const [busy, setBusy] = useState(false);
+  const area = useRef<HTMLTextAreaElement>(null);
+  const files = useEmailFiles();
+  const filesOk = !props.tall || (!files.busy && !files.problem);
   const send = async () => {
     const typed = text.trim();
-    if (!typed || busy || props.disabled) return;
+    if (!typed || busy || props.disabled || !filesOk) return;
     setBusy(true);
-    if (await props.onSend(typed)) setText("");
+    if (await props.onSend(typed, props.tall ? files.files : [])) {
+      setText("");
+      files.clear();
+    }
     setBusy(false);
   };
-  const ready = Boolean(text.trim()) && !busy && !props.disabled;
+  const ready = Boolean(text.trim()) && !busy && !props.disabled && filesOk;
   const box = (
     <textarea
+      ref={area}
       rows={props.tall ? 9 : 1}
       value={text}
       maxLength={MAX_LINE}
@@ -158,11 +169,13 @@ function Compose(props: {
       aria-label={props.placeholder}
       onChange={(e) => setText(e.target.value)}
       onKeyDown={(e) => {
-        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !props.tall) {
+        if (props.tall) return listKey(e, setText);
+        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
           e.preventDefault();
           void send();
         }
       }}
+      {...(props.tall ? { onPaste: files.onPaste, onDragOver: files.onDragOver, onDrop: files.onDrop } : {})}
       className={clsx(
         "block w-full resize-none bg-transparent text-[16px] leading-[1.35] text-ink outline-none placeholder:text-muted sm:text-[15px]",
         props.tall
@@ -182,7 +195,9 @@ function Compose(props: {
     >
       {props.tall ? (
         <div className="space-y-2">
+          <EmailFormatBar area={area} text={text} setText={setText} files={files} disabled={props.disabled} />
           {box}
+          <EmailFileChips files={files} />
           <button
             type="submit"
             disabled={!ready}
@@ -556,8 +571,8 @@ export function DealChat({
           tall={Boolean(drafts && draft)}
           sendLabel={drafts && draft ? `Send to ${chat.customer}` : undefined}
           placeholder={drafts && draft ? `Message to ${chat.customer}` : "Message"}
-          onSend={async (text) => {
-            const res = await sendReply(jobId, text);
+          onSend={async (text, files) => {
+            const res = await sendReply(jobId, text, files);
             if (!res.ok) {
               setStatus({ text: res.message, error: true });
               return false;
@@ -574,7 +589,7 @@ export function DealChat({
       </div>
       <p className="mt-2 text-[11.5px] leading-relaxed text-muted">
         {drafts && draft ? (
-          `Change anything before it goes. It shows at the top of ${chat.customer}'s proposal and in their chat, from “${names.business}”, and is emailed to them with the link when you have that on.`
+          `Change anything before it goes. It shows at the top of ${chat.customer}'s proposal and in their chat, from “${names.business}”, and is emailed to them with the link when you have that on. Pictures and files go with the email only, and are kept in the deal's Attachments.`
         ) : (
           <>
             The customer sees your reply as from &ldquo;{names.business}&rdquo;, never your own name or email. Enter sends; Shift and Enter

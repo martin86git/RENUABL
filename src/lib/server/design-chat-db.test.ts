@@ -162,7 +162,7 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
   it("takes a member's reply, marks the customer's lines read, and says why no email went", async () => {
     const replied = await chat.memberReplies(owner(), jobId, "It can. We'll redraw it.");
     expect(replied?.email).toBe("not-set-up");
-    expect(replied?.lines.map((l) => [l.from, l.text, l.by, l.read])).toEqual([
+    expect(replied?.lines?.map((l) => [l.from, l.text, l.by, l.read])).toEqual([
       ["customer", "Can it go on the garage?", null, true],
       ["business", "It can. We'll redraw it.", A, true],
     ]);
@@ -233,7 +233,7 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
     );
     expect(await chat.customerSays(token, "Too many", defer)).toEqual({ problem: CHAT_FULL, status: 429 });
     // A member can still write.
-    expect((await chat.memberReplies(owner(), jobId, "Call us"))?.lines.at(-1)?.text).toBe("Call us");
+    expect((await chat.memberReplies(owner(), jobId, "Call us"))?.lines?.at(-1)?.text).toBe("Call us");
   });
 
   it("keeps Sol's answers as his: shown to the customer as Sol's, never read for the business, and never late", async () => {

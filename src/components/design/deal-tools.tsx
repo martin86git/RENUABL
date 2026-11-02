@@ -9,6 +9,7 @@ import type { SectionLine } from "@/lib/domain/design/deal-sections";
 import { dealEmailStatus, emailDeal } from "@/lib/services/crm";
 import { PATHS, ui } from "./design-shell";
 import { DRAFT_KEY } from "@/lib/services/sol";
+import { EmailFileChips, EmailFormatBar, listKey, useEmailFiles } from "./email-compose";
 
 /**
  * The design tool as a drawer over the deal (Martin: not a new page; back and forth between the design and the deal's
@@ -118,7 +119,8 @@ export function DesignDrawer(props: { jobId: string; open: boolean; onOpen: () =
 
 /**
  * Emailing the customer from their deal: to their address, a ready-written start to change (`DEAL_EMAIL_TEMPLATES`),
- * a subject and the words. Sent in the business's name with replies to the member, and written on the deal's record.
+ * a subject and the words, with lists, symbols, pictures (inside the email) and files. Sent in the business's name with
+ * replies to the member, and written on the deal's record; what went with it is kept in the deal's Attachments.
  */
 export function DealEmail(props: { job: Job; customer: Customer; business: string; onSent: (a: Activity | null) => void }) {
   const { job, customer, business, onSent } = props;
@@ -128,6 +130,8 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
   const [body, setBody] = useState("");
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [sending, setSending] = useState(false);
+  const area = useRef<HTMLTextAreaElement>(null);
+  const files = useEmailFiles();
   useEffect(() => {
     void dealEmailStatus(job.id).then((res) => res.ok && setStatus({ canSend: res.canSend, replyTo: res.replyTo }));
   }, [job.id]);
@@ -163,12 +167,13 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
   };
   const send = async () => {
     setSending(true);
-    const res = await emailDeal(job.id, { to, subject, body });
+    const res = await emailDeal(job.id, { to, subject, body }, files.files);
     setSending(false);
     if (!res.ok) return setNote({ ok: false, text: res.message });
     setNote({ ok: true, text: res.message });
     setSubject("");
     setBody("");
+    files.clear();
     onSent(res.activity);
   };
 
@@ -213,14 +218,21 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
         maxLength={MAX_SUBJECT}
         placeholder="Subject"
       />
+      <EmailFormatBar className="mt-2" area={area} text={body} setText={setBody} files={files} />
       <textarea
+        ref={area}
         aria-label="Email"
-        className={clsx(ui.input, "mt-2 min-h-40 py-2 leading-relaxed")}
+        className={clsx(ui.input, "mt-1 min-h-40 py-2 leading-relaxed")}
         value={body}
         onChange={(e) => setBody(e.target.value)}
+        onKeyDown={(e) => listKey(e, setBody)}
+        onPaste={files.onPaste}
+        onDragOver={files.onDragOver}
+        onDrop={files.onDrop}
         maxLength={MAX_BODY}
         placeholder={`Write to ${customer.firstName || "the customer"}…`}
       />
+      <EmailFileChips files={files} />
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
         <p className={clsx("text-xs", note ? (note.ok ? "text-positive" : "text-danger") : "text-muted")} role="status">
           {note?.text ?? (status ? `Sent as ${business}. Replies go to ${status.replyTo}.` : "")}
@@ -228,7 +240,7 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
         <button
           className={ui.primary}
           onClick={send}
-          disabled={sending || !status?.canSend || !to.trim() || !subject.trim() || !body.trim()}
+          disabled={sending || !status?.canSend || !to.trim() || !subject.trim() || !body.trim() || files.busy || Boolean(files.problem)}
         >
           <Send className="size-4" aria-hidden /> {sending ? "Sending…" : "Send email"}
         </button>

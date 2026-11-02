@@ -7,6 +7,7 @@
  * was asked for, or a plain message to show.
  */
 import type { ChatLine, ChatThread, PublicChat, ReplyEmail } from "@/lib/domain/design/chat";
+import { withFiles } from "./form";
 
 export type Answer<T> = ({ ok: true } & T) | { ok: false; message: string };
 
@@ -16,7 +17,12 @@ async function ask<T>(path: string, init?: { method: string; body?: unknown }): 
   try {
     const res = await fetch(path, {
       method: init?.method ?? "GET",
-      ...(init?.body !== undefined ? { headers: { "content-type": "application/json" }, body: JSON.stringify(init.body) } : {}),
+      // A form (an email with files) goes as it is, so the browser sets its own multipart header.
+      ...(init?.body instanceof FormData
+        ? { body: init.body }
+        : init?.body !== undefined
+          ? { headers: { "content-type": "application/json" }, body: JSON.stringify(init.body) }
+          : {}),
       cache: "no-store",
     });
     const json = (await res.json().catch(() => null)) as (Record<string, unknown> & { ok?: boolean; message?: string }) | null;
@@ -43,8 +49,11 @@ export interface DealChat {
 }
 const jobChat = (jobId: string) => `/api/design/jobs/${encodeURIComponent(jobId)}/chat`;
 export const loadDealChat = (jobId: string) => ask<DealChat>(jobChat(jobId));
-export const sendReply = (jobId: string, text: string) =>
-  ask<{ lines: ChatLine[]; unanswered: number; email: ReplyEmail; outcome: string }>(jobChat(jobId), { method: "POST", body: { text } });
+export const sendReply = (jobId: string, text: string, files: readonly File[] = []) =>
+  ask<{ lines: ChatLine[]; unanswered: number; email: ReplyEmail; outcome: string }>(jobChat(jobId), {
+    method: "POST",
+    body: files.length ? withFiles({ text }, files) : { text },
+  });
 export const markChatRead = (jobId: string) => ask<{ marked: number }>(jobChat(jobId), { method: "PUT" });
 
 export const loadMessages = () => ask<{ unread: number; threads: ChatThread[] }>("/api/design/messages");
