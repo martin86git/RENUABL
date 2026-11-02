@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { CalendarDays, Camera, FileText, MapPin, Paperclip, Phone, Send, X } from "lucide-react";
 import { ShareJob } from "./share-job";
+import { InspectionStatus } from "./inspections";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -574,6 +575,7 @@ export function JobCardDialog({ jobId, onClose, onEvent }: { jobId: string; onCl
               aside={
                 <div className="space-y-5">
                   <ShareJob jobId={jobId} />
+                  <InspectionStatus jobId={jobId} />
                   <div>
                     <p className={head}>Email the job card</p>
                     {card.installers?.length ? (
@@ -714,4 +716,22 @@ export function InstallerJobCard({ token, framed }: { token: string; framed?: bo
       {!framed && <p className="mt-10 text-center text-xs text-muted">This link is for you: please don&apos;t pass it on.</p>}
     </Wrap>
   );
+}
+
+/**
+ * The job card read only (inspections.ts): the inspector's view of a job nominated to them. No composer, no as-built
+ * form; photos through the inspector's own addresses.
+ */
+export function ReadOnlyJobCard({
+  card,
+  picture,
+  fileHref,
+  aside,
+}: {
+  card: JobCardView;
+  picture: string | null;
+  fileHref: (id: string) => string;
+  aside?: React.ReactNode;
+}) {
+  return <CardBody card={card} picture={picture} fileHref={fileHref} composer={null} aside={aside} />;
 }

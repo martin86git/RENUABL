@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-02",
     area: "Installation",
+    words: "Installers nominate the inspector: they see the design and photos, then book, pass or note defects, with the certificate.",
+  },
+  {
+    day: "2026-11-02",
+    area: "Installation",
     words: "Send a job to an installer you're connected with: it waits in their Jobs, and once they accept they see its job card.",
   },
   {

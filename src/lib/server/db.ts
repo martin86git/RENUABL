@@ -270,6 +270,29 @@ create table if not exists design_job_shares (
 );
 create unique index if not exists design_job_shares_live on design_job_shares(business_id, job_id) where state in ('sent','accepted');
 create index if not exists design_job_shares_installer on design_job_shares(installer_business, state);
+-- Inspections an installer nominates on a job it accepted (domain/design/inspections.ts): one live a job, opened by the
+-- inspector read only while the job's share is accepted and each pair is connected; the certificate kept here.
+create table if not exists design_inspections (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  share_id text not null references design_job_shares(id) on delete cascade,
+  installer_business text not null references businesses(id) on delete cascade,
+  inspector_business text not null references businesses(id) on delete cascade,
+  state text not null default 'nominated',
+  inspect_on date,
+  notes text not null default '',
+  cert_name text,
+  cert_type text,
+  cert_bytes bytea,
+  nominated_by text not null,
+  nominated_at timestamptz not null default now(),
+  updated_by text,
+  updated_at timestamptz not null default now(),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create unique index if not exists design_inspections_live on design_inspections(business_id, job_id) where state not in ('declined','withdrawn');
+create index if not exists design_inspections_inspector on design_inspections(inspector_business, state);
 create table if not exists design_customers (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,

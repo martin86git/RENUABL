@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import type { SharedJobLine } from "@/lib/domain/design/job-shares";
 import { answerInstallerJob, loadInstallerJobs, openInstallerJob } from "@/lib/services/job-shares";
 import { PageHead, ui } from "./design-shell";
+import { NominateInspector } from "./inspections";
 import { InstallerJobCard } from "./job-card";
 
 const weekday = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-AU", { weekday: "short", timeZone: "UTC" });
@@ -141,7 +142,10 @@ export function InstallerJobPage({ id }: { id: string }) {
       ) : !open ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : (
-        <InstallerJobCard token={open.token} framed />
+        <>
+          <InstallerJobCard token={open.token} framed />
+          <NominateInspector shareId={id} />
+        </>
       )}
     </div>
   );

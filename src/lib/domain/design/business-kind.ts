@@ -82,6 +82,7 @@ const API: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
   installer: [
     ...COMMON_API,
     "installer-jobs",
+    "inspections",
     "roof",
     "projects",
     "workspace",
@@ -93,7 +94,7 @@ const API: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
     "marketplace",
     "trade",
   ],
-  inspector: [...COMMON_API],
+  inspector: [...COMMON_API, "inspections"],
 };
 
 const under = (path: string, href: string) => path === href || path.startsWith(`${href}/`);

@@ -3,6 +3,7 @@
 import { tradeUnreadCount } from "@/lib/services/trade";
 import { incomingRequests } from "@/lib/services/connections";
 import { waitingJobs } from "@/lib/services/job-shares";
+import { nominatedInspections } from "@/lib/services/inspections";
 import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import { inboxUnread } from "@/lib/services/inbox";
 import { stopViewing } from "@/lib/services/design-account";
@@ -171,7 +172,19 @@ function Shell({
     const res = await waitingJobs();
     return res.ok ? res.waiting : null;
   });
-  const counts: Record<string, number> = { service, ...gates, "my-equipment": trade, connections: requests, jobs: sentJobs };
+  // Inspections installers have nominated an inspector for, not yet booked (inspections.ts).
+  const toBook = useCount(on && kind === "inspector", "renuabl:inspections", async () => {
+    const res = await nominatedInspections();
+    return res.ok ? res.nominated : null;
+  });
+  const counts: Record<string, number> = {
+    service,
+    ...gates,
+    "my-equipment": trade,
+    connections: requests,
+    jobs: sentJobs,
+    inspections: toBook,
+  };
   // Gmail's own unread count on the envelope, asked each minute while the page is in view (0 until Gmail is connected).
   const mail = useCount(retail, "renuabl:inbox", async () => {
     const res = await inboxUnread();
