@@ -86,6 +86,12 @@ const KIND_TABS: Record<Exclude<BusinessKind, "retailer">, PhoneTab[]> = {
   inspector: [
     { label: "Today", href: "/design", icon: LayoutDashboard, match: (p) => p === "/design" },
     { label: "Inspections", href: "/design/inspections", icon: ClipboardCheck, match: (p) => p.startsWith("/design/inspections") },
+    {
+      label: "Marketplace",
+      href: marketplaceOpen() ? "/design/marketplace/equipment" : "/design/marketplace",
+      icon: Store,
+      match: (p) => p.startsWith("/design/marketplace"),
+    },
     { label: "Connections", href: "/design/connections", icon: Users, match: (p) => p.startsWith("/design/connections") },
     { label: "Team", href: "/design/team", icon: MessagesSquare, match: (p) => p.startsWith("/design/team") },
   ],
@@ -158,7 +164,7 @@ function Shell({
     };
   }, [retail]);
   // Conversations about equipment with lines this business hasn't read (as seller or buyer).
-  const trade = useCount(on && kind !== "inspector" && marketplaceOpen(), "renuabl:trade", async () => {
+  const trade = useCount(on && marketplaceOpen(), "renuabl:trade", async () => {
     const res = await tradeUnreadCount();
     return res.ok ? res.unread : null;
   });

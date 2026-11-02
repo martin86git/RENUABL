@@ -28,7 +28,7 @@ export function KindToday({ kind, business }: { kind: Exclude<BusinessKind, "ret
             icon: Store,
             title: "Marketplace",
             body: marketplaceOpen()
-              ? "Bid on jobs near you, and buy and sell spare equipment."
+              ? "Bid on jobs near you: a bid chosen lands in your Jobs as its job card. Buy and sell spare equipment too."
               : "Coming soon: bid on jobs near you, and buy and sell spare equipment. Save your place.",
             href: "/design/marketplace",
           },
@@ -58,6 +58,14 @@ export function KindToday({ kind, business }: { kind: Exclude<BusinessKind, "ret
             title: "Connections",
             body: "The installers you inspect for. Connect once, then they can send you their jobs.",
             href: "/design/connections",
+          },
+          {
+            icon: Store,
+            title: "Marketplace",
+            body: marketplaceOpen()
+              ? "Buy and sell test equipment and spares with other businesses near you."
+              : "Coming soon: the industry connected in one place, from job listings to spare equipment. Save your place.",
+            href: marketplaceOpen() ? "/design/marketplace/equipment" : "/design/marketplace",
           },
           {
             icon: BookOpen,

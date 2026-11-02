@@ -3,10 +3,12 @@
  * an installer's login has no CRM or procurement, and an installer may use the design tool, which charges them by the
  * design job as anyone's does). A **retailer** sells, designs and runs the whole job: everything RENUABL has. An
  * **installer** installs for retailers: Today, its jobs, the design tool (a design job bought in packs, no user fee),
- * the Marketplace and its connections. An **inspector** inspects installations: Today, its inspections and its
- * connections. The kind is chosen when the business is named and decides the sections on show and, on the server,
+ * the Marketplace (bidding on job listings and trading equipment, never listing jobs of its own: it has no deals) and
+ * its connections. An **inspector** inspects installations: Today, its inspections, the Marketplace's equipment trading
+ * and its connections. The kind is chosen when the business is named and decides the sections on show and, on the server,
  * which of the designer's addresses a member may use (`apiAllowed`, checked in requireMember). Pure, tested.
  */
+import { marketplaceOpen } from "./marketplace-launch";
 
 export const BUSINESS_KINDS = [
   {
@@ -53,7 +55,12 @@ const COMMON_PAGES = [
 ];
 const PAGES: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
   installer: [...COMMON_PAGES, "/design/jobs", "/design/roof", "/design/marketplace"],
-  inspector: [...COMMON_PAGES, "/design/inspections"],
+  inspector: [...COMMON_PAGES, "/design/inspections", "/design/marketplace/equipment"],
+};
+/** Pages under those above that a kind still doesn't have: an installer lists no jobs (it has no deals to list). */
+const NOT_PAGES: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
+  installer: ["/design/marketplace/mine"],
+  inspector: [],
 };
 
 /** Settings each kind has (by slug, settings-list.ts). */
@@ -77,6 +84,7 @@ const COMMON_API = [
   "marketplace-launch",
   "standards",
   "connections",
+  "base",
 ];
 const API: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
   installer: [
@@ -89,12 +97,17 @@ const API: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
     "price-list",
     "datasheets",
     "design-home",
+    // The design tool's own helpers: Ask Sol to change it, a bill or switchboard photo, and designing live with the customer.
+    "command",
+    "bill",
+    "switchboard",
+    "live",
     "import",
     "billing",
     "marketplace",
     "trade",
   ],
-  inspector: [...COMMON_API, "inspections"],
+  inspector: [...COMMON_API, "inspections", "trade"],
 };
 
 const under = (path: string, href: string) => path === href || path.startsWith(`${href}/`);
@@ -107,6 +120,10 @@ export function pageAllowed(kind: BusinessKind, path: string): boolean {
     const slug = path.split("/")[3];
     return !slug || SETTINGS[kind].includes(slug);
   }
+  // The Marketplace's own address is its launch page while it is closed, for everyone; once open, an inspector's
+  // Marketplace starts at its equipment.
+  if (path === "/design/marketplace" && kind === "inspector") return !marketplaceOpen();
+  if (NOT_PAGES[kind].some((p) => under(path, p))) return false;
   return PAGES[kind].some((p) => p !== "/design" && under(path, p));
 }
 

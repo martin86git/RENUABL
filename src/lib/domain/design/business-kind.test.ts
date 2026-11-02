@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BUSINESS_KINDS, apiAllowed, cleanKind, joinsFree, pageAllowed, settingsFor } from "./business-kind";
 import { KIND_SECTIONS, designsRoofs, sectionAt } from "./sections";
 
@@ -44,6 +44,7 @@ describe("what each login holds", () => {
       "/design/messages",
       "/design/settings/brand",
       "/design/inspections",
+      "/design/marketplace/mine",
     ])
       expect(pageAllowed("installer", p)).toBe(false);
     expect(apiAllowed("installer", "/api/design/projects")).toBe(true);
@@ -57,7 +58,11 @@ describe("what each login holds", () => {
     expect(pageAllowed("inspector", "/design/inspections")).toBe(true);
     expect(pageAllowed("inspector", "/design/settings/standards")).toBe(true);
     expect(pageAllowed("inspector", "/design/roof")).toBe(false);
-    expect(pageAllowed("inspector", "/design/marketplace")).toBe(false);
+    expect(pageAllowed("inspector", "/design/marketplace/equipment/new")).toBe(true);
+    expect(pageAllowed("inspector", "/design/marketplace/bids")).toBe(false);
+    expect(apiAllowed("inspector", "/api/design/trade/abc")).toBe(true);
+    expect(apiAllowed("inspector", "/api/design/marketplace")).toBe(false);
+    expect(apiAllowed("inspector", "/api/design/base")).toBe(true);
     expect(apiAllowed("inspector", "/api/design/standards/abc")).toBe(true);
     expect(apiAllowed("inspector", "/api/design/projects")).toBe(false);
     expect(apiAllowed("inspector", "/api/design")).toBe(false);
@@ -67,8 +72,33 @@ describe("what each login holds", () => {
 
   it("shows each kind its own sections", () => {
     expect(KIND_SECTIONS.installer.map((s) => s.id)).toEqual(["today", "jobs", "marketplace", "connections"]);
-    expect(KIND_SECTIONS.inspector.map((s) => s.id)).toEqual(["today", "inspections", "connections"]);
+    expect(KIND_SECTIONS.inspector.map((s) => s.id)).toEqual(["today", "inspections", "marketplace", "connections"]);
     expect(sectionAt("/design/jobs", "installer").id).toBe("jobs");
     expect(sectionAt("/design/settings/users", "inspector").id).toBe("today");
+  });
+});
+
+describe("the Marketplace for each kind", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("is the launch page for everyone while it is closed", () => {
+    for (const kind of ["retailer", "installer", "inspector"] as const) expect(pageAllowed(kind, "/design/marketplace")).toBe(true);
+    expect(KIND_SECTIONS.inspector.find((s) => s.id === "marketplace")?.pages.map((p) => p.id)).toEqual(["launch"]);
+  });
+
+  it("once open: an installer bids and trades but lists nothing; an inspector trades", async () => {
+    vi.stubEnv("NEXT_PUBLIC_MARKETPLACE_OPEN", "true");
+    vi.resetModules();
+    const kinds = await import("./business-kind");
+    const { KIND_SECTIONS: open } = await import("./sections");
+    const pages = (kind: "retailer" | "installer" | "inspector") => open[kind].find((s) => s.id === "marketplace")?.pages.map((p) => p.id);
+    expect(pages("retailer")).toEqual(["listings", "my-listings", "my-bids", "equipment", "my-equipment"]);
+    expect(pages("installer")).toEqual(["listings", "my-bids", "equipment", "my-equipment"]);
+    expect(pages("inspector")).toEqual(["equipment", "my-equipment"]);
+    expect(kinds.pageAllowed("inspector", "/design/marketplace")).toBe(false);
+    expect(kinds.pageAllowed("installer", "/design/marketplace")).toBe(true);
   });
 });

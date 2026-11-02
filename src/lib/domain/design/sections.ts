@@ -77,6 +77,9 @@ export const SECTIONS: readonly Section[] = [
 
 const TODAY = SECTIONS[0];
 const MARKETPLACE = SECTIONS.find((s) => s.id === "marketplace")!;
+/** A kind's Marketplace once open: an installer bids and trades but lists nothing; an inspector trades. */
+const marketplaceFor = (keep: (id: string) => boolean): Section =>
+  marketplaceOpen() ? { ...MARKETPLACE, pages: MARKETPLACE.pages.filter((p) => keep(p.id)) } : MARKETPLACE;
 const CONNECTIONS: Section = {
   id: "connections",
   label: "Connections",
@@ -86,14 +89,20 @@ const CONNECTIONS: Section = {
 /**
  * The sections each kind of business has (business-kind.ts): a retailer all of the above; an installer its jobs, the
  * Marketplace and its connections (the design tool is the orange round, as for everyone who designs); an inspector its
- * inspections and its connections.
+ * inspections, the Marketplace's equipment and its connections.
  */
 export const KIND_SECTIONS: Record<BusinessKind, readonly Section[]> = {
   retailer: SECTIONS,
-  installer: [TODAY, { id: "jobs", label: "Jobs", pages: [{ id: "jobs", label: "Jobs", href: "/design/jobs" }] }, MARKETPLACE, CONNECTIONS],
+  installer: [
+    TODAY,
+    { id: "jobs", label: "Jobs", pages: [{ id: "jobs", label: "Jobs", href: "/design/jobs" }] },
+    marketplaceFor((id) => id !== "my-listings"),
+    CONNECTIONS,
+  ],
   inspector: [
     TODAY,
     { id: "inspections", label: "Inspections", pages: [{ id: "inspections", label: "Inspections", href: "/design/inspections" }] },
+    marketplaceFor((id) => id === "equipment" || id === "my-equipment"),
     CONNECTIONS,
   ],
 };

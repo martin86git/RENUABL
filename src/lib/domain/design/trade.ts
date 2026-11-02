@@ -9,7 +9,16 @@
 import { todayInMarket } from "../market";
 import { kmBetween, publicWords, type Distance } from "./marketplace";
 
-export const TRADE_CATEGORIES = ["Panels", "Inverters", "Batteries", "Mounting and racking", "Electrical", "EV chargers", "Other"] as const;
+export const TRADE_CATEGORIES = [
+  "Panels",
+  "Inverters",
+  "Batteries",
+  "Mounting and racking",
+  "Electrical",
+  "EV chargers",
+  "Test equipment",
+  "Other",
+] as const;
 export type TradeCategory = (typeof TRADE_CATEGORIES)[number];
 export const CONDITIONS = ["New, in the box", "New, opened", "Ex-display", "Used, working", "For parts"] as const;
 export type Condition = (typeof CONDITIONS)[number];

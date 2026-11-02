@@ -298,12 +298,18 @@ export function newBidEmail(input: { suburb: string; system: string; bidder: str
 }
 
 /** "Your bid was accepted" email to the winning installer, from RENUABL, with the way to the job's details. */
-export function awardedEmail(input: { suburb: string; system: string; poster: string; amount: number; link: string }) {
+/** To the winner. With `jobCard` the job is already in its Jobs (an installer's), and the link opens its job card. */
+export function awardedEmail(input: { suburb: string; system: string; poster: string; amount: number; link: string; jobCard?: boolean }) {
   const money = `$${input.amount.toLocaleString("en-AU")} ex GST`;
+  const where = input.jobCard
+    ? "The job is in your Jobs, with the address and their contact"
+    : "The address and their contact are on the listing";
   return {
     subject: `Your bid was accepted: ${input.suburb} installation`,
-    text: `${input.poster} accepted your bid of ${money} for the installation in ${input.suburb} (${input.system}).\n\nThe address and their contact are on the listing: ${input.link}`,
-    html: `<p>${esc(input.poster)} accepted your bid of <strong>${esc(money)}</strong> for the installation in ${esc(input.suburb)} (${esc(input.system)}).</p><p><a href="${esc(input.link)}">The address and their contact are on the listing</a></p>`,
+    text: `${input.poster} accepted your bid of ${money} for the installation in ${input.suburb} (${input.system}).
+
+${where}: ${input.link}`,
+    html: `<p>${esc(input.poster)} accepted your bid of <strong>${esc(money)}</strong> for the installation in ${esc(input.suburb)} (${esc(input.system)}).</p><p><a href="${esc(input.link)}">${esc(where)}</a></p>`,
   };
 }
 

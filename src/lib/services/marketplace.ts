@@ -16,3 +16,7 @@ export const listingAction = (id: string, body: Record<string, unknown>) =>
   ask<ListingDetail>(`${BASE}/${encodeURIComponent(id)}`, { method: "POST", body });
 export const marketplacePath = (id: string) => `/design/marketplace/${encodeURIComponent(id)}`;
 export const listingPicturePath = (id: string) => `${BASE}/${encodeURIComponent(id)}/picture`;
+
+/** Where the business works from, for distances (/api/design/base; the Job map's base). */
+export const saveBase = (base: import("@/lib/domain/design/job-map").Place | null) =>
+  ask<{ base: import("@/lib/domain/design/job-map").Place | null }>("/api/design/base", { method: "PUT", body: { base } });

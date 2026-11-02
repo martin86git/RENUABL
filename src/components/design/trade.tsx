@@ -36,6 +36,7 @@ import {
   type ItemDetail,
 } from "@/lib/services/trade";
 import { PATHS, PageHead, ui } from "./design-shell";
+import { BaseNote } from "./marketplace";
 
 const DISTANCE_KEY = "renuabl.design.trade-distance";
 const STATE: Record<ItemState, { label: string; tone: string }> = {
@@ -94,6 +95,7 @@ export function TradePage({ view }: { view: "browse" | "mine" }) {
           <Plus className="size-4" aria-hidden /> Sell equipment
         </Link>
       </PageHead>
+      {view === "browse" && data && !data.base && <BaseNote what="item" onSaved={(base) => setData((d) => d && { ...d, base })} />}
       <p className="-mt-2 text-sm text-ink-2">
         {view === "browse"
           ? "Spare panels, inverters, batteries and more that other businesses are selling near you. Message the seller to ask or make an offer; you arrange payment and pickup between you."

@@ -106,7 +106,7 @@ export function AddressEntry({
   return (
     <form onSubmit={onSubmit} className={cn("relative w-full", className)} role="search">
       <label htmlFor={`${listId}-input`} className="sr-only">
-        Your home address
+        {placeholder ?? "Your home address"}
       </label>
       <div
         className={cn(

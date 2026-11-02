@@ -22,7 +22,9 @@ import {
 } from "@/lib/domain/design/marketplace";
 import { todayInMarket } from "@/lib/domain/market";
 import { siteUrl } from "@/lib/domain/sms";
-import { query, transaction } from "./db";
+import { BUSINESS_LINK } from "@/lib/domain/design/job-shares";
+import { newId, query, transaction } from "./db";
+import { installerLink } from "./design-job-card-repo";
 import { jobById, record } from "./design-crm-repo";
 import { NO_DESIGN, savedFor } from "./design-proposal-repo";
 import { emailProvider, sendEmail } from "./email";
@@ -86,6 +88,11 @@ export async function createListing(
   const { job, customer } = found;
   if (!PRE_INSTALL_STAGES.includes(job.stage))
     return { ok: false, status: 409, message: "Only a sold job not yet installed can be listed." };
+  const sent = await query(`select 1 from design_job_shares where business_id = $1 and job_id = $2 and state in ('sent','accepted')`, [
+    member.businessId,
+    jobId,
+  ]);
+  if (sent.length) return { ok: false, status: 409, message: "This job is already with an installer on RENUABL. Take it back first." };
   const spec = await systemOf(member, jobId);
   if (!spec) return { ok: false, status: 404, message: "There's no such deal." };
   const { system, design } = spec;
@@ -179,7 +186,13 @@ export interface ListingDetail {
   /** The poster's own: every bid, with the business behind each. */
   bids: Bid[] | null;
   /** Given only once awarded, and only to the poster and the business awarded it. */
-  handover: { address: string; poster: { business: string; email: string }; installer: { business: string; email: string } } | null;
+  handover: {
+    address: string;
+    poster: { business: string; email: string };
+    installer: { business: string; email: string };
+    /** For an installer that won it: its job card in Jobs (the share the award made), while it is live. */
+    jobCard: string | null;
+  } | null;
   /** The deal it came from, for the poster. */
   jobId: string | null;
 }
@@ -220,11 +233,20 @@ export async function listingDetail(businessId: string, id: string): Promise<Lis
       [id],
     );
     const v = h[0];
+    const card =
+      v && v.installerBusiness === businessId
+        ? await query<{ id: string }>(
+            `select s.id from design_job_shares s join design_listings l on l.business_id = s.business_id and l.job_id = s.job_id
+              where l.id = $1 and s.installer_business = $2 and s.state = 'accepted'`,
+            [id, businessId],
+          )
+        : [];
     if (v && (listing.mine || v.installerBusiness === businessId))
       handover = {
         address: v.address,
         poster: { business: v.poster, email: v.posterEmail },
         installer: { business: v.installer, email: v.installerEmail },
+        jobCard: card[0]?.id ?? null,
       };
   }
   return { listing, bids, handover, jobId: listing.mine ? jobId : null };
@@ -278,6 +300,9 @@ export async function withdrawBid(businessId: string, id: string): Promise<boole
 /**
  * The poster chooses a bid: the job goes to that business, every other bid is declined, the listing is awarded, the
  * deal's installer is set to that business and it is written on the deal's record. The winner is told by email.
+ * When the winner is an installer (business-kind.ts), the award is also the job sent and accepted on RENUABL
+ * (job-shares.ts): the two are connected (choosing a bid is working together) and the job lands in the installer's
+ * Jobs as its job card, where it records the as-built and nominates the inspector; any earlier share of the job ends.
  */
 export async function awardBid(
   member: Who,
@@ -292,8 +317,9 @@ export async function awardBid(
     const l = ls[0];
     if (!l) return { ok: false as const, status: 404, message: "That listing isn't yours." };
     if (l.status !== "open") return { ok: false as const, status: 409, message: "This listing is closed." };
-    const bs = await q<{ amount: number; email: string; business: string; status: BidState }>(
-      `select x.amount, x.by_email as email, b.name as business, x.status from design_bids x join businesses b on b.id = x.business_id
+    const bs = await q<{ amount: number; email: string; business: string; status: BidState; bidder: string; kind: string }>(
+      `select x.amount, x.by_email as email, b.name as business, x.status, x.business_id as bidder, b.kind
+         from design_bids x join businesses b on b.id = x.business_id
         where x.id = $1 and x.listing_id = $2`,
       [bidId, id],
     );
@@ -317,7 +343,40 @@ export async function awardBid(
         text: `Awarded on the marketplace to ${b.business} for $${b.amount.toLocaleString("en-AU")} ex GST.`,
         by: member.email.toLowerCase(),
       });
-    return { ok: true as const, winner: b, suburb: l.suburb, system: l.system };
+    let shareId: string | null = null;
+    if (b.kind === "installer") {
+      const [x, y] = member.businessId < b.bidder ? [member.businessId, b.bidder] : [b.bidder, member.businessId];
+      await q(
+        `insert into design_connections (id, a_business, b_business, asked_by_business, asked_by, status, answered_at, answered_by)
+         values ($1,$2,$3,$4,$5,'connected',now(),$6)
+         on conflict (a_business, b_business) do update set status = 'connected', answered_at = coalesce(design_connections.answered_at, now()),
+           answered_by = coalesce(design_connections.answered_by, excluded.answered_by)`,
+        [newId("con"), x, y, member.businessId, member.email.toLowerCase(), b.email],
+      );
+      await q(
+        `update design_job_shares set state = 'withdrawn', answered_at = now(), answered_by = $3
+          where business_id = $1 and job_id = $2 and state in ('sent','accepted')`,
+        [member.businessId, l.jobId, member.email.toLowerCase()],
+      );
+      const token = await installerLink(member.businessId, l.jobId, `${BUSINESS_LINK}${b.bidder}`);
+      shareId = newId("shr");
+      await q(
+        `insert into design_job_shares (id, business_id, job_id, installer_business, token, state, suburb, system, sent_by, answered_at, answered_by)
+         values ($1,$2,$3,$4,$5,'accepted',$6,$7,$8,now(),$9)`,
+        [
+          shareId,
+          member.businessId,
+          l.jobId,
+          b.bidder,
+          token,
+          l.suburb,
+          systemLine(l.system).slice(0, 120),
+          member.email.toLowerCase(),
+          b.email,
+        ],
+      );
+    }
+    return { ok: true as const, winner: b, suburb: l.suburb, system: l.system, shareId };
   });
   if (!done.ok) return done;
   const site = siteUrl();
@@ -329,7 +388,8 @@ export async function awardBid(
         system: systemLine(done.system),
         poster: member.businessName,
         amount: done.winner.amount,
-        link: `${site}/design/marketplace/${id}`,
+        link: done.shareId ? `${site}/design/jobs/${done.shareId}` : `${site}/design/marketplace/${id}`,
+        jobCard: Boolean(done.shareId),
       }),
       replyTo: member.email,
     }).catch((e) => console.error("awarded email failed", e instanceof Error ? e.message : e));

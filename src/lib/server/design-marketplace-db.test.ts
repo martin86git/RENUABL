@@ -2,7 +2,8 @@
  * Runs against a real Postgres when TEST_DATABASE_URL is set (skipped otherwise; `npm run test:db` sets it): the
  * Marketplace's job listings across three businesses: one lists a sold job, one bids, one only looks. That nothing of
  * the customer reaches the others; that a business can't bid on its own listing; that only the poster sees the bids
- * and a bidder only its own; and that the street address and contact go to the poster and the business awarded only.
+ * and a bidder only its own; that the street address and contact go to the poster and the business awarded only; and
+ * that a bid won by an installer sends it the job on RENUABL (connected, its job card in Jobs).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BUSINESS_TERMS_VERSION } from "@/lib/domain/design/account";
@@ -35,7 +36,7 @@ describe.skipIf(!url)("the marketplace's job listings (database)", () => {
     market = await import("./design-marketplace-repo");
     await db.query(`delete from businesses where created_by in ($1,$2,$3)`, [A, B, C]);
     a = (await repo.createBusiness(A, "Alpha Solar", BUSINESS_TERMS_VERSION)).businessId;
-    b = (await repo.createBusiness(B, "Beta Installs", BUSINESS_TERMS_VERSION)).businessId;
+    b = (await repo.createBusiness(B, "Beta Installs", BUSINESS_TERMS_VERSION, "installer")).businessId;
     c = (await repo.createBusiness(C, "Gamma Electrical", BUSINESS_TERMS_VERSION)).businessId;
     const address = `${STREET}, Glen Waverley VIC 3150`;
     const customer = cleanCustomerInput({
@@ -121,5 +122,21 @@ describe.skipIf(!url)("the marketplace's job listings (database)", () => {
     expect(await market.placeBid(who(c, "Gamma Electrical", C), listingId, { amount: 2000, start: null, note: "" })).toMatchObject({
       ok: false,
     });
+  });
+
+  it("sends an installer that wins the job on RENUABL: connected, accepted, its job card open", async () => {
+    const shares = await import("./design-job-shares-repo");
+    const con = await import("./design-connections-repo");
+    const forB = await market.listingDetail(b, listingId);
+    expect(forB?.handover?.jobCard).toEqual(expect.any(String));
+    expect((await market.listingDetail(a, listingId))?.handover?.jobCard).toBeNull();
+    expect(await con.areConnected(a, b)).toBe(true);
+    const [line] = await shares.jobsFor(b);
+    expect(line).toMatchObject({ id: forB!.handover!.jobCard, from: "Alpha Solar", state: "accepted" });
+    expect(await shares.openShared(b, line.id)).toMatchObject({ from: "Alpha Solar" });
+    expect(await shares.shareOf(a, jobId)).toMatchObject({ to: "Beta Installs", state: "accepted" });
+    // The job is with an installer now, so it can't be listed again until it is taken back.
+    const again = await market.createListing(who(a, "Alpha Solar", A), jobId, { notes: "", from: null, to: null, guide: null, openFor: 7 });
+    expect(again).toMatchObject({ ok: false, message: /already with an installer/ });
   });
 });

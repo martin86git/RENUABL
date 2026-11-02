@@ -19,7 +19,10 @@ import {
   type Distance,
   type Listing,
 } from "@/lib/domain/design/marketplace";
+import type { Address } from "@/lib/domain/types";
+import type { Place } from "@/lib/domain/design/job-map";
 import { todayInMarket } from "@/lib/domain/market";
+import { AddressEntry } from "@/components/consumer/address-entry";
 import { jobMapImage } from "@/lib/services/crm";
 import {
   createListing,
@@ -28,6 +31,7 @@ import {
   loadListing,
   loadListings,
   marketplacePath,
+  saveBase,
   type ListingDetail,
 } from "@/lib/services/marketplace";
 import { PATHS, PageHead, ui } from "./design-shell";
@@ -103,15 +107,7 @@ export function MarketplacePage({ view }: { view: "browse" | "mine" | "bids" }) 
             ? "Jobs you've listed for installers to bid on. List a sold job from its deal page."
             : "Listings you've bid on, and where each stands."}
       </p>
-      {view === "browse" && data && !data.base && (
-        <p className="rounded-md bg-sun px-4 py-2.5 text-sm text-sun-ink">
-          Mark your base on the{" "}
-          <Link href={PATHS.jobMap} className="font-medium underline underline-offset-4">
-            Job map
-          </Link>{" "}
-          to see how far each job is and keep to those near you.
-        </p>
-      )}
+      {view === "browse" && data && !data.base && <BaseNote what="job" onSaved={(base) => setData((d) => d && { ...d, base })} />}
       {problem && (
         <p className="rounded-md bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
           {problem}
@@ -141,6 +137,42 @@ export function MarketplacePage({ view }: { view: "browse" | "mine" | "bids" }) 
 }
 
 /** A listing as a card, the way a stay is shown: the place and the headline figure large, the rest in a few lines. */
+const placeOf = (a: Address): Place | null =>
+  typeof a.lat === "number" && typeof a.lng === "number"
+    ? { address: [a.line, a.suburb, a.state, a.postcode].filter(Boolean).join(", "), lat: a.lat, lng: a.lng }
+    : null;
+
+/**
+ * Where the business works from, asked for in place when it isn't marked (the Job map's base; an installer or an
+ * inspector has no Job map), so distances show and the list keeps to what is near.
+ */
+export function BaseNote({ what, onSaved }: { what: "job" | "item"; onSaved: (base: { lat: number; lng: number }) => void }) {
+  const [problem, setProblem] = useState<string | null>(null);
+  const pick = async (a: Address) => {
+    const place = placeOf(a);
+    if (!place) return setProblem("That address couldn't be found on the map. Try another.");
+    const res = await saveBase(place);
+    if (!res.ok) return setProblem(res.message);
+    if (res.base) onSaved(res.base);
+  };
+  return (
+    <div className="rounded-md bg-sun px-4 py-3 text-sm text-sun-ink">
+      <p>
+        Where do you work from? Mark your base to see how far each {what} is and keep to those near you. Only the distance is shown, never
+        your address.
+      </p>
+      <div className="mt-2 max-w-md">
+        <AddressEntry compact placeholder="Your base address" onPick={(a) => void pick(a)} />
+      </div>
+      {problem && (
+        <p className="mt-2 text-warning" role="alert">
+          {problem}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ListingCard({ listing: l, km, today }: { listing: Listing; km: number | null; today: string }) {
   const closing = closesWords(l, today);
   return (
@@ -327,7 +359,18 @@ export function ListingPage({ id }: { id: string }) {
                 <p className="text-ink">
                   <span className="text-muted">Installer:</span> {d.handover.installer.business} · {d.handover.installer.email}
                 </p>
-                <p className="mt-2 text-xs text-muted">The customer&apos;s own details are passed on by {d.handover.poster.business}.</p>
+                {d.handover.jobCard ? (
+                  <>
+                    <p className="mt-2 text-xs text-muted">
+                      It&apos;s in your Jobs: the day, the customer&apos;s name and phone, the drawings, notes and photos.
+                    </p>
+                    <Link href={`/design/jobs/${encodeURIComponent(d.handover.jobCard)}`} className={clsx(ui.primary, "mt-3 h-9 px-3")}>
+                      Open the job card
+                    </Link>
+                  </>
+                ) : (
+                  <p className="mt-2 text-xs text-muted">The customer&apos;s own details are passed on by {d.handover.poster.business}.</p>
+                )}
               </div>
             )}
           </div>
@@ -569,7 +612,7 @@ export function ListOnMarketplace({ jobId, suburb }: { jobId: string; suburb: st
                     Other businesses see the roof design (everything round the roof blurred), the suburb (
                     {suburb || "from the deal's address"}), the system and the dates, your business name and your guide price. Never the
                     customer&apos;s name, phone, email or street, and never your costs. The address goes only to the installer whose bid you
-                    accept.
+                    accept; an installer on RENUABL gets the job card too, as if you had sent it the job.
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <label className={ui.label}>
