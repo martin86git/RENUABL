@@ -53,6 +53,7 @@ export async function GET() {
       staff: set(process.env.ADMIN_EMAILS),
       siteUrl: Boolean(siteUrl()),
       google: set(process.env.GOOGLE_MAPS_API_KEY),
+      nearmap: set(process.env.NEARMAP_API_KEY),
       claude: set(process.env.ANTHROPIC_API_KEY),
       sms: smsConfigured(),
       // Staff mobiles texted about new leads to call now.
