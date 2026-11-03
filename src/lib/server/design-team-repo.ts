@@ -6,6 +6,7 @@
  * was sent in, and a deal card only to someone who may see that deal.
  */
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { actionWords, cleanAction, type ChatAction } from "@/lib/domain/design/sol-chat-work";
 import {
   SOL_BY,
   TEAM_CHANNELS,
@@ -81,6 +82,9 @@ function lineOf(r: Row, seeDeal: (id: string) => boolean, replies: ReadonlyMap<s
   const reactions = cleanReactions(r.reactions);
   // Pictures only ever on Sol's lines.
   const { charts, diagrams } = r.by === SOL_BY ? cleanVisuals(r.visuals) : { charts: [], diagrams: [] };
+  // Work Sol offers, only when the reader may see the deal it is for.
+  const offered = r.by === SOL_BY ? cleanAction((r.visuals as { action?: unknown } | null)?.action) : null;
+  const action = offered && (!offered.jobId || seeDeal(offered.jobId)) ? offered : null;
   return {
     id: r.id,
     room: r.room,
@@ -93,6 +97,7 @@ function lineOf(r: Row, seeDeal: (id: string) => boolean, replies: ReadonlyMap<s
     ...(Object.keys(reactions).length ? { reactions } : {}),
     ...(charts.length ? { charts } : {}),
     ...(diagrams.length ? { diagrams } : {}),
+    ...(action ? { action } : {}),
     ...(r.reply_to ? { replyTo: replies.get(r.reply_to) ?? { id: r.reply_to, by: "", text: "", gone: true } } : {}),
   };
 }
@@ -269,8 +274,15 @@ async function tellTagged(me: TeamMe, room: string, text: string, members: strin
     await sendEmail({
       to: address,
       ...teamTagEmail({ by: me.email, channel, text, link: `${site}/design?team=${room}` }),
-      replyTo: me.email,
+      // Sol has no mailbox: a tag from him isn't answered by email.
+      ...(me.email === SOL_BY ? {} : { replyTo: me.email }),
     }).catch(() => console.error("a team chat tag email couldn't be sent"));
+}
+
+/** Emails the members Sol tags in a line of his (handing a question to the teammate who usually answers it). */
+export async function tellTaggedBySol(businessId: string, room: string, text: string): Promise<void> {
+  if (!isChannel(room)) return;
+  await tellTagged({ businessId, email: SOL_BY }, room, text, await membersOf(businessId));
 }
 
 /** Sol's answer in a channel, written as Sol; `replyTo`, the line he answers (as a reply quotes it). */
@@ -283,11 +295,81 @@ export async function solSaysInTeam(
 ): Promise<void> {
   if (!isChannel(room)) return;
   const { charts, diagrams } = cleanVisuals(visuals);
+  const action = cleanAction((visuals as { action?: unknown } | null | undefined)?.action);
   const answering = isTeamLineId(replyTo) ? replyTo : null;
   await query(
     `insert into design_team_lines (business_id, id, room, by_email, text, visuals, reply_to) values ($1,$2,$3,$4,$5,$6::jsonb,$7)`,
-    [businessId, newId("tl", 10), room, SOL_BY, text.slice(0, 2000), JSON.stringify({ charts, diagrams }), answering],
+    [
+      businessId,
+      newId("tl", 10),
+      room,
+      SOL_BY,
+      text.slice(0, 2000),
+      JSON.stringify({ charts, diagrams, ...(action ? { action } : {}) }),
+      answering,
+    ],
   );
+}
+
+/** The work Sol offered on one of his lines, in a room this member may use, with the room; null when there is none. */
+export async function offeredAction(me: TeamMe, lineId: string): Promise<{ room: string; action: ChatAction } | null> {
+  const rows = await query<{ room: string; visuals: unknown }>(
+    `select room, visuals from design_team_lines where business_id = $1 and id = $2 and by_email = $3`,
+    [me.businessId, lineId, SOL_BY],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  await allowed(me, row.room);
+  const action = cleanAction((row.visuals as { action?: unknown } | null)?.action);
+  return action ? { room: row.room, action } : null;
+}
+
+/** Marks the work on Sol's line done or set aside, kept with the line; false when someone else got there first. */
+export async function settleAction(businessId: string, lineId: string, how: "done" | "dismissed", by: string): Promise<boolean> {
+  const stamp = JSON.stringify({ by: by.toLowerCase(), at: new Date().toISOString() });
+  const rows = await query(
+    `update design_team_lines set visuals = jsonb_set(visuals, $4::text[], $5::jsonb)
+      where business_id = $1 and id = $2 and by_email = $3 and visuals ? 'action'
+        and not (visuals->'action' ? 'done') and not (visuals->'action' ? 'dismissed')
+      returning id`,
+    [businessId, lineId, SOL_BY, `{action,${how}}`, stamp],
+  );
+  return rows.length > 0;
+}
+
+/** A room's latest lines from others (and Sol), oldest first, for a catch-up: as many as were unread when it was opened. */
+export async function latestFromOthers(me: TeamMe, room: string, n: number): Promise<{ by: string; text: string; at: string }[]> {
+  await allowed(me, room);
+  const rows = await query<{ by: string; text: string; at: string; visuals: unknown }>(
+    `select by_email as by, text, ${moment("at")} as at, visuals from design_team_lines
+      where business_id = $1 and room = $2 and by_email <> $3 order by at desc limit $4`,
+    [me.businessId, room, me.email.toLowerCase(), n],
+  );
+  // Sol's offers read as the work they offer, and whether it was done.
+  return rows.reverse().map((r) => {
+    const action = r.by === SOL_BY ? cleanAction((r.visuals as { action?: unknown } | null)?.action) : null;
+    const text = action
+      ? `Offered: ${actionWords(action)} (${action.done ? `done by ${action.done.by}` : action.dismissed ? "set aside" : "not done yet"})`
+      : r.text;
+    return { by: r.by, text, at: r.at };
+  });
+}
+
+/** A channel's history for telling who answers what: ids, writers, words and what each answers, oldest first. */
+export async function roomHistory(
+  businessId: string,
+  room: string,
+  n = 400,
+): Promise<{ history: { id: string; by: string; text: string; replyTo: string | null }[]; members: string[] }> {
+  if (!isChannel(room)) return { history: [], members: [] };
+  const [rows, members] = await Promise.all([
+    query<{ id: string; by: string; text: string; replyTo: string | null }>(
+      `select id, by_email as by, text, reply_to as "replyTo" from design_team_lines where business_id = $1 and room = $2 order by at desc limit $3`,
+      [businessId, room, n],
+    ),
+    membersOf(businessId),
+  ]);
+  return { history: rows.reverse(), members };
 }
 
 /** A channel's last lines, as Sol reads them for context: who said what. */

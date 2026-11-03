@@ -3,6 +3,7 @@
  * and each thing a member does in it.
  */
 import type { TeamLine } from "@/lib/domain/design/team-chat";
+import type { CatchUp } from "@/lib/domain/design/sol-chat-work";
 import { ask, type Answer } from "./crm";
 
 export interface TeamRoomView {
@@ -27,6 +28,10 @@ export const editTeamLine = (id: string, text: string) => post({ edit: id, text 
 export const deleteTeamLine = (id: string) => post({ delete: id });
 export const reactToTeamLine = (id: string, emoji: string) => post({ react: id, emoji });
 export const setSolJoinsIn = (on: boolean) => post<{ solJoinsIn: boolean }>({ solJoinsIn: on });
+/** Presses Sol's card on one of his lines: does what it offers, or sets it aside. */
+export const pressSolAction = (lineId: string, how: "do" | "dismiss") => post<{ words: string }>({ apply: lineId, how });
+/** What happened in a channel since the member was last there (the lines unread when they opened it). */
+export const catchUpRoom = (room: string, unread: number) => post<{ summary: CatchUp }>({ catchUp: room, unread });
 
 /** Says something: as JSON, or as a form when there are files. `replyTo` is the message it answers, when it is a reply. */
 export async function sayInTeam(

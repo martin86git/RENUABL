@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import clsx from "clsx";
 import { AtSign, FileText, Hash, MessagesSquare, Paperclip, Pencil, Reply, SmilePlus, SquareKanban, Trash2, X } from "lucide-react";
 import { cleanKind } from "@/lib/domain/design/business-kind";
+import { CATCH_UP_MIN, actionWords, type CatchUp, type ChatAction } from "@/lib/domain/design/sol-chat-work";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { handleOf } from "@/lib/domain/design/mentions";
@@ -42,7 +43,9 @@ import {
   teamUnreadCount,
   deleteTeamLine,
   editTeamLine,
+  catchUpRoom,
   loadTeamRoom,
+  pressSolAction,
   setSolJoinsIn,
   reactToTeamLine,
   sayInTeam,
@@ -110,6 +113,10 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
   /** The message being answered, with the room it is in: a reply is only offered in that room. */
   const [replying, setReplying] = useState<{ room: string; reply: TeamReply } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  /** How many lines were unread when this room was opened (opening it reads them), for Catch me up. */
+  const [missed, setMissed] = useState<{ room: string; n: number } | null>(null);
+  const [caught, setCaught] = useState<{ room: string; summary: CatchUp } | null>(null);
+  const [catching, setCatching] = useState(false);
   /** What the microphone is hearing, shown at the end of the box until the phrase is finished. */
   const [heard, setHeard] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
@@ -144,6 +151,7 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
     // What is on screen is read: the room's own unread lines are marked seen.
     const here = [...r.channels, ...r.people].find((x) => x.room === room)?.unread ?? 0;
     if (here > 0) {
+      setMissed((m) => (m?.room === room ? { room, n: m.n + here } : { room, n: here }));
       await teamSeen(room);
       window.dispatchEvent(new CustomEvent(TEAM_CHANGED, { detail: Math.max(0, r.unread - here) }));
     } else window.dispatchEvent(new CustomEvent(TEAM_CHANGED, { detail: r.unread }));
@@ -358,6 +366,24 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            {channel && hasSol && missed?.room === room && missed.n >= CATCH_UP_MIN && caught?.room !== room && (
+              <button
+                type="button"
+                disabled={catching}
+                onClick={async () => {
+                  setCatching(true);
+                  const r = await catchUpRoom(room, missed.n);
+                  setCatching(false);
+                  if (!r.ok) return setError(r.message);
+                  setCaught({ room, summary: r.summary });
+                }}
+                title={`Sol sums up the ${missed.n} messages you missed here`}
+                className="flex h-7 items-center gap-1.5 rounded-full bg-primary px-2.5 text-[11px] font-medium text-white hover:brightness-110 disabled:bg-surface-2 disabled:text-muted"
+              >
+                <SolBadge className="size-3.5" />
+                {catching ? "Catching up…" : `Catch me up · ${missed.n}`}
+              </button>
+            )}
             {channel && view?.solJoinsIn !== undefined && (
               <SolJoinsSwitch
                 on={view.solJoinsIn}
@@ -386,6 +412,7 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
         </header>
 
         <div className="staff-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-3 pt-5">
+          {caught?.room === room && <CatchUpCard summary={caught.summary} onClose={() => setCaught(null)} />}
           {lines === null && !error && <p className="text-sm text-muted">Opening…</p>}
           {lines?.length === 0 && (
             <p className="text-sm text-muted">
@@ -454,6 +481,7 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
                   )
                 )}
                 {l.edited && !isEditing && <p className="px-1 text-[10px] text-muted">edited</p>}
+                {l.action && <ActionCard lineId={l.id} action={l.action} me={me} onDone={() => void load()} onError={setError} />}
                 {(l.diagrams?.length || l.charts?.length) && (
                   <div className="mt-1 w-full max-w-[85%] space-y-2">
                     {l.diagrams?.map((d, k) => (
@@ -846,6 +874,92 @@ function SolJoinsSwitch({ on, may, onChange }: { on: boolean; may: boolean; onCh
         <span className={clsx("absolute top-0.5 size-2.5 rounded-full bg-surface transition-all", on ? "left-3" : "left-0.5")} />
       </span>
     </button>
+  );
+}
+
+/**
+ * What Sol offers to do from what was said (sol-chat-work.ts): the work in words, Do it and Not now. Pressed, it is done
+ * as the person who pressed it; once done or set aside it says so, for everyone.
+ */
+function ActionCard(props: { lineId: string; action: ChatAction; me: string; onDone: () => void; onError: (m: string) => void }) {
+  const { action } = props;
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState("");
+  const press = async (how: "do" | "dismiss") => {
+    setBusy(true);
+    const r = await pressSolAction(props.lineId, how);
+    setBusy(false);
+    if (!r.ok) return props.onError(r.message);
+    setSaid(how === "do" ? "Done." : "Set aside.");
+    props.onDone();
+  };
+  const settled = action.done ?? action.dismissed;
+  const notMine = action.kind === "reminder" && action.for !== props.me.toLowerCase();
+  return (
+    <div className="mt-1 w-full max-w-[85%] rounded-2xl bg-surface p-3 text-sm ring-1 ring-sun-line/40">
+      <p className="font-medium text-ink">{actionWords(action)}</p>
+      {settled ? (
+        <p className="mt-1 text-xs text-muted">
+          {action.done ? "Done" : "Set aside"} by {nameOf(settled.by)}
+        </p>
+      ) : said ? (
+        <p className="mt-1 text-xs text-muted">{said}</p>
+      ) : notMine ? (
+        <p className="mt-1 text-xs text-muted">For {nameOf(action.for)} to set.</p>
+      ) : (
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void press("do")}
+            className="rounded-full bg-sun-line px-3 py-1 text-xs font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+          >
+            Do it
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void press("dismiss")}
+            className="rounded-full px-3 py-1 text-xs font-medium text-ink-2 ring-1 ring-line hover:bg-canvas"
+          >
+            Not now
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Sol's catch-up on a channel, for the reader only: what changed, what was decided, and what waits on them. */
+function CatchUpCard({ summary, onClose }: { summary: CatchUp; onClose: () => void }) {
+  const parts: [string, string][] = [
+    ["What changed", summary.changed],
+    ["Decided", summary.decided],
+    ["Waiting on you", summary.waiting],
+  ];
+  return (
+    <div className="sticky top-0 z-10 rounded-2xl bg-primary p-4 text-sm text-white shadow-lg">
+      <div className="flex items-start gap-2">
+        <SolBadge className="mt-0.5 size-4 shrink-0" />
+        <p className="flex-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">
+          Sol caught you up · {summary.lines} messages
+        </p>
+        <button type="button" onClick={onClose} aria-label="Close the catch-up" className="text-white/70 hover:text-white">
+          <X className="size-4" aria-hidden />
+        </button>
+      </div>
+      <dl className="mt-2 space-y-1.5">
+        {parts
+          .filter(([, v]) => v)
+          .map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-[11px] font-semibold text-sun-line">{k}</dt>
+              <dd className="text-white/90">{v}</dd>
+            </div>
+          ))}
+      </dl>
+      <p className="mt-2 text-[11px] text-white/60">Only you see this. Scroll up for the messages themselves.</p>
+    </div>
   );
 }
 

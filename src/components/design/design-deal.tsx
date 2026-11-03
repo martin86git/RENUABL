@@ -47,6 +47,7 @@ import { ContactActions, DealEmail, DesignDrawer, SectionFieldLine } from "./dea
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
 import { DealFiles, DealPulseBadges } from "./deal-pulse";
+import { DealSol } from "./deal-sol";
 import { hasPulse, type DealPulse } from "@/lib/domain/design/deal-heat";
 import { openedWords } from "@/lib/domain/design/email-opens";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
@@ -54,7 +55,7 @@ import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
 type Written = "note" | "call" | "email";
-type Tab = "overview" | "activities" | "email" | "chat" | "files";
+type Tab = "overview" | "activities" | "email" | "chat" | "sol" | "files";
 /** Whether this person keeps the deal's left column folded away, on their device. */
 const ABOUT_FOLDED = "renuabl.design.deal-about";
 const FILTERS: { key: "all" | ActivityKind; label: string }[] = [
@@ -162,7 +163,7 @@ export function DealPage({ id }: { id: string }) {
   // "?tab=chat" (from Messages, and from the email about a new message) opens the deal on its conversation; "?tab=email"
   // (a draft Sol wrote) on its Email tab.
   const asked = useSearchParams().get("tab");
-  const [tab, setTab] = useState<Tab>(asked === "chat" ? "chat" : asked === "email" ? "email" : "activities");
+  const [tab, setTab] = useState<Tab>(asked === "chat" ? "chat" : asked === "email" ? "email" : asked === "sol" ? "sol" : "activities");
   // The design tool as a drawer over the deal (?design=1 opens it), and the left column folded away.
   const [drawer, setDrawer] = useState(useSearchParams().get("design") === "1");
   // The installation's job card, over the page (wave 7).
@@ -590,6 +591,9 @@ export function DealPage({ id }: { id: string }) {
           <button role="tab" aria-selected={tab === "chat"} className={pill(tab === "chat")} onClick={() => setTab("chat")}>
             Chat
           </button>
+          <button role="tab" aria-selected={tab === "sol"} className={pill(tab === "sol")} onClick={() => setTab("sol")}>
+            Sol
+          </button>
           <button role="tab" aria-selected={tab === "files"} className={pill(tab === "files")} onClick={() => setTab("files")}>
             Attachments
           </button>
@@ -602,6 +606,10 @@ export function DealPage({ id }: { id: string }) {
         ) : tab === "chat" ? (
           <div className="mt-5">
             <DealChat jobId={id} />
+          </div>
+        ) : tab === "sol" ? (
+          <div className="mt-5">
+            <DealSol jobId={id} name={`${customer.name} · ${job.title}`} />
           </div>
         ) : tab === "files" ? (
           <div className="mt-5">

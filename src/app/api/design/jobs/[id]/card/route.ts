@@ -3,8 +3,11 @@ import { readNote, sendJobCard } from "@/lib/server/design-job-card";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { allow } from "@/lib/server/rate-limit";
+import { parseApiKey } from "@/lib/server/bill-reader";
+import { checkJobPhotos } from "@/lib/server/design-photo-check";
 
-export const maxDuration = 60;
+// Sol's photo check reads several photos with Claude.
+export const maxDuration = 120;
 
 const missing = () => Response.json({ ok: false, message: "There's no such job." }, { status: 404 });
 
@@ -42,7 +45,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
   });
 }
 
-/** PUT { send: installerId }: emails the card to an installer on file, with its drawings and their private link. */
+/** PUT { check: true }: Sol checks the photos. PUT { send: installerId }: emails the card to an installer on file, with its drawings and their private link. */
 export async function PUT(request: Request, ctx: RouteContext<"/api/design/jobs/[id]/card">) {
   return answer(async () => {
     const who = await requireMember("design");
@@ -52,6 +55,12 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/jobs/
     if (!allow(request, "job-card-send", 30)) return Response.json({ ok: false, message: "Try again in a little while." }, { status: 429 });
     const read = await readBody(request, 500);
     if ("refuse" in read) return read.refuse;
+    // { check: true }: Sol looks at the card's newest photos and writes what he sees, and what's missing, on its thread.
+    if (read.body.check === true) {
+      const checked = await checkJobPhotos(who.member, id, parseApiKey(process.env.ANTHROPIC_API_KEY), who.member.email);
+      if (!checked.ok) return Response.json({ ok: false, message: checked.message }, { status: checked.status });
+      return Response.json({ ok: true, card: await jobCard(who.member, id) });
+    }
     if (typeof read.body.send !== "string") return Response.json({ ok: false, message: "Choose an installer." }, { status: 422 });
     const sent = await sendJobCard(who.member, id, read.body.send);
     if (!sent.ok) return Response.json({ ok: false, message: sent.message }, { status: sent.status });

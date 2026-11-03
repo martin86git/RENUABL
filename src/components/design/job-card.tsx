@@ -8,6 +8,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { isJobPicture, type JobDrawing, type JobNote } from "@/lib/domain/design/job-card";
+import { PHOTO_CHECK_BY } from "@/lib/domain/design/photo-check";
+import { SolBadge } from "./sol-icon";
 import {
   asBuiltDifferences,
   asBuiltFrom,
@@ -20,6 +22,7 @@ import {
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
 import {
   addNote,
+  checkCardPhotos,
   linkFileHref,
   linkRoofHref,
   loadInstallerCard,
@@ -339,13 +342,50 @@ function CardBody({
   );
 }
 
+/** Sol's own note on the thread: his look at the photos (photo-check.ts). */
+const isSol = (n: JobNote) => n.side === "team" && n.by === PHOTO_CHECK_BY;
+
+/** Asks Sol to look over the card's newest photos; his note lands on the thread. */
+function PhotoCheck({ jobId, onCard }: { jobId: string; onCard: (card: JobCardView) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setProblem("");
+          const res = await checkCardPhotos(jobId);
+          setBusy(false);
+          if (!res.ok) return setProblem(res.message);
+          onCard(res.card);
+        }}
+        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-ink ring-1 ring-line hover:bg-canvas disabled:text-muted"
+      >
+        <SolBadge className="size-3.5" />
+        {busy ? "Sol is looking at the photos…" : "Ask Sol to check the photos"}
+      </button>
+      <span className="text-[11px] text-muted">He also looks by himself when the installer posts photos on install day.</span>
+      {problem && <p className="w-full text-xs text-danger">{problem}</p>}
+    </div>
+  );
+}
+
 function Thread({ notes, fileHref }: { notes: JobNote[]; fileHref: (id: string) => string }) {
   if (!notes.length)
     return <p className="mt-3 text-sm text-muted">Nothing yet. Notes and photos from the team and the installer show here.</p>;
   return (
     <ol className="mt-3 space-y-2.5">
       {notes.map((n) => (
-        <li key={n.id} className={clsx("rounded-lg px-3 py-2.5", n.side === "installer" ? "bg-sun" : "bg-surface-2")}>
+        <li
+          key={n.id}
+          className={clsx(
+            "rounded-lg px-3 py-2.5",
+            n.side === "installer" ? "bg-sun" : isSol(n) ? "bg-surface ring-1 ring-sun-line/40" : "bg-surface-2",
+          )}
+        >
           {n.text && <p className="whitespace-pre-line text-[13.5px] leading-snug text-ink">{n.text}</p>}
           {n.files.length > 0 && (
             <div className="mt-2 grid grid-cols-3 gap-1.5">
@@ -373,8 +413,9 @@ function Thread({ notes, fileHref }: { notes: JobNote[]; fileHref: (id: string) 
               )}
             </div>
           )}
-          <p className="mt-1 text-[11px] text-muted">
-            {n.side === "installer" ? `${n.by} · installer` : n.by} · {when(n.at)}
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-muted">
+            {isSol(n) && <SolBadge className="size-3" />}
+            {n.side === "installer" ? `${n.by} · installer` : isSol(n) ? "Sol checked the photos" : n.by} · {when(n.at)}
           </p>
         </li>
       ))}
@@ -562,15 +603,18 @@ export function JobCardDialog({ jobId, onClose, onEvent }: { jobId: string; onCl
                 return res.ok ? { ok: true, asBuilt: res.asBuilt } : { ok: false, message: res.message };
               }}
               composer={
-                <Composer
-                  placeholder="A note for the installer, or what was found on site"
-                  send={async (text, files) => {
-                    const res = await addNote({ jobId }, text, files);
-                    if (!res.ok) return res.message;
-                    setCard({ ...card, notes: [res.note, ...card.notes] });
-                    return null;
-                  }}
-                />
+                <>
+                  <Composer
+                    placeholder="A note for the installer, or what was found on site"
+                    send={async (text, files) => {
+                      const res = await addNote({ jobId }, text, files);
+                      if (!res.ok) return res.message;
+                      setCard({ ...card, notes: [res.note, ...card.notes] });
+                      return null;
+                    }}
+                  />
+                  <PhotoCheck jobId={jobId} onCard={setCard} />
+                </>
               }
               aside={
                 <div className="space-y-5">

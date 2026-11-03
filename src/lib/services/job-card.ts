@@ -16,6 +16,8 @@ const linkPath = (token: string) => `/api/job/${encodeURIComponent(token)}`;
 export const loadJobCard = (jobId: string) => ask<{ card: JobCardView }>(teamPath(jobId));
 export const sendJobCard = (jobId: string, installerId: string) =>
   ask<{ to: string; card: JobCardView }>(teamPath(jobId), { method: "PUT", body: { send: installerId } });
+/** Sol looks at the card's newest photos and writes what they show, and what is missing, on its thread. */
+export const checkCardPhotos = (jobId: string) => ask<{ card: JobCardView }>(teamPath(jobId), { method: "PUT", body: { check: true } });
 export const loadInstallerCard = (token: string) => ask<{ card: JobCardView; installer: string }>(linkPath(token));
 /** What was really installed: kept by the team, or by the installer through their link (named for them). */
 export const saveAsBuilt = (where: { jobId: string } | { token: string }, asBuilt: AsBuiltInput, person = "") =>

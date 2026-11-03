@@ -8,6 +8,7 @@
  * nothing here reaches a customer. Pure, tested.
  */
 import { handleOf } from "./mentions";
+import type { ChatAction } from "./sol-chat-work";
 import { cleanCharts, type SolChart } from "./sol-charts";
 import { cleanDiagrams, type SolDiagram } from "./sol-diagrams";
 
@@ -63,6 +64,8 @@ export interface TeamLine {
   /** Sol's charts and diagrams with his answer (a battery's clearances, how strings run), drawn under his words. */
   charts?: SolChart[];
   diagrams?: SolDiagram[];
+  /** Work Sol offers to do from what was said (sol-chat-work.ts): a card pressed by a person, never done by him. */
+  action?: ChatAction;
 }
 
 /**

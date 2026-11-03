@@ -8,7 +8,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { canvasFacts } from "@/lib/domain/design/canvas";
 import { solSystem } from "@/lib/domain/design/sol";
 import { SOL_JOIN_WAIT_SECONDS, mayStepIn, readStepIn, stepInPrompt, stillHisToTake } from "@/lib/domain/design/sol-joins-in";
+import { handOffLine, whoAnswers } from "@/lib/domain/design/sol-chat-work";
 import { SOL_BY, TEAM_CHANNELS, nameOf } from "@/lib/domain/design/team-chat";
+import { handleOf } from "@/lib/domain/design/mentions";
 import { todayInMarket } from "@/lib/domain/market";
 import { redactSecrets } from "./bill-reader";
 import { viewerOf } from "./design-context";
@@ -17,7 +19,7 @@ import { listJobs } from "./design-crm-repo";
 import { query } from "./db";
 import type { Member } from "./design-repo";
 import { casesToResolve } from "./design-service-repo";
-import { channelContext, solSaysInTeam } from "./design-team-repo";
+import { channelContext, roomHistory, solSaysInTeam, tellTaggedBySol } from "./design-team-repo";
 
 const MODEL = () => process.env.SOL_MODEL?.trim() || "claude-opus-5-5";
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -94,7 +96,19 @@ export async function solStepsIn(member: Member, room: string, lineId: string, t
     return;
   }
   const said = readStepIn(reply);
-  if (!said) return;
+  // Not his to answer: the teammate who usually answers questions like it, from the room's own history, if one stands out.
+  let handOff: string | null = null;
+  if (!said) {
+    const { history, members } = await roomHistory(businessId, room);
+    const who = whoAnswers(
+      text,
+      history.filter((l) => l.id !== lineId),
+      member.email,
+      members,
+    );
+    if (!who) return;
+    handOff = handOffLine(handleOf(who), nameOf(who));
+  }
   // Someone may have answered while he was thinking: then he stays out.
   const late = await query<{ n: string }>(
     `select count(*) as n from design_team_lines
@@ -103,5 +117,7 @@ export async function solStepsIn(member: Member, room: string, lineId: string, t
     [businessId, room, lineId, member.email.toLowerCase()],
   );
   if (Number(late[0]?.n ?? 0) > 0) return;
-  await solSaysInTeam(businessId, room, said, undefined, lineId);
+  await solSaysInTeam(businessId, room, said ?? handOff!, undefined, lineId);
+  // A teammate handed the question is emailed like any tag.
+  if (handOff) await tellTaggedBySol(businessId, room, handOff).catch(() => console.error("sol's hand-off email couldn't be sent"));
 }

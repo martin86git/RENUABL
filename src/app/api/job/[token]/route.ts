@@ -1,8 +1,14 @@
+import { after } from "next/server";
 import { installerBy, isJobToken } from "@/lib/domain/design/job-card";
 import { answer } from "@/lib/server/design-context";
 import { readNote } from "@/lib/server/design-job-card";
 import { addJobNote, cardByToken, jobCard } from "@/lib/server/design-job-card-repo";
 import { allow } from "@/lib/server/rate-limit";
+import { parseApiKey } from "@/lib/server/bill-reader";
+import { checkAfterInstallerPhotos } from "@/lib/server/design-photo-check";
+
+// Sol's look at install-day photos runs after the answer has gone back.
+export const maxDuration = 90;
 
 const gone = () => Response.json({ ok: false, message: "This job card isn't available." }, { status: 404 });
 
@@ -38,6 +44,13 @@ export async function POST(request: Request, ctx: RouteContext<"/api/job/[token]
       text: note.text,
       files: note.files,
     });
+    // Photos on install day: Sol looks them over by himself once the answer has gone back.
+    if (made && note.files.some((f) => f.type.startsWith("image/")))
+      after(() =>
+        checkAfterInstallerPhotos(link, link.jobId, parseApiKey(process.env.ANTHROPIC_API_KEY)).catch((e) =>
+          console.error("sol's photo check", e instanceof Error ? e.message : e),
+        ),
+      );
     return made ? Response.json({ ok: true, note: made }) : gone();
   });
 }

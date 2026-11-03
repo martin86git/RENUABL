@@ -3,9 +3,11 @@ import { asksSol, cleanDealIds, cleanRoom, cleanWords, isTeamLineId } from "@/li
 import { parseApiKey } from "@/lib/server/bill-reader";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { can } from "@/lib/domain/design/account";
+import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { loadPrefs, savePrefs } from "@/lib/server/design-after-sale-repo";
 import { solAnswersInChannel } from "@/lib/server/design-sol";
 import { solStepsIn } from "@/lib/server/design-sol-joins";
+import { catchUp, pressAction, solOffersWork } from "@/lib/server/design-sol-work";
 import {
   TeamChatRefusal,
   deleteTeamLine,
@@ -36,6 +38,10 @@ const meOf = (member: Member): TeamMe => ({ businessId: member.businessId, email
  */
 function solHears(member: Member, room: string, text: string, lineId: string) {
   const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);
+  // Work said in passing ("Chloe's install moves to Thursday"): Sol offers a card to do it, at once.
+  after(() =>
+    solOffersWork(member, room, lineId, text, apiKey).catch((e) => console.error("sol offering work", e instanceof Error ? e.message : e)),
+  );
   if (!asksSol(room, text)) {
     after(() =>
       solStepsIn(member, room, lineId, text, apiKey).catch((e) => console.error("sol joining in", e instanceof Error ? e.message : e)),
@@ -112,6 +118,28 @@ export async function POST(request: Request) {
       if (id(b.react)) {
         await reactToTeamLine(me, id(b.react), typeof b.emoji === "string" ? b.emoji : "");
         return Response.json({ ok: true });
+      }
+      // A press on Sol's card: do what it offers, or set it aside.
+      if (id(b.apply)) {
+        const done = await pressAction(who.member, id(b.apply), b.how === "dismiss" ? "dismiss" : "do");
+        return done.ok
+          ? Response.json({ ok: true, words: done.words })
+          : Response.json({ ok: false, message: done.message }, { status: 409 });
+      }
+      if (typeof b.catchUp === "string") {
+        const room = cleanRoom(b.catchUp);
+        if (!room) return Response.json({ ok: false, message: "There's no such conversation." }, { status: 404 });
+        if (!allow(request, "design-team-catch-up", 60))
+          return Response.json({ ok: false, message: "That's a lot of catching up this hour: try again shortly." }, { status: 429 });
+        const summary = await catchUp(
+          who.member,
+          room,
+          typeof b.unread === "number" ? b.unread : 0,
+          parseApiKey(process.env.ANTHROPIC_API_KEY),
+        );
+        if (summary === "out") return Response.json({ ok: false, message: SOL_OUT_SHORT }, { status: 402 });
+        if (!summary) return Response.json({ ok: false, message: "Catch up works in a channel." }, { status: 422 });
+        return Response.json({ ok: true, summary });
       }
       if (typeof b.solJoinsIn === "boolean") {
         // Whether Sol steps in on the channels unasked: a business setting, so for those who change settings.
