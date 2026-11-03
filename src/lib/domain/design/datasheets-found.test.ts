@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { checkString } from "./electrical";
-import { NO_DATASHEETS, foundBasis, foundFigures, missingSheets, readingFrom, sheetCandidates, type RawReading, type SheetReading } from "./datasheets";
+import {
+  NO_DATASHEETS,
+  foundBasis,
+  foundFigures,
+  missingSheets,
+  readingFrom,
+  sheetCandidates,
+  type RawReading,
+  type SheetReading,
+} from "./datasheets";
 
 const panelReading: SheetReading = {
   isDatasheet: true,
