@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { applyUpdate, matchesSearch, openCaseFor, plannerOrder, recordLine, toResolve, waitingDays, type ServiceCase } from "./service";
+import {
+  applyUpdate,
+  caseInWords,
+  matchesSearch,
+  openCaseFor,
+  plannerOrder,
+  recordLine,
+  serviceBriefing,
+  serviceFocusWords,
+  toResolve,
+  waitingDays,
+  type ServiceCase,
+} from "./service";
 
 const base: ServiceCase = {
   id: "svc_1",
@@ -67,5 +79,45 @@ describe("the service planner", () => {
   it("finds a case by every word typed, in any order", () => {
     expect(matchesSearch(["Jordan Placeholder", "0400 000 000", base.issue], "earth jordan")).toBe(true);
     expect(matchesSearch(["Jordan Placeholder", base.issue], "earth smith")).toBe(false);
+  });
+});
+
+describe("what Sol is told about a case", () => {
+  const worked: ServiceCase = {
+    ...base,
+    state: "in-hand",
+    updates: [{ at: "2026-10-11T03:00:00Z", by: "jo@sunny.example", state: "in-hand", text: "Tech booked Thursday" }],
+  };
+  it("gives the issue and every step of its history, by handle only", () => {
+    const words = caseInWords(worked);
+    expect(words).toContain("Service case (In hand), raised 2026-10-10 by sam");
+    expect(words).toContain("The issue: Inverter showing an earth fault since Monday");
+    expect(words).toContain("- 2026-10-11 jo marked it in hand: Tech booked Thursday");
+    expect(words).not.toContain("@");
+    expect(caseInWords(base)).toContain("Nothing done on it yet.");
+  });
+  it("names the customer, the deal and its id, and the deal's earlier cases, not other deals'", () => {
+    const earlier: ServiceCase = { ...base, id: "svc_0", state: "resolved", issue: "Panel clip loose", resolvedAt: "2026-09-02T00:00:00Z" };
+    const elsewhere: ServiceCase = { ...base, id: "svc_9", jobId: "job_b", issue: "A fault on another deal" };
+    const focus = {
+      ...worked,
+      customer: "Casey Sample",
+      phone: "0491 570 006",
+      email: "",
+      address: "1 Sample Street",
+      title: "Solar",
+      stage: "installed",
+      installDate: "2026-09-01",
+      installer: "Jo",
+    };
+    const words = serviceFocusWords(focus, [earlier, worked, elsewhere]);
+    expect(words).toContain('Service case for Casey Sample · deal "Solar" (deal id job_a)');
+    expect(words).toContain("Earlier cases on this deal (1):");
+    expect(words).toContain("Panel clip loose");
+    expect(words).not.toContain("another deal");
+    expect(words).toContain("deal_details with deal id job_a");
+  });
+  it("asks to be brought up to speed by first name", () => {
+    expect(serviceBriefing("Casey Sample")).toMatch(/^Bring me up to speed on Casey's service case/);
   });
 });

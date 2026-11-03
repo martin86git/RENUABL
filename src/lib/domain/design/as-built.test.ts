@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asBuiltDifferences, asBuiltFrom, asBuiltMissing, cleanAsBuilt, serialsOf, type Designed } from "./as-built";
+import { asBuiltDifferences, asBuiltFrom, asBuiltInWords, asBuiltMissing, cleanAsBuilt, serialsOf, type Designed } from "./as-built";
 
 const designed: Designed = {
   panels: 16,
@@ -41,5 +41,24 @@ describe("the as-built record", () => {
       battery: null,
       notes: "",
     });
+  });
+});
+
+describe("the as-built in words, for Sol", () => {
+  it("gives the models and every serial", () => {
+    const words = asBuiltInWords({
+      installedOn: "2026-09-01",
+      panels: { model: "JKM475N", count: 2 },
+      panelSerials: ["P1", "P2"],
+      inverters: [{ model: "SH8.0RS", serial: "INV9" }],
+      battery: { model: "SigenStor", modules: 1, serials: [] },
+      notes: "",
+      by: "jo@sunny.example",
+      at: "2026-09-02T00:00:00Z",
+    });
+    expect(words).toContain("Panels: 2 × JKM475N; serials P1, P2");
+    expect(words).toContain("Inverter: SH8.0RS, serial INV9");
+    expect(words).toContain("Battery: SigenStor, 1 module; no serials recorded");
+    expect(words).not.toContain("@");
   });
 });

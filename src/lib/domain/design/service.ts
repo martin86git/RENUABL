@@ -147,3 +147,56 @@ export function matchesSearch(haystack: readonly (string | null | undefined)[], 
 
 /** How many cases are still to put right: the nav's count. */
 export const toResolve = (cases: readonly Pick<ServiceCase, "state">[]) => cases.filter((c) => c.state !== "resolved").length;
+
+const day = (iso: string) => iso.slice(0, 10);
+const handle = (email: string) => email.split("@")[0];
+
+/** A case in words, as Sol reads it: where it stands, the issue, and every step of its history. */
+export function caseInWords(c: Pick<ServiceCase, "issue" | "state" | "raisedAt" | "raisedBy" | "resolvedAt" | "updates">): string {
+  return [
+    `Service case (${SERVICE_STATE_LABEL[c.state]}), raised ${day(c.raisedAt)} by ${handle(c.raisedBy)}${c.resolvedAt ? `, resolved ${day(c.resolvedAt)}` : ""}.`,
+    `The issue: ${c.issue}`,
+    ...(c.updates.length
+      ? [
+          "History, oldest first:",
+          ...c.updates.map(
+            (u) =>
+              `- ${day(u.at)} ${handle(u.by)}${u.state ? ` ${u.state === "open" ? "opened it again" : `marked it ${SERVICE_STATE_LABEL[u.state].toLowerCase()}`}` : ""}${u.text ? `: ${u.text.replace(/\s+/g, " ")}` : ""}`,
+          ),
+        ]
+      : ["Nothing done on it yet."]),
+  ].join("\n");
+}
+
+/** What the Service screen's chosen case is, for the customer and deal around it. */
+export interface ServiceFocus extends ServiceCase {
+  customer: string;
+  phone: string;
+  email: string;
+  address: string;
+  title: string;
+  stage: string;
+  installDate: string | null;
+  installer: string | null;
+}
+
+/**
+ * What Sol is told about the case picked on the Service screen (3 Nov 2026, Martin: picking a case pivots Sol's
+ * conversation to that deal, and he should know all of it): the customer, the deal and its id (for his deal_details
+ * tool, which adds the deal's record, its system and its as-built), the case and its history, and its earlier cases.
+ */
+export function serviceFocusWords(c: ServiceFocus, all: readonly ServiceCase[]): string {
+  const earlier = all.filter((o) => o.jobId === c.jobId && o.id !== c.id);
+  return [
+    `Service case for ${c.customer} · deal "${c.title}" (deal id ${c.jobId}).`,
+    `Customer: phone ${c.phone || "none"} · email ${c.email || "none"} · ${c.address || "no address"}`,
+    `Deal stage ${c.stage}${c.installDate ? ` · installed ${c.installDate}` : ""}${c.installer ? ` · installer ${c.installer}` : ""}`,
+    caseInWords(c),
+    ...(earlier.length ? [`Earlier cases on this deal (${earlier.length}):`, ...earlier.map(caseInWords)] : []),
+    `For the deal's record, system and what was installed (serials), use deal_details with deal id ${c.jobId}.`,
+  ].join("\n");
+}
+
+/** What is asked of Sol when a case is picked, so the conversation turns to it at once. */
+export const serviceBriefing = (customer: string) =>
+  `Bring me up to speed on ${customer.split(/\s+/)[0] || customer}'s service case: what's wrong, what's been done so far, and what I should do next.`;

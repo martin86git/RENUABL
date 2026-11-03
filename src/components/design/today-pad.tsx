@@ -296,7 +296,7 @@ function SolAvatar() {
 }
 
 /** Something Sol says in the conversation: his round, then his words and what he puts in place. */
-function SolSays({ children }: { children: React.ReactNode }) {
+export function SolSays({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex gap-3">
       <SolAvatar />
@@ -350,7 +350,17 @@ function Hello(props: {
 }
 
 /** Sol's box: what is asked goes to Sol, in the same conversation as his panel. */
-function SolBox({ onAsk, asking }: { onAsk: (q: string) => void; asking: boolean }) {
+export function SolBox({
+  onAsk,
+  asking,
+  id = "today-ask",
+  placeholder = "Ask Sol about your deals, your day, or what to say to a customer",
+}: {
+  onAsk: (q: string) => void;
+  asking: boolean;
+  id?: string;
+  placeholder?: string;
+}) {
   const [text, setText] = useState("");
   const send = () => {
     const said = text.trim();
@@ -367,16 +377,16 @@ function SolBox({ onAsk, asking }: { onAsk: (q: string) => void; asking: boolean
       className="flex items-center gap-2 rounded-[26px] bg-surface p-2 pl-4 text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line"
     >
       <SolBadge className="size-5 shrink-0" />
-      <label className="sr-only" htmlFor="today-ask">
+      <label className="sr-only" htmlFor={id}>
         Ask Sol
       </label>
       <input
-        id="today-ask"
+        id={id}
         value={text}
         onChange={(e) => setText(e.target.value)}
         maxLength={4000}
         autoComplete="off"
-        placeholder="Ask Sol about your deals, your day, or what to say to a customer"
+        placeholder={placeholder}
         className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
       />
       <button
@@ -392,7 +402,7 @@ function SolBox({ onAsk, asking }: { onAsk: (q: string) => void; asking: boolean
 }
 
 /** Words Sol is writing, a few letters at a time with his caret, then done. Instant with reduced motion. */
-function Typed({ text, onDone, instant = false }: { text: string; onDone?: () => void; instant?: boolean }) {
+export function Typed({ text, onDone, instant = false }: { text: string; onDone?: () => void; instant?: boolean }) {
   const [shown, setShown] = useState(0);
   const done = useRef(false);
   const all = instant || shown >= text.length;

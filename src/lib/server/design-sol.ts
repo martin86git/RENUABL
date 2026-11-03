@@ -10,7 +10,9 @@ import { canvasFacts } from "@/lib/domain/design/canvas";
 import { cleanChart, CHARTS_PER_TURN, type SolChart } from "@/lib/domain/design/sol-charts";
 import { cleanDiagram, DIAGRAMS_PER_TURN, type SolDiagram } from "@/lib/domain/design/sol-diagrams";
 import { DESIGNS_PER_TURN, type SolDesignShown } from "@/lib/domain/design/sol-designs";
-import { jobCard } from "./design-job-card-repo";
+import { asBuiltInWords } from "@/lib/domain/design/as-built";
+import { caseInWords } from "@/lib/domain/design/service";
+import { asBuiltOf, jobCard } from "./design-job-card-repo";
 import {
   DRAFTS_PER_TURN,
   HISTORY_SENT,
@@ -38,7 +40,7 @@ import { redactSecrets } from "./bill-reader";
 import { viewerOf } from "./design-context";
 import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-repo";
 import { loadLists, type Member } from "./design-repo";
-import { casesToResolve } from "./design-service-repo";
+import { casesForJob, casesToResolve } from "./design-service-repo";
 import { addSolTurns, newSolId, solState, withSol } from "./design-sol-repo";
 import { giveBackSolCredit, takeSolCredit } from "./sol-credits";
 import { SOL_OUT, type SolUse } from "@/lib/domain/design/sol-credits";
@@ -126,7 +128,7 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "deal_details",
     description:
-      "Everything known about one deal: the customer (name, phone, email, address, source, notes), the deal's stage, value, kW, install date, owner and system details, and its latest activity (notes, calls, emails, stage moves, proposals, messages). Use it before advising on, or writing to, any customer.",
+      "Everything known about one deal: the customer (name, phone, email, address, source, notes), the deal's stage, value, kW, install date, owner and system details, its latest activity (notes, calls, emails, stage moves, proposals, messages), what was installed with its serials, and every service case with its history. Use it before advising on, or writing to, any customer.",
     input_schema: { type: "object", properties: { deal_id: { type: "string" } }, required: ["deal_id"] },
   },
   {
@@ -333,6 +335,7 @@ async function runTool(
     const detail = await customerDetail(businessId, customer.id, viewer);
     const activity = (detail?.activity ?? []).filter((a) => !a.jobId || a.jobId === job.id).slice(0, 15);
     const details = Object.entries(job.details).filter(([, v]) => v);
+    const [cases, built] = await Promise.all([casesForJob(businessId, job.id), asBuiltOf(businessId, job.id)]);
     return [
       `Customer: ${customer.name}${customer.sample ? " (a made-up sample customer)" : ""} · phone ${customer.phone || "none"} · email ${customer.email || "none"} · ${customer.address || "no address"}`,
       customer.source ? `Source: ${customer.source}` : "",
@@ -342,6 +345,9 @@ async function runTool(
       details.length ? `Details typed in: ${details.map(([k, v]) => `${k}: ${v}`).join("; ")}` : "",
       activity.length ? "Latest activity, newest first:" : "No activity yet.",
       ...activity.map((a) => `- ${a.at.slice(0, 10)} ${a.kind} by ${a.by}: ${a.text.replace(/\s+/g, " ").slice(0, 400)}`),
+      built ? asBuiltInWords(built) : "",
+      cases.length ? `Service cases (${cases.length}), oldest first:` : "",
+      ...cases.map(caseInWords),
     ]
       .filter(Boolean)
       .join("\n");

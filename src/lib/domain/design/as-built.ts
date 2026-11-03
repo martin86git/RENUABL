@@ -112,3 +112,18 @@ export function asBuiltMissing(built: AsBuiltInput): string[] {
   if (!built.installedOn) out.push("the install date");
   return out;
 }
+
+/** What was installed, in words, as Sol reads it for service: the models and every serial. */
+export function asBuiltInWords(b: AsBuilt): string {
+  return [
+    `As built (recorded ${b.at.slice(0, 10)} by ${b.by.split("@")[0]})${b.installedOn ? `, installed ${b.installedOn}` : ""}:`,
+    `Panels: ${b.panels.count} × ${b.panels.model || "model not given"}${b.panelSerials.length ? `; serials ${b.panelSerials.join(", ")}` : "; no serials recorded"}`,
+    ...b.inverters.map((i) => `Inverter: ${i.model || "model not given"}${i.serial ? `, serial ${i.serial}` : ", no serial recorded"}`),
+    ...(b.battery
+      ? [
+          `Battery: ${b.battery.model || "model not given"}, ${b.battery.modules} module${b.battery.modules === 1 ? "" : "s"}${b.battery.serials.length ? `; serials ${b.battery.serials.join(", ")}` : "; no serials recorded"}`,
+        ]
+      : []),
+    ...(b.notes ? [`Notes: ${b.notes}`] : []),
+  ].join("\n");
+}

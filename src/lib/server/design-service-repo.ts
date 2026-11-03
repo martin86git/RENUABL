@@ -48,6 +48,14 @@ export async function listCases(businessId: string): Promise<ServiceLine[]> {
   );
 }
 
+/** Every case on one deal, oldest first: what Sol reads with the deal. */
+export async function casesForJob(businessId: string, jobId: string): Promise<ServiceCase[]> {
+  return query<ServiceCase>(`select ${CASE} from design_service_cases c where c.business_id = $1 and c.job_id = $2 order by c.raised_at`, [
+    businessId,
+    jobId,
+  ]);
+}
+
 /** How many cases are still to put right, for the nav. */
 export async function casesToResolve(businessId: string): Promise<number> {
   const rows = await query<{ n: string }>(`select count(*) as n from design_service_cases where business_id = $1 and state <> 'resolved'`, [
