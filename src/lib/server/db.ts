@@ -772,6 +772,23 @@ create table if not exists design_live (
   ended_at timestamptz
 );
 create index if not exists design_live_business on design_live(business_id, lat, lng);
+-- Nearmap pictures a business fetched for a roof (server/nearmap.ts), each capture once, and which picture is in use.
+create table if not exists design_nearmap (
+  business_id text not null references businesses(id) on delete cascade,
+  spot text not null,
+  survey text not null,
+  captured text,
+  bytes bytea not null,
+  fetched_by text not null,
+  fetched_at timestamptz not null default now(),
+  primary key (business_id, spot, survey)
+);
+create table if not exists design_nearmap_use (
+  business_id text not null references businesses(id) on delete cascade,
+  spot text not null,
+  use text not null,
+  primary key (business_id, spot)
+);
 -- What was really installed on a job (domain/design/as-built.ts), with its serial numbers: the warranty and service file.
 create table if not exists design_as_built (
   business_id text not null references businesses(id) on delete cascade,

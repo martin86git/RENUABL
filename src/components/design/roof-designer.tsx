@@ -692,6 +692,10 @@ export function RoofDesigner(props: {
   onNote?: (text: string) => Promise<{ ok: boolean; message: string }>;
   /** An installer's designer (business-kind.ts): sites only, so no Publish, no Proposal view and no Sol panel to open. */
   sitesOnly?: boolean;
+  /** The roof picture's menu (Google or a Nearmap capture), in the picture's bottom right corner. */
+  pictureMenu?: React.ReactNode;
+  /** The picture under the design is Nearmap's: drawn straight down, so Google's roof model needs no shifting onto it. */
+  nearmapPicture?: boolean;
   /** A site with no deal: what Publish opens instead (the way to put it on a deal), since a proposal needs a customer. */
   noDeal?: React.ReactNode;
   /** Who the note goes to, for the box's wording. */
@@ -2871,6 +2875,9 @@ export function RoofDesigner(props: {
     const [info, fit] = await Promise.all([loadRoofInfo(spot.lat, spot.lng), loadModelFit(spot.lat, spot.lng)]);
     if (!info.model) return { note: "There's no roof data for this address to work from. Trace the roof faces, then ask again." };
     if (fit.kind === "mismatch") return { note: mismatchNote(info.imageryDate) };
+    // On Nearmap's picture, taken straight down like the photo Google measured its model on, no shift is needed: the
+    // shift is for Google's satellite picture, which leans. VERIFY on a real Nearmap roof.
+    if (props.nearmapPicture) return { model: info.model };
     return { model: info.model, ...(fit.kind === "aligned" ? { offset: modelOffset(fit.shift, spot.lat) } : {}) };
   };
   /**
@@ -4807,6 +4814,9 @@ export function RoofDesigner(props: {
                   </g>
                 </svg>
               </div>
+
+              {/* Which picture of the roof is under the design: Google's or a Nearmap capture (3 Nov 2026, as Primero's). */}
+              {props.pictureMenu && <div className="pointer-events-auto absolute bottom-3 right-3 z-20">{props.pictureMenu}</div>}
 
               {/* The roof's pitch (1 Nov 2026, Martin, as Primero's): until a person has set it for this home, a card asks for it
                   (so a flat roof isn't left at the 22 degree start); then it is a small roof-angle mark on the left edge that opens to change it. */}

@@ -33,6 +33,8 @@ import { sendReply, unreadChanged } from "@/lib/services/chat";
 import { DesignKeptNote, DesignRoofList, useDesignAccount } from "./design-account";
 import { DesignToolHome } from "./design-tool-home";
 import { DealNotes, ProposalSide, PutOnDeal } from "./designer-side";
+import { PictureMenu } from "./picture-menu";
+import { loadImagery, nearmapPictureHref, type RoofImagery } from "@/lib/services/nearmap";
 import { RoofDesigner } from "./roof-designer";
 
 /** What a kilowatt of panels makes in a day, from the same sunshine record the designer's months use. */
@@ -104,9 +106,24 @@ export function DesignStudio() {
   }, []);
   // Whether the roof's picture came: without it the designer still opens, on a plain backdrop, and says so.
   const [pictureMissing, setPictureMissing] = useState(false);
+  // Which picture the roof uses, Google's or a Nearmap capture the business kept (3 Nov 2026): signed in only.
+  const business = Boolean(account?.signedIn && account.business);
+  const spot = roof ? `${roof.lat.toFixed(6)},${roof.lng.toFixed(6)}` : null;
+  const [imagery, setImagery] = useState<{ spot: string; value: RoofImagery } | null>(null);
+  useEffect(() => {
+    if (!roof || !spot || !business) return;
+    let live = true;
+    void loadImagery(roof.lat, roof.lng).then((res) => live && res.ok && setImagery({ spot, value: res }));
+    return () => {
+      live = false;
+    };
+  }, [roof, spot, business]);
+  const roofImagery = imagery && imagery.spot === spot ? imagery.value : null;
   // The picture's shape is part of its address, so a browser never shows one it kept from before the shape changed.
   const image = roof
-    ? `/api/design/roof?lat=${roof.lat.toFixed(6)}&lng=${roof.lng.toFixed(6)}&size=${ROOF_IMAGE.width}x${ROOF_IMAGE.height}`
+    ? roofImagery && roofImagery.use !== "google"
+      ? nearmapPictureHref(roof.lat, roof.lng, roofImagery.use)
+      : `/api/design/roof?lat=${roof.lat.toFixed(6)}&lng=${roof.lng.toFixed(6)}&size=${ROOF_IMAGE.width}x${ROOF_IMAGE.height}`
     : null;
   useEffect(() => {
     if (!image) return;
@@ -265,6 +282,12 @@ export function DesignStudio() {
             setPublished((n) => n + 1);
             return res;
           }}
+          pictureMenu={
+            roofImagery && spot ? (
+              <PictureMenu lat={roof.lat} lng={roof.lng} imagery={roofImagery} onChange={(value) => setImagery({ spot, value })} />
+            ) : undefined
+          }
+          nearmapPicture={Boolean(roofImagery && roofImagery.use !== "google")}
           noDeal={
             signedIn && !onJob ? (
               <PutOnDeal
