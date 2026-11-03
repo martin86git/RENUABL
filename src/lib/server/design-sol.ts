@@ -9,6 +9,8 @@ import { can } from "@/lib/domain/design/account";
 import { canvasFacts } from "@/lib/domain/design/canvas";
 import { cleanChart, CHARTS_PER_TURN, type SolChart } from "@/lib/domain/design/sol-charts";
 import { cleanDiagram, DIAGRAMS_PER_TURN, type SolDiagram } from "@/lib/domain/design/sol-diagrams";
+import { DESIGNS_PER_TURN, type SolDesignShown } from "@/lib/domain/design/sol-designs";
+import { jobCard } from "./design-job-card-repo";
 import {
   DRAFTS_PER_TURN,
   HISTORY_SENT,
@@ -234,6 +236,12 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "show_design",
+    description:
+      "Show a deal's roof design under your answer: its panel layout (with where the inverter, battery and switchboard go) and its strings, drawn over the roof photo, with a button to open the design. The design shown is the system the customer signed for, else the primary. Find the deal first (find_deal, deals_at_stage or the facts, e.g. the next install by its date). Gives back what is drawn, in words.",
+    input_schema: { type: "object", properties: { deal_id: { type: "string" } }, required: ["deal_id"] },
+  },
+  {
     name: "recall_knowledge",
     description:
       "Look in the business's memory: answers found on the web before (networks, approvals, rebates, products, wholesalers, technical rules), each with its pages, when it was saved and whether it is old enough to check again. Call it before searching the web for any such question.",
@@ -267,6 +275,7 @@ const PRICE_TOOL: Anthropic.Tool = {
 interface Turn {
   charts: SolChart[];
   diagrams: SolDiagram[];
+  designs: SolDesignShown[];
   drafts: SolDraft[];
   reminder?: SolReminderAsk;
   /** The pages the answer drew on (cited, or read whole): shown under it. */
@@ -425,6 +434,23 @@ async function runTool(
     shown.diagrams.push(d);
     return "Drawn under your answer.";
   }
+  if (name === "show_design") {
+    const id = s(input.deal_id);
+    const got = await jobById(businessId, id, viewer);
+    if (!got) return "There's no such deal, or this person can't see it.";
+    if (shown.designs.some((d) => d.jobId === got.job.id)) return "That design is already under your answer.";
+    if (shown.designs.length >= DESIGNS_PER_TURN) return "That's enough designs for one answer.";
+    const card = await jobCard(member, got.job.id);
+    if (!card?.layout) return `${got.customer.name}'s deal has no roof design yet: it can be designed from the deal.`;
+    const title = [got.customer.name, card.job.address].filter(Boolean).join(" · ");
+    shown.designs.push({ jobId: got.job.id, title });
+    // What is drawn, in words, so he can talk about it without repeating it all.
+    return [
+      `Drawn under your answer: ${title}, the panel layout over the roof photo${card.strings ? " and the strings" : " (not strung yet)"}, with a button to open the design.`,
+      ...card.details.map((d) => `${d.label}: ${d.value}`),
+      ...(card.stringWords.length ? [`Strings: ${card.stringWords.join("; ")}`] : []),
+    ].join("\n");
+  }
   return "There's no such tool.";
 }
 
@@ -500,7 +526,7 @@ export async function askSol(
 
   // A search and a manual read can take a while.
   const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 1 });
-  const shown: Turn = { charts: [], diagrams: [], drafts: [], pages: [], seen: [], recalled: [], remembered: [] };
+  const shown: Turn = { charts: [], diagrams: [], designs: [], drafts: [], pages: [], seen: [], recalled: [], remembered: [] };
   let answer = "";
   /** The answer given just before he only kept it in memory: his next words add to it rather than replace it. */
   let keptAfter = "";
@@ -552,10 +578,17 @@ export async function askSol(
   const sources = answer ? answerSources(web, memoryUsed(listed.urls, shown.recalled)) : [];
   const sol: SolTurn = {
     role: "sol",
-    text: answer || (shown.drafts.length ? "Here's the draft." : shown.charts.length || shown.diagrams.length ? "Here it is." : "Done."),
+    text:
+      answer ||
+      (shown.drafts.length
+        ? "Here's the draft."
+        : shown.charts.length || shown.diagrams.length || shown.designs.length
+          ? "Here it is."
+          : "Done."),
     at: new Date().toISOString(),
     ...(shown.charts.length ? { charts: shown.charts } : {}),
     ...(shown.diagrams.length ? { diagrams: shown.diagrams } : {}),
+    ...(shown.designs.length ? { designs: shown.designs } : {}),
     ...(shown.drafts.length ? { drafts: shown.drafts } : {}),
     ...(shown.reminder ? { reminder: shown.reminder } : {}),
     ...(sources.length ? { sources } : {}),

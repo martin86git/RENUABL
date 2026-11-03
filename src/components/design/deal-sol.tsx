@@ -8,6 +8,7 @@ import { DictateButton, withSpoken } from "./dictate";
 import { SolBadge } from "./sol-icon";
 import { SolSources } from "./sol-sources";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
+import { SolDesignView } from "./sol-design-view";
 
 /** What the empty thread offers to ask, all answered from this deal. */
 const STARTERS = [
@@ -106,6 +107,9 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
               <>
                 {t.diagrams?.map((d, k) => (
                   <SolDiagramView key={`d${k}`} diagram={d} />
+                ))}
+                {t.designs?.map((d) => (
+                  <SolDesignView key={d.jobId} shown={d} />
                 ))}
                 {t.charts?.map((c, k) => (
                   <SolChartView key={`c${k}`} chart={c} />

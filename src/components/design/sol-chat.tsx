@@ -51,6 +51,7 @@ import { STARTER_QUESTIONS } from "@/lib/domain/design/sol-knowledge";
 import { SolMark } from "./sol-icon";
 import { SolThinking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
+import { SolDesignView } from "./sol-design-view";
 
 /** The last message the member chose to carry on from after a while away (sessionStorage). */
 const CARRIED_KEY = "renuabl.design.sol-carried";
@@ -348,6 +349,9 @@ export function SolChat({
                 {t.diagrams?.map((d, k) => (
                   <SolDiagramView key={k} diagram={d} />
                 ))}
+                {t.designs?.map((d) => (
+                  <SolDesignView key={d.jobId} shown={d} />
+                ))}
               </div>
             ))
           }
@@ -422,6 +426,9 @@ export function SolChat({
             ))}
             {t.diagrams?.map((d, k) => (
               <SolDiagramView key={k} diagram={d} />
+            ))}
+            {t.designs?.map((d) => (
+              <SolDesignView key={d.jobId} shown={d} />
             ))}
             {t.drafts?.map((d, k) => (
               <DraftCard key={k} draft={d} onOpen={() => openDraft(d)} />

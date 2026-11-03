@@ -15,8 +15,15 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-03",
+    area: "Sol",
+    words:
+      "Ask Sol to show you a deal's roof design and he draws it in the chat: the panel layout and strings on the roof photo, with Open the design.",
+  },
+  {
+    day: "2026-11-03",
     area: "Marketplace",
-    words: "The Marketplace has its own menu from a blue home, and a look inside before it opens: job listings, buy and sell, find partners.",
+    words:
+      "The Marketplace has its own menu from a blue home, and a look inside before it opens: job listings, buy and sell, find partners.",
   },
   {
     day: "2026-11-03",

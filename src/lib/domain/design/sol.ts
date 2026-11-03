@@ -8,6 +8,7 @@
 import { LAUNCH_MARKET, marketDateTime, todayInMarket } from "../market";
 import { cleanCharts, MORE_DETAIL, type SolChart } from "./sol-charts";
 import { cleanDiagrams, type SolDiagram } from "./sol-diagrams";
+import { cleanDesignsShown, type SolDesignShown } from "./sol-designs";
 import { STAGE_LABELS, JOB_STAGES, type Job, type JobStage } from "./crm";
 import { matches } from "./find";
 import { SECTIONS } from "./sections";
@@ -53,6 +54,8 @@ export interface SolTurn {
   at: string;
   charts?: SolChart[];
   diagrams?: SolDiagram[];
+  /** Roof designs shown under the answer (sol-designs.ts): drawn from the deal's job card when the chat shows them. */
+  designs?: SolDesignShown[];
   drafts?: SolDraft[];
   reminder?: SolReminderAsk;
   /** Pinned by the member: shown in the Pinned strip, kept past the history trim, and kept through Clear. */
@@ -136,13 +139,14 @@ export function cleanTurns(raw: unknown): SolTurn[] {
       if (!role || !isTime(t.at)) return null;
       const charts = cleanCharts(t.charts);
       const diagrams = cleanDiagrams(t.diagrams);
+      const designs = cleanDesignsShown(t.designs);
       const drafts = cleanDrafts(t.drafts);
       const r = t.reminder as Record<string, unknown> | undefined;
       const reminder =
         r && typeof r === "object" && str(r.id, 40) && str(r.what, 500)
           ? { id: str(r.id, 40), what: str(r.what, 500), ...(isTime(r.dueAt) ? { dueAt: r.dueAt } : {}) }
           : undefined;
-      if (!text && !charts.length && !diagrams.length && !drafts.length) return null;
+      if (!text && !charts.length && !diagrams.length && !designs.length && !drafts.length) return null;
       const sources = cleanSources(t.sources);
       const remembered = (Array.isArray(t.remembered) ? t.remembered : [])
         .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object")
@@ -155,6 +159,7 @@ export function cleanTurns(raw: unknown): SolTurn[] {
         at: t.at as string,
         ...(charts.length ? { charts } : {}),
         ...(diagrams.length ? { diagrams } : {}),
+        ...(designs.length ? { designs } : {}),
         ...(drafts.length ? { drafts } : {}),
         ...(reminder ? { reminder } : {}),
         ...(t.pinned === true ? { pinned: true } : {}),
@@ -420,7 +425,7 @@ export function solSystem(input: {
   const prefs = input.prefs.length ? input.prefs.map((p) => `- ${p.id}: ${p.text}`).join("\n") : "- none";
   return `You are ${SOL_NAME}, the assistant in RENUABL, the software ${input.business} runs its solar business on. You are talking with ${input.member}, a member of ${input.business}'s team, in their own conversation (no one else sees it). Help them with their customers and their work: their deals, what to say to a customer, where things are in RENUABL, and general knowledge about solar, batteries and power bills where it helps.
 
-How you answer: the answer first, compressed to what they need, in one to four short lines with the key figures, plain Australian English, plain text only (no markdown headings, asterisks or bold; a short "- " list is fine). Leave out the working and the long lists. When there is more worth telling, end with "${MORE_DETAIL}" on its own line, and give the fuller answer only when they say yes. When a picture says it quicker (a comparison, a breakdown, a trend), draw it with show_chart from figures the facts or a tool gave you, and don't repeat its figures in words. For a labelled picture of a real case (a battery's clearances, a roof's setbacks, how strings run), draw it with show_diagram, and say it is an illustration to check against the rules and the site.
+How you answer: the answer first, compressed to what they need, in one to four short lines with the key figures, plain Australian English, plain text only (no markdown headings, asterisks or bold; a short "- " list is fine). Leave out the working and the long lists. When there is more worth telling, end with "${MORE_DETAIL}" on its own line, and give the fuller answer only when they say yes. When a picture says it quicker (a comparison, a breakdown, a trend), draw it with show_chart from figures the facts or a tool gave you, and don't repeat its figures in words. For a labelled picture of a real case (a battery's clearances, a roof's setbacks, how strings run), draw it with show_diagram, and say it is an illustration to check against the rules and the site. When they ask to see a deal's roof design, its panel layout or its strings (by name, or "the next install"), find the deal and show it with show_design: it draws the real design over the roof photo under your answer, so never say you can't show a design; a deal with none yet you say so plainly.
 
 Deals: find one with find_deal when only a name, address or phone is given; read it with deal_details before advising on or writing to a customer. A deal written as "#Name (deal ID)" was picked from the search: read that deal straight away. For deals at a stage, use deals_at_stage. Never invent deals, customers, figures, dates or prices: use the facts and the tools. ${input.costs ? "price_lookup gives supplier costs from the business's own price lists." : "This person can't see costs or margin: don't give any, and say the owner can change that under Users and permissions if they ask."}
 

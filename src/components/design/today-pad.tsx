@@ -21,6 +21,7 @@ import {
 } from "@/lib/domain/design/today-pad";
 import type { Activity } from "@/lib/domain/design/crm";
 import type { SolReminder } from "@/lib/domain/design/sol";
+import type { SolDesignShown } from "@/lib/domain/design/sol-designs";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { SOL_CHANGED, SOL_TOGGLE, askSol, loadSol } from "@/lib/services/sol";
@@ -29,6 +30,7 @@ import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { NewLook } from "./new-look";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
 import { SolBadge, SolIcon, SolMark, SolStars } from "./sol-icon";
+import { SolDesignView } from "./sol-design-view";
 import { SolThinking } from "./sol-thinking";
 
 const TAB_ICONS: Record<TodayTab, typeof Sun> = { today: Sun, calendar: CalendarDays, pipeline: KanbanSquare };
@@ -63,7 +65,9 @@ const hourNow = () => Number(new Date().toLocaleString("en-AU", { hour: "numeric
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** One turn of the conversation on Today: Sol telling the day, or a question and his answer. */
-type Turn = { id: number; kind: "day" } | { id: number; kind: "ask"; q: string; a: { text: string; more: boolean } | null };
+type Turn =
+  | { id: number; kind: "day" }
+  | { id: number; kind: "ask"; q: string; a: { text: string; more: boolean; designs?: SolDesignShown[] } | null };
 
 /**
  * Today as one chat with Sol (3 Nov 2026, Martin: the pad and Sol's box felt like two things; it should feel like one
@@ -116,7 +120,7 @@ export function TodayPad(props: {
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
     const r = await askSol(q, []);
     setAsking(false);
-    let a: { text: string; more: boolean };
+    let a: { text: string; more: boolean; designs?: SolDesignShown[] };
     if (!r.ok) a = { text: r.message, more: false };
     else {
       window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
@@ -124,6 +128,8 @@ export function TodayPad(props: {
       a = {
         text: last?.text ?? "Done.",
         more: Boolean(last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.reminder),
+        // A roof design he shows is drawn here, in the conversation itself (3 Nov 2026, Martin).
+        ...(last?.designs?.length ? { designs: last.designs } : {}),
       };
     }
     setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a } : t)));
@@ -225,6 +231,13 @@ export function TodayPad(props: {
                     ) : (
                       <div className="text-[15px] leading-relaxed text-ink">
                         <Typed text={t.a.text} onDone={follow} />
+                        {t.a.designs?.length ? (
+                          <div className="mt-3 max-w-2xl space-y-3">
+                            {t.a.designs.map((d) => (
+                              <SolDesignView key={d.jobId} shown={d} />
+                            ))}
+                          </div>
+                        ) : null}
                         {t.a.more && (
                           <button
                             type="button"
