@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
-import { TRIAL_DAYS, TRIAL_JOBS } from "@/lib/domain/design/plans";
 import { welcomeBack } from "@/lib/services/billing";
 import { ui } from "./design-shell";
 
@@ -38,8 +37,7 @@ export function Welcome({ sessionId }: { sessionId: string | null }) {
             <h1 className="text-[32px] font-semibold leading-tight tracking-tight">Check your email.</h1>
             <p className="text-[15px] leading-relaxed text-ink-2">
               We&apos;ve sent a sign-in link to <strong className="text-ink">{state.email}</strong>. Open it on this device to name your
-              business and step inside. Your {TRIAL_DAYS}-day trial has started, with {TRIAL_JOBS} design jobs on us, and nothing is charged
-              until it ends.
+              business and step inside. Your plan has started.
             </p>
             <p className="text-sm text-muted">
               No email after a minute or two? Check junk, or{" "}

@@ -4,11 +4,11 @@ import { ENTERPRISE_FROM, cleanInterval, cleanSeats } from "@/lib/domain/design/
 import { dbConfigured } from "@/lib/server/db";
 import { memberByEmail } from "@/lib/server/design-repo";
 import { allow } from "@/lib/server/rate-limit";
-import { createTrialCheckout, stripeClient } from "@/lib/server/stripe";
+import { createPlanCheckout, stripeClient } from "@/lib/server/stripe";
 
 /**
  * POST { email, seats, interval }: starts a sign-up. Answers with Stripe's own secure page, where the card is taken
- * for the plan with its free trial; Stripe then sends them back to /design/welcome. Nothing is kept here: the
+ * for the plan, charged there and then; Stripe then sends them back to /design/welcome. Nothing is kept here: the
  * subscription is recorded when Stripe says it was made (the webhook, or the welcome page). An email already in a
  * business that pays no user fee (an installer or inspector, business-kind.ts) is refused: it has no plan to start.
  */
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   try {
-    const url = await createTrialCheckout(stripe, { email, seats, interval, origin: new URL(request.url).origin });
+    const url = await createPlanCheckout(stripe, { email, seats, interval, origin: new URL(request.url).origin });
     return Response.json({ ok: true, url });
   } catch (e) {
     console.error("trial checkout failed", e instanceof Error ? e.message : e);

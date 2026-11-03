@@ -1,7 +1,7 @@
 /** Server only. Stripe Checkout (embedded payment form) for the refundable deposit. */
 import Stripe from "stripe";
 import { DEPOSIT, depositCents } from "@/lib/domain/deposit";
-import { TRIAL_DAYS, packPriceCents, seatPriceCents, type BillingInterval, type TokenPack } from "@/lib/domain/design/plans";
+import { packPriceCents, seatPriceCents, type BillingInterval, type TokenPack } from "@/lib/domain/design/plans";
 import { INVOICE_FOOTER, gstTaxRate, packInvoice } from "./stripe-billing";
 
 /** The API version and beta flag Stripe's embedded checkout form needs. */
@@ -73,16 +73,16 @@ export async function createHostedDepositCheckout(stripe: Stripe, opts: { refere
 }
 
 /*
- * RENUABL's own plans for solar businesses (`domain/design/plans.ts`): a subscription a user a month or year with a
- * free trial, and design-token packs. Prices go up as `price_data`, so nothing has to be set up in Stripe's Dashboard
+ * RENUABL's own plans for solar businesses (`domain/design/plans.ts`): a subscription a user a month or year, charged
+ * at checkout (no free trial since 3 Nov 2026), and design-token packs. Prices go up as `price_data`, so nothing has to be set up in Stripe's Dashboard
  * first; they include GST, as the page says, so Stripe adds no tax. Hosted Checkout: Stripe's own secure page.
  */
 
 /** What Stripe's page and the receipts call the plan. */
 const PLAN_NAME = "RENUABL for solar businesses";
 
-/** A sign-up: the plan for `seats` users, the trial first, the card taken now and charged when the trial ends. Returns the page's URL. */
-export async function createTrialCheckout(
+/** A sign-up: the plan for `seats` users, the card taken and the first period charged now. Returns the page's URL. */
+export async function createPlanCheckout(
   stripe: Stripe,
   opts: { email: string; seats: number; interval: BillingInterval; origin: string },
 ): Promise<string> {
@@ -106,13 +106,12 @@ export async function createTrialCheckout(
       },
     ],
     subscription_data: {
-      trial_period_days: TRIAL_DAYS,
       description: INVOICE_FOOTER,
       metadata: { kind: "design-plan", email: opts.email },
     },
     metadata: { kind: "design-plan", email: opts.email },
     custom_text: {
-      submit: { message: `${TRIAL_DAYS} days free. Nothing is charged until your trial ends, and you can cancel before then.` },
+      submit: { message: "Charged today. Cancel any time: your plan runs to the end of the period you've paid for." },
     },
     success_url: `${opts.origin}/design/welcome?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/design#pricing`,

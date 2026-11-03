@@ -15,7 +15,7 @@ export const BUSINESS_KINDS = [
     kind: "retailer",
     label: "Solar retailer",
     about: "You sell and run the whole job: leads, designs, proposals, ordering and installation.",
-    price: "From $29 a user a month, with a 14-day free trial.",
+    price: "From $29 a user a month.",
   },
   {
     kind: "installer",

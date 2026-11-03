@@ -21,8 +21,8 @@ async function post(path: string, body: unknown): Promise<Answer & Record<string
   }
 }
 
-/** Starts the free trial: answers with Stripe's secure page to go to. */
-export function startTrial(o: { email: string; seats: number; interval: BillingInterval }) {
+/** Starts the plan: answers with Stripe's secure page to go to. */
+export function startPlan(o: { email: string; seats: number; interval: BillingInterval }) {
   return post("/api/design/subscribe", o);
 }
 

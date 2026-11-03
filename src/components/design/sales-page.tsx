@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Check, Clock, PencilRuler } from "lucide-react";
+import { ArrowRight, Check, Clock, LifeBuoy, PencilRuler, Sparkles } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
 import {
   ENTERPRISE_FROM,
@@ -30,10 +30,12 @@ import {
   OLD_WAY,
   PRICING,
   SALES_HERO,
+  SERVICE_SHOT,
   SOL,
+  UPGRADE,
   type Visual,
 } from "@/lib/domain/design/sales-page";
-import { askSales, registerInterest, startTrial } from "@/lib/services/billing";
+import { askSales, registerInterest, startPlan } from "@/lib/services/billing";
 import {
   AfterSigningDemo,
   AskDesignDemo,
@@ -50,7 +52,7 @@ import { SolBadge, SolIcon } from "./sol-icon";
  * The sign-up page for solar businesses (`/design` signed out; copy in `domain/design/sales-page.ts`, prices in
  * `plans.ts`). It sells: the price against the old way, one deal from enquiry to service shown on real screens (made-up
  * example data) and the product drawn at work, Sol, everything else in the box, what's coming, and the pricing. Starting
- * the trial is an email here, then Stripe's own secure page for the card, then straight back.
+ * the plan is an email here, then Stripe's own secure page for the card, then straight back.
  */
 export function SalesPage({ notice, signedIn = false }: { notice?: string | null; signedIn?: boolean }) {
   return (
@@ -58,6 +60,7 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       <Header signedIn={signedIn} />
       {notice && <p className="mx-auto max-w-3xl px-5 pt-4 text-center text-sm text-danger">{notice}</p>}
       <Hero />
+      <Upgrade />
       <BigThree />
       <OldWay />
       <Journey />
@@ -68,6 +71,7 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       <Pricing />
       <Faq />
       <Closing />
+      <StickySignUp />
       <footer className="border-t border-line px-5 py-10 text-center text-xs text-muted">
         <p>RENUABL · Reburthed Pty Ltd · ABN 96 662 374 905</p>
         <p className="mt-2 space-x-4">
@@ -132,8 +136,7 @@ function Header({ signedIn }: { signedIn: boolean }) {
             href="#start"
             className="inline-flex h-9 items-center whitespace-nowrap rounded-full bg-sun-line px-3.5 text-[13px] font-semibold text-white shadow-sm hover:brightness-105 sm:px-4"
           >
-            <span className="sm:hidden">Free trial</span>
-            <span className="hidden sm:inline">Start free trial</span>
+            {SALES_HERO.cta}
           </a>
         </div>
       </div>
@@ -141,7 +144,7 @@ function Header({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-/** The email box that starts the trial: Stripe's page next, then back. */
+/** The email box that starts the plan: Stripe's page next, then back. */
 function TrialForm({ seats = 1, interval = "month", dark = false }: { seats?: number; interval?: BillingInterval; dark?: boolean }) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -150,7 +153,7 @@ function TrialForm({ seats = 1, interval = "month", dark = false }: { seats?: nu
     e.preventDefault();
     setBusy(true);
     setProblem(null);
-    const a = await startTrial({ email, seats, interval });
+    const a = await startPlan({ email, seats, interval });
     if (a.ok && a.url) window.location.assign(a.url);
     else {
       setBusy(false);
@@ -322,26 +325,38 @@ function BigThree() {
                 tick: "text-sun-line",
                 link: "text-sun-line hover:brightness-110",
               }
-            : p.id === "sol"
+            : p.id === "service"
               ? {
-                  band: "bg-primary text-white",
-                  eyebrow: "text-sun-bright",
-                  body: "text-white/75",
-                  tick: "text-sun-bright",
-                  link: "text-white hover:text-white/80",
+                  band: "bg-surface text-ink",
+                  eyebrow: "text-ink-2",
+                  body: "text-ink-2",
+                  tick: "text-sun-line",
+                  link: "text-sun-line hover:brightness-110",
                 }
-              : {
-                  band: "bg-market text-white",
-                  eyebrow: "text-market-ink",
-                  body: "text-white/80",
-                  tick: "text-market-ink",
-                  link: "text-white hover:text-white/80",
-                };
+              : p.id === "sol"
+                ? {
+                    band: "bg-primary text-white",
+                    eyebrow: "text-sun-bright",
+                    body: "text-white/75",
+                    tick: "text-sun-bright",
+                    link: "text-white hover:text-white/80",
+                  }
+                : {
+                    band: "bg-market text-white",
+                    eyebrow: "text-market-ink",
+                    body: "text-white/80",
+                    tick: "text-market-ink",
+                    link: "text-white hover:text-white/80",
+                  };
         const linkClass = clsx("mt-8 inline-flex items-center gap-1.5 text-[15px] font-semibold", look.link);
         const mark =
           p.id === "designer" ? (
             <span className="grid size-12 place-items-center rounded-full bg-sun-line text-white">
               <PencilRuler className="size-6" />
+            </span>
+          ) : p.id === "service" ? (
+            <span className="grid size-12 place-items-center rounded-full bg-primary text-white">
+              <LifeBuoy className="size-6" />
             </span>
           ) : p.id === "sol" ? (
             <span className="grid size-12 place-items-center rounded-full bg-white/10">
@@ -358,6 +373,8 @@ function BigThree() {
               <AskDesignDemo label={ASK_DEMO.label} request={ASK_DEMO.request} reply={ASK_DEMO.reply} />
               <p className="mt-3 text-center text-xs text-muted">{ASK_DEMO.caption}</p>
             </div>
+          ) : p.id === "service" ? (
+            <Screen src={SERVICE_SHOT.src} alt={SERVICE_SHOT.alt} />
           ) : p.id === "sol" ? (
             <Screen
               src="/design/landing/today-sol.webp"
@@ -411,6 +428,134 @@ function BigThree() {
           </section>
         );
       })}
+    </div>
+  );
+}
+
+/** Everything a business gets, in one look, straight after the hero (`UPGRADE`). */
+function Upgrade() {
+  return (
+    <section className="px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="upgrade">
+      <Reveal className="mx-auto w-full max-w-7xl">
+        <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">{UPGRADE.eyebrow}</p>
+        <h2 id="upgrade" className="mt-4 text-[clamp(40px,6vw,80px)] font-semibold leading-[0.95] tracking-[-0.045em]">
+          {UPGRADE.headline}
+        </h2>
+        <p className="mt-5 max-w-2xl text-[18px] leading-relaxed text-ink-2">{UPGRADE.sub}</p>
+        <ul className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {UPGRADE.items.map((item, i) => (
+            <li
+              key={item.key}
+              className={clsx("flex flex-col rounded-2xl p-6", i === 1 ? "bg-primary text-white" : "bg-surface ring-1 ring-line")}
+            >
+              <span className={clsx("font-mono text-[12px]", i === 1 ? "text-sun-bright" : "text-sun-line")}>
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <h3 className="mt-6 text-[20px] font-semibold leading-tight tracking-tight">{item.title}</h3>
+              <p className={clsx("mt-2 text-[15px] leading-relaxed", i === 1 ? "text-white/75" : "text-ink-2")}>{item.body}</p>
+              {"soon" in item && item.soon && (
+                <span className="mt-4 self-start rounded-full bg-sun px-2.5 py-0.5 text-[11px] font-medium text-sun-ink">
+                  {COMING_SOON_LABEL}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </Reveal>
+    </section>
+  );
+}
+
+/**
+ * A sign-up that follows the reader down the page (3 Nov 2026, Martin: there are a lot of slides, so every one is a
+ * chance to sign up): once the hero's box has scrolled away, a bar at the foot of the screen with the email box and
+ * Get started; it goes again over the closing box, and can be put away for the visit.
+ */
+function StickySignUp() {
+  const [show, setShow] = useState(false);
+  const [closed, setClosed] = useState(false);
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => {
+    const hero = document.getElementById("start");
+    const closing = document.getElementById("closing");
+    if (!hero || !("IntersectionObserver" in window)) return;
+    let heroOn = true;
+    let closingOn = false;
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.target === hero) heroOn = e.isIntersecting;
+        else closingOn = e.isIntersecting;
+      }
+      setShow(!heroOn && !closingOn);
+    });
+    io.observe(hero);
+    if (closing) io.observe(closing);
+    return () => io.disconnect();
+  }, []);
+  const go = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setProblem(null);
+    const a = await startPlan({ email, seats: 1, interval: "month" });
+    if (a.ok && a.url) window.location.assign(a.url);
+    else {
+      setBusy(false);
+      setProblem(a.message ?? "That didn't go through.");
+    }
+  };
+  if (closed) return null;
+  return (
+    <div
+      className={clsx(
+        "fixed inset-x-0 bottom-0 z-40 px-3 pb-3 transition-all duration-300 sm:px-5 sm:pb-5",
+        show ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-6 opacity-0",
+      )}
+      aria-hidden={!show}
+    >
+      <form
+        onSubmit={(e) => void go(e)}
+        className="mx-auto flex w-full max-w-4xl items-center gap-2 rounded-2xl bg-primary p-2 pl-4 text-white shadow-[0_20px_60px_-15px_rgba(11,11,12,0.6)] ring-1 ring-white/10 sm:gap-3 sm:pl-5"
+      >
+        <span className="hidden shrink-0 items-center gap-2 text-[15px] font-semibold md:flex">
+          <Sparkles className="size-4 text-sun-bright" aria-hidden />
+          Give your business a brain.
+        </span>
+        <label className="sr-only" htmlFor="sticky-email">
+          Work email
+        </label>
+        <input
+          id="sticky-email"
+          type="email"
+          required
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Your work email"
+          tabIndex={show ? 0 : -1}
+          className="h-11 min-w-0 flex-1 rounded-xl bg-white/10 px-4 text-[16px] text-white outline-none placeholder:text-white/50"
+        />
+        <button
+          type="submit"
+          disabled={busy}
+          tabIndex={show ? 0 : -1}
+          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl bg-sun-line px-4 text-[15px] font-semibold text-white hover:brightness-105 disabled:opacity-80"
+        >
+          {busy ? "Opening…" : SALES_HERO.cta}
+          {!busy && <ArrowRight className="size-4" aria-hidden />}
+        </button>
+        <button
+          type="button"
+          onClick={() => setClosed(true)}
+          tabIndex={show ? 0 : -1}
+          className="hidden size-9 shrink-0 place-items-center rounded-full text-white/60 hover:text-white sm:grid"
+          aria-label="Put the sign-up bar away"
+        >
+          ×
+        </button>
+      </form>
+      {problem && <p className="mx-auto mt-1 max-w-4xl text-center text-sm text-sun-bright">{problem}</p>}
     </div>
   );
 }
@@ -763,7 +908,7 @@ function Pricing() {
             </div>
             <div className="mt-8">
               <TrialForm seats={seats} interval={interval} />
-              <p className="mt-3 text-[13px] leading-relaxed text-ink-2">{PRICING.trial}</p>
+              <p className="mt-3 text-[13px] leading-relaxed text-ink-2">{PRICING.start}</p>
             </div>
           </div>
           <Enterprise />

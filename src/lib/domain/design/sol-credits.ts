@@ -4,14 +4,14 @@
  * One credit is one answer from Sol, wherever he is asked: his panel and Today's box, @Sol in team chat, an email
  * summarised or a reply drafted, an answer in a customer's proposal chat, a call written up, a usage figure found in the
  * customer's file. Each paid user brings `SOL_PER_USER` credits a calendar month (the market's month), which don't roll
- * over; a business on its free trial has `SOL_TRIAL` for the month instead. Credits bought in packs never expire and are
+ * over; a business still on a free trial from before 3 Nov 2026 (there is none for new sign-ups) has `SOL_TRIAL` for the month instead. Credits bought in packs never expire and are
  * used only once the month's are gone. Prices include GST, as every price of RENUABL's does.
  */
 import { dollars } from "./plans";
 
 /** Included with each paid user, each calendar month. */
 export const SOL_PER_USER = 200;
-/** Included while the business is on its free trial (the whole business, not each user). */
+/** Included while a business is on a free trial from before 3 Nov 2026 (the whole business, not each user). */
 export const SOL_TRIAL = 100;
 
 /** The packs credits are sold in, cents GST inclusive. */

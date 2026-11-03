@@ -68,6 +68,31 @@ const SOL_DAY = `window.__clip = "wait"; (async () => {
   return JSON.stringify({ x: 0, y: scrollY, width: innerWidth, height: innerHeight });
 })().then((v) => (window.__clip = v ?? ""));`;
 
+/**
+ * The service screen with a case picked (the sign-up page's service slide, 3 Nov 2026, Martin): presses the inverter
+ * earth fault case so Sol turns the chat to it (the issue, what the customer wrote, what we've done, what's pending),
+ * lets it settle, and keeps the whole window.
+ */
+const SERVICE_CASE = `window.__clip = "wait"; (async () => {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const said = (el) => /earth fault/i.test(el.textContent);
+  const find = () => [...document.querySelectorAll("aside button")].filter(said);
+  let hits = find();
+  for (let i = 0; i < 40 && !hits.length; i++) {
+    await wait(500);
+    hits = find();
+  }
+  const card = hits[0];
+  if (!card) { console.log("nocard"); window.__dbg = document.body.innerText.slice(0, 400); return null; }
+  card.click();
+  await wait(14000);
+  [...document.querySelectorAll("button")].find((b) => /^show it all$/i.test(b.textContent.trim()))?.click();
+  await wait(1500);
+  scrollTo(0, 0);
+  await wait(800);
+  return JSON.stringify({ x: 0, y: scrollY, width: innerWidth, height: innerHeight });
+})().then((v) => (window.__clip = v ?? ""));`;
+
 /** Each screen: the file name, the page, the window size, how long to let it settle, and anything to do first. */
 const SHOTS = [
   { name: "today", path: "/design", width: 1440, height: 900, wait: 5000 },
@@ -80,6 +105,7 @@ const SHOTS = [
   { name: "sol", path: "/design/sol", width: 1440, height: 900, wait: 6000 },
   { name: "customers", path: "/design/customers", width: 1440, height: 900, wait: 4000 },
   { name: "service", path: "/design/service", width: 1440, height: 900, wait: 4000 },
+  { name: "service-sol", path: "/design/service", width: 1440, height: 900, wait: 5000, clip: SERVICE_CASE },
   { name: "sol-garage-wall", path: "/design/team", width: 1440, height: 1300, wait: 4000, clip: SOL_EXAMPLE, jpeg: true },
 ];
 
@@ -152,13 +178,17 @@ for (const shot of SHOTS.filter((s) => !only.length || only.includes(s.name))) {
     // Run the framing script, then read what it worked out once it has finished.
     await cdp("Runtime.evaluate", { expression: shot.clip });
     let framed = "wait";
-    for (let i = 0; i < 120 && framed === "wait"; i++) {
+    for (let i = 0; i < 240 && framed === "wait"; i++) {
       await sleep(250);
       framed = (await cdp("Runtime.evaluate", { expression: "window.__clip", returnByValue: true })).result.value;
     }
     const result = { value: framed === "wait" ? "" : framed };
     if (!result.value) {
       console.error(`skipped ${shot.name}: nothing to frame`);
+      console.error(
+        (await cdp("Runtime.evaluate", { expression: "window.__dbg || document.body.innerText.slice(0, 300)", returnByValue: true })).result
+          .value,
+      );
       continue;
     }
     clip = { ...JSON.parse(result.value), scale: 1 };

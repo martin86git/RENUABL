@@ -88,7 +88,7 @@ export function BillingPanel() {
             </dl>
           ) : (
             <p className="text-sm text-ink-2">
-              No plan yet. Start the {PLAN_WORDS.trial} from the sign-up page: {PLAN_WORDS.seat}. {PLAN_WORDS.gst}
+              No plan yet. Start one from the sign-up page: {PLAN_WORDS.seat}. {PLAN_WORDS.gst}
             </p>
           )}
           {plan && state.payments && (

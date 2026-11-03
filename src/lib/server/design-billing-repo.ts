@@ -5,7 +5,7 @@
  * email it was made for until that person's business exists, then attached to it (`claimSubscriptions`).
  */
 import type { BillingDetails } from "@/lib/domain/design/billing-invoice";
-import { TRIAL_JOBS, type BillingInterval } from "@/lib/domain/design/plans";
+import { type BillingInterval } from "@/lib/domain/design/plans";
 import { creditSource, includedThisMonth, monthOf, solBalance, type SolBalance, type SolUse } from "@/lib/domain/design/sol-credits";
 import { newId, query, transaction } from "./db";
 
@@ -83,26 +83,17 @@ export async function updateSubscription(facts: Omit<SubscriptionFacts, "email">
 }
 
 /**
- * Attaches the subscriptions made for this email to its business (once), and gives the business its free trial jobs
- * the first time it has a subscription. Safe to call again: nothing is attached or given twice. Only a retailer has a
- * plan (business-kind.ts): a subscription is never attached to an installer or inspector.
+ * Attaches the subscriptions made for this email to its business (once). Safe to call again: nothing is attached
+ * twice. Only a retailer has a plan (business-kind.ts): a subscription is never attached to an installer or inspector.
+ * There are no free trial jobs since 3 Nov 2026 (no free trial): design jobs are bought in packs.
  */
 export async function claimSubscriptions(businessId: string, email: string): Promise<void> {
-  const claimed = await query<{ id: string }>(
+  await query(
     `update design_subscriptions set business_id = $1, updated_at = now()
       where business_id is null and lower(email) = lower($2)
-        and exists (select 1 from businesses where id = $1 and coalesce(kind, 'retailer') = 'retailer') returning id`,
+        and exists (select 1 from businesses where id = $1 and coalesce(kind, 'retailer') = 'retailer')`,
     [businessId, email],
   );
-  const any = claimed.length
-    ? true
-    : (await query(`select 1 from design_subscriptions where business_id = $1 limit 1`, [businessId])).length > 0;
-  if (any)
-    await query(
-      `insert into design_tokens (id, business_id, change, reason, by_email) values ($1, $2, $3, 'trial', $4)
-       on conflict do nothing`,
-      [newId("tok"), businessId, TRIAL_JOBS, email.toLowerCase()],
-    );
 }
 
 /** The business's plan: its newest subscription, or null when it has none. */

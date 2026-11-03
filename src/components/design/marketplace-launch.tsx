@@ -497,7 +497,7 @@ function Network({ signedIn, business }: { signedIn: boolean; business: string |
         <p className="mt-8 text-center text-[15px] text-ink-2">
           Not on RENUABL yet?{" "}
           <Link href={PATHS.home} className={ui.link}>
-            Start your free trial
+            Get started
           </Link>
         </p>
       )}

@@ -4,7 +4,7 @@
  * Law): no "best" or "first", no rival named, a price compared only with its source and date, every coming-soon thing
  * labelled, and every screenshot a real screen of the product with made-up example data.
  */
-import { ENTERPRISE_FROM, PLAN_WORDS, TRIAL_DAYS, TRIAL_JOBS, TOKEN_CENTS, dollars, SEAT_MONTHLY_CENTS } from "./plans";
+import { ENTERPRISE_FROM, PLAN_WORDS, TOKEN_CENTS, dollars, SEAT_MONTHLY_CENTS } from "./plans";
 
 /**
  * The hero (3 Nov 2026, Martin, after "Pay less. Do more." and "Just ask. It's done." didn't land: witty, not a feature
@@ -16,8 +16,46 @@ export const SALES_HERO = {
   /** Said in two lines, the second lit in the signal orange. */
   headline: ["Solar just", "got a brain."],
   sub: "RENUABL is the all-in-one platform for solar businesses, with AI built into every part of it. Ask it to design a roof, line up your day, check a standard or write the follow-up, and watch it happen.",
-  cta: `Start your ${TRIAL_DAYS}-day free trial`,
-  small: [`${PLAN_WORDS.seat}, inc GST`, `${TRIAL_JOBS} design jobs free`, "Cancel any time"],
+  cta: PLAN_WORDS.start,
+  small: [`${PLAN_WORDS.seat}, inc GST`, "Up and running today", "Cancel any time"],
+} as const;
+
+/**
+ * Everything a business gets, early and in one look (3 Nov 2026, Martin: "a slide that very quickly details everything
+ * you get... upgrade your business"). Each line something RENUABL does today; the Marketplace is marked coming soon.
+ */
+/** The service band's real screen: a case picked, Sol's summary and recommended next steps (made-up customer). */
+export const SERVICE_SHOT = {
+  src: "/design/landing/service-sol.webp",
+  alt: "RENUABL's service screen: Sol summing up a customer's inverter fault and recommending the next steps (example data)",
+} as const;
+
+export const UPGRADE = {
+  eyebrow: "What you get",
+  headline: "Your business, upgraded.",
+  sub: "Everything a solar business runs on, in one place, with AI in every part of it.",
+  items: [
+    { key: "crm", title: "A smart CRM", body: "Every lead, deal and customer, with the next thing to do already lined up." },
+    {
+      key: "sol",
+      title: "An AI expert on the team",
+      body: "Sol knows solar, your deals and the rules of the trade, and does the legwork.",
+    },
+    {
+      key: "design",
+      title: "A design tool that designs",
+      body: "Type what you want, or press once for three designs, priced as they're drawn.",
+    },
+    { key: "proposals", title: "Proposals that are yours", body: "Your logo, your colours, your terms. Signed online, deposit asked for." },
+    { key: "service", title: "Service, made easy", body: "Every customer issue summed up by Sol, with the steps he'd take next." },
+    {
+      key: "installs",
+      title: "Orders and installs, handled",
+      body: "A signed job becomes the order, the booking and the job card for your crew.",
+    },
+    { key: "team", title: "Your team, in one chat", body: "Channels, direct messages and @Sol, right beside your deals." },
+    { key: "market", title: "RENUABL Marketplace", body: "Jobs, installers and spare stock across the industry.", soon: true },
+  ],
 } as const;
 
 /**
@@ -80,6 +118,19 @@ export const BIG_THREE = [
     link: { label: "See the quote build itself", href: "#journey" },
   },
   {
+    id: "service",
+    eyebrow: "After the sale",
+    title: "“My inverter's flashing red.” Relax.",
+    body: "Service is where solar businesses lose hours: digging through old chats, emails and notes to work out what's wrong and what was promised. On RENUABL, pick the case and Sol has already read the lot: the issue in a line, what the customer told you, what's been done, and the steps he'd take next.",
+    points: [
+      "Every case in one place, the longest waiting at the top",
+      "Sol sums up the issue and recommends the fix",
+      "What the customer said and what's been done, side by side",
+      "An electrical fault always goes to a licensed electrician",
+    ],
+    link: { label: "Get started", href: "#start" },
+  },
+  {
     id: "sol",
     eyebrow: "Sol, your AI assistant",
     title: "An expert on solar, on every screen.",
@@ -116,7 +167,6 @@ export const OLD_WAY = {
     { what: "A user, a month", us: dollars(SEAT_MONTHLY_CENTS), them: "from $49" },
     { what: "A design job", us: dollars(TOKEN_CENTS), them: "$4 to $10" },
     { what: "An e-signature", us: "Included", them: "80c each" },
-    { what: "Free trial", us: `${TRIAL_DAYS} days`, them: "5 projects" },
   ],
   source:
     "The other column is a well-known Australian solar platform's published pricing, read on 1 November 2026: its solar CRM from $49 a user a month billed monthly, designs at $4 or $10 a project, e-signatures 80c a project. Prices change: check theirs.",
@@ -301,7 +351,7 @@ export const PRICING = {
     "Team chat, Gmail inbox and note-taker",
   ],
   tokens: PLAN_WORDS.tokenExplained,
-  trial: PLAN_WORDS.trialExplained,
+  start: PLAN_WORDS.startExplained,
   enterprise: {
     title: "Enterprise",
     lead: `${ENTERPRISE_FROM} users or more`,
@@ -312,8 +362,8 @@ export const PRICING = {
 
 export const FAQ: readonly { q: string; a: string }[] = [
   {
-    q: "Why do you take my card for a free trial?",
-    a: `So your team keeps working the day the trial ends. Nothing is charged for ${TRIAL_DAYS} days, Stripe holds the card (we never see it), and you can cancel before then and pay nothing.`,
+    q: "When am I charged?",
+    a: "When you sign up, on Stripe's secure page (we never see your card). Your plan starts straight away. Cancel any time: it runs to the end of the period you've paid for.",
   },
   { q: "What's a design job?", a: PLAN_WORDS.tokenExplained },
   {
@@ -333,7 +383,7 @@ export const FAQ: readonly { q: string; a: string }[] = [
 
 export const CLOSING = {
   headline: "Better product. Lower price. Your move.",
-  sub: `${TRIAL_DAYS} days free. ${TRIAL_JOBS} design jobs on us. Bring the whole team.`,
+  sub: "Up and running today. Bring the whole team. Cancel any time.",
 } as const;
 
 /** Every line of copy on the page, for the test that checks it. */
@@ -347,6 +397,10 @@ export function salesCopy(): string[] {
     ASK_ANYTHING.label,
     ASK_ANYTHING.caption,
     ...ASK_ANYTHING.prompts.flatMap((p) => [p.ask, p.answer]),
+    UPGRADE.eyebrow,
+    UPGRADE.headline,
+    UPGRADE.sub,
+    ...UPGRADE.items.flatMap((i) => [i.title, i.body]),
     ...BIG_THREE.flatMap((p) => [p.eyebrow, p.title, p.body, ...p.points, p.link.label]),
     ...OLD_WAY.rows.flatMap((r) => [r.what, r.us, r.them]),
     ...JOURNEY.flatMap((j) => [j.step, j.title, j.body]),

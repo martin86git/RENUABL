@@ -3,8 +3,9 @@
  *
  * Every price is in Australian dollars and **includes GST**. A seat is a user. Yearly billing is 20% off the whole
  * package, one user or twelve. The design tool is paid by the job in tokens, bought in packs: one token is used when a
- * job's first design is saved. A new business gets a 14-day free trial with five design jobs free; the card is taken
- * on Stripe's own page when they sign up. Teams of 13 or more talk to sales.
+ * job's first design is saved. There is no free trial (3 Nov 2026, Martin: "just charge immediately"): the card is taken
+ * on Stripe's own page when they sign up and the first month or year is charged there and then. Teams of 13 or more
+ * talk to sales.
  */
 
 export type BillingInterval = "month" | "year";
@@ -17,9 +18,6 @@ export const YEARLY_DISCOUNT = 0.2;
 export const MAX_SELF_SERVE_SEATS = 12;
 /** Enterprise starts here: talk to sales. */
 export const ENTERPRISE_FROM = MAX_SELF_SERVE_SEATS + 1;
-/** The free trial, days, and the design jobs it includes. */
-export const TRIAL_DAYS = 14;
-export const TRIAL_JOBS = 5;
 /** One design job, cents, GST inclusive. */
 export const TOKEN_CENTS = 300;
 /** The packs tokens are sold in. */
@@ -90,8 +88,9 @@ export const PLAN_WORDS = {
   yearlySeat: `${dollars(Math.round(seatPriceCents("year") / 12))} a user a month, billed yearly`,
   token: `${dollars(TOKEN_CENTS)} a job`,
   tokenExplained: `The design tool is ${dollars(TOKEN_CENTS)} a job: one token, used once when a new job's roof is designed. Open it, change it and send it again as often as you like.`,
-  trial: `${TRIAL_DAYS}-day free trial`,
-  trialExplained: `${TRIAL_DAYS} days free, with ${TRIAL_JOBS} design jobs on us. Your card is taken on Stripe's secure page and nothing is charged until the trial ends. Cancel any time before then and you pay nothing.`,
+  start: "Get started",
+  startExplained:
+    "Your card is taken on Stripe's secure page and your plan starts straight away. Cancel any time: it runs to the end of the period you've paid for.",
   enterprise: `${ENTERPRISE_FROM} users or more? Talk to us about Enterprise.`,
 } as const;
 
