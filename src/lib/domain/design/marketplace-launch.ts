@@ -45,6 +45,8 @@ export const LAUNCH = {
   headline: "The solar industry, connected.",
   sub: "One place where solar businesses find installers, win installation work and trade spare stock with each other. Open to every business on RENUABL.",
   save: "Save my place",
+  signUp: "Sign up",
+  signUpNote: "We'll email you the day it opens.",
   saved: "You're on the list. We'll email you the day it opens.",
   why: "Opening once enough businesses are on board for there to be work and stock near you. Every business that joins brings that day closer.",
 

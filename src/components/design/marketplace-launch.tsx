@@ -89,25 +89,13 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
  */
 function Hero() {
   return (
-    <section className="pt-1 text-center sm:pt-3">
-      <p className="inline-flex items-center gap-2 rounded-full bg-surface px-3.5 py-1.5 text-[12px] font-medium text-ink-2 ring-1 ring-line">
-        <span className="relative flex size-2">
-          <span className="absolute inline-flex size-full rounded-full bg-sun-line opacity-60 motion-safe:animate-ping" />
-          <span className="relative inline-flex size-2 rounded-full bg-sun-line" />
-        </span>
-        {LAUNCH.eyebrow}
-      </p>
-      <h1 className="mx-auto mt-4 max-w-4xl text-[clamp(34px,5vw,60px)] font-light leading-[1.02] tracking-[-0.03em] text-ink">
+    <section className="text-center">
+      <h1 className="mx-auto max-w-4xl text-[clamp(34px,5vw,60px)] font-light leading-[1.02] tracking-[-0.03em] text-ink">
         {LAUNCH.headline}
       </h1>
-      <div className="mx-auto mt-3 flex max-w-3xl flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-5">
-        <p className="text-[15px] leading-relaxed text-ink-2">{LAUNCH.sub}</p>
-        <a
-          href="#waitlist"
-          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-sun-line px-5 text-[14px] font-medium text-white shadow-[0_8px_24px_-8px_var(--sun-line)] transition hover:brightness-105"
-        >
-          {LAUNCH.save} <ArrowRight className="size-4" aria-hidden />
-        </a>
+      <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-relaxed text-ink-2">{LAUNCH.sub}</p>
+      <div className="mt-6">
+        <Waitlist quick />
       </div>
     </section>
   );
@@ -205,7 +193,11 @@ const PULSES: [number, number, number, number][] = LINKS.filter((_, i) => i % 5 
 ]);
 
 /** A place on the list: what they'd use it for (all three if nothing is picked), and their email when signed out. */
-function Waitlist() {
+/**
+ * The waiting list. `quick` is the heading's: an email and Sign up, nothing to choose (none chosen is all three), so
+ * signing up is one step; the foot of the page asks what they want from it.
+ */
+function Waitlist({ quick = false }: { quick?: boolean }) {
   const [state, setState] = useState<{ joined: boolean; signedIn: boolean; count: string | null } | null>(null);
   const [roles, setRoles] = useState<WaitlistRole[]>([]);
   const [email, setEmail] = useState("");
@@ -227,7 +219,7 @@ function Waitlist() {
     // Both boxes on the page show it.
     window.dispatchEvent(new Event("renuabl:market-joined"));
   };
-  if (!state) return <div className="h-32" aria-busy="true" />;
+  if (!state) return <div className={quick ? "h-14" : "h-32"} aria-busy="true" />;
   if (state.joined)
     return (
       <div className="mx-auto inline-flex max-w-xl items-center gap-3 rounded-2xl bg-surface px-5 py-4 text-left ring-1 ring-line">
@@ -239,26 +231,30 @@ function Waitlist() {
     );
   return (
     <div className="mx-auto max-w-xl">
-      <p className="text-[13px] font-medium text-ink-2">I want to</p>
-      <div className="mt-2 flex flex-wrap justify-center gap-2">
-        {WAITLIST_ROLES.map((r) => (
-          <button
-            key={r.id}
-            type="button"
-            aria-pressed={roles.includes(r.id)}
-            onClick={() => toggle(r.id)}
-            className={clsx(
-              "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm transition",
-              roles.includes(r.id) ? "bg-ink text-canvas" : "bg-surface text-ink ring-1 ring-line hover:ring-ink-2",
-            )}
-          >
-            {roles.includes(r.id) && <Check className="size-3.5" aria-hidden />}
-            {r.label}
-          </button>
-        ))}
-      </div>
+      {!quick && (
+        <>
+          <p className="text-[13px] font-medium text-ink-2">I want to</p>
+          <div className="mt-2 flex flex-wrap justify-center gap-2">
+            {WAITLIST_ROLES.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                aria-pressed={roles.includes(r.id)}
+                onClick={() => toggle(r.id)}
+                className={clsx(
+                  "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm transition",
+                  roles.includes(r.id) ? "bg-ink text-canvas" : "bg-surface text-ink ring-1 ring-line hover:ring-ink-2",
+                )}
+              >
+                {roles.includes(r.id) && <Check className="size-3.5" aria-hidden />}
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       <form
-        className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center"
+        className={clsx("flex flex-col gap-2 sm:flex-row sm:justify-center", !quick && "mt-4")}
         onSubmit={(e) => {
           e.preventDefault();
           void save();
@@ -272,15 +268,18 @@ function Waitlist() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Your work email"
             aria-label="Your work email"
-            className={clsx(ui.input, "h-12 rounded-full px-5 sm:w-72")}
+            className={clsx(ui.input, "rounded-full px-5 sm:w-72", quick ? "h-14 text-[16px]" : "h-12")}
           />
         )}
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-sun-line px-7 text-[15px] font-medium text-white shadow-[0_8px_24px_-8px_var(--sun-line)] transition hover:brightness-105 disabled:bg-surface-2 disabled:text-muted disabled:shadow-none"
+          className={clsx(
+            "inline-flex items-center justify-center gap-2 rounded-full bg-sun-line font-medium text-white shadow-[0_8px_24px_-8px_var(--sun-line)] transition hover:brightness-105 disabled:bg-surface-2 disabled:text-muted disabled:shadow-none",
+            quick ? "h-14 px-9 text-[17px] font-semibold" : "h-12 px-7 text-[15px]",
+          )}
         >
-          {LAUNCH.save} <ArrowRight className="size-4" aria-hidden />
+          {quick ? LAUNCH.signUp : LAUNCH.save} <ArrowRight className="size-4" aria-hidden />
         </button>
       </form>
       {problem && (
@@ -288,6 +287,7 @@ function Waitlist() {
           {problem}
         </p>
       )}
+      {quick && <p className="mt-2.5 text-[13px] text-muted">{LAUNCH.signUpNote}</p>}
       {state.count && <p className="mt-3 text-[13px] text-muted">{state.count}</p>}
     </div>
   );
