@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-03",
+    area: "Marketplace",
+    words: "The Marketplace has its own menu at the top of the page, from its blue home, and its page shows it before it opens: job listings for retailers and installers, buy and sell, and finding partners, all to press around in.",
+  },
+  {
+    day: "2026-11-03",
     area: "Design tool",
     words: "A pitch for each roof: add a garage or patio at its own angle; the pitch card is smaller and you can type the figure.",
   },

@@ -82,9 +82,20 @@ export const SECTIONS: readonly Section[] = [
 
 const TODAY = SECTIONS[0];
 const MARKETPLACE = SECTIONS.find((s) => s.id === "marketplace")!;
-/** A kind's Marketplace once open: an installer bids and trades but lists nothing; an inspector trades. */
-const marketplaceFor = (keep: (id: string) => boolean): Section =>
-  marketplaceOpen() ? { ...MARKETPLACE, pages: MARKETPLACE.pages.filter((p) => keep(p.id)) } : MARKETPLACE;
+const MARKETPLACE_KEEP: Record<BusinessKind, (id: string) => boolean> = {
+  retailer: () => true,
+  installer: (id) => id === "listings" || id === "equipment" || id === "watching" || id === "messages",
+  inspector: (id) => id === "equipment" || id === "my-equipment" || id === "watching" || id === "messages",
+};
+/**
+ * The Marketplace's menu a kind has once it opens, open yet or not (3 Nov 2026, Martin: the launch page shows what it
+ * will look like signed in, given each kind's access): an installer bids and trades but lists nothing; an inspector
+ * trades.
+ */
+export const marketplacePagesFor = (kind: BusinessKind): readonly SectionPage[] =>
+  MARKETPLACE_PAGES.filter((p) => MARKETPLACE_KEEP[kind](p.id));
+const marketplaceFor = (kind: BusinessKind): Section =>
+  marketplaceOpen() ? { ...MARKETPLACE, pages: marketplacePagesFor(kind) } : MARKETPLACE;
 const CONNECTIONS: Section = {
   id: "connections",
   label: "Connections",
@@ -109,11 +120,11 @@ const MY_JOBS: Section = {
  */
 export const KIND_SECTIONS: Record<BusinessKind, readonly Section[]> = {
   retailer: SECTIONS,
-  installer: [MY_JOBS, marketplaceFor((id) => id === "listings" || id === "equipment" || id === "watching" || id === "messages")],
+  installer: [MY_JOBS, marketplaceFor("installer")],
   inspector: [
     TODAY,
     { id: "inspections", label: "Inspections", pages: [{ id: "inspections", label: "Inspections", href: "/design/inspections" }] },
-    marketplaceFor((id) => id === "equipment" || id === "my-equipment" || id === "watching" || id === "messages"),
+    marketplaceFor("inspector"),
     CONNECTIONS,
   ],
 };

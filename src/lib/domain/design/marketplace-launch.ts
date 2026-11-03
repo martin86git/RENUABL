@@ -105,6 +105,29 @@ export const LAUNCH = {
   ],
   feedNote: "An example feed, with made-up businesses and jobs.",
 
+  showroom: {
+    eyebrow: "A look inside",
+    headline: "See it before it opens.",
+    sub: "Three views of the Marketplace as it will be once you're in: jobs to list or win, spare stock to buy and sell, and the businesses near you to work with. Press around: it all works.",
+    views: [
+      { id: "jobs", label: "Job listings" },
+      { id: "trade", label: "Buy & sell" },
+      { id: "partners", label: "Find partners" },
+    ],
+    roles: [
+      { id: "installer", label: "As an installer" },
+      { id: "retailer", label: "As a retailer" },
+    ],
+    retailerTitle: "Your listing",
+    retailerSub: "Bids come in from installers near the job. Only you see them, the lowest at the top.",
+    readyTitle: "Sold, ready to list",
+    accepted: "Sent on RENUABL. You're connected, their job card is open, and you both see the address.",
+    tradeSub: "Spare stock from businesses near you. Message the seller; you agree the sale between you.",
+    partnersSub:
+      "The businesses on RENUABL that list themselves in the directory. Connect, and you can send each other jobs and nominate inspectors.",
+    note: "Made-up businesses, jobs and stock: a look at the Marketplace before it opens.",
+  },
+
   networkEyebrow: "Why it matters",
   networkHeadline: "Every business that joins makes it worth more to the rest.",
   networkPoints: [

@@ -203,8 +203,10 @@ interface MyBid {
   start: string;
 }
 
-export function MarketplaceFeed() {
-  const [tab, setTab] = useState<"jobs" | "stock">("jobs");
+/** `bare`: the job feed alone, inside the showroom (marketplace-showroom.tsx), which draws the frame and the menu. */
+export function MarketplaceFeed({ bare = false }: { bare?: boolean } = {}) {
+  const [chosenTab, setTab] = useState<"jobs" | "stock">("jobs");
+  const tab = bare ? "jobs" : chosenTab;
   const [within, setWithin] = useState<number | null>(50);
   const [battery, setBattery] = useState(false);
   const [ev, setEv] = useState(false);
@@ -248,28 +250,37 @@ export function MarketplaceFeed() {
 
   return (
     <section>
-      <div className="mx-auto max-w-3xl text-center">
-        <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-sun-line">{LAUNCH.feedEyebrow}</p>
-        <h2 className="mt-3 text-[clamp(32px,5vw,60px)] font-light leading-[1.02] tracking-[-0.03em] text-ink">{LAUNCH.feedHeadline}</h2>
-        <p className="mx-auto mt-5 max-w-2xl text-[16px] leading-relaxed text-ink-2">{LAUNCH.feedSub}</p>
-        <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-sun/60 px-3.5 py-1.5 text-[13px] font-medium text-ink">
-          <Gavel className="size-3.5 text-sun-line" aria-hidden /> {LAUNCH.feedTry}
-        </p>
-      </div>
+      {!bare && (
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-sun-line">{LAUNCH.feedEyebrow}</p>
+          <h2 className="mt-3 text-[clamp(32px,5vw,60px)] font-light leading-[1.02] tracking-[-0.03em] text-ink">{LAUNCH.feedHeadline}</h2>
+          <p className="mx-auto mt-5 max-w-2xl text-[16px] leading-relaxed text-ink-2">{LAUNCH.feedSub}</p>
+          <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-sun/60 px-3.5 py-1.5 text-[13px] font-medium text-ink">
+            <Gavel className="size-3.5 text-sun-line" aria-hidden /> {LAUNCH.feedTry}
+          </p>
+        </div>
+      )}
 
       {/* The app, framed. */}
-      <div className="relative mt-12 overflow-hidden rounded-[22px] bg-canvas shadow-[0_30px_80px_-30px_rgba(11,11,12,0.35)] ring-1 ring-line">
-        <div className="flex h-9 items-center gap-1.5 border-b border-line bg-surface px-4" aria-hidden>
-          <span className="size-2.5 rounded-full bg-line" />
-          <span className="size-2.5 rounded-full bg-line" />
-          <span className="size-2.5 rounded-full bg-line" />
-          <span className="ml-3 text-[12px] text-muted">Marketplace · {tab === "jobs" ? "Job listings" : "Equipment"}</span>
-        </div>
+      <div
+        className={clsx(
+          "relative overflow-hidden bg-canvas",
+          !bare && "mt-12 rounded-[22px] shadow-[0_30px_80px_-30px_rgba(11,11,12,0.35)] ring-1 ring-line",
+        )}
+      >
+        {!bare && (
+          <div className="flex h-9 items-center gap-1.5 border-b border-line bg-surface px-4" aria-hidden>
+            <span className="size-2.5 rounded-full bg-line" />
+            <span className="size-2.5 rounded-full bg-line" />
+            <span className="size-2.5 rounded-full bg-line" />
+            <span className="ml-3 text-[12px] text-muted">Marketplace · {tab === "jobs" ? "Job listings" : "Equipment"}</span>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-[13.5rem_minmax(0,1fr)_17rem]">
           {/* Filters, as a rail on wide screens and chips above the feed on a phone. */}
           <aside className="hidden border-r border-line bg-surface p-4 lg:block">
-            <Tabs tab={tab} setTab={setTab} jobs={feed.length} />
+            {!bare && <Tabs tab={tab} setTab={setTab} jobs={feed.length} />}
             {tab === "jobs" && (
               <>
                 <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Within</p>
@@ -329,12 +340,16 @@ export function MarketplaceFeed() {
                 />
               </label>
               <div className="flex gap-2 overflow-x-auto lg:hidden">
-                <Chip on={tab === "jobs"} onClick={() => setTab("jobs")}>
-                  Jobs
-                </Chip>
-                <Chip on={tab === "stock"} onClick={() => setTab("stock")}>
-                  Equipment
-                </Chip>
+                {!bare && (
+                  <>
+                    <Chip on={tab === "jobs"} onClick={() => setTab("jobs")}>
+                      Jobs
+                    </Chip>
+                    <Chip on={tab === "stock"} onClick={() => setTab("stock")}>
+                      Equipment
+                    </Chip>
+                  </>
+                )}
                 {tab === "jobs" &&
                   DISTANCES.map((d) => (
                     <Chip key={d.label} on={within === d.km} onClick={() => setWithin(d.km)}>
@@ -442,7 +457,7 @@ export function MarketplaceFeed() {
           </div>
         )}
       </div>
-      <p className="mt-3 text-center text-xs text-muted">{LAUNCH.feedNote}</p>
+      {!bare && <p className="mt-3 text-center text-xs text-muted">{LAUNCH.feedNote}</p>}
     </section>
   );
 }

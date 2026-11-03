@@ -27,7 +27,8 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
-import { KIND_SECTIONS, designsRoofs, pageAt, sectionAt } from "@/lib/domain/design/sections";
+import { KIND_SECTIONS, designsRoofs, marketplacePagesFor, pageAt, sectionAt } from "@/lib/domain/design/sections";
+import { MarketplaceMark, MarketplaceMenu } from "./marketplace-bar";
 import { BUSINESS_KINDS, cleanKind, pageAllowed, type BusinessKind } from "@/lib/domain/design/business-kind";
 import { staffView } from "./staff-view-as";
 import { notificationCount, serviceCount, approvalCounts, updatesUnseen } from "@/lib/services/crm";
@@ -37,6 +38,8 @@ import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail } from "./sol-dock";
 import { TeamChatButton } from "./team-chat";
 import { DayPill, GearMenu, MessagesMenu, NotificationsMenu, TopIcon } from "./shell-menus";
+
+export { MarketplaceMark };
 
 /** Where everything in the product lives. */
 export const PATHS = {
@@ -114,26 +117,6 @@ const PHONE_TABS: [PhoneTab, PhoneTab, PhoneTab] = [
  * the frame (a page shown inside another). Signed out, a screen that needs an account (`needsAccount`) asks for one;
  * the others (the design tool, its settings) are shown bare, as they work on the device without one.
  */
-/** RENUABL Marketplace's mark: two roofs joined, the businesses of the network side by side. */
-export function MarketplaceMark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinejoin="round"
-      strokeLinecap="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M2.5 12 8 7l5.5 5" />
-      <path d="M10.5 12 16 7l5.5 5" />
-      <path d="M4.5 12v6h15v-6" />
-    </svg>
-  );
-}
-
 /**
  * RENUABL Marketplace beside the sections (3 Nov 2026, Martin: the add-on network should read as a sub-brand, apart
  * from the business's own work): its mark white in a blue round, beside it RENUABL in small black capitals over
@@ -473,7 +456,7 @@ function Shell({
           </div>
         </div>
         {/* The section's own pages, quiet: only the one you are on stands out. Today has none over it. */}
-        {current.pages.length > 1 && (
+        {current.id !== "marketplace" && current.pages.length > 1 && (
           <nav aria-label={current.label} className="flex justify-center gap-5 overflow-x-auto px-5 pb-2 pt-2.5">
             {current.pages.map((p) => {
               const lit = here?.page.id === p.id;
@@ -522,12 +505,23 @@ function Shell({
       </div>
 
       {tool ? (
-        <div data-sol-page className="relative min-w-0">
+        <div data-sol-page className="relative min-w-0 lg:pt-5">
           {children}
         </div>
       ) : (
-        <div className="px-3 pb-20 pt-2 sm:px-6 lg:px-14">
+        <div className="px-3 pb-20 pt-2 sm:px-6 lg:px-14 lg:pt-9">
           <div data-tour="pad" data-sol-page className={PAD}>
+            {/* Inside the Marketplace, its own menu at the top of the pad, from its blue home; while closed, the menu this
+                kind will have, not yet links. */}
+            {current.id === "marketplace" && (
+              <MarketplaceMenu
+                className="-mt-1 mb-6 border-b border-line pb-3"
+                pages={marketplaceOpen() ? current.pages : marketplacePagesFor(kind)}
+                preview={!marketplaceOpen()}
+                lit={here?.page.id}
+                count={count}
+              />
+            )}
             {children}
           </div>
         </div>

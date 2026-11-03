@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pageAt, sectionAt, SECTIONS } from "./sections";
+import { marketplacePagesFor, pageAt, sectionAt, SECTIONS } from "./sections";
 
 describe("the sections across the top", () => {
   it("lights the section and page an address belongs to, the closest match winning", () => {
@@ -23,5 +23,14 @@ describe("the sections across the top", () => {
   it("gives every page a unique id", () => {
     const ids = SECTIONS.flatMap((s) => s.pages.map((p) => p.id));
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("the Marketplace's menu for each kind", () => {
+  it("is all of it for a retailer, bidding and trading for an installer, trading for an inspector", () => {
+    const ids = (k: Parameters<typeof marketplacePagesFor>[0]) => marketplacePagesFor(k).map((p) => p.id);
+    expect(ids("retailer")).toEqual(["listings", "my-listings", "my-bids", "equipment", "my-equipment", "watching", "messages"]);
+    expect(ids("installer")).toEqual(["listings", "equipment", "watching", "messages"]);
+    expect(ids("inspector")).toEqual(["equipment", "my-equipment", "watching", "messages"]);
   });
 });
