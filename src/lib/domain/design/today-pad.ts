@@ -186,3 +186,66 @@ export function pipelineBoard<J extends Job>(jobs: readonly J[], perStage = 6) {
     };
   });
 }
+
+/** One step of Sol telling the member their day: words he types, or a part of the day he puts in place. */
+export type SolBeat = { say: string } | { show: "first" | "call" | "rest" | "ready" };
+
+const COUNT_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+const countWords = (n: number) => COUNT_WORDS[n] ?? String(n);
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** "a, b and c". */
+function listWords(parts: readonly string[]): string {
+  return parts.length < 2 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/**
+ * Sol telling the member their day, once "Show me my day" is pressed (3 Nov 2026, Martin: not a software landing pad,
+ * Sol writing it up for you as you watch): his words in order, with the parts of the day (Up first, Before you call,
+ * the rest to action, what he has drafted) put in place between them. Every word is from what is on the list; he
+ * claims nothing else.
+ */
+export function solDayScript(input: {
+  /** How many things need the business. */
+  count: number;
+  /** The first customer's first name when Before you call has them, else null. */
+  callName: string | null;
+  /** What this member has logged today (from `daySoFar`), or null while not known. */
+  done: readonly { label: string; n: number }[] | null;
+  /** Whether Sol has drafted anything for them to check. */
+  ready: boolean;
+  hour: number;
+  name: string | null;
+}): SolBeat[] {
+  const part = input.hour < 12 ? "morning" : input.hour < 17 ? "afternoon" : "evening";
+  const you = input.name ? `, ${input.name}` : "";
+  const beats: SolBeat[] = [];
+  if (input.count === 0) {
+    beats.push({ say: `Here's your ${part}${you}. Nothing needs you right now: everything is answered, followed up and booked.` });
+  } else {
+    beats.push({
+      say:
+        input.count === 1
+          ? `Here's your ${part}${you}. One thing needs you, so let's start there.`
+          : `Here's your ${part}${you}. ${capital(countWords(input.count))} things need you, and I've put them in order.`,
+    });
+    beats.push({ say: "Up first, the one that matters most." }, { show: "first" });
+    if (input.callName) beats.push({ say: `Before you ring ${input.callName}, here's where things stand.` }, { show: "call" });
+    const rest = input.count - 1;
+    if (rest > 0)
+      beats.push(
+        { say: rest === 1 ? "Then one more to action." : `Then ${countWords(rest)} more to action, most pressing first.` },
+        { show: "rest" },
+      );
+  }
+  if (input.ready) beats.push({ say: "I've drafted these for you to check before they go." }, { show: "ready" });
+  if (input.done)
+    beats.push({
+      say:
+        input.done.length === 0
+          ? "You haven't logged anything yet today. Calls, emails and notes you log on a deal show up here."
+          : `So far today: ${listWords(input.done.map((d) => `${d.n} ${d.label}`))}.`,
+    });
+  beats.push({ say: "Ask me anything below." });
+  return beats;
+}

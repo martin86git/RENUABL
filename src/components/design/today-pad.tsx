@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowUp, CalendarDays, ChevronLeft, ChevronRight, HardHat, KanbanSquare, Mail, Phone, Sun, X } from "lucide-react";
+import { ArrowUp, CalendarDays, ChevronLeft, ChevronRight, HardHat, KanbanSquare, Mail, Phone, Sun } from "lucide-react";
 import { LAUNCH_MARKET, greeting } from "@/lib/domain/market";
 import { nextHeadline, type NextItem } from "@/lib/domain/design/next-up";
 import {
@@ -14,7 +14,9 @@ import {
   jobOf,
   nextWorkingDay,
   pipelineBoard,
+  solDayScript,
   type BeforeCall,
+  type SolBeat,
   type TodayTab,
 } from "@/lib/domain/design/today-pad";
 import type { Activity } from "@/lib/domain/design/crm";
@@ -25,13 +27,18 @@ import { SOL_CHANGED, SOL_TOGGLE, askSol, loadSol } from "@/lib/services/sol";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { NewLook } from "./new-look";
-import { ReadyForYou } from "./ready-for-you";
-import { SolIcon } from "./sol-icon";
+import { ReadyForYou, usePrepared } from "./ready-for-you";
+import { SolBadge, SolIcon, SolMark, SolStars } from "./sol-icon";
 import { SolThinking } from "./sol-thinking";
 
 const TAB_ICONS: Record<TodayTab, typeof Sun> = { today: Sun, calendar: CalendarDays, pipeline: KanbanSquare };
-/** Items under Up first before "N more". */
+/** Items under To action before "N more". */
 const SHOWN = 5;
+/** How long Sol waits for his drafts, and for Before you call, before telling the day without them. */
+const WAIT_MS = 2500;
+const CALL_WAIT_MS = 9000;
+/** A pause between one thing Sol says or puts in place and the next. */
+const BEAT_GAP_MS = 260;
 
 const dayWords = (d: string) =>
   new Intl.DateTimeFormat("en-AU", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long" }).format(new Date(`${d}T12:00:00Z`));
@@ -52,14 +59,21 @@ const clock = (t: string) => {
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 ? "am" : "pm"}`;
 };
+const hourNow = () => Number(new Date().toLocaleString("en-AU", { hour: "numeric", hourCycle: "h23", timeZone: LAUNCH_MARKET.timeZone }));
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** One turn of the conversation on Today: Sol telling the day, or a question and his answer. */
+type Turn = { id: number; kind: "day" } | { id: number; kind: "ask"; q: string; a: { text: string; more: boolean } | null };
 
 /**
- * Today as one pad (1 Nov 2026, as Primero's: it replaces the canvas). Across its top Today, Calendar and Pipeline, and
- * in the corner "Your day" (the sun keeping time on the day's list). Today is the greeting, **Up first** (the most
- * pressing thing, large) with **Before you call** beside it, **To action** (the rest) and **Your day so far**. Calendar
- * is a day's installs and reminders, stepping through the working days. Pipeline is the deals being sold as a board,
- * or the numbers. Sol's box sits at the foot: what is asked there comes back as a card over the box, so the pad stays
- * in sight, and "Open in Sol" carries on in his panel.
+ * Today as one chat with Sol (3 Nov 2026, Martin: the pad and Sol's box felt like two things; it should feel like one
+ * large chat screen, not a software landing pad). Across its top Today, Calendar and Pipeline, and in the corner "Your
+ * day" (the sun keeping time on the day's list). Today opens on the greeting in the middle with **Show me my day** and
+ * Sol's box under it; pressing it (or asking anything) folds the greeting away and Sol writes the day up as you watch:
+ * his words typed out, and between them **Up first**, **Before you call**, the rest **to action** and what he drafted,
+ * each put in place as he gets to it (`solDayScript`). Questions and his answers carry on in the same column, and the
+ * box docks at its foot. Calendar is a day's installs and reminders; Pipeline is the deals being sold as a board, or the
+ * numbers; asking from either comes back to Today's conversation.
  */
 export function TodayPad(props: {
   jobs: JobLine[] | null;
@@ -74,7 +88,47 @@ export function TodayPad(props: {
   day: React.ReactNode;
 }) {
   const [tab, setTab] = useState<TodayTab | "day">("today");
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [asking, setAsking] = useState(false);
   const items = useNextUp(props.jobs, props.today);
+  const end = useRef<HTMLDivElement>(null);
+  const talking = turns.length > 0;
+  const dayTold = turns.some((t) => t.kind === "day");
+
+  /** Keeps the newest of the conversation in view, unless the member has scrolled up to read. */
+  const follow = useCallback(() => {
+    const el = end.current;
+    if (!el) return;
+    const below = el.getBoundingClientRect().bottom - window.innerHeight;
+    if (below > -40 && below < 480) el.scrollIntoView({ block: "end", behavior: reducedMotion() ? "auto" : "smooth" });
+  }, []);
+
+  const showDay = () => {
+    setTab("today");
+    if (!dayTold) setTurns((t) => [...t, { id: Date.now(), kind: "day" }]);
+  };
+  const ask = async (q: string) => {
+    if (asking) return;
+    const id = Date.now();
+    setTab("today");
+    setAsking(true);
+    setTurns((t) => [...t, { id, kind: "ask", q, a: null }]);
+    window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
+    const r = await askSol(q, []);
+    setAsking(false);
+    let a: { text: string; more: boolean };
+    if (!r.ok) a = { text: r.message, more: false };
+    else {
+      window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
+      const last = [...r.state.turns].reverse().find((t) => t.role === "sol");
+      a = {
+        text: last?.text ?? "Done.",
+        more: Boolean(last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.reminder),
+      };
+    }
+    setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a } : t)));
+  };
+
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-13rem)] w-full max-w-6xl flex-col">
       <div className="flex items-center gap-2">
@@ -132,125 +186,472 @@ export function TodayPad(props: {
         </p>
       )}
 
-      <div className="mt-5 flex-1">
-        {tab === "today" && <TodayView {...props} items={items} />}
-        {tab === "calendar" && <CalendarView jobs={props.jobs} today={props.today} />}
-        {tab === "pipeline" && <PipelineView jobs={props.jobs} today={props.today} />}
-        {tab === "day" && props.day}
+      <div className={clsx("mt-8 flex flex-1 flex-col", tab !== "today" && "hidden")}>
+        <div className="mx-auto w-full max-w-3xl">
+          <NewLook name={props.name} />
+        </div>
+        {/* The greeting, in the middle of the screen until the conversation starts, then folded away. */}
+        <div
+          className={clsx(
+            "flex flex-col justify-center transition-[flex-grow,opacity] duration-500 ease-out",
+            talking ? "grow-0 opacity-0" : "grow opacity-100",
+          )}
+          aria-hidden={talking}
+        >
+          <div
+            className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
+          >
+            <div className="overflow-hidden">
+              <Hello {...props} count={items?.length ?? null} onDay={showDay} onAsk={ask} asking={asking} hidden={talking} />
+            </div>
+          </div>
+        </div>
+
+        {talking && (
+          <div className="mx-auto w-full max-w-3xl flex-1 space-y-7 pb-4 pt-2" aria-live="polite">
+            {turns.map((t) =>
+              t.kind === "day" ? (
+                <SolDay key={t.id} {...props} items={items} onGrow={follow} />
+              ) : (
+                <div key={t.id} className="space-y-4">
+                  <div className="flex justify-end">
+                    <p className="max-w-[80%] whitespace-pre-wrap rounded-[20px] rounded-br-md bg-primary px-4 py-2.5 text-[15px] text-primary-ink">
+                      {t.q}
+                    </p>
+                  </div>
+                  <SolSays>
+                    {!t.a ? (
+                      <SolThinking />
+                    ) : (
+                      <div className="text-[15px] leading-relaxed text-ink">
+                        <Typed text={t.a.text} onDone={follow} />
+                        {t.a.more && (
+                          <button
+                            type="button"
+                            onClick={() => window.dispatchEvent(new Event(SOL_TOGGLE))}
+                            className="mt-2 block text-[13px] text-ink-2 underline underline-offset-4 hover:text-ink"
+                          >
+                            There is more with it in your conversation with Sol. Open it
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </SolSays>
+                </div>
+              ),
+            )}
+            <div ref={end} className="scroll-mb-40" />
+          </div>
+        )}
       </div>
 
-      <AskSol />
+      {tab !== "today" && (
+        <div className="mt-8 flex-1">
+          {tab === "calendar" && <CalendarView jobs={props.jobs} today={props.today} />}
+          {tab === "pipeline" && <PipelineView jobs={props.jobs} today={props.today} />}
+          {tab === "day" && props.day}
+        </div>
+      )}
+
+      {(talking || tab !== "today") && (
+        <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-60% to-transparent pb-5 pt-10 print:hidden">
+          <div className="mx-auto max-w-3xl">
+            {!dayTold && (
+              <button
+                type="button"
+                onClick={showDay}
+                className="mb-2.5 inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
+              >
+                <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Show me my day
+              </button>
+            )}
+            <SolBox onAsk={ask} asking={asking} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function TodayView(props: {
-  jobs: JobLine[] | null;
-  today: ISODate;
+/** Sol's round, small, for the start of each thing he says. */
+function SolAvatar() {
+  return (
+    <span className="sol-orb relative mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full" aria-hidden>
+      <SolMark className="size-6" glow={false} />
+    </span>
+  );
+}
+
+/** Something Sol says in the conversation: his round, then his words and what he puts in place. */
+function SolSays({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3">
+      <SolAvatar />
+      <div className="min-w-0 flex-1 pt-1">
+        <p className="sr-only">Sol:</p>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** The greeting in the middle of the screen, with Show me my day and Sol's box under it. */
+function Hello(props: {
   business: string;
   name: string | null;
-  email: string;
-  mine: Pick<Activity, "kind" | "by">[] | null;
-  items: NextItem[] | null;
+  count: number | null;
+  asking: boolean;
+  hidden: boolean;
+  onDay: () => void;
+  onAsk: (q: string) => void;
 }) {
-  const [all, setAll] = useState(false);
-  const hour = Number(new Date().toLocaleString("en-AU", { hour: "numeric", hourCycle: "h23", timeZone: LAUNCH_MARKET.timeZone }));
-  const [first, ...rest] = props.items ?? [];
-  const shown = all ? rest : rest.slice(0, SHOWN);
-  const done = props.mine ? daySoFar(props.mine, props.email) : null;
   return (
-    <div>
-      <NewLook name={props.name} />
-      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{props.business || "Your business"}</p>
-      <h1 className="mt-1.5 text-[clamp(24px,3.2vw,32px)] font-light leading-[1.1] tracking-[-0.02em] text-ink">
+    <div className="mx-auto flex max-w-3xl flex-col items-center px-1 py-10 text-center" inert={props.hidden}>
+      <span className="relative">
+        <span className="sol-orb sol-breathe inline-flex size-16 items-center justify-center rounded-full">
+          <SolMark className="size-12" />
+        </span>
+        <SolStars className="absolute -right-3 -top-3 size-6" />
+      </span>
+      <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{props.business || "Your business"}</p>
+      <h1 className="mt-2 text-[clamp(30px,4.4vw,48px)] font-light leading-[1.05] tracking-[-0.025em] text-ink">
         {greeting()}
         {props.name ? `, ${props.name}` : ""}.
       </h1>
-      <p className="mt-1.5 text-[14px] text-ink-2">{props.items ? nextHeadline(props.items.length, hour) : "Looking at your day…"}</p>
-      <ReadyForYou />
-
-      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <section aria-label="Up first" className="rounded-3xl bg-surface p-5 ring-1 ring-line sm:p-6">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Up first</p>
-          {!props.items ? (
-            <p className="mt-3 animate-pulse text-[14px] text-muted">Looking…</p>
-          ) : !first ? (
-            <p className="mt-3 text-[14px] text-ink-2">
-              Everything is answered, followed up and booked. Ask Sol below, or look at the Pipeline.
-            </p>
-          ) : (
-            <NextCard item={first} lead />
-          )}
-          {rest.length > 0 && (
-            <>
-              <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">To action</p>
-              <ul className="mt-1 divide-y divide-line">
-                {shown.map((i) => (
-                  <li key={i.key}>
-                    <NextCard item={i} />
-                  </li>
-                ))}
-              </ul>
-              {rest.length > SHOWN && (
-                <button
-                  type="button"
-                  onClick={() => setAll(!all)}
-                  className="tap-area mt-2 text-[13px] font-medium text-ink-2 hover:text-ink"
-                >
-                  {all ? "Show fewer" : `${rest.length - SHOWN} more`}
-                </button>
-              )}
-            </>
-          )}
-        </section>
-
-        <div className="space-y-4">
-          {first && jobOf(first) && <BeforeYouCall jobId={jobOf(first)!} today={props.today} />}
-          <section aria-label="Your day so far" className="rounded-3xl bg-surface p-5 ring-1 ring-line">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Your day so far</p>
-            {!done ? (
-              <p className="mt-2 animate-pulse text-sm text-muted">Looking…</p>
-            ) : done.length === 0 ? (
-              <p className="mt-2 text-sm text-ink-2">Nothing logged yet today. Calls, emails and notes you log on a deal show here.</p>
-            ) : (
-              <ul className="mt-3 space-y-1.5">
-                {done.map((d) => (
-                  <li key={d.kind} className="flex items-baseline gap-2 text-sm">
-                    <span className="w-8 text-right text-[20px] font-light tabular-nums text-ink">{d.n}</span>
-                    <span className="text-ink-2">{d.label}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
+      <p className="mt-3 text-[15px] text-ink-2">{props.count === null ? "Looking at your day…" : nextHeadline(props.count, hourNow())}</p>
+      <button
+        type="button"
+        onClick={props.onDay}
+        className="group mt-7 inline-flex h-12 items-center gap-2.5 rounded-full bg-primary pl-2 pr-5 text-[15px] font-medium text-primary-ink shadow-[0_6px_20px_rgb(20_22_26_/_0.18)] transition hover:shadow-[0_6px_24px_rgb(255_90_31_/_0.35)]"
+      >
+        <span className="inline-flex size-8 items-center justify-center rounded-full bg-white/10">
+          <SolBadge className="size-5 transition-transform duration-300 group-hover:scale-110" />
+        </span>
+        Show me my day
+      </button>
+      <div className="mt-8 w-full">
+        <SolBox onAsk={props.onAsk} asking={props.asking} />
       </div>
     </div>
   );
 }
 
-/** What to know about the first customer on the list before ringing them, from their record. */
-function BeforeYouCall({ jobId, today }: { jobId: string; today: ISODate }) {
-  const [got, setGot] = useState<{ id: string; name: string; phone: string; email: string; facts: BeforeCall } | null>(null);
+/** Sol's box: what is asked goes to Sol, in the same conversation as his panel. */
+function SolBox({ onAsk, asking }: { onAsk: (q: string) => void; asking: boolean }) {
+  const [text, setText] = useState("");
+  const send = () => {
+    const said = text.trim();
+    if (said.length < 2 || asking) return;
+    setText("");
+    onAsk(said);
+  };
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        send();
+      }}
+      className="flex items-center gap-2 rounded-[26px] bg-surface p-2 pl-4 text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line"
+    >
+      <SolBadge className="size-5 shrink-0" />
+      <label className="sr-only" htmlFor="today-ask">
+        Ask Sol
+      </label>
+      <input
+        id="today-ask"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        maxLength={4000}
+        autoComplete="off"
+        placeholder="Ask Sol about your deals, your day, or what to say to a customer"
+        className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
+      />
+      <button
+        type="submit"
+        disabled={asking || text.trim().length < 2}
+        aria-label="Ask Sol"
+        className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white disabled:bg-surface-2 disabled:text-muted"
+      >
+        <ArrowUp className="size-4" aria-hidden />
+      </button>
+    </form>
+  );
+}
+
+/** Words Sol is writing, a few letters at a time with his caret, then done. Instant with reduced motion. */
+function Typed({ text, onDone, instant = false }: { text: string; onDone?: () => void; instant?: boolean }) {
+  const [shown, setShown] = useState(0);
+  const done = useRef(false);
+  const all = instant || shown >= text.length;
   useEffect(() => {
+    if (instant || reducedMotion()) {
+      const t = window.setTimeout(() => setShown(text.length), 0);
+      return () => window.clearTimeout(t);
+    }
+    // A long answer is written faster, so none takes more than about three seconds.
+    const step = Math.max(2, Math.ceil(text.length / 160));
+    const t = window.setInterval(() => setShown((n) => Math.min(text.length, n + step + (Math.random() < 0.3 ? 1 : 0))), 18);
+    return () => window.clearInterval(t);
+  }, [text, instant]);
+  useEffect(() => {
+    if (all && !done.current) {
+      done.current = true;
+      onDone?.();
+    }
+  }, [all, onDone]);
+  return (
+    <span className="whitespace-pre-wrap">
+      {all ? text : text.slice(0, shown)}
+      {!all && (
+        <span className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[0.15em] animate-pulse rounded-full bg-sun-line" aria-hidden />
+      )}
+    </span>
+  );
+}
+
+/**
+ * A part of the day Sol puts in place: it comes in out of a soft blur with a warm light passing across it once, as if
+ * being made, then says it is done. Still with reduced motion.
+ */
+function Made({
+  children,
+  onDone,
+  instant,
+  after = 650,
+}: {
+  children: React.ReactNode;
+  onDone: () => void;
+  instant: boolean;
+  after?: number;
+}) {
+  const done = useRef(false);
+  useEffect(() => {
+    if (done.current) return;
+    const t = window.setTimeout(
+      () => {
+        done.current = true;
+        onDone();
+      },
+      instant || reducedMotion() ? 0 : after,
+    );
+    return () => window.clearTimeout(t);
+  }, [instant, after, onDone]);
+  return (
+    <div className={clsx("relative", !instant && "motion-safe:animate-[sol-made_700ms_cubic-bezier(.2,.7,.2,1)_both]")}>
+      {children}
+      {!instant && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-3xl motion-safe:animate-[sol-sweep_1200ms_ease-out_both] motion-reduce:hidden"
+          style={{
+            backgroundImage: "linear-gradient(100deg, transparent 25%, rgb(255 138 61 / 0.16) 50%, transparent 75%)",
+            backgroundSize: "250% 100%",
+          }}
+        />
+      )}
+      <style>{`@keyframes sol-made{from{opacity:0;filter:blur(8px);transform:translateY(10px) scale(.985)}to{opacity:1;filter:none;transform:none}}@keyframes sol-sweep{from{background-position:120% 0;opacity:1}to{background-position:-20% 0;opacity:0}}@keyframes sol-row{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}`}</style>
+    </div>
+  );
+}
+
+/** Before you call, read from the first customer's record: undefined while looking, null when there is none. */
+type CallFacts = { id: string; name: string; phone: string; email: string; facts: BeforeCall };
+function useBeforeCall(jobId: string | null, today: ISODate): CallFacts | null | undefined {
+  const [got, setGot] = useState<{ for: string | null; facts: CallFacts | null } | null>(null);
+  useEffect(() => {
+    if (!jobId) return;
     let gone = false;
     void loadJob(jobId).then(async (j) => {
-      if (!j.ok || gone) return;
+      if (gone) return;
+      if (!j.ok) return setGot({ for: jobId, facts: null });
       const c = await loadCustomer(j.customer.id);
       if (gone) return;
       setGot({
-        id: jobId,
-        name: j.customer.name,
-        phone: j.customer.phone,
-        email: j.customer.email,
-        facts: beforeYouCall({ job: j.job, customer: j.customer, activity: c.ok ? c.activity : [], today }),
+        for: jobId,
+        facts: {
+          id: jobId,
+          name: j.customer.name,
+          phone: j.customer.phone,
+          email: j.customer.email,
+          facts: beforeYouCall({ job: j.job, customer: j.customer, activity: c.ok ? c.activity : [], today }),
+        },
       });
     });
     return () => {
       gone = true;
     };
   }, [jobId, today]);
-  if (!got || got.id !== jobId) return null;
+  if (!jobId) return null;
+  return got?.for === jobId ? got.facts : undefined;
+}
+
+/** What Sol is telling, fixed when he starts so the list doesn't change under him. */
+type Told = {
+  beats: SolBeat[];
+  first: NextItem | null;
+  rest: NextItem[];
+  call: CallFacts | null;
+};
+
+/**
+ * Sol telling the member their day, as they watch: he looks first (his thinking drawings while the list, Before you
+ * call and his drafts are read), then writes it up a line at a time, putting each part in place as he reaches it.
+ * "Show it all" finishes it at once.
+ */
+function SolDay(props: {
+  jobs: JobLine[] | null;
+  today: ISODate;
+  name: string | null;
+  email: string;
+  mine: Pick<Activity, "kind" | "by">[] | null;
+  items: NextItem[] | null;
+  onGrow: () => void;
+}) {
+  const { items, onGrow } = props;
+  const first = items?.[0] ?? null;
+  const call = useBeforeCall(first ? jobOf(first) : null, props.today);
+  const { items: prepared } = usePrepared();
+  const [told, setTold] = useState<Told | null>(null);
+  const [waited, setWaited] = useState(false);
+  const [gaveUp, setGaveUp] = useState(false);
+  const [step, setStep] = useState(0);
+  const [instant, setInstant] = useState(false);
+  const [all, setAll] = useState(false);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setWaited(true), WAIT_MS);
+    const u = window.setTimeout(() => setGaveUp(true), CALL_WAIT_MS);
+    return () => {
+      window.clearTimeout(t);
+      window.clearTimeout(u);
+    };
+  }, []);
+  const ready = items !== null && (gaveUp || (call !== undefined && (prepared !== null || waited)));
+  useEffect(() => {
+    if (!ready || told || !items) return;
+    const t = window.setTimeout(() => {
+      const facts = call ?? null;
+      setTold({
+        first: items[0] ?? null,
+        rest: items.slice(1),
+        call: facts,
+        beats: solDayScript({
+          count: items.length,
+          callName: facts ? facts.name.split(/\s+/)[0] : null,
+          done: props.mine ? daySoFar(props.mine, props.email) : null,
+          ready: Boolean(prepared?.length),
+          hour: hourNow(),
+          name: props.name,
+        }),
+      });
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [ready, told, items, call, prepared, props.mine, props.email, props.name]);
+
+  const next = useCallback(() => {
+    window.setTimeout(() => setStep((s) => s + 1), instant ? 0 : BEAT_GAP_MS);
+  }, [instant]);
+  useEffect(() => {
+    if (told) onGrow();
+  }, [step, told, onGrow]);
+
+  if (!told)
+    return (
+      <SolSays>
+        <SolThinking say="Looking at your day…" />
+      </SolSays>
+    );
+  const writing = step < told.beats.length;
+  return (
+    <SolSays>
+      <div className="space-y-4">
+        {told.beats.slice(0, step + 1).map((b, i) => {
+          const live = i === step;
+          const done = live ? next : noop;
+          if ("say" in b)
+            return (
+              <p key={i} className="text-[15.5px] leading-relaxed text-ink">
+                <Typed text={b.say} onDone={done} instant={instant || !live} />
+              </p>
+            );
+          const quick = instant || !live;
+          if (b.show === "first" && told.first)
+            return (
+              <Made key={i} onDone={done} instant={quick}>
+                <div className="rounded-3xl bg-surface p-2 ring-1 ring-line">
+                  <NextCard item={told.first} lead flush />
+                </div>
+              </Made>
+            );
+          if (b.show === "call" && told.call)
+            return (
+              <Made key={i} onDone={done} instant={quick}>
+                <CallCard got={told.call} />
+              </Made>
+            );
+          if (b.show === "rest") {
+            const shown = all ? told.rest : told.rest.slice(0, SHOWN);
+            return (
+              <Made key={i} onDone={done} instant={quick} after={400 + Math.min(told.rest.length, SHOWN) * 110}>
+                <div className="rounded-3xl bg-surface px-4 py-1 ring-1 ring-line sm:px-5">
+                  <ul className="divide-y divide-line">
+                    {shown.map((it, n) => (
+                      <li
+                        key={it.key}
+                        className={clsx(!quick && "motion-safe:animate-[sol-row_450ms_ease-out_both]")}
+                        style={quick ? undefined : { animationDelay: `${200 + n * 110}ms` }}
+                      >
+                        <NextCard item={it} />
+                      </li>
+                    ))}
+                  </ul>
+                  {told.rest.length > SHOWN && (
+                    <button
+                      type="button"
+                      onClick={() => setAll(!all)}
+                      className="tap-area mb-2 mt-1 text-[13px] font-medium text-ink-2 hover:text-ink"
+                    >
+                      {all ? "Show fewer" : `${told.rest.length - SHOWN} more`}
+                    </button>
+                  )}
+                </div>
+              </Made>
+            );
+          }
+          if (b.show === "ready")
+            return (
+              <Made key={i} onDone={done} instant={quick}>
+                <ReadyForYou compact />
+              </Made>
+            );
+          // A part with nothing to show (its data went): move straight on.
+          return <Skip key={i} onDone={done} />;
+        })}
+        {writing && !instant && (
+          <button
+            type="button"
+            onClick={() => setInstant(true)}
+            className="text-[12px] text-muted underline-offset-4 hover:text-ink hover:underline"
+          >
+            Show it all
+          </button>
+        )}
+      </div>
+    </SolSays>
+  );
+}
+
+const noop = () => {};
+
+function Skip({ onDone }: { onDone: () => void }) {
+  useEffect(() => {
+    onDone();
+  }, [onDone]);
+  return null;
+}
+
+/** What to know about the first customer on the list before ringing them, from their record. */
+function CallCard({ got }: { got: CallFacts }) {
   return (
     <section aria-label="Before you call" className="rounded-3xl bg-surface p-5 ring-1 ring-line">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Before you call</p>
@@ -278,14 +679,14 @@ function BeforeYouCall({ jobId, today }: { jobId: string; today: ISODate }) {
         )}
         {got.email && (
           <Link
-            href={`${PATHS.deals}/${jobId}?tab=email`}
+            href={`${PATHS.deals}/${got.id}?tab=email`}
             className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-ink-2"
           >
             <Mail className="size-3.5" aria-hidden /> Email
           </Link>
         )}
         <Link
-          href={`${PATHS.deals}/${jobId}`}
+          href={`${PATHS.deals}/${got.id}`}
           className="inline-flex h-9 items-center px-2 text-[13px] font-medium text-ink-2 hover:text-ink"
         >
           Open deal
@@ -442,91 +843,5 @@ function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate 
         )}
       </div>
     </section>
-  );
-}
-
-/**
- * Sol's box at the foot of Today: a question goes to Sol (the same conversation as his panel), and his answer comes
- * back as a card over the box, so the pad stays in sight. "Open in Sol" carries on in his panel.
- */
-function AskSol() {
-  const [text, setText] = useState("");
-  const [asking, setAsking] = useState(false);
-  const [answer, setAnswer] = useState<{ text: string; more: boolean } | null>(null);
-  const send = async () => {
-    const said = text.trim();
-    if (said.length < 2 || asking) return;
-    setText("");
-    setAsking(true);
-    setAnswer(null);
-    const r = await askSol(said, []);
-    setAsking(false);
-    if (!r.ok) return setAnswer({ text: r.message, more: false });
-    window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
-    const last = [...r.state.turns].reverse().find((t) => t.role === "sol");
-    setAnswer({
-      text: last?.text ?? "Done.",
-      more: Boolean(last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.reminder),
-    });
-  };
-  return (
-    <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-70% to-transparent pb-5 pt-6 print:hidden">
-      {(asking || answer) && (
-        <div className="mx-auto mb-2 max-h-64 max-w-3xl overflow-y-auto rounded-2xl bg-surface p-4 text-sm text-ink shadow-[0_8px_30px_rgba(20,22,26,0.12)] ring-1 ring-line">
-          <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-ink">
-            <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Sol
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new Event(SOL_TOGGLE))}
-              className="ml-auto text-[12px] font-medium normal-case tracking-normal text-ink-2 underline-offset-4 hover:underline"
-            >
-              Open in Sol
-            </button>
-            {answer && (
-              <button type="button" onClick={() => setAnswer(null)} aria-label="Close" className="text-muted hover:text-ink">
-                <X className="size-3.5" aria-hidden />
-              </button>
-            )}
-          </div>
-          {asking ? (
-            <SolThinking />
-          ) : (
-            <p className="whitespace-pre-wrap">
-              {answer?.text}
-              {answer?.more && <span className="mt-1 block text-xs text-muted">There is more with it in your conversation with Sol.</span>}
-            </p>
-          )}
-        </div>
-      )}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send();
-        }}
-        className="mx-auto flex max-w-3xl items-center gap-2 rounded-2xl bg-surface p-2 pl-4 shadow-[var(--shadow-soft)] ring-1 ring-line focus-within:ring-sun-line"
-      >
-        <SolIcon className="size-4 shrink-0 text-sun-line" aria-hidden />
-        <label htmlFor="today-ask" className="sr-only">
-          Ask Sol
-        </label>
-        <input
-          id="today-ask"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          maxLength={4000}
-          autoComplete="off"
-          placeholder="Ask Sol about your deals, your day, or what to say to a customer"
-          className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
-        />
-        <button
-          type="submit"
-          disabled={asking || text.trim().length < 2}
-          aria-label="Ask Sol"
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white disabled:bg-surface-2 disabled:text-muted"
-        >
-          <ArrowUp className="size-4" aria-hidden />
-        </button>
-      </form>
-    </div>
   );
 }

@@ -157,10 +157,10 @@ export function useNextUp(jobs: JobLine[] | null, today: ISODate): NextItem[] | 
 }
 
 /** One thing to do: what, why, and the one button. The most pressing is larger and lit. */
-export function NextCard({ item, lead }: { item: NextItem; lead?: boolean }) {
+export function NextCard({ item, lead, flush }: { item: NextItem; lead?: boolean; flush?: boolean }) {
   const Icon = KIND_ICONS[item.kind];
   return (
-    <div className={clsx("flex items-center gap-4", lead ? "mt-5 rounded-2xl bg-surface-2 p-4 sm:p-5" : "py-3")}>
+    <div className={clsx("flex items-center gap-4", lead ? clsx("rounded-2xl bg-surface-2 p-4 sm:p-5", !flush && "mt-5") : "py-3")}>
       <span
         className={clsx(
           "grid shrink-0 place-items-center rounded-full",

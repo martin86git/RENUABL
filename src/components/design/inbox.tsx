@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowLeft, Bot, Copy, ExternalLink, Lock, Paperclip, RefreshCw, Search, Sparkles } from "lucide-react";
+import { ArrowLeft, Bot, Copy, ExternalLink, Lock, Paperclip, RefreshCw, Search } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -19,6 +19,7 @@ import {
 } from "@/lib/services/inbox";
 import { useDesignAccount } from "./design-account";
 import { PATHS, PageHead, ui } from "./design-shell";
+import { SolIcon } from "./sol-icon";
 
 const when = (iso: string) => {
   const d = new Date(iso);
@@ -399,7 +400,7 @@ function EmailView({ id, owner, onBack }: { id: string; owner?: string; onBack: 
             </section>
             <section className={clsx(ui.card, "p-4")}>
               <p className="flex items-center gap-1.5 text-sm font-medium text-ink">
-                <Sparkles className="size-3.5 text-sun-line" aria-hidden /> Sol
+                <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Sol
               </p>
               <div className="mt-2 flex gap-2">
                 <button type="button" className={clsx(ui.quiet, "h-8 px-3 text-xs")} onClick={() => void askSol("summary")}>

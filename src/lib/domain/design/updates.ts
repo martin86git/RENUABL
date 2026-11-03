@@ -20,6 +20,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-03",
+    area: "Today",
+    words: "Today is one conversation with Sol: press Show me my day and he writes it up for you, then answers your questions below.",
+  },
+  {
+    day: "2026-11-03",
     area: "Design tool",
     words: "A pitch for each roof: add a garage or patio at its own angle; the pitch card is smaller and you can type the figure.",
   },

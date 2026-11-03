@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { Activity, Customer, Job } from "./crm";
-import { agendaFor, agoWords, beforeYouCall, daySoFar, isWorkingDay, jobOf, nextWorkingDay, pipelineBoard } from "./today-pad";
+import {
+  agendaFor,
+  agoWords,
+  beforeYouCall,
+  daySoFar,
+  isWorkingDay,
+  jobOf,
+  nextWorkingDay,
+  pipelineBoard,
+  solDayScript,
+} from "./today-pad";
 
 const job = (id: string, extra: Partial<Job> = {}): Job & { customerName: string } => ({
   id,
@@ -127,5 +137,45 @@ describe("Today's pad", () => {
     ]);
     expect(board[0].jobs.map((j) => j.id)).toEqual(["b", "a"]);
     expect(board[3].value).toBe(8600);
+  });
+});
+
+describe("solDayScript", () => {
+  const base = { count: 3, callName: "Olivia", done: [], ready: false, hour: 14, name: "Demo" };
+  it("greets, then puts Up first, Before you call and the rest in place in that order", () => {
+    const beats = solDayScript(base);
+    expect(beats[0]).toEqual({ say: "Here's your afternoon, Demo. Three things need you, and I've put them in order." });
+    expect(beats.filter((b) => "show" in b).map((b) => ("show" in b ? b.show : ""))).toEqual(["first", "call", "rest"]);
+    expect(beats).toContainEqual({ say: "Before you ring Olivia, here's where things stand." });
+    expect(beats).toContainEqual({ say: "Then two more to action, most pressing first." });
+    expect(beats[beats.length - 1]).toEqual({ say: "Ask me anything below." });
+  });
+  it("says so when nothing needs them, and shows nothing", () => {
+    const beats = solDayScript({ ...base, count: 0, callName: null, hour: 9, name: null });
+    expect(beats[0]).toEqual({ say: "Here's your morning. Nothing needs you right now: everything is answered, followed up and booked." });
+    expect(beats.some((b) => "show" in b)).toBe(false);
+  });
+  it("leaves out Before you call without a customer, and the rest when there is one thing", () => {
+    const beats = solDayScript({ ...base, count: 1, callName: null });
+    expect(beats.filter((b) => "show" in b)).toEqual([{ show: "first" }]);
+  });
+  it("puts what he drafted in place, and the day so far in words", () => {
+    const beats = solDayScript({
+      ...base,
+      ready: true,
+      done: [
+        { label: "calls logged", n: 2 },
+        { label: "email", n: 1 },
+      ],
+      hour: 19,
+    });
+    expect(beats).toContainEqual({ show: "ready" });
+    expect(beats).toContainEqual({ say: "So far today: 2 calls logged and 1 email." });
+    expect(beats[0]).toMatchObject({ say: expect.stringContaining("evening") });
+  });
+  it("uses figures past ten", () => {
+    expect(solDayScript({ ...base, count: 12 })[0]).toEqual({
+      say: "Here's your afternoon, Demo. 12 things need you, and I've put them in order.",
+    });
   });
 });
