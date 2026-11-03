@@ -226,22 +226,7 @@ html.sol-resizing .team-pop {
     display: none;
   }
 }
-/* A reply from Sol waiting: a ring of rays round his mark on the rail turns slowly, each ray brightening in turn, and
-   his count glows. */
-@keyframes sol-rays-turn {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes sol-ray {
-  0%,
-  100% {
-    opacity: 0.25;
-  }
-  30% {
-    opacity: 1;
-  }
-}
+/* A reply from Sol waiting: his count glows. */
 @keyframes sol-glow {
   0%,
   100% {
@@ -277,45 +262,39 @@ html.sol-resizing .team-pop {
 .sol-breathe {
   animation: sol-breathe 4s ease-in-out infinite;
 }
-.sol-rays {
-  transform-origin: center;
-  animation: sol-rays-turn 9s linear infinite;
-}
-.sol-rays line {
-  animation: sol-ray 1.8s ease-in-out infinite;
-}
 .sol-glow {
   animation: sol-glow 1.8s ease-out infinite;
 }
-/* Sol beckoning (3 Nov 2026, Martin: a subtle signal to engage, like a notification): while his panel is closed a soft
-   orange ring ripples out from his round every few seconds. On a ring of its own so the round keeps its shadow. */
-@keyframes sol-beckon {
-  0% {
-    box-shadow: 0 0 0 0 rgb(255 90 31 / 0.5);
-  }
-  55%,
+/* Sol's sun beats like a heart (3 Nov 2026, Martin: no rays; the sun itself pulses, a subtle signal to engage): two
+   quick beats, then a rest, the glow brightening with each. */
+@keyframes sol-heartbeat {
+  0%,
+  40%,
   100% {
-    box-shadow: 0 0 0 9px rgb(255 90 31 / 0);
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgb(255 138 61 / 0));
+  }
+  10% {
+    transform: scale(1.09);
+    filter: drop-shadow(0 0 5px rgb(255 138 61 / 0.8));
+  }
+  20% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px rgb(255 138 61 / 0.4));
+  }
+  30% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 4px rgb(255 138 61 / 0.6));
   }
 }
-.sol-beckon::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 9999px;
-  pointer-events: none;
-  animation: sol-beckon 2.6s ease-out infinite;
+.sol-heartbeat {
+  animation: sol-heartbeat 1.8s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .sol-rays,
-  .sol-rays line,
   .sol-breathe,
   .sol-glow,
-  .sol-beckon::after {
+  .sol-heartbeat {
     animation: none;
-  }
-  .sol-rays line {
-    opacity: 0.8;
   }
 }
 

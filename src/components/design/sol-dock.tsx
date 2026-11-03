@@ -196,45 +196,6 @@ export function useSolUnread(): number {
   return n;
 }
 
-/** A ring of rays round Sol's round while a reply waits: it turns slowly, each ray brightening in turn. */
-function Rays() {
-  const rays = Array.from({ length: 12 }, (_, i) => {
-    const a = (i / 12) * Math.PI * 2;
-    // Just outside the round (it fills 26 of the 36 across), so they turn round it rather than over it.
-    const [r1, r2] = i % 2 ? [14.6, 16] : [14.2, 17.4];
-    return {
-      x1: 18 + r1 * Math.sin(a),
-      y1: 18 - r1 * Math.cos(a),
-      x2: 18 + r2 * Math.sin(a),
-      y2: 18 - r2 * Math.cos(a),
-      delay: (i / 12) * 1.8,
-    };
-  });
-  return (
-    <svg
-      viewBox="0 0 36 36"
-      className="pointer-events-none absolute left-1/2 top-1/2 size-[3.75rem] -translate-x-1/2 -translate-y-1/2 overflow-visible"
-      aria-hidden
-    >
-      <g className="sol-rays">
-        {rays.map((r, i) => (
-          <line
-            key={i}
-            x1={r.x1}
-            y1={r.y1}
-            x2={r.x2}
-            y2={r.y2}
-            stroke="var(--sun-line)"
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            style={{ animationDelay: `${r.delay}s` }}
-          />
-        ))}
-      </g>
-    </svg>
-  );
-}
-
 /** Whether Sol's panel is open, as it says (`SOL_STATE`). */
 function useSolOpen(): boolean {
   const [open, setOpen] = useState(false);
@@ -250,7 +211,8 @@ function useSolOpen(): boolean {
  * Sol's round in the nav (1 Nov 2026, Martin: Sol deserves his place beside the design tool). The design tool is the
  * orange round at one end of the sections; Sol is the graphite round at the other, his mark lit inside, so the two
  * tools frame the sections without the one signal colour being spent twice. Pressing it opens his panel over the page
- * you are on (his own page is a press further, from the panel); while a reply waits his rays turn and his count glows.
+ * you are on (his own page is a press further, from the panel); his sun beats like a heart, and while a reply waits his
+ * count glows.
  * `phone` is the foot bar's raised round.
  */
 export function SolNavButton({ phone = false }: { phone?: boolean }) {
@@ -267,11 +229,13 @@ export function SolNavButton({ phone = false }: { phone?: boolean }) {
       className={clsx(
         "sol-orb group relative flex shrink-0 items-center justify-center rounded-full transition-shadow",
         phone ? "size-12" : "-my-2 size-11",
-        open ? "ring-2 ring-sun-line/50 ring-offset-2 ring-offset-surface-2" : "sol-beckon",
+        open && "ring-2 ring-sun-line/50 ring-offset-2 ring-offset-surface-2",
       )}
     >
-      {waiting && <Rays />}
-      <SolMark className={clsx("sol-breathe transition-transform duration-300 group-hover:scale-110", phone ? "size-9" : "size-8")} />
+      {/* No rays (3 Nov 2026, Martin): the sun itself beats like a heart, a subtle signal to engage. */}
+      <span className="sol-heartbeat inline-flex">
+        <SolMark className={clsx("transition-transform duration-300 group-hover:scale-110", phone ? "size-10" : "size-[35px]")} />
+      </span>
       {/* The AI's stars, floating diagonally above the round and outside it (3 Nov 2026, Martin). */}
       <SolStars
         className={clsx(
