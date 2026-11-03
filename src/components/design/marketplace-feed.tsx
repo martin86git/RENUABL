@@ -21,6 +21,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { LAUNCH, closesIn, servedFeed } from "@/lib/domain/design/marketplace-launch";
 import type { ListingSystem } from "@/lib/domain/design/marketplace";
+import { AerialRoof, type AerialRoofSpec } from "./aerial-roof";
 import { ListingRoofExample } from "./designer-showcase";
 import { Breakdown } from "./marketplace";
 
@@ -31,8 +32,6 @@ import { Breakdown } from "./marketplace";
  * businesses and jobs; everything it does is what the Marketplace does: jobs within the distance chosen, closing
  * soonest at the top, sealed bids, the address once a bid is chosen.
  */
-
-type Roof = "hip" | "gable" | "ell" | "flat";
 
 interface FeedJob {
   id: string;
@@ -47,7 +46,8 @@ interface FeedJob {
   /** How many people are watching it (never who). */
   watching: number;
   guide: number | null;
-  roof: Roof | "example";
+  /** The roof as the listing shows it, drawn (aerial-roof.tsx); "example" is the front page's made-up home. */
+  roof: AerialRoofSpec | "example";
   system: ListingSystem;
 }
 
@@ -108,7 +108,7 @@ const JOBS: FeedJob[] = [
     bids: 1,
     watching: 2,
     guide: 3200,
-    roof: "gable",
+    roof: { form: "gable", finish: "charcoal-tile", at: [160, 64, 320, 186], panels: { north: 14 }, seed: 3 },
     system: sys({ kw: 6.65, panels: 14, inverter: "5 kW string inverter", arrays: 1, strings: 1 }),
   },
   {
@@ -123,7 +123,7 @@ const JOBS: FeedJob[] = [
     bids: 5,
     watching: 7,
     guide: null,
-    roof: "hip",
+    roof: { form: "hip", finish: "monument", at: [150, 56, 340, 196], panels: { north: 22 }, seed: 7 },
     system: sys({
       kw: 10.45,
       panels: 22,
@@ -148,7 +148,7 @@ const JOBS: FeedJob[] = [
     bids: 0,
     watching: 1,
     guide: 2400,
-    roof: "ell",
+    roof: { form: "ell", finish: "terracotta", at: [130, 60, 300, 160], wing: [330, 100, 70], panels: {}, pool: true, seed: 11 },
     system: sys({ kw: 0, panels: 0, panel: "", inverter: "Battery inverter", batteryKwh: 24, arrays: 0, strings: 0 }),
   },
   {
@@ -163,7 +163,7 @@ const JOBS: FeedJob[] = [
     bids: 2,
     watching: 3,
     guide: null,
-    roof: "flat",
+    roof: { form: "flat", finish: "zinc", at: [150, 26, 340, 286], scale: 9, panels: { north: 64 }, seed: 17 },
     system: sys({
       kw: 30.4,
       panels: 64,
@@ -173,6 +173,194 @@ const JOBS: FeedJob[] = [
       arrays: 4,
       strings: 6,
       tiltFrames: true,
+    }),
+  },
+  {
+    id: "mtw",
+    poster: "Eastside Energy (example)",
+    initials: "EE",
+    posted: "20m",
+    suburb: "Mount Waverley, VIC",
+    km: 5,
+    minutesLeft: 4 * 1440 + 11 * 60,
+    from: "19 Nov",
+    bids: 2,
+    watching: 5,
+    guide: 2900,
+    roof: { form: "hip", finish: "charcoal-tile", at: [150, 60, 330, 190], panels: { north: 14 }, seed: 21 },
+    system: sys({ kw: 6.65, panels: 14, inverter: "5 kW hybrid", batteryKwh: 16, arrays: 1, strings: 1 }),
+  },
+  {
+    id: "oak",
+    poster: "Clayton Solar Co (example)",
+    initials: "CS",
+    posted: "50m",
+    suburb: "Oakleigh, VIC",
+    km: 4,
+    minutesLeft: 9 * 60 + 40,
+    from: "12 Nov",
+    bids: 4,
+    watching: 6,
+    guide: 2100,
+    roof: { form: "gable", finish: "surfmist", at: [170, 70, 300, 176], panels: { north: 11 }, seed: 23 },
+    system: sys({ kw: 5.23, panels: 11, inverter: "5 kW string inverter", roof: "Tin", arrays: 1, strings: 1 }),
+  },
+  {
+    id: "chel",
+    poster: "Bayside Power (example)",
+    initials: "BP",
+    posted: "4h",
+    suburb: "Cheltenham, VIC",
+    km: 13,
+    minutesLeft: 3 * 1440 + 5 * 60,
+    from: "24 Nov",
+    bids: 3,
+    watching: 4,
+    guide: null,
+    roof: { form: "hip", finish: "terracotta", at: [140, 54, 350, 200], panels: { north: 14, west: 6 }, seed: 29 },
+    system: sys({ kw: 9.5, panels: 20, inverter: "8 kW hybrid", batteryKwh: 24, arrays: 2, strings: 2, switchboard: "included" }),
+  },
+  {
+    id: "ber",
+    poster: "Southern Cross Solar (example)",
+    initials: "SC",
+    posted: "6h",
+    suburb: "Berwick, VIC",
+    km: 33,
+    minutesLeft: 5 * 1440 + 15 * 60,
+    from: "2 Dec",
+    bids: 1,
+    watching: 3,
+    guide: 4600,
+    roof: { form: "hip", finish: "monument", at: [120, 44, 390, 220], panels: { north: 22, east: 6 }, pool: true, seed: 31 },
+    system: sys({
+      kw: 13.3,
+      panels: 28,
+      inverter: "10 kW three-phase hybrid",
+      batteryKwh: 24,
+      ev: true,
+      storeys: "Double",
+      roof: "Tin",
+      phases: "Three",
+      arrays: 2,
+      strings: 3,
+      switchboard: "to-confirm",
+    }),
+  },
+  {
+    id: "ring",
+    poster: "Harbour Energy (example)",
+    initials: "HE",
+    posted: "1h",
+    suburb: "Ringwood, VIC",
+    km: 24,
+    minutesLeft: 1440 + 3 * 60,
+    from: "17 Nov",
+    bids: 2,
+    watching: 2,
+    guide: null,
+    roof: {
+      form: "ell",
+      finish: "charcoal-tile",
+      at: [120, 40, 320, 160],
+      wing: [316, 124, 110],
+      panels: { north: 10, wing: 6 },
+      seed: 37,
+    },
+    system: sys({ kw: 6.18, panels: 13, inverter: "5 kW hybrid", batteryKwh: 16, arrays: 2, strings: 2 }),
+  },
+  {
+    id: "ment",
+    poster: "Peninsula Solar (example)",
+    initials: "PS",
+    posted: "3h",
+    suburb: "Mentone, VIC",
+    km: 16,
+    minutesLeft: 2 * 1440 + 20 * 60,
+    from: "21 Nov",
+    bids: 0,
+    watching: 1,
+    guide: 2500,
+    roof: { form: "skillion", finish: "woodland", at: [170, 60, 290, 180], panels: { north: 13 }, seed: 41 },
+    system: sys({ kw: 6.18, panels: 13, inverter: "5 kW string inverter", roof: "Tin, skillion", arrays: 1, strings: 1 }),
+  },
+  {
+    id: "narre",
+    poster: "Southside Solar (example)",
+    initials: "SO",
+    posted: "8h",
+    suburb: "Narre Warren, VIC",
+    km: 27,
+    minutesLeft: 4 * 1440 + 2 * 60,
+    from: "26 Nov",
+    bids: 3,
+    watching: 5,
+    guide: null,
+    roof: { form: "hip", finish: "shale", at: [140, 56, 350, 200], panels: { north: 14, east: 8 }, seed: 43 },
+    system: sys({ kw: 10.45, panels: 22, inverter: "10 kW hybrid", batteryKwh: 16, ev: true, roof: "Tin", arrays: 2, strings: 2 }),
+  },
+  {
+    id: "bri",
+    poster: "Bayside Power (example)",
+    initials: "BP",
+    posted: "2d",
+    suburb: "Brighton, VIC",
+    km: 15,
+    minutesLeft: 22 * 60 + 30,
+    from: "14 Nov",
+    bids: 6,
+    watching: 9,
+    guide: 4200,
+    roof: { form: "hip", finish: "terracotta", at: [130, 50, 370, 210], panels: { north: 18, west: 6 }, pool: true, seed: 47 },
+    system: sys({
+      kw: 11.4,
+      panels: 24,
+      inverter: "10 kW hybrid",
+      batteryKwh: 32,
+      storeys: "Double",
+      arrays: 2,
+      strings: 3,
+      switchboard: "included",
+    }),
+  },
+  {
+    id: "wer",
+    poster: "Western Suns (example)",
+    initials: "WS",
+    posted: "5h",
+    suburb: "Werribee, VIC",
+    km: 47,
+    minutesLeft: 6 * 1440 + 4 * 60,
+    from: "3 Dec",
+    bids: 1,
+    watching: 2,
+    guide: 2800,
+    roof: { form: "gable", finish: "charcoal-tile", at: [150, 66, 330, 184], panels: { north: 14 }, seed: 53 },
+    system: sys({ kw: 6.65, panels: 14, inverter: "5 kW string inverter", arrays: 1, strings: 1 }),
+  },
+  {
+    id: "moor",
+    poster: "Metro Commercial Solar (example)",
+    initials: "MC",
+    posted: "1d",
+    suburb: "Moorabbin, VIC",
+    km: 10,
+    minutesLeft: 5 * 1440 + 8 * 60,
+    from: "8 Dec",
+    bids: 2,
+    watching: 4,
+    guide: null,
+    roof: { form: "flat", finish: "zinc", at: [120, 30, 400, 280], scale: 10, panels: { north: 42 }, seed: 59 },
+    system: sys({
+      kw: 19.95,
+      panels: 42,
+      inverter: "20 kW three-phase",
+      roof: "Flat, Kliplok",
+      phases: "Three",
+      arrays: 3,
+      strings: 4,
+      tiltFrames: true,
+      switchboard: "to-confirm",
     }),
   },
 ];
@@ -542,7 +730,11 @@ function JobPost(props: {
       </header>
 
       <div className="relative bg-ink">
-        {j.roof === "example" ? <ListingRoofExample className="block aspect-[16/9] w-full object-cover" /> : <FeedRoof shape={j.roof} />}
+        {j.roof === "example" ? (
+          <ListingRoofExample className="block aspect-[16/9] w-full object-cover" />
+        ) : (
+          <AerialRoof spec={j.roof} className="block aspect-[16/9] w-full" />
+        )}
         <button
           type="button"
           onClick={props.watch}
@@ -744,92 +936,4 @@ function Stock({ query }: { query: string }) {
       ))}
     </ul>
   );
-}
-
-/**
- * A made-up roof from above for the feed: blurred ground, the roof sharp with its panels. Drawn, never a real home.
- */
-function FeedRoof({ shape }: { shape: Roof }) {
-  const id = `feed-${shape}`;
-  const roof: Record<Roof, { path: string; fill: string; panels: [number, number, number, number][] }> = {
-    gable: {
-      path: "M150 70 H450 V230 H150 Z",
-      fill: "#8a6a5a",
-      panels: rows(175, 82, 7, 2, 34, 52),
-    },
-    hip: {
-      path: "M130 60 H470 V240 H130 Z",
-      fill: "#7d8288",
-      panels: [...rows(165, 76, 8, 2, 34, 52), ...rows(200, 190, 6, 1, 34, 40)],
-    },
-    ell: {
-      path: "M140 60 H380 V150 H460 V250 H140 Z",
-      fill: "#6f6a66",
-      panels: [],
-    },
-    flat: {
-      path: "M110 50 H490 V250 H110 Z",
-      fill: "#b9bcc0",
-      panels: [...rows(130, 70, 10, 2, 34, 52), ...rows(130, 175, 10, 1, 34, 52)],
-    },
-  };
-  const r = roof[shape];
-  return (
-    <svg
-      viewBox="0 0 600 300"
-      className="block aspect-[16/9] w-full"
-      role="img"
-      aria-label="A roof design from above, everything round it blurred"
-    >
-      <defs>
-        <filter id={`${id}-blur`} x="-10%" y="-10%" width="120%" height="120%">
-          <feGaussianBlur stdDeviation="9" />
-        </filter>
-        <clipPath id={`${id}-clip`}>
-          <path d={r.path} />
-        </clipPath>
-      </defs>
-      <g filter={`url(#${id}-blur)`}>
-        <rect width="600" height="300" fill="#56664d" />
-        <circle cx="70" cy="60" r="55" fill="#3e4d38" />
-        <circle cx="540" cy="250" r="70" fill="#3b4935" />
-        <rect x="0" y="262" width="600" height="38" fill="#8d8f8c" />
-        <rect x="500" y="40" width="80" height="120" rx="8" fill="#7e9aa9" />
-        <path d={r.path} fill={r.fill} />
-      </g>
-      <rect width="600" height="300" fill="#0b0b0c" fillOpacity="0.4" />
-      <g clipPath={`url(#${id}-clip)`}>
-        <path d={r.path} fill={r.fill} />
-        {shape !== "flat" && <path d={ridgeOf(shape)} stroke="#000" strokeOpacity="0.25" strokeWidth="2" fill="none" />}
-      </g>
-      <path d={r.path} fill="none" stroke="#fff" strokeOpacity="0.5" strokeWidth="1" />
-      {r.panels.map(([x, y, w, h], i) => (
-        <g key={i}>
-          <rect x={x} y={y} width={w} height={h} fill="#16191d" stroke="#9aa3ad" strokeWidth="0.8" />
-          <line x1={x} y1={y + h / 2} x2={x + w} y2={y + h / 2} stroke="#2b3138" strokeWidth="0.6" />
-        </g>
-      ))}
-      {shape === "ell" && (
-        <g>
-          <rect x="300" y="200" width="44" height="30" rx="3" fill="#e8e6e1" stroke="#fff" />
-          <text x="322" y="219" textAnchor="middle" fontSize="11" fontWeight="600" fill="#1a1a1a">
-            BAT
-          </text>
-        </g>
-      )}
-    </svg>
-  );
-}
-
-/** Rows of portrait panels: n across, k rows, each w by h with a small gap. */
-function rows(x: number, y: number, n: number, k: number, w: number, h: number): [number, number, number, number][] {
-  const out: [number, number, number, number][] = [];
-  for (let r = 0; r < k; r++) for (let c = 0; c < n; c++) out.push([x + c * (w + 2), y + r * (h + 2), w, h]);
-  return out;
-}
-
-function ridgeOf(shape: Roof): string {
-  if (shape === "gable") return "M150 150 H450";
-  if (shape === "hip") return "M130 60 L220 150 H380 L470 60 M130 240 L220 150 M380 150 L470 240";
-  return "M140 60 L260 150 V250 M260 150 L380 60";
 }
