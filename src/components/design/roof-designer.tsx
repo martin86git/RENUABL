@@ -6979,7 +6979,17 @@ export function RoofDesigner(props: {
               {board?.error && <p className="mt-2 rounded-md bg-warning-soft px-2.5 py-2 text-xs text-warning">{board.error}</p>}
               {board?.advice && (
                 <div className="mt-2 rounded-md bg-surface-2 p-2.5 text-xs text-ink">
-                  <ul className="space-y-1">
+                  {/* The two answers first (3 Nov 2026, Martin): which phase, and whether the solar's circuits fit. */}
+                  <p className="text-sm font-semibold">{board.advice.phaseLine}</p>
+                  <p
+                    className={clsx(
+                      "mt-1 text-sm font-semibold",
+                      board.advice.room === "yes" ? "text-positive" : board.advice.room === "no" ? "text-danger" : "text-sun-ink",
+                    )}
+                  >
+                    {board.advice.roomLine}
+                  </p>
+                  <ul className="mt-2 space-y-1 border-t border-line pt-2 text-ink-2">
                     {board.advice.reasons.map((r) => (
                       <li key={r}>{r}</li>
                     ))}

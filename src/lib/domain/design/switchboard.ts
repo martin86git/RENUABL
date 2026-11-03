@@ -8,7 +8,10 @@ export type Seen = "yes" | "no" | "unclear";
 
 export interface SwitchboardRead {
   isSwitchboard: boolean;
-  phase: "single" | "three" | "unclear";
+  /** Two phase is a rural supply: two active phases (3 Nov 2026, Martin: say single, two or three phase). */
+  phase: "single" | "two" | "three" | "unclear";
+  /** What showed the phase: the main switch's poles, the phase markings (Sol's words, a few). */
+  phaseClue: string;
   /** Empty breaker spaces on the rail (each single-pole space), when they can be counted. */
   spareSpaces: number | null;
   /** RCDs (safety switches, or RCBOs) protecting the circuits. */
@@ -23,8 +26,22 @@ export interface SwitchboardAdvice {
   /** Include the switchboard upgrade (true), leave it out (false), or check on site (null). */
   upgrade: boolean | null;
   rcbo: boolean | null;
+  /** For the quote, which has single and three phase: a two-phase board is left for the electrician to say. */
   phase: "single" | "three" | null;
+  /** The phase in words, first on the card: "Single phase: a one-pole main switch." */
+  phaseLine: string;
+  /** Whether the board has room for the solar's circuits, first on the card with the line saying why. */
+  room: "yes" | "no" | "unclear";
+  roomLine: string;
   reasons: string[];
+}
+
+const PHASE_WORDS = { single: "Single phase", two: "Two phase", three: "Three phase" } as const;
+
+/** The new system's breakers in words: "the inverter and the battery". */
+export function newCircuits(kit: { battery: boolean; ev: boolean }): string {
+  const list = ["the inverter", ...(kit.battery ? ["the battery"] : []), ...(kit.ev ? ["the EV charger"] : [])];
+  return list.length === 1 ? list[0] : `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
 }
 
 /**
@@ -59,7 +76,30 @@ export function switchboardAdvice(read: SwitchboardRead, kit: { battery: boolean
     reasons.push("Safety switches seen on the board.");
   } else reasons.push("Whether there's a safety switch couldn't be told: check on site.");
   if (read.notes.trim()) reasons.push(read.notes.trim().slice(0, 240));
-  return { upgrade, rcbo, phase: read.phase === "unclear" ? null : read.phase, reasons };
+  const clue = read.phaseClue.trim().replace(/\.$/, "");
+  const phaseLine =
+    read.phase === "unclear"
+      ? "Phase: couldn't be told from the photo. Check the main switch or the meter."
+      : `${PHASE_WORDS[read.phase]}${clue ? `: ${clue}` : ""}.${read.phase === "two" ? " The quote has single or three phase: the electrician chooses." : ""}`;
+  const spaces = (n: number) => `${n} spare ${n === 1 ? "space" : "spaces"}`;
+  const what = `${need} needed for ${newCircuits(kit)}`;
+  const [room, roomLine]: ["yes" | "no" | "unclear", string] =
+    read.oldFuses === "yes"
+      ? ["no", "No room for the solar as it is: old fuses, so the board needs upgrading first."]
+      : read.spareSpaces !== null && read.spareSpaces < need
+        ? ["no", `No room for the solar: ${spaces(read.spareSpaces)}, ${what}. A switchboard upgrade, or a sub-board.`]
+        : read.spareSpaces !== null && read.oldFuses === "no"
+          ? ["yes", `Room for the solar: ${spaces(read.spareSpaces)}, ${what}.`]
+          : ["unclear", `Room for the solar: couldn't be told from the photo (${what}). Check on site.`];
+  return {
+    upgrade,
+    rcbo,
+    phase: read.phase === "single" || read.phase === "three" ? read.phase : null,
+    phaseLine,
+    room,
+    roomLine,
+    reasons,
+  };
 }
 
 /** Sol's reading of the photo, checked: anything not one of the expected answers is unclear. */
@@ -71,7 +111,8 @@ export function cleanSwitchboardRead(raw: Record<string, unknown>): SwitchboardR
       : null;
   return {
     isSwitchboard: raw.isSwitchboard === true,
-    phase: raw.phase === "single" || raw.phase === "three" ? raw.phase : "unclear",
+    phase: raw.phase === "single" || raw.phase === "two" || raw.phase === "three" ? raw.phase : "unclear",
+    phaseClue: typeof raw.phaseClue === "string" ? raw.phaseClue.replace(/[<>]/g, "").trim().slice(0, 120) : "",
     spareSpaces: spare,
     rcd: seen(raw.rcd),
     oldFuses: seen(raw.oldFuses),
@@ -86,9 +127,11 @@ export const SWITCHBOARD_SCHEMA = {
     isSwitchboard: { type: "boolean", description: "True only if the photo shows a home's electrical switchboard." },
     phase: {
       type: "string",
-      enum: ["single", "three", "unclear"],
-      description: "Three-phase when the main switch is three-pole or three phases are marked.",
+      enum: ["single", "two", "three", "unclear"],
+      description:
+        "From the main switch: one pole is single phase, two linked poles two phase, three linked poles three phase; or from phase markings (A B C, red white blue, L1 L2 L3).",
     },
+    phaseClue: { type: "string", description: "In a few words, what showed the phase, e.g. a three-pole main switch. Empty if unclear." },
     spareSpaces: {
       type: ["integer", "null"] as ("integer" | "null")[],
       description: "Empty single-pole spaces on the DIN rail, counted. Null if they can't be counted.",
@@ -105,7 +148,7 @@ export const SWITCHBOARD_SCHEMA = {
     },
     notes: { type: "string", description: "One sentence on anything else an electrician would want to know. Empty if nothing." },
   },
-  required: ["isSwitchboard", "phase", "spareSpaces", "rcd", "oldFuses", "notes"],
+  required: ["isSwitchboard", "phase", "phaseClue", "spareSpaces", "rcd", "oldFuses", "notes"],
 } as const;
 
-export const SWITCHBOARD_PROMPT = `Above is a photo of a home's electrical switchboard in Australia. Read only what the photo shows, for planning a solar and battery installation: whether it is three-phase or single-phase, how many empty single-pole spaces there are on the rail, whether there are safety switches (RCDs or RCBOs, with a test button), and whether it still has old rewireable or ceramic fuses. Say "unclear" (or null) for anything you can't see plainly: never guess.`;
+export const SWITCHBOARD_PROMPT = `Above is a photo of a home's electrical switchboard in Australia. Read only what the photo shows, for planning a solar and battery installation: whether it is single, two or three phase (from the main switch's poles or the phase markings), how many empty single-pole spaces there are on the rail, whether there are safety switches (RCDs or RCBOs, with a test button), and whether it still has old rewireable or ceramic fuses. Say "unclear" (or null) for anything you can't see plainly: never guess.`;
