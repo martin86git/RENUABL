@@ -3017,7 +3017,42 @@ export function RoofDesigner(props: {
     setPrimary(lead);
     show(list, lead);
     setSaved("changed");
+    madeFor.current = { bill: billKey, designs: designsKey(list) };
+    setBillMoved(false);
   };
+  /**
+   * The three designs follow the bill (3 Nov 2026, Martin: "as I increase the bill amount, the 3x recommended system
+   * types need to adjust"): what they were made for, so a new bill makes them again a moment after typing stops, while
+   * nobody has changed them by hand; once someone has, Redesign for this bill is offered instead of writing over them.
+   */
+  const madeFor = useRef<{ bill: string; designs: string } | null>(null);
+  const [billMoved, setBillMoved] = useState(false);
+  /** The designs changed by hand stay as they are for this bill. */
+  const keepMyDesigns = () => {
+    setBillMoved(false);
+    if (madeFor.current) madeFor.current = { ...madeFor.current, bill: billKey };
+  };
+  const billKey = JSON.stringify([bill.interval, bill.amount, bill.rate, bill.supplyPerDay, bill.feedIn, bill.usage ?? ""]);
+  const designsKey = (list: RoofDesign[]) =>
+    JSON.stringify(
+      list.map((d) => [
+        (d.loose ?? []).map((p) => [p.x, p.y, p.angle, p.tilt ?? null]),
+        d.faces.length,
+        (d.inverters ?? []).map((i) => i.sku),
+        d.battery ? [d.battery.sku, d.battery.qty] : null,
+      ]),
+    );
+  useEffect(() => {
+    const made = madeFor.current;
+    if (!made || made.bill === billKey || costsHidden) return;
+    const t = window.setTimeout(() => {
+      if (designsKey(everyDesign()) === made.designs) void designForMe(false);
+      else setBillMoved(true);
+    }, 1200);
+    return () => window.clearTimeout(t);
+    // Only when the bill changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [billKey]);
   // The roof designs itself as it opens (1 Nov 2026, Martin: land on a finished first design, not a blank roof): once,
   // only when nothing has been drawn on any of the roof's designs, and only for someone who sees costs (it prices them).
   const autoDesigned = useRef(false);
@@ -6548,6 +6583,27 @@ export function RoofDesigner(props: {
                       >
                         <X className="size-4" aria-hidden />
                       </button>
+                    </div>
+                  )}
+                  {billMoved && (
+                    <div className={clsx(GLASS, "w-80 p-3 text-[13px]")} role="status">
+                      <p className="text-ink">
+                        The bill has changed since the three designs were made, and they&apos;ve been changed by hand.
+                      </p>
+                      <div className="mt-2 flex gap-1.5">
+                        <button
+                          onClick={() => void designForMe(false)}
+                          className="flex-1 rounded-full bg-primary py-1.5 text-xs font-semibold text-primary-ink hover:bg-forest"
+                        >
+                          Redesign for this bill
+                        </button>
+                        <button
+                          onClick={keepMyDesigns}
+                          className="flex-1 rounded-full bg-surface py-1.5 text-xs font-semibold text-ink ring-1 ring-line hover:bg-surface-2"
+                        >
+                          Keep mine
+                        </button>
+                      </div>
                     </div>
                   )}
                   {typeof mine === "object" && mineOpen && (
