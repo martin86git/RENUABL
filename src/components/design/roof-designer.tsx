@@ -54,6 +54,7 @@ import type { CatalogueBattery, CatalogueInverter, CataloguePanel } from "@/lib/
 import type { Workspace } from "@/lib/domain/design/pricing";
 import {
   costSystem,
+  MAX_ROOFS,
   stcValue,
   editedLines,
   solarVicBar,
@@ -566,29 +567,94 @@ function PitchStepper({ pitch, onPitch, onEnter }: { pitch: number; onPitch: (pi
 }
 
 /** The roof pitch as a small mark on the picture's left edge: the angle and its degrees; pressed, a pad to change it. */
-function RoofPitchMark(props: { pitch: number; open: boolean; onOpen: (open: boolean) => void; onPitch: (pitch: number) => void }) {
-  const { pitch, open, onOpen, onPitch } = props;
+/**
+ * The home's roofs and their pitches, on the picture's left edge (3 Nov 2026, Martin: a house and a garage at different
+ * angles; a flat roof keeps its mark, to be changed). One mark a roof, the one ringed the roof new panels go down at:
+ * pressing another makes it that one (and lays any panels picked at its pitch); pressing the ringed one opens it to
+ * change; + adds a roof. Roof 1 is the home's own pitch, flat when the roof is set flat.
+ */
+function RoofPitches(props: {
+  roofs: number[];
+  flat: boolean;
+  active: number;
+  open: boolean;
+  onActive: (index: number) => void;
+  onOpen: (open: boolean) => void;
+  onPitch: (index: number, pitch: number) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+  onNotFlat: () => void;
+}) {
+  const { roofs, flat, active, open } = props;
+  const pitch = roofs[active] ?? 0;
+  const several = roofs.length > 1;
   return (
     <div className="absolute left-3 top-1/2 z-30 -translate-y-1/2">
-      <button
-        onClick={() => onOpen(!open)}
-        className={clsx("flex flex-col items-center gap-0.5 px-2 py-1.5 text-ink", GLASS, open && "ring-2 ring-sun-line")}
-        title={`Roof pitch ${pitch}°: new panels and traced faces start at it. Press to change it.`}
-        aria-expanded={open}
-        aria-label={`Roof pitch ${pitch} degrees: change it`}
-      >
-        <RoofAngle pitch={pitch} />
-        <span className="text-xs font-semibold tabular-nums leading-none">{pitch}°</span>
-      </button>
+      <div className="flex flex-col items-center gap-1.5">
+        {roofs.map((p, i) => {
+          const isFlat = i === 0 && flat;
+          return (
+            <button
+              key={i}
+              onClick={() => (i === active ? props.onOpen(!open) : props.onActive(i))}
+              className={clsx(
+                "flex flex-col items-center gap-0.5 px-2 py-1.5 text-ink",
+                GLASS,
+                i === active ? "ring-2 ring-sun-line" : "opacity-80 hover:opacity-100",
+              )}
+              title={
+                i === active
+                  ? `${several ? `Roof ${i + 1}: ` : ""}${isFlat ? "flat" : `${p}°`}. New panels go down at it. Press to change it.`
+                  : `Roof ${i + 1}, ${isFlat ? "flat" : `${p}°`}: lay new panels (and any picked) at it`
+              }
+              aria-expanded={i === active ? open : undefined}
+              aria-label={`Roof ${i + 1}, ${isFlat ? "flat" : `${p} degrees`}${i === active ? ", in use: change it" : ": use it"}`}
+            >
+              <RoofAngle pitch={isFlat ? 0 : p} />
+              <span className="text-xs font-semibold tabular-nums leading-none">{isFlat ? "Flat" : `${p}°`}</span>
+              {several && <span className="text-[9px] font-medium uppercase tracking-[0.1em] text-muted">Roof {i + 1}</span>}
+            </button>
+          );
+        })}
+        {roofs.length < MAX_ROOFS && (
+          <button
+            onClick={props.onAdd}
+            className={clsx("flex size-8 items-center justify-center text-ink-2 hover:text-ink", GLASS)}
+            title="Another roof at its own pitch (a garage, a patio)"
+            aria-label="Add another roof pitch"
+          >
+            <Plus className="size-4" aria-hidden />
+          </button>
+        )}
+      </div>
       {open && (
         <div className="absolute left-full top-1/2 ml-2 w-56 -translate-y-1/2 rounded-2xl bg-surface p-3 text-ink shadow-lift ring-1 ring-line">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">Roof pitch</span>
-            <button onClick={() => onOpen(false)} className="text-xs font-medium text-muted hover:text-ink">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+              {several ? `Roof ${active + 1} pitch` : "Roof pitch"}
+            </span>
+            <button onClick={() => props.onOpen(false)} className="text-xs font-medium text-muted hover:text-ink">
               Done
             </button>
           </div>
-          <PitchStepper pitch={pitch} onPitch={onPitch} />
+          {active === 0 && flat ? (
+            <>
+              <p className="mt-2 text-sm text-ink-2">Set as a flat roof: panels lie flat unless tilted on frames.</p>
+              <button
+                onClick={props.onNotFlat}
+                className="mt-2 w-full rounded-full bg-surface py-1.5 text-xs font-semibold text-ink ring-1 ring-line hover:bg-surface-2"
+              >
+                It isn&apos;t flat: set a pitch
+              </button>
+            </>
+          ) : (
+            <PitchStepper pitch={pitch} onPitch={(n) => props.onPitch(active, n)} onEnter={() => props.onOpen(false)} />
+          )}
+          {active > 0 && (
+            <button onClick={() => props.onRemove(active)} className="mt-2 w-full text-xs font-medium text-muted hover:text-danger">
+              Remove roof {active + 1}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -1307,8 +1373,12 @@ export function RoofDesigner(props: {
   const stored = quotes[active] ?? defaultQuote(props.postcode);
   const quoteNow = props.postcode ? { ...stored, form: { ...stored.form, postcode: props.postcode } } : stored;
   const everyQuote = () => designs.map((_, i) => quotes[i] ?? defaultQuote(props.postcode));
-  // The roof's pitch, one figure for the home: new panels and traced faces start at it; a flat roof's lie flat.
-  const homePitch = quoteNow.form.roof === "flat" ? 0 : (quoteNow.form.pitch ?? TILT.roof);
+  // The home's roofs and their pitches (3 Nov 2026: a house and a garage at different angles): roof 1 is the home's own
+  // (flat when the roof is set flat), the rest from `pitches`. New panels and traced faces start at the one in use.
+  const roofPitches = [quoteNow.form.roof === "flat" ? 0 : (quoteNow.form.pitch ?? TILT.roof), ...(quoteNow.form.pitches ?? [])];
+  const [activeRoof, setActiveRoof] = useState(0);
+  const roofInUse = Math.min(activeRoof, roofPitches.length - 1);
+  const homePitch = roofPitches[roofInUse];
   const [pitchOpen, setPitchOpen] = useState(false);
   const setQuote = (next: QuoteFields) => {
     setQuotes(designs.map((_, i) => (i === active ? next : (quotes[i] ?? defaultQuote(props.postcode)))));
@@ -4838,12 +4908,39 @@ export function RoofDesigner(props: {
 
               {/* The roof's pitch (1 Nov 2026, Martin, as Primero's): until a person has set it for this home, a card asks for it
                   (so a flat roof isn't left at the 22 degree start); then it is a small roof-angle mark on the left edge that opens to change it. */}
-              {quoteNow.form.roof !== "flat" && quoteNow.form.pitchSet && (
-                <RoofPitchMark
-                  pitch={homePitch}
+              {quoteNow.form.pitchSet && (
+                <RoofPitches
+                  roofs={roofPitches}
+                  flat={quoteNow.form.roof === "flat"}
+                  active={roofInUse}
                   open={pitchOpen}
                   onOpen={setPitchOpen}
-                  onPitch={(pitch) => setQuote({ ...quoteNow, form: { ...quoteNow.form, pitch, pitchSet: true } })}
+                  onActive={(i) => {
+                    setActiveRoof(i);
+                    setPitchOpen(false);
+                    // Panels picked go to that roof's pitch.
+                    if (panelPicks.length) amend((panel) => ({ ...panel, tilt: roofPitches[i] }));
+                  }}
+                  onPitch={(i, pitch) =>
+                    setQuote({
+                      ...quoteNow,
+                      form:
+                        i === 0
+                          ? { ...quoteNow.form, pitch, pitchSet: true }
+                          : { ...quoteNow.form, pitches: roofPitches.slice(1).map((x, j) => (j === i - 1 ? pitch : x)) },
+                    })
+                  }
+                  onAdd={() => {
+                    setQuote({ ...quoteNow, form: { ...quoteNow.form, pitches: [...roofPitches.slice(1), homePitch] } });
+                    setActiveRoof(roofPitches.length);
+                    setPitchOpen(true);
+                  }}
+                  onRemove={(i) => {
+                    setQuote({ ...quoteNow, form: { ...quoteNow.form, pitches: roofPitches.slice(1).filter((_, j) => j !== i - 1) } });
+                    setActiveRoof(0);
+                    setPitchOpen(false);
+                  }}
+                  onNotFlat={() => setQuote({ ...quoteNow, form: { ...quoteNow.form, roof: "tile", pitchSet: true } })}
                 />
               )}
               {!quoteNow.form.pitchSet && (

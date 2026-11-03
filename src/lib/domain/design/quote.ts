@@ -59,7 +59,15 @@ export interface QuoteForm {
   pitch?: number;
   /** A person has set the pitch for this home: until then the designer asks for it. */
   pitchSet?: boolean;
+  /**
+   * The pitches of the home's other roofs (3 Nov 2026, Martin: a house and its garage at different angles), after the
+   * main one (`pitch`): each a roof new panels can be laid at, chosen on the designer's pitch mark. Up to `MAX_ROOFS` - 1.
+   */
+  pitches?: number[];
 }
+
+/** The most roofs a home's pitch mark holds, the main one included. */
+export const MAX_ROOFS = 4;
 
 /** The system on the drawing. */
 export interface SystemSpec {
@@ -557,6 +565,14 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
         ...(f.solarVicRebate === true ? { solarVicRebate: true, ...(f.solarVicLoan === true ? { solarVicLoan: true } : {}) } : {}),
         ...(typeof f.pitch === "number" && Number.isFinite(f.pitch) && f.pitch >= 0 && f.pitch <= 70 ? { pitch: Math.round(f.pitch) } : {}),
         ...(f.pitchSet === true ? { pitchSet: true } : {}),
+        ...(Array.isArray(f.pitches) && f.pitches.length
+          ? {
+              pitches: f.pitches
+                .filter((x): x is number => typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 70)
+                .slice(0, MAX_ROOFS - 1)
+                .map((x) => Math.round(x)),
+            }
+          : {}),
       },
       edits,
     });
