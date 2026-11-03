@@ -1,5 +1,6 @@
 "use client";
 
+import { BUSINESS_LINK_SHOWN } from "@/lib/domain/business-link";
 import { ArrowRight, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { Dialog } from "radix-ui";
@@ -41,17 +42,19 @@ export function MobileMenu() {
               Log in <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
             </Link>
           </nav>
-          <Link
-            href="/business"
-            onClick={() => setOpen(false)}
-            className="mt-4 flex items-center justify-between px-1 text-[14px] text-ink-2"
-          >
-            <span>
-              <span className="block text-ink">For solar businesses</span>
-              <span className="block text-[12.5px] text-muted">RENUABL Business, for retailers and installers</span>
-            </span>
-            <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
-          </Link>
+          {BUSINESS_LINK_SHOWN && (
+            <Link
+              href="/business"
+              onClick={() => setOpen(false)}
+              className="mt-4 flex items-center justify-between px-1 text-[14px] text-ink-2"
+            >
+              <span>
+                <span className="block text-ink">For solar businesses</span>
+                <span className="block text-[12.5px] text-muted">RENUABL Business, for retailers and installers</span>
+              </span>
+              <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
+            </Link>
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

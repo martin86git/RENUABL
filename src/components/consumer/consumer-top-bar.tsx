@@ -1,3 +1,4 @@
+import { BUSINESS_LINK_SHOWN } from "@/lib/domain/business-link";
 import { ChevronDown, UserRound } from "lucide-react";
 import Link from "next/link";
 import { LEARN_NAME } from "@/lib/domain/guides";
@@ -28,7 +29,7 @@ export function ConsumerTopBar({
           {LEARN_NAME}
         </Link>
       )}
-      {partners && (
+      {partners && BUSINESS_LINK_SHOWN && (
         <Link href="/business" className="text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline">
           For solar businesses
         </Link>
