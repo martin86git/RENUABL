@@ -18,9 +18,12 @@ export function SettingsFrame({ children }: { children: React.ReactNode }) {
   // An installer or inspector has only the settings their login uses (business-kind.ts).
   const [account] = useDesignAccount();
   const only = settingsFor(cleanKind(account?.signedIn ? account.business?.kind : undefined));
-  const groups = only
-    ? SETTINGS.map((g) => ({ ...g, items: g.items.filter((i) => only.includes(i.slug)) })).filter((g) => g.items.length)
-    : SETTINGS;
+  // RENUABL staff see View as, whatever kind of business they are looking through; nobody else does.
+  const staff = Boolean(account?.signedIn && account.staff);
+  const groups = SETTINGS.map((g) => ({
+    ...g,
+    items: g.items.filter((i) => (i.staff ? staff : !only || only.includes(i.slug))),
+  })).filter((g) => g.items.length);
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
       <nav

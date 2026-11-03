@@ -1,5 +1,7 @@
 import { BUSINESS_TERMS_VERSION, can } from "@/lib/domain/design/account";
+import { sampleByEmail } from "@/lib/domain/design/staff-view";
 import { answer, designAccess } from "@/lib/server/design-context";
+import { staffBehind } from "@/lib/server/design-staff-view";
 
 /**
  * GET: who the roof designer is being used by. Signed out, the designer keeps
@@ -12,6 +14,7 @@ export async function GET() {
     const access = await designAccess();
     if (access.state === "signed-out") return Response.json({ signedIn: false });
     const member = access.state === "no-business" ? null : access.member;
+    const staff = await staffBehind().catch(() => null);
     return Response.json({
       signedIn: true,
       state: access.state,
@@ -27,6 +30,8 @@ export async function GET() {
       termsVersion: BUSINESS_TERMS_VERSION,
       // The owner viewing as this member: whose own view it really is.
       ...(member?.viewedBy ? { viewedBy: member.viewedBy } : {}),
+      // RENUABL staff: Settings offers View as a retailer, installer or inspector; while in a sample, which one.
+      ...(staff ? { staff: true, ...(sampleByEmail(access.email) ? { staffViewing: sampleByEmail(access.email)!.kind } : {}) } : {}),
     });
   });
 }

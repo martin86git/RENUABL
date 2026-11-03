@@ -10,6 +10,7 @@ import { DatasheetSettings } from "@/components/design/settings-datasheets";
 import { StandardsSettings } from "@/components/design/settings-standards";
 import { TargetsSettings } from "@/components/design/settings-targets";
 import { CardPaymentsSettings } from "@/components/design/settings-card-payments";
+import { StaffViewAs } from "@/components/design/staff-view-as";
 import { settingBySlug } from "@/components/design/settings-list";
 import { SettingSoon, SettingsFrame } from "@/components/design/settings-nav";
 import { BillingPage, NeedsCosts, ProposalSettings, type ProposalPart } from "@/components/design/settings-proposal";
@@ -77,6 +78,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <BillingPage />
         ) : section === "card-payments" ? (
           <CardPaymentsSettings />
+        ) : section === "view-as" ? (
+          <StaffViewAs />
         ) : (
           <DesignAccountPage />
         )}

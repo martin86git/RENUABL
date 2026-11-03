@@ -118,7 +118,8 @@ export function pageAllowed(kind: BusinessKind, path: string): boolean {
   if (path === "/design") return true;
   if (under(path, "/design/settings")) {
     const slug = path.split("/")[3];
-    return !slug || SETTINGS[kind].includes(slug);
+    // View as is open to every kind: it shows nothing but to RENUABL staff (staff-view.ts).
+    return !slug || slug === "view-as" || SETTINGS[kind].includes(slug);
   }
   // The Marketplace's own address is its launch page while it is closed, for everyone; once open, an inspector's
   // Marketplace starts at its equipment.

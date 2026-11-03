@@ -28,7 +28,8 @@ import {
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 import { KIND_SECTIONS, designsRoofs, pageAt, sectionAt } from "@/lib/domain/design/sections";
-import { cleanKind, pageAllowed, type BusinessKind } from "@/lib/domain/design/business-kind";
+import { BUSINESS_KINDS, cleanKind, pageAllowed, type BusinessKind } from "@/lib/domain/design/business-kind";
+import { staffView } from "./staff-view-as";
 import { notificationCount, serviceCount, approvalCounts, updatesUnseen } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
@@ -269,6 +270,31 @@ function Shell({
             className="rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-ink"
           >
             Back to my own view
+          </button>
+        </div>
+      )}
+      {/* RENUABL staff looking through a sample business (Settings → View as): which kind, and the way back to their own sign-in. */}
+      {account.staffViewing && (
+        <div className="sticky top-0 z-[45] flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-sun-line px-4 py-2 text-center text-sm text-white print:hidden">
+          <span>
+            Viewing as {account.staffViewing === "inspector" ? "an" : "a"}{" "}
+            <strong className="font-semibold">
+              {BUSINESS_KINDS.find((k) => k.kind === account.staffViewing)?.label.toLowerCase() ?? account.staffViewing}
+            </strong>
+            : {account.business?.name}, a sample business.
+          </span>
+          <Link href="/design/settings/view-as" className="rounded-full bg-white/20 px-3 py-0.5 text-xs font-semibold text-white">
+            Switch
+          </Link>
+          <button
+            type="button"
+            onClick={async () => {
+              await staffView("own");
+              window.location.replace("/design/settings/view-as");
+            }}
+            className="rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-ink"
+          >
+            Back to my account
           </button>
         </div>
       )}

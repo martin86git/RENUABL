@@ -85,6 +85,13 @@ export async function currentSession(): Promise<Session | null> {
   }
 }
 
+/** Whose session an id is, while it lasts: for a session kept aside (staff looking through a sample business). */
+export async function sessionEmail(id: string | undefined): Promise<string | null> {
+  if (!id || !/^[a-f0-9]{64}$/.test(id)) return null;
+  const rows = await query<{ email: string }>(`select email from sessions where id_hash = $1 and expires_at > now()`, [hash(id)]);
+  return rows[0]?.email ?? null;
+}
+
 export async function endSession(id: string | undefined) {
   if (id && /^[a-f0-9]{64}$/.test(id)) await query(`delete from sessions where id_hash = $1`, [hash(id)]);
 }

@@ -28,6 +28,9 @@ export type DesignAccount =
       may?: { costs: boolean; prices: boolean; publish: boolean; members: boolean } | null;
       /** The owner viewing the product as this member (read only): the owner's email. */
       viewedBy?: string;
+      /** RENUABL staff (Settings → View as), and the sample business kind they are looking through. */
+      staff?: boolean;
+      staffViewing?: "retailer" | "installer" | "inspector";
     };
 
 /**

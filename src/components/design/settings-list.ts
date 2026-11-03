@@ -3,7 +3,7 @@
  * beside the product's sections. `soon` marks a page that is named and has
  * its place, and says plainly that it isn't built yet.
  */
-export const SETTINGS: { title: string; items: { slug: string; label: string; soon?: string }[] }[] = [
+export const SETTINGS: { title: string; items: { slug: string; label: string; soon?: string; staff?: true }[] }[] = [
   {
     title: "CRM",
     items: [
@@ -58,6 +58,11 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
       { slug: "billing", label: "Billing" },
       { slug: "card-payments", label: "Card payments from customers" },
     ],
+  },
+  {
+    // RENUABL's own staff only (`ADMIN_EMAILS`): never shown to a business.
+    title: "RENUABL staff",
+    items: [{ slug: "view-as", label: "View as", staff: true }],
   },
 ];
 
