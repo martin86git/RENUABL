@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { formatCallTime, isBookableCallSlot } from "@/lib/domain/booking";
 import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
 import { validateContact } from "@/lib/domain/contact";
@@ -11,6 +12,7 @@ import { sendEmail } from "@/lib/server/email";
 import { addNote, crmNote, upsertContact, hubspotToken } from "@/lib/server/hubspot-crm";
 import { alertNewLead } from "@/lib/server/lead-alert";
 import { allow } from "@/lib/server/rate-limit";
+import { stopVoiceCalls } from "@/lib/server/voice-calls";
 
 /**
  * POST { firstName, lastName, mobile, email, date, time, source?, consent }: a prospect without a
@@ -73,6 +75,9 @@ export async function POST(request: Request) {
   );
   if (!saved && !alerted)
     return Response.json({ ok: false, message: "We couldn't book that just now. Please try again." }, { status: 502 });
+
+  // They booked it themselves: Revo doesn't need to call.
+  after(() => stopVoiceCalls(contact.mobile, "booked on /book-a-call"));
 
   let emailed = false;
   const site = siteUrl() ?? publicSiteUrl();

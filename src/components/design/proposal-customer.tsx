@@ -5,6 +5,7 @@ import type { PublicDeposit } from "@/lib/domain/design/deposit";
 import { recommendedGoal, viewForChoice, type ProposalState, type ProposalView } from "@/lib/domain/design/proposal";
 import type { OptionKey } from "@/lib/domain/design/proposal";
 import { acceptProposal, proposalUrls, sayPaid, tellOpened } from "@/lib/services/proposals";
+import { CallMe } from "./call-me";
 import { ChatDock, ChatGreeting, useCustomerChat } from "./chat-panel";
 import { PayDeposit } from "./deposit-panel";
 import { PaySchedule } from "./pay-schedule";
@@ -26,6 +27,8 @@ export function CustomerProposal(props: {
   accepted: { name: string; at: string; option?: OptionKey | null } | null;
   deposit: PublicDeposit | null;
   payments: PublicPayments | null;
+  /** "Call me" with the business's automated assistant, when the business has calls on. */
+  callMe?: { assistant: string } | null;
 }) {
   const { token, view } = props;
   const [state, setState] = useState(props.state);
@@ -68,7 +71,16 @@ export function CustomerProposal(props: {
         ) : null
       }
       onOpenChat={() => chat.show(true)}
-      greeting={<ChatGreeting chat={chat} />}
+      greeting={
+        <>
+          <ChatGreeting chat={chat} />
+          {props.callMe && state !== "withdrawn" && (
+            <div className="mt-4">
+              <CallMe token={token} assistant={props.callMe.assistant} />
+            </div>
+          )}
+        </>
+      }
       chat={<ChatDock chat={chat} />}
       actions={{
         accept: async (name, agree) => {

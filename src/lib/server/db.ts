@@ -165,6 +165,51 @@ create table if not exists briefs (
 alter table briefs add column if not exists call_slot text;
 alter table briefs add column if not exists hubspot_id text;
 alter table briefs add column if not exists unfinished_noted_at timestamptz;
+-- The assistant's phone calls on a CRM deal (server/voice-calls.ts, Vapi): one row a run of calls on a deal (a new
+-- lead, or a customer who asked to be called about their proposal), and one event a call ended or a tool used. What
+-- happened is also written on the deal's own record. Never HubSpot.
+create table if not exists voice_calls (
+  id text primary key,
+  business_id text references businesses(id) on delete cascade,
+  job_id text,
+  customer_id text,
+  mode text not null default 'lead',
+  asked boolean not null default false,
+  first_name text,
+  mobile text not null,
+  email text,
+  lead jsonb not null default '{}',
+  status text not null default 'waiting',
+  attempts integer not null default 0,
+  vapi_call_id text,
+  outcome text,
+  call_label text,
+  stop_reason text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table voice_calls add column if not exists business_id text references businesses(id) on delete cascade;
+alter table voice_calls add column if not exists job_id text;
+alter table voice_calls add column if not exists customer_id text;
+alter table voice_calls add column if not exists mode text not null default 'lead';
+alter table voice_calls add column if not exists asked boolean not null default false;
+drop index if exists voice_calls_one_open;
+create unique index if not exists voice_calls_one_open_job on voice_calls(business_id, job_id) where status in ('waiting', 'calling');
+create index if not exists voice_calls_vapi on voice_calls(vapi_call_id);
+create index if not exists voice_calls_mobile on voice_calls(mobile, status);
+create table if not exists voice_call_events (
+  id text primary key,
+  voice_call_id text not null references voice_calls(id) on delete cascade,
+  attempt integer not null,
+  kind text not null,
+  outcome text,
+  ended_reason text,
+  summary text,
+  transcript text,
+  vapi_call_id text,
+  at timestamptz not null default now()
+);
+create index if not exists voice_call_events_call on voice_call_events(voice_call_id, at);
 -- The roof designer's own customers: businesses and the people in them. Not RENUABL's installation partners.
 -- Every table below carries business_id, and every query on it filters by it (server/design-repo.ts).
 create table if not exists businesses (
@@ -544,6 +589,9 @@ create table if not exists design_service_cases (
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
 create index if not exists design_service_cases_business on design_service_cases(business_id, state);
+-- Sol's summary of a case (domain/design/service-brief.ts), kept until something new happens on it.
+alter table design_service_cases add column if not exists brief jsonb;
+alter table design_service_cases add column if not exists brief_key text;
 -- What a signed job's installation was allowed for in its quote (domain/design/installer-invoices.ts), fixed at signing.
 create table if not exists design_install_costs (
   business_id text not null references businesses(id) on delete cascade,

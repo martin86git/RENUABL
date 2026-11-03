@@ -398,6 +398,26 @@ export function chatMessageEmail(o: { business: string; customer: string; title:
 }
 
 /**
+ * To a business's own people (never the customer): on a call with the business's automated assistant, the customer
+ * asked for a person to call them back. Who, about what, when suits them, and the way to the deal; nothing else.
+ */
+export function callbackRequestEmail(o: { assistant: string; customer: string; title: string; about: string; when: string; link: string }) {
+  const customer = plainText(o.customer, 120) || "A customer";
+  return simpleEmail({
+    subject: `Call back ${customer}`,
+    heading: `${customer} would like a call back`,
+    lines: [
+      `On a call with ${plainText(o.assistant, 20) || "your assistant"} about "${plainText(o.title, 80) || "their job"}", they asked for someone from the team to ring them.`,
+      `About: ${plainText(o.about, 300) || "not said"}`,
+      `When suits them: ${plainText(o.when, 120) || "not said"}`,
+      "The call's summary is on the deal's record.",
+    ],
+    button: { label: "Open the deal", href: o.link },
+    footer: "This message was sent by RENUABL for your business. It wasn't sent to the customer.",
+  });
+}
+
+/**
  * To a business's customer, when the business replies in their job's conversation (the roof designer). Sent by
  * RENUABL and says so, naming the business plainly: it is not sent in the business's name. It carries the one new
  * message and the way back to their proposal, and asks them to answer there: a reply by email isn't read.

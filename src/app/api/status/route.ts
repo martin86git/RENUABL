@@ -10,6 +10,7 @@ import { checkHubspot, hubspotToken } from "@/lib/server/hubspot-crm";
 import { looksLikeHubspotToken } from "@/lib/domain/hubspot-token";
 import { smsConfigured } from "@/lib/server/sms";
 import { storageConfigured } from "@/lib/server/storage";
+import { voiceStatus } from "@/lib/server/voice-calls";
 
 const set = (v: string | undefined) => Boolean(v?.trim());
 
@@ -56,6 +57,8 @@ export async function GET() {
       nearmap: set(process.env.NEARMAP_API_KEY),
       claude: set(process.env.ANTHROPIC_API_KEY),
       sms: smsConfigured(),
+      // Revo calling new leads (Vapi): switched on, and which settings are in.
+      voiceCalls: voiceStatus(),
       // Staff mobiles texted about new leads to call now.
       leadTexts: staffMobiles(process.env.LEAD_ALERT_MOBILES || process.env.ALERT_MOBILES).length > 0,
       // Browser tags (public IDs): which are set, so missing ones are easy to spot.

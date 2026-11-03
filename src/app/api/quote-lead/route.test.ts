@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// Run after() work straight away (no request scope in tests); voice calls are off here, so it does nothing.
+vi.mock("next/server", () => ({ after: (fn: () => unknown) => void fn() }));
 import { POST } from "./route";
 
 let ip = 0;

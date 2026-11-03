@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { readFollowUpContact } from "@/lib/domain/contact";
 import { finishLaterEmail, plainText, startedPlanEmail } from "@/lib/domain/emails";
 import { CONSENT_MISSING, consentRecord, readConsent } from "@/lib/domain/legal";
@@ -8,6 +9,7 @@ import { addNote, crmNote, followUpContactId, hubspotToken } from "@/lib/server/
 import { alertNewLead, textStaff } from "@/lib/server/lead-alert";
 import { allow } from "@/lib/server/rate-limit";
 import { sendSms } from "@/lib/server/sms";
+import { takeHomeLead } from "@/lib/server/voice-calls";
 
 /**
  * POST { email?, mobile?, home?, suburb?, source?, entry?, stage?, consent: { terms: true, marketing? } }.
@@ -112,5 +114,19 @@ export async function POST(request: Request) {
   });
   if (!saved && !emailed && !alerted)
     return Response.json({ ok: false, message: "We couldn't save that just now. Please try again." }, { status: 502 });
+  // The lead becomes a deal in RENUABL's own CRM; one who started their plan and left a mobile is rung by Revo when
+  // calls are on (server/voice-calls.ts).
+  after(() =>
+    takeHomeLead(
+      {
+        mobile,
+        email,
+        home: plainText(body.home, 160) || null,
+        source: started ? "Started their plan" : "No bill yet: follow up",
+        details,
+      },
+      started && Boolean(mobile),
+    ),
+  );
   return Response.json({ ok: true, emailed, texted });
 }

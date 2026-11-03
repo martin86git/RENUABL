@@ -4,7 +4,8 @@ import { connection } from "next/server";
 import { CustomerProposal } from "@/components/design/proposal-customer";
 import { ProposalGone } from "@/components/design/proposal-view";
 import { todayInMarket } from "@/lib/domain/market";
-import { publicProposal } from "@/lib/server/design-proposal-repo";
+import { proposalJob, publicProposal } from "@/lib/server/design-proposal-repo";
+import { callMeFor } from "@/lib/server/voice-calls";
 
 /**
  * Kept out of search, and the page it links to is never told where the
@@ -37,6 +38,9 @@ export default async function ProposalLinkPage({ params }: PageProps<"/p/[token]
   const found = await publicProposal(token, todayInMarket()).catch(() => null);
   if (!found) notFound();
   if (!found.view) return <ProposalGone business={found.business} />;
+  // "Call me" only where the business has calls on (server/voice-calls.ts).
+  const job = await proposalJob(token).catch(() => null);
+  const callMe = job ? await callMeFor(job.businessId).catch(() => null) : null;
   return (
     <CustomerProposal
       token={token}
@@ -45,6 +49,7 @@ export default async function ProposalLinkPage({ params }: PageProps<"/p/[token]
       accepted={found.accepted}
       deposit={found.deposit}
       payments={found.payments}
+      callMe={callMe}
     />
   );
 }

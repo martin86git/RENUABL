@@ -24,6 +24,8 @@ import { listBriefs } from "@/lib/server/briefs-repo";
 import { noteUnfinishedBriefs } from "@/lib/server/brief-hubspot";
 import { BUSINESS_KINDS, countByKind, kindLabel } from "@/lib/domain/design/business-kind";
 import { listDesignBusinesses } from "@/lib/server/design-admin-repo";
+import { listVoiceCalls } from "@/lib/server/voice-calls";
+import { OUTCOME_WORDS, type CallOutcome } from "@/lib/domain/voice-agent";
 
 export const metadata = { title: "Partners and jobs" };
 
@@ -48,7 +50,7 @@ export default async function AdminPage() {
   await processOffersSoon();
   // Briefs left partway for a few hours get their "not finished" note when staff look (and from the daily cron).
   await noteUnfinishedBriefs();
-  const [partners, jobs, uploads, claims, checks, briefs, businesses] = await Promise.all([
+  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls] = await Promise.all([
     listPartners(),
     listAllJobs(),
     listPriceUploads(),
@@ -56,6 +58,7 @@ export default async function AdminPage() {
     allHealthAnswers(),
     listBriefs(),
     listDesignBusinesses(),
+    listVoiceCalls().catch(() => []),
   ]);
   const kinds = countByKind(businesses);
   const tallies = interestSummary(checks);
@@ -105,6 +108,46 @@ export default async function AdminPage() {
                 </li>
               );
             })}
+          </ul>
+        </Panel>
+      )}
+      {voiceCalls.length > 0 && (
+        <Panel className="mt-6" title={`Revo's calls · ${voiceCalls.length}`}>
+          <ul className="divide-y divide-line">
+            {voiceCalls.map((c) => (
+              <li key={c.id} className="px-5 py-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[15px] font-medium">{c.first_name || "New lead"}</span>
+                  <Badge tone={c.status === "booked" ? "positive" : c.status === "calling" ? "info" : "neutral"}>
+                    {c.status === "booked"
+                      ? "Call booked"
+                      : c.status === "calling"
+                        ? "Calling"
+                        : c.outcome
+                          ? OUTCOME_WORDS[c.outcome]
+                          : c.status === "stopped"
+                            ? "Stopped"
+                            : "Waiting"}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-[13px] text-muted">
+                  {c.mobile} · {c.attempts} {c.attempts === 1 ? "call" : "calls"}
+                  {c.call_label ? ` · call ${c.call_label}` : ""}
+                  {c.stop_reason ? ` · ${c.stop_reason}` : ""}
+                </p>
+                {c.events
+                  .filter((e) => e.kind === "ended")
+                  .map((e, i) => (
+                    <details key={i} className="mt-1 text-[13px]">
+                      <summary className="cursor-pointer text-muted">
+                        Call {e.attempt}: {e.outcome ? OUTCOME_WORDS[e.outcome as CallOutcome] : e.ended_reason}
+                        {e.summary ? `. ${e.summary}` : ""}
+                      </summary>
+                      {e.transcript && <p className="mt-1 whitespace-pre-wrap text-muted">{e.transcript}</p>}
+                    </details>
+                  ))}
+              </li>
+            ))}
           </ul>
         </Panel>
       )}

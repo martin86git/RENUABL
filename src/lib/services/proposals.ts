@@ -163,6 +163,9 @@ export const acceptProposal = (token: string, name: string, agree: boolean, opti
   ask<OpenedProposal>(link(token), { method: "POST", body: { action: "accept", name, agree, option } });
 
 /** The customer saying they have paid the deposit, and how. Kept as what they said: it is not a payment. */
+/** "Call me": the business's assistant rings the number on the customer's record. `when` is "now", "today at 1pm", … */
+export const askForCall = (token: string) => ask<{ when: string; already?: boolean }>(`${link(token)}/call`, { method: "POST" });
+
 export const sayPaid = (token: string, way: PaidWay) => ask<OpenedProposal>(link(token), { method: "POST", body: { action: "paid", way } });
 
 /** Where a proposal's pictures, its roof from above, its PDF and the business's own terms are, by its private link. */

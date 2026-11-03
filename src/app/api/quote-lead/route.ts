@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { normaliseMobile } from "@/lib/domain/contact";
 import { normaliseEmail } from "@/lib/domain/accounts";
 import { plainText, quickQuoteEmail } from "@/lib/domain/emails";
@@ -9,6 +10,7 @@ import { sendEmail } from "@/lib/server/email";
 import { addNote, crmNote, followUpContactId, hubspotToken } from "@/lib/server/hubspot-crm";
 import { alertNewLead, textStaff } from "@/lib/server/lead-alert";
 import { allow } from "@/lib/server/rate-limit";
+import { takeHomeLead } from "@/lib/server/voice-calls";
 
 /**
  * POST { firstName, mobile, email?, answers, home?, suburb?, source?, entry?, consent } from the /quote landing page:
@@ -94,5 +96,20 @@ export async function POST(request: Request) {
   });
   if (!saved && !alerted)
     return Response.json({ ok: false, message: "We couldn't save that just now. Please try again." }, { status: 502 });
+  // The lead becomes a deal in RENUABL's own CRM, and when calls are on, Revo rings them (server/voice-calls.ts).
+  after(() =>
+    takeHomeLead(
+      {
+        firstName,
+        mobile,
+        email,
+        home: plainText(b.home, 160) || null,
+        lookingFor: details["Looking for"],
+        source: details["Landing page"] ?? "Quick quote (/quote)",
+        details,
+      },
+      true,
+    ),
+  );
   return Response.json({ ok: true, emailed });
 }
