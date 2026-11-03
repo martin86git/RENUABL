@@ -15,8 +15,13 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-03",
+    area: "Design tool",
+    words: "Panels and inverters with no datasheet figures: RENUABL finds the datasheet online, reads it and marks it to check.",
+  },
+  {
+    day: "2026-11-03",
     area: "Everywhere",
-    words: "RENUABL Marketplace has its own blue button beside the sections, and Sol a new mark: the sun rising in a speech bubble.",
+    words: "RENUABL Marketplace has its own blue button beside the sections, and Sol a new mark: a sun, with the AI's stars above it.",
   },
   {
     day: "2026-11-03",

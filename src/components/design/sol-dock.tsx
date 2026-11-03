@@ -9,7 +9,7 @@ import type { SolState } from "@/lib/domain/design/sol";
 import { SOL_ASK, SOL_CHANGED, SOL_STATE, SOL_TOGGLE, loadSol } from "@/lib/services/sol";
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
-import { SolMark } from "./sol-icon";
+import { SolMark, SolStars } from "./sol-icon";
 
 /** The page makes room for the panel on a wide screen (`html.sol-docked`, globals.css); kept for this tab. */
 const OPEN_CLASS = "sol-docked";
@@ -272,8 +272,15 @@ export function SolNavButton({ phone = false }: { phone?: boolean }) {
     >
       {waiting && <Rays />}
       <SolMark className={clsx("sol-breathe transition-transform duration-300 group-hover:scale-110", phone ? "size-7" : "size-6")} />
+      {/* The AI's stars, floating diagonally above the round and outside it (3 Nov 2026, Martin). */}
+      <SolStars
+        className={clsx(
+          "pointer-events-none absolute transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5",
+          phone ? "-right-3.5 -top-4 size-6" : "-right-3 -top-3.5 size-[22px]",
+        )}
+      />
       {waiting && (
-        <span className="sol-glow absolute -right-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
+        <span className="sol-glow absolute -bottom-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
           {unread}
         </span>
       )}
