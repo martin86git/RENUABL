@@ -50,10 +50,10 @@ import { SolBadge, SolIcon } from "./sol-icon";
  * example data) and the product drawn at work, Sol, everything else in the box, what's coming, and the pricing. Starting
  * the trial is an email here, then Stripe's own secure page for the card, then straight back.
  */
-export function SalesPage({ notice }: { notice?: string | null }) {
+export function SalesPage({ notice, signedIn = false }: { notice?: string | null; signedIn?: boolean }) {
   return (
     <div className="theme-studio min-h-dvh bg-canvas text-ink">
-      <Header />
+      <Header signedIn={signedIn} />
       {notice && <p className="mx-auto max-w-3xl px-5 pt-4 text-center text-sm text-danger">{notice}</p>}
       <Hero />
       <BigThree />
@@ -87,7 +87,7 @@ export function SalesPage({ notice }: { notice?: string | null }) {
   );
 }
 
-function Header() {
+function Header({ signedIn }: { signedIn: boolean }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-5 lg:px-8">
@@ -117,9 +117,15 @@ function Header() {
           <Link href="/" className="hidden text-[14px] text-ink-2 hover:text-ink lg:inline">
             For homeowners
           </Link>
-          <Link href="/design/sign-in" className="whitespace-nowrap text-[14px] text-ink-2 hover:text-ink">
-            Sign in
-          </Link>
+          {signedIn ? (
+            <Link href="/design" className="whitespace-nowrap text-[14px] font-medium text-ink hover:text-sun-line">
+              Open RENUABL
+            </Link>
+          ) : (
+            <Link href="/design/sign-in" className="whitespace-nowrap text-[14px] text-ink-2 hover:text-ink">
+              Sign in
+            </Link>
+          )}
           <a
             href="#start"
             className="inline-flex h-9 items-center whitespace-nowrap rounded-full bg-sun-line px-3.5 text-[13px] font-semibold text-white shadow-sm hover:brightness-105 sm:px-4"
