@@ -267,11 +267,11 @@ export function SolNavButton({ phone = false }: { phone?: boolean }) {
       className={clsx(
         "sol-orb group relative flex shrink-0 items-center justify-center rounded-full transition-shadow",
         phone ? "size-12" : "-my-2 size-11",
-        open && "ring-2 ring-sun-line/50 ring-offset-2 ring-offset-surface-2",
+        open ? "ring-2 ring-sun-line/50 ring-offset-2 ring-offset-surface-2" : "sol-beckon",
       )}
     >
       {waiting && <Rays />}
-      <SolMark className={clsx("sol-breathe transition-transform duration-300 group-hover:scale-110", phone ? "size-7" : "size-6")} />
+      <SolMark className={clsx("sol-breathe transition-transform duration-300 group-hover:scale-110", phone ? "size-9" : "size-8")} />
       {/* The AI's stars, floating diagonally above the round and outside it (3 Nov 2026, Martin). */}
       <SolStars
         className={clsx(

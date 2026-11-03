@@ -287,11 +287,31 @@ html.sol-resizing .team-pop {
 .sol-glow {
   animation: sol-glow 1.8s ease-out infinite;
 }
+/* Sol beckoning (3 Nov 2026, Martin: a subtle signal to engage, like a notification): while his panel is closed a soft
+   orange ring ripples out from his round every few seconds. On a ring of its own so the round keeps its shadow. */
+@keyframes sol-beckon {
+  0% {
+    box-shadow: 0 0 0 0 rgb(255 90 31 / 0.5);
+  }
+  55%,
+  100% {
+    box-shadow: 0 0 0 9px rgb(255 90 31 / 0);
+  }
+}
+.sol-beckon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  pointer-events: none;
+  animation: sol-beckon 2.6s ease-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .sol-rays,
   .sol-rays line,
   .sol-breathe,
-  .sol-glow {
+  .sol-glow,
+  .sol-beckon::after {
     animation: none;
   }
   .sol-rays line {
