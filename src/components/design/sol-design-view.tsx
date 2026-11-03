@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowUpRight, Maximize2, X } from "lucide-react";
+import { ArrowUpRight, Maximize2, PencilRuler, X } from "lucide-react";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
 import type { JobDrawing } from "@/lib/domain/design/job-card";
 import { designHref, type SolDesignShown } from "@/lib/domain/design/sol-designs";
@@ -87,9 +87,21 @@ export function SolDesignView({ shown }: { shown: SolDesignShown }) {
             aria-label="Drawing the design"
           />
         ) : !drawing ? (
-          <p className="rounded-xl bg-canvas px-3 py-6 text-center text-xs text-muted">
-            {"problem" in loaded ? loaded.problem : "This deal has no roof design yet."}
-          </p>
+          "problem" in loaded ? (
+            <p className="rounded-xl bg-canvas px-3 py-6 text-center text-xs text-muted">{loaded.problem}</p>
+          ) : (
+            // No design yet (3 Nov 2026, Martin): the way to start one, in one press.
+            <div className="flex flex-col items-center gap-3 rounded-xl bg-canvas px-4 py-7 text-center">
+              <p className="text-sm text-ink-2">No roof design yet.</p>
+              <Link
+                href={designHref(loaded.card.job.id)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-sun-line px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              >
+                <PencilRuler className="size-4" aria-hidden />
+                Start the design
+              </Link>
+            </div>
+          )
         ) : (
           <button
             type="button"
@@ -110,13 +122,15 @@ export function SolDesignView({ shown }: { shown: SolDesignShown }) {
             {glance.length ? glance.join(" · ") : card.job.stage}
             {card.job.installDate && <span className="text-muted"> · installs {dayWords(card.job.installDate)}</span>}
           </p>
-          <Link
-            href={designHref(card.job.id)}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-ink hover:opacity-90"
-          >
-            Open the design
-            <ArrowUpRight className="size-3.5" aria-hidden />
-          </Link>
+          {drawing && (
+            <Link
+              href={designHref(card.job.id)}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-ink hover:opacity-90"
+            >
+              Open the design
+              <ArrowUpRight className="size-3.5" aria-hidden />
+            </Link>
+          )}
         </div>
       )}
       {big && drawing && (

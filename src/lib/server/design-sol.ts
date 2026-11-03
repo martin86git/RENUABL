@@ -441,9 +441,12 @@ async function runTool(
     if (shown.designs.some((d) => d.jobId === got.job.id)) return "That design is already under your answer.";
     if (shown.designs.length >= DESIGNS_PER_TURN) return "That's enough designs for one answer.";
     const card = await jobCard(member, got.job.id);
-    if (!card?.layout) return `${got.customer.name}'s deal has no roof design yet: it can be designed from the deal.`;
+    if (!card) return "There's no such deal, or this person can't see it.";
     const title = [got.customer.name, card.job.address].filter(Boolean).join(" · ");
     shown.designs.push({ jobId: got.job.id, title });
+    // No design yet: the card under the answer offers Start the design in one press (3 Nov 2026, Martin).
+    if (!card.layout)
+      return `${got.customer.name}'s deal has no roof design yet. Under your answer is a card with a Start the design button that opens the designer on this deal: point them to it in a few words, never to menus.`;
     // What is drawn, in words, so he can talk about it without repeating it all.
     return [
       `Drawn under your answer: ${title}, the panel layout over the roof photo${card.strings ? " and the strings" : " (not strung yet)"}, with a button to open the design.`,
