@@ -14,7 +14,8 @@ export function metaPixelId(raw: string | undefined): string | null {
 }
 
 /** Public pages the pixel may load and count visits on. */
-const PIXEL_PATHS = ["/learn", "/start", "/battery", "/quote", "/book-a-call", "/privacy", "/terms", "/contact"];
+// /business: RENUABL Business's front door (3 Nov 2026), an ad landing page for solar businesses.
+const PIXEL_PATHS = ["/learn", "/start", "/battery", "/quote", "/book-a-call", "/business", "/privacy", "/terms", "/contact"];
 
 export function pixelAllowedPath(pathname: string): boolean {
   if (pathname === "/") return true;

@@ -42,13 +42,13 @@ export function MobileMenu() {
             </Link>
           </nav>
           <Link
-            href="/partners"
+            href="/business"
             onClick={() => setOpen(false)}
             className="mt-4 flex items-center justify-between px-1 text-[14px] text-ink-2"
           >
             <span>
-              <span className="block text-ink">Become a partner</span>
-              <span className="block text-[12.5px] text-muted">For solar installers and retailers</span>
+              <span className="block text-ink">For solar businesses</span>
+              <span className="block text-[12.5px] text-muted">RENUABL Business, for retailers and installers</span>
             </span>
             <ArrowRight className="h-4 w-4" strokeWidth={1.6} />
           </Link>

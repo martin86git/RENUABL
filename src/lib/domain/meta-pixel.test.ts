@@ -19,6 +19,7 @@ describe("Meta Pixel", () => {
       "/quote",
       "/start/profile",
       "/book-a-call",
+      "/business",
       "/privacy",
       "/terms",
       "/contact",

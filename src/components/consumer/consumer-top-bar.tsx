@@ -15,7 +15,7 @@ export function ConsumerTopBar({
 }: {
   className?: string;
   account?: string;
-  /** "Learn with Revo" and "Become a partner" (home page only, not mid-purchase). */
+  /** "Learn with Revo" and "For solar businesses" (RENUABL Business; home page only, not mid-purchase). */
   partners?: boolean;
 }) {
   return (
@@ -29,8 +29,8 @@ export function ConsumerTopBar({
         </Link>
       )}
       {partners && (
-        <Link href="/partners" className=" text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline">
-          Become a partner
+        <Link href="/business" className="text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline">
+          For solar businesses
         </Link>
       )}
       <Link href="/login" className={cn("flex items-center gap-2.5 text-[13px] text-ink-2 hover:text-ink", !partners && "ml-auto")}>

@@ -61,6 +61,9 @@ export function SalesPage({ notice }: { notice?: string | null }) {
           <Link href="/design/terms" className="hover:text-ink">
             Terms
           </Link>
+          <Link href="/" className="hover:text-ink">
+            For homeowners
+          </Link>
           <Link href="/privacy" className="hover:text-ink">
             Privacy
           </Link>
@@ -77,8 +80,10 @@ function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-5 lg:px-8">
-        <Link href="/design" aria-label="RENUABL">
+        {/* RENUABL Business: the network's side for retailers and installers (RENUABL Home, for homeowners, is at /). */}
+        <Link href="/business" aria-label="RENUABL Business" className="flex items-baseline gap-2">
           <Wordmark />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sun-line">Business</span>
         </Link>
         <nav className="hidden items-center gap-7 text-[14px] text-ink-2 md:flex">
           <a href="#journey" className="hover:text-ink">
@@ -92,6 +97,9 @@ function Header() {
           </a>
         </nav>
         <div className="flex items-center gap-3">
+          <Link href="/" className="hidden text-[14px] text-ink-2 hover:text-ink lg:inline">
+            For homeowners
+          </Link>
           <Link href="/design/sign-in" className="text-[14px] text-ink-2 hover:text-ink">
             Sign in
           </Link>
