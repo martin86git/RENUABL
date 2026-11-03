@@ -1,16 +1,25 @@
 import { jobAnsweredEmail } from "@/lib/domain/design/job-shares";
 import { siteUrl } from "@/lib/domain/sms";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
-import { answerJob, jobsFor, waitingCount } from "@/lib/server/design-job-shares-repo";
+import { answerJob, installerSheets, jobsFor, waitingCount } from "@/lib/server/design-job-shares-repo";
+import { todayInMarket } from "@/lib/domain/market";
 import { emailProvider, sendEmail } from "@/lib/server/email";
 
-/** GET → { jobs } | ?count=1 → { waiting }: the jobs retailers have sent this installer (domain/design/job-shares.ts). */
+/**
+ * GET → { jobs } | ?count=1 → { waiting } | ?sheets=1 → { jobs, sheets, today }: the jobs retailers have sent this
+ * installer (domain/design/job-shares.ts), and for My Jobs the accepted ones as job sheets (domain/design/my-jobs.ts)
+ * with the market's today, so the periods are counted in Melbourne time.
+ */
 export async function GET(request: Request) {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     if (new URL(request.url).searchParams.get("count"))
       return Response.json({ ok: true, waiting: await waitingCount(who.member.businessId) });
+    if (new URL(request.url).searchParams.get("sheets")) {
+      const [jobs, sheets] = await Promise.all([jobsFor(who.member.businessId), installerSheets(who.member.businessId)]);
+      return Response.json({ ok: true, jobs, sheets, today: todayInMarket() });
+    }
     return Response.json({ ok: true, jobs: await jobsFor(who.member.businessId) });
   });
 }

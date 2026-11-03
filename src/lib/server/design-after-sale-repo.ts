@@ -321,8 +321,11 @@ export interface JobOrder {
 const NOT_SIGNED = "The order opens once the customer has signed their proposal.";
 export { NOT_SIGNED };
 
-/** A job's order with everything worked out, or a reason there isn't one. Opens the order of a signed job that hasn't one yet. */
-export async function jobOrder(businessId: string, jobId: string): Promise<JobOrder | "missing" | "unsigned"> {
+/**
+ * A job's order with everything worked out, or a reason there isn't one. Opens the order of a signed job that hasn't
+ * one yet, unless `open` is false (an installer reading it changes nothing of the retailer's).
+ */
+export async function jobOrder(businessId: string, jobId: string, open = true): Promise<JobOrder | "missing" | "unsigned"> {
   const jobs = await query<{ customerId: string; customer: string; address: string; installDate: string | null }>(
     `select c.id as "customerId", c.name as customer, j.address, ${day("j.install_date")} as "installDate"
        from design_jobs j join design_customers c on c.business_id = j.business_id and c.id = j.customer_id
@@ -336,7 +339,7 @@ export async function jobOrder(businessId: string, jobId: string): Promise<JobOr
     [businessId, jobId],
   );
   if (!rows[0]) {
-    if (!signed) return "unsigned";
+    if (!signed || !open) return "unsigned";
     await openOrder(businessId, jobId, "RENUABL");
     rows = await query(`select data, ${moment("updated_at")} as "updatedAt" from design_orders where business_id = $1 and job_id = $2`, [
       businessId,

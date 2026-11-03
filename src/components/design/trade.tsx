@@ -90,7 +90,14 @@ export function TradePage({ view }: { view: "browse" | "mine" }) {
   }, [data, view, within, category, search]);
   return (
     <div className={clsx(ui.page, "space-y-5")}>
-      <PageHead title={view === "browse" ? "Equipment" : "My equipment"}>
+      <PageHead title={view === "browse" ? "Buy & sell" : "My equipment"}>
+        {/* My equipment is a link here rather than a toggle (2 Nov 2026: the toggles are Job listings, Buy & sell, Messages). */}
+        <Link
+          href={view === "browse" ? `${PATHS.marketplace}/equipment/mine` : `${PATHS.marketplace}/equipment`}
+          className={clsx(ui.quiet, "h-9 px-3")}
+        >
+          {view === "browse" ? "My equipment" : "Buy & sell"}
+        </Link>
         <Link href={`${PATHS.marketplace}/equipment/new`} className={clsx(ui.primary, "h-9 px-3")}>
           <Plus className="size-4" aria-hidden /> Sell equipment
         </Link>

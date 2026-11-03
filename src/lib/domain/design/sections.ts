@@ -27,8 +27,11 @@ export const MARKETPLACE_PAGES: readonly SectionPage[] = [
   { id: "listings", label: "Job listings", href: "/design/marketplace" },
   { id: "my-listings", label: "My listings", href: "/design/marketplace/mine" },
   { id: "my-bids", label: "My bids", href: "/design/marketplace/bids" },
-  { id: "equipment", label: "Equipment", href: "/design/marketplace/equipment" },
+  // Equipment trading, named Buy & sell (2 Nov 2026, Martin).
+  { id: "equipment", label: "Buy & sell", href: "/design/marketplace/equipment" },
   { id: "my-equipment", label: "My equipment", href: "/design/marketplace/equipment/mine" },
+  // Conversations between businesses on the Marketplace (2 Nov 2026, Martin).
+  { id: "messages", label: "Messages", href: "/design/marketplace/messages" },
 ];
 
 export const SECTIONS: readonly Section[] = [
@@ -87,22 +90,28 @@ const CONNECTIONS: Section = {
 };
 
 /**
- * The sections each kind of business has (business-kind.ts): a retailer all of the above; an installer its jobs, the
- * Marketplace and its connections (the design tool is the orange round, as for everyone who designs); an inspector its
- * inspections, the Marketplace's equipment and its connections.
+ * An installer's home (2 Nov 2026, Martin: My Jobs / the designer / Marketplace): its jobs at /design, each job's card
+ * under /design/jobs. Its connections are in the gear menu.
+ */
+const MY_JOBS: Section = {
+  id: "jobs",
+  label: "My Jobs",
+  pages: [{ id: "jobs", label: "My Jobs", href: "/design", also: ["/design/jobs"] }],
+};
+
+/**
+ * The sections each kind of business has (business-kind.ts): a retailer all of the above; an installer My Jobs and
+ * the Marketplace (the design tool is the orange round between them, as for everyone who designs; Connections in the
+ * gear menu), whose toggles are Job listings, Buy & sell and Messages (My bids and My equipment are links inside
+ * them); an inspector its inspections, the Marketplace's Buy & sell and Messages, and its connections.
  */
 export const KIND_SECTIONS: Record<BusinessKind, readonly Section[]> = {
   retailer: SECTIONS,
-  installer: [
-    TODAY,
-    { id: "jobs", label: "Jobs", pages: [{ id: "jobs", label: "Jobs", href: "/design/jobs" }] },
-    marketplaceFor((id) => id !== "my-listings"),
-    CONNECTIONS,
-  ],
+  installer: [MY_JOBS, marketplaceFor((id) => id === "listings" || id === "equipment" || id === "messages")],
   inspector: [
     TODAY,
     { id: "inspections", label: "Inspections", pages: [{ id: "inspections", label: "Inspections", href: "/design/inspections" }] },
-    marketplaceFor((id) => id === "equipment" || id === "my-equipment"),
+    marketplaceFor((id) => id === "equipment" || id === "my-equipment" || id === "messages"),
     CONNECTIONS,
   ],
 };

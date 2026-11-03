@@ -2,6 +2,7 @@
 
 import { cleanKind } from "@/lib/domain/design/business-kind";
 import { KindToday } from "./kind-home";
+import { MyJobsPage } from "./my-jobs";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -94,6 +95,9 @@ export function DesignHome() {
       <DesignShell needsAccount>
         {kind === "retailer" ? (
           <OverviewPage business={account.business?.name ?? ""} email={account.email} />
+        ) : kind === "installer" ? (
+          // An installer's home is My Jobs (my-jobs.ts, 2 Nov 2026, Martin).
+          <MyJobsPage />
         ) : (
           <KindToday kind={kind} business={account.business?.name ?? ""} />
         )}

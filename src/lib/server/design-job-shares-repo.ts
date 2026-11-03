@@ -15,10 +15,12 @@ import {
   type ShareStatus,
   type SharedJobLine,
 } from "@/lib/domain/design/job-shares";
+import { collectionOf, jobSheet, type JobSheet } from "@/lib/domain/design/my-jobs";
 import { newId, query, transaction } from "./db";
+import { jobOrder, loadPrefs } from "./design-after-sale-repo";
 import { areConnected } from "./design-connections-repo";
 import { jobById, record } from "./design-crm-repo";
-import { installerLink } from "./design-job-card-repo";
+import { installerLink, jobCard } from "./design-job-card-repo";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
 const owner = async (businessId: string) =>
@@ -217,4 +219,34 @@ export async function linkedBusiness(
   const r = rows[0];
   if (!r || r.state !== "accepted" || !(await areConnected(businessId, partner))) return null;
   return { id: installerId, name: r.name, email: (await owner(partner)) ?? "", phone: "" };
+}
+
+/**
+ * The installer's accepted jobs as My Jobs shows them (domain/design/my-jobs.ts): each read from the retailer's job
+ * card (as the installer sees it: never the customer's email) and its order's collection, only while the two are
+ * still connected. Reading changes nothing of the retailer's (the order isn't opened). At most 60, soonest first.
+ */
+export async function installerSheets(installerBusinessId: string): Promise<JobSheet[]> {
+  const shares = await query<{ id: string; businessId: string; retailer: string; jobId: string }>(
+    `select s.id, s.business_id as "businessId", b.name as retailer, s.job_id as "jobId"
+       from design_job_shares s join businesses b on b.id = s.business_id
+       join design_jobs j on j.business_id = s.business_id and j.id = s.job_id
+      where s.installer_business = $1 and s.state = 'accepted'
+      order by j.install_date nulls last, s.sent_at desc limit 60`,
+    [installerBusinessId],
+  );
+  const sheets = await Promise.all(
+    shares.map(async (s) => {
+      if (!(await areConnected(s.businessId, installerBusinessId))) return null;
+      const [card, order, prefs] = await Promise.all([
+        jobCard({ businessId: s.businessId, businessName: s.retailer }, s.jobId, true),
+        jobOrder(s.businessId, s.jobId, false),
+        loadPrefs(s.businessId),
+      ]);
+      if (!card) return null;
+      const collection = typeof order === "string" ? [] : collectionOf(order.groups, order.order, prefs.places.collection);
+      return jobSheet({ id: s.id, retailer: card.business || s.retailer, card, collection });
+    }),
+  );
+  return sheets.filter((s): s is JobSheet => s !== null);
 }

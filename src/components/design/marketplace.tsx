@@ -81,6 +81,12 @@ export function MarketplacePage({ view }: { view: "browse" | "mine" | "bids" }) 
   return (
     <div className={clsx(ui.page, "space-y-5")}>
       <PageHead title={title}>
+        {/* My bids is a link here rather than a toggle for an installer (its toggles are Job listings, Buy & sell, Messages). */}
+        {view !== "mine" && (
+          <Link href={view === "browse" ? `${PATHS.marketplace}/bids` : PATHS.marketplace} className={clsx(ui.quiet, "h-9 px-3")}>
+            {view === "browse" ? "My bids" : "Job listings"}
+          </Link>
+        )}
         {view === "browse" && data && (
           <div role="radiogroup" aria-label="How far" className="flex rounded-md border border-line bg-surface-2 p-0.5 text-sm">
             {DISTANCES.map((d) => (

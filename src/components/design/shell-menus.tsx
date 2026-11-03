@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   UserRound,
+  Users,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -268,6 +269,8 @@ export function GearMenu(props: {
   account: string;
   updates: string;
   feedback: string;
+  /** For an installer: its connections, with how many ask to connect. */
+  connections?: { href: string; waiting: number };
   /** Updates since this member last opened them. */
   unseen: number;
   on: boolean;
@@ -299,6 +302,7 @@ export function GearMenu(props: {
           <p className="truncate px-3 pb-2 pt-1 text-xs text-muted">{props.email}</p>
           {row("Settings", props.settings, SlidersHorizontal)}
           {row("Your account", props.account, UserRound)}
+          {props.connections && row("Connections", props.connections.href, Users, props.connections.waiting)}
           <div className="my-1 border-t border-line" />
           {row("Updates", props.updates, Sparkles, props.unseen)}
           {row("Feedback", props.feedback, MessageSquarePlus)}

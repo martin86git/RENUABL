@@ -2,14 +2,15 @@
  * The Marketplace's equipment trading, as the screens reach it (/api/design/trade).
  */
 import type { ItemState, TradeItem } from "@/lib/domain/design/trade";
-import type { ItemDetail } from "@/lib/server/design-trade-repo";
+import type { ItemDetail, ThreadLine } from "@/lib/server/design-trade-repo";
 import { ask, type Answer } from "./crm";
 import { prepareBillFile } from "./consumer";
 
-export type { ItemDetail };
+export type { ItemDetail, ThreadLine };
 
 const BASE = "/api/design/trade";
 export const loadItems = () => ask<{ items: TradeItem[]; base: { lat: number; lng: number } | null }>(BASE);
+export const loadThreads = () => ask<{ threads: ThreadLine[] }>(`${BASE}?threads=1`);
 export const tradeUnreadCount = () => ask<{ unread: number }>(`${BASE}?count=1`);
 export const createItem = (body: Record<string, unknown>) => ask<{ id: string }>(BASE, { method: "POST", body });
 export const loadItem = (id: string, read?: string) =>

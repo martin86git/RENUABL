@@ -106,7 +106,7 @@ export function InstallerJobsPage() {
   );
 }
 
-function Line({ job: j }: { job: SharedJobLine }) {
+export function Line({ job: j }: { job: SharedJobLine }) {
   return (
     <span className="flex min-w-0 items-center gap-3">
       <span className="flex w-14 shrink-0 flex-col items-center rounded-lg bg-surface-2 py-1.5 text-center">

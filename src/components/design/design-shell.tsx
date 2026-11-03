@@ -78,8 +78,8 @@ type PhoneTab = { label: string; href: string; icon: LucideIcon; match: (path: s
 /** An installer's and an inspector's foot bar: their sections, then More (no Sol: his answers read the CRM). */
 const KIND_TABS: Record<Exclude<BusinessKind, "retailer">, PhoneTab[]> = {
   installer: [
-    { label: "Today", href: "/design", icon: LayoutDashboard, match: (p) => p === "/design" },
-    { label: "Jobs", href: "/design/jobs", icon: Wrench, match: (p) => p.startsWith("/design/jobs") },
+    { label: "My Jobs", href: "/design", icon: Wrench, match: (p) => p === "/design" || p.startsWith("/design/jobs") },
+    { label: "Designer", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
     { label: "Marketplace", href: "/design/marketplace", icon: Store, match: (p) => p.startsWith("/design/marketplace") },
     { label: "Connections", href: "/design/connections", icon: Users, match: (p) => p.startsWith("/design/connections") },
   ],
@@ -186,7 +186,9 @@ function Shell({
   const counts: Record<string, number> = {
     service,
     ...gates,
-    "my-equipment": trade,
+    // Unread Marketplace conversations: on Messages, and on My equipment for a retailer (whose toggles still show it).
+    messages: trade,
+    "my-equipment": kind === "retailer" ? trade : 0,
     connections: requests,
     jobs: sentJobs,
     inspections: toBook,
@@ -300,7 +302,7 @@ function Shell({
                       aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
                       className={clsx(
                         "-my-2 flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
-                        current.id === "today" ? "ml-3.5" : "mx-0",
+                        current.id === sections[0].id ? "ml-3.5" : "mx-0",
                         path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface-2",
                       )}
                     >
@@ -365,8 +367,15 @@ function Shell({
                 account={PATHS.account}
                 updates={PATHS.updates}
                 feedback={PATHS.feedback}
+                // An installer's connections live here (its menu is My Jobs, the designer and the Marketplace).
+                connections={kind === "installer" ? { href: "/design/connections", waiting: requests } : undefined}
                 unseen={updates}
-                on={settingsOn || path.startsWith(PATHS.updates) || path.startsWith(PATHS.feedback)}
+                on={
+                  settingsOn ||
+                  path.startsWith(PATHS.updates) ||
+                  path.startsWith(PATHS.feedback) ||
+                  (kind === "installer" && path.startsWith("/design/connections"))
+                }
               />
             </div>
           </div>

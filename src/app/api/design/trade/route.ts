@@ -2,10 +2,13 @@ import { marketClosed, marketplaceOpen } from "@/lib/domain/design/marketplace-l
 import { cleanItemInput } from "@/lib/domain/design/trade";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { loadPrefs } from "@/lib/server/design-after-sale-repo";
-import { createItem, listItems, placeOf, tradeUnread } from "@/lib/server/design-trade-repo";
+import { createItem, listItems, placeOf, tradeThreads, tradeUnread } from "@/lib/server/design-trade-repo";
 import { allow } from "@/lib/server/rate-limit";
 
-/** GET → { items, base }: equipment for sale, this business's own and any it has asked about; `?count=1` → { unread }. */
+/**
+ * GET → { items, base }: equipment for sale, this business's own and any it has asked about; `?count=1` → { unread };
+ * `?threads=1` → { threads }: every conversation it is in, as seller or buyer (the Marketplace's Messages).
+ */
 export async function GET(request: Request) {
   if (!marketplaceOpen()) return marketClosed();
   return answer(async () => {
@@ -13,6 +16,8 @@ export async function GET(request: Request) {
     if ("refuse" in who) return who.refuse;
     if (new URL(request.url).searchParams.get("count") === "1")
       return Response.json({ ok: true, unread: await tradeUnread(who.member.businessId) });
+    if (new URL(request.url).searchParams.get("threads") === "1")
+      return Response.json({ ok: true, threads: await tradeThreads(who.member.businessId) });
     const [items, prefs] = await Promise.all([listItems(who.member.businessId), loadPrefs(who.member.businessId)]);
     return Response.json({ ok: true, items, base: prefs.places.base ? { lat: prefs.places.base.lat, lng: prefs.places.base.lng } : null });
   });

@@ -10,7 +10,7 @@ import {
   pageAllowed,
   settingsFor,
 } from "./business-kind";
-import { KIND_SECTIONS, designsRoofs, sectionAt } from "./sections";
+import { KIND_SECTIONS, designsRoofs, pageAt, sectionAt } from "./sections";
 
 describe("kinds of business", () => {
   it("reads anything unknown as a retailer, as every business made before kinds was", () => {
@@ -81,7 +81,10 @@ describe("what each login holds", () => {
   });
 
   it("shows each kind its own sections", () => {
-    expect(KIND_SECTIONS.installer.map((s) => s.id)).toEqual(["today", "jobs", "marketplace", "connections"]);
+    // An installer's menu is My Jobs, the designer (the orange round) and the Marketplace; Connections is in the gear.
+    expect(KIND_SECTIONS.installer.map((s) => s.label)).toEqual(["My Jobs", "Marketplace"]);
+    expect(pageAt("/design", "installer")).toMatchObject({ section: { id: "jobs" }, page: { id: "jobs" } });
+    expect(sectionAt("/design/jobs/shr_1", "installer").id).toBe("jobs");
     expect(KIND_SECTIONS.inspector.map((s) => s.id)).toEqual(["today", "inspections", "marketplace", "connections"]);
     expect(sectionAt("/design/jobs", "installer").id).toBe("jobs");
     expect(sectionAt("/design/settings/users", "inspector").id).toBe("today");
@@ -105,9 +108,15 @@ describe("the Marketplace for each kind", () => {
     const kinds = await import("./business-kind");
     const { KIND_SECTIONS: open } = await import("./sections");
     const pages = (kind: "retailer" | "installer" | "inspector") => open[kind].find((s) => s.id === "marketplace")?.pages.map((p) => p.id);
-    expect(pages("retailer")).toEqual(["listings", "my-listings", "my-bids", "equipment", "my-equipment"]);
-    expect(pages("installer")).toEqual(["listings", "my-bids", "equipment", "my-equipment"]);
-    expect(pages("inspector")).toEqual(["equipment", "my-equipment"]);
+    expect(pages("retailer")).toEqual(["listings", "my-listings", "my-bids", "equipment", "my-equipment", "messages"]);
+    // An installer's toggles: Job listings, Buy & sell, Messages (My bids and My equipment are links inside them).
+    expect(pages("installer")).toEqual(["listings", "equipment", "messages"]);
+    expect(open.installer.find((s) => s.id === "marketplace")?.pages.map((p) => p.label)).toEqual([
+      "Job listings",
+      "Buy & sell",
+      "Messages",
+    ]);
+    expect(pages("inspector")).toEqual(["equipment", "my-equipment", "messages"]);
     expect(kinds.pageAllowed("inspector", "/design/marketplace")).toBe(false);
     expect(kinds.pageAllowed("installer", "/design/marketplace")).toBe(true);
   });

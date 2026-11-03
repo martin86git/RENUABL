@@ -301,3 +301,38 @@ export async function tradeUnread(businessId: string): Promise<number> {
   );
   return Number(rows[0]?.n ?? 0);
 }
+
+/** One conversation about an item, for the Marketplace's Messages: who it is with, the item, the latest line. */
+export interface ThreadLine {
+  id: string;
+  itemId: string;
+  item: string;
+  /** This business sells the item, or is asking to buy it. */
+  side: "selling" | "buying";
+  with: string;
+  last: string;
+  lastAt: string;
+  unread: number;
+}
+
+/**
+ * Every conversation this business is in, as seller or buyer, newest first (2 Nov 2026, Martin: the Marketplace's
+ * Messages between businesses). Only threads with a line in them; nothing of another business's but its name.
+ */
+export async function tradeThreads(businessId: string): Promise<ThreadLine[]> {
+  return query<ThreadLine>(
+    `select t.id, i.id as "itemId", i.title as item,
+            case when i.business_id = $1 then 'selling' else 'buying' end as side,
+            case when i.business_id = $1 then buyer.name else seller.name end as with,
+            last.text as last, ${moment("last.at")} as "lastAt",
+            (select count(*)::int from design_trade_messages m where m.thread_id = t.id and m.from_business <> $1 and m.read_at is null) as unread
+       from design_trade_threads t
+       join design_trade_items i on i.id = t.item_id
+       join businesses seller on seller.id = i.business_id
+       join businesses buyer on buyer.id = t.buyer_id
+       join lateral (select text, at from design_trade_messages m where m.thread_id = t.id order by at desc limit 1) last on true
+      where i.business_id = $1 or t.buyer_id = $1
+      order by last.at desc limit 100`,
+    [businessId],
+  );
+}
