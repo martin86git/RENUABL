@@ -335,24 +335,42 @@ function Shell({
                       <PenTool className="size-5" aria-hidden />
                     </Link>
                   ) : null;
+                // The Marketplace is an add-on, the network, still coming soon (3 Nov 2026, Martin): it sits after Sol,
+                // lightly shaded apart from the sections of the business's own work.
+                const market = sec.id === "marketplace";
                 return [
                   design,
+                  market && retail ? (
+                    <span key="sol" className="mx-1">
+                      <SolNavButton />
+                    </span>
+                  ) : null,
                   <Link
                     key={sec.id}
                     href={sec.pages[0].href}
                     aria-current={lit ? "true" : undefined}
                     className={clsx(
                       "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
-                      lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                      market
+                        ? clsx(
+                            "bg-sun text-sun-ink ring-1 ring-sun-line/20",
+                            lit && "shadow-[0_1px_3px_rgba(11,11,12,0.12)] ring-sun-line/50",
+                          )
+                        : lit
+                          ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]"
+                          : "text-ink-2 hover:text-ink",
                     )}
                   >
                     {sec.label}
+                    {market && !marketplaceOpen() && (
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] opacity-70">Soon</span>
+                    )}
                     {waiting > 0 && <span className="size-1.5 rounded-full bg-sun-line" aria-label={`${waiting} waiting`} />}
                   </Link>,
                 ];
               })}
-              {/* Sol, the other tool, as the graphite round at the far end: the two rounds frame the sections. */}
-              {retail && (
+              {/* Sol, the other tool, as a graphite round: before the Marketplace, else at the far end. */}
+              {retail && !sections.some((s) => s.id === "marketplace") && (
                 <span className="ml-1">
                   <SolNavButton />
                 </span>
