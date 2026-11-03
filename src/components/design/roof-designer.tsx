@@ -2687,22 +2687,21 @@ export function RoofDesigner(props: {
   const pickedTilt = shared((p) => p.tilt ?? TILT.roof);
   const pickedFacing = shared(panelFacing);
   // What the design does to the customer's bill, once their bill is typed in.
-  const finance =
-    summary.panels > 0
-      ? designFinance(
-          {
-            interval: bill.interval,
-            amount: Number(bill.amount) || 0,
-            supplyPerDay: Number(bill.supplyPerDay) || 0,
-            rate: Number(bill.rate) || 0,
-            feedIn: Number(bill.feedIn) || 0,
-          },
-          year,
-          // A module held back for blackouts doesn't carry the evenings.
-          shiftingKwhOf({ battery }),
-          props.workspace.settings.bill.selfUseShare,
-        )
-      : null;
+  // With no panels yet the bill still counts (3 Nov 2026, Martin: the red box stayed after the bill was typed in): the
+  // home's use and bill show, and the saving is nothing until panels go on.
+  const finance = designFinance(
+    {
+      interval: bill.interval,
+      amount: Number(bill.amount) || 0,
+      supplyPerDay: Number(bill.supplyPerDay) || 0,
+      rate: Number(bill.rate) || 0,
+      feedIn: Number(bill.feedIn) || 0,
+    },
+    year,
+    // A module held back for blackouts doesn't carry the evenings.
+    shiftingKwhOf({ battery }),
+    props.workspace.settings.bill.selfUseShare,
+  );
   const dollars = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
   // The system as the quote reads it. Worked out in the domain (systemSpecOf), so a published proposal reads the design the same way.
   const firstListed = props.catalogue[0];
