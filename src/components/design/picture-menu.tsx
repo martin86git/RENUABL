@@ -58,39 +58,52 @@ export function PictureMenu({
 
   return (
     <div className="relative">
-      <button
-        type="button"
-        onClick={() => void show()}
-        aria-expanded={open}
-        className={clsx(
-          "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs shadow-lift ring-1 backdrop-blur-md",
-          inUse ? "bg-primary text-primary-ink ring-primary" : "bg-surface/90 text-ink ring-line",
-        )}
-      >
-        <ImageIcon className="size-3.5" aria-hidden /> {label}
-      </button>
+      {/* Which picture is under the design, and the button that calls on Nearmap where Google's isn't good enough. */}
+      <div className="flex items-center gap-1 rounded-full bg-surface/90 p-1 shadow-lift ring-1 ring-line backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => void choose("google")}
+          title={inUse ? "Go back to Google's picture" : "Google's picture is in use"}
+          className={clsx("h-7 rounded-full px-2.5 text-xs", inUse ? "text-ink-2 hover:text-ink" : "bg-surface-2 font-medium text-ink")}
+        >
+          Google
+        </button>
+        <button
+          type="button"
+          onClick={() => void show()}
+          aria-expanded={open}
+          title="Pick a Nearmap picture from the last two years"
+          className={clsx(
+            "inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium",
+            inUse ? "bg-primary text-primary-ink" : "bg-primary/90 text-primary-ink hover:bg-primary",
+          )}
+        >
+          <ImageIcon className="size-3.5" aria-hidden /> {inUse ? label : "Nearmap"}
+        </button>
+      </div>
       {open && (
-        <div className="absolute bottom-10 right-0 w-[min(20rem,calc(100vw-2rem))] rounded-lg bg-surface p-2 shadow-[var(--shadow-lift)] ring-1 ring-line">
-          <div className="flex items-center justify-between px-2.5 pb-1.5 pt-1">
-            <p className="text-sm font-medium text-ink">The roof&apos;s picture</p>
+        <div className="absolute bottom-11 right-0 w-[min(20rem,calc(100vw-2rem))] rounded-lg bg-surface p-2 shadow-[var(--shadow-lift)] ring-1 ring-line">
+          <div className="flex items-center justify-between px-2.5 pb-1 pt-1">
+            <p className="text-sm font-medium text-ink">Nearmap pictures</p>
             <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="text-muted hover:text-ink">
               <X className="size-4" aria-hidden />
             </button>
           </div>
-          <button type="button" className={row} onClick={() => void choose("google")}>
-            <span>Google</span>
-            {imagery.use === "google" && <Check className="size-3.5 text-sun-line" aria-label="in use" />}
-          </button>
-          {imagery.kept.map((k) => (
-            <button key={k.survey} type="button" className={row} onClick={() => void choose(k.survey)}>
-              <span>Nearmap · {capturedWords(k.captured)}</span>
-              {imagery.use === k.survey ? (
-                <Check className="size-3.5 text-sun-line" aria-label="in use" />
-              ) : (
-                <span className="text-muted">Kept</span>
-              )}
-            </button>
-          ))}
+          <p className="px-2.5 pb-1.5 text-xs text-muted">
+            The last two years of this roof. A picture is fetched once and kept, so going back to it costs nothing.
+          </p>
+          {imagery.kept
+            .filter((k) => !surveys?.some((s) => s.id === k.survey))
+            .map((k) => (
+              <button key={k.survey} type="button" className={row} onClick={() => void choose(k.survey)}>
+                <span>{capturedWords(k.captured)}</span>
+                {imagery.use === k.survey ? (
+                  <Check className="size-3.5 text-sun-line" aria-label="in use" />
+                ) : (
+                  <span className="text-muted">Kept</span>
+                )}
+              </button>
+            ))}
           {!imagery.ready ? (
             <p className="px-2.5 py-2 text-xs text-muted">Nearmap isn&apos;t connected to RENUABL yet.</p>
           ) : surveys === undefined ? (
@@ -98,21 +111,29 @@ export function PictureMenu({
           ) : surveys === null ? (
             <p className="px-2.5 py-2 text-xs text-muted">Nearmap couldn&apos;t be reached. Try again shortly.</p>
           ) : !surveys.length ? (
-            <p className="px-2.5 py-2 text-xs text-muted">Nearmap has no picture of this roof.</p>
+            <p className="px-2.5 py-2 text-xs text-muted">Nearmap has no picture of this roof from the last two years.</p>
           ) : (
             <>
-              <p className="mt-1 border-t border-line px-2.5 pb-1 pt-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted">
-                Nearmap captures here
-              </p>
-              <div className="max-h-48 overflow-y-auto">
-                {surveys
-                  .filter((s) => !imagery.kept.some((k) => k.survey === s.id))
-                  .map((s) => (
-                    <button key={s.id} type="button" className={row} disabled={busy !== null} onClick={() => void fetchOne(s.id)}>
+              <div className="max-h-56 overflow-y-auto">
+                {surveys.map((s) => {
+                  const kept = imagery.kept.some((k) => k.survey === s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className={row}
+                      disabled={busy !== null}
+                      onClick={() => void (kept ? choose(s.id) : fetchOne(s.id))}
+                    >
                       <span>{capturedWords(s.captured)}</span>
-                      <span className="text-muted">{busy === s.id ? "Fetching…" : "Fetch"}</span>
+                      {imagery.use === s.id ? (
+                        <Check className="size-3.5 text-sun-line" aria-label="in use" />
+                      ) : (
+                        <span className="text-muted">{busy === s.id ? "Fetching…" : kept ? "Kept" : "Fetch"}</span>
+                      )}
                     </button>
-                  ))}
+                  );
+                })}
               </div>
               {offers && (
                 <div className="mt-1 border-t border-line px-2.5 pt-2 text-xs">

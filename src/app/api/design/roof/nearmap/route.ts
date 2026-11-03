@@ -3,6 +3,8 @@ import { chooseImagery, fetchNearmap, roofImagery } from "@/lib/server/design-ne
 import { inAustralia } from "@/lib/server/google-solar";
 import { nearmapReady, nearmapSurveys } from "@/lib/server/nearmap";
 import { allow } from "@/lib/server/rate-limit";
+import { recentCaptures } from "@/lib/domain/design/nearmap";
+import { todayInMarket } from "@/lib/domain/market";
 
 const place = (lat: unknown, lng: unknown) => {
   const p = { lat: Number(lat), lng: Number(lng) };
@@ -12,7 +14,7 @@ const badPlace = () => Response.json({ ok: false, message: "That roof isn't in A
 
 /**
  * GET ?lat=&lng=[&surveys=1] → { ready, use, kept[, surveys] }: the roof's pictures for the designer's picture menu.
- * `surveys` (one Coverage call, no tiles) lists Nearmap's captures there and what each offers with this key.
+ * `surveys` (one Coverage call, no tiles) lists Nearmap's captures there from the last two years, and what each offers.
  */
 export async function GET(request: Request) {
   return answer(async () => {
@@ -24,8 +26,9 @@ export async function GET(request: Request) {
     const imagery = await roofImagery(who.member.businessId, p.lat, p.lng);
     if (u.searchParams.get("surveys") !== "1" || !nearmapReady()) return Response.json({ ok: true, ready: nearmapReady(), ...imagery });
     if (!allow(request, "nearmap-surveys", 120)) return Response.json({ ok: false, message: "Try again in a minute." }, { status: 429 });
-    const surveys = await nearmapSurveys(p.lat, p.lng);
-    return Response.json({ ok: true, ready: true, ...imagery, surveys });
+    // The last two years of captures (Martin, 3 Nov 2026), newest first.
+    const all = await nearmapSurveys(p.lat, p.lng);
+    return Response.json({ ok: true, ready: true, ...imagery, surveys: all && recentCaptures(all, todayInMarket()) });
   });
 }
 

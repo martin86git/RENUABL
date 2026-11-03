@@ -32,3 +32,13 @@ export function offersOf(resources: readonly string[]): NearmapOffers {
     obliques: has(/:(north|south|east|west)\b|oblique|panorama/i),
   };
 }
+
+/** How far back the designer offers Nearmap's captures of a roof (Martin, 3 Nov 2026: the last two years). */
+export const NEARMAP_YEARS = 2;
+
+/** The captures from the last `years` up to `today` (YYYY-MM-DD, the market's day), newest first. */
+export function recentCaptures<T extends { captured: string }>(captures: readonly T[], today: string, years = NEARMAP_YEARS): T[] {
+  const [y, m, d] = today.split("-").map(Number);
+  const from = new Date(Date.UTC(y - years, m - 1, d)).toISOString().slice(0, 10);
+  return captures.filter((c) => c.captured >= from && c.captured <= today).sort((a, b) => b.captured.localeCompare(a.captured));
+}
