@@ -642,8 +642,11 @@ function PitchFirst(props: { pitch: number; flat: boolean; onSet: (pitch: number
  */
 const FIT = `calc((100dvh - 14rem) * ${ROOF_IMAGE.width / ROOF_IMAGE.height})`;
 const WHOLE: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: ROOF_IMAGE.width, h: ROOF_IMAGE.height };
-/** How far in the designer opens on the roof (1 Nov 2026, as Primero's): the middle of the picture, this many times closer than the whole of it. */
-const OPEN_ZOOM = 1.6;
+/**
+ * How far in the designer opens on the roof: the middle of the picture, this many times closer than the whole of it.
+ * One press of the zoom button (1.4×) back from 1.6 (3 Nov 2026, Martin: "too zoomed in").
+ */
+const OPEN_ZOOM = 1.6 / 1.4;
 const OPENED: typeof WHOLE = {
   x: (ROOF_IMAGE.width - ROOF_IMAGE.width / OPEN_ZOOM) / 2,
   y: (ROOF_IMAGE.height - ROOF_IMAGE.height / OPEN_ZOOM) / 2,
