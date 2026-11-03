@@ -26,7 +26,7 @@ export const SALES_HERO = {
 export const ASK_DEMO = {
   label: "Ask Sol to change it",
   request: "Load 8 kW of panels, an inverter and a battery",
-  reply: "17 panels, 8.08 kW · 8 kW hybrid inverter · 2 × 8 kWh battery (16 kWh).",
+  reply: "17 panels, 8.07 kW · 8 kW hybrid inverter · 2 × 8 kWh battery (16 kWh).",
   caption: "The design tool, drawn at work on a made-up home. The request is one you can type today.",
 } as const;
 
