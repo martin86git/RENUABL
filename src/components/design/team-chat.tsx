@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 import { AtSign, FileText, Hash, MessagesSquare, Paperclip, Pencil, Reply, SmilePlus, SquareKanban, Trash2, X } from "lucide-react";
+import { cleanKind } from "@/lib/domain/design/business-kind";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { handleOf } from "@/lib/domain/design/mentions";
@@ -50,7 +51,8 @@ import {
 } from "@/lib/services/team-chat";
 import { useDesignAccount } from "./design-account";
 import { DictateButton, withSpoken } from "./dictate";
-import { SolIcon } from "./sol-icon";
+import { SolChat } from "./sol-chat";
+import { SolBadge } from "./sol-icon";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolThinking } from "./sol-thinking";
 
@@ -59,6 +61,12 @@ const when = (iso: string) =>
 
 /** How long the chat waits for Sol's answer in a channel before it stops showing that he is answering. */
 const SOL_WAIT_MS = 120_000;
+
+/**
+ * Sol's own conversation, first under Direct messages: the member's chat with him, the same one as his panel (kept by
+ * his own service, never a team room), shown in place of a room.
+ */
+const SOL_ROOM = "sol";
 
 /**
  * The team chat (1 Nov 2026, as Primero's): channels and the people down the left, the room on the right. Lines run
@@ -79,6 +87,13 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
   });
   const [view, setView] = useState<TeamRoomView | null>(null);
   const [error, setError] = useState("");
+  // Only a retailer has Sol (installers and inspectors join without him), so only a retailer's members talk to him here.
+  const [account] = useDesignAccount();
+  const hasSol = cleanKind(account?.signedIn ? account.business?.kind : undefined) === "retailer";
+  const solOpen = hasSol && room === SOL_ROOM;
+  // A business without Sol that was left on his conversation (another account in this browser) opens on Deals.
+  const known = account !== null;
+  if (known && !hasSol && room === SOL_ROOM) setRoomState("deals");
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [deals, setDeals] = useState<TeamDeal[]>([]);
@@ -116,7 +131,8 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
   };
 
   const load = useCallback(async () => {
-    const r = await loadTeamRoom(room);
+    const withSol = room === SOL_ROOM;
+    const r = await loadTeamRoom(withSol ? "deals" : room);
     if (!r.ok) {
       setError(r.message);
       if (room !== "deals") setRoomState("deals");
@@ -124,6 +140,7 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
     }
     setError("");
     setView(r);
+    if (withSol) return window.dispatchEvent(new CustomEvent(TEAM_CHANGED, { detail: r.unread }));
     // What is on screen is read: the room's own unread lines are marked seen.
     const here = [...r.channels, ...r.people].find((x) => x.room === room)?.unread ?? 0;
     if (here > 0) {
@@ -292,8 +309,14 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
         ))}
         <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Direct messages</p>
         <div className="staff-scroll min-h-0 flex-1 overflow-y-auto pb-2">
+          {hasSol && (
+            <RoomButton on={solOpen} unread={0} onClick={() => setRoom(SOL_ROOM)} title="Your own conversation with Sol">
+              <Round email={SOL_BY} small />
+              <span className="truncate">Sol</span>
+            </RoomButton>
+          )}
           {view && view.people.length === 0 && (
-            <p className="px-3 text-xs text-muted">No one else is in the business yet. Add people under Your account.</p>
+            <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Add people under Your account.</p>
           )}
           {view?.people.map((p) => (
             <RoomButton key={p.room} on={room === p.room} unread={p.unread} onClick={() => setRoom(p.room)} title={p.email}>
@@ -304,8 +327,13 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
         </div>
       </nav>
 
+      {solOpen && (
+        <div className="flex min-w-0 flex-1 flex-col">
+          <SolChat side onClose={onClose} />
+        </div>
+      )}
       <div
-        className={clsx("relative flex min-w-0 flex-1 flex-col", dropping && "ring-2 ring-inset ring-sun-line")}
+        className={clsx("relative flex min-w-0 flex-1 flex-col", dropping && "ring-2 ring-inset ring-sun-line", solOpen && "hidden")}
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes("Files")) {
             e.preventDefault();
@@ -420,7 +448,7 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
                         mine ? "bg-primary text-white" : l.by === SOL_BY ? "bg-sun text-ink" : "bg-canvas text-ink",
                       )}
                     >
-                      {l.by === SOL_BY && <SolIcon className="mr-1 inline size-3.5 -translate-y-px text-sun-line" aria-hidden />}
+                      {l.by === SOL_BY && <SolBadge className="mr-1 inline size-3.5 -translate-y-px" />}
                       <Tagged text={l.text} members={members} dark={mine} />
                     </p>
                   )
@@ -559,7 +587,7 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
                   {dealAt ? (
                     <SquareKanban className="size-3.5 shrink-0 text-muted" aria-hidden />
                   ) : o.key === SOL_BY ? (
-                    <SolIcon className="size-3.5 shrink-0 text-sun-line" aria-hidden />
+                    <SolBadge className="size-3.5 shrink-0" />
                   ) : (
                     <AtSign className="size-3.5 shrink-0 text-muted" aria-hidden />
                   )}
@@ -812,7 +840,7 @@ function SolJoinsSwitch({ on, may, onChange }: { on: boolean; may: boolean; onCh
         may ? "hover:ring-line-strong" : "cursor-default",
       )}
     >
-      <SolIcon className="size-3.5" />
+      <SolBadge className="size-3.5" />
       {words}
       <span aria-hidden className={clsx("relative ml-0.5 h-3.5 w-6 rounded-full transition-colors", on ? "bg-sun-line" : "bg-line-strong")}>
         <span className={clsx("absolute top-0.5 size-2.5 rounded-full bg-surface transition-all", on ? "left-3" : "left-0.5")} />
@@ -827,11 +855,11 @@ function Round({ email, small = false }: { email: string; small?: boolean }) {
       className={clsx(
         "flex shrink-0 items-center justify-center rounded-full font-semibold",
         small ? "size-5 text-[9px]" : "size-7 text-[11px]",
-        email === SOL_BY ? "bg-sun text-sun-line" : "bg-primary text-white",
+        email === SOL_BY ? "bg-primary" : "bg-primary text-white",
       )}
       aria-hidden
     >
-      {email === SOL_BY ? <SolIcon className="size-3" /> : initialsOf(email)}
+      {email === SOL_BY ? <SolBadge className={small ? "size-3.5" : "size-[18px]"} /> : initialsOf(email)}
     </span>
   );
 }
