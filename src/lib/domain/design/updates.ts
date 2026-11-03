@@ -16,7 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-03",
     area: "Marketplace",
-    words: "The Marketplace has its own menu at the top of the page, from its blue home, and its page shows it before it opens: job listings for retailers and installers, buy and sell, and finding partners, all to press around in.",
+    words: "The Marketplace has its own menu from a blue home, and a look inside before it opens: job listings, buy and sell, find partners.",
   },
   {
     day: "2026-11-03",
