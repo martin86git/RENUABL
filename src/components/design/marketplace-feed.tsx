@@ -437,7 +437,7 @@ export function MarketplaceFeed({ bare = false }: { bare?: boolean } = {}) {
   const jobOf = (id: string) => JOBS.find((j) => j.id === id)!;
 
   return (
-    <section>
+    <section className={bare ? "lg:h-full" : undefined}>
       {!bare && (
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-sun-line">{LAUNCH.feedEyebrow}</p>
@@ -453,6 +453,8 @@ export function MarketplaceFeed({ bare = false }: { bare?: boolean } = {}) {
       <div
         className={clsx(
           "relative overflow-hidden bg-canvas",
+          // Inside the showroom it fills the frame, and only the feed scrolls.
+          bare && "lg:flex lg:h-full lg:flex-col",
           !bare && "mt-12 rounded-[22px] shadow-[0_30px_80px_-30px_rgba(11,11,12,0.35)] ring-1 ring-line",
         )}
       >
@@ -465,9 +467,11 @@ export function MarketplaceFeed({ bare = false }: { bare?: boolean } = {}) {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-[13.5rem_minmax(0,1fr)_17rem]">
+        <div
+          className={clsx("grid lg:grid-cols-[13.5rem_minmax(0,1fr)_17rem]", bare && "lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)]")}
+        >
           {/* Filters, as a rail on wide screens and chips above the feed on a phone. */}
-          <aside className="hidden border-r border-line bg-surface p-4 lg:block">
+          <aside className="hidden border-r border-line bg-surface p-4 lg:block lg:overflow-y-auto">
             {!bare && <Tabs tab={tab} setTab={setTab} jobs={feed.length} />}
             {tab === "jobs" && (
               <>
@@ -515,7 +519,7 @@ export function MarketplaceFeed({ bare = false }: { bare?: boolean } = {}) {
             </div>
           </aside>
 
-          <div className="min-w-0 border-line lg:border-r">
+          <div className={clsx("min-w-0 border-line lg:border-r", bare && "lg:flex lg:min-h-0 lg:flex-col")}>
             <div className="z-10 space-y-3 lg:sticky lg:top-0 border-b border-line bg-canvas/95 p-3 backdrop-blur sm:p-4">
               <label className="flex h-10 items-center gap-2 rounded-full bg-surface px-4 ring-1 ring-line">
                 <Search className="size-4 text-muted" aria-hidden />
@@ -552,7 +556,12 @@ export function MarketplaceFeed({ bare = false }: { bare?: boolean } = {}) {
               </div>
             </div>
 
-            <div className="space-y-4 p-3 sm:p-4 lg:h-[46rem] lg:overflow-y-auto lg:overscroll-contain">
+            <div
+              className={clsx(
+                "space-y-4 p-3 sm:p-4 lg:overflow-y-auto lg:overscroll-contain",
+                bare ? "lg:min-h-0 lg:flex-1" : "lg:h-[46rem]",
+              )}
+            >
               {tab === "jobs" ? (
                 feed.length ? (
                   feed.map((j) => (
@@ -581,7 +590,7 @@ export function MarketplaceFeed({ bare = false }: { bare?: boolean } = {}) {
             </div>
           </div>
 
-          <aside className="hidden bg-surface p-4 lg:block">
+          <aside className="hidden bg-surface p-4 lg:block lg:overflow-y-auto">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">My bids</p>
             {bids.length ? (
               <ul className="mt-3 space-y-2">

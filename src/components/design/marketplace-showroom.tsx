@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { Check, Gavel, MapPin, MessageCircle, Search, Send, UserPlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { LAUNCH } from "@/lib/domain/design/marketplace-launch";
+import { MARKETPLACE_PAGES } from "@/lib/domain/design/sections";
 import { ListingRoofExample } from "./designer-showcase";
 import { MarketplaceMark } from "./marketplace-bar";
 import { MarketplaceFeed } from "./marketplace-feed";
@@ -19,11 +20,36 @@ import { MarketplaceFeed } from "./marketplace-feed";
 type View = (typeof LAUNCH.showroom.views)[number]["id"];
 type Role = (typeof LAUNCH.showroom.roles)[number]["id"];
 
+/**
+ * The demo's menu is the Marketplace's own (Martin: the sub menu belongs in the demo), each page opening the view that
+ * shows it, with Find partners (the directory) beside them.
+ */
+const TABS: { id: string; label: string; view: View; role?: Role }[] = [
+  ...MARKETPLACE_PAGES.map((p) => {
+    const to: Record<string, { view: View; role?: Role }> = {
+      listings: { view: "jobs" },
+      "my-listings": { view: "jobs", role: "retailer" },
+      "my-bids": { view: "jobs", role: "installer" },
+      equipment: { view: "trade" },
+      "my-equipment": { view: "trade" },
+      watching: { view: "jobs", role: "installer" },
+      messages: { view: "trade" },
+    };
+    return { id: p.id, label: p.label, ...(to[p.id] ?? { view: "jobs" as View }) };
+  }),
+  { id: "partners", label: LAUNCH.showroom.views[2].label, view: "partners" },
+];
+
 /** `compact`: straight under the page's heading, with no heading of its own. */
 export function MarketplaceShowroom({ compact = false }: { compact?: boolean }) {
   const copy = LAUNCH.showroom;
-  const [view, setView] = useState<View>("jobs");
+  const [tab, setTab] = useState("listings");
   const [role, setRole] = useState<Role>("installer");
+  const view = TABS.find((t) => t.id === tab)?.view ?? "jobs";
+  const open = (t: (typeof TABS)[number]) => {
+    setTab(t.id);
+    if (t.role) setRole(t.role);
+  };
   return (
     <section>
       {!compact && (
@@ -37,6 +63,9 @@ export function MarketplaceShowroom({ compact = false }: { compact?: boolean }) 
       <div
         className={clsx(
           "overflow-hidden rounded-[22px] bg-canvas shadow-[0_30px_80px_-30px_rgba(11,11,12,0.35)] ring-1 ring-line",
+          // The whole app in one fold (Martin): the frame is the window's height, less the top bar, and each view
+          // scrolls inside it.
+          "lg:-mx-10 lg:flex lg:h-[calc(100dvh-6.5rem)] lg:max-h-[62rem] lg:min-h-[34rem] lg:flex-col xl:-mx-16",
           !compact && "mt-10",
         )}
       >
@@ -49,20 +78,20 @@ export function MarketplaceShowroom({ compact = false }: { compact?: boolean }) 
             Marketplace
           </span>
           <span className="hidden h-4 w-px bg-line sm:block" aria-hidden />
-          <div role="tablist" aria-label="Marketplace views" className="flex gap-5 overflow-x-auto">
-            {copy.views.map((v) => (
+          <div role="tablist" aria-label="Marketplace pages" className="flex gap-5 overflow-x-auto">
+            {TABS.map((t) => (
               <button
-                key={v.id}
+                key={t.id}
                 type="button"
                 role="tab"
-                aria-selected={view === v.id}
-                onClick={() => setView(v.id)}
+                aria-selected={tab === t.id}
+                onClick={() => open(t)}
                 className={clsx(
                   "shrink-0 border-b-2 pb-1 pt-1 text-[13.5px] transition-colors",
-                  view === v.id ? "border-market font-medium text-ink" : "border-transparent text-muted hover:text-ink",
+                  tab === t.id ? "border-market font-medium text-ink" : "border-transparent text-muted hover:text-ink",
                 )}
               >
-                {v.label}
+                {t.label}
               </button>
             ))}
           </div>
@@ -74,7 +103,10 @@ export function MarketplaceShowroom({ compact = false }: { compact?: boolean }) 
                   type="button"
                   role="radio"
                   aria-checked={role === r.id}
-                  onClick={() => setRole(r.id)}
+                  onClick={() => {
+                    setRole(r.id);
+                    setTab(r.id === "retailer" ? "my-listings" : "listings");
+                  }}
                   className={clsx(
                     "rounded-full px-3 py-1 text-[12px] font-medium transition-colors",
                     role === r.id ? "bg-market text-white" : "text-ink-2 hover:text-ink",
@@ -87,10 +119,14 @@ export function MarketplaceShowroom({ compact = false }: { compact?: boolean }) 
           )}
         </div>
 
-        {view === "jobs" && role === "installer" && <MarketplaceFeed bare />}
-        {view === "jobs" && role === "retailer" && <RetailerListing />}
-        {view === "trade" && <BuySell />}
-        {view === "partners" && <Partners />}
+        <div
+          className={clsx("lg:min-h-0 lg:flex-1", view === "jobs" && role === "installer" ? "lg:overflow-hidden" : "lg:overflow-y-auto")}
+        >
+          {view === "jobs" && role === "installer" && <MarketplaceFeed bare />}
+          {view === "jobs" && role === "retailer" && <RetailerListing />}
+          {view === "trade" && <BuySell />}
+          {view === "partners" && <Partners />}
+        </div>
       </div>
       <p className="mt-3 text-center text-xs text-muted">{copy.note}</p>
     </section>

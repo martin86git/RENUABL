@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
-import { KIND_SECTIONS, designsRoofs, marketplacePagesFor, pageAt, sectionAt } from "@/lib/domain/design/sections";
+import { KIND_SECTIONS, designsRoofs, pageAt, sectionAt } from "@/lib/domain/design/sections";
 import { MarketplaceMark, MarketplaceMenu } from "./marketplace-bar";
 import { BUSINESS_KINDS, cleanKind, pageAllowed, type BusinessKind } from "@/lib/domain/design/business-kind";
 import { staffView } from "./staff-view-as";
@@ -405,7 +405,12 @@ function Shell({
               const market = sections.find((s) => s.id === "marketplace");
               if (!market) return null;
               const waiting = market.pages.reduce((n, p) => n + count(p.id), 0);
-              return <MarketplaceButton href={market.pages[0].href} lit={market.id === current.id} waiting={waiting} />;
+              // A little room from Sol's round, so the two read as different things.
+              return (
+                <span className="ml-3">
+                  <MarketplaceButton href={market.pages[0].href} lit={market.id === current.id} waiting={waiting} />
+                </span>
+              );
             })()}
             {retail && (
               <button
@@ -511,16 +516,10 @@ function Shell({
       ) : (
         <div className="px-3 pb-20 pt-2 sm:px-6 lg:px-14 lg:pt-9">
           <div data-tour="pad" data-sol-page className={PAD}>
-            {/* Inside the Marketplace, its own menu at the top of the pad, from its blue home; while closed, the menu this
-                kind will have, not yet links. */}
-            {current.id === "marketplace" && (
-              <MarketplaceMenu
-                className="-mt-1 mb-6 border-b border-line pb-3"
-                pages={marketplaceOpen() ? current.pages : marketplacePagesFor(kind)}
-                preview={!marketplaceOpen()}
-                lit={here?.page.id}
-                count={count}
-              />
+            {/* Inside the Marketplace, its own menu at the top of the pad, from its blue home, once it is open; until then
+                the launch page's demo carries it. */}
+            {current.id === "marketplace" && marketplaceOpen() && (
+              <MarketplaceMenu className="-mt-1 mb-6 border-b border-line pb-3" pages={current.pages} lit={here?.page.id} count={count} />
             )}
             {children}
           </div>
