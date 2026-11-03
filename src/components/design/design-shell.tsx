@@ -402,7 +402,19 @@ function Shell({
               )}
             </nav>
           </div>
-          <div className="mt-3 flex min-w-0 items-center justify-end gap-2.5">
+          <div className="mt-3 flex min-w-0 items-center gap-2.5">
+            {(() => {
+              // The Marketplace is the network, not the business's own work: in the middle of the room between the
+              // sections and the card (3 Nov 2026, Martin), its words beside its round where there is room
+              // (`.studio-market-words`).
+              const market = sections.find((s) => s.id === "marketplace");
+              const waiting = market ? market.pages.reduce((n, p) => n + count(p.id), 0) : 0;
+              return (
+                <div className="flex min-w-0 flex-1 justify-center">
+                  {market && <MarketplaceButton href={market.pages[0].href} lit={market.id === current.id} waiting={waiting} />}
+                </div>
+              );
+            })()}
             {retail && (
               <button
                 type="button"
@@ -414,14 +426,6 @@ function Shell({
                 <Search className="size-4" aria-hidden />
               </button>
             )}
-            {(() => {
-              // The Marketplace is the network, not the business's own work: at the side, its words beside its round where
-              // there is room (`.studio-market-words`).
-              const market = sections.find((s) => s.id === "marketplace");
-              if (!market) return null;
-              const waiting = market.pages.reduce((n, p) => n + count(p.id), 0);
-              return <MarketplaceButton href={market.pages[0].href} lit={market.id === current.id} waiting={waiting} />;
-            })()}
             <div
               data-tour="icons"
               className="flex shrink-0 items-center gap-0.5 rounded-full bg-surface p-1 shadow-[0_8px_30px_rgba(11,11,12,0.08)] ring-1 ring-line"

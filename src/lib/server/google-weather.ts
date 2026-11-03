@@ -3,7 +3,7 @@
  * Needs GOOGLE_MAPS_API_KEY with the Weather API enabled. Kept for an hour
  * per area, so busy pages don't repeat the call.
  */
-import { FORECAST_DAYS, parseDailyForecast, type DayForecast } from "@/lib/domain/weather";
+import { FORECAST_DAYS, parseDailyForecast, skyOf, type DayForecast, type Sky } from "@/lib/domain/weather";
 
 const HOUR = 3_600_000;
 const memory = new Map<string, { days: DayForecast[]; at: number }>();
@@ -38,32 +38,43 @@ export async function dailyForecast(lat: number, lng: number): Promise<DayForeca
 }
 
 const QUARTER = 900_000;
-const now = new Map<string, { degrees: number | null; at: number }>();
+/** The weather there right now: whole degrees Celsius, and the kind of sky (`skyOf`); null for what can't be had. */
+export interface Conditions {
+  degrees: number | null;
+  sky: Sky | null;
+}
+const now = new Map<string, Conditions & { at: number }>();
 
 /**
- * The temperature there right now, in whole degrees Celsius, from the same
- * Weather API (current conditions). Null when it can't be had (no key, the
- * API not enabled, or it didn't answer): the screen then shows no
- * temperature rather than a stale or made-up one. Kept 15 minutes per area.
+ * The weather there right now from the same Weather API (current conditions): the temperature in whole degrees
+ * Celsius and the kind of sky. Each is null when it can't be had (no key, the API not enabled, or it didn't answer):
+ * the screen then shows nothing rather than a stale or made-up one. Kept 15 minutes per area.
  */
-export async function currentTemperature(lat: number, lng: number): Promise<number | null> {
+export async function currentConditions(lat: number, lng: number): Promise<Conditions> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
-  if (!apiKey) return null;
+  if (!apiKey) return { degrees: null, sky: null };
   const key = `${lat.toFixed(2)},${lng.toFixed(2)}`;
   const hit = now.get(key);
-  if (hit && Date.now() - hit.at < QUARTER) return hit.degrees;
+  if (hit && Date.now() - hit.at < QUARTER) return { degrees: hit.degrees, sky: hit.sky };
   const params = new URLSearchParams({ "location.latitude": lat.toFixed(4), "location.longitude": lng.toFixed(4), key: apiKey });
-  let degrees: number | null = null;
+  let found: Conditions = { degrees: null, sky: null };
   try {
     const res = await fetch(`https://weather.googleapis.com/v1/currentConditions:lookup?${params}`, { signal: AbortSignal.timeout(8_000) });
     if (res.ok) {
-      const json = (await res.json()) as { temperature?: { degrees?: unknown; unit?: unknown } };
+      const json = (await res.json()) as {
+        temperature?: { degrees?: unknown; unit?: unknown };
+        weatherCondition?: { type?: unknown };
+        isDaytime?: unknown;
+      };
       const t = json.temperature;
-      if (typeof t?.degrees === "number" && Number.isFinite(t.degrees) && t.unit !== "FAHRENHEIT") degrees = Math.round(t.degrees);
+      found = {
+        degrees: typeof t?.degrees === "number" && Number.isFinite(t.degrees) && t.unit !== "FAHRENHEIT" ? Math.round(t.degrees) : null,
+        sky: skyOf(json.weatherCondition?.type, json.isDaytime),
+      };
     } else console.error(`Weather API (now) ${res.status}: ${(await res.text()).slice(0, 200)}`);
   } catch (error) {
     console.error("Weather API (now) failed", error);
   }
-  now.set(key, { degrees, at: Date.now() });
-  return degrees;
+  now.set(key, { ...found, at: Date.now() });
+  return found;
 }

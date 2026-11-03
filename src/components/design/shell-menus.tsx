@@ -3,7 +3,28 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { CheckCheck, LogOut, MessageSquarePlus, SlidersHorizontal, Sparkles, Bell, UserRound, Users, type LucideIcon } from "lucide-react";
+import {
+  Bell,
+  CheckCheck,
+  Cloud,
+  CloudFog,
+  CloudLightning,
+  CloudMoon,
+  CloudRain,
+  CloudSnow,
+  CloudSun,
+  LogOut,
+  MessageSquarePlus,
+  Moon,
+  SlidersHorizontal,
+  Sparkles,
+  Sun,
+  UserRound,
+  Users,
+  Wind,
+  type LucideIcon,
+} from "lucide-react";
+import type { Sky } from "@/lib/domain/weather";
 import clsx from "clsx";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import type { Notification } from "@/lib/server/design-notifications-repo";
@@ -91,20 +112,35 @@ export function RailIcon(props: { href: string; label: string; icon: LucideIcon;
   );
 }
 
+/** Each kind of sky as its icon, its words and its colour (the sun in the signal orange, rain in the Marketplace blue). */
+const SKY: Record<Sky, { icon: LucideIcon; words: string; tone: string }> = {
+  clear: { icon: Sun, words: "Sunny", tone: "text-sun-line" },
+  "clear-night": { icon: Moon, words: "Clear", tone: "text-ink-2" },
+  partly: { icon: CloudSun, words: "Partly cloudy", tone: "text-sun-line" },
+  "partly-night": { icon: CloudMoon, words: "Partly cloudy", tone: "text-ink-2" },
+  cloudy: { icon: Cloud, words: "Overcast", tone: "text-muted" },
+  rain: { icon: CloudRain, words: "Rain", tone: "text-market" },
+  storm: { icon: CloudLightning, words: "Storms", tone: "text-market" },
+  snow: { icon: CloudSnow, words: "Snow or hail", tone: "text-muted" },
+  fog: { icon: CloudFog, words: "Fog", tone: "text-muted" },
+  wind: { icon: Wind, words: "Windy", tone: "text-muted" },
+};
+
 /**
  * The date and the weather as one small tile (3 Nov 2026, Martin: less room, no time): a calendar leaf with the
- * weekday over the day of the month, and the temperature beside it. The full date and the place are in its title.
+ * weekday over the day of the month, and the temperature beside it with an icon for the sky (sun, cloud, rain…).
+ * The full date, the sky and the place are in its title.
  */
 export function DayWeather() {
   const [now, setNow] = useState<Date | null>(null);
-  const [weather, setWeather] = useState<{ place: string; degrees: number | null } | null>(null);
+  const [weather, setWeather] = useState<{ place: string; degrees: number | null; sky: Sky | null } | null>(null);
   useEffect(() => {
     // The day is only known once the page is in the browser.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setNow(new Date());
     const tick = window.setInterval(() => setNow(new Date()), 10 * 60_000);
     let gone = false;
-    void loadWeather().then((res) => !gone && res.ok && setWeather({ place: res.place, degrees: res.degrees }));
+    void loadWeather().then((res) => !gone && res.ok && setWeather({ place: res.place, degrees: res.degrees, sky: res.sky ?? null }));
     return () => {
       gone = true;
       window.clearInterval(tick);
@@ -113,7 +149,11 @@ export function DayWeather() {
   const part = (o: Intl.DateTimeFormatOptions) =>
     now ? new Intl.DateTimeFormat("en-AU", { timeZone: LAUNCH_MARKET.timeZone, ...o }).format(now) : "";
   const degrees = weather?.degrees ?? null;
-  const title = [part({ weekday: "long", day: "numeric", month: "long" }), degrees !== null ? `${degrees}° in ${weather?.place}` : null]
+  const sky = weather?.sky ? SKY[weather.sky] : null;
+  const title = [
+    part({ weekday: "long", day: "numeric", month: "long" }),
+    degrees !== null ? `${sky ? `${sky.words}, ` : ""}${degrees}° in ${weather?.place}` : null,
+  ]
     .filter(Boolean)
     .join(" · ");
   return (
@@ -125,7 +165,8 @@ export function DayWeather() {
         <span className="text-[13px] font-semibold leading-[19px] tabular-nums text-ink">{part({ day: "numeric" })}</span>
       </span>
       {degrees !== null && (
-        <span className="text-[13px] tabular-nums text-ink-2" aria-hidden>
+        <span className="flex items-center gap-1 text-[13px] tabular-nums text-ink-2" aria-hidden>
+          {sky && <sky.icon className={clsx("size-4", sky.tone)} strokeWidth={2} />}
           {degrees}°
         </span>
       )}

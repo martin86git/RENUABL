@@ -11,7 +11,7 @@ import {
   usableRoofSunHours,
 } from "./solar-roof";
 import { blendedYieldPerKw } from "./sunshine";
-import { customerOutlookLine, installOutlook, parseDailyForecast, solarDayOutlook, type DayForecast } from "./weather";
+import { customerOutlookLine, installOutlook, parseDailyForecast, skyOf, solarDayOutlook, type DayForecast } from "./weather";
 
 // Shaped like Google's documented buildingInsights:findClosest response (trimmed).
 const insights = {
@@ -204,5 +204,25 @@ describe("the home's own roof", () => {
     expect(roofPanelLimit(31, 8, 11)).toBe(11);
     expect(roofPanelLimit(31, null, 11)).toBe(31);
     expect(roofPanelLimit(31, 60, 11)).toBe(31);
+  });
+});
+
+describe("skyOf", () => {
+  it("draws the sun by day and the moon by night for a clear sky", () => {
+    expect(skyOf("CLEAR")).toBe("clear");
+    expect(skyOf("MOSTLY_CLEAR", false)).toBe("clear-night");
+    expect(skyOf("PARTLY_CLOUDY", false)).toBe("partly-night");
+  });
+  it("reads overcast, rain, storms and snow, the stronger weather first", () => {
+    expect(skyOf("MOSTLY_CLOUDY")).toBe("cloudy");
+    expect(skyOf("LIGHT_RAIN_SHOWERS")).toBe("rain");
+    expect(skyOf("WIND_AND_RAIN")).toBe("rain");
+    expect(skyOf("SCATTERED_THUNDERSTORMS")).toBe("storm");
+    expect(skyOf("HAIL_SHOWERS")).toBe("snow");
+    expect(skyOf("WINDY")).toBe("wind");
+  });
+  it("draws nothing for a type it doesn't know", () => {
+    expect(skyOf("TYPE_UNSPECIFIED")).toBeNull();
+    expect(skyOf(undefined)).toBeNull();
   });
 });

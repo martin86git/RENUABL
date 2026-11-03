@@ -124,3 +124,26 @@ export function solarDayOutlook(f: DayForecast, home: { battery: boolean; ev: bo
       : "Save big loads for a sunnier day if you can.",
   };
 }
+
+/** The sky now, in as few kinds as an icon needs. */
+export type Sky = "clear" | "clear-night" | "partly" | "partly-night" | "cloudy" | "rain" | "storm" | "snow" | "fog" | "wind";
+
+/**
+ * Google's current condition type (CLEAR, PARTLY_CLOUDY, LIGHT_RAIN_SHOWERS, SCATTERED_THUNDERSTORMS…) as the kind of
+ * sky to draw beside the temperature, night or day; null for a type it doesn't know, so no icon is drawn rather than a
+ * wrong one. Storms before rain, snow and hail before rain, so the stronger weather wins.
+ */
+export function skyOf(type: unknown, daytime: unknown = true): Sky | null {
+  if (typeof type !== "string") return null;
+  const t = type.toUpperCase();
+  const day = daytime !== false;
+  if (t.includes("THUNDER")) return "storm";
+  if (/SNOW|HAIL|SLEET|BLIZZARD|FREEZING/.test(t)) return "snow";
+  if (/RAIN|SHOWER|DRIZZLE/.test(t)) return "rain";
+  if (/FOG|HAZE|MIST|SMOKE|DUST/.test(t)) return "fog";
+  if (t.includes("WIND")) return "wind";
+  if (t === "PARTLY_CLOUDY") return day ? "partly" : "partly-night";
+  if (t === "CLOUDY" || t === "MOSTLY_CLOUDY") return "cloudy";
+  if (t === "CLEAR" || t === "MOSTLY_CLEAR") return day ? "clear" : "clear-night";
+  return null;
+}

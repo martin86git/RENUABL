@@ -108,7 +108,8 @@ export const savePipeline = (id: string, input: { name: string; stages: JobStage
 export const deletePipeline = (id: string) => ask<object>(`/api/design/pipelines/${encodeURIComponent(id)}`, { method: "DELETE" });
 
 /** The temperature now, and where it is for. `degrees` is null when it can't be had. */
-export const loadWeather = () => ask<{ place: string; degrees: number | null }>("/api/design/weather");
+export const loadWeather = () =>
+  ask<{ place: string; degrees: number | null; sky: import("@/lib/domain/weather").Sky | null }>("/api/design/weather");
 
 export const loadOverview = () => ask<Overview>("/api/design/overview");
 
