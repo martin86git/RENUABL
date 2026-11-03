@@ -18,7 +18,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LAUNCH, closesIn, servedFeed } from "@/lib/domain/design/marketplace-launch";
 import type { ListingSystem } from "@/lib/domain/design/marketplace";
 import { AerialRoof, type AerialRoofSpec } from "./aerial-roof";
@@ -418,6 +418,20 @@ export function MarketplaceFeed({ bare = false }: { bare?: boolean } = {}) {
     );
   }, [within, battery, ev, query]);
 
+  // A filter changed: the list goes back to the top and the new results fade in, with the count said above them,
+  // so the change is seen (Martin: playing with the filters should show the feed update).
+  const filters = `${within}-${battery}-${ev}`;
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (list.current) list.current.scrollTop = 0;
+  }, [filters]);
+  const showing = [
+    `${feed.length} ${feed.length === 1 ? "job" : "jobs"}`,
+    within === null ? "anywhere" : `within ${within} km`,
+    ...(battery ? ["with a battery"] : []),
+    ...(ev ? ["with an EV charger"] : []),
+  ].join(", ");
+
   // The first bid placed is chosen a little later, as the seller would choose one some days on.
   useEffect(() => {
     if (!bids.length || won) return;
@@ -557,30 +571,38 @@ export function MarketplaceFeed({ bare = false }: { bare?: boolean } = {}) {
             </div>
 
             <div
+              ref={list}
               className={clsx(
                 "space-y-4 p-3 sm:p-4 lg:overflow-y-auto lg:overscroll-contain",
                 bare ? "lg:min-h-0 lg:flex-1" : "lg:h-[46rem]",
               )}
             >
+              {tab === "jobs" && (
+                <p aria-live="polite" className="px-1 text-[12.5px] font-medium text-ink-2">
+                  {showing}
+                </p>
+              )}
               {tab === "jobs" ? (
                 feed.length ? (
-                  feed.map((j) => (
-                    <JobPost
-                      key={j.id}
-                      job={j}
-                      open={open === j.id}
-                      toggle={() => setOpen((o) => (o === j.id ? null : j.id))}
-                      bidding={bidding === j.id}
-                      startBid={() => setBidding(j.id)}
-                      cancelBid={() => setBidding(null)}
-                      mine={bids.find((b) => b.job === j.id) ?? null}
-                      won={won === j.id}
-                      place={(a, s) => place(j.id, a, s)}
-                      withdraw={() => withdraw(j.id)}
-                      watched={watched.includes(j.id)}
-                      watch={() => watch(j.id)}
-                    />
-                  ))
+                  <div key={filters} className="space-y-4 motion-safe:animate-[fade-up_0.35s_ease-out]">
+                    {feed.map((j) => (
+                      <JobPost
+                        key={j.id}
+                        job={j}
+                        open={open === j.id}
+                        toggle={() => setOpen((o) => (o === j.id ? null : j.id))}
+                        bidding={bidding === j.id}
+                        startBid={() => setBidding(j.id)}
+                        cancelBid={() => setBidding(null)}
+                        mine={bids.find((b) => b.job === j.id) ?? null}
+                        won={won === j.id}
+                        place={(a, s) => place(j.id, a, s)}
+                        withdraw={() => withdraw(j.id)}
+                        watched={watched.includes(j.id)}
+                        watch={() => watch(j.id)}
+                      />
+                    ))}
+                  </div>
                 ) : (
                   <p className="py-16 text-center text-sm text-muted">No jobs match. Try a wider distance.</p>
                 )
