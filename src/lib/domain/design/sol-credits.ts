@@ -1,7 +1,8 @@
 /**
  * Sol credits (Martin, 1 Nov 2026): what Sol's answers cost a business. Pure, tested (`sol-credits.test.ts`).
  *
- * One credit is one answer from Sol, wherever he is asked: his panel and Today's box, @Sol in team chat, an email
+ * Credits are spent by the answer (3 Nov 2026, sol-routing.ts): a quick answer is one, a deep one three, and two more
+ * when he researched it online. Answers come from Sol wherever he is asked: his panel and Today's box, @Sol in team chat, an email
  * summarised or a reply drafted, an answer in a customer's proposal chat, a call written up, a usage figure found in the
  * customer's file. Each paid user brings `SOL_PER_USER` credits a calendar month (the market's month), which don't roll
  * over; a business still on a free trial from before 3 Nov 2026 (there is none for new sign-ups) has `SOL_TRIAL` for the month instead. Credits bought in packs never expire and are
@@ -10,15 +11,16 @@
 import { dollars } from "./plans";
 
 /** Included with each paid user, each calendar month. */
-export const SOL_PER_USER = 200;
+export const SOL_PER_USER = 150;
 /** Included while a business is on a free trial from before 3 Nov 2026 (the whole business, not each user). */
 export const SOL_TRIAL = 100;
 
 /** The packs credits are sold in, cents GST inclusive. */
 export const SOL_PACKS = [
-  { credits: 500, cents: 2500 },
-  { credits: 1000, cents: 4500 },
-  { credits: 2500, cents: 10000 },
+  // About three times what the credits cost RENUABL (a credit is about US$0.04, ai-costs.ts), so packs make money.
+  { credits: 250, cents: 4900 },
+  { credits: 1000, cents: 14900 },
+  { credits: 3000, cents: 42900 },
 ] as const;
 export type SolPack = (typeof SOL_PACKS)[number];
 
@@ -85,6 +87,6 @@ export const SOL_OUT_SHORT = "No Sol credits left this month. The owner can add 
 
 export const SOL_WORDS = {
   perUser: `${SOL_PER_USER} Sol credits a user each month`,
-  explained: `One credit is one answer from Sol. Each user brings ${SOL_PER_USER} a month, which start again on the 1st. Credits you buy never expire, and are used once the month's are gone.`,
+  explained: `An everyday answer from Sol is one credit; a deep one (writing a customer will read, advice, files to read, or Think deeper) is three, and research online adds two. Each user brings ${SOL_PER_USER} a month, which start again on the 1st. Credits you buy never expire, and are used once the month's are gone.`,
   pack: (p: SolPack) => `${p.credits.toLocaleString("en-AU")} credits · ${dollars(p.cents)}`,
 } as const;

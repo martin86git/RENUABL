@@ -55,20 +55,36 @@ describe.skipIf(!url)("plans and design tokens (database)", () => {
     expect((await billing.subscriptionByCheckout("cs_test_alpha_0000000001"))?.businessId).toBe(a);
 
     await billing.updateSubscription({ ...facts, status: "active", seats: 4 });
-    expect(await billing.subscriptionOf(a)).toMatchObject({ status: "active", seats: 4 });
+    expect(await billing.subscriptionOf(a)).toMatchObject({ status: "active", seats: 4, term: "flex", commitUntil: null });
+
+    // The 12-month plan, as Stripe's metadata says it, and found by the cron once its months are up.
+    await billing.updateSubscription({ ...facts, seats: 4, term: "commit", commitFrom: "2026-12-03", commitUntil: "2027-11-03" });
+    expect(await billing.subscriptionOf(a)).toMatchObject({ term: "commit", commitFrom: "2026-12-03", commitUntil: "2027-11-03" });
+    expect(await billing.twelveMonthsEnded("2027-11-02")).not.toContain("sub_alpha");
+    expect(await billing.twelveMonthsEnded("2027-11-03")).toContain("sub_alpha");
+    await billing.updateSubscription({ ...facts, seats: 4 });
+    expect(await billing.twelveMonthsEnded("2027-11-03")).not.toContain("sub_alpha");
   });
 
-  it("credits a pack once, uses one token a roof, and spends nothing past nothing", async () => {
+  it("credits a pack once in dollars, takes $3 a roof and $4 more once it has a battery, and nothing past nothing", async () => {
     const a = (await db.query<{ id: string }>(`select id from businesses where created_by = $1`, [A]))[0].id;
-    await billing.creditPack(a, "cs_test_pack_0000000001", 20, A);
-    await billing.creditPack(a, "cs_test_pack_0000000001", 20, A);
-    expect(await billing.tokenBalance(a)).toBe(20);
+    // A pack of 20 design jobs is $60 of balance.
+    await billing.creditPack(a, "cs_test_pack_0000000001", 60, A);
+    await billing.creditPack(a, "cs_test_pack_0000000001", 60, A);
+    expect(await billing.tokenBalance(a)).toBe(60);
     expect(await billing.spendToken(a, "roof_1", A)).toBe("used");
     expect(await billing.spendToken(a, "roof_1", A)).toBe("already");
-    expect(await billing.tokenBalance(a)).toBe(19);
+    expect(await billing.tokenBalance(a)).toBe(57);
+    expect(await billing.canAddBattery(a, "roof_1")).toBe(true);
+    expect(await billing.spendBatteryDesign(a, "roof_1", A)).toBe("used");
+    expect(await billing.spendBatteryDesign(a, "roof_1", A)).toBe("already");
+    expect(await billing.tokenBalance(a)).toBe(53);
+    expect(await billing.canStartRoof(a, true)).toBe(true);
     expect(await billing.spendToken(b, "roof_b", B)).toBe("none");
+    expect(await billing.spendBatteryDesign(b, "roof_b", B)).toBe("none");
     expect(await billing.tokenBalance(b)).toBe(0);
     expect(await billing.canStartRoof(b)).toBe(false);
-    expect((await billing.tokenLedger(a)).map((l) => l.reason)).toEqual(["job", "pack"]);
+    expect(await billing.canAddBattery(b, "roof_b")).toBe(false);
+    expect((await billing.tokenLedger(a)).map((l) => l.reason)).toEqual(["battery", "job", "pack"]);
   });
 });

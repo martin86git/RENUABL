@@ -24,6 +24,8 @@ import { listBriefs } from "@/lib/server/briefs-repo";
 import { noteUnfinishedBriefs } from "@/lib/server/brief-hubspot";
 import { BUSINESS_KINDS, countByKind, kindLabel } from "@/lib/domain/design/business-kind";
 import { listDesignBusinesses } from "@/lib/server/design-admin-repo";
+import { solCostsThisMonth } from "@/lib/server/design-billing-repo";
+import { todayInMarket } from "@/lib/domain/market";
 import { listVoiceCalls } from "@/lib/server/voice-calls";
 import { OUTCOME_WORDS, type CallOutcome } from "@/lib/domain/voice-agent";
 
@@ -50,7 +52,7 @@ export default async function AdminPage() {
   await processOffersSoon();
   // Briefs left partway for a few hours get their "not finished" note when staff look (and from the daily cron).
   await noteUnfinishedBriefs();
-  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls] = await Promise.all([
+  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls, solCosts] = await Promise.all([
     listPartners(),
     listAllJobs(),
     listPriceUploads(),
@@ -59,6 +61,7 @@ export default async function AdminPage() {
     listBriefs(),
     listDesignBusinesses(),
     listVoiceCalls().catch(() => []),
+    solCostsThisMonth(todayInMarket()).catch(() => []),
   ]);
   const kinds = countByKind(businesses);
   const tallies = interestSummary(checks);
@@ -317,6 +320,30 @@ export default async function AdminPage() {
             ))}
           </ul>
         )}
+      </Panel>
+
+      {/* What Sol really cost this month against the credits his answers took (ai-costs.ts), to check the allowance and packs. */}
+      <Panel className="mt-6" title="Sol's running cost this month">
+        {solCosts.length === 0 ? (
+          <p className="px-5 py-4 text-[14px] text-muted">No answers costed yet this month.</p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {solCosts.map((c) => (
+              <li key={c.tier} className="flex flex-wrap items-baseline justify-between gap-2 px-5 py-3 text-[14px]">
+                <span className="font-medium text-ink">
+                  {c.tier === "deep" ? "Deep answers (Opus)" : c.tier === "quick" ? "Quick answers (Sonnet)" : c.tier}
+                </span>
+                <span className="tabular-nums text-ink-2">
+                  {c.answers} answers · {c.credits} credits · US${c.usd.toFixed(2)} · US$
+                  {(c.answers ? c.usd / c.answers : 0).toFixed(3)} an answer · US${(c.credits ? c.usd / c.credits : 0).toFixed(3)} a credit
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="px-5 pb-4 text-[12px] text-muted">
+          At list prices. Packs sell a credit for about US$0.09 or more: keep what a credit costs well under that.
+        </p>
       </Panel>
 
       {/* The design tool's own customers (solar businesses) by kind: read only, for staff. Not installation partners. */}

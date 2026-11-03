@@ -63,8 +63,14 @@ export async function checkJobPhotos(
   });
   let reading: Record<string, unknown> | "out";
   try {
-    reading = await withSolCredit(business.businessId, "chat", by, () =>
-      readWithClaude<Record<string, unknown>>(blocks, PHOTO_CHECK_SCHEMA, prompt, apiKey),
+    // Photos to read against the design: the deeper model (sol-routing.ts).
+    reading = await withSolCredit(
+      business.businessId,
+      "chat",
+      by,
+      (ai) => readWithClaude<Record<string, unknown>>(blocks, PHOTO_CHECK_SCHEMA, prompt, apiKey, ai),
+      "deep",
+      "photo check",
     );
   } catch (e) {
     console.error("sol's photo check", e instanceof Error ? e.message : e);

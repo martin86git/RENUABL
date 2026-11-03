@@ -3,11 +3,22 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { EMPTY_BILLING, INVOICE_STATUS, type BillingDetails } from "@/lib/domain/design/billing-invoice";
-import { PLAN_WORDS, SEAT_NOTE, TOKEN_PACKS, dollars, packPriceCents, priceFor, type TokenPack } from "@/lib/domain/design/plans";
+import {
+  PLAN_WORDS,
+  SEAT_NOTE,
+  TOKEN_PACKS,
+  designBalanceWords,
+  dollars,
+  packPriceCents,
+  planNow,
+  type TokenPack,
+} from "@/lib/domain/design/plans";
 import { SOL_PACKS, SOL_USE_WORDS, SOL_WORDS, type SolUse } from "@/lib/domain/design/sol-credits";
 import {
   buySolCredits,
   buyTokens,
+  cancelPlan,
+  chooseTwelveMonths,
   invoicePdfUrl,
   loadBilling,
   manageBilling,
@@ -31,7 +42,12 @@ const STATUS: Record<string, string> = {
   paused: "Paused",
 };
 
-const REASON: Record<string, string> = { trial: "Free with your trial", pack: "Pack bought", job: "Roof designed" };
+const REASON: Record<string, string> = {
+  trial: "Free with your trial",
+  pack: "Pack bought",
+  job: "Roof designed",
+  battery: "Battery added to a design",
+};
 
 const day = (iso: string | null) =>
   iso
@@ -43,6 +59,7 @@ export function BillingPanel() {
   const [state, setState] = useState<BillingState | { error: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   useEffect(() => {
     void loadBilling().then(setState);
   }, []);
@@ -65,7 +82,22 @@ export function BillingPanel() {
   const has = (part: BillingPart) => state.parts.includes(part);
   // An installer (business-kind.ts) is free to join: no plan, users or Sol, only design jobs bought in packs.
   const packsOnly = !has("plan");
-  const price = plan ? priceFor(plan.seats, plan.interval) : null;
+  const now = plan ? planNow(plan, state.today, day) : null;
+  // Choosing the 12-month plan or cancelling changes the plan here: the page is read again afterwards.
+  const change = async (key: string, ask: () => Promise<{ ok: boolean; message?: string; chargedCents?: unknown }>, done: string) => {
+    setBusy(key);
+    setNote(null);
+    const a = await ask();
+    setBusy(null);
+    setConfirming(false);
+    if (!a.ok) return setNote(a.message ?? "That didn't go through.");
+    const charged =
+      typeof a.chargedCents === "number" && a.chargedCents > 0
+        ? ` ${dollars(a.chargedCents)} was charged for leaving the 12-month plan early.`
+        : "";
+    setNote(done + charged);
+    setState(await loadBilling());
+  };
   const bought = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("bought");
 
   return (
@@ -74,27 +106,75 @@ export function BillingPanel() {
       {has("plan") && (
         <section className={clsx(ui.card, "space-y-3 p-5 sm:p-6")}>
           <h2 className="text-base font-semibold text-ink">Your plan</h2>
-          {plan && price ? (
+          {plan && now ? (
             <dl className="space-y-3 text-sm">
-              <Row k="Plan" v={`${STATUS[plan.status] ?? plan.status} · ${plan.seats} ${plan.seats === 1 ? "user" : "users"}`} />
               <Row
-                k="What you pay"
-                v={`${dollars(price.chargeCents)} ${plan.interval === "month" ? "a month" : "a year"}, including GST${
-                  plan.interval === "year" ? ` (${PLAN_WORDS.yearly})` : ""
-                }`}
+                k="Plan"
+                v={`${STATUS[plan.status] ?? plan.status} · ${plan.seats} ${plan.seats === 1 ? "user" : "users"} · ${now.termWords}`}
+              />
+              <Row
+                k="Next bill"
+                v={
+                  plan.interval === "year"
+                    ? `${dollars(now.nextPerUserCents * plan.seats)} a year, including GST, on ${day(plan.periodEnd)}`
+                    : `${dollars(now.nextPerUserCents * plan.seats)}, including GST, on ${day(plan.periodEnd)} (${dollars(now.nextPerUserCents)} a user)`
+                }
               />
               {plan.status === "trialing" && <Row k="Trial ends" v={`${day(plan.trialEnd)}. Nothing is charged before then.`} />}
-              {plan.status !== "trialing" && <Row k="Next bill" v={day(plan.periodEnd)} />}
             </dl>
           ) : (
             <p className="text-sm text-ink-2">
               No plan yet. Start one from the sign-up page: {PLAN_WORDS.seat}. {PLAN_WORDS.gst}
             </p>
           )}
+          {/* The 12-month plan, offered while month to month: $29 a user instead of $59 (plans.ts). */}
+          {plan && now?.canCommit && state.payments && !["canceled", "incomplete_expired"].includes(plan.status) && (
+            <div className="space-y-2 rounded-xl bg-surface-2 p-4">
+              <p className="text-sm font-semibold text-ink">The 12-month plan: {PLAN_WORDS.commit.replace(" on the 12-month plan", "")}</p>
+              <p className="text-sm leading-relaxed text-ink-2">{PLAN_WORDS.commitExplained}</p>
+              <button
+                className={ui.primary}
+                disabled={busy !== null}
+                onClick={() => void change("commit", chooseTwelveMonths, "You're on the 12-month plan.")}
+              >
+                {busy === "commit" ? "Choosing…" : "Choose the 12-month plan"}
+              </button>
+            </div>
+          )}
           {plan && state.payments && (
-            <button className={ui.quiet} disabled={busy !== null} onClick={() => void go("portal", manageBilling)}>
-              {busy === "portal" ? "Opening Stripe…" : "Change your card, billing period or cancel"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button className={ui.quiet} disabled={busy !== null} onClick={() => void go("portal", manageBilling)}>
+                {busy === "portal" ? "Opening Stripe…" : "Change your card or billing details"}
+              </button>
+              {!["canceled", "incomplete_expired"].includes(plan.status) && !confirming && (
+                <button className={ui.quiet} disabled={busy !== null} onClick={() => setConfirming(true)}>
+                  Cancel the plan
+                </button>
+              )}
+            </div>
+          )}
+          {/* Cancelling says what it costs before it is done: on the 12-month plan, what it saved is paid back. */}
+          {plan && now && confirming && (
+            <div className="space-y-2 rounded-xl border border-line p-4" role="alertdialog" aria-label="Cancel the plan">
+              <p className="text-sm leading-relaxed text-ink">
+                Your plan runs to the end of the month you&apos;ve paid for ({day(plan.periodEnd)}), then stops.
+                {now.exitCents > 0
+                  ? ` You're leaving the 12-month plan early, so ${dollars(now.exitCents)} (what it has saved you) is charged today.`
+                  : ""}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className={ui.primary}
+                  disabled={busy !== null}
+                  onClick={() => void change("cancel", cancelPlan, "Your plan is cancelled at the end of the month you've paid for.")}
+                >
+                  {busy === "cancel" ? "Cancelling…" : now.exitCents > 0 ? `Pay ${dollars(now.exitCents)} and cancel` : "Cancel the plan"}
+                </button>
+                <button className={ui.quiet} disabled={busy !== null} onClick={() => setConfirming(false)}>
+                  Keep my plan
+                </button>
+              </div>
+            </div>
           )}
           {plan && <p className="text-xs leading-relaxed text-muted">{SEAT_NOTE}</p>}
         </section>
@@ -155,7 +235,8 @@ export function BillingPanel() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-semibold text-ink">Design jobs</h2>
           <p className="text-sm text-ink-2">
-            <span className="text-2xl font-semibold tabular-nums text-ink">{state.tokens}</span> left
+            <span className="text-2xl font-semibold tabular-nums text-ink">{dollars(Math.max(0, state.tokens) * 100)}</span> left
+            <span className="ml-2 text-xs text-muted">{designBalanceWords(state.tokens).split(" · ")[1]}</span>
           </p>
         </div>
         <p className="text-sm leading-relaxed text-ink-2">{PLAN_WORDS.tokenExplained}</p>
@@ -172,7 +253,7 @@ export function BillingPanel() {
               disabled={busy !== null || !state.payments}
               onClick={() => void go(`pack-${pack}`, () => buyTokens(pack))}
             >
-              <span className="text-base font-semibold text-ink">{pack} jobs</span>
+              <span className="text-base font-semibold text-ink">{pack} design jobs</span>
               <span className="text-xs tabular-nums text-ink-2">
                 {busy === `pack-${pack}` ? "Opening Stripe…" : dollars(packPriceCents(pack))}
               </span>
@@ -190,7 +271,7 @@ export function BillingPanel() {
                   <span className="ml-2 text-xs text-muted">{day(l.at)}</span>
                 </span>
                 <span className={clsx("tabular-nums", l.change > 0 ? "text-positive" : "text-ink")}>
-                  {l.change > 0 ? `+${l.change}` : l.change}
+                  {l.change > 0 ? `+${dollars(l.change * 100)}` : `−${dollars(-l.change * 100)}`}
                 </span>
               </li>
             ))}

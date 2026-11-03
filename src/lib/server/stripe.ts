@@ -1,8 +1,16 @@
 /** Server only. Stripe Checkout (embedded payment form) for the refundable deposit. */
 import Stripe from "stripe";
 import { DEPOSIT, depositCents } from "@/lib/domain/deposit";
-import { packPriceCents, seatPriceCents, type BillingInterval, type TokenPack } from "@/lib/domain/design/plans";
-import { INVOICE_FOOTER, gstTaxRate, packInvoice } from "./stripe-billing";
+import {
+  COMMIT_SEAT_CENTS,
+  FIRST_MONTH_CENTS,
+  SEAT_MONTHLY_CENTS,
+  dollars,
+  packPriceCents,
+  type BillingInterval,
+  type TokenPack,
+} from "@/lib/domain/design/plans";
+import { INVOICE_FOOTER, gstTaxRate, packInvoice, portalWithoutCancel, termOf } from "./stripe-billing";
 
 /** The API version and beta flag Stripe's embedded checkout form needs. */
 export const STRIPE_API_VERSION = "2026-03-25.dahlia; custom_checkout_payment_form_preview=v1";
@@ -81,12 +89,32 @@ export async function createHostedDepositCheckout(stripe: Stripe, opts: { refere
 /** What Stripe's page and the receipts call the plan. */
 const PLAN_NAME = "RENUABL for solar businesses";
 
-/** A sign-up: the plan for `seats` users, the card taken and the first period charged now. Returns the page's URL. */
+/**
+ * The first month's price, off the first bill only: $30 a user off $59, made for this sign-up's users (an amount off
+ * is off the whole bill, so it is made for each sign-up).
+ */
+async function firstMonthCoupon(stripe: Stripe, seats: number): Promise<string> {
+  const coupon = await stripe.coupons.create({
+    amount_off: (SEAT_MONTHLY_CENTS - FIRST_MONTH_CENTS) * seats,
+    currency: "aud",
+    duration: "once",
+    name: `First month: ${dollars(FIRST_MONTH_CENTS)} a user`,
+    metadata: { kind: "design-first-month", seats: String(seats) },
+  });
+  return coupon.id;
+}
+
+/**
+ * A sign-up: the plan for `seats` users at $59 a user a month, the first month at $29 (`firstMonthCoupon`), the card
+ * taken and the first month charged now. Returns the page's URL. Yearly is no longer sold (plans.ts), so it is always
+ * monthly; the 12-month plan is chosen afterwards in Billing (`commitToTwelveMonths`).
+ */
 export async function createPlanCheckout(
   stripe: Stripe,
-  opts: { email: string; seats: number; interval: BillingInterval; origin: string },
+  opts: { email: string; seats: number; interval?: BillingInterval; origin: string },
 ): Promise<string> {
   const session = await stripe.checkout.sessions.create({
+    discounts: [{ coupon: await firstMonthCoupon(stripe, opts.seats) }],
     mode: "subscription",
     customer_email: opts.email,
     payment_method_collection: "always",
@@ -99,8 +127,8 @@ export async function createPlanCheckout(
         tax_rates: [await gstTaxRate(stripe)],
         price_data: {
           currency: "aud",
-          unit_amount: seatPriceCents(opts.interval),
-          recurring: { interval: opts.interval },
+          unit_amount: SEAT_MONTHLY_CENTS,
+          recurring: { interval: "month" },
           product_data: { name: PLAN_NAME, description: "A user. Includes GST." },
         },
       },
@@ -111,7 +139,9 @@ export async function createPlanCheckout(
     },
     metadata: { kind: "design-plan", email: opts.email },
     custom_text: {
-      submit: { message: "Charged today. Cancel any time: your plan runs to the end of the period you've paid for." },
+      submit: {
+        message: `Your first month, ${dollars(FIRST_MONTH_CENTS)} a user, is charged today; then ${dollars(SEAT_MONTHLY_CENTS)} a user a month, or ${dollars(COMMIT_SEAT_CENTS)} if you choose the 12-month plan. Cancel any time.`,
+      },
     },
     success_url: `${opts.origin}/design/welcome?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${opts.origin}/design#pricing`,
@@ -150,17 +180,25 @@ export async function createTokenCheckout(
   return session.url;
 }
 
-/** Stripe's own page for the card, invoices, seats and cancelling. Returns its URL. */
+/** Stripe's own page for the card, details and invoices (cancelling is in Billing, `cancelPlan`). Returns its URL. */
 export async function billingPortalUrl(stripe: Stripe, customer: string, origin: string): Promise<string> {
-  const portal = await stripe.billingPortal.sessions.create({ customer, return_url: `${origin}/design/settings/billing` });
+  const portal = await stripe.billingPortal.sessions.create({
+    customer,
+    configuration: await portalWithoutCancel(stripe),
+    return_url: `${origin}/design/settings/billing`,
+  });
   return portal.url;
 }
 
-/** What we keep of a subscription Stripe sends: its status, seats, interval, trial and period end. */
+/** What we keep of a subscription Stripe sends: its status, seats, interval, trial and period end, and its term. */
 export function subscriptionFacts(sub: Stripe.Subscription) {
   const item = sub.items.data[0];
   const interval: BillingInterval = item?.price?.recurring?.interval === "year" ? "year" : "month";
+  const term = termOf(sub);
   return {
+    term: term.term,
+    commitFrom: term.from,
+    commitUntil: term.until,
     stripeSubscription: sub.id,
     stripeCustomer: typeof sub.customer === "string" ? sub.customer : (sub.customer?.id ?? null),
     status: sub.status,

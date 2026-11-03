@@ -64,6 +64,10 @@ export interface SolTurn {
   sources?: SolSource[];
   /** What he kept in the business's memory with this answer: each saved answer's id and question. */
   remembered?: { id: string; question: string }[];
+  /** Answered by the deeper model (sol-routing.ts). */
+  deep?: boolean;
+  /** The credits the answer took, shown under it. */
+  credits?: number;
 }
 
 /** The turns kept: the latest `CHAT_KEPT`, and any pinned before them (1 Nov 2026, Martin: as Primero's). */
@@ -165,6 +169,8 @@ export function cleanTurns(raw: unknown): SolTurn[] {
         ...(t.pinned === true ? { pinned: true } : {}),
         ...(sources.length ? { sources } : {}),
         ...(remembered.length ? { remembered } : {}),
+        ...(t.deep === true ? { deep: true } : {}),
+        ...(typeof t.credits === "number" && Number.isInteger(t.credits) && t.credits > 0 && t.credits < 100 ? { credits: t.credits } : {}),
       };
     })
     .filter((t): t is SolTurn => t !== null);
@@ -319,7 +325,7 @@ export interface SolFile {
 }
 
 /** A message from the browser: its words (to `MAX_SAID`) and up to three files, or null when there is nothing. */
-export function cleanSolInput(raw: unknown): { text: string; files: SolFile[]; page?: PageContext } | null {
+export function cleanSolInput(raw: unknown): { text: string; files: SolFile[]; page?: PageContext; deep?: boolean } | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const text = typeof r.text === "string" ? r.text.trim().slice(0, MAX_SAID) : "";
@@ -336,7 +342,7 @@ export function cleanSolInput(raw: unknown): { text: string; files: SolFile[]; p
   if (!text && !files.length) return null;
   // What their screen shows, sent from Sol's side panel (page-context.ts).
   const page = cleanPageContext(r.page);
-  return { text, files, ...(page ? { page } : {}) };
+  return { text, files, ...(page ? { page } : {}), ...(r.deep === true ? { deep: true } : {}) };
 }
 
 /** "#" in the box finds a deal, as in Primero: the "#" and what follows it, up to the caret, or null. */

@@ -35,8 +35,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if (!apiKey) return Response.json({ ok: false, message: "Sol can't read files here: Claude isn't set up." }, { status: 503 });
     const current = cleanExtras({ bill: read.body.current }, 1, { bill: EMPTY, postcode: "" }).bill;
     try {
-      const usage = await withSolCredit(who.member.businessId, "usage", who.member.email, () =>
-        findUsageInFile(who.member.businessId, found.job, found.customer, apiKey),
+      const usage = await withSolCredit(who.member.businessId, "usage", who.member.email, (ai) =>
+        findUsageInFile(who.member.businessId, found.job, found.customer, apiKey, ai),
       );
       if (usage === "out") return Response.json({ ok: false, message: SOL_OUT_SHORT }, { status: 402 });
       return Response.json(billFieldsFromFile(usage, current));

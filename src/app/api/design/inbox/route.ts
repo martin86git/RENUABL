@@ -7,6 +7,7 @@ import { GmailOff, disconnectGmail, gmailAddress, gmailConfig, unreadCount } fro
 import { allow } from "@/lib/server/rate-limit";
 import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { withSolCredit } from "@/lib/server/sol-credits";
+import { inboxTier } from "@/lib/domain/design/sol-routing";
 
 export const maxDuration = 60;
 
@@ -125,8 +126,14 @@ export async function POST(request: Request) {
           `Subject: ${email.subject}`,
           words,
         ].join("\n");
-        const out = await withSolCredit(member.businessId, "inbox", member.email, () =>
-          readWithClaude<{ text: string }>([], SOL_SCHEMA, prompt, apiKey),
+        // A reply a customer reads is drafted by the deeper model; a summary for the team is quick (sol-routing.ts).
+        const out = await withSolCredit(
+          member.businessId,
+          "inbox",
+          member.email,
+          (ai) => readWithClaude<{ text: string }>([], SOL_SCHEMA, prompt, apiKey, ai),
+          inboxTier(reply),
+          reply ? "reply drafted" : "summary",
         );
         if (out === "out") return json({ ok: false, message: SOL_OUT_SHORT }, 402);
         return json({ ok: true, text: String(out.text ?? "").slice(0, 4_000) });

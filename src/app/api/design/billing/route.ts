@@ -14,11 +14,12 @@ import {
   subscriptionOf,
   tokenBalance,
   tokenLedger,
+  updateSubscription,
 } from "@/lib/server/design-billing-repo";
 import { billingCustomer, ensureBillingCustomer } from "@/lib/server/design-billing-customer";
 import { syncSeats } from "@/lib/server/design-seats";
-import { billingPortalUrl, createTokenCheckout, stripeClient } from "@/lib/server/stripe";
-import { createSolCheckout, invoicesOf, syncBillingCustomer } from "@/lib/server/stripe-billing";
+import { billingPortalUrl, createTokenCheckout, stripeClient, subscriptionFacts } from "@/lib/server/stripe";
+import { cancelPlan, commitToTwelveMonths, createSolCheckout, invoicesOf, syncBillingCustomer } from "@/lib/server/stripe-billing";
 
 /**
  * GET: the business's plan, its Sol credits and design tokens with what used them, its billing details and its
@@ -61,7 +62,17 @@ export async function GET() {
     return Response.json({
       ok: true,
       parts: billingParts(kind),
-      plan: plan && { status: plan.status, interval: plan.interval, seats: plan.seats, trialEnd: plan.trialEnd, periodEnd: plan.periodEnd },
+      plan: plan && {
+        status: plan.status,
+        interval: plan.interval,
+        seats: plan.seats,
+        trialEnd: plan.trialEnd,
+        periodEnd: plan.periodEnd,
+        term: plan.term,
+        commitFrom: plan.commitFrom,
+        commitUntil: plan.commitUntil,
+      },
+      today,
       tokens,
       ledger,
       sol,
@@ -84,7 +95,8 @@ export async function GET() {
 
 /**
  * POST { do: "tokens", pack } or { do: "sol", credits } → Stripe's page to buy a pack; { do: "portal" } → Stripe's page
- * for the card, invoices and cancelling; { do: "details", legalName, abn, email, address } → the business's billing
+ * for the card and invoices; { do: "commit" } → the 12-month plan; { do: "cancel" } → cancelled at the end of the month
+ * paid for, with what leaving the 12-month plan early costs charged first; { do: "details", legalName, abn, email, address } → the business's billing
  * details, kept and given to Stripe for its invoices.
  */
 export async function POST(request: Request) {
@@ -112,12 +124,32 @@ export async function POST(request: Request) {
 
     const origin = new URL(request.url).origin;
     // A business with no plan (an installer) has no plan to manage and no Sol to buy for: refused here, not only hidden.
-    if ((read.body.do === "portal" && !billsFor(kind, "plan")) || (read.body.do === "sol" && !billsFor(kind, "sol")))
+    if (
+      (["portal", "commit", "cancel"].includes(String(read.body.do)) && !billsFor(kind, "plan")) ||
+      (read.body.do === "sol" && !billsFor(kind, "sol"))
+    )
       return Response.json({ ok: false, message: KIND_REFUSAL }, { status: 403 });
     if (!stripe) return Response.json({ ok: false, message: "Payments aren't set up yet." }, { status: 503 });
     if (read.body.do === "portal") {
       if (!plan?.stripeCustomer) return Response.json({ ok: false, message: "There's no plan to manage yet." }, { status: 404 });
       return Response.json({ ok: true, url: await billingPortalUrl(stripe, plan.stripeCustomer, origin) });
+    }
+    // The 12-month plan (plans.ts): chosen here, never on Stripe's page.
+    if (read.body.do === "commit" || read.body.do === "cancel") {
+      if (!plan?.stripeSubscription) return Response.json({ ok: false, message: "There's no plan to change yet." }, { status: 404 });
+      if (read.body.do === "commit") {
+        const done = await commitToTwelveMonths(stripe, plan.stripeSubscription);
+        if (done === "ended") return Response.json({ ok: false, message: "This plan has ended." }, { status: 409 });
+        if (done === "not-monthly")
+          return Response.json({ ok: false, message: "A yearly plan can't move to the 12-month plan." }, { status: 409 });
+      } else {
+        // The fee is worked out again here, never taken from the browser; the page has already shown it.
+        const charged = await cancelPlan(stripe, plan.stripeSubscription, todayInMarket());
+        await updateSubscription(subscriptionFacts(await stripe.subscriptions.retrieve(plan.stripeSubscription)));
+        return Response.json({ ok: true, chargedCents: charged.chargedCents });
+      }
+      await updateSubscription(subscriptionFacts(await stripe.subscriptions.retrieve(plan.stripeSubscription)));
+      return Response.json({ ok: true });
     }
     if (read.body.do === "sol") {
       const pack = cleanSolPack(read.body.credits);

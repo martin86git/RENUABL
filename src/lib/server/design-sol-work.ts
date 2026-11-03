@@ -50,12 +50,13 @@ export async function solOffersWork(member: Member, room: string, lineId: string
     .map((l) => `${nameOf(l.by)}: ${l.text}`)
     .join("\n");
   const today = todayInMarket();
-  const reading = await withSolCredit(businessId, "channel", member.email, () =>
+  const reading = await withSolCredit(businessId, "channel", member.email, (ai) =>
     readWithClaude<Record<string, unknown>>(
       [],
       WORK_SCHEMA,
       workPrompt({ asker: nameOf(member.email), line: text, today, deals, context }),
       apiKey,
+      ai,
     ),
   );
   if (reading === "out") return;
@@ -136,12 +137,13 @@ export async function catchUp(member: Member, room: string, unread: number, apiK
   if (!apiKey)
     return { lines: lines.length, changed: "Sol can't catch you up just now: Claude isn't set up on this site.", decided: "", waiting: "" };
   const said = lines.map((l) => `[${l.at.slice(0, 16).replace("T", " ")}] ${l.by === SOL_BY ? "Sol" : nameOf(l.by)}: ${l.text}`).join("\n");
-  const reading = await withSolCredit(member.businessId, "channel", member.email, () =>
+  const reading = await withSolCredit(member.businessId, "channel", member.email, (ai) =>
     readWithClaude<Record<string, unknown>>(
       [],
       CATCH_UP_SCHEMA,
       catchUpPrompt({ reader: nameOf(member.email), channel: channel.label, lines: said }),
       apiKey,
+      ai,
     ),
   );
   if (reading === "out") return "out";

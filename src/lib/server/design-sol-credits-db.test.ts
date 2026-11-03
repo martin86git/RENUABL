@@ -67,6 +67,24 @@ describe.skipIf(!url)("Sol credits (database)", () => {
     expect((await billing.solBalanceOf(a, "2026-12-01")).left).toBe(SOL_PER_USER + 500);
   });
 
+  it("takes several credits for a deep answer, adds more to it, and keeps its cost", async () => {
+    // A has 500 bought (from the test above).
+    const id = await billing.spendSolCredit(a, "chat", A, TODAY, true, 3);
+    expect((await billing.solBalanceOf(a, TODAY)).bought).toBe(497);
+    expect(await billing.addToSolCredit(a, id!, 2, TODAY, true)).toBe(true);
+    expect((await billing.solBalanceOf(a, TODAY)).bought).toBe(495);
+    // More than is left: nothing taken, when enforced.
+    expect(await billing.spendSolCredit(a, "chat", A, TODAY, true, 1000)).toBeNull();
+    expect(await billing.addToSolCredit(a, id!, 1000, TODAY, true)).toBe(false);
+    await billing.keepSolCost(a, id!, { tier: "deep", model: "claude-opus-5-5", reason: "writing", costMicros: 120_000, usage: [] });
+    const lines = await billing.solCostsThisMonth(TODAY);
+    expect(lines.find((l) => l.tier === "deep")).toMatchObject({ answers: expect.any(Number) });
+    expect(lines.find((l) => l.tier === "deep")!.credits).toBeGreaterThanOrEqual(5);
+    // Given back whole.
+    await billing.refundSolCredit(a, id!);
+    expect((await billing.solBalanceOf(a, TODAY)).bought).toBe(500);
+  });
+
   it("only counts an answer with none left while billing isn't enforced", async () => {
     expect((await billing.solBalanceOf(b, TODAY)).left).toBe(0);
     expect(await billing.spendSolCredit(b, "chat", B, TODAY, false)).toBeTruthy();

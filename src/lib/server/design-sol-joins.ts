@@ -19,9 +19,11 @@ import { listJobs } from "./design-crm-repo";
 import { query } from "./db";
 import type { Member } from "./design-repo";
 import { casesToResolve } from "./design-service-repo";
+import { modelFor } from "./sol-credits";
 import { channelContext, roomHistory, solSaysInTeam, tellTaggedBySol } from "./design-team-repo";
 
-const MODEL = () => process.env.SOL_MODEL?.trim() || "claude-opus-5-5";
+/** Unasked and often not his to answer: the quick model, and no credit (sol-routing.ts). */
+const MODEL = () => modelFor("quick");
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** After `member` said `text` (line `lineId`) in `room`: Sol answers it there if nobody has and it is his to take. */

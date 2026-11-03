@@ -74,8 +74,13 @@ export async function caseBrief(member: { businessId: string; email: string }, c
     timeline,
   );
   try {
-    const read = await withSolCredit(businessId, "chat", member.email, () =>
-      readWithClaude<unknown>([{ type: "text", text: facts }], SERVICE_BRIEF_SCHEMA, SERVICE_BRIEF_PROMPT, apiKey),
+    const read = await withSolCredit(
+      businessId,
+      "chat",
+      member.email,
+      (ai) => readWithClaude<unknown>([{ type: "text", text: facts }], SERVICE_BRIEF_SCHEMA, SERVICE_BRIEF_PROMPT, apiKey, ai),
+      "quick",
+      "service brief",
     );
     if (read === "out") return { words, timeline, brief: byRule };
     const brief = cleanBrief(read, byRule);

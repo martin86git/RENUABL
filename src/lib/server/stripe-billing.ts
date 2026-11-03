@@ -7,6 +7,17 @@ import type { BillingDetails, InvoiceFacts } from "@/lib/domain/design/billing-i
 import { shownAbn } from "@/lib/domain/design/brand";
 import type { SolPack } from "@/lib/domain/design/sol-credits";
 import { RENUABL_BUSINESS } from "@/lib/domain/payouts";
+import {
+  COMMIT_SAVING_CENTS,
+  COMMIT_SEAT_CENTS,
+  SEAT_MONTHLY_CENTS,
+  commitBillsBy,
+  commitRunning,
+  commitTerm,
+  dollars,
+  earlyExitCents,
+  type PlanTerm,
+} from "@/lib/domain/design/plans";
 
 /*
  * Tax invoices. Every price includes GST, so Stripe is given an inclusive 10% GST rate on each line: its invoices and
@@ -224,4 +235,134 @@ export async function createProposalPaymentCheckout(
   );
   if (!session.url) throw new Error("Stripe returned no checkout URL");
   return session.url;
+}
+
+/*
+ * The 12-month plan (plans.ts): $29 a user a month for 12 months, chosen in Billing. The subscription's price is
+ * changed with no proration (this month stays as billed), and the term is kept on the subscription's own metadata, so
+ * whatever Stripe sends back about it carries the term too (`subscriptionFacts`). When the 12 months are up the daily
+ * cron puts it back to $59 (`endTwelveMonths`).
+ */
+
+/** The month-to-month or 12-month price on the plan's own product, for a subscription item. */
+const seatPrice = (product: string, cents: number): Stripe.SubscriptionUpdateParams.Item.PriceData => ({
+  currency: "aud",
+  product,
+  unit_amount: cents,
+  recurring: { interval: "month" },
+});
+
+export interface TermChange {
+  term: PlanTerm;
+  /** The 12-month plan's first own bill, and the day it ends. */
+  from: string | null;
+  until: string | null;
+}
+
+/** The subscription's term as kept on it. */
+export function termOf(sub: Pick<Stripe.Subscription, "metadata">): TermChange {
+  const m = sub.metadata ?? {};
+  return m.term === "commit"
+    ? { term: "commit", from: m.commit_from || null, until: m.commit_until || null }
+    : { term: "flex", from: null, until: null };
+}
+
+/** Puts a monthly subscription on the 12-month plan from the start of its current month. Refuses a yearly or ended one. */
+export async function commitToTwelveMonths(stripe: Stripe, subscriptionId: string): Promise<TermChange | "not-monthly" | "ended"> {
+  const sub = await stripe.subscriptions.retrieve(subscriptionId);
+  const item = sub.items.data[0];
+  if (!item || ["canceled", "incomplete_expired"].includes(sub.status)) return "ended";
+  if (item.price.recurring?.interval !== "month") return "not-monthly";
+  const iso = (s: number) => new Date(s * 1000).toISOString().slice(0, 10);
+  const { from, until } = commitTerm(iso(item.current_period_start), iso(item.current_period_end));
+  const product = typeof item.price.product === "string" ? item.price.product : item.price.product.id;
+  await stripe.subscriptions.update(subscriptionId, {
+    items: [{ id: item.id, price_data: seatPrice(product, COMMIT_SEAT_CENTS), tax_rates: [await gstTaxRate(stripe)] }],
+    proration_behavior: "none",
+    cancel_at_period_end: false,
+    metadata: { ...sub.metadata, term: "commit", commit_from: from, commit_until: until },
+  });
+  return { term: "commit", from, until };
+}
+
+/** The 12-month plan over: back to $59 a user a month, month to month. Nothing happens to one already month to month. */
+export async function endTwelveMonths(stripe: Stripe, subscriptionId: string): Promise<boolean> {
+  const sub = await stripe.subscriptions.retrieve(subscriptionId);
+  const item = sub.items.data[0];
+  if (!item || termOf(sub).term !== "commit" || ["canceled", "incomplete_expired"].includes(sub.status)) return false;
+  const product = typeof item.price.product === "string" ? item.price.product : item.price.product.id;
+  await stripe.subscriptions.update(subscriptionId, {
+    items: [{ id: item.id, price_data: seatPrice(product, SEAT_MONTHLY_CENTS), tax_rates: [await gstTaxRate(stripe)] }],
+    proration_behavior: "none",
+    metadata: { ...sub.metadata, term: "flex", commit_from: "", commit_until: "" },
+  });
+  return true;
+}
+
+/**
+ * Cancelling from Billing: the plan runs to the end of the month paid for. On the 12-month plan before it ends, what it
+ * saved is charged first (`earlyExitCents`), on an invoice of its own, and only then is it cancelled. Answers what was
+ * charged, in cents (0 month to month).
+ */
+export async function cancelPlan(stripe: Stripe, subscriptionId: string, today: string): Promise<{ chargedCents: number }> {
+  const sub = await stripe.subscriptions.retrieve(subscriptionId);
+  const item = sub.items.data[0];
+  const term = termOf(sub);
+  let chargedCents = 0;
+  if (term.term === "commit" && term.from && commitRunning(term.until, today)) {
+    chargedCents = earlyExitCents(item?.quantity ?? 1, commitBillsBy(term.from, today));
+    if (chargedCents > 0) {
+      const customer = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+      const invoice = await stripe.invoices.create({
+        customer,
+        collection_method: "charge_automatically",
+        pending_invoice_items_behavior: "exclude",
+        footer: INVOICE_FOOTER,
+        metadata: { kind: "design-early-exit", subscription: subscriptionId },
+      });
+      await stripe.invoiceItems.create({
+        customer,
+        invoice: invoice.id,
+        amount: chargedCents,
+        currency: "aud",
+        description: `Leaving the 12-month plan early: ${dollars(COMMIT_SAVING_CENTS)} a user for each month billed at ${dollars(COMMIT_SEAT_CENTS)}`,
+        tax_rates: [await gstTaxRate(stripe)],
+      });
+      if (invoice.id) {
+        await stripe.invoices.finalizeInvoice(invoice.id);
+        await stripe.invoices
+          .pay(invoice.id)
+          .catch((e) => console.error("early exit not paid at once", e instanceof Error ? e.message : e));
+      }
+    }
+  }
+  await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
+  return { chargedCents };
+}
+
+/**
+ * Stripe's own page for the card, details and invoices, with cancelling and plan changes taken off: those go through
+ * Billing (`cancelPlan`), which charges what leaving the 12-month plan early costs. Made once, found again by metadata.
+ */
+let portalConfigId: string | null = null;
+export async function portalWithoutCancel(stripe: Stripe): Promise<string> {
+  if (portalConfigId) return portalConfigId;
+  const found = (await stripe.billingPortal.configurations.list({ active: true, limit: 100 })).data.find(
+    (c) => c.metadata?.kind === "renuabl-no-cancel",
+  );
+  const config =
+    found ??
+    (await stripe.billingPortal.configurations.create({
+      business_profile: { headline: "RENUABL: your card, details and invoices" },
+      features: {
+        customer_update: { enabled: true, allowed_updates: ["email", "address", "name", "tax_id"] },
+        invoice_history: { enabled: true },
+        payment_method_update: { enabled: true },
+        subscription_cancel: { enabled: false },
+        subscription_update: { enabled: false },
+      },
+      metadata: { kind: "renuabl-no-cancel" },
+    }));
+  portalConfigId = config.id;
+  return config.id;
 }

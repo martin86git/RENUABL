@@ -13,8 +13,8 @@ export const loadSol = () => ask<{ state: SolState }>("/api/design/sol");
 const post = (body: Record<string, unknown>) => ask<{ state: SolState }>("/api/design/sol", { method: "POST", body });
 
 /** A question, with what their screen shows when asked from the side panel (page-context.ts). */
-export const askSol = (text: string, files: SolFile[], page?: PageContext | null) =>
-  post({ do: "chat", text, files, ...(page ? { page } : {}) });
+export const askSol = (text: string, files: SolFile[], page?: PageContext | null, deep = false) =>
+  post({ do: "chat", text, files, ...(page ? { page } : {}), ...(deep ? { deep: true } : {}) });
 export const solSeen = () => post({ do: "seen" });
 export const clearSolChat = () => post({ do: "clear" });
 export const remindAt = (id: string, when: WhenChoice) => post({ do: "remind", id, when });

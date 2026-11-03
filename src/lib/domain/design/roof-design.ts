@@ -1000,6 +1000,13 @@ export function packDesignSet(set: DesignSet): Record<string, unknown> {
   return { ...bare(designs[slot]), comments: set.comments, slot, others: designs.filter((_, i) => i !== slot).map(bare) };
 }
 
+/** Whether any design on a packed roof (`packDesignSet`: the primary and `others`) has a battery. */
+export function packedHasBattery(packed: unknown): boolean {
+  const p = (packed ?? {}) as { battery?: unknown; others?: unknown };
+  const others = Array.isArray(p.others) ? (p.others as { battery?: unknown }[]) : [];
+  return Boolean(p.battery) || others.some((d) => Boolean(d?.battery));
+}
+
 /** A saved design, read back. Null when there isn't one or it can't be read. */
 export function parseDesign(saved: string | null | undefined): RoofDesign | null {
   if (!saved) return null;

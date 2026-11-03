@@ -1,6 +1,7 @@
 import { DESIGN_COMMAND_PROMPT, DESIGN_COMMAND_SCHEMA, commandFrom } from "@/lib/domain/design/design-commands";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
+import { modelFor } from "@/lib/server/sol-credits";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { allow } from "@/lib/server/rate-limit";
 
@@ -35,6 +36,8 @@ export async function POST(request: Request) {
         DESIGN_COMMAND_SCHEMA,
         DESIGN_COMMAND_PROMPT,
         apiKey,
+        // A change to the design or a short answer about it: the quick model (sol-routing.ts).
+        { model: modelFor("quick") },
       );
       return Response.json({ ok: true, command: commandFrom(reading) });
     } catch (e) {

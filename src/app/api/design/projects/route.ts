@@ -1,8 +1,10 @@
 import { MAX_PROJECTS, MAX_PROJECT_BYTES, can, cleanRoofPlace, cleanRoofWork } from "@/lib/domain/design/account";
 import { keepCostEdits, withoutCostEdits } from "@/lib/domain/design/permissions";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
-import { canStartRoof, spendToken } from "@/lib/server/design-billing-repo";
+import { canStartRoof, spendBatteryDesign, spendToken } from "@/lib/server/design-billing-repo";
 import { createProject, listProjects, projectAt } from "@/lib/server/design-repo";
+import { packedHasBattery } from "@/lib/domain/design/roof-design";
+import { NO_DESIGN_JOBS } from "@/lib/domain/design/plans";
 
 /** Whether a new roof needs a design token before it is kept (off until RENUABL's plans are live: BILLING_ENFORCED=true). */
 const billingEnforced = () => process.env.BILLING_ENFORCED?.trim() === "true";
@@ -44,19 +46,20 @@ export async function POST(request: Request) {
     const seesCosts = can(who.member.role, "costs", who.member.permissions);
     // Someone who can't see costs can't set them either: a quote line's cost typed by hand isn't taken from them.
     if (!seesCosts) work.extras = keepCostEdits(work.extras, null);
-    // A new roof is a new design job: one token (`domain/design/plans.ts`). A roof the business already has costs nothing.
-    if (billingEnforced() && !(await projectAt(who.member.businessId, roof)) && !(await canStartRoof(who.member.businessId)))
-      return Response.json(
-        { ok: false, noTokens: true, message: "You have no design jobs left. Buy a pack in Settings → Billing to design this roof." },
-        { status: 402 },
-      );
+    // A new roof is a new design job: $3, or $7 with a battery (`domain/design/plans.ts`). A roof the business already has costs nothing.
+    const withBattery = packedHasBattery(work.design);
+    if (billingEnforced() && !(await projectAt(who.member.businessId, roof)) && !(await canStartRoof(who.member.businessId, withBattery)))
+      return Response.json({ ok: false, noTokens: true, message: NO_DESIGN_JOBS }, { status: 402 });
     const made = await createProject(who.member.businessId, roof, work, who.member.email);
     if (made === "full")
       return Response.json(
         { ok: false, message: `A business can keep up to ${MAX_PROJECTS.toLocaleString("en-AU")} roofs for now.` },
         { status: 422 },
       );
-    if (!made.existed) await spendToken(who.member.businessId, made.project.id, who.member.email);
+    if (!made.existed) {
+      await spendToken(who.member.businessId, made.project.id, who.member.email);
+      if (withBattery) await spendBatteryDesign(who.member.businessId, made.project.id, who.member.email);
+    }
     const project = seesCosts ? made.project : { ...made.project, extras: withoutCostEdits(made.project.extras) };
     return Response.json({ ok: true, project, existed: made.existed });
   });

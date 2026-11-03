@@ -5,7 +5,7 @@
  */
 import type { BillingPart } from "@/lib/domain/design/business-kind";
 import type { BillingDetails } from "@/lib/domain/design/billing-invoice";
-import type { BillingInterval, TokenPack } from "@/lib/domain/design/plans";
+import type { BillingInterval, PlanTerm, TokenPack } from "@/lib/domain/design/plans";
 import type { SolBalance } from "@/lib/domain/design/sol-credits";
 
 type Answer = { ok: true; url?: string; message?: string } | { ok: false; message: string };
@@ -21,8 +21,13 @@ async function post(path: string, body: unknown): Promise<Answer & Record<string
   }
 }
 
-/** Starts the plan: answers with Stripe's secure page to go to. */
-export function startPlan(o: { email: string; seats: number; interval: BillingInterval }) {
+/** The 12-month plan, chosen in Billing. */
+export const chooseTwelveMonths = () => post("/api/design/billing", { do: "commit" });
+/** Cancels at the end of the month paid for (charging what leaving the 12-month plan early costs). */
+export const cancelPlan = () => post("/api/design/billing", { do: "cancel" });
+
+/** Starts the plan: answers with Stripe's secure page to go to. Monthly only (the interval is no longer used). */
+export function startPlan(o: { email: string; seats: number; interval?: BillingInterval }) {
   return post("/api/design/subscribe", o);
 }
 
@@ -43,7 +48,18 @@ export function askSales(o: { name: string; business: string; email: string; mob
 export interface BillingState {
   /** What this kind of business is billed for (business-kind.ts): an installer, design-job packs only. */
   parts: BillingPart[];
-  plan: { status: string; interval: BillingInterval; seats: number; trialEnd: string | null; periodEnd: string | null } | null;
+  plan: {
+    status: string;
+    interval: BillingInterval;
+    seats: number;
+    trialEnd: string | null;
+    periodEnd: string | null;
+    term: PlanTerm;
+    commitFrom: string | null;
+    commitUntil: string | null;
+  } | null;
+  /** The market's today, as the server sees it. */
+  today: string;
   tokens: number;
   ledger: { change: number; reason: string; by: string | null; at: string }[];
   /** Null for a business with no Sol (an installer). */

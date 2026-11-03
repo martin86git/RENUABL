@@ -5,7 +5,7 @@
  */
 import { FILE_USAGE_PROMPT, FILE_USAGE_SCHEMA, type FileUsageRead } from "@/lib/domain/design/design-bill";
 import type { Customer, Job } from "@/lib/domain/design/crm";
-import { readWithClaude } from "./claude-reader";
+import { readWithClaude, type ReadOptions } from "./claude-reader";
 import { chatLines } from "./design-chat-repo";
 import { customerDetail } from "./design-crm-repo";
 
@@ -31,7 +31,13 @@ async function fileText(businessId: string, job: Job, customer: Customer): Promi
   return out.join("\n").slice(0, 60_000);
 }
 
-export async function findUsageInFile(businessId: string, job: Job, customer: Customer, apiKey: string): Promise<Partial<FileUsageRead>> {
+export async function findUsageInFile(
+  businessId: string,
+  job: Job,
+  customer: Customer,
+  apiKey: string,
+  ai?: ReadOptions,
+): Promise<Partial<FileUsageRead>> {
   const text = await fileText(businessId, job, customer);
-  return readWithClaude<FileUsageRead>([{ type: "text", text }], FILE_USAGE_SCHEMA, FILE_USAGE_PROMPT, apiKey);
+  return readWithClaude<FileUsageRead>([{ type: "text", text }], FILE_USAGE_SCHEMA, FILE_USAGE_PROMPT, apiKey, ai);
 }

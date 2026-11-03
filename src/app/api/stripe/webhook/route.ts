@@ -6,6 +6,7 @@ import { stripeClient, subscriptionFacts } from "@/lib/server/stripe";
 import { connectFacts } from "@/lib/server/stripe-billing";
 import { businessOfAccount, updateConnect } from "@/lib/server/design-connect-repo";
 import { recordCardPayment } from "@/lib/server/design-proposal-repo";
+import { TOKEN_CENTS } from "@/lib/domain/design/plans";
 import { isDueKey, platformFeeCents } from "@/lib/domain/design/proposal-payments";
 
 /**
@@ -78,7 +79,8 @@ export async function POST(request: Request) {
     const tokens = Number(session.metadata?.tokens);
     if (business && Number.isInteger(tokens) && tokens > 0 && session.payment_status === "paid") {
       try {
-        await creditPack(business, session.id, tokens, session.metadata?.email ?? null);
+        // A pack of N design jobs adds its price to the balance, in dollars (plans.ts: $3 a job).
+        await creditPack(business, session.id, (tokens * TOKEN_CENTS) / 100, session.metadata?.email ?? null);
       } catch (e) {
         console.error("token pack not credited", session.id, e instanceof Error ? e.message : e);
         return new Response("Not saved", { status: 500 });

@@ -3,6 +3,7 @@ import { noteUnfinishedBriefs } from "@/lib/server/brief-hubspot";
 import { sendHealthReminders } from "@/lib/server/health-reminders";
 import { processOffers } from "@/lib/server/offers-engine";
 import { sendInstallReminders } from "@/lib/server/design-reminders";
+import { endTwelveMonthPlans } from "@/lib/server/design-twelve-months";
 import { remindWatchers } from "@/lib/server/design-market-watch-repo";
 
 /**
@@ -21,6 +22,11 @@ export async function GET(request: Request) {
     return 0;
   });
   const unfinishedBriefs = await noteUnfinishedBriefs();
+  // 12-month plans whose months are up go back to month to month (plans.ts).
+  const twelveMonthsEnded = await endTwelveMonthPlans().catch((e) => {
+    console.error("12-month plans not ended", e instanceof Error ? e.message : e);
+    return 0;
+  });
   // The roof designer's businesses: installation reminders to their customers, for those that have switched them on.
   const installReminders = await sendInstallReminders().catch((e) => {
     console.error("installation reminders failed", e instanceof Error ? e.message : e);
@@ -31,5 +37,5 @@ export async function GET(request: Request) {
     console.error("watch reminders failed", e instanceof Error ? e.message : e);
     return 0;
   });
-  return Response.json({ ok: true, ...offers, healthReminders, unfinishedBriefs, installReminders, watchReminders });
+  return Response.json({ ok: true, ...offers, healthReminders, unfinishedBriefs, installReminders, watchReminders, twelveMonthsEnded });
 }

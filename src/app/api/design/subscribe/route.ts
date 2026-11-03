@@ -1,6 +1,6 @@
 import { normaliseEmail } from "@/lib/domain/accounts";
 import { NO_PLAN_FOR_KIND, billsFor, cleanKind } from "@/lib/domain/design/business-kind";
-import { ENTERPRISE_FROM, cleanInterval, cleanSeats } from "@/lib/domain/design/plans";
+import { ENTERPRISE_FROM, cleanSeats } from "@/lib/domain/design/plans";
 import { dbConfigured } from "@/lib/server/db";
 import { memberByEmail } from "@/lib/server/design-repo";
 import { allow } from "@/lib/server/rate-limit";
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const seats = cleanSeats(body.seats ?? 1);
   if (!seats)
     return Response.json({ ok: false, message: `For ${ENTERPRISE_FROM} users or more, talk to us about Enterprise.` }, { status: 422 });
-  const interval = cleanInterval(body.interval ?? "month") ?? "month";
+  // Monthly only: yearly is no longer sold (plans.ts); the 12-month plan is chosen in Billing.
   const stripe = stripeClient();
   if (!stripe)
     return Response.json(
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   try {
-    const url = await createPlanCheckout(stripe, { email, seats, interval, origin: new URL(request.url).origin });
+    const url = await createPlanCheckout(stripe, { email, seats, origin: new URL(request.url).origin });
     return Response.json({ ok: true, url });
   } catch (e) {
     console.error("trial checkout failed", e instanceof Error ? e.message : e);

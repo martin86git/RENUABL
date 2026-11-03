@@ -1031,6 +1031,10 @@ create table if not exists design_subscriptions (
   updated_at timestamptz not null default now()
 );
 create index if not exists design_subscriptions_email on design_subscriptions(lower(email));
+-- The 12-month plan (plans.ts, 3 Nov 2026): as kept on the Stripe subscription's metadata.
+alter table design_subscriptions add column if not exists term text not null default 'flex';
+alter table design_subscriptions add column if not exists commit_from date;
+alter table design_subscriptions add column if not exists commit_until date;
 create index if not exists design_subscriptions_business on design_subscriptions(business_id);
 create table if not exists design_tokens (
   id text primary key,
@@ -1045,6 +1049,12 @@ create table if not exists design_tokens (
 create index if not exists design_tokens_business on design_tokens(business_id, at desc);
 create unique index if not exists design_tokens_one_trial on design_tokens(business_id) where reason = 'trial';
 create unique index if not exists design_tokens_one_job on design_tokens(business_id, project_id) where reason = 'job';
+create unique index if not exists design_tokens_one_battery on design_tokens(business_id, project_id) where reason = 'battery';
+-- Design jobs became a balance in dollars (3 Nov 2026: $3 a design, $7 with a battery): rows counted in jobs are
+-- turned into dollars once, at $3 a job.
+alter table design_tokens add column if not exists in_dollars boolean not null default false;
+update design_tokens set change = change * 3, in_dollars = true where not in_dollars;
+alter table design_tokens alter column in_dollars set default true;
 create table if not exists design_leads (
   id text primary key,
   kind text not null,
@@ -1068,6 +1078,12 @@ create table if not exists design_sol_credits (
   at timestamptz not null default now()
 );
 create index if not exists design_sol_credits_business on design_sol_credits(business_id, month, at desc);
+-- What each answer really cost RENUABL (ai-costs.ts), kept beside the credits it took (3 Nov 2026).
+alter table design_sol_credits add column if not exists tier text;
+alter table design_sol_credits add column if not exists model text;
+alter table design_sol_credits add column if not exists reason text;
+alter table design_sol_credits add column if not exists cost_micros bigint;
+alter table design_sol_credits add column if not exists usage jsonb;
 create table if not exists design_billing_details (
   business_id text primary key references businesses(id) on delete cascade,
   legal_name text not null,

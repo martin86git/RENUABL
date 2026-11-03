@@ -1,6 +1,10 @@
 import { MAX_PROJECT_BYTES, PROJECT_CONFLICT, can, cleanRoofPlace, cleanRoofWork } from "@/lib/domain/design/account";
 import { keepCostEdits, withoutCostEdits } from "@/lib/domain/design/permissions";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
+import { packedHasBattery } from "@/lib/domain/design/roof-design";
+import { NO_DESIGN_JOBS } from "@/lib/domain/design/plans";
+import { canAddBattery, spendBatteryDesign } from "@/lib/server/design-billing-repo";
+import { billingEnforced } from "@/lib/server/sol-credits";
 import { deleteProject, projectById, saveProject } from "@/lib/server/design-repo";
 
 const validId = (id: string) => /^roof_[a-f0-9]{8,64}$/.test(id);
@@ -41,9 +45,14 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/proje
       return Response.json({ ok: false, message: "That design couldn't be read." }, { status: 422 });
     // Someone who can't see costs was never sent the costs typed over the quote's lines: what the business had stays.
     if (!can(who.member.role, "costs", who.member.permissions)) work.extras = keepCostEdits(work.extras, project.extras);
+    // A battery going on a roof's designs for the first time takes the $4 more a battery job is (plans.ts).
+    const withBattery = packedHasBattery(work.design);
+    if (withBattery && billingEnforced() && !(await canAddBattery(who.member.businessId, id)))
+      return Response.json({ ok: false, noTokens: true, message: NO_DESIGN_JOBS }, { status: 402 });
     const saved = await saveProject(who.member.businessId, id, read.body.version as number, work, who.member.email, address);
     if (saved === "missing") return Response.json({ ok: false }, { status: 404 });
     if (saved === "conflict") return Response.json({ ok: false, conflict: true, message: PROJECT_CONFLICT }, { status: 409 });
+    if (withBattery) await spendBatteryDesign(who.member.businessId, id, who.member.email);
     return Response.json({ ok: true, version: saved.version });
   });
 }

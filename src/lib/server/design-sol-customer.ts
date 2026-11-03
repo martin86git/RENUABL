@@ -16,10 +16,13 @@ import { redactSecrets } from "./bill-reader";
 import { transaction } from "./db";
 import { addSolLine, chatLines } from "./design-chat-repo";
 import { record } from "./design-crm-repo";
-import { giveBackSolCredit, takeSolCredit } from "./sol-credits";
+import { giveBackSolCredit, keepCost, modelFor, takeSolCredit } from "./sol-credits";
+import { TIER_CREDITS, USE_TIER } from "@/lib/domain/design/sol-routing";
+import { usageOf } from "@/lib/domain/ai-costs";
 import { loadBrand, proposalJob, publicProposal } from "./design-proposal-repo";
 
-const MODEL = () => process.env.SOL_MODEL?.trim() || "claude-opus-5-5";
+/** A customer reads every word: always the deeper model (sol-routing.ts). */
+const TIER = USE_TIER.customer;
 /** Who an answer of Sol's is from on the customer's record. */
 const BY_SOL = "Sol";
 
@@ -41,14 +44,14 @@ export async function solAnswersCustomer(token: string): Promise<void> {
   const proposal = await publicProposal(token, todayInMarket());
   if (!proposal?.view) return;
   const asked = lines[lines.length - 1];
-  const credit = await takeSolCredit(found.businessId, "customer", null);
+  const credit = await takeSolCredit(found.businessId, "customer", null, TIER_CREDITS[TIER]);
   if (!credit) return;
 
   let raw = "";
   try {
     const client = new Anthropic({ apiKey, timeout: 45_000, maxRetries: 1 });
     const m = await client.messages.create({
-      model: MODEL(),
+      model: modelFor(TIER),
       max_tokens: 700,
       system: solCustomerSystem(proposal.view),
       messages: solHistory(lines),
@@ -58,6 +61,7 @@ export async function solAnswersCustomer(token: string): Promise<void> {
       .map((b) => b.text)
       .join("")
       .trim();
+    await keepCost(found.businessId, credit, TIER, "customer chat", [usageOf(m.model, m.usage)]);
   } catch (e) {
     console.error("sol couldn't answer a customer", redactSecrets(e instanceof Anthropic.APIError ? `Claude API ${e.status}` : String(e)));
     await giveBackSolCredit(found.businessId, credit);

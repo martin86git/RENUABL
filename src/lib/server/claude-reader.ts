@@ -6,6 +6,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { betaJSONSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/beta/json-schema";
+import { usageOf, type AiUsage } from "@/lib/domain/ai-costs";
 
 const DEFAULT_MODEL = "claude-opus-5";
 const DEFAULT_FALLBACK_MODEL = "claude-sonnet-5";
@@ -19,15 +20,23 @@ export function isBusyError(e: unknown): boolean {
   return e instanceof Anthropic.APIError && typeof e.status === "number" && (e.status === 429 || e.status >= 500);
 }
 
+export interface ReadOptions {
+  /** The model to ask first, in place of `ANTHROPIC_MODEL` (Sol's work names its tier's model, sol-routing.ts). */
+  model?: string;
+  /** Told what the reading used, so its cost can be kept (ai-costs.ts). */
+  onUsage?: (u: AiUsage) => void;
+}
+
 export async function readWithClaude<T>(
   files: Anthropic.Beta.BetaContentBlockParam[],
   schema: Schema,
   prompt: string,
   apiKey: string,
+  options: ReadOptions = {},
 ): Promise<T> {
   // One SDK retry per model (with backoff), and a timeout that keeps both models inside the 60 s route limit.
   const client = new Anthropic({ apiKey, timeout: 25_000, maxRetries: 1 });
-  const primary = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+  const primary = options.model || process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
   const fallback = process.env.ANTHROPIC_FALLBACK_MODEL || DEFAULT_FALLBACK_MODEL;
   const request = (model: string) => ({
     model,
@@ -62,6 +71,7 @@ export async function readWithClaude<T>(
     throw new ClaudeReadError(`Unreadable reply: ${e instanceof Error ? e.message : String(e)}`);
   }
 
+  options.onUsage?.(usageOf(response.model, response.usage));
   if (response.stop_reason === "refusal") throw new ClaudeReadError("Claude declined to read the file");
   if (response.stop_reason === "max_tokens") throw new ClaudeReadError("Reading was cut off");
   if (!response.parsed_output) throw new ClaudeReadError("Claude returned no figures");

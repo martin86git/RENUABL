@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { SOL_PACKS, cleanSolPack, creditSource, includedThisMonth, monthOf, solBalance } from "./sol-credits";
 
 describe("Sol credits", () => {
-  it("brings 200 a paid user a month, 100 on the trial, none without a plan", () => {
-    expect(includedThisMonth({ status: "active", seats: 3 })).toBe(600);
-    expect(includedThisMonth({ status: "past_due", seats: 1 })).toBe(200);
+  it("brings 150 a paid user a month, 100 on an old trial, none without a plan", () => {
+    expect(includedThisMonth({ status: "active", seats: 3 })).toBe(450);
+    expect(includedThisMonth({ status: "past_due", seats: 1 })).toBe(150);
     expect(includedThisMonth({ status: "trialing", seats: 5 })).toBe(100);
     expect(includedThisMonth({ status: "canceled", seats: 5 })).toBe(0);
     expect(includedThisMonth(null)).toBe(0);
@@ -20,10 +20,15 @@ describe("Sol credits", () => {
   });
 
   it("sells only its own packs", () => {
-    expect(cleanSolPack(500)).toEqual(SOL_PACKS[0]);
-    expect(cleanSolPack("2500")?.cents).toBe(10000);
-    expect(cleanSolPack(501)).toBeNull();
+    expect(cleanSolPack(250)).toEqual(SOL_PACKS[0]);
+    expect(cleanSolPack("3000")?.cents).toBe(42900);
+    expect(cleanSolPack(500)).toBeNull();
     expect(cleanSolPack(undefined)).toBeNull();
+  });
+
+  it("sells packs for more than they cost RENUABL", () => {
+    // About US$0.04 a credit at list prices, about A$0.065; GST is a tenth of the price.
+    for (const p of SOL_PACKS) expect(p.cents / 1.1 / p.credits / 6.5).toBeGreaterThan(1.9);
   });
 
   it("counts a credit in the market's month", () => {

@@ -42,7 +42,9 @@ import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-r
 import { loadLists, type Member } from "./design-repo";
 import { casesForJob, casesToResolve } from "./design-service-repo";
 import { addSolTurns, newSolId, solState, withSol } from "./design-sol-repo";
-import { giveBackSolCredit, takeSolCredit } from "./sol-credits";
+import { addSolCredits, giveBackSolCredit, keepCost, modelFor, takeSolCredit } from "./sol-credits";
+import { RESEARCH_CREDITS, THINK_DEEPER_TOOL, TIER_CREDITS, routeQuestion, type SolTier } from "@/lib/domain/design/sol-routing";
+import { usageOf, type AiUsage } from "@/lib/domain/ai-costs";
 import { SOL_OUT, type SolUse } from "@/lib/domain/design/sol-credits";
 import { channelContext, solSaysInTeam } from "./design-team-repo";
 import { listSheets } from "./design-datasheets-repo";
@@ -70,7 +72,6 @@ import { recall, saveKnowledge } from "./design-sol-knowledge-repo";
 import { pageContextBlock, type PageContext } from "@/lib/domain/design/page-context";
 import { TEAM_CHANNELS, nameOf } from "@/lib/domain/design/team-chat";
 
-const MODEL = () => process.env.SOL_MODEL?.trim() || "claude-opus-5-5";
 const STEPS = 6;
 /** Searches that end a step early (pause_turn) carry on; this many at most, so a long search can't loop. */
 const MAX_RESUMES = 3;
@@ -474,7 +475,7 @@ function fileBlocks(files: readonly SolFile[]): Anthropic.ContentBlockParam[] {
 /** Sol answers what the member said (with any files) and both are kept in their conversation. */
 export async function askSol(
   member: Member,
-  said: { text: string; files: SolFile[]; page?: PageContext },
+  said: { text: string; files: SolFile[]; page?: PageContext; deep?: boolean; routeOn?: string },
   apiKey: string | null,
   use: SolUse = "chat",
 ): Promise<SolState> {
@@ -493,8 +494,17 @@ export async function askSol(
       },
     ]);
   }
-  // One credit an answer, taken before Claude is asked and given back when no answer comes.
-  const credit = await takeSolCredit(businessId, use, email);
+  // Quick (Sonnet) unless the question needs more (sol-routing.ts). The credits are taken before Claude is asked
+  // and given back when no answer comes. A deep answer with too few credits left is answered quickly instead.
+  const route = routeQuestion({ text: said.routeOn ?? said.text, files: said.files.length, asked: said.deep });
+  let tier: SolTier = route.tier;
+  let reason = route.reason;
+  let credit = await takeSolCredit(businessId, use, email, TIER_CREDITS[tier]);
+  if (!credit && tier === "deep") {
+    tier = "quick";
+    reason = "deep, but too few credits left";
+    credit = await takeSolCredit(businessId, use, email, TIER_CREDITS.quick);
+  }
   if (!credit) return addSolTurns(businessId, email, [you, { role: "sol", text: SOL_OUT, at: new Date().toISOString() }]);
   const viewer = viewerOf(member);
   const [state, jobs, customers, serviceOpen] = await Promise.all([
@@ -513,7 +523,12 @@ export async function askSol(
     prefs: state.prefs,
     now: new Date(),
   });
-  const tools: Anthropic.ToolUnion[] = [...(can(member.role, "costs", member.permissions) ? [...TOOLS, PRICE_TOOL] : TOOLS), ...WEB_TOOLS];
+  const ownTools: Anthropic.ToolUnion[] = [
+    ...(can(member.role, "costs", member.permissions) ? [...TOOLS, PRICE_TOOL] : TOOLS),
+    ...WEB_TOOLS,
+  ];
+  // A quick answer may hand itself up before it starts; a deep one has nothing to hand up to.
+  const toolsFor = (t: SolTier): Anthropic.ToolUnion[] => (t === "quick" ? [THINK_DEEPER_TOOL, ...ownTools] : ownTools);
   const blocks = fileBlocks(said.files);
   // What their screen shows goes with this question only, ahead of it; the conversation keeps just what they said.
   const asking = said.page ? `${pageContextBlock(said.page)}\n\n${text}` : text;
@@ -540,9 +555,30 @@ export async function askSol(
   /** The answer given just before he only kept it in memory: his next words add to it rather than replace it. */
   let keptAfter = "";
   let resumes = 0;
+  /** Every call's usage, kept as the answer's real cost (ai-costs.ts). */
+  const calls: AiUsage[] = [];
+  /** The conversation as it was before any step, to start again on the deeper model. */
+  const asAsked = merged.map((m) => ({ ...m }));
   try {
     for (let step = 0; step < STEPS; step++) {
-      const m = await client.messages.create({ model: MODEL(), max_tokens: 8000, system, tools, messages: merged });
+      const model = modelFor(tier);
+      const m = await client.messages.create({ model, max_tokens: 8000, system, tools: toolsFor(tier), messages: merged });
+      calls.push(usageOf(m.model || model, m.usage));
+      // Handed up: start the question again on the deeper model, when the credits allow (else answer it as it is).
+      const handUp = m.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === THINK_DEEPER_TOOL.name);
+      if (handUp && tier === "quick") {
+        if (await addSolCredits(businessId, credit, TIER_CREDITS.deep - TIER_CREDITS.quick)) {
+          tier = "deep";
+          const why = typeof (handUp.input as { why?: unknown })?.why === "string" ? String((handUp.input as { why: string }).why) : "";
+          reason = `handed up${why ? `: ${why.slice(0, 120)}` : ""}`;
+          merged.splice(0, merged.length, ...asAsked.map((x) => ({ ...x })));
+          shown.pages.length = 0;
+          shown.seen.length = 0;
+          step--;
+          continue;
+        }
+        // Too few credits to hand up: the tool answers that below, and he carries on himself.
+      }
       shown.pages.push(...citedPages(m.content));
       shown.seen.push(...searchedPages(m.content));
       // The server paused its own search loop: send the turn back as it is and it carries on.
@@ -566,7 +602,10 @@ export async function askSol(
       for (const u of uses) {
         let out: string;
         try {
-          out = await runTool(member, u.name, (u.input ?? {}) as Record<string, unknown>, jobs, phones, shown);
+          out =
+            u.name === THINK_DEEPER_TOOL.name
+              ? "Not available just now: answer it yourself, as well as you can."
+              : await runTool(member, u.name, (u.input ?? {}) as Record<string, unknown>, jobs, phones, shown);
         } catch (e) {
           out = `That didn't work: ${e instanceof Error ? e.message : String(e)}`;
         }
@@ -579,6 +618,11 @@ export async function askSol(
     if (!answer) await giveBackSolCredit(businessId, credit);
     answer = answer || "Something went wrong reaching Claude just then. Try again in a moment.";
   }
+  // An answer researched online took longer and cost more: its research credits are added (never stopping it).
+  const researched = calls.some((c) => c.searches > 0) || shown.pages.length > 0;
+  let credits = TIER_CREDITS[tier];
+  if (answer && researched && (await addSolCredits(businessId, credit, RESEARCH_CREDITS))) credits += RESEARCH_CREDITS;
+  if (answer) await keepCost(businessId, credit, tier, researched ? `${reason}, researched` : reason, calls);
   // What he read online or recalled from memory, shown under the answer as its sources so the person can check it:
   // his own list taken off the words, kept only where he really saw the page, with any pages cited or read whole.
   const listed = takeSourcesList(answer);
@@ -602,6 +646,7 @@ export async function askSol(
     ...(shown.reminder ? { reminder: shown.reminder } : {}),
     ...(sources.length ? { sources } : {}),
     ...(shown.remembered.length ? { remembered: shown.remembered } : {}),
+    ...(answer ? { credits, ...(tier === "deep" ? { deep: true } : {}) } : {}),
   };
   return addSolTurns(businessId, email, [you, sol]);
 }
@@ -642,7 +687,7 @@ export async function solAnswersInChannel(member: Member, room: string, asked: s
   let said: string;
   let visuals: { charts?: unknown; diagrams?: unknown } = {};
   try {
-    const state = await askSol(member, { text: prompt, files: [] }, apiKey, "channel");
+    const state = await askSol(member, { text: prompt, files: [], routeOn: asked }, apiKey, "channel");
     const last = [...state.turns].reverse().find((t) => t.role === "sol");
     said = last?.text?.trim() || "I couldn't answer that just now.";
     // A channel line is words only: his sources go under them as a short list.

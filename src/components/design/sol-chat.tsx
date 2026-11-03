@@ -24,6 +24,7 @@ import {
   type SolFile,
   type SolReminderAsk,
   type SolState,
+  type SolTurn,
   type WhenChoice,
 } from "@/lib/domain/design/sol";
 import { listJobs, type JobLine } from "@/lib/services/crm";
@@ -46,6 +47,7 @@ import { askToStartAfresh, worthKeeping } from "@/lib/domain/design/sol-history"
 import { DictateButton, withSpoken } from "./dictate";
 import { SolHistory } from "./sol-history";
 import { SolSources } from "./sol-sources";
+import { costWords, TIER_CREDITS } from "@/lib/domain/design/sol-routing";
 import { SolKnows } from "./sol-knows";
 import { STARTER_QUESTIONS } from "@/lib/domain/design/sol-knowledge";
 import { SolMark } from "./sol-icon";
@@ -212,7 +214,7 @@ export function SolChat({
     if (picker.current) picker.current.value = "";
   };
 
-  const send = async (over?: string) => {
+  const send = async (over?: string, deep = false) => {
     const said = (over ?? text).trim();
     const sending = over ? [] : files;
     if ((!said && !sending.length) || busy) return;
@@ -231,7 +233,7 @@ export function SolChat({
     setDealAt(null);
     setBusy(true);
     setPending(said + (sending.length ? `${said ? "\n" : ""}(Attached: ${sending.map((f) => f.name).join(", ")})` : ""));
-    const ok = await run(askSol(said, encoded, side && seePage ? currentPageContext(pageName) : null));
+    const ok = await run(askSol(said, encoded, side && seePage ? currentPageContext(pageName) : null, deep));
     setPending(null);
     setBusy(false);
     if (ok) void run(solSeen());
@@ -420,6 +422,17 @@ export function SolChat({
             />
             {t.role === "sol" && t.sources?.length ? (
               <SolSources sources={t.sources} remembered={t.remembered} onRemember={() => run(rememberAnswer(t.at))} />
+            ) : null}
+            {t.role === "sol" && t.credits ? (
+              <AnswerCost
+                turn={t}
+                // Only the latest quick answer offers to think again, asking the same question of the deeper model.
+                again={
+                  i === turns.length - 1 && !t.deep && turns[i - 1]?.role === "you" && !busy
+                    ? () => void send(askedText(turns[i - 1].text), true)
+                    : null
+                }
+              />
             ) : null}
             {t.charts?.map((c, k) => (
               <SolChartView key={k} chart={c} />
@@ -712,6 +725,27 @@ export function SolChat({
 }
 
 const turnId = (t: { role: string; at: string }) => `sol-turn-${t.role}-${t.at.replace(/[^0-9a-z]/gi, "")}`;
+
+/** The question as they asked it, without the note of what was attached (files aren't sent again). */
+const askedText = (text: string) => text.replace(/\n\(Attached: [^)]*\)$/, "").trim();
+
+/** What an answer took, and on the latest quick one, Think deeper (sol-routing.ts). */
+function AnswerCost({ turn, again }: { turn: SolTurn; again: (() => void) | null }) {
+  return (
+    <p className="flex flex-wrap items-center gap-2 pl-1 text-[11px] text-muted">
+      <span>{costWords(turn.deep ? "deep" : "quick", turn.credits ?? 1)}</span>
+      {again && (
+        <button
+          type="button"
+          onClick={again}
+          className="tap-area rounded-full px-1.5 font-medium text-ink underline-offset-2 hover:underline"
+        >
+          Think deeper · {TIER_CREDITS.deep} credits
+        </button>
+      )}
+    </p>
+  );
+}
 
 /** One message, with Copy and Pin beside it (1 Nov 2026, Martin: as Primero's) once it has been said. */
 function Bubble({ you, text, at, pinned, onPin }: { you: boolean; text: string; at: string; pinned?: boolean; onPin?: () => void }) {
