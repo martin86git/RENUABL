@@ -8,6 +8,7 @@ import { INVERTER_ELECTRICAL, PANEL_ELECTRICAL, type InverterElectrical, type Pa
 import { workspaceCatalogue } from "@/lib/domain/design/pricing";
 import { shortDate } from "@/lib/services/crm";
 import {
+  confirmDatasheet,
   datasheetFileHref,
   deleteDatasheet,
   keepDatasheetFile,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/services/datasheets";
 import { loadWorkspace } from "@/lib/services/design-store";
 import { ui } from "./design-shell";
+import { useDesignAccount } from "./design-account";
 
 const EMPTY_PANEL: PanelForm = { voc: "", vmp: "", isc: "", imp: "", vocPercent: "", iscPercent: "", pmaxPercent: "" };
 const EMPTY_INVERTER: InverterForm = {
@@ -49,6 +51,8 @@ const INVERTER_FIELDS: { key: Exclude<keyof InverterForm, "mppts">; label: strin
  * use them for that product code. Without one, a product RENUABL has no figures for can't be strung by the designer.
  */
 export function DatasheetSettings() {
+  const [account] = useDesignAccount();
+  const may = account?.signedIn ? account.may : null;
   const [sheets, setSheets] = useState<SavedSheet[] | null>(null);
   const [products, setProducts] = useState<{ panels: { sku: string; name: string }[]; inverters: { sku: string; name: string }[] }>({
     panels: [],
@@ -339,10 +343,43 @@ export function DatasheetSettings() {
                   {s.model && <span className="text-ink-2"> · {s.model}</span>}
                 </p>
                 <p className="mt-0.5 text-xs tabular-nums text-muted">{summary(s)}</p>
-                <p className="mt-0.5 text-xs text-muted">
-                  Checked by {s.checkedBy.split("@")[0]} on {shortDate(s.checkedAt)}
-                  {s.fileName && ` · from ${s.fileName}`}
-                </p>
+                {s.unchecked ? (
+                  // Found online by itself (3 Nov 2026): in use, every string on it marked to check, until someone confirms it.
+                  <div className="mt-1.5 rounded-md bg-sun px-2.5 py-2 text-xs text-sun-ink">
+                    <p>
+                      <strong className="font-semibold">Found online · to check.</strong> In use now, and every string on it is marked to
+                      check. Open the sheet, check these figures against it, then confirm.
+                    </p>
+                    {s.foundUrl && (
+                      <a
+                        href={s.foundUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 block break-all underline underline-offset-2"
+                      >
+                        {s.foundUrl}
+                      </a>
+                    )}
+                    {may?.prices && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const res = await confirmDatasheet(s.kind, s.sku);
+                          if (res.ok) setSheets(res.sheets);
+                          else setStatus({ ok: false, text: res.message });
+                        }}
+                        className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-ink hover:bg-forest"
+                      >
+                        I&apos;ve checked them: confirm
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-0.5 text-xs text-muted">
+                    Checked by {s.checkedBy.split("@")[0]} on {shortDate(s.checkedAt)}
+                    {s.fileName && ` · from ${s.fileName}`}
+                  </p>
+                )}
               </div>
               {s.hasFile && (
                 <a

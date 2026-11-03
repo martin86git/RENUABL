@@ -718,6 +718,9 @@ create table if not exists design_standard_parts (
 -- A product datasheet's own file, kept with its checked figures so the team can open it again.
 alter table design_datasheets add column if not exists file_bytes bytea;
 alter table design_datasheets add column if not exists file_type text;
+-- Figures RENUABL found online by itself (server/datasheet-finder.ts): where, and whether a person has checked them yet.
+alter table design_datasheets add column if not exists found_url text;
+alter table design_datasheets add column if not exists unchecked boolean not null default false;
 -- The installation job card (domain/design/job-card.ts): each installer's private link to a job's card (one each,
 -- for good; sent_at when it was last emailed), and the card's thread of notes and the photos on them.
 create table if not exists design_job_links (

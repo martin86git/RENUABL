@@ -1,7 +1,12 @@
 import { checkInverter, checkPanel, cleanSku, sheetBasis, type SheetKind } from "@/lib/domain/design/datasheets";
 import { todayInMarket } from "@/lib/domain/market";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
-import { businessDatasheets, deleteSheet, listSheets, saveSheet } from "@/lib/server/design-datasheets-repo";
+import { businessDatasheets, confirmSheet, deleteSheet, listSheets, saveSheet } from "@/lib/server/design-datasheets-repo";
+import { findDatasheet } from "@/lib/server/datasheet-finder";
+import { allow } from "@/lib/server/rate-limit";
+
+/** Finding a datasheet online (a search, a download, a read) can take a couple of minutes, after the answer too. */
+export const maxDuration = 300;
 
 const kindOf = (v: unknown): SheetKind | null => (v === "panel" || v === "inverter" ? v : null);
 const text = (v: unknown, max: number) =>
@@ -53,6 +58,47 @@ export async function PUT(request: Request) {
     if (!checked.ok) return Response.json({ ok: false, message: checked.message }, { status: 422 });
     await saveSheet(who.member.businessId, { kind, sku, model, fileName, figures: checked.value }, who.member.email);
     return Response.json({ ok: true, sheets: await listSheets(who.member.businessId) });
+  });
+}
+
+/**
+ * POST { do: "find", kind, sku, name }: looks for the product's datasheet online now and keeps its figures unchecked
+ * (datasheet-finder.ts; any member designing, 30 an hour). { do: "confirm", kind, sku }: a person has checked figures
+ * found online against the sheet (who may change prices).
+ */
+export async function POST(request: Request) {
+  return answer(async () => {
+    const read = await readBody(request, 2_000);
+    if ("refuse" in read) return read.refuse;
+    const kind = kindOf(read.body.kind);
+    const sku = cleanSku(read.body.sku);
+    if (!kind || !sku) return Response.json({ ok: false, message: "Which product?" }, { status: 422 });
+    if (read.body.do === "confirm") {
+      const who = await requireMember("prices");
+      if ("refuse" in who) return who.refuse;
+      if (!(await confirmSheet(who.member.businessId, kind, sku, who.member.email)))
+        return Response.json({ ok: false, message: "There are no figures waiting to be checked for that product." }, { status: 404 });
+      return Response.json({ ok: true, sheets: await listSheets(who.member.businessId) });
+    }
+    if (read.body.do !== "find") return Response.json({ ok: false }, { status: 400 });
+    const who = await requireMember("design");
+    if ("refuse" in who) return who.refuse;
+    if (!allow(request, "datasheet-find", 30))
+      return Response.json({ ok: false, message: "Try again in a little while." }, { status: 429 });
+    const outcome = await findDatasheet(who.member.businessId, { kind, sku, name: text(read.body.name, 160) || sku });
+    const message = {
+      found: "Found its datasheet online. Its figures are in use, marked to check until someone confirms them in Settings.",
+      "kept-already": "Its figures are already on file.",
+      "not-found": "Couldn't find its datasheet online. Upload it in Settings, Product datasheets.",
+      "not-read": "Found a datasheet but couldn't read its figures clearly. Upload it in Settings, Product datasheets.",
+      off: "Finding datasheets isn't set up here.",
+    }[outcome];
+    return Response.json({
+      ok: outcome === "found" || outcome === "kept-already",
+      outcome,
+      message,
+      datasheets: await businessDatasheets(who.member.businessId),
+    });
   });
 }
 

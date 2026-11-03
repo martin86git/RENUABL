@@ -28,6 +28,10 @@ export interface SavedSheet {
   figures: PanelElectrical | InverterElectrical;
   /** Whether the sheet itself is kept with the figures, to open again. */
   hasFile?: boolean;
+  /** Where RENUABL found the sheet online, when it found it by itself. */
+  foundUrl?: string | null;
+  /** Found online and not yet checked by a person. */
+  unchecked?: boolean;
 }
 
 /** A sheet is kept with its figures when it fits in one request to the host (under Vercel's 4.5 MB limit). */
@@ -241,4 +245,142 @@ export function datasheetFigures(
   const all = [...own, ...renuabl];
   if (!all.length) return "No datasheet figures match that. They can be added under Settings, Product datasheets.";
   return all.slice(0, 10).join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Found online by themselves (3 Nov 2026, Martin: "an auto function that does this each time a product is added")
+// ---------------------------------------------------------------------------
+
+/** The most products whose datasheets are looked for at one go (a price list upload): each is a few searches. */
+export const FIND_AT_ONCE = 8;
+
+/** The panels and inverters on a price list with no figures anywhere: not the business's, not RENUABL's own. */
+export function missingSheets(
+  list: { panels: readonly { sku: string; name: string }[]; inverters: readonly { sku: string; name: string }[] },
+  sheets: Datasheets,
+): { kind: SheetKind; sku: string; name: string }[] {
+  const known = (kind: SheetKind) =>
+    new Set(
+      Object.keys(kind === "panel" ? { ...PANEL_ELECTRICAL, ...sheets.panels } : { ...INVERTER_ELECTRICAL, ...sheets.inverters }).map(
+        codeKey,
+      ),
+    );
+  const out: { kind: SheetKind; sku: string; name: string }[] = [];
+  for (const kind of ["panel", "inverter"] as const) {
+    const have = known(kind);
+    const seen = new Set<string>();
+    for (const p of kind === "panel" ? list.panels : list.inverters) {
+      const key = codeKey(p.sku);
+      if (!key || have.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      out.push({ kind, sku: p.sku, name: p.name });
+    }
+  }
+  return out;
+}
+
+/** Where figures found online came from, as the string check names it. */
+export const foundBasis = (model: string, url: string, on: string) => {
+  let host = "the web";
+  try {
+    host = new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    // Not an address: said plainly.
+  }
+  return `${model || "Datasheet"}, found online at ${host} on ${on} and read by itself: not yet checked`;
+};
+
+/**
+ * A datasheet found online, read and checked the way a person's save is checked (every figure present and in range),
+ * for the kind of product it was looked for. Not a reading of that kind, or a figure missing, is no figures at all.
+ */
+export function foundFigures(
+  reading: SheetReading,
+  kind: SheetKind,
+  url: string,
+  on: string,
+): Checked<PanelElectrical | InverterElectrical> {
+  if (!reading.isDatasheet) return { ok: false, message: "That isn't a datasheet for this product." };
+  const form = formFromReading(reading);
+  if (form.kind !== kind) return { ok: false, message: `That datasheet is for ${form.kind === "panel" ? "a panel" : "an inverter"}.` };
+  const basis = foundBasis(form.model, url, on);
+  return kind === "panel" ? checkPanel(form.panel, basis) : checkInverter(form.inverter, basis);
+}
+
+/**
+ * The links to try for a product's datasheet, best first, at most `MAX_SHEET_TRIES`: only links the search really
+ * showed or opened (Claude can write a plausible address that doesn't exist), PDFs first, those naming more of the
+ * product code first, the one Claude chose ahead of its equals; Claude's own answer last when it never appeared.
+ */
+export const MAX_SHEET_TRIES = 5;
+export function sheetCandidates(answer: string | null, seen: readonly string[], sku: string): string[] {
+  const parts = sku
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((p) => p.length >= 2);
+  const unique = [...new Set(seen.filter((u) => /^https:\/\//i.test(u)))];
+  const score = (u: string) => {
+    const l = u.toLowerCase();
+    return (/\.pdf($|[?#])/.test(l) ? 100 : 0) + parts.filter((p) => l.includes(p)).length * 10 + (u === answer ? 5 : 0);
+  };
+  const ranked = unique.filter((u) => score(u) >= 100 || u === answer).sort((a, b) => score(b) - score(a));
+  if (answer && /^https:\/\//i.test(answer) && !ranked.includes(answer)) ranked.push(answer);
+  return ranked.slice(0, MAX_SHEET_TRIES);
+}
+
+/** What the datasheet reader answers: every figure a number, 0 where it couldn't be read (see `readingFrom`). */
+export interface RawReading {
+  isDatasheet: boolean;
+  kind: "panel" | "inverter" | "unknown";
+  model: string;
+  panel: Record<"voc" | "vmp" | "isc" | "imp" | "vocPercentPerC" | "iscPercentPerC" | "pmaxPercentPerC", number>;
+  inverter: {
+    maxVoltage: number;
+    mppMin: number;
+    mppMax: number;
+    startVoltage: number;
+    mppts: { maxCurrent: number; maxShortCircuit: number; strings: number }[];
+  };
+}
+
+/**
+ * The reader's answer as a reading: a 0 (no real figure is 0) is a figure that couldn't be read, so null; the other
+ * kind's figures are null as a whole.
+ */
+export function readingFrom(raw: RawReading): SheetReading {
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v !== 0 ? v : null);
+  const kind = raw.kind === "panel" || raw.kind === "inverter" ? raw.kind : null;
+  const p = raw.panel;
+  const i = raw.inverter;
+  return {
+    isDatasheet: Boolean(raw.isDatasheet),
+    kind,
+    model: raw.model?.trim() || null,
+    panel:
+      kind === "inverter" || !p
+        ? null
+        : {
+            voc: n(p.voc),
+            vmp: n(p.vmp),
+            isc: n(p.isc),
+            imp: n(p.imp),
+            vocPercentPerC: n(p.vocPercentPerC),
+            iscPercentPerC: n(p.iscPercentPerC),
+            pmaxPercentPerC: n(p.pmaxPercentPerC),
+          },
+    inverter:
+      kind === "panel" || !i
+        ? null
+        : {
+            maxVoltage: n(i.maxVoltage),
+            mppMin: n(i.mppMin),
+            mppMax: n(i.mppMax),
+            startVoltage: n(i.startVoltage),
+            mppts: (i.mppts ?? []).map((m) => ({
+              maxCurrent: n(m.maxCurrent),
+              maxShortCircuit: n(m.maxShortCircuit),
+              strings: n(m.strings),
+            })),
+          },
+  };
 }

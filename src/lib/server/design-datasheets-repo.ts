@@ -11,7 +11,7 @@ const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-
 export async function listSheets(businessId: string): Promise<SavedSheet[]> {
   return query<SavedSheet>(
     `select kind, sku, model, figures, file_name as "fileName", checked_by as "checkedBy", ${moment("checked_at")} as "checkedAt",
-            file_bytes is not null as "hasFile"
+            file_bytes is not null as "hasFile", found_url as "foundUrl", unchecked
        from design_datasheets where business_id = $1 order by kind, sku`,
     [businessId],
   );
@@ -21,13 +21,15 @@ export async function listSheets(businessId: string): Promise<SavedSheet[]> {
 export async function businessDatasheets(businessId: string): Promise<Datasheets> {
   const sheets: Datasheets = { panels: {}, inverters: {} };
   for (const s of await listSheets(businessId)) {
-    if (s.kind === "panel") sheets.panels[s.sku] = s.figures as PanelElectrical;
-    else sheets.inverters[s.sku] = s.figures as InverterElectrical;
+    // Figures found online and not yet checked carry where they came from, so the string check says so.
+    const figures = s.unchecked ? { ...s.figures, unchecked: s.foundUrl ?? "found online" } : s.figures;
+    if (s.kind === "panel") sheets.panels[s.sku] = figures as PanelElectrical;
+    else sheets.inverters[s.sku] = figures as InverterElectrical;
   }
   return sheets;
 }
 
-/** Keeps a product's checked figures, replacing any it had. */
+/** Keeps a product's checked figures, replacing any it had (found ones included): a person has checked them. */
 export async function saveSheet(
   businessId: string,
   sheet: { kind: SheetKind; sku: string; model: string; fileName: string; figures: PanelElectrical | InverterElectrical },
@@ -36,7 +38,7 @@ export async function saveSheet(
   await query(
     `insert into design_datasheets (business_id, kind, sku, model, figures, file_name, checked_by) values ($1,$2,$3,$4,$5,$6,$7)
      on conflict (business_id, kind, sku) do update set model = excluded.model, figures = excluded.figures,
-       file_name = excluded.file_name, checked_by = excluded.checked_by, checked_at = now()`,
+       file_name = excluded.file_name, checked_by = excluded.checked_by, checked_at = now(), unchecked = false`,
     [businessId, sheet.kind, sheet.sku, sheet.model, JSON.stringify(sheet.figures), sheet.fileName, by.toLowerCase()],
   );
 }
@@ -61,6 +63,43 @@ export async function sheetFile(
     [businessId, kind, sku],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * Keeps figures found online by themselves (unchecked), with the sheet when it fits; never over figures already kept,
+ * so nothing a person has checked or typed is written over. False when the product already has figures.
+ */
+export async function saveFoundSheet(
+  businessId: string,
+  sheet: { kind: SheetKind; sku: string; model: string; fileName: string; figures: PanelElectrical | InverterElectrical; url: string },
+  file: { bytes: Buffer; type: string } | null,
+): Promise<boolean> {
+  const rows = await query(
+    `insert into design_datasheets (business_id, kind, sku, model, figures, file_name, checked_by, found_url, unchecked, file_bytes, file_type)
+     values ($1,$2,$3,$4,$5,$6,'found online',$7,true,$8,$9) on conflict (business_id, kind, sku) do nothing returning sku`,
+    [
+      businessId,
+      sheet.kind,
+      sheet.sku,
+      sheet.model,
+      JSON.stringify(sheet.figures),
+      sheet.fileName,
+      sheet.url,
+      file?.bytes ?? null,
+      file?.type ?? null,
+    ],
+  );
+  return rows.length > 0;
+}
+
+/** A person confirms figures found online against the sheet: from then on they are checked. */
+export async function confirmSheet(businessId: string, kind: SheetKind, sku: string, by: string): Promise<boolean> {
+  const rows = await query(
+    `update design_datasheets set unchecked = false, checked_by = $4, checked_at = now()
+      where business_id = $1 and kind = $2 and sku = $3 and unchecked returning sku`,
+    [businessId, kind, sku, by.toLowerCase()],
+  );
+  return rows.length > 0;
 }
 
 export async function deleteSheet(businessId: string, kind: SheetKind, sku: string): Promise<boolean> {

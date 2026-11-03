@@ -1,6 +1,13 @@
+import { after } from "next/server";
 import { MAX_LIST_BYTES, cleanSupplierList } from "@/lib/domain/design/account";
+import { FIND_AT_ONCE, missingSheets } from "@/lib/domain/design/datasheets";
+import { findDatasheets } from "@/lib/server/datasheet-finder";
+import { businessDatasheets } from "@/lib/server/design-datasheets-repo";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { loadLists, removeList, saveList } from "@/lib/server/design-repo";
+
+/** Finding a datasheet online (a search, a download, a read) can take a couple of minutes, after the answer too. */
+export const maxDuration = 300;
 
 /**
  * PUT { list }: keeps one supplier price list for the business, checked row
@@ -16,7 +23,13 @@ export async function PUT(request: Request) {
     const list = cleanSupplierList(read.body.list);
     if (!list) return Response.json({ ok: false, message: "That price list has no priced rows to keep." }, { status: 422 });
     await saveList(who.member.businessId, list, who.member.email);
-    return Response.json({ ok: true, names: (await loadLists(who.member.businessId)).map((l) => l.name) });
+    // Its panels and inverters with no figures anywhere: their datasheets are looked for online once the answer has gone
+    // (datasheet-finder.ts), a few at a time, and kept unchecked until a person confirms them.
+    const businessId = who.member.businessId;
+    const missing = missingSheets(list, await businessDatasheets(businessId)).slice(0, FIND_AT_ONCE);
+    const finding = process.env.ANTHROPIC_API_KEY ? missing.length : 0;
+    if (finding) after(() => findDatasheets(businessId, missing).catch(() => undefined));
+    return Response.json({ ok: true, names: (await loadLists(businessId)).map((l) => l.name), finding });
   });
 }
 

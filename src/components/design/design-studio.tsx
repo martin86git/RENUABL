@@ -1,7 +1,7 @@
 "use client";
 
 import { withDatasheets, type Datasheets } from "@/lib/domain/design/datasheets";
-import { loadDatasheets } from "@/lib/services/datasheets";
+import { findDatasheetOnline, loadDatasheets } from "@/lib/services/datasheets";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -282,6 +282,16 @@ export function DesignStudio() {
             setPublished((n) => n + 1);
             return res;
           }}
+          // A product with no figures: its datasheet looked for online, and the catalogue takes the figures at once.
+          onFindSheet={
+            signedIn
+              ? async (product) => {
+                  const res = await findDatasheetOnline(product);
+                  if (res.ok) setSheets(res.datasheets);
+                  return { ok: res.ok, message: res.message };
+                }
+              : undefined
+          }
           pictureMenu={
             roofImagery && spot ? (
               <PictureMenu lat={roof.lat} lng={roof.lng} imagery={roofImagery} onChange={(value) => setImagery({ spot, value })} />

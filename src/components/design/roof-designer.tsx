@@ -695,6 +695,8 @@ export function RoofDesigner(props: {
   onNote?: (text: string) => Promise<{ ok: boolean; message: string }>;
   /** An installer's designer (business-kind.ts): sites only, so no Publish, no Proposal view and no Sol panel to open. */
   sitesOnly?: boolean;
+  /** Looks for a product's datasheet online and keeps its figures, unchecked (datasheet-finder.ts). */
+  onFindSheet?: (product: { kind: "panel" | "inverter"; sku: string; name: string }) => Promise<{ ok: boolean; message: string }>;
   /** The roof picture's menu (Google or a Nearmap capture), in the picture's bottom right corner. */
   pictureMenu?: React.ReactNode;
   /** The picture under the design is Nearmap's: drawn straight down, so Google's roof model needs no shifting onto it. */
@@ -849,7 +851,13 @@ export function RoofDesigner(props: {
   const [loose, setLoose] = useState<LoosePanel[]>(first.loose ?? []);
   const [strings, setStrings] = useState<PanelString[]>(first.strings ?? []);
   /** What String automatically did, in plain words, until the strings are next changed by hand. */
-  const [autoNote, setAutoNote] = useState<{ ok: boolean; note: string } | null>(null);
+  const [autoNote, setAutoNote] = useState<{
+    ok: boolean;
+    note: string;
+    /** The product whose figures aren't on file, to look for its datasheet online. */
+    missing?: { kind: "panel" | "inverter"; sku: string; name: string };
+  } | null>(null);
+  const [findingSheet, setFindingSheet] = useState(false);
   const [labels, setLabels] = useState<DesignLabel[]>(first.labels ?? []);
   const [panel, setPanel] = useState<PanelSpec | undefined>(first.panel);
   const [designLabel, setDesignLabel] = useState(first.label ?? "");
@@ -2985,7 +2993,15 @@ export function RoofDesigner(props: {
       chosenPanel?.electrical,
       chosenPanel?.name,
     );
-    setAutoNote({ ok: done.ok, note: done.note });
+    // What stopped it, when a product's figures aren't on file: the panel first, then the first inverter without them.
+    const lacking = !done.ok
+      ? chosenPanel && !chosenPanel.electrical
+        ? { kind: "panel" as const, sku: chosenPanel.sku, name: chosenPanel.name }
+        : fittedItems.find((i) => i && !i.electrical)
+      : undefined;
+    const missing =
+      lacking && "kind" in lacking ? lacking : lacking ? { kind: "inverter" as const, sku: lacking.sku, name: lacking.name } : undefined;
+    setAutoNote({ ok: done.ok, note: done.note, ...(missing ? { missing } : {}) });
     if (!done.strings.length) return;
     setStrings(done.strings);
     setWiring(null);
@@ -5347,6 +5363,28 @@ export function RoofDesigner(props: {
                       role="status"
                     >
                       {autoNote.note}
+                      {/* Found online by itself (3 Nov 2026): the sheet read and its figures kept, marked to check. */}
+                      {autoNote.missing && props.onFindSheet && (
+                        <button
+                          type="button"
+                          disabled={findingSheet}
+                          onClick={async () => {
+                            const missing = autoNote.missing!;
+                            setFindingSheet(true);
+                            const res = await props.onFindSheet!(missing);
+                            setFindingSheet(false);
+                            setAutoNote({
+                              ok: res.ok,
+                              note: res.ok ? `${res.message} Press String automatically again.` : res.message,
+                              ...(res.ok ? {} : { missing }),
+                            });
+                          }}
+                          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-surface px-2.5 py-1.5 font-medium text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted"
+                        >
+                          <Sparkles className="size-3.5 text-sun-ink" aria-hidden />
+                          {findingSheet ? "Looking for its datasheet… (up to a minute or two)" : "Find its datasheet online"}
+                        </button>
+                      )}
                     </p>
                   )}
                   <button

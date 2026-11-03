@@ -38,6 +38,8 @@ export interface PanelElectrical {
   pmaxPerC: number;
   /** Where the figures are from. */
   basis: string;
+  /** Found online and read by themselves, not yet checked by a person: the datasheet's address (datasheet-finder.ts). */
+  unchecked?: string;
 }
 
 /** One tracker input of an inverter. */
@@ -60,6 +62,8 @@ export interface InverterElectrical {
   startVoltage: number;
   mppts: MpptInput[];
   basis: string;
+  /** Found online and read by themselves, not yet checked by a person: the datasheet's address. */
+  unchecked?: string;
 }
 
 const inputs = (...list: [number, number, number][]): MpptInput[] =>
@@ -264,6 +268,14 @@ export function checkString(input: {
       basis,
       coldVoc,
     };
+  // Figures found online and not yet checked by a person: the string is never passed outright on them (3 Nov 2026).
+  if (panel.unchecked || inverter.unchecked)
+    lines.push({
+      what: "Its figures were found online and aren't checked yet",
+      value: "",
+      limit: "confirm them in Settings, Product datasheets",
+      ok: null,
+    });
   const bad = lines.filter((l) => l.ok === false);
   const caution = lines.filter((l) => l.ok === null);
   // (The datasheet line has no verdict of its own: it is there to read.)

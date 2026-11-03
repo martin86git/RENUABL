@@ -52,3 +52,11 @@ export async function keepDatasheetFile(kind: SheetKind, sku: string, file: File
 
 export const datasheetFileHref = (kind: SheetKind, sku: string) =>
   `/api/design/datasheets/file?kind=${kind}&sku=${encodeURIComponent(sku)}`;
+
+/** Looks for a product's datasheet online now; its figures are kept unchecked (datasheet-finder.ts). */
+export const findDatasheetOnline = (product: { kind: SheetKind; sku: string; name: string }) =>
+  ask<{ message: string; datasheets: Datasheets }>("/api/design/datasheets", { method: "POST", body: { do: "find", ...product } });
+
+/** A person has checked figures found online against the sheet. */
+export const confirmDatasheet = (kind: SheetKind, sku: string) =>
+  ask<{ sheets: SavedSheet[] }>("/api/design/datasheets", { method: "POST", body: { do: "confirm", kind, sku } });
