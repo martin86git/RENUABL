@@ -3878,7 +3878,7 @@ export function RoofDesigner(props: {
 
       <div
         className={clsx(
-          "mt-5 grid items-start gap-5",
+          "relative mt-5 grid items-start gap-5",
           shown &&
             (shown === "quote" && quoteShort
               ? "xl:grid-cols-[minmax(0,1fr)_13rem]"
@@ -6912,147 +6912,162 @@ export function RoofDesigner(props: {
           </aside>
         </div>
         {/* Beside the picture, one view at a time. Every view stays on the page, only hidden, so the quote keeps working
-            out the figures above while another view (or none) is open. */}
-        <div className={clsx("space-y-3 xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100dvh-6.5rem)] xl:overflow-y-auto", !shown && "hidden")}>
-          {/* One view at a time, chosen at the top of the column (as Primero's). */}
-          <div role="tablist" aria-label="Beside the picture" className="flex rounded-lg border border-line bg-surface-2 p-1">
-            {SIDE_VIEWS.filter((v) => (v.id !== "quote" || !costsHidden) && (v.id !== "proposal" || !props.sitesOnly)).map((v) => (
-              <button
-                key={v.id}
-                role="tab"
-                aria-selected={shown === v.id}
-                onClick={() => showSide(v.id)}
-                title={v.hint}
-                className={clsx(
-                  "inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium tabular-nums",
-                  shown === v.id ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                {v.label}
-                {v.id === "quote" && net !== null ? <span className="text-ink-2">· {dollars(net)}</span> : null}
-                {v.id === "proposal" && (props.waiting ?? 0) > 0 && (
-                  <span
-                    className="rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white"
-                    aria-label={`${props.waiting} waiting`}
-                  >
-                    {props.waiting}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          <div className={clsx("space-y-3", shown !== "designer" && "hidden")}>
-            <section className="rounded-lg border border-line bg-surface p-3" aria-label="This home">
-              <HomeToggles
-                form={quoteNow.form}
-                onPick={(name, value) => setQuote({ ...quoteNow, form: { ...quoteNow.form, [name]: value } as QuoteFields["form"] })}
-              />
-              {!props.sitesOnly && (
+            out the figures above while another view (or none) is open. In Proposal view the column lies over the picture's
+            right half, so the proposal, its chat and timeline have room (3 Nov 2026, Martin, as Primero's); the picture
+            keeps its size underneath. */}
+        <div
+          className={clsx(
+            shown === "proposal" && "xl:absolute xl:inset-y-0 xl:right-0 xl:z-40 xl:w-[calc(50%+10rem)] 2xl:w-[calc(50%+11rem)]",
+            !shown && "hidden",
+          )}
+        >
+          <div
+            className={clsx(
+              "space-y-3 xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100dvh-6.5rem)] xl:overflow-y-auto",
+              shown === "proposal" &&
+                "xl:rounded-3xl xl:bg-canvas/95 xl:p-3 xl:shadow-[0_12px_40px_rgba(20,22,26,0.22)] xl:ring-1 xl:ring-line xl:backdrop-blur",
+            )}
+          >
+            {/* One view at a time, chosen at the top of the column (as Primero's). */}
+            <div role="tablist" aria-label="Beside the picture" className="flex rounded-lg border border-line bg-surface-2 p-1">
+              {SIDE_VIEWS.filter((v) => (v.id !== "quote" || !costsHidden) && (v.id !== "proposal" || !props.sitesOnly)).map((v) => (
                 <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new Event(SOL_TOGGLE))}
-                  className="mt-3 flex w-full items-center gap-2 rounded-md border border-line px-3 py-2 text-left text-sm font-medium text-ink hover:border-forest"
+                  key={v.id}
+                  role="tab"
+                  aria-selected={shown === v.id}
+                  onClick={() => showSide(v.id)}
+                  title={v.hint}
+                  className={clsx(
+                    "inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium tabular-nums",
+                    shown === v.id ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                  )}
                 >
-                  <SolIcon className="size-5" />
-                  Ask Sol about this design
+                  {v.label}
+                  {v.id === "quote" && net !== null ? <span className="text-ink-2">· {dollars(net)}</span> : null}
+                  {v.id === "proposal" && (props.waiting ?? 0) > 0 && (
+                    <span
+                      className="rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white"
+                      aria-label={`${props.waiting} waiting`}
+                    >
+                      {props.waiting}
+                    </span>
+                  )}
                 </button>
-              )}
-            </section>
-            {/* The switchboard from a photo: Sol reads it, a rule suggests the upgrade and RCBO, one press puts them on the quote. */}
-            <section className="rounded-lg border border-line bg-surface p-3" aria-label="The switchboard">
-              <p className="text-sm font-medium text-ink">The switchboard</p>
-              <p className="mt-0.5 text-xs text-muted">
-                A photo of the board, cover open: Sol reads its phases, spare spaces and safety switches.
-              </p>
-              <div className="mt-2">
-                <CaptureButtons
-                  onFiles={(files) => files[0] && void readBoard(files[0])}
-                  accept="image/jpeg,image/png,image/webp"
-                  busy={Boolean(board?.busy)}
-                  photoLabel="Photo of the board"
-                  fileLabel="Choose a photo"
-                  desktopLabel="Read a switchboard photo"
-                  size="sm"
+              ))}
+            </div>
+
+            <div className={clsx("space-y-3", shown !== "designer" && "hidden")}>
+              <section className="rounded-lg border border-line bg-surface p-3" aria-label="This home">
+                <HomeToggles
+                  form={quoteNow.form}
+                  onPick={(name, value) => setQuote({ ...quoteNow, form: { ...quoteNow.form, [name]: value } as QuoteFields["form"] })}
                 />
-              </div>
-              {board?.error && <p className="mt-2 rounded-md bg-warning-soft px-2.5 py-2 text-xs text-warning">{board.error}</p>}
-              {board?.advice && (
-                <div className="mt-2 rounded-md bg-surface-2 p-2.5 text-xs text-ink">
-                  {/* The two answers first (3 Nov 2026, Martin): which phase, and whether the solar's circuits fit. */}
-                  <p className="text-sm font-semibold">{board.advice.phaseLine}</p>
-                  <p
-                    className={clsx(
-                      "mt-1 text-sm font-semibold",
-                      board.advice.room === "yes" ? "text-positive" : board.advice.room === "no" ? "text-danger" : "text-sun-ink",
-                    )}
+                {!props.sitesOnly && (
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new Event(SOL_TOGGLE))}
+                    className="mt-3 flex w-full items-center gap-2 rounded-md border border-line px-3 py-2 text-left text-sm font-medium text-ink hover:border-forest"
                   >
-                    {board.advice.roomLine}
-                  </p>
-                  <ul className="mt-2 space-y-1 border-t border-line pt-2 text-ink-2">
-                    {board.advice.reasons.map((r) => (
-                      <li key={r}>{r}</li>
-                    ))}
-                  </ul>
-                  <p className="mt-2 text-ink-2">
-                    Suggests: switchboard upgrade{" "}
-                    <strong>{board.advice.upgrade === null ? "to check" : board.advice.upgrade ? "included" : "left out"}</strong>, RCBO{" "}
-                    <strong>{board.advice.rcbo === null ? "to check" : board.advice.rcbo ? "included" : "left out"}</strong>
-                    {board.advice.phase ? `, ${board.advice.phase}-phase` : ""}.
-                  </p>
-                  {!costsHidden &&
-                    (board.applied ? (
-                      <p className="mt-2 font-medium text-positive">On the quote: change it there like any decision.</p>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => applyBoard(board.advice!)}
-                        className="mt-2 inline-flex h-8 items-center rounded-full bg-primary px-3 text-xs font-semibold text-primary-ink"
-                      >
-                        Put this on the quote
-                      </button>
-                    ))}
-                  <p className="mt-2 text-[11px] text-muted">A guide from a photo, not the electrician&apos;s assessment of the board.</p>
-                </div>
-              )}
-            </section>
-            {props.notes}
-          </div>
-          <div className={clsx(shown !== "quote" && "hidden")}>
-            <DesignQuote
-              design={`Design ${active + 1}${active === primary ? " (primary)" : ""}`}
-              spec={spec}
-              workspace={props.workspace}
-              rates={props.rates}
-              value={quoteNow}
-              onChange={setQuote}
-              onNet={onNet}
-              compact={quoteShort}
-              onCompact={shortQuote}
-              homeless
-            />
-          </div>
-          <div className={clsx("space-y-3", shown !== "proposal" && "hidden")}>
-            <section className="rounded-lg border border-line bg-surface p-3" aria-label="Proposal">
-              <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">Proposal</p>
-              <p className="mt-1 text-sm text-ink-2">
-                {props.proposalHref
-                  ? "Publish design brings the proposal up to date. Its link stays the same."
-                  : "Publish design makes the proposal from the starred design."}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {props.proposalHref ? (
-                  <Link href={props.proposalHref} className={button}>
-                    <FileText className="mr-1.5 size-4" aria-hidden /> View proposal
-                  </Link>
-                ) : (
-                  <button disabled title="Publish the design first: that makes its proposal" className={button}>
-                    <FileText className="mr-1.5 size-4" aria-hidden /> View proposal
+                    <SolIcon className="size-5" />
+                    Ask Sol about this design
                   </button>
                 )}
-              </div>
-            </section>
-            {props.proposal}
+              </section>
+              {/* The switchboard from a photo: Sol reads it, a rule suggests the upgrade and RCBO, one press puts them on the quote. */}
+              <section className="rounded-lg border border-line bg-surface p-3" aria-label="The switchboard">
+                <p className="text-sm font-medium text-ink">The switchboard</p>
+                <p className="mt-0.5 text-xs text-muted">
+                  A photo of the board, cover open: Sol reads its phases, spare spaces and safety switches.
+                </p>
+                <div className="mt-2">
+                  <CaptureButtons
+                    onFiles={(files) => files[0] && void readBoard(files[0])}
+                    accept="image/jpeg,image/png,image/webp"
+                    busy={Boolean(board?.busy)}
+                    photoLabel="Photo of the board"
+                    fileLabel="Choose a photo"
+                    desktopLabel="Read a switchboard photo"
+                    size="sm"
+                  />
+                </div>
+                {board?.error && <p className="mt-2 rounded-md bg-warning-soft px-2.5 py-2 text-xs text-warning">{board.error}</p>}
+                {board?.advice && (
+                  <div className="mt-2 rounded-md bg-surface-2 p-2.5 text-xs text-ink">
+                    {/* The two answers first (3 Nov 2026, Martin): which phase, and whether the solar's circuits fit. */}
+                    <p className="text-sm font-semibold">{board.advice.phaseLine}</p>
+                    <p
+                      className={clsx(
+                        "mt-1 text-sm font-semibold",
+                        board.advice.room === "yes" ? "text-positive" : board.advice.room === "no" ? "text-danger" : "text-sun-ink",
+                      )}
+                    >
+                      {board.advice.roomLine}
+                    </p>
+                    <ul className="mt-2 space-y-1 border-t border-line pt-2 text-ink-2">
+                      {board.advice.reasons.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-ink-2">
+                      Suggests: switchboard upgrade{" "}
+                      <strong>{board.advice.upgrade === null ? "to check" : board.advice.upgrade ? "included" : "left out"}</strong>, RCBO{" "}
+                      <strong>{board.advice.rcbo === null ? "to check" : board.advice.rcbo ? "included" : "left out"}</strong>
+                      {board.advice.phase ? `, ${board.advice.phase}-phase` : ""}.
+                    </p>
+                    {!costsHidden &&
+                      (board.applied ? (
+                        <p className="mt-2 font-medium text-positive">On the quote: change it there like any decision.</p>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => applyBoard(board.advice!)}
+                          className="mt-2 inline-flex h-8 items-center rounded-full bg-primary px-3 text-xs font-semibold text-primary-ink"
+                        >
+                          Put this on the quote
+                        </button>
+                      ))}
+                    <p className="mt-2 text-[11px] text-muted">A guide from a photo, not the electrician&apos;s assessment of the board.</p>
+                  </div>
+                )}
+              </section>
+              {props.notes}
+            </div>
+            <div className={clsx(shown !== "quote" && "hidden")}>
+              <DesignQuote
+                design={`Design ${active + 1}${active === primary ? " (primary)" : ""}`}
+                spec={spec}
+                workspace={props.workspace}
+                rates={props.rates}
+                value={quoteNow}
+                onChange={setQuote}
+                onNet={onNet}
+                compact={quoteShort}
+                onCompact={shortQuote}
+                homeless
+              />
+            </div>
+            <div className={clsx("space-y-3", shown !== "proposal" && "hidden")}>
+              <section className="rounded-lg border border-line bg-surface p-3" aria-label="Proposal">
+                <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">Proposal</p>
+                <p className="mt-1 text-sm text-ink-2">
+                  {props.proposalHref
+                    ? "Publish design brings the proposal up to date. Its link stays the same."
+                    : "Publish design makes the proposal from the starred design."}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {props.proposalHref ? (
+                    <Link href={props.proposalHref} className={button}>
+                      <FileText className="mr-1.5 size-4" aria-hidden /> View proposal
+                    </Link>
+                  ) : (
+                    <button disabled title="Publish the design first: that makes its proposal" className={button}>
+                      <FileText className="mr-1.5 size-4" aria-hidden /> View proposal
+                    </button>
+                  )}
+                </div>
+              </section>
+              {props.proposal}
+            </div>
           </div>
         </div>
       </div>
