@@ -161,7 +161,7 @@ describe.skipIf(!url)("roof designer after the sale (database)", () => {
     expect(
       await after.addInvoice(
         a,
-        unsigned.jobId.replace(/.$/, "0"),
+        "job_never_made_0000000000",
         { installer: "", number: "", date: "", subTotal: 1, gst: 0, lines: [], fileName: "" },
         A,
       ),

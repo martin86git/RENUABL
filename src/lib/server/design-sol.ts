@@ -39,7 +39,24 @@ import { todayInMarket } from "@/lib/domain/market";
 import { redactSecrets } from "./bill-reader";
 import { viewerOf } from "./design-context";
 import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-repo";
-import { loadLists, type Member } from "./design-repo";
+import { listMembers, loadLists, type Member } from "./design-repo";
+import { seesAllDeals, type DealViewer } from "@/lib/domain/design/account";
+
+/**
+ * The deals Sol may speak of where everyone in the business reads him (a team channel): all of them when every member
+ * sees every deal, else only those with no owner, which every member sees (3 Nov 2026, a bug review: he answered there
+ * with the asker's own view, deals and costs others may not see).
+ */
+export async function sharedViewer(businessId: string): Promise<DealViewer> {
+  const members = await listMembers(businessId);
+  return { email: "", all: members.length > 0 && members.every((m) => seesAllDeals(m.role, m.permissions)) };
+}
+
+/** What one answer's tools may use: whose deals it sees, and whether it has read a customer's own words yet. */
+interface ToolGuard {
+  viewer: DealViewer;
+  readCustomerText: boolean;
+}
 import { casesForJob, casesToResolve } from "./design-service-repo";
 import { addSolTurns, newSolId, solState, withSol } from "./design-sol-repo";
 import { addSolCredits, giveBackSolCredit, keepCost, modelFor, takeSolCredit } from "./sol-credits";
@@ -300,9 +317,10 @@ async function runTool(
   jobs: SolJob[],
   phones: Map<string, string>,
   shown: Turn,
+  guard: ToolGuard,
 ): Promise<string> {
   const { businessId, email } = member;
-  const viewer = viewerOf(member);
+  const viewer = guard.viewer;
   if (name === "recall_knowledge") {
     const found = await recall(businessId, s(input.question));
     for (const e of found) if (!shown.recalled.some((r) => r.id === e.id)) shown.recalled.push(e);
@@ -332,6 +350,8 @@ async function runTool(
   if (name === "deal_details") {
     const got = await jobById(businessId, s(input.deal_id), viewer);
     if (!got) return "There's no such deal, or this person can't see it.";
+    // What follows holds the customer's own words (notes, chat, emails).
+    guard.readCustomerText = true;
     const { job, customer } = got;
     const detail = await customerDetail(businessId, customer.id, viewer);
     const activity = (detail?.activity ?? []).filter((a) => !a.jobId || a.jobId === job.id).slice(0, 15);
@@ -371,6 +391,8 @@ async function runTool(
     if (shown.drafts.length >= DRAFTS_PER_TURN) return `Only ${DRAFTS_PER_TURN} drafts an answer.`;
     const got = await jobById(businessId, s(input.deal_id), viewer);
     if (!got) return "There's no such deal, or this person can't see it.";
+    // What follows holds the customer's own words (notes, chat, emails).
+    guard.readCustomerText = true;
     shown.drafts.push({
       jobId: got.job.id,
       customer: got.customer.name,
@@ -380,6 +402,10 @@ async function runTool(
     });
     return `Shown as a draft card to ${got.customer.name}${got.customer.email ? "" : " (who has no email address yet: say so)"}.`;
   }
+  // Nothing lasting is kept in a turn that has read a customer's own words (their notes, chat and emails): a line in
+  // them can't become an instruction he follows from then on (3 Nov 2026, a bug review).
+  if ((name === "remember_my_preference" || name === "forget_my_preference") && guard.readCustomerText)
+    return "Not kept: this answer read a customer's own words. Ask me again in your own words to keep a preference.";
   if (name === "remember_my_preference") {
     await withSol(businessId, email, (row) => ({ ...row, prefs: withPref(row.prefs, s(input.text), newSolId(), new Date()) }));
     return "Kept: it applies to every email you write for them from now.";
@@ -445,6 +471,8 @@ async function runTool(
     const id = s(input.deal_id);
     const got = await jobById(businessId, id, viewer);
     if (!got) return "There's no such deal, or this person can't see it.";
+    // What follows holds the customer's own words (notes, chat, emails).
+    guard.readCustomerText = true;
     if (shown.designs.some((d) => d.jobId === got.job.id)) return "That design is already under your answer.";
     if (shown.designs.length >= DESIGNS_PER_TURN) return "That's enough designs for one answer.";
     const card = await jobCard(member, got.job.id);
@@ -475,7 +503,15 @@ function fileBlocks(files: readonly SolFile[]): Anthropic.ContentBlockParam[] {
 /** Sol answers what the member said (with any files) and both are kept in their conversation. */
 export async function askSol(
   member: Member,
-  said: { text: string; files: SolFile[]; page?: PageContext; deep?: boolean; routeOn?: string },
+  said: {
+    text: string;
+    files: SolFile[];
+    page?: PageContext;
+    deep?: boolean;
+    routeOn?: string;
+    /** Answered where the whole business reads it (a team channel): no costs, no private history, the shared view. */
+    shared?: boolean;
+  },
   apiKey: string | null,
   use: SolUse = "chat",
 ): Promise<SolState> {
@@ -506,7 +542,9 @@ export async function askSol(
     credit = await takeSolCredit(businessId, use, email, TIER_CREDITS.quick);
   }
   if (!credit) return addSolTurns(businessId, email, [you, { role: "sol", text: SOL_OUT, at: new Date().toISOString() }]);
-  const viewer = viewerOf(member);
+  const viewer = said.shared ? await sharedViewer(businessId) : viewerOf(member);
+  const costs = !said.shared && can(member.role, "costs", member.permissions);
+  const guard: ToolGuard = { viewer, readCustomerText: false };
   const [state, jobs, customers, serviceOpen] = await Promise.all([
     solState(businessId, email),
     listJobs(businessId, viewer),
@@ -518,22 +556,19 @@ export async function askSol(
   const system = solSystem({
     business: member.businessName,
     member: email,
-    costs: can(member.role, "costs", member.permissions),
+    costs,
     facts: canvasFacts(jobs, serviceOpen, todayInMarket()),
     prefs: state.prefs,
     now: new Date(),
   });
-  const ownTools: Anthropic.ToolUnion[] = [
-    ...(can(member.role, "costs", member.permissions) ? [...TOOLS, PRICE_TOOL] : TOOLS),
-    ...WEB_TOOLS,
-  ];
+  const ownTools: Anthropic.ToolUnion[] = [...(costs ? [...TOOLS, PRICE_TOOL] : TOOLS), ...WEB_TOOLS];
   // A quick answer may hand itself up before it starts; a deep one has nothing to hand up to.
   const toolsFor = (t: SolTier): Anthropic.ToolUnion[] => (t === "quick" ? [THINK_DEEPER_TOOL, ...ownTools] : ownTools);
   const blocks = fileBlocks(said.files);
   // What their screen shows goes with this question only, ahead of it; the conversation keeps just what they said.
   const asking = said.page ? `${pageContextBlock(said.page)}\n\n${text}` : text;
   const messages: Anthropic.MessageParam[] = [
-    ...state.turns
+    ...(said.shared ? [] : state.turns)
       .slice(-HISTORY_SENT)
       .map((t) => ({ role: t.role === "you" ? ("user" as const) : ("assistant" as const), content: t.text || "(drawn)" })),
     { role: "user", content: blocks.length ? [...blocks, { type: "text" as const, text: asking }] : asking },
@@ -605,7 +640,7 @@ export async function askSol(
           out =
             u.name === THINK_DEEPER_TOOL.name
               ? "Not available just now: answer it yourself, as well as you can."
-              : await runTool(member, u.name, (u.input ?? {}) as Record<string, unknown>, jobs, phones, shown);
+              : await runTool(member, u.name, (u.input ?? {}) as Record<string, unknown>, jobs, phones, shown, guard);
         } catch (e) {
           out = `That didn't work: ${e instanceof Error ? e.message : String(e)}`;
         }
@@ -687,7 +722,7 @@ export async function solAnswersInChannel(member: Member, room: string, asked: s
   let said: string;
   let visuals: { charts?: unknown; diagrams?: unknown } = {};
   try {
-    const state = await askSol(member, { text: prompt, files: [], routeOn: asked }, apiKey, "channel");
+    const state = await askSol(member, { text: prompt, files: [], routeOn: asked, shared: true }, apiKey, "channel");
     const last = [...state.turns].reverse().find((t) => t.role === "sol");
     said = last?.text?.trim() || "I couldn't answer that just now.";
     // A channel line is words only: his sources go under them as a short list.

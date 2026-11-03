@@ -13,7 +13,7 @@ import { SOL_BY, TEAM_CHANNELS, nameOf } from "@/lib/domain/design/team-chat";
 import { handleOf } from "@/lib/domain/design/mentions";
 import { todayInMarket } from "@/lib/domain/market";
 import { redactSecrets } from "./bill-reader";
-import { viewerOf } from "./design-context";
+import { sharedViewer } from "./design-sol";
 import { loadPrefs } from "./design-after-sale-repo";
 import { listJobs } from "./design-crm-repo";
 import { query } from "./db";
@@ -62,7 +62,8 @@ export async function solStepsIn(member: Member, room: string, lineId: string, t
     return;
 
   const [jobs, serviceOpen, before] = await Promise.all([
-    listJobs(businessId, viewerOf(member)),
+    // The deals everyone reading the channel may see, not only the asker's (3 Nov 2026, a bug review).
+    sharedViewer(businessId).then((v) => listJobs(businessId, v)),
     casesToResolve(businessId),
     channelContext(businessId, room),
   ]);

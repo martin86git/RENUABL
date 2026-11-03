@@ -107,8 +107,16 @@ export async function readyFor(
   member: { businessId: string; businessName: string; email: string },
   viewer: DealViewer,
   now = new Date(),
+  /** The owner viewing as this member (read only): what is there is shown, nothing is started or marked. */
+  readOnly = false,
 ): Promise<{ items: PreparedItem[]; pending: Pending[] }> {
   const businessId = member.businessId;
+  if (readOnly) {
+    const seenJobs = viewer.all ? null : await listJobs(businessId, viewer);
+    const seen = seenJobs && new Set(seenJobs.map((j) => j.id));
+    const all = await rows(businessId);
+    return { items: all.map((r) => ({ ...r.item, id: r.id, status: r.status })).filter((i) => !seen || seen.has(i.jobId)), pending: [] };
+  }
   const [proposals, seenJobs, existing] = await Promise.all([
     listProposals(businessId, todayInMarket(now)),
     viewer.all ? Promise.resolve(null) : listJobs(businessId, viewer),

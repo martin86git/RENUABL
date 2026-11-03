@@ -55,6 +55,8 @@ export async function fetchNearmap(
   const surveys = (await nearmapSurveys(place.lat, place.lng)) ?? [];
   const chosen = survey ? surveys.find((s) => s.id === survey) : surveys[0];
   if (survey && !chosen) return "unknown";
+  // Kept only with the capture it is (its survey and date): never as a "latest" a later fetch would write over.
+  if (!chosen) return "none";
   const bytes = await nearmapPicture(place.lat, place.lng, chosen?.id);
   if (!bytes) return "none";
   const id = chosen?.id ?? "latest";

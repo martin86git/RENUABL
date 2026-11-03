@@ -4,6 +4,7 @@ import { FIND_AT_ONCE, missingSheets } from "@/lib/domain/design/datasheets";
 import { findDatasheets } from "@/lib/server/datasheet-finder";
 import { businessDatasheets } from "@/lib/server/design-datasheets-repo";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
+import { allow } from "@/lib/server/rate-limit";
 import { loadLists, removeList, saveList } from "@/lib/server/design-repo";
 
 /** Finding a datasheet online (a search, a download, a read) can take a couple of minutes, after the answer too. */
@@ -27,7 +28,8 @@ export async function PUT(request: Request) {
     // (datasheet-finder.ts), a few at a time, and kept unchecked until a person confirms them.
     const businessId = who.member.businessId;
     const missing = missingSheets(list, await businessDatasheets(businessId)).slice(0, FIND_AT_ONCE);
-    const finding = process.env.ANTHROPIC_API_KEY ? missing.length : 0;
+    // A few uploads an hour start searches: each is paid, and a product not found stays missing (3 Nov 2026, a bug review).
+    const finding = process.env.ANTHROPIC_API_KEY && missing.length && allow(request, "datasheet-auto", 4) ? missing.length : 0;
     if (finding) after(() => findDatasheets(businessId, missing).catch(() => undefined));
     return Response.json({ ok: true, names: (await loadLists(businessId)).map((l) => l.name), finding });
   });

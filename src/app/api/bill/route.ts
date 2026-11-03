@@ -9,6 +9,7 @@ import {
   summariseBill,
 } from "@/lib/domain/bill";
 import { PREVIEW_MODE } from "@/lib/config";
+import { allow } from "@/lib/server/rate-limit";
 import { SAMPLE_READING, parseApiKey, readBillWithClaude, redactSecrets } from "@/lib/server/bill-reader";
 
 export const maxDuration = 60;
@@ -23,6 +24,8 @@ function fail(message: string, status: number) {
  * clearly for a different address is turned away.
  */
 export async function POST(request: Request) {
+  // Each read is a Claude call: a customer reads a bill or two, so a script can't run up the bill (3 Nov 2026, a bug review).
+  if (!allow(request, "bill", 12)) return Response.json({ ok: false, message: "Please wait a minute and try again." }, { status: 429 });
   let file: FormDataEntryValue | null;
   let address: string | null;
   try {

@@ -18,14 +18,18 @@ const json = (method: string, body: unknown) => ({
   body: JSON.stringify(body),
 });
 
-type Answer<T> = ({ ok: true } & T) | { ok: false; message: string };
+type Answer<T> = ({ ok: true } & T) | { ok: false; message: string; gone?: boolean };
 
 async function call<T>(url: string, init?: RequestInit): Promise<Answer<T>> {
   try {
     const res = await fetch(url, { cache: "no-store", ...init });
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (res.ok && data.ok) return data as { ok: true } & T;
-    return { ok: false, message: typeof data.message === "string" ? data.message : "That didn't work. Try again." };
+    return {
+      ok: false,
+      message: typeof data.message === "string" ? data.message : "That didn't work. Try again.",
+      ...(data.gone === true ? { gone: true } : {}),
+    };
   } catch {
     return { ok: false, message: "You seem to be offline." };
   }

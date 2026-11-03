@@ -8,7 +8,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/live/[token]
   const { token } = await ctx.params;
   if (!allow(request, "live-roof", 60)) return new Response(null, { status: 429 });
   const live = isLiveToken(token) ? await liveByToken(token) : null;
-  if (!live) return new Response(null, { status: 404 });
+  // Only while the link is open (3 Nov 2026, a bug review).
+  if (!live || !live.open) return new Response(null, { status: 404 });
   try {
     return (
       (await satelliteImage({ line: "", suburb: "", state: "", postcode: "", lat: live.lat, lng: live.lng }, "designer")) ??

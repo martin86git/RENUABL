@@ -3,7 +3,7 @@ import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { endLive, liveStatus, pushLive, startLive } from "@/lib/server/design-live-repo";
 import { allow } from "@/lib/server/rate-limit";
 
-const gone = () => Response.json({ ok: false, message: "That live link has ended." }, { status: 404 });
+const gone = () => Response.json({ ok: false, gone: true, message: "That live link has ended." }, { status: 404 });
 
 /** GET ?token= → { status }: whether the customer is watching, and the design they chose. */
 export async function GET(request: Request) {

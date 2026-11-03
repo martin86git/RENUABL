@@ -338,6 +338,13 @@ create table if not exists design_inspections (
 );
 create unique index if not exists design_inspections_live on design_inspections(business_id, job_id) where state not in ('declined','withdrawn');
 create index if not exists design_inspections_inspector on design_inspections(inspector_business, state);
+-- When Sol last started an automatic check of a job's photos (server/design-photo-check.ts): one at a time a job.
+create table if not exists design_photo_claims (
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  at timestamptz not null default now(),
+  primary key (business_id, job_id)
+);
 create table if not exists design_customers (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,

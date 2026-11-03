@@ -65,9 +65,10 @@ export async function pushLive(businessId: string, token: string, raw: unknown):
 export async function liveStatus(businessId: string, token: string): Promise<LiveStatus | null> {
   const rows = await query<LiveStatus>(
     `select token, ${moment("seen_at")} as "seenAt", choice, ${moment("choice_at")} as "choiceAt", ${moment("ends_at")} as "endsAt"
-       from design_live where business_id = $1 and token = $2`,
+       from design_live where business_id = $1 and token = $2 and ended_at is null and ends_at > now()`,
     [businessId, token],
   );
+  // An ended or expired link is no link: the designer then stops sharing (3 Nov 2026, a bug review).
   return rows[0] ?? null;
 }
 

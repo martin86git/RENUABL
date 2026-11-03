@@ -138,8 +138,9 @@ export async function POST(request: Request) {
     if (read.body.do === "commit" || read.body.do === "cancel") {
       if (!plan?.stripeSubscription) return Response.json({ ok: false, message: "There's no plan to change yet." }, { status: 404 });
       if (read.body.do === "commit") {
-        const done = await commitToTwelveMonths(stripe, plan.stripeSubscription);
+        const done = await commitToTwelveMonths(stripe, plan.stripeSubscription, todayInMarket());
         if (done === "ended") return Response.json({ ok: false, message: "This plan has ended." }, { status: 409 });
+        if (done === "running") return Response.json({ ok: false, message: "You're already on the 12-month plan." }, { status: 409 });
         if (done === "not-monthly")
           return Response.json({ ok: false, message: "A yearly plan can't move to the 12-month plan." }, { status: 409 });
       } else {
@@ -154,7 +155,9 @@ export async function POST(request: Request) {
     if (read.body.do === "sol") {
       const pack = cleanSolPack(read.body.credits);
       if (!pack) return Response.json({ ok: false }, { status: 400 });
-      return Response.json({ ok: true, url: await createSolCheckout(stripe, { businessId, email, pack, customer, origin }) });
+      // On the business's own Stripe customer, plan or not, so its invoices show in Billing (3 Nov 2026, a bug review).
+      const buyer = customer ?? (await ensureBillingCustomer(stripe, { businessId, email, name: who.member.businessName }));
+      return Response.json({ ok: true, url: await createSolCheckout(stripe, { businessId, email, pack, customer: buyer, origin }) });
     }
     const pack = cleanPack(read.body.pack);
     if (read.body.do !== "tokens" || !pack) return Response.json({ ok: false }, { status: 400 });

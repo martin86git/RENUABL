@@ -1,6 +1,6 @@
 import { validateContact } from "@/lib/domain/contact";
-import { PREVIEW_MODE } from "@/lib/config";
-import { formatCallTime } from "@/lib/domain/booking";
+import { formatCallTime, isBookableCallSlot } from "@/lib/domain/booking";
+import { allow } from "@/lib/server/rate-limit";
 import { buildIcs, callEvent, installEvent } from "@/lib/domain/calendar";
 import { formatDate } from "@/lib/domain/format";
 import { CONSENT_MISSING, consentRecord, readConsent } from "@/lib/domain/legal";
@@ -24,6 +24,8 @@ import { addNote, reservationNote, upsertContact, hubspotToken } from "@/lib/ser
  * saved and offered to the best installation partner (24 hours to accept).
  */
 export async function POST(request: Request) {
+  // A reservation makes a job, offers it to a partner, emails and may claim a WHOOP: a person makes a few at most.
+  if (!allow(request, "reserve", 10)) return Response.json({ ok: false, message: "Please wait a minute and try again." }, { status: 429 });
   let body: {
     contact?: Record<string, unknown>;
     details?: Record<string, unknown>;
@@ -57,6 +59,9 @@ export async function POST(request: Request) {
   }
   // The 15-minute call is booked before reserving (in-app calendar): its label is built here, not taken from the browser.
   const call = cleanCall(body.call);
+  // A call time sent with the reservation must be one we offer, and before the install day (3 Nov 2026, a bug review).
+  if (call && (!isBookableCallSlot(todayInMarket(), call.date, call.time) || (body.installDate && call.date >= body.installDate)))
+    return Response.json({ ok: false, message: "That call time isn't available any more. Please pick another." }, { status: 422 });
   if (call) details["Confirmation call booked"] = call.label;
   details.Consent = consentRecord({ kind: "reserve", marketing: consent.marketing, at: new Date(), timeZone: LAUNCH_MARKET.timeZone });
   const reservationId = await newReference();
@@ -92,16 +97,16 @@ export async function POST(request: Request) {
     const emailed = await email();
     return Response.json({ ok: true, reservationId, emailed, whoop: whoop === true });
   } catch (e) {
+    // The reservation is already kept (the job, the offer to a partner, the WHOOP claim and the staff email with every
+    // detail), so HubSpot failing doesn't fail it: asking the customer to try again made a second job each time
+    // (3 Nov 2026, a bug review). It is logged with the details for staff to add to HubSpot by hand.
     console.error(
       `reservation ${reservationId} failed to reach HubSpot`,
       e instanceof Error ? e.message : e,
       JSON.stringify({ contact: checked.contact, details }),
     );
-    const message = "We couldn't save your reservation just now. Please try again in a moment.";
-    return Response.json(
-      { ok: false, message: PREVIEW_MODE && e instanceof Error ? `${message} (Preview detail: ${e.message.slice(0, 200)})` : message },
-      { status: 502 },
-    );
+    const emailed = await email();
+    return Response.json({ ok: true, reservationId, emailed, whoop: whoop === true });
   }
 }
 

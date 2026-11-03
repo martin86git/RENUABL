@@ -523,9 +523,9 @@ function RoofAngle({ pitch, size = 22 }: { pitch: number; size?: number }) {
 function PitchStepper({ pitch, onPitch, onEnter }: { pitch: number; onPitch: (pitch: number) => void; onEnter?: () => void }) {
   const [typed, setTyped] = useState<string | null>(null);
   const take = (raw: string) => {
-    setTyped(raw.replace(/[^d]/g, "").slice(0, 2));
-    const n = Number(raw.replace(/[^d]/g, ""));
-    if (raw.trim() && Number.isFinite(n)) onPitch(Math.min(70, Math.max(0, Math.round(n))));
+    const digits = raw.replace(/\D/g, "").slice(0, 2);
+    setTyped(digits);
+    if (digits) onPitch(Math.min(70, Math.max(0, Number(digits))));
   };
   return (
     <div className="mt-1.5 flex items-center justify-center gap-2.5">
@@ -2868,7 +2868,7 @@ export function RoofDesigner(props: {
             : null;
         return {
           at: i,
-          name: d.label || (d.goal ? SELF_DESIGN_LABELS[d.goal] : `Option ${i + 1}`),
+          name: liveName(d, i),
           kw: sum.kw,
           panels: sum.panels,
           panelName: d.panel?.name ?? firstListed?.name ?? "",
@@ -2899,7 +2899,8 @@ export function RoofDesigner(props: {
     const timer = window.setInterval(() => {
       void liveStatusOf(liveToken).then((res) => {
         if (res.ok) setLive(res.status);
-        else setLive(null);
+        // Only a link that has really ended stops it: a moment offline or a busy server keeps it going (3 Nov 2026).
+        else if (res.gone) setLive(null);
       });
     }, LIVE_POLL_MS);
     return () => window.clearInterval(timer);
@@ -2928,16 +2929,14 @@ export function RoofDesigner(props: {
     setLiveOpen(false);
   };
   const liveChoice = live?.choice ?? null;
+  const liveName = (d: RoofDesign | undefined, i: number) => d?.label || (d?.goal ? SELF_DESIGN_LABELS[d.goal] : `Option ${i + 1}`);
   const liveWords = live
     ? liveStatusWords(
         {
           seenAt: live.seenAt,
           choice: liveChoice,
-          choiceName:
-            liveChoice === null
-              ? null
-              : (designs[liveChoice]?.label ??
-                (designs[liveChoice]?.goal ? SELF_DESIGN_LABELS[designs[liveChoice].goal!] : `Option ${liveChoice + 1}`)),
+          // Named as the customer sees it (the snapshot's own naming), the open design as it stands.
+          choiceName: liveChoice === null ? null : liveName(everyDesign()[liveChoice], liveChoice),
         },
         new Date(),
       )

@@ -19,6 +19,7 @@ import { addDaysISO } from "@/lib/domain/scheduling";
 import { readWithClaude } from "./claude-reader";
 import { addJobNote, jobCard, jobFile } from "./design-job-card-repo";
 import { withSolCredit } from "./sol-credits";
+import { query } from "./db";
 
 const PICTURES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
@@ -94,5 +95,13 @@ export async function checkAfterInstallerPhotos(
   const today = todayInMarket();
   const lastCheck = card.notes.find((n) => n.side === "team" && n.by === PHOTO_CHECK_BY)?.at ?? null;
   if (!autoCheckDue({ installDate: card.job.installDate, today, yesterday: addDaysISO(today, -1), lastCheck, now: new Date() })) return;
+  // Claimed first, so two lots of photos posted seconds apart start one check, not two (3 Nov 2026, a bug review).
+  const claimed = await query(
+    `insert into design_photo_claims (business_id, job_id) values ($1, $2)
+     on conflict (business_id, job_id) do update set at = now() where design_photo_claims.at < now() - interval '30 minutes'
+     returning job_id`,
+    [business.businessId, jobId],
+  );
+  if (!claimed.length) return;
   await checkJobPhotos(business, jobId, apiKey, null);
 }

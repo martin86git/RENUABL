@@ -130,7 +130,12 @@ const invoiceRow = (inv: Stripe.Invoice): StripeInvoiceRow => ({
   paidAt: inv.status_transitions?.paid_at ?? null,
   status: inv.status ?? "draft",
   totalCents: inv.total,
-  lines: inv.lines.data.map((l) => ({ description: l.description ?? "RENUABL", quantity: l.quantity ?? 1, amountCents: l.amount })),
+  // Each line after its discounts (a first-month coupon), so a tax invoice's GST is worked out on what was charged.
+  lines: inv.lines.data.map((l) => ({
+    description: l.description ?? "RENUABL",
+    quantity: l.quantity ?? 1,
+    amountCents: l.amount - (l.discount_amounts ?? []).reduce((n, d) => n + d.amount, 0),
+  })),
   hostedUrl: inv.hosted_invoice_url ?? null,
 });
 
@@ -268,10 +273,18 @@ export function termOf(sub: Pick<Stripe.Subscription, "metadata">): TermChange {
 }
 
 /** Puts a monthly subscription on the 12-month plan from the start of its current month. Refuses a yearly or ended one. */
-export async function commitToTwelveMonths(stripe: Stripe, subscriptionId: string): Promise<TermChange | "not-monthly" | "ended"> {
+export async function commitToTwelveMonths(
+  stripe: Stripe,
+  subscriptionId: string,
+  today: string,
+): Promise<TermChange | "not-monthly" | "ended" | "running"> {
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
   const item = sub.items.data[0];
   if (!item || ["canceled", "incomplete_expired"].includes(sub.status)) return "ended";
+  // A 12-month plan still running stays as it is: choosing it again would start its months afresh and wipe what leaving
+  // early costs (3 Nov 2026, a bug review).
+  const now = termOf(sub);
+  if (now.term === "commit" && commitRunning(now.until, today)) return "running";
   if (item.price.recurring?.interval !== "month") return "not-monthly";
   const iso = (s: number) => new Date(s * 1000).toISOString().slice(0, 10);
   const { from, until } = commitTerm(iso(item.current_period_start), iso(item.current_period_end));
@@ -306,6 +319,8 @@ export async function endTwelveMonths(stripe: Stripe, subscriptionId: string): P
  */
 export async function cancelPlan(stripe: Stripe, subscriptionId: string, today: string): Promise<{ chargedCents: number }> {
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
+  // Already cancelled (a second press, a retry): nothing more is charged or changed.
+  if (sub.cancel_at_period_end || ["canceled", "incomplete_expired"].includes(sub.status)) return { chargedCents: 0 };
   const item = sub.items.data[0];
   const term = termOf(sub);
   let chargedCents = 0;
@@ -313,13 +328,17 @@ export async function cancelPlan(stripe: Stripe, subscriptionId: string, today: 
     chargedCents = earlyExitCents(item?.quantity ?? 1, commitBillsBy(term.from, today));
     if (chargedCents > 0) {
       const customer = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
-      const invoice = await stripe.invoices.create({
-        customer,
-        collection_method: "charge_automatically",
-        pending_invoice_items_behavior: "exclude",
-        footer: INVOICE_FOOTER,
-        metadata: { kind: "design-early-exit", subscription: subscriptionId },
-      });
+      // One early-exit invoice for a 12-month plan, however many times it is asked for.
+      const invoice = await stripe.invoices.create(
+        {
+          customer,
+          collection_method: "charge_automatically",
+          pending_invoice_items_behavior: "exclude",
+          footer: INVOICE_FOOTER,
+          metadata: { kind: "design-early-exit", subscription: subscriptionId },
+        },
+        { idempotencyKey: `early-exit-${subscriptionId}-${term.from}` },
+      );
       await stripe.invoiceItems.create({
         customer,
         invoice: invoice.id,

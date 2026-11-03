@@ -12,7 +12,8 @@ const gone = () => Response.json({ ok: false, message: "This live design isn't a
 export async function GET(request: Request, ctx: RouteContext<"/api/live/[token]">) {
   return answer(async () => {
     const { token } = await ctx.params;
-    if (!allow(request, "live-view", 2400)) return new Response(null, { status: 429 });
+    // Per link: a phone asks every 2 s for up to 4 hours, and several on one connection mustn't share a budget.
+    if (!allow(request, `live-view:${token.slice(0, 48)}`, 4000)) return new Response(null, { status: 429 });
     const live = isLiveToken(token) ? await liveByToken(token, true) : null;
     if (!live) return gone();
     const { lat: _lat, lng: _lng, ...shown } = live;

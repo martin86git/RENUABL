@@ -3,6 +3,7 @@ import { NO_PLAN_FOR_KIND, billsFor, cleanKind } from "@/lib/domain/design/busin
 import { ENTERPRISE_FROM, cleanSeats } from "@/lib/domain/design/plans";
 import { dbConfigured } from "@/lib/server/db";
 import { memberByEmail } from "@/lib/server/design-repo";
+import { subscriptionOf } from "@/lib/server/design-billing-repo";
 import { allow } from "@/lib/server/rate-limit";
 import { createPlanCheckout, stripeClient } from "@/lib/server/stripe";
 
@@ -26,6 +27,14 @@ export async function POST(request: Request) {
   const member = dbConfigured() ? await memberByEmail(email).catch(() => null) : null;
   if (member && !billsFor(cleanKind(member.businessKind), "plan"))
     return Response.json({ ok: false, message: NO_PLAN_FOR_KIND }, { status: 409 });
+  // A business with a plan already isn't sold a second one (3 Nov 2026, a bug review: both billed, and the older one
+  // couldn't be cancelled from Billing): its users and term are changed in Billing.
+  const current = member ? await subscriptionOf(member.businessId).catch(() => null) : null;
+  if (current && !["canceled", "incomplete_expired"].includes(current.status))
+    return Response.json(
+      { ok: false, message: "Your business already has a plan. Sign in and open Settings, Billing to change it." },
+      { status: 409 },
+    );
   const seats = cleanSeats(body.seats ?? 1);
   if (!seats)
     return Response.json({ ok: false, message: `For ${ENTERPRISE_FROM} users or more, talk to us about Enterprise.` }, { status: 422 });

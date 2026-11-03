@@ -7,7 +7,9 @@
  * (`saveFoundSheet`): used at once, every string on them marked to check until a person confirms them in Settings.
  * Never over figures already kept.
  */
-import { lookup } from "node:dns/promises";
+import { lookup as dnsLookup } from "node:dns";
+import type { LookupFunction } from "node:net";
+import { get as httpsGet } from "node:https";
 import Anthropic from "@anthropic-ai/sdk";
 import { KEEP_SHEET_BYTES, foundFigures, sheetCandidates, type SheetKind } from "@/lib/domain/design/datasheets";
 import { BLOCKED_SITES, SEARCH_FROM } from "@/lib/domain/design/sol-knowledge";
@@ -67,34 +69,61 @@ export async function findSheetLinks(kind: SheetKind, sku: string, name: string,
 export async function safeDownload(raw: string): Promise<Buffer | null> {
   let url = fetchableUrl(raw);
   for (let hop = 0; url && hop < 5; hop++) {
-    // The host must not resolve to this computer or a private network (a link can be made to point anywhere).
-    const ips = await lookup(url.hostname, { all: true }).catch(() => []);
-    if (!ips.length || ips.some((a) => isPrivateAddress(a.address))) return null;
-    const res = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(20_000), cache: "no-store" }).catch(() => null);
-    if (!res) return null;
-    if (res.status >= 300 && res.status < 400) {
-      const next = res.headers.get("location");
-      url = next ? fetchableUrl(new URL(next, url).toString()) : null;
+    const got = await getOnce(url).catch(() => null);
+    if (!got) return null;
+    if (got.redirect !== undefined) {
+      url = got.redirect ? fetchableUrl(new URL(got.redirect, url).toString()) : null;
       continue;
     }
-    if (!res.ok || Number(res.headers.get("content-length") ?? 0) > MAX_SHEET_BYTES || !res.body) return null;
-    const parts: Uint8Array[] = [];
-    let size = 0;
-    const reader = res.body.getReader();
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.length;
-      if (size > MAX_SHEET_BYTES) {
-        await reader.cancel();
-        return null;
-      }
-      parts.push(value);
-    }
-    const bytes = Buffer.concat(parts);
-    return bytes.subarray(0, 5).toString("latin1") === "%PDF-" ? bytes : null;
+    return got.bytes.subarray(0, 5).toString("latin1") === "%PDF-" ? got.bytes : null;
   }
   return null;
+}
+
+/**
+ * The address is looked up as the connection is made, and refused there when it is this computer or a private network:
+ * checked once and fetched later, a site could answer a public address to the check and a private one to the fetch
+ * (3 Nov 2026, a bug review).
+ */
+const publicOnly: LookupFunction = (host, options, done) => {
+  dnsLookup(host, { ...options, all: true }, (err, found) => {
+    if (err) return done(err, "", 0);
+    const list = (Array.isArray(found) ? found : []) as { address: string; family: number }[];
+    if (!list.length || list.some((a) => isPrivateAddress(a.address))) return done(new Error("private address"), "", 0);
+    if ((options as { all?: boolean }).all) return (done as unknown as (e: null, a: typeof list) => void)(null, list);
+    done(null, list[0].address, list[0].family);
+  });
+};
+
+/** One request: a redirect's address, or the body up to `MAX_SHEET_BYTES`. Null when it isn't to be had. */
+function getOnce(url: URL): Promise<{ redirect: string | null } | { redirect?: undefined; bytes: Buffer } | null> {
+  return new Promise((resolve) => {
+    const req = httpsGet(url, { lookup: publicOnly, timeout: 20_000, headers: { "user-agent": "RENUABL datasheet finder" } }, (res) => {
+      const status = res.statusCode ?? 0;
+      if (status >= 300 && status < 400) {
+        res.resume();
+        return resolve({ redirect: res.headers.location ?? null });
+      }
+      if (status < 200 || status >= 300 || Number(res.headers["content-length"] ?? 0) > MAX_SHEET_BYTES) {
+        res.resume();
+        return resolve(null);
+      }
+      const parts: Buffer[] = [];
+      let size = 0;
+      res.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > MAX_SHEET_BYTES) {
+          res.destroy();
+          return resolve(null);
+        }
+        parts.push(chunk);
+      });
+      res.on("end", () => resolve({ bytes: Buffer.concat(parts) }));
+      res.on("error", () => resolve(null));
+    });
+    req.on("timeout", () => req.destroy());
+    req.on("error", () => resolve(null));
+  });
 }
 
 export type FindOutcome = "found" | "not-found" | "not-read" | "kept-already" | "off";
@@ -127,7 +156,7 @@ export async function findDatasheet(businessId: string, product: { kind: SheetKi
         kind: product.kind,
         sku: product.sku,
         model: reading.model ?? product.name,
-        fileName: decodeURIComponent(new URL(url).pathname.split("/").pop() || "datasheet.pdf").slice(0, 120),
+        fileName: sheetName(url),
         figures: figures.value,
         url,
       },
@@ -146,4 +175,14 @@ export async function findDatasheets(
   let found = 0;
   for (const p of products) if ((await findDatasheet(businessId, p).catch(() => "not-found" as const)) === "found") found++;
   return found;
+}
+
+/** The sheet's file name from its address; a stray "%" in it doesn't stop the figures being kept (3 Nov 2026). */
+function sheetName(url: string): string {
+  const last = new URL(url).pathname.split("/").pop() || "datasheet.pdf";
+  try {
+    return decodeURIComponent(last).slice(0, 120);
+  } catch {
+    return last.slice(0, 120);
+  }
 }

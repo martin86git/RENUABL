@@ -505,7 +505,23 @@ export async function recordCardPayment(p: {
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) on conflict do nothing returning 1`,
       [newId("pay"), p.businessId, p.versionId, p.dueKey, due.name, p.amountCents, p.feeCents, p.account, p.session, p.payment],
     );
-    if (!kept.length) return "already";
+    if (!kept.length) {
+      // The same payment told again is nothing new; a second payment for the same amount (two tabs, two presses) is
+      // money in the business's account with nothing to show it, so it is said on the deal (3 Nov 2026, a bug review).
+      const same = await q(
+        `select 1 from design_proposal_payments where business_id = $1 and version_id = $2 and due_key = $3 and stripe_session = $4`,
+        [p.businessId, p.versionId, p.dueKey, p.session],
+      );
+      if (!same.length)
+        await record(q, p.businessId, {
+          customerId: row.customerId,
+          jobId: row.jobId,
+          kind: "proposal",
+          text: `${due.name} was paid by card a second time ($${(p.amountCents / 100).toFixed(2)}): refund one of them in your Stripe dashboard.`,
+          by: "Stripe",
+        });
+      return "already";
+    }
     if (p.dueKey === "deposit")
       await q(
         `update design_proposal_versions set deposit_received_at = coalesce(deposit_received_at, now()),

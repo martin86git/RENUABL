@@ -14,7 +14,8 @@ export async function GET(request: Request) {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    const { items, pending } = await readyFor(who.member, viewerOf(who.member));
+    // Viewing as someone is read only (3 Nov 2026, a bug review): no drafts started, no Sol credits used in their name.
+    const { items, pending } = await readyFor(who.member, viewerOf(who.member), new Date(), Boolean(who.member.viewedBy));
     if (pending.length) {
       const sol = allow(request, "design-prepared-draft", 30);
       after(() => draftPending(who.member.businessId, pending, sol));

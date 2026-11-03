@@ -345,9 +345,12 @@ export async function latestFromOthers(me: TeamMe, room: string, n: number): Pro
       where business_id = $1 and room = $2 and by_email <> $3 order by at desc limit $4`,
     [me.businessId, room, me.email.toLowerCase(), n],
   );
-  // Sol's offers read as the work they offer, and whether it was done.
+  // Sol's offers read as the work they offer, and whether it was done: only for a deal this member may see (3 Nov 2026,
+  // a bug review: the catch-up named deals the line itself hides from them).
+  const seeDeal = await dealSight(me);
   return rows.reverse().map((r) => {
-    const action = r.by === SOL_BY ? cleanAction((r.visuals as { action?: unknown } | null)?.action) : null;
+    const offered = r.by === SOL_BY ? cleanAction((r.visuals as { action?: unknown } | null)?.action) : null;
+    const action = offered && (!offered.jobId || seeDeal(offered.jobId)) ? offered : null;
     const text = action
       ? `Offered: ${actionWords(action)} (${action.done ? `done by ${action.done.by}` : action.dismissed ? "set aside" : "not done yet"})`
       : r.text;

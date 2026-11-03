@@ -99,6 +99,9 @@ export async function searchDirectory(
     `select d.business_id, d.key, b.name, b.kind, d.suburb, d.state, d.abn
        from design_directory d join businesses b on b.id = d.business_id
       where d.listed and d.business_id <> $1 and ($2 = 'all' or b.kind = $2)
+        -- RENUABL staff's sample businesses (staff-view.ts) are found only by each other, never by a real business.
+        and (b.created_by not like '%@renuabl-staff.example'
+             or exists (select 1 from businesses me where me.id = $1 and me.created_by like '%@renuabl-staff.example'))
         and (b.name ilike $3 or d.suburb ilike $3 or d.state ilike $3 or ($4 <> '' and d.abn = $4))
       order by b.name limit 200`,
     [businessId, kind, `%${first}%`, digits.length === 11 ? digits : ""],

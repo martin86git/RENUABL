@@ -113,6 +113,13 @@ export async function withdrawJob(member: { businessId: string; email: string },
     [member.businessId, jobId, member.email.toLowerCase()],
   );
   if (!rows.length) return false;
+  // The job's inspection still waiting (nominated or booked) goes with the share, so a new one can be nominated and
+  // the inspector no longer sees the job (3 Nov 2026, a bug review). A finished one stays as the job's record.
+  await query(
+    `update design_inspections set state = 'withdrawn', updated_at = now(), updated_by = $3
+      where business_id = $1 and job_id = $2 and state in ('nominated','booked')`,
+    [member.businessId, jobId, member.email.toLowerCase()],
+  );
   await record(query, member.businessId, {
     customerId: rows[0].customerId,
     jobId,
