@@ -161,7 +161,19 @@ function TrialForm({ seats = 1, interval = "month", dark = false }: { seats?: nu
   );
 }
 
-function Screen({ src, alt, priority }: { src: string; alt: string; priority?: boolean }) {
+function Screen({
+  src,
+  alt,
+  priority,
+  width = 2880,
+  height = 1800,
+}: {
+  src: string;
+  alt: string;
+  priority?: boolean;
+  width?: number;
+  height?: number;
+}) {
   return (
     <figure className="overflow-hidden rounded-2xl bg-surface shadow-[0_30px_80px_-30px_rgba(11,11,12,0.35)] ring-1 ring-line">
       <div className="flex h-7 items-center gap-1.5 border-b border-line bg-surface-2 px-3" aria-hidden>
@@ -172,8 +184,8 @@ function Screen({ src, alt, priority }: { src: string; alt: string; priority?: b
       <Image
         src={src}
         alt={alt}
-        width={2880}
-        height={1800}
+        width={width}
+        height={height}
         sizes="(min-width: 1024px) 760px, 100vw"
         priority={priority}
         className="h-auto w-full"
@@ -364,6 +376,17 @@ function SolSection() {
         </Reveal>
         <Reveal>
           <Screen src={SOL.shot.src} alt={SOL.shot.alt} />
+        </Reveal>
+      </div>
+      <div className="mx-auto mt-20 grid w-full max-w-7xl items-center gap-12 lg:mt-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
+        <Reveal className="lg:order-2">
+          <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-sun-ink">{SOL.example.eyebrow}</p>
+          <h3 className="mt-4 text-[clamp(26px,3.2vw,40px)] font-semibold leading-[1.08] tracking-[-0.025em]">{SOL.example.title}</h3>
+          <p className="mt-5 text-[17px] leading-relaxed text-ink-2">{SOL.example.body}</p>
+          <p className="mt-6 text-xs text-muted">{SOL.example.fine}</p>
+        </Reveal>
+        <Reveal className="mx-auto w-full max-w-[620px] lg:order-1">
+          <Screen {...SOL.example.shot} />
         </Reveal>
       </div>
     </section>

@@ -123,10 +123,24 @@ export const SOL = {
     "Finds any customer, deal or price in a sentence",
     "Sets reminders and charts your month",
     "Answers in your team's chat when someone tags @Sol",
+    "Draws a diagram or a chart when a picture says it faster",
     "Never sends anything himself: you check, you send",
   ],
   footnote: "Sol runs on Claude, by Anthropic.",
   shot: { src: "/design/landing/sol.webp", alt: "Sol suggesting which proposal to follow up and drafting the email" },
+  /** A real answer from Sol on solar work (Martin, 1 Nov 2026: "use examples like this in our marketing"). */
+  example: {
+    eyebrow: "Asked in the Installations channel",
+    title: "He knows solar, and says what to check.",
+    body: "Asked where a battery can go on a garage wall with a door and a window, Sol set out the clearances, drew them, flagged a bollard if a car could hit it, and said what to check before picking a spot: the current standard, the battery maker's manual and Energy Safe Victoria's rules. Your team sees it. Your customers never do.",
+    fine: "A real answer from Sol in RENUABL's team chat. Check figures like these against the current standard before acting on them.",
+    shot: {
+      src: "/design/landing/sol-garage-wall.webp",
+      alt: "Asked where a battery can go on a garage wall with a door and a window, Sol answers with the clearances, a drawing and what to check",
+      width: 1920,
+      height: 1800,
+    },
+  },
 } as const;
 
 export interface Feature {
@@ -237,6 +251,9 @@ export function salesCopy(): string[] {
     SOL.headline,
     SOL.sub,
     ...SOL.points,
+    SOL.example.title,
+    SOL.example.body,
+    SOL.example.fine,
     ...EVERYTHING.flatMap((f) => [f.title, f.body]),
     ...COMING_SOON.flatMap((f) => [f.title, f.body]),
     MARKETPLACE.headline,

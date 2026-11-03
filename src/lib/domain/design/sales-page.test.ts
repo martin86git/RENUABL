@@ -23,9 +23,11 @@ describe("the sign-up page for solar businesses", () => {
   });
 
   it("shows only screenshots that exist", () => {
-    const shots = [...JOURNEY.map((j) => j.visual), { kind: "shot" as const, src: SOL.shot.src, alt: SOL.shot.alt }].filter(
-      (v) => v.kind === "shot",
-    );
+    const shots = [
+      ...JOURNEY.map((j) => j.visual),
+      { kind: "shot" as const, src: SOL.shot.src, alt: SOL.shot.alt },
+      { kind: "shot" as const, src: SOL.example.shot.src, alt: SOL.example.shot.alt },
+    ].filter((v) => v.kind === "shot");
     for (const v of shots) if (v.kind === "shot") expect(existsSync(`public${v.src}`), v.src).toBe(true);
   });
 });
