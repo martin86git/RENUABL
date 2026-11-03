@@ -123,6 +123,9 @@ export interface Listing {
   mine: boolean;
   /** This business's own bid on it, if any. */
   myBid: Bid | null;
+  /** How many people are watching it (never who), and whether the person reading is (market-alerts.ts). */
+  watching?: number;
+  watched?: boolean;
 }
 
 export interface Bid {

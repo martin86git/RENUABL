@@ -108,15 +108,16 @@ describe("the Marketplace for each kind", () => {
     const kinds = await import("./business-kind");
     const { KIND_SECTIONS: open } = await import("./sections");
     const pages = (kind: "retailer" | "installer" | "inspector") => open[kind].find((s) => s.id === "marketplace")?.pages.map((p) => p.id);
-    expect(pages("retailer")).toEqual(["listings", "my-listings", "my-bids", "equipment", "my-equipment", "messages"]);
+    expect(pages("retailer")).toEqual(["listings", "my-listings", "my-bids", "equipment", "my-equipment", "watching", "messages"]);
     // An installer's toggles: Job listings, Buy & sell, Messages (My bids and My equipment are links inside them).
-    expect(pages("installer")).toEqual(["listings", "equipment", "messages"]);
+    expect(pages("installer")).toEqual(["listings", "equipment", "watching", "messages"]);
     expect(open.installer.find((s) => s.id === "marketplace")?.pages.map((p) => p.label)).toEqual([
       "Job listings",
       "Buy & sell",
+      "Watching",
       "Messages",
     ]);
-    expect(pages("inspector")).toEqual(["equipment", "my-equipment", "messages"]);
+    expect(pages("inspector")).toEqual(["equipment", "my-equipment", "watching", "messages"]);
     expect(kinds.pageAllowed("inspector", "/design/marketplace")).toBe(false);
     expect(kinds.pageAllowed("installer", "/design/marketplace")).toBe(true);
   });

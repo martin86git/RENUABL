@@ -55,7 +55,7 @@ const COMMON_PAGES = [
 ];
 const PAGES: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
   installer: [...COMMON_PAGES, "/design/jobs", "/design/roof", "/design/marketplace"],
-  inspector: [...COMMON_PAGES, "/design/inspections", "/design/marketplace/equipment"],
+  inspector: [...COMMON_PAGES, "/design/inspections", "/design/marketplace/equipment", "/design/marketplace/watching"],
 };
 /** Pages under those above that a kind still doesn't have: an installer lists no jobs (it has no deals to list). */
 const NOT_PAGES: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {

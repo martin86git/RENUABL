@@ -3,7 +3,15 @@ import { cleanBidInput } from "@/lib/domain/design/marketplace";
 import { todayInMarket } from "@/lib/domain/market";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { awardBid, listingDetail, placeBid, withdrawBid, withdrawListing } from "@/lib/server/design-marketplace-repo";
+import { withWatches } from "@/lib/server/design-market-watch-repo";
+import type { ListingDetail } from "@/lib/server/design-marketplace-repo";
 import { allow } from "@/lib/server/rate-limit";
+
+/** The listing with how many are watching it and whether this person is. */
+const watched = async (who: { businessId: string; email: string }, d: ListingDetail) => ({
+  ...d,
+  listing: (await withWatches(who, "listing", [d.listing]))[0],
+});
 
 const missing = () => Response.json({ ok: false, message: "That listing isn't there any more." }, { status: 404 });
 
@@ -15,7 +23,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/mark
     if ("refuse" in who) return who.refuse;
     const { id } = await ctx.params;
     const detail = await listingDetail(who.member.businessId, id.slice(0, 80));
-    return detail ? Response.json({ ok: true, ...detail }) : missing();
+    return detail ? Response.json({ ok: true, ...(await watched(who.member, detail)) }) : missing();
   });
 }
 
@@ -51,6 +59,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/mark
         return Response.json({ ok: false, message: "Only an open listing of yours can be taken down." }, { status: 409 });
     } else return Response.json({ ok: false, message: "That couldn't be read." }, { status: 400 });
     const detail = await listingDetail(who.member.businessId, id);
-    return detail ? Response.json({ ok: true, ...detail }) : missing();
+    return detail ? Response.json({ ok: true, ...(await watched(who.member, detail)) }) : missing();
   });
 }

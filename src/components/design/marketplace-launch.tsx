@@ -12,6 +12,7 @@ import { useDesignAccount } from "./design-account";
 import { PATHS, ui } from "./design-shell";
 import { ListingRoofExample } from "./designer-showcase";
 import { Breakdown } from "./marketplace";
+import { MarketplaceFeed } from "./marketplace-feed";
 
 /** The example listing on the page: the made-up home's design (18 panels on three arrays), its facts as a listing gives them. */
 const EXAMPLE: ListingSystem = {
@@ -45,6 +46,7 @@ export function MarketplaceLaunch() {
     <div className="space-y-24 pb-16 sm:space-y-32">
       <Hero />
       <Jobs />
+      <MarketplaceFeed />
       <Privacy />
       <Trade />
       <Network signedIn={signedIn} business={account?.signedIn ? (account.business?.name ?? null) : null} />

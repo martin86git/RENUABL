@@ -93,6 +93,18 @@ export const LAUNCH = {
     "Ten panels left over from a job, an inverter swapped out, a pallet of rail. Put it up with photos and a price, and businesses near you can message you about it. You agree the sale between you: RENUABL takes no part in the payment.",
   tradePoints: ["Photos, a price each or offers", "Pick up or delivery", "Message the seller in the app", "Marked pending, then sold"],
 
+  feedEyebrow: "Your feed",
+  feedHeadline: "Work near you, as it comes up.",
+  feedSub:
+    "Installers get the jobs near their base as a feed, the ones closing soonest at the top: the roof, the system, the dates and how long is left. Watch the ones you're weighing up, bid in a few seconds, and turn on alerts to hear about new jobs near you as they're listed.",
+  feedTry: "Try it: place a bid on a job below.",
+  feedRules: [
+    "The jobs closing soonest at the top, within the distance you choose",
+    "Bids are sealed: only the seller sees your price",
+    "The address and the seller's contact once your bid is chosen",
+  ],
+  feedNote: "An example feed, with made-up businesses and jobs.",
+
   networkEyebrow: "Why it matters",
   networkHeadline: "Every business that joins makes it worth more to the rest.",
   networkPoints: [
@@ -103,6 +115,25 @@ export const LAUNCH = {
   invite: "Know a business that should be on it?",
   inviteButton: "Tell them about it",
 } as const;
+
+/**
+ * How long a listing has left, the way an auction says it: days and hours, then hours and minutes on its last day,
+ * "Closing now" in its last minute, "Closed" after. `soon` marks the last 24 hours.
+ */
+export function closesIn(minutes: number): { words: string; soon: boolean } {
+  if (minutes <= 0) return { words: "Closed", soon: false };
+  if (minutes < 1) return { words: "Closing now", soon: true };
+  const m = Math.floor(minutes);
+  const days = Math.floor(m / 1440);
+  const hours = Math.floor((m % 1440) / 60);
+  if (days > 0) return { words: `${days}d ${hours}h left`, soon: false };
+  return { words: hours > 0 ? `${hours}h ${m % 60}m left` : `${m % 60}m left`, soon: true };
+}
+
+/** A feed is served soonest closing first, within the distance chosen (null is anywhere), as the Marketplace's own is. */
+export function servedFeed<T extends { km: number; minutesLeft: number }>(items: readonly T[], withinKm: number | null): T[] {
+  return items.filter((i) => i.minutesLeft > 0 && (withinKm === null || i.km <= withinKm)).sort((a, b) => a.minutesLeft - b.minutesLeft);
+}
 
 /** The email a business sends from its own mail app to another (we send nothing ourselves): plain words, the link. */
 export function inviteMail(site: string, from: string | null): string {

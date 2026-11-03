@@ -1,9 +1,18 @@
+import { after } from "next/server";
 import { marketClosed, marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import { ITEM_STATES, cleanItemInput, cleanMessage, type ItemState } from "@/lib/domain/design/trade";
 import { can } from "@/lib/domain/design/account";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { itemDetail, markThreadRead, sendMessage, updateItem } from "@/lib/server/design-trade-repo";
+import { tellItemWatchers, withWatches } from "@/lib/server/design-market-watch-repo";
+import type { ItemDetail } from "@/lib/server/design-trade-repo";
 import { allow } from "@/lib/server/rate-limit";
+
+/** The item with how many are watching it and whether this person is. */
+const watched = async (who: { businessId: string; email: string }, d: ItemDetail) => ({
+  ...d,
+  item: (await withWatches(who, "item", [d.item]))[0],
+});
 
 const missing = () => Response.json({ ok: false, message: "That item isn't there any more." }, { status: 404 });
 
@@ -17,7 +26,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/design/trade
     const read = new URL(request.url).searchParams.get("read");
     if (read) await markThreadRead(who.member.businessId, read.slice(0, 80));
     const detail = await itemDetail(who.member.businessId, id.slice(0, 80));
-    return detail ? Response.json({ ok: true, ...detail }) : missing();
+    return detail ? Response.json({ ok: true, ...(await watched(who.member, detail)) }) : missing();
   });
 }
 
@@ -36,8 +45,15 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/trade
     if (!status && !item) return Response.json({ ok: false, message: "Nothing to change." }, { status: 400 });
     if (!(await updateItem(who.member.businessId, id.slice(0, 80), { status, item: item?.ok ? item.value : undefined })))
       return Response.json({ ok: false, message: "That item isn't yours." }, { status: 404 });
+    // Sold or taken down: whoever was watching it is told, once the answer has gone back.
+    if (status === "sold" || status === "withdrawn") {
+      const itemId = id.slice(0, 80);
+      after(() =>
+        tellItemWatchers(itemId, status === "sold").catch((e) => console.error("watchers failed", e instanceof Error ? e.message : e)),
+      );
+    }
     const detail = await itemDetail(who.member.businessId, id.slice(0, 80));
-    return detail ? Response.json({ ok: true, ...detail }) : missing();
+    return detail ? Response.json({ ok: true, ...(await watched(who.member, detail)) }) : missing();
   });
 }
 
@@ -61,6 +77,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/trad
     const sent = await sendMessage(who.member, id.slice(0, 80), text, thread);
     if (!sent.ok) return Response.json({ ok: false, message: sent.message }, { status: sent.status });
     const detail = await itemDetail(who.member.businessId, id.slice(0, 80));
-    return detail ? Response.json({ ok: true, ...detail }) : missing();
+    return detail ? Response.json({ ok: true, ...(await watched(who.member, detail)) }) : missing();
   });
 }

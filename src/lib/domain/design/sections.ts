@@ -30,6 +30,8 @@ export const MARKETPLACE_PAGES: readonly SectionPage[] = [
   // Equipment trading, named Buy & sell (2 Nov 2026, Martin).
   { id: "equipment", label: "Buy & sell", href: "/design/marketplace/equipment" },
   { id: "my-equipment", label: "My equipment", href: "/design/marketplace/equipment/mine" },
+  // Jobs and equipment a person is watching (market-alerts.ts).
+  { id: "watching", label: "Watching", href: "/design/marketplace/watching" },
   // Conversations between businesses on the Marketplace (2 Nov 2026, Martin).
   { id: "messages", label: "Messages", href: "/design/marketplace/messages" },
 ];
@@ -107,11 +109,11 @@ const MY_JOBS: Section = {
  */
 export const KIND_SECTIONS: Record<BusinessKind, readonly Section[]> = {
   retailer: SECTIONS,
-  installer: [MY_JOBS, marketplaceFor((id) => id === "listings" || id === "equipment" || id === "messages")],
+  installer: [MY_JOBS, marketplaceFor((id) => id === "listings" || id === "equipment" || id === "watching" || id === "messages")],
   inspector: [
     TODAY,
     { id: "inspections", label: "Inspections", pages: [{ id: "inspections", label: "Inspections", href: "/design/inspections" }] },
-    marketplaceFor((id) => id === "equipment" || id === "my-equipment" || id === "messages"),
+    marketplaceFor((id) => id === "equipment" || id === "my-equipment" || id === "watching" || id === "messages"),
     CONNECTIONS,
   ],
 };

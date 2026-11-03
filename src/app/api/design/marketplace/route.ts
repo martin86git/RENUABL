@@ -1,9 +1,11 @@
+import { after } from "next/server";
 import { marketClosed, marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import { cleanListingInput } from "@/lib/domain/design/marketplace";
 import { todayInMarket } from "@/lib/domain/market";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { loadPrefs } from "@/lib/server/design-after-sale-repo";
 import { createListing, listListings } from "@/lib/server/design-marketplace-repo";
+import { alertNewListing, withWatches } from "@/lib/server/design-market-watch-repo";
 import { allow } from "@/lib/server/rate-limit";
 
 /** GET → { listings, base }: every open listing, this business's own and those it bid on; and its base, for distance. */
@@ -15,7 +17,7 @@ export async function GET() {
     const [listings, prefs] = await Promise.all([listListings(who.member.businessId), loadPrefs(who.member.businessId)]);
     return Response.json({
       ok: true,
-      listings,
+      listings: await withWatches(who.member, "listing", listings),
       base: prefs.places.base ? { lat: prefs.places.base.lat, lng: prefs.places.base.lng } : null,
     });
   });
@@ -38,6 +40,8 @@ export async function POST(request: Request) {
     const input = cleanListingInput(read.body, todayInMarket());
     if (!input.ok) return Response.json(input, { status: 422 });
     const made = await createListing(who.member, jobId, input);
+    // Those whose job alerts it matches are emailed once the answer has gone back.
+    if (made.ok) after(() => alertNewListing(made.id).catch((e) => console.error("job alerts failed", e instanceof Error ? e.message : e)));
     return made.ok
       ? Response.json({ ok: true, id: made.id })
       : Response.json({ ok: false, message: made.message }, { status: made.status });

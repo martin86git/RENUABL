@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { LAUNCH, SHOW_COUNT_FROM, cleanRoles, countLine, inviteMail, launchWords, marketplaceOpen, rolesNote } from "./marketplace-launch";
+import {
+  LAUNCH,
+  SHOW_COUNT_FROM,
+  cleanRoles,
+  closesIn,
+  countLine,
+  inviteMail,
+  launchWords,
+  marketplaceOpen,
+  rolesNote,
+  servedFeed,
+} from "./marketplace-launch";
 import { MARKETPLACE_PAGES, SECTIONS, pageAt } from "./sections";
 
 describe("the Marketplace's launch switch", () => {
@@ -39,6 +50,33 @@ describe("the waiting list", () => {
     const body = decodeURIComponent(mail.split("&body=")[1]);
     expect(body).toContain("https://www.renuabl.com.au/design");
     expect(body).toContain("Sunrise Solar");
+  });
+});
+
+describe("the example feed", () => {
+  it("says how long is left as an auction does", () => {
+    expect(closesIn(5 * 1440 + 4 * 60)).toEqual({ words: "5d 4h left", soon: false });
+    expect(closesIn(18 * 60 + 5)).toEqual({ words: "18h 5m left", soon: true });
+    expect(closesIn(42)).toEqual({ words: "42m left", soon: true });
+    expect(closesIn(0.5)).toEqual({ words: "Closing now", soon: true });
+    expect(closesIn(0)).toEqual({ words: "Closed", soon: false });
+  });
+
+  it("serves open jobs within the distance, soonest closing first", () => {
+    const jobs = [
+      { id: "a", km: 6, minutesLeft: 3000 },
+      { id: "b", km: 40, minutesLeft: 100 },
+      { id: "c", km: 14, minutesLeft: 600 },
+      { id: "d", km: 5, minutesLeft: 0 },
+    ];
+    expect(servedFeed(jobs, 25).map((j) => j.id)).toEqual(["c", "a"]);
+    expect(servedFeed(jobs, null).map((j) => j.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("is honest that bids are sealed and the address comes with winning", () => {
+    expect(LAUNCH.feedRules.join(" ")).toMatch(/only the seller sees your price/);
+    expect(LAUNCH.feedRules.join(" ")).toMatch(/address .* once your bid is chosen/);
+    expect(LAUNCH.feedNote).toMatch(/made-up/);
   });
 });
 

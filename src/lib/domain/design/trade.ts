@@ -58,6 +58,9 @@ export interface TradeItem {
   /** For the seller: how many businesses have asked about it, and how many conversations have lines unread. */
   threads: number;
   unread: number;
+  /** How many people are watching it (never who), and whether the person reading is (market-alerts.ts). */
+  watching?: number;
+  watched?: boolean;
 }
 
 export interface TradeMessage {

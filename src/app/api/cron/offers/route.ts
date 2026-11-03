@@ -3,6 +3,7 @@ import { noteUnfinishedBriefs } from "@/lib/server/brief-hubspot";
 import { sendHealthReminders } from "@/lib/server/health-reminders";
 import { processOffers } from "@/lib/server/offers-engine";
 import { sendInstallReminders } from "@/lib/server/design-reminders";
+import { remindWatchers } from "@/lib/server/design-market-watch-repo";
 
 /**
  * Vercel cron (vercel.json): moves lapsed offers on to the next partner and
@@ -25,5 +26,10 @@ export async function GET(request: Request) {
     console.error("installation reminders failed", e instanceof Error ? e.message : e);
     return 0;
   });
-  return Response.json({ ok: true, ...offers, healthReminders, unfinishedBriefs, installReminders });
+  // The Marketplace: a watched job closing tomorrow that the watcher's business hasn't bid on.
+  const watchReminders = await remindWatchers().catch((e) => {
+    console.error("watch reminders failed", e instanceof Error ? e.message : e);
+    return 0;
+  });
+  return Response.json({ ok: true, ...offers, healthReminders, unfinishedBriefs, installReminders, watchReminders });
 }

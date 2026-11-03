@@ -888,6 +888,26 @@ create table if not exists design_bids (
   at timestamptz not null default now(),
   unique (listing_id, business_id)
 );
+-- Watching on the Marketplace (domain/design/market-alerts.ts): a person's own watch on a job listing or an item of
+-- equipment (its count shown to everyone, never who), and when they were last emailed about it.
+create table if not exists design_watches (
+  kind text not null,
+  target_id text not null,
+  business_id text not null references businesses(id) on delete cascade,
+  email text not null,
+  at timestamptz not null default now(),
+  reminded_at timestamptz,
+  primary key (kind, target_id, business_id, email)
+);
+create index if not exists design_watches_person on design_watches(business_id, email);
+-- A person's job alerts: new listings near the business's base emailed to them.
+create table if not exists design_market_alerts (
+  business_id text not null references businesses(id) on delete cascade,
+  email text not null,
+  alert jsonb not null,
+  updated_at timestamptz not null default now(),
+  primary key (business_id, email)
+);
 -- The Marketplace's equipment trading (domain/design/trade.ts): spare stock a business puts up, its photos (redrawn,
 -- nothing but the picture kept), and the conversations between the seller and each business that asks about it.
 create table if not exists design_trade_items (

@@ -35,6 +35,7 @@ import {
   type ListingDetail,
 } from "@/lib/services/marketplace";
 import { PATHS, PageHead, ui } from "./design-shell";
+import { JobAlertsCard, WatchButton, watchingLine } from "./market-watch";
 
 const money = (n: number) => `$${n.toLocaleString("en-AU")}`;
 /** Suburb zoom: an area a few kilometres across, so the map shows where the work is without showing the home. */
@@ -114,6 +115,7 @@ export function MarketplacePage({ view }: { view: "browse" | "mine" | "bids" }) 
             : "Listings you've bid on, and where each stands."}
       </p>
       {view === "browse" && data && !data.base && <BaseNote what="job" onSaved={(base) => setData((d) => d && { ...d, base })} />}
+      {view === "browse" && data && <JobAlertsCard hasBase={Boolean(data.base)} />}
       {problem && (
         <p className="rounded-md bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
           {problem}
@@ -179,7 +181,7 @@ export function BaseNote({ what, onSaved }: { what: "job" | "item"; onSaved: (ba
   );
 }
 
-function ListingCard({ listing: l, km, today }: { listing: Listing; km: number | null; today: string }) {
+export function ListingCard({ listing: l, km, today }: { listing: Listing; km: number | null; today: string }) {
   const closing = closesWords(l, today);
   return (
     <Link href={marketplacePath(l.id)} className="group block">
@@ -219,6 +221,11 @@ function ListingCard({ listing: l, km, today }: { listing: Listing; km: number |
             {STATE_WORDS[l.status]}
           </span>
         )}
+        {!l.mine && (
+          <span className="absolute bottom-3 right-3 z-10">
+            <WatchButton kind="listing" id={l.id} watched={Boolean(l.watched)} watching={l.watching ?? 0} round />
+          </span>
+        )}
         <div className="absolute inset-x-0 bottom-0 p-4">
           <p className="text-[44px] font-light leading-none tabular-nums text-ink">
             {l.system.kw ? l.system.kw.toFixed(1) : "–"}
@@ -252,7 +259,8 @@ function ListingCard({ listing: l, km, today }: { listing: Listing; km: number |
           <span className="font-semibold text-ink">{l.guide ? `${money(l.guide)} guide` : "Open to offers"}</span>
           <span className="text-muted">
             {" "}
-            · {l.bids} {l.bids === 1 ? "bid" : "bids"} · {l.business}
+            · {l.bids} {l.bids === 1 ? "bid" : "bids"}
+            {watchingLine(l.watching) ? ` · ${watchingLine(l.watching)}` : ""} · {l.business}
           </span>
         </p>
       </div>
@@ -337,7 +345,13 @@ export function ListingPage({ id }: { id: string }) {
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">{l.title}</h1>
             <p className="mt-1 text-sm text-ink-2">
               Listed by {l.business} · {closesWords(l, today)} · {l.bids} {l.bids === 1 ? "bid" : "bids"}
+              {l.mine && watchingLine(l.watching) ? ` · ${watchingLine(l.watching)}` : ""}
             </p>
+            {!l.mine && l.status === "open" && (
+              <div className="mt-3">
+                <WatchButton kind="listing" id={l.id} watched={Boolean(l.watched)} watching={l.watching ?? 0} />
+              </div>
+            )}
             <Breakdown listing={l} />
             <dl className="mt-5 grid gap-x-6 gap-y-2 border-t border-line pt-4 text-sm sm:grid-cols-[auto_1fr]">
               {facts.map(([k, v]) => (

@@ -36,6 +36,7 @@ import {
   type ItemDetail,
 } from "@/lib/services/trade";
 import { PATHS, PageHead, ui } from "./design-shell";
+import { WatchButton, watchingLine } from "./market-watch";
 import { BaseNote } from "./marketplace";
 
 const DISTANCE_KEY = "renuabl.design.trade-distance";
@@ -179,7 +180,7 @@ export function TradePage({ view }: { view: "browse" | "mine" }) {
 }
 
 /** An item as a photo card, the way things for sale are shown: the photo square, the price, what it is, where. */
-function ItemCard({ item: i, km }: { item: TradeItem; km: number | null }) {
+export function ItemCard({ item: i, km }: { item: TradeItem; km: number | null }) {
   return (
     <Link href={itemPath(i.id)} className="group block">
       <div className="relative aspect-square overflow-hidden rounded-xl bg-surface-2 ring-1 ring-line transition group-hover:ring-forest">
@@ -201,6 +202,11 @@ function ItemCard({ item: i, km }: { item: TradeItem; km: number | null }) {
             {STATE[i.status].label}
           </span>
         )}
+        {!i.mine && (
+          <span className="absolute bottom-2 right-2">
+            <WatchButton kind="item" id={i.id} watched={Boolean(i.watched)} watching={i.watching ?? 0} round />
+          </span>
+        )}
         {i.mine && i.unread > 0 && (
           <span className="absolute right-2 top-2 rounded-full bg-sun-line px-2 py-0.5 text-[11px] font-semibold text-white">
             {i.unread} new
@@ -214,6 +220,7 @@ function ItemCard({ item: i, km }: { item: TradeItem; km: number | null }) {
           {i.qty > 1 ? `${i.qty} available · ` : ""}
           {i.suburb}
           {km !== null ? ` · ${km} km` : ""}
+          {watchingLine(i.watching) ? ` · ${watchingLine(i.watching)}` : ""}
         </p>
       </div>
     </Link>
@@ -323,7 +330,13 @@ export function ItemPage({ id }: { id: string }) {
             </p>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
               <MapPin className="size-4" aria-hidden /> {i.suburb} · {listedWords(i.createdAt)} · {i.business}
+              {i.mine && watchingLine(i.watching) ? ` · ${watchingLine(i.watching)}` : ""}
             </p>
+            {!i.mine && (i.status === "available" || i.status === "pending") && (
+              <div className="mt-3">
+                <WatchButton kind="item" id={i.id} watched={Boolean(i.watched)} watching={i.watching ?? 0} />
+              </div>
+            )}
             <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-5 gap-y-1.5 text-sm">
               {[
                 ["Kind", i.category],

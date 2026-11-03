@@ -20,3 +20,10 @@ export const listingPicturePath = (id: string) => `${BASE}/${encodeURIComponent(
 /** Where the business works from, for distances (/api/design/base; the Job map's base). */
 export const saveBase = (base: import("@/lib/domain/design/job-map").Place | null) =>
   ask<{ base: import("@/lib/domain/design/job-map").Place | null }>("/api/design/base", { method: "PUT", body: { base } });
+
+/** Watching a job listing or an item of equipment (market-alerts.ts), and this person's job alerts. */
+export const setWatched = (kind: import("@/lib/domain/design/market-alerts").WatchKind, id: string, on: boolean) =>
+  ask<{ watched: boolean }>(kind === "listing" ? `${BASE}/watch` : "/api/design/trade/watch", { method: "POST", body: { id, on } });
+export const loadJobAlert = () => ask<{ alert: import("@/lib/domain/design/market-alerts").JobAlert }>(`${BASE}/alerts`);
+export const saveJobAlert = (alert: import("@/lib/domain/design/market-alerts").JobAlert) =>
+  ask<{ alert: import("@/lib/domain/design/market-alerts").JobAlert }>(`${BASE}/alerts`, { method: "PUT", body: { alert } });

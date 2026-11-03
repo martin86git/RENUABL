@@ -3,6 +3,7 @@ import { cleanItemInput } from "@/lib/domain/design/trade";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { loadPrefs } from "@/lib/server/design-after-sale-repo";
 import { createItem, listItems, placeOf, tradeThreads, tradeUnread } from "@/lib/server/design-trade-repo";
+import { withWatches } from "@/lib/server/design-market-watch-repo";
 import { allow } from "@/lib/server/rate-limit";
 
 /**
@@ -19,7 +20,11 @@ export async function GET(request: Request) {
     if (new URL(request.url).searchParams.get("threads") === "1")
       return Response.json({ ok: true, threads: await tradeThreads(who.member.businessId) });
     const [items, prefs] = await Promise.all([listItems(who.member.businessId), loadPrefs(who.member.businessId)]);
-    return Response.json({ ok: true, items, base: prefs.places.base ? { lat: prefs.places.base.lat, lng: prefs.places.base.lng } : null });
+    return Response.json({
+      ok: true,
+      items: await withWatches(who.member, "item", items),
+      base: prefs.places.base ? { lat: prefs.places.base.lat, lng: prefs.places.base.lng } : null,
+    });
   });
 }
 
