@@ -13,14 +13,14 @@ import {
   matchesSearch,
   nextStates,
   plannerOrder,
-  serviceBriefing,
   serviceFocusWords,
   waitingDays,
   type PlannerFilter,
   type ServiceCase,
   type ServiceState,
 } from "@/lib/domain/design/service";
-import { listService, raiseService, shortDate, updateService } from "@/lib/services/crm";
+import type { CaseBrief, TimelineKind } from "@/lib/domain/design/service-brief";
+import { listService, raiseService, serviceBrief, shortDate, updateService } from "@/lib/services/crm";
 import type { ServiceLine } from "@/lib/server/design-service-repo";
 import type { SolDesignShown } from "@/lib/domain/design/sol-designs";
 import { SOL_CHANGED, SOL_TOGGLE, askSol } from "@/lib/services/sol";
@@ -117,7 +117,7 @@ function History({ c }: { c: ServiceCase }) {
 
 /** One turn of the Service conversation: Sol turned to a case, or a question and his answer. */
 type Turn =
-  | { id: number; kind: "focus"; customer: string; title: string }
+  | { id: number; kind: "focus"; caseId: string; customer: string; title: string }
   | { id: number; kind: "ask"; q: string; a: { text: string; more: boolean; designs?: SolDesignShown[] } | null };
 
 /** The cases waiting, in a line each: what Sol is told on the Service screen while no case is picked. */
@@ -132,12 +132,17 @@ function pipelineWords(cases: readonly ServiceLine[]): string {
   ].join("\n");
 }
 
+/** A case's brief as the screen holds it: loading, read, or why it couldn't be. */
+type BriefState = CaseBrief | "loading" | { problem: string };
+const isBrief = (b: BriefState | undefined): b is CaseBrief => Boolean(b && typeof b === "object" && "brief" in b);
+
 /**
  * /design/service (3 Nov 2026, Martin): Sol's chat, as on Today, with the service cases down the right. Picking a case
- * turns the conversation to that deal: a line in the chat says so, Sol is asked to bring the member up to speed the
- * first time it is picked in the visit, and every question after goes with the case, its history, its earlier cases and
- * the deal's id (his deal_details adds the record, the system and the as-built). The picked card opens to its history
- * and what can be done to it. Each change is written on the deal; nothing is sent to the customer.
+ * turns the conversation to that deal: Sol opens on the case (the issue, what the customer wrote in, what the team has
+ * done, and Pending with what it waits on), and every question after goes with the case, its history, its earlier cases
+ * and the deal's id (his deal_details adds the record, the system and the as-built). The picked card opens to the Issue
+ * and the Solution Sol recommends, then what can be done to it. Each change is written on the deal; nothing is sent to
+ * the customer.
  */
 export function ServicePlanner() {
   const [cases, setCases] = useState<ServiceLine[] | null>(null);
@@ -147,7 +152,7 @@ export function ServicePlanner() {
   const [picked, setPicked] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [asking, setAsking] = useState(false);
-  const briefed = useRef(new Set<string>());
+  const [briefs, setBriefs] = useState<Record<string, BriefState>>({});
   /** Each turn its own number. */
   const turnNo = useRef(0);
   const end = useRef<HTMLDivElement>(null);
@@ -163,7 +168,17 @@ export function ServicePlanner() {
     [cases, filter, find],
   );
   const count = (s: ServiceState) => (cases ?? []).filter((c) => c.state === s).length;
-  const replace = (next: ServiceCase) => setCases((all) => (all ?? []).map((c) => (c.id === next.id ? { ...c, ...next } : c)));
+  /** Reads a case's brief: what the customer said, what the team did, and Sol's issue, solution and Pending. */
+  const loadBrief = useCallback(async (id: string) => {
+    setBriefs((b) => ({ ...b, [id]: isBrief(b[id]) ? b[id] : "loading" }));
+    const res = await serviceBrief(id);
+    setBriefs((b) => ({ ...b, [id]: res.ok ? { words: res.words, timeline: res.timeline, brief: res.brief } : { problem: res.message } }));
+    window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
+  }, []);
+  const replace = (next: ServiceCase) => {
+    setCases((all) => (all ?? []).map((c) => (c.id === next.id ? { ...c, ...next } : c)));
+    void loadBrief(next.id);
+  };
   const focus = cases?.find((c) => c.id === picked) ?? null;
   const talking = turns.length > 0;
 
@@ -197,15 +212,13 @@ export function ServicePlanner() {
     setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a } : t)));
   };
 
-  /** Turns the conversation to a case: said in the chat, and Sol brings them up to speed the first time. */
+  /** Turns the conversation to a case: Sol opens on it, read once a visit and again whenever it changes. */
   const pick = (c: ServiceLine) => {
     if (picked === c.id) return setPicked(null);
     setPicked(c.id);
-    setTurns((t) => [...t, { id: ++turnNo.current, kind: "focus", customer: c.customer, title: c.title }]);
-    if (!briefed.current.has(c.id) && !asking) {
-      briefed.current.add(c.id);
-      void ask(serviceBriefing(c.customer), c);
-    } else window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
+    setTurns((t) => [...t, { id: ++turnNo.current, kind: "focus", caseId: c.id, customer: c.customer, title: c.title }]);
+    if (!isBrief(briefs[c.id])) void loadBrief(c.id);
+    else window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
   };
 
   const box = (
@@ -252,12 +265,17 @@ export function ServicePlanner() {
             <div className="mx-auto w-full max-w-2xl flex-1 space-y-7 pb-4 pt-2" aria-live="polite">
               {turns.map((t) =>
                 t.kind === "focus" ? (
-                  <div key={t.id} className="flex items-center gap-3 text-xs text-muted">
-                    <span className="h-px flex-1 bg-line" />
-                    <span className="inline-flex items-center gap-1.5">
-                      <Wrench className="size-3.5 text-sun-line" aria-hidden /> Now on {t.customer} · {t.title}
-                    </span>
-                    <span className="h-px flex-1 bg-line" />
+                  <div key={t.id} className="space-y-5">
+                    <div className="flex items-center gap-3 text-xs text-muted">
+                      <span className="h-px flex-1 bg-line" />
+                      <span className="inline-flex items-center gap-1.5">
+                        <Wrench className="size-3.5 text-sun-line" aria-hidden /> Now on {t.customer} · {t.title}
+                      </span>
+                      <span className="h-px flex-1 bg-line" />
+                    </div>
+                    <SolSays>
+                      <CaseInChat state={briefs[t.caseId]} customer={t.customer} />
+                    </SolSays>
                   </div>
                 ) : (
                   <div key={t.id} className="space-y-4">
@@ -371,12 +389,13 @@ export function ServicePlanner() {
                         ? `resolved ${shortDate(c.resolvedAt)}`
                         : `waiting ${days} day${days === 1 ? "" : "s"}`}
                     </p>
-                    <p className={clsx("mt-1.5 text-[13px] text-ink", !on && "line-clamp-2")}>{c.issue}</p>
+                    {!on && <p className="mt-1.5 line-clamp-2 text-[13px] text-ink">{c.issue}</p>}
                     {latest && !on && <p className="mt-1 truncate text-xs text-ink-2">Latest: {latest.text}</p>}
                   </button>
                   {on && (
                     <div className="border-t border-line px-3.5 pb-3.5 pt-3 text-[13px]">
-                      <div className="space-y-1 text-ink-2">
+                      <IssueAndSolution c={c} state={briefs[c.id]} />
+                      <div className="mt-4 space-y-1 border-t border-line pt-3 text-ink-2">
                         {c.phone && (
                           <a href={`tel:${c.phone.replace(/\s/g, "")}`} className="flex items-center gap-1.5 hover:text-ink">
                             <Phone className="size-3.5" aria-hidden /> {c.phone}
@@ -390,7 +409,7 @@ export function ServicePlanner() {
                         {c.address && <p className="truncate">{c.address}</p>}
                         <p className="text-xs text-muted">
                           {STAGE_LABELS[c.stage]}
-                          {c.installDate && ` · installed ${shortDate(c.installDate)}`}
+                          {c.installDate && ` · install day ${shortDate(c.installDate)}`}
                           {c.installer && ` · ${c.installer}`} · raised by {who(c.raisedBy)}
                         </p>
                       </div>
@@ -400,7 +419,6 @@ export function ServicePlanner() {
                           Open deal
                         </Link>
                       </div>
-                      <History c={c} />
                       <CaseActions c={c} onChange={replace} />
                     </div>
                   )}
@@ -410,6 +428,131 @@ export function ServicePlanner() {
           </ul>
         </div>
       </aside>
+    </div>
+  );
+}
+
+/** A small coloured header over a part of a case: red for the issue, green for the solution. */
+function Header({ tone, children }: { tone: "issue" | "solution" | "plain"; children: React.ReactNode }) {
+  return (
+    <p
+      className={clsx(
+        "text-[11px] font-semibold uppercase tracking-[0.12em]",
+        tone === "issue" ? "text-danger" : tone === "solution" ? "text-positive" : "text-muted",
+      )}
+    >
+      {children}
+    </p>
+  );
+}
+
+/** Words Sol wrote as lines starting "- " drawn as a list; anything else as it is. */
+function Lines({ text }: { text: string }) {
+  const lines = text
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (!lines.some((l) => /^[-•]\s/.test(l))) return <p className="whitespace-pre-wrap">{text}</p>;
+  return (
+    <ul className="list-disc space-y-1 pl-4">
+      {lines.map((l, i) => (
+        <li key={i}>{l.replace(/^[-•]\s+/, "")}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** The picked card's top: the Issue in red with Sol's summary, and the Solution he recommends in green. */
+function IssueAndSolution({ c, state }: { c: ServiceLine; state: BriefState | undefined }) {
+  const brief = isBrief(state) ? state.brief : null;
+  const loading = state === undefined || state === "loading";
+  return (
+    <div className="space-y-3">
+      <div>
+        <Header tone="issue">Issue</Header>
+        <div className="mt-1 text-[13px] leading-relaxed text-ink">
+          <Lines text={brief?.issue ?? c.issue} />
+        </div>
+      </div>
+      <div>
+        <Header tone="solution">Solution</Header>
+        <div className="mt-1 text-[13px] leading-relaxed text-ink">
+          {brief?.solution ? (
+            <Lines text={brief.solution} />
+          ) : loading ? (
+            <p className="text-muted">Sol is working out what to recommend…</p>
+          ) : (
+            <p className="text-muted">
+              {brief ? "Sol can't recommend one just now. Ask him in the chat." : (state as { problem: string }).problem}
+            </p>
+          )}
+        </div>
+        {brief?.solution && <p className="mt-1.5 text-[11px] text-muted">Sol&apos;s recommendation: check it before acting on it.</p>}
+      </div>
+    </div>
+  );
+}
+
+const STEP_WORDS: Record<TimelineKind, string> = {
+  raised: "Raised",
+  case: "Case",
+  reply: "Replied",
+  email: "Emailed",
+  call: "Called",
+  note: "Note",
+};
+
+/** Sol opening on a case: the issue, what the customer wrote in, what the team has done, and Pending. */
+function CaseInChat({ state, customer }: { state: BriefState | undefined; customer: string }) {
+  const first = customer.split(/\s+/)[0] || customer;
+  if (state === undefined || state === "loading") return <SolThinking />;
+  if (!isBrief(state)) return <p className="text-[15px] text-ink">{state.problem}</p>;
+  const { words, timeline, brief } = state;
+  return (
+    <div className="space-y-5 text-[15px] leading-relaxed text-ink">
+      <div>
+        <Header tone="issue">Issue</Header>
+        <div className="mt-1">
+          <Lines text={brief.issue} />
+        </div>
+      </div>
+      <div>
+        <Header tone="plain">What {first} wrote in</Header>
+        {words.length ? (
+          <ul className="mt-2 space-y-2">
+            {words.map((w, i) => (
+              <li key={i} className="max-w-[90%]">
+                <p className="mb-1 text-xs text-muted">
+                  {shortDate(w.at)} · {w.via === "chat" ? "in the chat" : `on a call, logged by ${w.by}`}
+                </p>
+                <p className="whitespace-pre-wrap rounded-[18px] rounded-bl-md bg-surface-2 px-4 py-2.5 text-[14px]">{w.text}</p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-1 text-[14px] text-ink-2">Nothing from {first} on record. The case was raised by the team.</p>
+        )}
+      </div>
+      <div>
+        <Header tone="plain">What we&apos;ve done</Header>
+        <ol className="mt-2 space-y-2.5 border-l border-line pl-4">
+          {timeline.map((t, i) => (
+            <li key={i} className="relative text-[14px]">
+              <span className="absolute -left-[21px] top-1.5 size-2 rounded-full bg-line" aria-hidden />
+              <p className="text-xs text-muted">
+                {shortDate(t.at)} · {STEP_WORDS[t.kind]} · {t.by}
+              </p>
+              <p className="whitespace-pre-wrap">{t.text}</p>
+            </li>
+          ))}
+        </ol>
+        {timeline.length === 1 && <p className="mt-2 text-[14px] text-ink-2">Nothing done on it since.</p>}
+      </div>
+      <div className="flex flex-wrap items-baseline gap-2">
+        <span className="rounded-full bg-sun px-2.5 py-0.5 text-xs font-semibold text-sun-ink">Pending</span>
+        <p className="text-[14px]">{brief.pending}</p>
+      </div>
+      <p className="text-[13px] text-ink-2">The Solution Sol recommends is on the case. Ask him anything about it below.</p>
     </div>
   );
 }

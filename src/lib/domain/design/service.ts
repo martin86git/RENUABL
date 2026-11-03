@@ -196,7 +196,3 @@ export function serviceFocusWords(c: ServiceFocus, all: readonly ServiceCase[]):
     `For the deal's record, system and what was installed (serials), use deal_details with deal id ${c.jobId}.`,
   ].join("\n");
 }
-
-/** What is asked of Sol when a case is picked, so the conversation turns to it at once. */
-export const serviceBriefing = (customer: string) =>
-  `Bring me up to speed on ${customer.split(/\s+/)[0] || customer}'s service case: what's wrong, what's been done so far, and what I should do next.`;

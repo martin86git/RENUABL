@@ -6,7 +6,6 @@ import {
   openCaseFor,
   plannerOrder,
   recordLine,
-  serviceBriefing,
   serviceFocusWords,
   toResolve,
   waitingDays,
@@ -116,8 +115,5 @@ describe("what Sol is told about a case", () => {
     expect(words).toContain("Panel clip loose");
     expect(words).not.toContain("another deal");
     expect(words).toContain("deal_details with deal id job_a");
-  });
-  it("asks to be brought up to speed by first name", () => {
-    expect(serviceBriefing("Casey Sample")).toMatch(/^Bring me up to speed on Casey's service case/);
   });
 });

@@ -246,3 +246,6 @@ export const writeUpCall = (jobId: string, lines: import("@/lib/domain/design/ca
     text: string;
     changes: import("@/lib/domain/design/prepared").DetailChange[];
   }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call-notes`, { method: "POST", body: { lines } });
+/** A service case at a glance: what the customer said, what the team has done, and Sol's issue, solution and what it waits on. */
+export const serviceBrief = (id: string) =>
+  ask<import("@/lib/domain/design/service-brief").CaseBrief>(`/api/design/service/${encodeURIComponent(id)}/brief`);
