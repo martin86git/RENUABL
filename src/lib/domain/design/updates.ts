@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-03",
+    area: "Everywhere",
+    words: "RENUABL Marketplace has its own blue button beside the sections, and Sol a new mark: the sun rising in a speech bubble.",
+  },
+  {
+    day: "2026-11-03",
     area: "Design tool",
     words: "Nearmap pictures in the designer: choose a capture date, fetch it once, and see what your plan includes at the roof.",
   },

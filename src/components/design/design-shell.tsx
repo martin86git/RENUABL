@@ -114,6 +114,64 @@ const PHONE_TABS: [PhoneTab, PhoneTab, PhoneTab] = [
  * the frame (a page shown inside another). Signed out, a screen that needs an account (`needsAccount`) asks for one;
  * the others (the design tool, its settings) are shown bare, as they work on the device without one.
  */
+/** RENUABL Marketplace's mark: two roofs joined, the businesses of the network side by side. */
+export function MarketplaceMark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M2.5 12 8 7l5.5 5" />
+      <path d="M10.5 12 16 7l5.5 5" />
+      <path d="M4.5 12v6h15v-6" />
+    </svg>
+  );
+}
+
+/**
+ * RENUABL Marketplace beside the sections (3 Nov 2026, Martin: the add-on network should read as a sub-brand, apart
+ * from the business's own work): its mark white in a blue round, beside it RENUABL in small black capitals over
+ * Marketplace in the signal orange, no pill behind them, and "Soon" while it is closed.
+ */
+function MarketplaceButton({ href, lit, waiting }: { href: string; lit: boolean; waiting: number }) {
+  return (
+    <Link
+      href={href}
+      aria-current={lit ? "true" : undefined}
+      aria-label={`RENUABL Marketplace${marketplaceOpen() ? "" : ", coming soon"}`}
+      className="group flex shrink-0 items-center gap-2.5 rounded-full pr-1"
+    >
+      <span
+        className={clsx(
+          "relative flex size-10 items-center justify-center rounded-full bg-market text-white shadow-[0_4px_14px_rgba(24,73,169,0.3)] transition group-hover:brightness-110",
+          lit && "ring-2 ring-market/40 ring-offset-2 ring-offset-canvas",
+        )}
+      >
+        <MarketplaceMark className="size-5" />
+        {waiting > 0 && (
+          <span
+            className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-sun-line ring-2 ring-canvas"
+            aria-label={`${waiting} waiting`}
+          />
+        )}
+      </span>
+      <span className="flex flex-col text-left leading-none">
+        <span className="text-[9px] font-medium uppercase tracking-[0.26em] text-ink">RENUABL</span>
+        <span className="mt-1 flex items-baseline gap-1.5 text-[15px] font-semibold tracking-[-0.01em] text-sun-line">
+          Marketplace
+          {!marketplaceOpen() && <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted">Soon</span>}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
 export function DesignShell(props: { children: React.ReactNode; compact?: boolean; needsAccount?: boolean; bare?: boolean }) {
   return (
     <DesignAccountGate>
@@ -335,47 +393,37 @@ function Shell({
                       <PenTool className="size-5" aria-hidden />
                     </Link>
                   ) : null;
-                // The Marketplace is an add-on, the network, still coming soon (3 Nov 2026, Martin): it sits after Sol,
-                // lightly shaded apart from the sections of the business's own work.
-                const market = sec.id === "marketplace";
+                // The Marketplace is the network, not the business's own work: it has its own button beside the pill.
+                if (sec.id === "marketplace") return design;
                 return [
                   design,
-                  market && retail ? (
-                    <span key="sol" className="mx-1">
-                      <SolNavButton />
-                    </span>
-                  ) : null,
                   <Link
                     key={sec.id}
                     href={sec.pages[0].href}
                     aria-current={lit ? "true" : undefined}
                     className={clsx(
                       "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
-                      market
-                        ? clsx(
-                            "bg-sun text-sun-ink ring-1 ring-sun-line/20",
-                            lit && "shadow-[0_1px_3px_rgba(11,11,12,0.12)] ring-sun-line/50",
-                          )
-                        : lit
-                          ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]"
-                          : "text-ink-2 hover:text-ink",
+                      lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
                     )}
                   >
                     {sec.label}
-                    {market && !marketplaceOpen() && (
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] opacity-70">Soon</span>
-                    )}
                     {waiting > 0 && <span className="size-1.5 rounded-full bg-sun-line" aria-label={`${waiting} waiting`} />}
                   </Link>,
                 ];
               })}
-              {/* Sol, the other tool, as a graphite round: before the Marketplace, else at the far end. */}
-              {retail && !sections.some((s) => s.id === "marketplace") && (
+              {/* Sol, the other tool, as the graphite round at the far end: the two rounds frame the sections. */}
+              {retail && (
                 <span className="ml-1">
                   <SolNavButton />
                 </span>
               )}
             </nav>
+            {(() => {
+              const market = sections.find((s) => s.id === "marketplace");
+              if (!market) return null;
+              const waiting = market.pages.reduce((n, p) => n + count(p.id), 0);
+              return <MarketplaceButton href={market.pages[0].href} lit={market.id === current.id} waiting={waiting} />;
+            })()}
             {retail && (
               <button
                 type="button"

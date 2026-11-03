@@ -98,6 +98,10 @@
   --sun-bright: #ff7a33;
   --sun-line: #ff5a1f;
   --sun-line-ink: #c24100;
+  /* RENUABL Marketplace, the network beside the business's own work (3 Nov 2026, Martin): its own blue, with the
+     signal orange in its mark and pale blue for the small RENUABL above its name. */
+  --market: #1849a9;
+  --market-ink: #b5d4f4;
   --positive: #128a57;
   --positive-soft: #e3f4ec;
   --warning: #a15c00;
@@ -320,6 +324,8 @@ html.sol-resizing .team-pop {
   --color-sun-bright: var(--sun-bright);
   --color-sun-line: var(--sun-line);
   --color-sun-line-ink: var(--sun-line-ink);
+  --color-market: var(--market);
+  --color-market-ink: var(--market-ink);
   --color-leaf: var(--leaf);
   --color-positive: var(--positive);
   --color-positive-soft: var(--positive-soft);
