@@ -44,13 +44,16 @@ export function MarketplaceLaunch() {
   const signedIn = Boolean(account?.signedIn && account.business);
   const page = (
     <div className="space-y-24 pb-16 sm:space-y-32">
-      <Hero />
-      <MarketplaceShowroom />
+      {/* The Marketplace itself in the first fold (3 Nov 2026, Martin): a short heading, then the showroom. */}
+      <div className="space-y-6 sm:space-y-8">
+        <Hero />
+        <MarketplaceShowroom compact />
+      </div>
       <Jobs />
       <Privacy />
       <Trade />
       <Network signedIn={signedIn} business={account?.signedIn ? (account.business?.name ?? null) : null} />
-      <section className="mx-auto max-w-2xl text-center">
+      <section id="waitlist" className="mx-auto max-w-2xl scroll-mt-24 text-center">
         <h2 className="text-[clamp(30px,4.5vw,52px)] font-light leading-[1.05] tracking-tight text-ink">Be there the day it opens.</h2>
         <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-ink-2">{LAUNCH.why}</p>
         <div className="mt-8">
@@ -80,9 +83,13 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   return <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-sun-line">{children}</p>;
 }
 
+/**
+ * The heading, kept short so the Marketplace itself is in the first fold (3 Nov 2026, Martin: "the marketplace must
+ * be seen immediately"): what it is, one line on it, and a way to the waiting list at the foot of the page.
+ */
 function Hero() {
   return (
-    <section className="relative pt-6 text-center sm:pt-12">
+    <section className="pt-1 text-center sm:pt-3">
       <p className="inline-flex items-center gap-2 rounded-full bg-surface px-3.5 py-1.5 text-[12px] font-medium text-ink-2 ring-1 ring-line">
         <span className="relative flex size-2">
           <span className="absolute inline-flex size-full rounded-full bg-sun-line opacity-60 motion-safe:animate-ping" />
@@ -90,14 +97,18 @@ function Hero() {
         </span>
         {LAUNCH.eyebrow}
       </p>
-      <h1 className="mx-auto mt-6 max-w-4xl text-[clamp(44px,8vw,104px)] font-light leading-[0.98] tracking-[-0.035em] text-ink">
+      <h1 className="mx-auto mt-4 max-w-4xl text-[clamp(34px,5vw,60px)] font-light leading-[1.02] tracking-[-0.03em] text-ink">
         {LAUNCH.headline}
       </h1>
-      <p className="mx-auto mt-6 max-w-2xl text-[17px] leading-relaxed text-ink-2 sm:text-lg">{LAUNCH.sub}</p>
-      <div className="mt-9">
-        <Waitlist />
+      <div className="mx-auto mt-3 flex max-w-3xl flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-5">
+        <p className="text-[15px] leading-relaxed text-ink-2">{LAUNCH.sub}</p>
+        <a
+          href="#waitlist"
+          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-sun-line px-5 text-[14px] font-medium text-white shadow-[0_8px_24px_-8px_var(--sun-line)] transition hover:brightness-105"
+        >
+          {LAUNCH.save} <ArrowRight className="size-4" aria-hidden />
+        </a>
       </div>
-      <NetworkPicture />
     </section>
   );
 }
@@ -116,7 +127,7 @@ function NetworkPicture() {
   const nodes = NODES;
   const links = LINKS;
   return (
-    <div className="relative mx-auto mt-16 max-w-5xl" aria-hidden>
+    <div className="relative mx-auto mt-10 max-w-5xl" aria-hidden>
       <svg viewBox="0 0 1000 260" className="w-full">
         <defs>
           <radialGradient id="mk-glow">
@@ -461,7 +472,8 @@ function Network({ signedIn, business }: { signedIn: boolean; business: string |
           {LAUNCH.networkHeadline}
         </h2>
       </div>
-      <div className="mt-12 grid gap-px overflow-hidden rounded-2xl bg-line ring-1 ring-line sm:grid-cols-3">
+      <NetworkPicture />
+      <div className="mt-10 grid gap-px overflow-hidden rounded-2xl bg-line ring-1 ring-line sm:grid-cols-3">
         {LAUNCH.networkPoints.map((p, i) => {
           const Icon = [LayoutGrid, Send, Package][i];
           return (

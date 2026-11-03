@@ -19,19 +19,27 @@ import { MarketplaceFeed } from "./marketplace-feed";
 type View = (typeof LAUNCH.showroom.views)[number]["id"];
 type Role = (typeof LAUNCH.showroom.roles)[number]["id"];
 
-export function MarketplaceShowroom() {
+/** `compact`: straight under the page's heading, with no heading of its own. */
+export function MarketplaceShowroom({ compact = false }: { compact?: boolean }) {
   const copy = LAUNCH.showroom;
   const [view, setView] = useState<View>("jobs");
   const [role, setRole] = useState<Role>("installer");
   return (
     <section>
-      <div className="mx-auto max-w-3xl text-center">
-        <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-market">{copy.eyebrow}</p>
-        <h2 className="mt-3 text-[clamp(32px,5vw,60px)] font-light leading-[1.02] tracking-[-0.03em] text-ink">{copy.headline}</h2>
-        <p className="mx-auto mt-5 max-w-2xl text-[16px] leading-relaxed text-ink-2">{copy.sub}</p>
-      </div>
+      {!compact && (
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-market">{copy.eyebrow}</p>
+          <h2 className="mt-3 text-[clamp(32px,5vw,60px)] font-light leading-[1.02] tracking-[-0.03em] text-ink">{copy.headline}</h2>
+          <p className="mx-auto mt-5 max-w-2xl text-[16px] leading-relaxed text-ink-2">{copy.sub}</p>
+        </div>
+      )}
 
-      <div className="mt-10 overflow-hidden rounded-[22px] bg-canvas shadow-[0_30px_80px_-30px_rgba(11,11,12,0.35)] ring-1 ring-line">
+      <div
+        className={clsx(
+          "overflow-hidden rounded-[22px] bg-canvas shadow-[0_30px_80px_-30px_rgba(11,11,12,0.35)] ring-1 ring-line",
+          !compact && "mt-10",
+        )}
+      >
         {/* The Marketplace's own menu, as it sits at the top of the pad once you're in. */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-line bg-surface px-4 py-3 sm:px-5">
           <span className="flex items-center gap-2 text-[13px] font-semibold text-market">
