@@ -97,7 +97,7 @@ const SERVICE_CASE = `window.__clip = "wait"; (async () => {
 const SHOTS = [
   { name: "today", path: "/design", width: 1440, height: 900, wait: 5000 },
   { name: "today-sol", path: "/design", width: 1440, height: 900, wait: 5000, clip: SOL_DAY },
-  { name: "deals", path: "/design/sales/pipelines", width: 1440, height: 900, wait: 5000 },
+  { name: "deals", path: "/design/sales/pipelines", width: 1440, height: 900, wait: 14000 },
   { name: "approvals", path: "/design/procurement/pre-approvals", width: 1440, height: 900, wait: 4500 },
   { name: "calendar", path: "/design/procurement/scheduler", width: 1440, height: 900, wait: 4500 },
   { name: "upcoming", path: "/design/installations", width: 1440, height: 900, wait: 4500 },

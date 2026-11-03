@@ -4,18 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Check, Clock, LifeBuoy, PencilRuler, Sparkles } from "lucide-react";
+import { ArrowRight, Brain, Check, Clock, LifeBuoy, PencilRuler, Sparkles } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
-import {
-  ENTERPRISE_FROM,
-  MAX_SELF_SERVE_SEATS,
-  PLAN_WORDS,
-  TOKEN_PACKS,
-  dollars,
-  packPriceCents,
-  priceFor,
-  type BillingInterval,
-} from "@/lib/domain/design/plans";
+import { ENTERPRISE_FROM, TOKEN_PACKS, dollars, packPriceCents, type BillingInterval } from "@/lib/domain/design/plans";
 import {
   CLOSING,
   COMING_SOON,
@@ -27,9 +18,9 @@ import {
   ASK_ANYTHING,
   ASK_DEMO,
   BIG_THREE,
-  OLD_WAY,
   PRICING,
   SALES_HERO,
+  CRM_SHOT,
   SERVICE_SHOT,
   SOL,
   UPGRADE,
@@ -47,14 +38,16 @@ import {
 } from "./designer-showcase";
 import { Reveal } from "./front-hero";
 import { SolBadge, SolIcon } from "./sol-icon";
+import { MarketplaceMark } from "./marketplace-bar";
 
 /**
  * The sign-up page for solar businesses (`/design` signed out; copy in `domain/design/sales-page.ts`, prices in
- * `plans.ts`). It sells: the price against the old way, one deal from enquiry to service shown on real screens (made-up
+ * `plans.ts`). It sells: one deal from enquiry to service shown on real screens (made-up
  * example data) and the product drawn at work, Sol, everything else in the box, what's coming, and the pricing. Starting
  * the plan is an email here, then Stripe's own secure page for the card, then straight back.
  */
 export function SalesPage({ notice, signedIn = false }: { notice?: string | null; signedIn?: boolean }) {
+  useFoldScroll();
   return (
     <div className="theme-studio min-h-dvh bg-canvas text-ink">
       <Header signedIn={signedIn} />
@@ -62,7 +55,6 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       <Hero />
       <Upgrade />
       <BigThree />
-      <OldWay />
       <Journey />
       <SolSection />
       <Everything />
@@ -72,7 +64,7 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       <Faq />
       <Closing />
       <StickySignUp />
-      <footer className="border-t border-line px-5 py-10 text-center text-xs text-muted">
+      <footer className="snap-end border-t border-line px-5 py-10 text-center text-xs text-muted">
         <p>RENUABL · Reburthed Pty Ltd · ABN 96 662 374 905</p>
         <p className="mt-2 space-x-4">
           <Link href="/design/terms" className="hover:text-ink">
@@ -91,6 +83,74 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       </footer>
     </div>
   );
+}
+
+/**
+ * One scroll, one fold (3 Nov 2026, Martin: "a scroll should push me into the next fold", the way Apple's pages move).
+ * On a screen at least 1024px wide, a turn of the wheel or a swipe on the trackpad glides the page to the next section
+ * (`.snap-start`, each a fold tall where it can be), clear of the 4rem top bar, and the rest of that gesture's
+ * momentum is swallowed so it moves one fold, not three. A section taller than the screen scrolls as usual until its
+ * end is in view. A box that scrolls inside the page keeps its own scrolling; keys, phones and pinch zoom are left
+ * alone. CSS snapping alone didn't do it: it pulls back to the fold you were on after a small scroll.
+ */
+function useFoldScroll() {
+  useEffect(() => {
+    const wide = window.matchMedia("(min-width: 1024px)");
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const TOP = 64;
+    const QUIET_MS = 220;
+    let gliding = false;
+    let lastWheel = 0;
+    let glideEnds = 0;
+
+    const tops = () =>
+      Array.from(document.querySelectorAll<HTMLElement>(".snap-start"))
+        .filter((el) => el.getClientRects().length > 0)
+        .map((el) => Math.round(el.getBoundingClientRect().top + window.scrollY - TOP))
+        .sort((a, b) => a - b);
+
+    const scrollsInside = (target: EventTarget | null, down: boolean) => {
+      for (let el = target instanceof Element ? target : null; el && el !== document.body; el = el.parentElement) {
+        const { overflowY } = getComputedStyle(el);
+        if ((overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight + 1) {
+          if (down ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0) return true;
+        }
+      }
+      return false;
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      if (!wide.matches || e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const now = performance.now();
+      const quiet = now - lastWheel > QUIET_MS;
+      lastWheel = now;
+      // The tail of the gesture that moved the page: swallowed until the glide is done and the wheel goes quiet.
+      if (gliding) {
+        if (now < glideEnds || !quiet) {
+          e.preventDefault();
+          return;
+        }
+        gliding = false;
+      }
+      const down = e.deltaY > 0;
+      if (scrollsInside(e.target, down)) return;
+      const y = window.scrollY;
+      const fold = window.innerHeight - TOP;
+      const all = tops();
+      const target = down ? all.find((t) => t > y + 2) : [...all].reverse().find((t) => t < y - 2);
+      if (target === undefined) return;
+      // Still inside a section well over a screen tall: let it scroll until its edge is within about a fold. A slide a
+      // little taller than the screen (its content a few pixels over) still moves as one.
+      if (Math.abs(target - y) > fold * 1.2) return;
+      e.preventDefault();
+      gliding = true;
+      glideEnds = now + (still.matches ? 150 : 700);
+      window.scrollTo({ top: target, behavior: still.matches ? "auto" : "smooth" });
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => window.removeEventListener("wheel", onWheel);
+  }, []);
 }
 
 function Header({ signedIn }: { signedIn: boolean }) {
@@ -133,7 +193,7 @@ function Header({ signedIn }: { signedIn: boolean }) {
             </Link>
           )}
           <a
-            href="#start"
+            href="#pricing"
             className="inline-flex h-9 items-center whitespace-nowrap rounded-full bg-sun-line px-3.5 text-[13px] font-semibold text-white shadow-sm hover:brightness-105 sm:px-4"
           >
             {SALES_HERO.cta}
@@ -145,7 +205,19 @@ function Header({ signedIn }: { signedIn: boolean }) {
 }
 
 /** The email box that starts the plan: Stripe's page next, then back. */
-function TrialForm({ seats = 1, interval = "month", dark = false }: { seats?: number; interval?: BillingInterval; dark?: boolean }) {
+function TrialForm({
+  seats = 1,
+  interval = "month",
+  dark = false,
+  label = SALES_HERO.cta,
+  id = "plan",
+}: {
+  seats?: number;
+  interval?: BillingInterval;
+  dark?: boolean;
+  label?: string;
+  id?: string;
+}) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -168,11 +240,11 @@ function TrialForm({ seats = 1, interval = "month", dark = false }: { seats?: nu
           dark ? "bg-white/10 ring-1 ring-white/15" : "bg-surface shadow-lift ring-1 ring-line",
         )}
       >
-        <label className="sr-only" htmlFor={`trial-email-${dark ? "d" : "l"}-${seats}`}>
+        <label className="sr-only" htmlFor={`trial-email-${id}`}>
           Work email
         </label>
         <input
-          id={`trial-email-${dark ? "d" : "l"}-${seats}`}
+          id={`trial-email-${id}`}
           type="email"
           required
           autoComplete="email"
@@ -189,7 +261,7 @@ function TrialForm({ seats = 1, interval = "month", dark = false }: { seats?: nu
           disabled={busy}
           className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-sun-line px-5 text-[15px] font-semibold text-white hover:brightness-105 disabled:opacity-80"
         >
-          {busy ? "Opening secure checkout…" : SALES_HERO.cta}
+          {busy ? "Opening secure checkout…" : label}
           {!busy && <ArrowRight className="size-4" aria-hidden />}
         </button>
       </div>
@@ -231,6 +303,22 @@ function Screen({
   );
 }
 
+/** "Sign up": every one on the page goes to the pricing, where the plan is chosen (3 Nov 2026, Martin). */
+function SignUpLink({ dark = false }: { dark?: boolean }) {
+  return (
+    <a
+      href="#pricing"
+      className={clsx(
+        "inline-flex h-12 items-center gap-2 rounded-full px-7 text-[16px] font-semibold hover:brightness-105",
+        dark ? "bg-white text-ink" : "bg-sun-line text-white shadow-lift",
+      )}
+    >
+      {SALES_HERO.cta}
+      <ArrowRight className="size-4" aria-hidden />
+    </a>
+  );
+}
+
 function VisualOf({ visual }: { visual: Visual }) {
   if (visual.kind === "shot") return <Screen src={visual.src} alt={visual.alt} />;
   return (
@@ -250,7 +338,11 @@ function VisualOf({ visual }: { visual: Visual }) {
 
 function Hero() {
   return (
-    <section id="start" className="relative isolate overflow-x-clip" aria-labelledby="hero">
+    <section
+      id="start"
+      className="relative isolate overflow-x-clip snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center"
+      aria-labelledby="hero"
+    >
       <div
         aria-hidden
         className="absolute inset-x-0 top-0 -z-10 h-[80vh]"
@@ -268,7 +360,7 @@ function Hero() {
           </h1>
           <p className="mt-7 max-w-xl text-[18px] leading-relaxed text-ink-2">{SALES_HERO.sub}</p>
           <div className="mt-8 max-w-xl">
-            <TrialForm />
+            <SignUpLink />
             <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-ink-2">
               {SALES_HERO.small.map((s) => (
                 <li key={s} className="inline-flex items-center gap-1.5">
@@ -285,26 +377,6 @@ function Hero() {
         </div>
       </div>
     </section>
-  );
-}
-
-/** RENUABL Marketplace's mark: two roofs joined (as on its button in the app's menu). */
-function MarketMark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinejoin="round"
-      strokeLinecap="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M2.5 12 8 7l5.5 5" />
-      <path d="M10.5 12 16 7l5.5 5" />
-      <path d="M4.5 12v6h15v-6" />
-    </svg>
   );
 }
 
@@ -325,9 +397,9 @@ function BigThree() {
                 tick: "text-sun-line",
                 link: "text-sun-line hover:brightness-110",
               }
-            : p.id === "service"
+            : p.id === "crm" || p.id === "service"
               ? {
-                  band: "bg-surface text-ink",
+                  band: p.id === "crm" ? "bg-surface text-ink" : "bg-canvas text-ink",
                   eyebrow: "text-ink-2",
                   body: "text-ink-2",
                   tick: "text-sun-line",
@@ -348,11 +420,15 @@ function BigThree() {
                     tick: "text-market-ink",
                     link: "text-white hover:text-white/80",
                   };
-        const linkClass = clsx("mt-8 inline-flex items-center gap-1.5 text-[15px] font-semibold", look.link);
+        const linkClass = clsx("mt-6 inline-flex items-center gap-1.5 text-[15px] font-semibold", look.link);
         const mark =
           p.id === "designer" ? (
             <span className="grid size-12 place-items-center rounded-full bg-sun-line text-white">
               <PencilRuler className="size-6" />
+            </span>
+          ) : p.id === "crm" ? (
+            <span className="grid size-12 place-items-center rounded-full bg-primary text-white">
+              <Brain className="size-6" />
             </span>
           ) : p.id === "service" ? (
             <span className="grid size-12 place-items-center rounded-full bg-primary text-white">
@@ -364,7 +440,7 @@ function BigThree() {
             </span>
           ) : (
             <span className="grid size-12 place-items-center rounded-full bg-white text-market">
-              <MarketMark className="size-6" />
+              <MarketplaceMark className="size-6" />
             </span>
           );
         const visual =
@@ -373,6 +449,8 @@ function BigThree() {
               <AskDesignDemo label={ASK_DEMO.label} request={ASK_DEMO.request} reply={ASK_DEMO.reply} />
               <p className="mt-3 text-center text-xs text-muted">{ASK_DEMO.caption}</p>
             </div>
+          ) : p.id === "crm" ? (
+            <Screen src={CRM_SHOT.src} alt={CRM_SHOT.alt} />
           ) : p.id === "service" ? (
             <Screen src={SERVICE_SHOT.src} alt={SERVICE_SHOT.alt} />
           ) : p.id === "sol" ? (
@@ -388,25 +466,29 @@ function BigThree() {
         return (
           <section
             key={p.id}
-            id={p.id === "marketplace" ? "network" : p.id === "designer" ? "designer" : undefined}
-            className={clsx("scroll-mt-16 px-5 py-24 lg:px-8 lg:py-32", look.band)}
+            id={p.id === "marketplace" ? "network" : p.id === "designer" || p.id === "crm" || p.id === "service" ? p.id : undefined}
+            className={clsx(
+              "scroll-mt-16 px-5 py-20 lg:px-8 lg:py-24 snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center",
+              look.band,
+            )}
             aria-labelledby={`big-${p.id}`}
           >
-            <Reveal className="mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            {/* One fold (Martin): the words beside the picture, the picture given the larger share. */}
+            <Reveal className="mx-auto grid w-full max-w-[88rem] items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,0.68fr)_minmax(0,1.32fr)]">
               <div className={clsx(i % 2 === 1 && "lg:order-2")}>
                 <div className="flex items-center gap-4" aria-hidden>
                   {mark}
                   <span className={clsx("font-mono text-[13px]", look.eyebrow)}>0{i + 1}</span>
                 </div>
-                <p className={clsx("mt-8 text-[13px] font-medium uppercase tracking-[0.18em]", look.eyebrow)}>{p.eyebrow}</p>
-                <h2 id={`big-${p.id}`} className="mt-4 text-[clamp(36px,5vw,68px)] font-semibold leading-[0.98] tracking-[-0.04em]">
+                <p className={clsx("mt-6 text-[13px] font-medium uppercase tracking-[0.18em]", look.eyebrow)}>{p.eyebrow}</p>
+                <h2 id={`big-${p.id}`} className="mt-3 text-[clamp(32px,3.6vw,52px)] font-semibold leading-[1] tracking-[-0.04em]">
                   {p.title}
                 </h2>
-                <p className={clsx("mt-6 max-w-xl text-[18px] leading-relaxed", look.body)}>{p.body}</p>
-                <ul className="mt-7 grid max-w-xl gap-2.5 text-[15px]">
+                <p className={clsx("mt-5 text-[16px] leading-relaxed", look.body)}>{p.body}</p>
+                <ul className="mt-5 grid gap-2 text-[14px]">
                   {p.points.map((pt) => (
                     <li key={pt} className="flex items-start gap-2.5">
-                      <Check className={clsx("mt-1 size-4 shrink-0", look.tick)} aria-hidden />
+                      <Check className={clsx("mt-0.5 size-4 shrink-0", look.tick)} aria-hidden />
                       {pt}
                     </li>
                   ))}
@@ -432,36 +514,194 @@ function BigThree() {
   );
 }
 
-/** Everything a business gets, in one look, straight after the hero (`UPGRADE`). */
-function Upgrade() {
+/** How long each card of the upgrade stays on top before the next is dealt, ms. */
+const DECK_MS = 4500;
+
+/** What each card of the upgrade shows: a real screen where there is one, else the product drawn (made-up data). */
+function UpgradeVisual({ k }: { k: (typeof UPGRADE.items)[number]["key"] }) {
+  const shot = (src: string, alt: string, position = "object-top") => (
+    <Image src={src} alt={alt} fill sizes="(min-width: 1024px) 720px, 100vw" className={clsx("object-cover", position)} />
+  );
+  switch (k) {
+    case "crm":
+      return shot("/design/landing/deals.webp", "The smart CRM's pipeline, with each deal's temperature and who to call first");
+    case "sol":
+      return shot("/design/landing/today-sol.webp", "Sol writing up the day, the most pressing thing at the top");
+    case "design":
+      return (
+        <div className="absolute inset-0 overflow-hidden bg-canvas p-3">
+          <AskDesignDemo label={ASK_DEMO.label} request={ASK_DEMO.request} reply={ASK_DEMO.reply} />
+        </div>
+      );
+    case "proposals":
+      return <ProposalCardExample />;
+    case "service":
+      return shot("/design/landing/service-sol.webp", "A service case with Sol's summary and recommended next steps");
+    case "installs":
+      return shot("/design/landing/calendar.webp", "The install calendar with each week's capacity");
+    case "team":
+      return shot("/design/landing/sol-garage-wall.webp", "Team chat with Sol answering in the Installations channel");
+    case "market":
+      return (
+        <div className="absolute inset-0 grid place-items-center bg-market p-6">
+          <ListingRoofExample className="h-full w-auto max-w-full rounded-xl" />
+        </div>
+      );
+  }
+}
+
+/** A proposal as a customer opens it, drawn small: the business's own name and colour (a made-up business). */
+function ProposalCardExample() {
   return (
-    <section className="px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="upgrade">
-      <Reveal className="mx-auto w-full max-w-7xl">
-        <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">{UPGRADE.eyebrow}</p>
-        <h2 id="upgrade" className="mt-4 text-[clamp(40px,6vw,80px)] font-semibold leading-[0.95] tracking-[-0.045em]">
-          {UPGRADE.headline}
-        </h2>
-        <p className="mt-5 max-w-2xl text-[18px] leading-relaxed text-ink-2">{UPGRADE.sub}</p>
-        <ul className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {UPGRADE.items.map((item, i) => (
-            <li
-              key={item.key}
-              className={clsx("flex flex-col rounded-2xl p-6", i === 1 ? "bg-primary text-white" : "bg-surface ring-1 ring-line")}
-            >
-              <span className={clsx("font-mono text-[12px]", i === 1 ? "text-sun-bright" : "text-sun-line")}>
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <h3 className="mt-6 text-[20px] font-semibold leading-tight tracking-tight">{item.title}</h3>
-              <p className={clsx("mt-2 text-[15px] leading-relaxed", i === 1 ? "text-white/75" : "text-ink-2")}>{item.body}</p>
-              {"soon" in item && item.soon && (
-                <span className="mt-4 self-start rounded-full bg-sun px-2.5 py-0.5 text-[11px] font-medium text-sun-ink">
-                  {COMING_SOON_LABEL}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      </Reveal>
+    <div className="absolute inset-0 overflow-hidden bg-[#f4efe8] p-5 sm:p-7">
+      <div className="mx-auto h-full max-w-md overflow-hidden rounded-xl bg-white shadow-lift ring-1 ring-black/5">
+        <div className="flex items-center justify-between bg-[#1f4d3a] px-5 py-4 text-white">
+          <span className="text-[14px] font-semibold">Sunrise Solar (example)</span>
+          <span className="text-[11px] text-white/70">Proposal for Olivia</span>
+        </div>
+        <div className="space-y-3 p-5 text-[13px] text-ink">
+          <p className="text-[18px] font-semibold tracking-tight">Solar and a battery for your home</p>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {[
+              ["8.07 kW", "solar"],
+              ["16 kWh", "battery"],
+              ["3", "systems to choose"],
+            ].map(([v, l]) => (
+              <div key={l} className="rounded-lg bg-[#1f4d3a]/5 px-2 py-2">
+                <p className="text-[15px] font-semibold tabular-nums">{v}</p>
+                <p className="text-[11px] text-muted">{l}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-baseline justify-between border-t border-line pt-3">
+            <span className="text-muted">You pay, after the rebate</span>
+            <span className="text-[18px] font-semibold tabular-nums">$14,980</span>
+          </div>
+          <span className="block rounded-lg bg-[#1f4d3a] py-2.5 text-center text-[13px] font-semibold text-white">
+            I&apos;d like to go ahead
+          </span>
+          <p className="text-[11px] text-muted">Example business and figures.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Everything a business gets, straight after the hero (`UPGRADE`; 3 Nov 2026, Martin: a list or cards on a page
+ * didn't show it, he wanted overlaid cards that show what each thing looks like). A deck of cards, each a real screen
+ * (or the product drawn), dealt one after another with the next two peeking behind; the list beside it says which is
+ * on top and jumps to any. Stops dealing while hovered, and doesn't move with reduced motion.
+ */
+function Upgrade() {
+  const items = UPGRADE.items;
+  const [at, setAt] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [still, setStill] = useState(false);
+  useEffect(() => {
+    const q = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const on = () => setStill(q.matches);
+    on();
+    q.addEventListener("change", on);
+    return () => q.removeEventListener("change", on);
+  }, []);
+  useEffect(() => {
+    if (paused || still) return;
+    const t = window.setTimeout(() => setAt((n) => (n + 1) % items.length), DECK_MS);
+    return () => window.clearTimeout(t);
+  }, [at, paused, still, items.length]);
+  const now = items[at];
+  return (
+    <section
+      className="relative isolate overflow-hidden bg-primary px-5 py-20 text-white lg:px-8 lg:py-24 snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center"
+      aria-labelledby="upgrade"
+    >
+      {/* The bar under the card on top fills as it waits to be dealt. */}
+      <style>{"@keyframes upgrade-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}"}</style>
+      <div
+        aria-hidden
+        className="absolute -right-40 top-10 -z-10 size-[40rem] rounded-full"
+        style={{ background: "radial-gradient(closest-side, rgba(255,90,31,0.22), rgba(255,90,31,0))" }}
+      />
+      <div
+        className="mx-auto grid w-full max-w-[88rem] items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,0.68fr)_minmax(0,1.32fr)]"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
+        <div>
+          <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-sun-bright">{UPGRADE.eyebrow}</p>
+          <h2 id="upgrade" className="mt-3 text-[clamp(36px,4.4vw,64px)] font-semibold leading-[0.95] tracking-[-0.045em]">
+            {UPGRADE.headline}
+          </h2>
+          <p className="mt-4 text-[16px] leading-relaxed text-white/70">{UPGRADE.sub}</p>
+          <ol className="mt-7 grid gap-1">
+            {items.map((item, i) => (
+              <li key={item.key}>
+                <button
+                  type="button"
+                  onClick={() => setAt(i)}
+                  aria-current={i === at}
+                  className={clsx(
+                    "relative flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2 text-left text-[15px] transition-colors",
+                    i === at ? "bg-white/10 text-white" : "text-white/55 hover:text-white",
+                  )}
+                >
+                  <span className={clsx("font-mono text-[12px]", i === at ? "text-sun-bright" : "text-white/35")}>
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="font-medium">{item.title}</span>
+                  {"soon" in item && item.soon && <span className="text-[11px] text-sun-bright">{COMING_SOON_LABEL}</span>}
+                  {i === at && !still && (
+                    <span
+                      key={`${at}-${paused}`}
+                      aria-hidden
+                      className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-sun-line"
+                      style={{
+                        animation: `upgrade-fill ${DECK_MS}ms linear forwards`,
+                        animationPlayState: paused ? "paused" : "running",
+                      }}
+                    />
+                  )}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+        {/* The deck: the card on top, the next two peeking up behind it. */}
+        <div className="relative min-w-0 pt-10">
+          <div className="relative aspect-[16/11] w-full">
+            {items.map((item, i) => {
+              const place = (i - at + items.length) % items.length;
+              const shown = place < 3;
+              return (
+                <div
+                  key={item.key}
+                  aria-hidden={place !== 0}
+                  className="absolute inset-0 transition-all duration-700 ease-out motion-reduce:transition-none"
+                  style={{
+                    transform: `translateY(${-place * 20}px) scale(${1 - place * 0.05})`,
+                    opacity: shown ? 1 - place * 0.25 : 0,
+                    zIndex: items.length - place,
+                    pointerEvents: place === 0 ? "auto" : "none",
+                  }}
+                >
+                  <div className="relative h-full w-full overflow-hidden rounded-2xl bg-surface shadow-[0_30px_80px_-25px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                    {shown && <UpgradeVisual k={item.key} />}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/55 to-transparent px-5 pb-4 pt-14 text-white sm:px-6">
+                      <p className="text-[12px] text-white/60 line-through decoration-sun-line">{item.was}</p>
+                      <p className="mt-1 text-[20px] font-semibold tracking-tight sm:text-[24px]">{item.title}</p>
+                      <p className="mt-0.5 max-w-xl text-[13px] text-white/80 sm:text-[14px]">{item.body}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="sr-only" aria-live="polite">
+            {now.title}: {now.body}
+          </p>
+        </div>
+      </div>
     </section>
   );
 }
@@ -474,37 +714,19 @@ function Upgrade() {
 function StickySignUp() {
   const [show, setShow] = useState(false);
   const [closed, setClosed] = useState(false);
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
     const hero = document.getElementById("start");
+    const pricing = document.getElementById("pricing");
     const closing = document.getElementById("closing");
     if (!hero || !("IntersectionObserver" in window)) return;
-    let heroOn = true;
-    let closingOn = false;
+    const on = new Map<Element, boolean>([[hero, true]]);
     const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (e.target === hero) heroOn = e.isIntersecting;
-        else closingOn = e.isIntersecting;
-      }
-      setShow(!heroOn && !closingOn);
+      for (const e of entries) on.set(e.target, e.isIntersecting);
+      setShow(![...on.values()].some(Boolean));
     });
-    io.observe(hero);
-    if (closing) io.observe(closing);
+    for (const el of [hero, pricing, closing]) if (el) io.observe(el);
     return () => io.disconnect();
   }, []);
-  const go = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setProblem(null);
-    const a = await startPlan({ email, seats: 1, interval: "month" });
-    if (a.ok && a.url) window.location.assign(a.url);
-    else {
-      setBusy(false);
-      setProblem(a.message ?? "That didn't go through.");
-    }
-  };
   if (closed) return null;
   return (
     <div
@@ -514,37 +736,19 @@ function StickySignUp() {
       )}
       aria-hidden={!show}
     >
-      <form
-        onSubmit={(e) => void go(e)}
-        className="mx-auto flex w-full max-w-4xl items-center gap-2 rounded-2xl bg-primary p-2 pl-4 text-white shadow-[0_20px_60px_-15px_rgba(11,11,12,0.6)] ring-1 ring-white/10 sm:gap-3 sm:pl-5"
-      >
-        <span className="hidden shrink-0 items-center gap-2 text-[15px] font-semibold md:flex">
-          <Sparkles className="size-4 text-sun-bright" aria-hidden />
-          Give your business a brain.
+      <div className="mx-auto flex w-full max-w-3xl items-center gap-3 rounded-2xl bg-primary p-2 pl-5 text-white shadow-[0_20px_60px_-15px_rgba(11,11,12,0.6)] ring-1 ring-white/10">
+        <span className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold">
+          <Sparkles className="size-4 shrink-0 text-sun-bright" aria-hidden />
+          <span className="truncate">Your whole solar business, in one platform.</span>
         </span>
-        <label className="sr-only" htmlFor="sticky-email">
-          Work email
-        </label>
-        <input
-          id="sticky-email"
-          type="email"
-          required
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Your work email"
+        <a
+          href="#pricing"
           tabIndex={show ? 0 : -1}
-          className="h-11 min-w-0 flex-1 rounded-xl bg-white/10 px-4 text-[16px] text-white outline-none placeholder:text-white/50"
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          tabIndex={show ? 0 : -1}
-          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl bg-sun-line px-4 text-[15px] font-semibold text-white hover:brightness-105 disabled:opacity-80"
+          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl bg-sun-line px-5 text-[15px] font-semibold text-white hover:brightness-105"
         >
-          {busy ? "Opening…" : SALES_HERO.cta}
-          {!busy && <ArrowRight className="size-4" aria-hidden />}
-        </button>
+          {SALES_HERO.cta}
+          <ArrowRight className="size-4" aria-hidden />
+        </a>
         <button
           type="button"
           onClick={() => setClosed(true)}
@@ -554,44 +758,14 @@ function StickySignUp() {
         >
           ×
         </button>
-      </form>
-      {problem && <p className="mx-auto mt-1 max-w-4xl text-center text-sm text-sun-bright">{problem}</p>}
+      </div>
     </div>
-  );
-}
-
-function OldWay() {
-  return (
-    <section className="bg-primary px-5 py-24 text-white lg:px-8 lg:py-32" aria-labelledby="old-way">
-      <Reveal className="mx-auto w-full max-w-6xl">
-        <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-sun-bright">{OLD_WAY.eyebrow}</p>
-        <h2 id="old-way" className="mt-5 max-w-4xl text-[clamp(36px,5.5vw,72px)] font-semibold leading-[1] tracking-[-0.035em]">
-          {OLD_WAY.headline}
-        </h2>
-        <p className="mt-6 max-w-2xl text-[18px] leading-relaxed text-white/70">{OLD_WAY.sub}</p>
-        <div className="mt-14 overflow-hidden rounded-2xl ring-1 ring-white/15">
-          <div className="grid grid-cols-[1.2fr_1fr_1fr] bg-white/5 px-5 py-3 text-[12px] font-medium uppercase tracking-[0.14em] text-white/60 sm:px-8">
-            <span />
-            <span className="text-sun-bright">RENUABL</span>
-            <span>The old way</span>
-          </div>
-          {OLD_WAY.rows.map((r) => (
-            <div key={r.what} className="grid grid-cols-[1.2fr_1fr_1fr] items-center gap-3 border-t border-white/10 px-5 py-5 sm:px-8">
-              <span className="text-[15px] text-white/80">{r.what}</span>
-              <span className="text-[clamp(20px,2.6vw,32px)] font-semibold tabular-nums tracking-tight text-white">{r.us}</span>
-              <span className="text-[clamp(16px,2vw,24px)] tabular-nums text-white/50 line-through decoration-white/30">{r.them}</span>
-            </div>
-          ))}
-        </div>
-        <p className="mt-5 max-w-3xl text-xs leading-relaxed text-white/45">{OLD_WAY.source}</p>
-      </Reveal>
-    </section>
   );
 }
 
 function Journey() {
   return (
-    <section id="journey" className="px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="journey-title">
+    <section id="journey" className="snap-start px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="journey-title">
       <Reveal className="mx-auto w-full max-w-4xl text-center">
         <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">How it works</p>
         <h2 id="journey-title" className="mt-5 text-[clamp(36px,5.5vw,72px)] font-semibold leading-[1] tracking-[-0.035em]">
@@ -614,7 +788,7 @@ function Journey() {
           ))}
         </ol>
       </Reveal>
-      <div className="mx-auto mt-20 w-full max-w-7xl space-y-24 lg:space-y-32">
+      <div className="mx-auto mt-20 w-full max-w-7xl space-y-24 lg:mt-0 lg:space-y-0">
         {JOURNEY.map((j, i) => {
           const label = (
             <p className="text-[13px] font-medium tabular-nums tracking-[0.18em] text-sun-line">
@@ -624,7 +798,11 @@ function Journey() {
           // The product drawn at work needs the whole width: its words go above it. A screenshot sits beside its words.
           if (j.visual.kind === "demo")
             return (
-              <article key={j.key} id={`step-${j.key}`} className="scroll-mt-24">
+              <article
+                key={j.key}
+                id={`step-${j.key}`}
+                className="snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center"
+              >
                 <Reveal className="mx-auto max-w-3xl text-center">
                   {label}
                   <h3 className="mt-4 text-[clamp(28px,3.6vw,46px)] font-semibold leading-[1.05] tracking-[-0.03em]">{j.title}</h3>
@@ -640,7 +818,7 @@ function Journey() {
             <article
               key={j.key}
               id={`step-${j.key}`}
-              className="grid scroll-mt-24 items-center gap-10 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16"
+              className="snap-start grid items-center gap-10 lg:min-h-[calc(100dvh-4rem)] lg:content-center lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16"
             >
               <Reveal className={clsx(flip && "lg:order-2")}>
                 {label}
@@ -660,7 +838,7 @@ function Journey() {
 
 function SolSection() {
   return (
-    <section id="sol" className="relative isolate overflow-x-clip px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="sol-title">
+    <section id="sol" className="snap-start relative isolate overflow-x-clip px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="sol-title">
       <div aria-hidden className="absolute inset-0 -z-10 bg-sun/60" />
       <div className="mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <Reveal>
@@ -703,7 +881,7 @@ function SolSection() {
 
 function Everything() {
   return (
-    <section className="px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="everything">
+    <section className="snap-start px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="everything">
       <Reveal className="mx-auto w-full max-w-6xl">
         <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">And all of this, included</p>
         <h2 id="everything" className="mt-5 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-semibold leading-[1.02] tracking-[-0.035em]">
@@ -733,7 +911,7 @@ function Everything() {
 
 function Soon() {
   return (
-    <section className="px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="soon">
+    <section className="snap-start px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="soon">
       <Reveal className="mx-auto w-full max-w-6xl">
         <h2 id="soon" className="text-[clamp(26px,3.4vw,40px)] font-semibold tracking-[-0.03em]">
           On the way
@@ -767,39 +945,57 @@ function Marketplace() {
     setState({ ok: a.ok, message: a.message ?? "" });
   };
   return (
-    <section id="marketplace" className="scroll-mt-16 bg-market px-5 py-24 text-white lg:px-8 lg:py-32" aria-labelledby="marketplace-title">
+    <section
+      id="marketplace"
+      className="snap-start scroll-mt-16 bg-surface px-5 py-24 lg:px-8 lg:py-32"
+      aria-labelledby="marketplace-title"
+    >
       <Reveal className="mx-auto w-full max-w-6xl">
-        <p className="inline-flex items-center gap-2.5 text-[13px] font-medium uppercase tracking-[0.18em] text-market-ink">
-          <span className="grid size-8 place-items-center rounded-full bg-white text-market" aria-hidden>
-            <MarketMark className="size-4" />
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <p className="flex items-center gap-4" aria-label="RENUABL Marketplace">
+            <span
+              className="grid size-16 place-items-center rounded-full bg-market text-white shadow-[0_8px_24px_rgba(24,73,169,0.3)]"
+              aria-hidden
+            >
+              <MarketplaceMark className="size-8" />
+            </span>
+            <span className="flex flex-col leading-none" aria-hidden>
+              <span className="text-[13px] font-medium uppercase tracking-[0.26em] text-ink">RENUABL</span>
+              <span className="mt-1.5 text-[36px] font-semibold tracking-[-0.02em] text-sun-line">Marketplace</span>
+            </span>
+          </p>
+          <span className="rounded-full bg-canvas px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-muted ring-1 ring-line">
+            {COMING_SOON_LABEL}
           </span>
-          {MARKETPLACE.eyebrow}
-        </p>
+        </div>
         <h2
           id="marketplace-title"
           className="mt-5 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-semibold leading-[1.02] tracking-[-0.035em]"
         >
           {MARKETPLACE.headline}
         </h2>
-        <p className="mt-5 max-w-2xl text-[18px] leading-relaxed text-white/80">{MARKETPLACE.sub}</p>
+        <p className="mt-5 max-w-2xl text-[18px] leading-relaxed text-ink-2">{MARKETPLACE.sub}</p>
         <div className="mt-12 grid gap-4 md:grid-cols-3">
           {MARKETPLACE.sides.map((s) => (
-            <div key={s.title} className="rounded-2xl bg-white/10 p-7 ring-1 ring-white/15">
+            <div key={s.title} className="rounded-2xl bg-canvas p-7 ring-1 ring-line">
               <h3 className="text-[20px] font-semibold">{s.title}</h3>
-              <p className="mt-3 text-[15px] leading-relaxed text-white/80">{s.body}</p>
+              <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{s.body}</p>
             </div>
           ))}
         </div>
-        <Link href="/design/marketplace" className="mt-8 inline-flex items-center gap-1.5 text-[15px] font-semibold hover:text-white/80">
+        <Link
+          href="/design/marketplace"
+          className="mt-8 inline-flex items-center gap-1.5 text-[15px] font-semibold text-market hover:underline"
+        >
           {MARKETPLACE.look}
           <ArrowRight className="size-4" aria-hidden />
         </Link>
         {state?.ok ? (
-          <p className="mt-10 text-[16px] text-market-ink">{state.message}</p>
+          <p className="mt-10 text-[16px] text-market">{state.message}</p>
         ) : (
           <form
             onSubmit={(e) => void go(e)}
-            className="mt-10 flex max-w-lg flex-col gap-2 rounded-2xl bg-white/10 p-1.5 ring-1 ring-white/15 sm:flex-row"
+            className="mt-10 flex max-w-lg flex-col gap-2 rounded-2xl bg-canvas p-1.5 ring-1 ring-line sm:flex-row"
           >
             <label className="sr-only" htmlFor="interest-email">
               Email
@@ -811,83 +1007,79 @@ function Marketplace() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Your work email"
-              className="h-12 min-w-0 flex-1 rounded-xl bg-transparent px-4 text-[16px] text-white outline-none placeholder:text-white/50"
+              className="h-12 min-w-0 flex-1 rounded-xl bg-transparent px-4 text-[16px] text-ink outline-none placeholder:text-muted"
             />
-            <button disabled={busy} className="h-12 rounded-xl bg-white px-5 text-[15px] font-semibold text-ink hover:bg-white/90">
+            <button disabled={busy} className="h-12 rounded-xl bg-market px-5 text-[15px] font-semibold text-white hover:brightness-110">
               {busy ? "Adding you…" : MARKETPLACE.cta}
             </button>
           </form>
         )}
-        {state && !state.ok && <p className="mt-2 text-sm text-market-ink">{state.message}</p>}
+        {state && !state.ok && <p className="mt-2 text-sm text-danger">{state.message}</p>}
       </Reveal>
     </section>
   );
 }
 
+/**
+ * The pricing, as a software pricing page (3 Nov 2026, Martin): Monthly and the 12-month plan side by side with
+ * Enterprise, nothing crossed out. Each plan's Sign up opens the email box under it and goes to Stripe's checkout; the
+ * 12-month plan is then chosen in Billing (it can't be bought at sign-up). Figures from `plans.ts` through `PRICING`.
+ */
 function Pricing() {
-  const [interval, setInterval] = useState<BillingInterval>("month");
-  const [seats, setSeats] = useState(3);
-  const price = priceFor(seats, interval);
+  const [open, setOpen] = useState<string | null>(null);
   return (
-    <section id="pricing" className="scroll-mt-16 px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="pricing-title">
+    <section id="pricing" className="snap-start scroll-mt-16 px-5 py-24 lg:px-8 lg:py-28" aria-labelledby="pricing-title">
       <Reveal className="mx-auto w-full max-w-6xl">
         <div className="text-center">
           <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">{PRICING.eyebrow}</p>
-          <h2 id="pricing-title" className="mt-5 text-[clamp(36px,5.5vw,72px)] font-semibold leading-[1] tracking-[-0.035em]">
+          <h2 id="pricing-title" className="mt-5 text-[clamp(36px,5vw,64px)] font-semibold leading-[1] tracking-[-0.035em]">
             {PRICING.headline}
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-[18px] text-ink-2">{PRICING.sub}</p>
-          <div className="mt-8 inline-flex rounded-full bg-surface-2 p-1 text-[14px] font-medium" role="group" aria-label="Billing">
-            {(["month", "year"] as const).map((iv) => (
-              <button
-                key={iv}
-                onClick={() => setInterval(iv)}
-                aria-pressed={interval === iv}
-                className={clsx("rounded-full px-5 py-2", interval === iv ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink")}
-              >
-                {iv === "month" ? "Monthly" : "Yearly"}
-                {iv === "year" && (
-                  <span className="ml-2 rounded-full bg-sun px-2 py-0.5 text-[11px] font-semibold text-sun-ink">Save 20%</span>
-                )}
-              </button>
-            ))}
-          </div>
         </div>
 
-        <div className="mt-12 grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
-          <div className="rounded-3xl bg-surface p-7 shadow-lift ring-2 ring-sun-line sm:p-10">
-            <div className="flex flex-wrap items-end justify-between gap-6">
-              <div>
-                <p className="text-[14px] font-medium text-ink-2">RENUABL, everything</p>
-                <p className="mt-2 flex items-baseline gap-2">
-                  <span className="text-[64px] font-semibold leading-none tracking-[-0.04em] tabular-nums">
-                    {dollars(interval === "month" ? 2900 : Math.round(priceFor(1, "year").chargeCents / 12))}
-                  </span>
-                  <span className="text-[15px] text-ink-2">a user a month{interval === "year" ? ", billed yearly" : ""}</span>
-                </p>
-                <p className="mt-1 text-[13px] text-muted">{PLAN_WORDS.gst}</p>
-              </div>
-              <div className="w-full sm:w-64">
-                <label htmlFor="seats" className="flex justify-between text-[14px] font-medium">
-                  <span>Users</span>
-                  <span className="tabular-nums">{seats}</span>
-                </label>
-                <input
-                  id="seats"
-                  type="range"
-                  min={1}
-                  max={MAX_SELF_SERVE_SEATS}
-                  value={seats}
-                  onChange={(e) => setSeats(Number(e.target.value))}
-                  className="mt-3 w-full accent-[var(--sun-line)]"
-                />
-                <p className="mt-3 text-[14px] text-ink-2">
-                  <strong className="tabular-nums text-ink">{dollars(price.chargeCents)}</strong>{" "}
-                  {interval === "month" ? "a month" : `a year, saving ${dollars(price.savedCents)}`}
-                </p>
+        <div className="mt-12 grid gap-5 lg:grid-cols-3">
+          {PRICING.plans.map((p) => (
+            <div
+              key={p.key}
+              className={clsx(
+                "flex flex-col rounded-3xl bg-surface p-7 shadow-lift sm:p-8",
+                p.featured ? "ring-2 ring-sun-line" : "ring-1 ring-line",
+              )}
+            >
+              <p className="text-[15px] font-semibold">{p.name}</p>
+              <p className="mt-5 flex items-baseline gap-2">
+                <span className="text-[56px] font-semibold leading-none tracking-[-0.04em] tabular-nums">{p.price}</span>
+                <span className="text-[15px] text-ink-2">{p.per}</span>
+              </p>
+              <p className="mt-3 text-[14px] leading-relaxed text-ink-2">{p.note}</p>
+              <div className="mt-auto pt-8">
+                {open === p.key ? (
+                  <TrialForm id={p.key} label="Continue" />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setOpen(p.key)}
+                    className={clsx(
+                      "h-12 w-full rounded-xl text-[15px] font-semibold",
+                      p.featured ? "bg-sun-line text-white hover:brightness-105" : "bg-primary text-white hover:brightness-110",
+                    )}
+                  >
+                    {SALES_HERO.cta}
+                  </button>
+                )}
               </div>
             </div>
-            <ul className="mt-8 grid gap-3 sm:grid-cols-2">
+          ))}
+          <Enterprise />
+        </div>
+
+        <p className="mt-5 text-center text-[14px] text-ink-2">{PRICING.firstMonth}</p>
+
+        <div className="mt-12 grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <div className="rounded-3xl bg-surface p-7 ring-1 ring-line sm:p-8">
+            <p className="text-[15px] font-semibold">{PRICING.includesTitle}</p>
+            <ul className="mt-5 grid gap-3 sm:grid-cols-2">
               {PRICING.includes.map((p) => (
                 <li key={p} className="flex gap-2.5 text-[15px]">
                   <Check className="mt-0.5 size-4 shrink-0 text-sun-line" aria-hidden />
@@ -895,24 +1087,20 @@ function Pricing() {
                 </li>
               ))}
             </ul>
-            <div className="mt-8 rounded-2xl bg-canvas p-5">
-              <p className="text-[15px] font-semibold">Design jobs: {PLAN_WORDS.token}</p>
-              <p className="mt-1 text-[14px] leading-relaxed text-ink-2">{PRICING.tokens}</p>
-              <p className="mt-3 flex flex-wrap gap-2 text-[13px]">
-                {TOKEN_PACKS.map((p) => (
-                  <span key={p} className="rounded-full bg-surface px-3 py-1 tabular-nums ring-1 ring-line">
-                    {p} jobs · {dollars(packPriceCents(p))}
-                  </span>
-                ))}
-              </p>
-            </div>
-            <div className="mt-8">
-              <TrialForm seats={seats} interval={interval} />
-              <p className="mt-3 text-[13px] leading-relaxed text-ink-2">{PRICING.start}</p>
-            </div>
           </div>
-          <Enterprise />
+          <div className="rounded-3xl bg-surface p-7 ring-1 ring-line sm:p-8">
+            <p className="text-[15px] font-semibold">{PRICING.tokensTitle}</p>
+            <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{PRICING.tokens}</p>
+            <p className="mt-4 flex flex-wrap gap-2 text-[13px]">
+              {TOKEN_PACKS.map((p) => (
+                <span key={p} className="rounded-full bg-canvas px-3 py-1 tabular-nums ring-1 ring-line">
+                  {p} jobs · {dollars(packPriceCents(p))}
+                </span>
+              ))}
+            </p>
+          </div>
         </div>
+        <p className="mx-auto mt-6 max-w-2xl text-center text-[13px] leading-relaxed text-muted">{PRICING.start}</p>
       </Reveal>
     </section>
   );
@@ -975,7 +1163,7 @@ function Enterprise() {
 
 function Faq() {
   return (
-    <section className="px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="faq">
+    <section className="snap-start px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="faq">
       <Reveal className="mx-auto w-full max-w-3xl">
         <h2 id="faq" className="text-[clamp(26px,3.4vw,40px)] font-semibold tracking-[-0.03em]">
           Questions
@@ -1002,14 +1190,14 @@ function Faq() {
 
 function Closing() {
   return (
-    <section className="bg-primary px-5 py-24 text-white lg:px-8 lg:py-32" aria-labelledby="closing">
+    <section className="snap-start bg-primary px-5 py-24 text-white lg:px-8 lg:py-32" aria-labelledby="closing">
       <Reveal className="mx-auto w-full max-w-3xl text-center">
         <h2 id="closing" className="text-[clamp(40px,6.5vw,84px)] font-semibold leading-[0.98] tracking-[-0.04em]">
           {CLOSING.headline}
         </h2>
         <p className="mt-6 text-[18px] text-white/70">{CLOSING.sub}</p>
-        <div className="mx-auto mt-10 max-w-xl text-left">
-          <TrialForm dark />
+        <div className="mt-10">
+          <SignUpLink dark />
         </div>
       </Reveal>
     </section>

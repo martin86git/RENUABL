@@ -1,10 +1,10 @@
 /**
  * The sign-up page for solar businesses (`/design` signed out; Martin, 1 Nov 2026: "Pay less. Do more."): what it
  * says, in one place so it can be checked (`sales-page.test.ts`). Loud in tone, true in every line (Australian Consumer
- * Law): no "best" or "first", no rival named, a price compared only with its source and date, every coming-soon thing
+ * Law): no "best" or "first", no rival named or compared with (3 Nov 2026, Martin: "we don't need to compare"), every coming-soon thing
  * labelled, and every screenshot a real screen of the product with made-up example data.
  */
-import { ENTERPRISE_FROM, PLAN_WORDS, TOKEN_CENTS, dollars, SEAT_MONTHLY_CENTS } from "./plans";
+import { COMMIT_MONTHS, COMMIT_SEAT_CENTS, ENTERPRISE_FROM, PLAN_WORDS, SEAT_MONTHLY_CENTS, dollars } from "./plans";
 
 /**
  * The hero (3 Nov 2026, Martin, after "Pay less. Do more." and "Just ask. It's done." didn't land: witty, not a feature
@@ -16,14 +16,20 @@ export const SALES_HERO = {
   /** Said in two lines, the second lit in the signal orange. */
   headline: ["Solar just", "got a brain."],
   sub: "RENUABL is the all-in-one platform for solar businesses, with AI built into every part of it. Ask it to design a roof, line up your day, check a standard or write the follow-up, and watch it happen.",
-  cta: PLAN_WORDS.start,
-  small: [`${PLAN_WORDS.seat}, inc GST`, "Up and running today", "Cancel any time"],
+  cta: "Sign up",
+  small: ["Everything in one platform", "Up and running today", "Cancel any time"],
 } as const;
 
 /**
  * Everything a business gets, early and in one look (3 Nov 2026, Martin: "a slide that very quickly details everything
  * you get... upgrade your business"). Each line something RENUABL does today; the Marketplace is marked coming soon.
  */
+/** The smart CRM band's real screen: the pipeline with each deal's clock and temperature (made-up customers). */
+export const CRM_SHOT = {
+  src: "/design/landing/deals.webp",
+  alt: "RENUABL's smart CRM: deals with their clock, temperature and who to call next (example data)",
+} as const;
+
 /** The service band's real screen: a case picked, Sol's summary and recommended next steps (made-up customer). */
 export const SERVICE_SHOT = {
   src: "/design/landing/service-sol.webp",
@@ -33,28 +39,57 @@ export const SERVICE_SHOT = {
 export const UPGRADE = {
   eyebrow: "What you get",
   headline: "Your business, upgraded.",
-  sub: "Everything a solar business runs on, in one place, with AI in every part of it.",
+  sub: "Out with the old way. Here's what changes the day you start.",
   items: [
-    { key: "crm", title: "A smart CRM", body: "Every lead, deal and customer, with the next thing to do already lined up." },
+    {
+      key: "crm",
+      was: "A CRM you feed by hand",
+      title: "A smart CRM",
+      body: "It writes up your calls, drafts your emails and tells you who to ring next.",
+    },
     {
       key: "sol",
+      was: "Googling the rules at 9pm",
       title: "An AI expert on the team",
-      body: "Sol knows solar, your deals and the rules of the trade, and does the legwork.",
+      body: "Sol knows solar, your deals and the standards, and shows his sources.",
     },
     {
       key: "design",
-      title: "A design tool that designs",
-      body: "Type what you want, or press once for three designs, priced as they're drawn.",
+      was: "Drawing every roof from scratch",
+      title: "A design tool that designs itself",
+      body: "Ask for 8 kW and a battery, or press once for three designs, priced as they're drawn.",
     },
-    { key: "proposals", title: "Proposals that are yours", body: "Your logo, your colours, your terms. Signed online, deposit asked for." },
-    { key: "service", title: "Service, made easy", body: "Every customer issue summed up by Sol, with the steps he'd take next." },
+    {
+      key: "proposals",
+      was: "Quotes pasted into a template",
+      title: "Proposals that are yours",
+      body: "Your brand, your terms, signed online with the deposit asked for.",
+    },
+    {
+      key: "service",
+      was: "Hunting through old texts",
+      title: "Service, summed up by Sol",
+      body: "Every customer issue in a line, with the steps he'd take next.",
+    },
     {
       key: "installs",
+      was: "Spreadsheets and phone tag",
       title: "Orders and installs, handled",
-      body: "A signed job becomes the order, the booking and the job card for your crew.",
+      body: "A signed job becomes the order, the booking and the job card.",
     },
-    { key: "team", title: "Your team, in one chat", body: "Channels, direct messages and @Sol, right beside your deals." },
-    { key: "market", title: "RENUABL Marketplace", body: "Jobs, installers and spare stock across the industry.", soon: true },
+    {
+      key: "team",
+      was: "A group chat on your phone",
+      title: "Your team, beside the work",
+      body: "Channels, direct messages and @Sol, right next to your deals.",
+    },
+    {
+      key: "market",
+      was: "Ringing around for a crew",
+      title: "RENUABL Marketplace",
+      body: "Jobs, installers and spare stock across the industry.",
+      soon: true,
+    },
   ],
 } as const;
 
@@ -118,6 +153,19 @@ export const BIG_THREE = [
     link: { label: "See the quote build itself", href: "#journey" },
   },
   {
+    id: "crm",
+    eyebrow: "The smart CRM",
+    title: "The CRM that takes its own notes.",
+    body: "A normal CRM sits there waiting for you to type. This one does the typing. Turn on the note-taker for a call and it writes the call up, fills in the deal and sends the design notes straight to the design tool. Sol drafts the follow-up in your voice. And every deal tells you how warm it is and who to ring next.",
+    points: [
+      "Calls written up for you, with the recap email ready",
+      "Design notes land beside the roof in the design tool",
+      "Sol drafts the emails; you check and send",
+      "Every deal's clock and temperature, and who to call next",
+    ],
+    link: { label: "Get started", href: "#start" },
+  },
+  {
     id: "service",
     eyebrow: "After the sale",
     title: "“My inverter's flashing red.” Relax.",
@@ -157,20 +205,6 @@ export const BIG_THREE = [
     link: { label: "Look inside the Marketplace", href: "/design/marketplace" },
   },
 ] as const;
-
-/** The old way, against this one. Figures for the other side are another platform's published prices, with the date read. */
-export const OLD_WAY = {
-  eyebrow: "The price",
-  headline: "Your software is still charging you like it's 2015.",
-  sub: "A fee for every seat. Another for every project. Another for every signature. Five tools that don't talk to each other, and a spreadsheet to hold them together. Enough.",
-  rows: [
-    { what: "A user, a month", us: dollars(SEAT_MONTHLY_CENTS), them: "from $49" },
-    { what: "A design job", us: dollars(TOKEN_CENTS), them: "$4 to $10" },
-    { what: "An e-signature", us: "Included", them: "80c each" },
-  ],
-  source:
-    "The other column is a well-known Australian solar platform's published pricing, read on 1 November 2026: its solar CRM from $49 a user a month billed monthly, designs at $4 or $10 a project, e-signatures 80c a project. Prices change: check theirs.",
-} as const;
 
 export type Visual = { kind: "shot"; src: string; alt: string } | { kind: "demo"; demo: "automation" | "three" | "conversation" | "after" };
 
@@ -338,10 +372,35 @@ export const MARKETPLACE = {
   look: "Look inside the Marketplace",
 } as const;
 
+/**
+ * The pricing, set out as a software pricing page (3 Nov 2026, Martin: "more like a software pricing page"; nothing
+ * crossed out, nothing that reads as a discount, which devalues the tool). Two plans and Enterprise. The first month's
+ * price is said once, plainly, because it is what is charged at sign-up.
+ */
 export const PRICING = {
   eyebrow: "Pricing",
   headline: "One price. Everything in it.",
-  sub: "Every feature for every user. No add-ons, no per-signature fees, no lock-in.",
+  sub: "Every feature for every user. No add-ons, no per-signature fees.",
+  plans: [
+    {
+      key: "month",
+      name: "Monthly",
+      price: dollars(SEAT_MONTHLY_CENTS),
+      per: "a user a month",
+      note: "Month to month. Cancel any time.",
+      featured: false,
+    },
+    {
+      key: "commit",
+      name: `${COMMIT_MONTHS}-month plan`,
+      price: dollars(COMMIT_SEAT_CENTS),
+      per: "a user a month",
+      note: `For ${COMMIT_MONTHS} months. Sign up, then choose it in Billing.`,
+      featured: true,
+    },
+  ],
+  firstMonth: `Your first month is ${PLAN_WORDS.firstMonth.replace(" for your first month", "")}, on either plan. ${PLAN_WORDS.gst}`,
+  includesTitle: "Every plan includes",
   includes: [
     "The full CRM, pipelines and Today",
     "Branded proposals with online acceptance",
@@ -350,6 +409,7 @@ export const PRICING = {
     "Sol, the AI assistant",
     "Team chat, Gmail inbox and note-taker",
   ],
+  tokensTitle: `Design jobs: ${PLAN_WORDS.token}`,
   tokens: PLAN_WORDS.tokenExplained,
   start: PLAN_WORDS.startExplained,
   enterprise: {
@@ -363,16 +423,14 @@ export const PRICING = {
 export const FAQ: readonly { q: string; a: string }[] = [
   {
     q: "When am I charged?",
-    a: "When you sign up, on Stripe's secure page (we never see your card). Your plan starts straight away. Cancel any time: it runs to the end of the period you've paid for.",
+    a: `When you sign up, on Stripe's secure page (we never see your card): ${PLAN_WORDS.firstMonth}. Cancel any time: it runs to the end of the month you've paid for.`,
   },
+  { q: "What happens after the first month?", a: PLAN_WORDS.offerExplained },
+  { q: "Can I leave the 12-month plan early?", a: PLAN_WORDS.commitExplained },
   { q: "What's a design job?", a: PLAN_WORDS.tokenExplained },
   {
-    q: "Is it really everything for $29?",
+    q: "Is it really everything for one price a user?",
     a: "Every feature for every user, including Sol. The only other cost is design jobs, which you buy as you use them.",
-  },
-  {
-    q: "Monthly or yearly?",
-    a: `Monthly, cancel any time. Or pay for the year and take ${PLAN_WORDS.yearly.replace(" when you pay for the year", "")} off the whole package.`,
   },
   { q: "Are prices with GST?", a: "Yes. Every price on this page includes GST." },
   {
@@ -382,7 +440,7 @@ export const FAQ: readonly { q: string; a: string }[] = [
 ];
 
 export const CLOSING = {
-  headline: "Better product. Lower price. Your move.",
+  headline: "Solar just got a brain. Your move.",
   sub: "Up and running today. Bring the whole team. Cancel any time.",
 } as const;
 
@@ -390,9 +448,6 @@ export const CLOSING = {
 export function salesCopy(): string[] {
   return [
     ...Object.values(SALES_HERO).flat(),
-    OLD_WAY.eyebrow,
-    OLD_WAY.headline,
-    OLD_WAY.sub,
     ...Object.values(ASK_DEMO),
     ASK_ANYTHING.label,
     ASK_ANYTHING.caption,
@@ -400,9 +455,8 @@ export function salesCopy(): string[] {
     UPGRADE.eyebrow,
     UPGRADE.headline,
     UPGRADE.sub,
-    ...UPGRADE.items.flatMap((i) => [i.title, i.body]),
+    ...UPGRADE.items.flatMap((i) => [i.was, i.title, i.body]),
     ...BIG_THREE.flatMap((p) => [p.eyebrow, p.title, p.body, ...p.points, p.link.label]),
-    ...OLD_WAY.rows.flatMap((r) => [r.what, r.us, r.them]),
     ...JOURNEY.flatMap((j) => [j.step, j.title, j.body]),
     SOL.eyebrow,
     SOL.headline,
@@ -422,6 +476,10 @@ export function salesCopy(): string[] {
     ...PRICING.includes,
     ...Object.values(PRICING.enterprise),
     ...FAQ.flatMap((f) => [f.q, f.a]),
+    ...PRICING.plans.flatMap((p) => [p.name, p.per, p.note]),
+    PRICING.firstMonth,
+    PRICING.includesTitle,
+    ...PRICING.includes,
     CLOSING.headline,
     CLOSING.sub,
   ];
