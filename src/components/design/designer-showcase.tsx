@@ -1274,3 +1274,100 @@ export function AskDesignDemo({ label, request, reply }: { label: string; reques
     </figure>
   );
 }
+
+// ---------------------------------------------------------------------------
+// 6. Ask Sol anything: the sign-up page's hero, requests typed and answered one after another.
+
+type Exchange = { ask: string; answer: string };
+const CHAT_PACE = { perChar: 32, think: 1000, hold: 2200, start: 500 };
+
+/** When each request starts typing, is sent and is answered, and how long the whole loop runs. */
+function chatTimes(prompts: readonly Exchange[]) {
+  let at = CHAT_PACE.start;
+  const times = prompts.map((p) => {
+    const typeAt = at;
+    const sendAt = typeAt + p.ask.length * CHAT_PACE.perChar;
+    const answerAt = sendAt + CHAT_PACE.think;
+    at = answerAt + CHAT_PACE.hold;
+    return { typeAt, sendAt, answerAt };
+  });
+  return { times, total: at };
+}
+
+/**
+ * The sign-up page's hero (3 Nov 2026, Martin: spark what's possible with AI, not a design picture): Sol's box typing
+ * one request after another, each sent and answered, the latest three kept in view. Words from the page's copy
+ * (`ASK_ANYTHING`); with reduced motion, the last three still.
+ */
+export function SolAskDemo({ label, prompts }: { label: string; prompts: readonly Exchange[] }) {
+  const { times, total } = chatTimes(prompts);
+  const [t, playing] = useTimeline(total, 50);
+  const sent = prompts.map((p, i) => ({ ...p, ...times[i], i })).filter((x) => t >= x.sendAt);
+  const shown = sent.slice(-3);
+  const typing = prompts.findIndex((_, i) => t >= times[i].typeAt && t < times[i].sendAt);
+  const typed = typing >= 0 ? prompts[typing].ask.slice(0, Math.floor((t - times[typing].typeAt) / CHAT_PACE.perChar)) : "";
+  return (
+    <figure ref={playing} className="w-full min-w-0" aria-label="Requests made to Sol, RENUABL's AI, and his answers: an example">
+      <div
+        aria-hidden
+        className="pointer-events-none relative select-none overflow-hidden rounded-[28px] bg-primary p-5 text-white shadow-[0_40px_90px_-30px_rgba(11,11,12,0.55)] sm:p-7"
+      >
+        <div
+          className="absolute -right-24 -top-24 size-72 rounded-full"
+          style={{ background: "radial-gradient(closest-side, rgba(255,90,31,0.35), rgba(255,90,31,0))" }}
+        />
+        <div className="relative flex items-center gap-3">
+          <span className="grid size-10 place-items-center rounded-full bg-white/10">
+            <SolBadge className="size-6" />
+          </span>
+          <div>
+            <p className="text-[15px] font-semibold">Sol</p>
+            <p className="text-[12px] text-white/55">Your AI, inside RENUABL</p>
+          </div>
+        </div>
+        <div className="relative mt-5 flex h-[22rem] flex-col justify-end gap-4 overflow-hidden sm:h-[24rem]">
+          {shown.map((x) => (
+            <div key={x.i} className="flex flex-col gap-2">
+              <p className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-white px-4 py-2.5 text-[14px] leading-snug text-ink sm:text-[15px]">
+                {x.ask}
+              </p>
+              <div className="flex max-w-[90%] items-start gap-2.5">
+                <SolBadge className="mt-1 size-5 shrink-0" />
+                {t >= x.answerAt ? (
+                  <p className="rounded-2xl rounded-tl-md bg-white/10 px-4 py-2.5 text-[14px] leading-snug text-white/90 sm:text-[15px]">
+                    {x.answer}
+                  </p>
+                ) : (
+                  <span className="flex gap-1 rounded-2xl bg-white/10 px-4 py-3.5">
+                    {[0, 1, 2].map((d) => (
+                      <span
+                        key={d}
+                        className="size-1.5 animate-pulse rounded-full bg-sun-bright"
+                        style={{ animationDelay: `${d * 150}ms` }}
+                      />
+                    ))}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="relative mt-5 flex items-center gap-3 rounded-full bg-white/10 px-4 py-3 ring-1 ring-white/15">
+          <span className="min-w-0 flex-1 truncate text-[14px] sm:text-[15px]">
+            {typed ? (
+              <>
+                {typed}
+                <span className="ml-px inline-block h-4 w-px animate-pulse bg-white align-middle" />
+              </>
+            ) : (
+              <span className="text-white/45">{label}…</span>
+            )}
+          </span>
+          <span className={clsx("grid size-8 shrink-0 place-items-center rounded-full", typed ? "bg-sun-line" : "bg-white/15")}>
+            <ArrowRight className="size-4" />
+          </span>
+        </div>
+      </div>
+    </figure>
+  );
+}

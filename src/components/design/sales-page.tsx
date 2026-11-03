@@ -24,6 +24,7 @@ import {
   FAQ,
   JOURNEY,
   MARKETPLACE,
+  ASK_ANYTHING,
   ASK_DEMO,
   BIG_THREE,
   OLD_WAY,
@@ -39,6 +40,7 @@ import {
   AutomationDemo,
   ConversationDemo,
   ListingRoofExample,
+  SolAskDemo,
   ThreeDesignsDemo,
 } from "./designer-showcase";
 import { Reveal } from "./front-hero";
@@ -255,10 +257,9 @@ function Hero() {
         <div>
           <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">{SALES_HERO.eyebrow}</p>
           <h1 id="hero" className="mt-5 text-[clamp(52px,8vw,104px)] font-semibold leading-[0.92] tracking-[-0.045em]">
-            {SALES_HERO.headline.split(". ").map((part, i, all) => (
+            {SALES_HERO.headline.map((part, i, all) => (
               <span key={part} className={clsx("block", i === all.length - 1 && "text-sun-line")}>
                 {part}
-                {i < all.length - 1 ? "." : ""}
               </span>
             ))}
           </h1>
@@ -276,8 +277,8 @@ function Hero() {
           </div>
         </div>
         <div className="lg:-mr-24">
-          <AskDesignDemo label={ASK_DEMO.label} request={ASK_DEMO.request} reply={ASK_DEMO.reply} />
-          <p className="mt-3 text-center text-xs text-muted">{ASK_DEMO.caption}</p>
+          <SolAskDemo label={ASK_ANYTHING.label} prompts={ASK_ANYTHING.prompts} />
+          <p className="mt-3 text-center text-xs text-muted">{ASK_ANYTHING.caption}</p>
         </div>
       </div>
     </section>
@@ -353,7 +354,10 @@ function BigThree() {
           );
         const visual =
           p.id === "designer" ? (
-            <ThreeDesignsDemo />
+            <div>
+              <AskDesignDemo label={ASK_DEMO.label} request={ASK_DEMO.request} reply={ASK_DEMO.reply} />
+              <p className="mt-3 text-center text-xs text-muted">{ASK_DEMO.caption}</p>
+            </div>
           ) : p.id === "sol" ? (
             <Screen
               src="/design/landing/today-sol.webp"

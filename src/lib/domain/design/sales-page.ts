@@ -7,19 +7,49 @@
 import { ENTERPRISE_FROM, PLAN_WORDS, TRIAL_DAYS, TRIAL_JOBS, TOKEN_CENTS, dollars, SEAT_MONTHLY_CENTS } from "./plans";
 
 /**
- * The hero (3 Nov 2026, Martin: "Pay less. Do more." didn't say what RENUABL is. It is powerful because of AI: it
- * automates, adds intelligence, simplifies and brings the solar industry together; work has never been this easy).
+ * The hero (3 Nov 2026, Martin, after "Pay less. Do more." and "Just ask. It's done." didn't land: witty, not a feature
+ * list; call out that RENUABL is powered by AI and spark what's possible with it, in a trade that is usually dull. The
+ * all-in-one platform is said, but isn't the headline).
  */
 export const SALES_HERO = {
-  eyebrow: "The AI-powered, all-in-one platform for solar businesses",
-  headline: "Just ask. It's done.",
-  sub: "Solar work has never been this easy. Type what you want and RENUABL does it: the roof designed, the system priced, the follow-up drafted, the order opened the moment they sign. And RENUABL Marketplace brings the whole industry together.",
+  eyebrow: "RENUABL Business · Powered by AI",
+  /** Said in two lines, the second lit in the signal orange. */
+  headline: ["Solar just", "got a brain."],
+  sub: "RENUABL is the all-in-one platform for solar businesses, with AI built into every part of it. Ask it to design a roof, line up your day, check a standard or write the follow-up, and watch it happen.",
   cta: `Start your ${TRIAL_DAYS}-day free trial`,
   small: [`${PLAN_WORDS.seat}, inc GST`, `${TRIAL_JOBS} design jobs free`, "Cancel any time"],
 } as const;
 
 /**
- * The hero's moving example: a request typed into the design tool's "Ask Sol to change it" bar, done as it is in the
+ * The hero's moving example (3 Nov 2026, Martin: spark the imagination, don't lead with a design): requests typed to
+ * Sol one after another, each answered in a line. Every one is something RENUABL does today: the design tool's whole-
+ * system request, Today's Up first, the web with sources, the electrical rules (never saying a site complies), a
+ * drafted follow-up (never sent by him), a bill read. Made-up names; no figure he'd have to prove.
+ */
+export const ASK_ANYTHING = {
+  label: "Ask Sol anything",
+  prompts: [
+    {
+      ask: "Load 8 kW of panels, an inverter and a battery on the Hart roof",
+      answer: "Done. 17 panels, a hybrid inverter and a battery, strung and priced.",
+    },
+    { ask: "Who should I call next?", answer: "Olivia Hart. Her enquiry came in two days ago and her roof isn't designed yet." },
+    {
+      ask: "What's AusNet's export limit for a single-phase home?",
+      answer: "Here's what AusNet's own pages say, with the links so you can check.",
+    },
+    {
+      ask: "What does AS/NZS 5139 ask for around a battery in a garage?",
+      answer: "The clearances and barriers it asks for, and why. Check the clause in your copy.",
+    },
+    { ask: "Write the follow-up for Priya's proposal", answer: "Drafted in your voice. Have a read, then press send." },
+    { ask: "Read this bill and size the system", answer: "About 18 kWh a day. Three designs are ready, each priced against it." },
+  ],
+  caption: "Requests you can make in RENUABL today. Made-up customers.",
+} as const;
+
+/**
+ * The design tool's moving example: a request typed into its "Ask Sol to change it" bar, done as it is in the
  * product (`parseCommand` reads it as a whole system: the panels to the kW, an inverter and a battery by rule). The
  * reply is the shape the designer gives, on the drawn, made-up home with generic product names.
  */
@@ -117,6 +147,13 @@ export const JOURNEY: readonly JourneyStep[] = [
     title: "Draw the roof. The quote builds itself.",
     body: "Panels, rails, brackets, inverter, battery and every fee, priced from your own wholesaler lists as you place them. Strung and checked against the inverter's inputs.",
     visual: { kind: "demo", demo: "automation" },
+  },
+  {
+    key: "three",
+    step: "Design it for me",
+    title: "Three designs. One click.",
+    body: "The fastest payback, the most dollars back over the years, the most independence. Each laid by installer rules, priced and strung, set against the customer's bill.",
+    visual: { kind: "demo", demo: "three" },
   },
   {
     key: "proposal",
@@ -307,6 +344,9 @@ export function salesCopy(): string[] {
     OLD_WAY.headline,
     OLD_WAY.sub,
     ...Object.values(ASK_DEMO),
+    ASK_ANYTHING.label,
+    ASK_ANYTHING.caption,
+    ...ASK_ANYTHING.prompts.flatMap((p) => [p.ask, p.answer]),
     ...BIG_THREE.flatMap((p) => [p.eyebrow, p.title, p.body, ...p.points, p.link.label]),
     ...OLD_WAY.rows.flatMap((r) => [r.what, r.us, r.them]),
     ...JOURNEY.flatMap((j) => [j.step, j.title, j.body]),
