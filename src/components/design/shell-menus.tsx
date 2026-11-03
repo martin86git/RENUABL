@@ -3,33 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import {
-  Bell,
-  CheckCheck,
-  ExternalLink,
-  LogOut,
-  MessageCircle,
-  MessageSquarePlus,
-  Settings,
-  SlidersHorizontal,
-  Sparkles,
-  UserRound,
-  Users,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import { CheckCheck, LogOut, MessageSquarePlus, SlidersHorizontal, Sparkles, Bell, UserRound, Users, type LucideIcon } from "lucide-react";
 import clsx from "clsx";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import type { Notification } from "@/lib/server/design-notifications-repo";
+import type { ChatThread } from "@/lib/domain/design/chat";
 import { loadNotifications, loadWeather, markNotificationsRead, shortDate } from "@/lib/services/crm";
-import { MessagesPage } from "./chat-panel";
+import { lineTime, loadMessages } from "@/lib/services/chat";
 import { SignOut } from "./design-account";
 
 /**
- * The menus top right of every screen (31 Oct 2026, as Primero's): one floating white card of round icons, each a
- * window over the page rather than a page of its own. Black when open, a count in the signal orange while something waits.
+ * The menus round the edges of every screen (31 Oct 2026, as Primero's; 3 Nov 2026, Martin: a quieter top right). Top
+ * right, one small card: the date and the weather as a tile, and the profile round whose menu holds Settings and the
+ * account. Notifications (the customers' messages and mentions together) and email sit on the rail down the right. Each
+ * is a window over the page rather than a page of its own. Black when open, a count in the signal orange while something waits.
  */
-
 /** Closes a window when the pointer goes down outside it, on Escape, and when the page changes. */
 function useWindow(): [boolean, (open: boolean) => void, React.RefObject<HTMLDivElement | null>] {
   const [open, setOpen] = useState(false);
@@ -83,15 +71,38 @@ export function TopIcon(props: { href: string; label: string; icon: LucideIcon; 
   );
 }
 
-/** The day and the temperature, as one short line at the start of the card, with a hairline after it. */
-export function DayPill() {
+/** The rail's rounds are a touch larger than the top card's. */
+const RAIL_ICON = "relative flex size-10 items-center justify-center rounded-full transition-colors";
+const railLook = (on: boolean) => (on ? "bg-ink text-sun-line" : "text-ink-2 hover:bg-canvas hover:text-ink");
+
+/** A round on the rail down the right that is a link (email). */
+export function RailIcon(props: { href: string; label: string; icon: LucideIcon; on?: boolean; badge?: number }) {
+  return (
+    <Link
+      href={props.href}
+      title={props.label}
+      aria-label={props.badge ? `${props.label}: ${props.badge} unread` : props.label}
+      aria-current={props.on ? "page" : undefined}
+      className={clsx(RAIL_ICON, railLook(Boolean(props.on)))}
+    >
+      <props.icon className="size-[18px]" aria-hidden />
+      <Count n={props.badge ?? 0} />
+    </Link>
+  );
+}
+
+/**
+ * The date and the weather as one small tile (3 Nov 2026, Martin: less room, no time): a calendar leaf with the
+ * weekday over the day of the month, and the temperature beside it. The full date and the place are in its title.
+ */
+export function DayWeather() {
   const [now, setNow] = useState<Date | null>(null);
   const [weather, setWeather] = useState<{ place: string; degrees: number | null } | null>(null);
   useEffect(() => {
     // The day is only known once the page is in the browser.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setNow(new Date());
-    const tick = window.setInterval(() => setNow(new Date()), 60_000);
+    const tick = window.setInterval(() => setNow(new Date()), 10 * 60_000);
     let gone = false;
     void loadWeather().then((res) => !gone && res.ok && setWeather({ place: res.place, degrees: res.degrees }));
     return () => {
@@ -99,87 +110,47 @@ export function DayPill() {
       window.clearInterval(tick);
     };
   }, []);
-  const day = now
-    ? new Intl.DateTimeFormat("en-AU", { timeZone: LAUNCH_MARKET.timeZone, weekday: "short", day: "numeric", month: "short" }).format(now)
-    : " ";
-  const time = now ? now.toLocaleTimeString("en-AU", { timeZone: LAUNCH_MARKET.timeZone, hour: "numeric", minute: "2-digit" }) : "";
+  const part = (o: Intl.DateTimeFormatOptions) =>
+    now ? new Intl.DateTimeFormat("en-AU", { timeZone: LAUNCH_MARKET.timeZone, ...o }).format(now) : "";
+  const degrees = weather?.degrees ?? null;
+  const title = [part({ weekday: "long", day: "numeric", month: "long" }), degrees !== null ? `${degrees}° in ${weather?.place}` : null]
+    .filter(Boolean)
+    .join(" · ");
   return (
-    <span className="flex items-center gap-2 pl-3 pr-1 text-[13px] text-ink-2" title={weather ? `${weather.place}, now` : undefined}>
-      <span className="whitespace-nowrap">{day}</span>
-      {time && <span className="hidden whitespace-nowrap tabular-nums text-muted xl:inline">{time}</span>}
-      {weather?.degrees !== null && weather?.degrees !== undefined && (
-        <span className="whitespace-nowrap tabular-nums text-sun-ink">{weather.degrees}°</span>
+    <span className="flex items-center gap-1.5 pl-1 pr-1.5" title={title || undefined} role="img" aria-label={title || "Today"}>
+      <span className="flex w-8 flex-col items-center overflow-hidden rounded-md bg-surface ring-1 ring-line" aria-hidden>
+        <span className="w-full bg-sun-line text-center text-[8px] font-semibold uppercase leading-[11px] tracking-wider text-white">
+          {part({ weekday: "short" }) || " "}
+        </span>
+        <span className="text-[13px] font-semibold leading-[19px] tabular-nums text-ink">{part({ day: "numeric" })}</span>
+      </span>
+      {degrees !== null && (
+        <span className="text-[13px] tabular-nums text-ink-2" aria-hidden>
+          {degrees}°
+        </span>
       )}
-      <span className="ml-1 h-5 w-px bg-line" aria-hidden />
     </span>
   );
 }
 
 /**
- * Messages: the customers' conversations about their proposals in a window over the page, the same list as the page of
- * its own, answered there. "Full page" opens it alone.
+ * Notifications on the rail (3 Nov 2026, Martin: the customers' chat folds in here): what customers have written from
+ * their proposals, those waiting first, then this member's mentions. Asked for each time it opens, each opening its
+ * deal. It opens to the left of the rail.
  */
-export function MessagesMenu({ badge, href }: { badge: number; href: string }) {
-  const [open, setOpen, box] = useWindow();
-  const label = badge ? `Messages: ${badge} unread` : "Messages";
-  return (
-    <div className="relative" ref={box}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        title={label}
-        aria-label={label}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        className={clsx(ICON, iconLook(open))}
-      >
-        <MessageCircle className="size-[18px]" aria-hidden />
-        <Count n={badge} />
-      </button>
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Messages"
-          className="absolute right-0 top-11 z-50 flex h-[78vh] w-[min(64rem,94vw)] flex-col overflow-hidden rounded-2xl bg-canvas text-ink shadow-2xl ring-1 ring-line"
-        >
-          <WindowHead title="Messages" full={href} onClose={() => setOpen(false)} />
-          <div className="staff-scroll min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-            <MessagesPage />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function WindowHead(props: { title: string; full: string; onClose: () => void }) {
-  return (
-    <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-2.5">
-      <p className="text-sm font-semibold">{props.title}</p>
-      <div className="flex items-center gap-1">
-        <Link
-          href={props.full}
-          className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-ink-2 hover:bg-canvas hover:text-ink"
-        >
-          <ExternalLink className="size-3.5" aria-hidden /> Full page
-        </Link>
-        <button
-          type="button"
-          onClick={props.onClose}
-          aria-label={`Close ${props.title.toLowerCase()}`}
-          className="flex size-7 items-center justify-center rounded-full text-ink-2 hover:bg-canvas hover:text-ink"
-        >
-          <X className="size-4" aria-hidden />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** Notifications under the bell: this member's mentions, asked for each time it opens, each opening its deal. */
-export function NotificationsMenu({ badge, full, deal }: { badge: number; full: string; deal: (id: string) => string }) {
+export function NotificationsMenu(props: {
+  /** Customers' lines nobody has read, and this member's unread mentions. */
+  messages: number;
+  mentions: number;
+  full: string;
+  messagesFull: string;
+  /** On the rail it opens to its left; in the top card (the design tool, where the rail is put away) it opens below. */
+  place?: "rail" | "top";
+  deal: (id: string) => string;
+}) {
   const [open, setOpen, box] = useWindow();
   const [items, setItems] = useState<Notification[] | null>(null);
+  const [threads, setThreads] = useState<ChatThread[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const told = () => window.dispatchEvent(new Event("renuabl:notifications"));
   const show = (to: boolean) => {
@@ -187,6 +158,7 @@ export function NotificationsMenu({ badge, full, deal }: { badge: number; full: 
     if (!to) return;
     setProblem(null);
     void loadNotifications().then((res) => (res.ok ? setItems(res.notifications) : setProblem(res.message)));
+    void loadMessages().then((res) => setThreads(res.ok ? res.threads : []));
   };
   const read = async (which: { ids?: string[]; all?: boolean }) => {
     const res = await markNotificationsRead(which);
@@ -195,6 +167,9 @@ export function NotificationsMenu({ badge, full, deal }: { badge: number; full: 
     told();
   };
   const unread = (items ?? []).filter((n) => !n.read).length;
+  const badge = props.messages + props.mentions;
+  // Those waiting on a reply first, then the latest few, so the window stays short.
+  const recent = threads ? [...threads.filter((t) => t.unread > 0), ...threads.filter((t) => !t.unread)].slice(0, 5) : null;
   return (
     <div className="relative" ref={box}>
       <button
@@ -203,37 +178,54 @@ export function NotificationsMenu({ badge, full, deal }: { badge: number; full: 
         title="Notifications"
         aria-label={badge ? `Notifications: ${badge} unread` : "Notifications"}
         aria-expanded={open}
-        className={clsx(ICON, iconLook(open))}
+        className={props.place === "top" ? clsx(ICON, iconLook(open)) : clsx(RAIL_ICON, railLook(open))}
       >
         <Bell className="size-[18px]" aria-hidden />
         <Count n={badge} />
       </button>
       {open && (
-        <div className="absolute right-0 top-11 z-50 flex max-h-[70vh] w-[26rem] max-w-[92vw] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl ring-1 ring-line">
+        <div
+          className={clsx(
+            "absolute z-50 flex max-h-[76vh] w-[26rem] max-w-[calc(100vw-6rem)] flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl ring-1 ring-line",
+            props.place === "top" ? "right-0 top-11" : "right-full top-1/2 mr-3 -translate-y-1/2",
+          )}
+        >
           <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
             <p className="text-sm font-semibold">Notifications</p>
-            <div className="flex items-center gap-1">
-              {unread > 0 && (
-                <button
-                  type="button"
-                  onClick={() => void read({ all: true })}
-                  className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-ink-2 hover:bg-canvas hover:text-ink"
-                >
-                  <CheckCheck className="size-3.5" aria-hidden /> Mark all read
-                </button>
-              )}
-              <Link
-                href={full}
-                className="inline-flex h-7 items-center rounded-full px-2.5 text-xs text-ink-2 hover:bg-canvas hover:text-ink"
+            {unread > 0 && (
+              <button
+                type="button"
+                onClick={() => void read({ all: true })}
+                className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-ink-2 hover:bg-canvas hover:text-ink"
               >
-                All
-              </Link>
-            </div>
+                <CheckCheck className="size-3.5" aria-hidden /> Mark mentions read
+              </button>
+            )}
           </div>
           <div className="staff-scroll min-h-0 flex-1 overflow-y-auto p-2">
             {problem && <p className="px-3 py-4 text-sm text-warning">{problem}</p>}
-            {!items && !problem && <p className="animate-pulse px-3 py-6 text-center text-sm text-muted">Looking…</p>}
-            {items?.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted">Nothing yet. No one has mentioned you.</p>}
+            <Heading label="From customers" href={props.messagesFull} more="All messages" />
+            {!recent && <p className="animate-pulse px-3 py-3 text-sm text-muted">Looking…</p>}
+            {recent?.length === 0 && <p className="px-3 pb-3 pt-1 text-[13px] text-muted">No messages from customers yet.</p>}
+            {recent?.map((t) => (
+              <Link
+                key={t.jobId}
+                href={`${props.deal(t.jobId)}?tab=chat`}
+                className={clsx("block rounded-xl px-3 py-2.5 hover:bg-canvas", t.unread > 0 && "bg-sun/60")}
+              >
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className={clsx("truncate text-[13px] text-ink", t.unread > 0 && "font-semibold")}>
+                    {t.customerName}
+                    {t.unread > 0 && <span className="ml-1.5 text-[11px] font-semibold text-sun-ink">{t.unread} new</span>}
+                  </span>
+                  <span className="shrink-0 text-[11px] tabular-nums text-muted">{lineTime(t.at)}</span>
+                </span>
+                <span className="mt-0.5 block truncate text-[13px] text-ink-2">{t.last}</span>
+              </Link>
+            ))}
+            <Heading label="Mentions" href={props.full} more="All mentions" />
+            {!items && !problem && <p className="animate-pulse px-3 py-3 text-sm text-muted">Looking…</p>}
+            {items?.length === 0 && <p className="px-3 pb-3 pt-1 text-[13px] text-muted">No one has mentioned you.</p>}
             {items?.map((n) => (
               <div key={n.id} className={clsx("rounded-xl px-3 py-2.5", !n.read && "bg-sun/60")}>
                 <div className="flex items-baseline justify-between gap-2">
@@ -244,7 +236,7 @@ export function NotificationsMenu({ badge, full, deal }: { badge: number; full: 
                 </div>
                 <p className="mt-0.5 line-clamp-2 text-[13px] text-ink-2">{n.text}</p>
                 <div className="mt-1.5 flex gap-3 text-xs font-medium">
-                  <Link href={deal(n.jobId)} className="text-ink underline underline-offset-4">
+                  <Link href={props.deal(n.jobId)} className="text-ink underline underline-offset-4">
                     Open deal
                   </Link>
                   {!n.read && (
@@ -262,8 +254,26 @@ export function NotificationsMenu({ badge, full, deal }: { badge: number; full: 
   );
 }
 
-/** The gear: who is signed in, Settings, the account, and signing out. */
-export function GearMenu(props: {
+function Heading({ label, href, more }: { label: string; href: string; more: string }) {
+  return (
+    <p className="flex items-baseline justify-between px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted first:pt-1">
+      {label}
+      <Link href={href} className="text-[11px] font-medium normal-case tracking-normal text-ink-2 hover:text-ink">
+        {more}
+      </Link>
+    </p>
+  );
+}
+
+/** The two letters a profile round shows: the first of each part of the email's name, else its first two. */
+function initialsOf(email: string): string {
+  const name = email.split("@")[0] ?? "";
+  const parts = name.split(/[._-]+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2)).toUpperCase() || "?";
+}
+
+/** The profile round (3 Nov 2026, Martin: it replaced the gear): who is signed in, Settings, the account, and signing out. */
+export function ProfileMenu(props: {
   email: string;
   settings: string;
   account: string;
@@ -288,13 +298,19 @@ export function GearMenu(props: {
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-label="Settings and your account"
-        title="Settings and your account"
-        className={clsx(ICON, iconLook(open || props.on))}
+        aria-label="Your profile, settings and account"
+        title={props.email}
+        className={clsx(
+          "relative flex size-9 items-center justify-center rounded-full text-[12px] font-semibold tracking-wide transition-colors",
+          open || props.on ? "bg-ink text-white" : "bg-surface-2 text-ink hover:bg-line",
+        )}
       >
-        <Settings className="size-[18px]" aria-hidden />
+        {initialsOf(props.email)}
         {props.unseen > 0 && (
-          <span className="absolute right-1 top-1 size-2 rounded-full bg-sun-line" aria-label={`${props.unseen} new updates`} />
+          <span
+            className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-sun-line ring-2 ring-surface"
+            aria-label={`${props.unseen} new updates`}
+          />
         )}
       </button>
       {open && (

@@ -192,14 +192,34 @@ html.sol-resizing .sol-rail,
 html.sol-resizing .team-pop {
   transition: none;
 }
-/* The top bar fits in less room (a narrow wide screen, or Sol's panel open) by putting the day and weather away. */
-@media (max-width: 1535px) {
-  .studio-day-pill {
-    display: none;
+/* Team chat on the rail: a larger round standing out of it, the rail's focus point (3 Nov 2026, Martin). */
+.team-bulb > button {
+  width: 3.25rem;
+  height: 3.25rem;
+  margin: -0.625rem -0.5rem 0.125rem;
+}
+.team-bulb > button:not([aria-pressed="true"]) {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow:
+    0 6px 18px rgb(20 22 26 / 0.14),
+    0 0 0 1px var(--line);
+}
+.team-bulb > button svg {
+  width: 22px;
+  height: 22px;
+}
+/* The Marketplace's words beside its round only where the top bar has room for them: the round alone otherwise. */
+.studio-market-words {
+  display: none;
+}
+@media (min-width: 1536px) {
+  .studio-market-words {
+    display: flex;
   }
 }
 @media (max-width: 1919px) {
-  html.sol-docked .studio-day-pill {
+  html.sol-docked .studio-market-words {
     display: none;
   }
 }

@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-03",
+    area: "Everywhere",
+    words:
+      "The top bar is cleaner: the menu sits in the middle, Settings is under your profile, and notifications and email are on the right.",
+  },
+  {
+    day: "2026-11-03",
     area: "Sol",
     words:
       "Ask Sol to show you a deal's roof design and he draws it in the chat: the panel layout and strings on the roof photo, with Open the design.",

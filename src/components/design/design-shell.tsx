@@ -37,7 +37,7 @@ import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail } from "./sol-dock";
 import { TeamChatButton } from "./team-chat";
-import { DayPill, GearMenu, MessagesMenu, NotificationsMenu, TopIcon } from "./shell-menus";
+import { DayWeather, NotificationsMenu, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
 
 export { MarketplaceMark };
 
@@ -144,7 +144,7 @@ function MarketplaceButton({ href, lit, waiting }: { href: string; lit: boolean;
           />
         )}
       </span>
-      <span className="flex flex-col text-left leading-none">
+      <span className="studio-market-words flex-col text-left leading-none">
         <span className="text-[9px] font-medium uppercase tracking-[0.26em] text-ink">RENUABL</span>
         <span className="mt-1 flex items-baseline gap-1.5 text-[15px] font-semibold tracking-[-0.01em] text-sun-line">
           Marketplace
@@ -339,20 +339,20 @@ function Shell({
           </button>
         </div>
       )}
-      {/* Across the top on a wide screen: the logo, the sections (with the design tool in orange) and a round search, and the card of icons. */}
+      {/* Across the top on a wide screen: the logo, the sections (with the design tool in orange and Sol at the end), and on
+          the right the search, the Marketplace and a small card with the date and weather and the profile round. */}
       <header
         className={clsx("studio-top z-[35] hidden bg-canvas/90 backdrop-blur print:hidden lg:block lg:px-14", !tool && "sticky top-0")}
       >
-        {/* The sections centre in the room between the logo and the icons, so the three never overlap (1 Nov 2026: with Sol's
-            round and the Marketplace the pill no longer fitted the page's middle third at 1440px). */}
-        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-4 px-2 pt-4">
+        {/* The sections sit in the middle of the screen (3 Nov 2026, Martin: on a laptop they didn't): two equal sides round
+            them, everything else at the sides, and the icons moved to the rail down the right. */}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-4 px-2 pt-4">
           <div className="flex min-w-0 items-start gap-5">
             <Link href={PATHS.home} aria-label="RENUABL, today" className="mt-[1.45rem] shrink-0">
               <Wordmark className="text-[17px]" />
             </Link>
           </div>
-          {/* 1 Nov 2026, Martin (as Primero's): the Search pill gave way to a round magnifier just right of the sections. */}
-          <div className="mt-4 flex min-w-0 items-center justify-center-safe gap-2">
+          <div className="mt-4 flex min-w-0 items-center justify-center">
             <nav aria-label="Sections" className="studio-sections flex items-center gap-0.5 rounded-full bg-surface-2 p-1">
               {sections.map((sec, i) => {
                 const lit = sec.id === current.id;
@@ -401,17 +401,8 @@ function Shell({
                 </span>
               )}
             </nav>
-            {(() => {
-              const market = sections.find((s) => s.id === "marketplace");
-              if (!market) return null;
-              const waiting = market.pages.reduce((n, p) => n + count(p.id), 0);
-              // A little room from Sol's round, so the two read as different things.
-              return (
-                <span className="ml-3">
-                  <MarketplaceButton href={market.pages[0].href} lit={market.id === current.id} waiting={waiting} />
-                </span>
-              );
-            })()}
+          </div>
+          <div className="mt-3 flex min-w-0 items-center justify-end gap-2.5">
             {retail && (
               <button
                 type="button"
@@ -423,25 +414,35 @@ function Shell({
                 <Search className="size-4" aria-hidden />
               </button>
             )}
-          </div>
-          <div className="mt-3 flex justify-end">
+            {(() => {
+              // The Marketplace is the network, not the business's own work: at the side, its words beside its round where
+              // there is room (`.studio-market-words`).
+              const market = sections.find((s) => s.id === "marketplace");
+              if (!market) return null;
+              const waiting = market.pages.reduce((n, p) => n + count(p.id), 0);
+              return <MarketplaceButton href={market.pages[0].href} lit={market.id === current.id} waiting={waiting} />;
+            })()}
             <div
               data-tour="icons"
-              className="flex items-center gap-0.5 rounded-full bg-surface p-1 shadow-[0_8px_30px_rgba(11,11,12,0.08)] ring-1 ring-line"
+              className="flex shrink-0 items-center gap-0.5 rounded-full bg-surface p-1 shadow-[0_8px_30px_rgba(11,11,12,0.08)] ring-1 ring-line"
             >
-              <span className="studio-day-pill contents">
-                <DayPill />
-              </span>
-              {retail ? (
+              <DayWeather />
+              {/* On the design tool the rail is put away for the roof, so notifications and email come up here. */}
+              {retail && tool && (
                 <>
+                  <NotificationsMenu
+                    place="top"
+                    messages={unread}
+                    mentions={mentions}
+                    full={PATHS.notifications}
+                    messagesFull={PATHS.messages}
+                    deal={(id) => `${PATHS.deals}/${id}`}
+                  />
                   <TopIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />
-                  <MessagesMenu badge={unread} href={PATHS.messages} />
-                  <NotificationsMenu badge={mentions} full={PATHS.notifications} deal={(id) => `${PATHS.deals}/${id}`} />
                 </>
-              ) : (
-                <TopIcon href={PATHS.team} label="Team chat" icon={MessagesSquare} on={path.startsWith(PATHS.team)} badge={0} />
               )}
-              <GearMenu
+              {!retail && <TopIcon href={PATHS.team} label="Team chat" icon={MessagesSquare} on={path.startsWith(PATHS.team)} badge={0} />}
+              <ProfileMenu
                 email={account.email}
                 settings={PATHS.settings}
                 account={PATHS.account}
@@ -670,8 +671,25 @@ function Shell({
           deal={(id) => `${PATHS.deals}/${id}`}
         />
       )}
-      {/* The rail down the right (team chat and the numbers; not over the design tool, which needs the room) and Sol's panel. */}
-      {retail && !tool && <SolRail team={<TeamChatButton me={account.email} />} />}
+      {/* The rail down the right (team chat, notifications, email and the numbers; not over the design tool, which needs the
+          room) and Sol's panel. */}
+      {retail && !tool && (
+        <SolRail
+          team={<TeamChatButton me={account.email} />}
+          tools={
+            <>
+              <NotificationsMenu
+                messages={unread}
+                mentions={mentions}
+                full={PATHS.notifications}
+                messagesFull={PATHS.messages}
+                deal={(id) => `${PATHS.deals}/${id}`}
+              />
+              <RailIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />
+            </>
+          }
+        />
+      )}
       {retail && <SolDock />}
     </div>
   );

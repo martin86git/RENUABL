@@ -20,13 +20,18 @@ const WHERE: { what: string; now: string; at: string }[] = [
   },
   {
     what: "Search",
-    now: "is top left (or Ctrl K): a name, a phone number as it rings, an email or an address.",
-    at: 'button[aria-label="Search customers and deals"]',
+    now: "is the round magnifier top right (or Ctrl K): a name, a phone number as it rings, an email or an address.",
+    at: 'button[aria-label="Search, or ask Sol"]',
   },
   {
     what: "Top right",
-    now: "has today's date and weather, customers' messages, your notifications, the design tool, and the gear (Settings, your account, sign out).",
+    now: "has today's date and weather, and your profile: Settings, your account and signing out.",
     at: '[data-tour="icons"]',
+  },
+  {
+    what: "The rail on the right",
+    now: "has team chat, your notifications (customers' messages and mentions), email and the numbers.",
+    at: ".sol-rail",
   },
   { what: "The pad", now: "is where each page sits. Today opens on what needs you now.", at: '[data-tour="pad"]' },
 ];
