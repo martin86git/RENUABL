@@ -3130,34 +3130,137 @@ export function RoofDesigner(props: {
     ].join("\n"),
   );
   /** Fills the roof to about so many kW: on the traced faces (those looking the way asked), else Google's roof model. */
-  const fillTo = async (kw: number, facing?: Way): Promise<string> => {
+  const fillTo = async (kw: number, facing?: Way): Promise<{ words: string; laid: number }> => {
     const watts = panelOf(design).watts || 475;
     const n = Math.max(1, Math.ceil((kw * 1000) / watts));
     if (faces.length) {
       const chosen = facing ? faces.filter((fc) => facesWay(facing, faceFacing(fc))) : faces;
-      if (!chosen.length) return `No traced roof face looks ${{ N: "north", E: "east", S: "south", W: "west" }[facing!]}.`;
+      if (!chosen.length)
+        return { words: `No traced roof face looks ${{ N: "north", E: "east", S: "south", W: "west" }[facing!]}.`, laid: 0 };
       const packed = packFaces(chosen, size, n, () => newId("p"));
       const ids = new Set(chosen.map((fc) => fc.id));
       setFaces(faces.map((fc) => (ids.has(fc.id) ? (packed.faces.find((x) => x.id === fc.id) ?? fc) : fc)));
       setLoose(packed.loose);
       setStrings([]);
       changed();
-      return `${packed.loose.length} panels, ${((packed.loose.length * watts) / 1000).toFixed(2)} kW${packed.loose.length < n ? `: only that many fit` : ""}. Strings cleared: string them again.`;
+      return {
+        words: `${packed.loose.length} panels, ${((packed.loose.length * watts) / 1000).toFixed(2)} kW${packed.loose.length < n ? `: only that many fit` : ""}. Strings cleared: string them again.`,
+        laid: packed.loose.length,
+      };
     }
     const found = await googleModelInPlace();
-    if ("note" in found) return found.note;
+    if ("note" in found) return { words: found.note, laid: 0 };
     let laid = suggestPanels(found.model, spot, n, size, () => newId("p"), found.offset);
     if (facing) laid = laid.filter((p) => facesWay(facing, panelFacing(p)));
-    if (!laid.length) return "Nothing fits that way round on Google's roof data: trace the roof faces and ask again.";
+    if (!laid.length) return { words: "Nothing fits that way round on Google's roof data: trace the roof faces and ask again.", laid: 0 };
     setLoose(laid);
     setStrings([]);
     changed();
-    return `${laid.length} panels, ${((laid.length * watts) / 1000).toFixed(2)} kW from Google's roof data${laid.length < n ? ": only that many fit" : ""}. Check it against the photo.`;
+    return {
+      words: `${laid.length} panels, ${((laid.length * watts) / 1000).toFixed(2)} kW from Google's roof data${laid.length < n ? ": only that many fit" : ""}. Check it against the photo.`,
+      laid: laid.length,
+    };
   };
+  // A whole system asked for at once ("load 8 kW of panels, an inverter and a battery", 3 Nov 2026, Martin): the panels go
+  // down first, then on the next render, with the design's kW and output known, the inverter and the battery are chosen:
+  // by name when named, else by the same rules as "Suggest one" and "Recommended for this home".
+  const systemAsk = useRef<{ inverter?: string; battery?: string } | null>(null);
+  const [systemTick, setSystemTick] = useState(0);
+  // What the inverter and battery step chose, said after the panels' line (it lands after the reply is set).
+  const [systemWords, setSystemWords] = useState("");
+  useEffect(() => {
+    const ask = systemAsk.current;
+    if (!ask || !summary.panels) return;
+    systemAsk.current = null;
+    const words: string[] = [];
+    const wantsBattery = ask.battery !== undefined;
+    let inverter: { item: CatalogueInverter; count: number } | null = null;
+    if (ask.inverter !== undefined) {
+      if (ask.inverter) {
+        const named = pickByQuery(props.inverters, ask.inverter);
+        inverter = named ? { item: named, count: 1 } : null;
+        if (!named) words.push(`no inverter on your lists matches “${ask.inverter}”`);
+      } else {
+        const ideas = suggestInverters({ arrayKw: summary.kw, inverters: props.inverters, panel: chosenPanel?.electrical, strings: [] });
+        const phase = quoteNow.form.phase === "three" ? "Three" : "Single";
+        const idea =
+          ideas.find((s) => s.kind.startsWith(phase) && /hybrid/i.test(s.kind) === wantsBattery) ??
+          ideas.find((s) => s.kind.startsWith(phase)) ??
+          ideas[0];
+        inverter = idea ? { item: idea.inverter, count: idea.count } : null;
+        if (!idea) words.push("no inverter on your lists suits these panels");
+      }
+      if (inverter) {
+        const { item, count } = inverter;
+        setFitted(
+          Array.from({ length: count }, (_, n) => ({
+            sku: item.sku,
+            name: item.name,
+            kw: item.kw,
+            x: fitted[n]?.x ?? cm((view.x + view.w * (0.8 - n * 0.06) - ROOF_IMAGE.width / 2) * scale),
+            y: fitted[n]?.y ?? cm((view.y + view.h * 0.36 - ROOF_IMAGE.height / 2) * scale),
+          })),
+        );
+        words.push(`${count > 1 ? `${count} × ` : ""}${item.name}`);
+      }
+    }
+    if (wantsBattery) {
+      let pick: { battery: CatalogueBattery; qty: number } | null = null;
+      if (ask.battery) {
+        const named = pickByQuery(props.batteries, ask.battery);
+        pick = named ? { battery: named, qty: 1 } : null;
+        if (!named) words.push(`no battery on your lists matches “${ask.battery}”`);
+      } else {
+        const onDesign = inverter
+          ? [{ name: inverter.item.name, ...(inverter.item.hybrid !== undefined ? { hybrid: inverter.item.hybrid } : {}) }]
+          : fitted.map((x, n) => ({
+              name: x.name,
+              ...(fittedItems[n]?.hybrid !== undefined ? { hybrid: fittedItems[n]?.hybrid } : {}),
+            }));
+        const idea = suggestBatteries({
+          batteries: props.batteries,
+          inverters: onDesign,
+          monthlyKwh: year,
+          dailyKwh: finance?.dailyKwh ?? null,
+          selfUseShare: props.workspace.settings.bill.selfUseShare,
+          eveningShare: DAY.eveningShare,
+        }).suggestions[0];
+        pick = idea ? { battery: idea.battery, qty: idea.qty } : null;
+        if (!idea) words.push("no battery on your lists suits this home");
+      }
+      if (pick) {
+        setBattery({
+          sku: pick.battery.sku,
+          name: pick.battery.name,
+          kwh: pick.battery.kwh,
+          qty: pick.qty,
+          x: battery?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
+          y: battery?.y ?? cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
+        });
+        words.push(
+          `${pick.qty > 1 ? `${pick.qty} × ` : ""}${pick.battery.name} (${Math.round(pick.battery.kwh * pick.qty * 10) / 10} kWh)`,
+        );
+      }
+    }
+    changed();
+    setSystemWords(words.length ? `${words.join(" · ")}.` : "");
+    // Only when a whole system has just had its panels laid.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [systemTick]);
   const runCommand = async (command: DesignCommand): Promise<string> => {
     switch (command.do) {
       case "targetKw":
-        return fillTo(command.kw, command.facing);
+        return (await fillTo(command.kw, command.facing)).words;
+      case "system": {
+        const done = await fillTo(command.kw, command.facing);
+        if (!done.laid) return done.words;
+        systemAsk.current = {
+          ...(command.inverter !== undefined ? { inverter: command.inverter } : {}),
+          ...(command.battery !== undefined ? { battery: command.battery } : {}),
+        };
+        setSystemTick((n) => n + 1);
+        return done.words.replace(" Strings cleared: string them again.", "");
+      }
       case "battery": {
         const to = pickByQuery(props.batteries, command.query);
         if (!to) return `No battery on your lists matches “${command.query}”.`;
@@ -3235,6 +3338,7 @@ export function RoofDesigner(props: {
     if (!text || commandBusy) return;
     setCommandBusy(true);
     setCommandReply(null);
+    setSystemWords("");
     try {
       const quick = parseCommand(text);
       if (quick) setCommandReply(await runCommand(quick));
@@ -4119,6 +4223,7 @@ export function RoofDesigner(props: {
                   {commandReply && (
                     <p className={clsx(GLASS, "mt-2 px-4 py-2.5 text-sm text-ink")} role="status">
                       {commandReply}
+                      {systemWords && ` ${systemWords}`}
                     </p>
                   )}
                 </div>

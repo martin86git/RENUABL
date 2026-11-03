@@ -6,6 +6,19 @@ describe("reading a designer command at once", () => {
     expect(parseCommand("fit 10 kW on the north face")).toEqual({ do: "targetKw", kw: 10, facing: "N" });
     expect(parseCommand("make it 6.6kw")).toEqual({ do: "targetKw", kw: 6.6 });
   });
+  it("reads a whole system in one request", () => {
+    expect(parseCommand("Load 8 kW PV + an inverter and a battery")).toEqual({ do: "system", kw: 8, inverter: "", battery: "" });
+    expect(parseCommand("load for me 8kW pv + an inverter and battery")).toEqual({ do: "system", kw: 8, inverter: "", battery: "" });
+    expect(parseCommand("6.6 kW on the north face with a Sungrow inverter and a Sigenergy battery")).toEqual({
+      do: "system",
+      kw: 6.6,
+      facing: "N",
+      inverter: "Sungrow",
+      battery: "Sigenergy",
+    });
+    expect(parseCommand("fit 10 kW and an inverter")).toEqual({ do: "system", kw: 10, inverter: "" });
+    expect(parseCommand("make it 8 kW with an inverter, no battery")).toEqual({ do: "system", kw: 8, inverter: "" });
+  });
   it("reads products by their words", () => {
     expect(parseCommand("swap to the Sigenergy battery")).toEqual({ do: "battery", query: "Sigenergy" });
     expect(parseCommand("use the Sungrow 8 kW inverter")).toEqual({ do: "inverter", query: "Sungrow 8 kW" });
@@ -45,6 +58,11 @@ describe("the rest", () => {
   it("checks Sol's reading, falling back to words", () => {
     expect(commandFrom({ do: "targetKw", kw: 8, facing: "N", words: "ok" })).toEqual({ do: "targetKw", kw: 8, facing: "N" });
     expect(commandFrom({ do: "targetKw", kw: 900, words: "too big" })).toEqual({ do: "answer", words: "too big" });
+    expect(commandFrom({ do: "system", kw: 8, facing: null, inverter: "", battery: null, words: "ok" })).toEqual({
+      do: "system",
+      kw: 8,
+      inverter: "",
+    });
     expect(commandFrom({ do: "answer", words: "About 6 years." })).toEqual({ do: "answer", words: "About 6 years." });
     expect(commandFrom({ do: "hack" }).do).toBe("answer");
   });

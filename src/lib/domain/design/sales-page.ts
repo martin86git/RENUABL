@@ -6,26 +6,61 @@
  */
 import { ENTERPRISE_FROM, PLAN_WORDS, TRIAL_DAYS, TRIAL_JOBS, TOKEN_CENTS, dollars, SEAT_MONTHLY_CENTS } from "./plans";
 
+/**
+ * The hero (3 Nov 2026, Martin: "Pay less. Do more." didn't say what RENUABL is. It is powerful because of AI: it
+ * automates, adds intelligence, simplifies and brings the solar industry together; work has never been this easy).
+ */
 export const SALES_HERO = {
-  eyebrow: "RENUABL Business · for solar retailers and installers",
-  headline: "Pay less. Do more.",
-  sub: "Run the whole business in one place, from enquiry to final invoice, with Sol, the AI assistant inside your deals. Then plug into RENUABL Marketplace, the network that connects solar businesses.",
+  eyebrow: "The AI-powered, all-in-one platform for solar businesses",
+  headline: "Just ask. It's done.",
+  sub: "Solar work has never been this easy. Type what you want and RENUABL does it: the roof designed, the system priced, the follow-up drafted, the order opened the moment they sign. And RENUABL Marketplace brings the whole industry together.",
   cta: `Start your ${TRIAL_DAYS}-day free trial`,
   small: [`${PLAN_WORDS.seat}, inc GST`, `${TRIAL_JOBS} design jobs free`, "Cancel any time"],
 } as const;
 
 /**
- * The two things the page stands on (3 Nov 2026, Martin: the all-in-one platform, and the Marketplace, his vision of an
- * interconnected ecosystem), side by side under the hero. The Marketplace is labelled coming soon.
+ * The hero's moving example: a request typed into the design tool's "Ask Sol to change it" bar, done as it is in the
+ * product (`parseCommand` reads it as a whole system: the panels to the kW, an inverter and a battery by rule). The
+ * reply is the shape the designer gives, on the drawn, made-up home with generic product names.
  */
-export const PILLARS = [
+export const ASK_DEMO = {
+  label: "Ask Sol to change it",
+  request: "Load 8 kW of panels, an inverter and a battery",
+  reply: "17 panels, 8.08 kW · 8 kW hybrid inverter · 2 × 8 kWh battery (16 kWh).",
+  caption: "The design tool, drawn at work on a made-up home. The request is one you can type today.",
+} as const;
+
+/**
+ * The three things RENUABL is known by (3 Nov 2026, Martin: the designer, Sol and the Marketplace are huge features and
+ * must feel it; the designer is sold for the AI over it, not as one more design tool). The Marketplace is labelled
+ * coming soon.
+ */
+export const BIG_THREE = [
   {
-    id: "platform",
-    eyebrow: "RENUABL Business",
-    title: "The all-in-one platform for solar businesses.",
-    body: "Design, quote, sell, approve, book, order, install and get paid, in one place built for Australian solar retailers and installers. Sol, your AI assistant, works inside every deal.",
-    points: ["Design tool and proposals", "CRM, approvals and ordering", "Install calendar and job cards", "Sol, on every screen"],
-    link: { label: "See a deal start to finish", href: "#journey" },
+    id: "designer",
+    eyebrow: "The design tool, with AI over it",
+    title: "Type it. It's designed.",
+    body: "Tell it what you want in plain words, typed or spoken: “Load 8 kW of panels, an inverter and a battery.” The panels go on the roof, the inverter and battery are chosen to suit, and the quote prices itself as it goes. Or press once and get three designs, each priced against the customer's bill.",
+    points: [
+      "Plain words or your voice: “fit 10 kW on the north face”",
+      "Three designs in one press: quickest payback, maximum return, most independence",
+      "Strings checked against the inverter's limits",
+      "A light that only turns green when the design is ready to install",
+    ],
+    link: { label: "See the quote build itself", href: "#journey" },
+  },
+  {
+    id: "sol",
+    eyebrow: "Sol, your AI assistant",
+    title: "An expert on solar, on every screen.",
+    body: "Sol knows your deals, your customers and the rules of the trade. He lines up your day, drafts the follow-ups, writes up your calls, reads bills and switchboard photos, and looks up network rules, rebates and datasheets with the sources to prove it. You check, you send.",
+    points: [
+      "Writes your day up for you, the most pressing at the top",
+      "Drafts every follow-up in your voice",
+      "Answers from the web with his sources shown",
+      "Never sends anything himself",
+    ],
+    link: { label: "Meet Sol", href: "#sol" },
   },
   {
     id: "marketplace",
@@ -82,13 +117,6 @@ export const JOURNEY: readonly JourneyStep[] = [
     title: "Draw the roof. The quote builds itself.",
     body: "Panels, rails, brackets, inverter, battery and every fee, priced from your own wholesaler lists as you place them. Strung and checked against the inverter's inputs.",
     visual: { kind: "demo", demo: "automation" },
-  },
-  {
-    key: "three",
-    step: "Design it for me",
-    title: "Three designs. One click.",
-    body: "The fastest payback, the most dollars back over the years, the most independence. Each laid by installer rules, priced and strung, set against the customer's bill.",
-    visual: { kind: "demo", demo: "three" },
   },
   {
     key: "proposal",
@@ -278,7 +306,8 @@ export function salesCopy(): string[] {
     OLD_WAY.eyebrow,
     OLD_WAY.headline,
     OLD_WAY.sub,
-    ...PILLARS.flatMap((p) => [p.eyebrow, p.title, p.body, ...p.points, p.link.label]),
+    ...Object.values(ASK_DEMO),
+    ...BIG_THREE.flatMap((p) => [p.eyebrow, p.title, p.body, ...p.points, p.link.label]),
     ...OLD_WAY.rows.flatMap((r) => [r.what, r.us, r.them]),
     ...JOURNEY.flatMap((j) => [j.step, j.title, j.body]),
     SOL.eyebrow,

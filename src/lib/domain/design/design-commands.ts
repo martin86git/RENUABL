@@ -8,6 +8,11 @@ export type Facing = "N" | "E" | "S" | "W";
 
 export type DesignCommand =
   | { do: "targetKw"; kw: number; facing?: Facing }
+  /**
+   * A whole system in one request (3 Nov 2026, Martin: "load 8 kW PV + an inverter and a battery"): fill to the kW, then
+   * the inverter and the battery. Each is left out when not asked for; "" chooses it by rule, other words by name.
+   */
+  | { do: "system"; kw: number; facing?: Facing; inverter?: string; battery?: string }
   | { do: "battery"; query: string }
   | { do: "noBattery" }
   | { do: "inverter"; query: string }
@@ -39,6 +44,21 @@ const queryOf = (text: string, kind: RegExp) =>
     .replace(/\s+/g, " ")
     .trim();
 
+/** The parts of a request joined by "+", commas, "and", "with" or "plus". */
+const partsOf = (text: string) => text.split(/\+|,|\band\b|\bwith\b|\bplus\b|&/i).map((s) => s.trim());
+
+/** What a whole-system request names for one product: undefined when it isn't asked for, "" for one by rule. */
+function productAsked(text: string, kind: RegExp, refused?: RegExp): string | undefined {
+  if (refused?.test(text)) return undefined;
+  const part = partsOf(text).find((p) => kind.test(p));
+  if (part === undefined) return undefined;
+  const words = queryOf(part, kind)
+    .replace(/\b(load|fit|give|me|us|some|matching|suitable|right|good|hybrid|new|also|plus|of)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return words;
+}
+
 /** A command read from common phrasings, or null for Sol to read. */
 export function parseCommand(raw: string): DesignCommand | null {
   const text = raw.trim();
@@ -53,7 +73,23 @@ export function parseCommand(raw: string): DesignCommand | null {
   if (/\bdesign it for me\b|\bthree designs\b/.test(t)) return { do: "designForMe" };
   if (/\bstring (it|them|the panels|everything|automatically)\b|\bauto[- ]?string\b/.test(t)) return { do: "stringAuto" };
   const kw = t.match(/(\d+(?:\.\d+)?)\s*kw\b/);
-  if (kw && /\b(fit|make|size|design|put|lay|give|go|target|want)\b/.test(t)) {
+  // A whole system: the kW asked for in a part of its own, not inside a product's name ("the Sungrow 8 kW inverter").
+  const kwOnItsOwn = partsOf(t).some((p) => /\d\s*kw\b/.test(p) && !/\b(inverters?|batter(y|ies))\b/.test(p));
+  if (kw && kwOnItsOwn) {
+    const inverter = productAsked(text, /\binverters?\b/i);
+    const battery = productAsked(text, /\bbatter(y|ies)\b/i, /\b(no|without|remove|drop)\b[^+,]*\bbatter(y|ies)\b/i);
+    if (inverter !== undefined || battery !== undefined) {
+      const facing = FACINGS.find(([re]) => re.test(t))?.[1];
+      return {
+        do: "system",
+        kw: Number(kw[1]),
+        ...(facing ? { facing } : {}),
+        ...(inverter !== undefined ? { inverter } : {}),
+        ...(battery !== undefined ? { battery } : {}),
+      };
+    }
+  }
+  if (kw && /\b(fit|make|size|design|put|lay|give|go|target|want|load|add)\b/.test(t)) {
     const facing = FACINGS.find(([re]) => re.test(t))?.[1];
     return { do: "targetKw", kw: Number(kw[1]), ...(facing ? { facing } : {}) };
   }
@@ -108,6 +144,7 @@ export const DESIGN_COMMAND_SCHEMA = {
       type: "string",
       enum: [
         "targetKw",
+        "system",
         "battery",
         "noBattery",
         "inverter",
@@ -129,13 +166,21 @@ export const DESIGN_COMMAND_SCHEMA = {
       type: ["string", "null"] as ("string" | "null")[],
       description: "The product's maker and model words, for battery, inverter or panel.",
     },
+    inverter: {
+      type: ["string", "null"] as ("string" | "null")[],
+      description: 'For system: the inverter\'s maker and model words, "" to choose one by rule, null when none was asked for.',
+    },
+    battery: {
+      type: ["string", "null"] as ("string" | "null")[],
+      description: 'For system: the battery\'s maker and model words, "" to choose one by rule, null when none was asked for.',
+    },
     letter: { type: ["string", "null"] as ("string" | "null")[] },
     degrees: { type: ["number", "null"] as ("number" | "null")[] },
     phase: { type: ["string", "null"] as ("string" | "null")[], enum: ["single", "three", null] },
     storeys: { type: ["string", "null"] as ("string" | "null")[], enum: ["single", "double", null] },
     words: { type: "string", description: "What to say to the person: the answer to a question, or the change in a sentence. Short." },
   },
-  required: ["do", "kw", "facing", "query", "letter", "degrees", "phase", "storeys", "words"],
+  required: ["do", "kw", "facing", "query", "inverter", "battery", "letter", "degrees", "phase", "storeys", "words"],
 } as const;
 
 /** Sol's reading, checked: a command the designer can carry out, else his words as an answer. */
@@ -148,6 +193,21 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
       const kw = n(read.kw);
       const facing = ["N", "E", "S", "W"].includes(read.facing as string) ? (read.facing as Facing) : undefined;
       return kw && kw > 0 && kw <= 100 ? { do: "targetKw", kw, ...(facing ? { facing } : {}) } : { do: "answer", words };
+    }
+    case "system": {
+      const kw = n(read.kw);
+      const facing = ["N", "E", "S", "W"].includes(read.facing as string) ? (read.facing as Facing) : undefined;
+      const part = (v: unknown) => (typeof v === "string" ? { value: v.slice(0, 80) } : null);
+      const inverter = part(read.inverter);
+      const battery = part(read.battery);
+      if (!kw || kw <= 0 || kw > 100) return { do: "answer", words };
+      return {
+        do: "system",
+        kw,
+        ...(facing ? { facing } : {}),
+        ...(inverter ? { inverter: inverter.value } : {}),
+        ...(battery ? { battery: battery.value } : {}),
+      };
     }
     case "battery":
     case "inverter":
@@ -178,6 +238,7 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
 export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roof designer. Above is the design as it stands. Read the person's request and answer with one change the designer can make, or, for a question, do "answer" with the answer in words.
 
 - targetKw: fill the roof (or the faces facing a direction) to about that many kW.
+- system: a whole system at once ("load 8 kW of panels, an inverter and a battery"): kw, then inverter and battery, each the product's words from the lists, "" to choose one by rule, or null when it wasn't asked for.
 - battery / inverter / panel: choose that product; query holds its maker and model words as named in the lists above.
 - noBattery, stringAuto (string the panels by rule), designForMe (make the three designs), flat (the roof is flat), pitch (the roof pitch in degrees), tilt (the picked panels' tilt), phase, storeys.
 - explainString: show the check for a string, by its letter; put the reason in words too, from the string checks above.

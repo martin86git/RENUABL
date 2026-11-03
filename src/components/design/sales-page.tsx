@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Check, Clock, Layers } from "lucide-react";
+import { ArrowRight, Check, Clock, PencilRuler } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
 import {
   ENTERPRISE_FROM,
@@ -24,17 +24,25 @@ import {
   FAQ,
   JOURNEY,
   MARKETPLACE,
+  ASK_DEMO,
+  BIG_THREE,
   OLD_WAY,
-  PILLARS,
   PRICING,
   SALES_HERO,
   SOL,
   type Visual,
 } from "@/lib/domain/design/sales-page";
 import { askSales, registerInterest, startTrial } from "@/lib/services/billing";
-import { AfterSigningDemo, AutomationDemo, ConversationDemo, ThreeDesignsDemo } from "./designer-showcase";
+import {
+  AfterSigningDemo,
+  AskDesignDemo,
+  AutomationDemo,
+  ConversationDemo,
+  ListingRoofExample,
+  ThreeDesignsDemo,
+} from "./designer-showcase";
 import { Reveal } from "./front-hero";
-import { SolIcon } from "./sol-icon";
+import { SolBadge, SolIcon } from "./sol-icon";
 
 /**
  * The sign-up page for solar businesses (`/design` signed out; copy in `domain/design/sales-page.ts`, prices in
@@ -48,7 +56,7 @@ export function SalesPage({ notice }: { notice?: string | null }) {
       <Header />
       {notice && <p className="mx-auto max-w-3xl px-5 pt-4 text-center text-sm text-danger">{notice}</p>}
       <Hero />
-      <Pillars />
+      <BigThree />
       <OldWay />
       <Journey />
       <SolSection />
@@ -89,14 +97,17 @@ function Header() {
           <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-line sm:tracking-[0.2em]">Business</span>
         </Link>
         <nav className="hidden items-center gap-7 text-[14px] text-ink-2 md:flex">
-          <a href="#journey" className="hover:text-ink">
-            How it works
+          <a href="#designer" className="hover:text-ink">
+            Designer
           </a>
           <a href="#sol" className="hover:text-ink">
             Sol
           </a>
-          <a href="#marketplace" className="hover:text-ink">
+          <a href="#network" className="hover:text-ink">
             Marketplace
+          </a>
+          <a href="#journey" className="hover:text-ink">
+            How it works
           </a>
           <a href="#pricing" className="hover:text-ink">
             Pricing
@@ -259,12 +270,8 @@ function Hero() {
           </div>
         </div>
         <div className="lg:-mr-24">
-          <Screen
-            src="/design/landing/today-sol.webp"
-            alt="RENUABL's Today screen: Sol writes up the day, with RENUABL Marketplace and Sol in the menu (example data)"
-            priority
-          />
-          <p className="mt-3 text-center text-xs text-muted">Real screens. Made-up example customers.</p>
+          <AskDesignDemo label={ASK_DEMO.label} request={ASK_DEMO.request} reply={ASK_DEMO.reply} />
+          <p className="mt-3 text-center text-xs text-muted">{ASK_DEMO.caption}</p>
         </div>
       </div>
     </section>
@@ -291,66 +298,110 @@ function MarketMark({ className }: { className?: string }) {
   );
 }
 
-/** The two things RENUABL is, side by side under the hero: the platform, and the Marketplace that connects it. */
-function Pillars() {
+/**
+ * The three things RENUABL is known by, a band each under the hero (3 Nov 2026, Martin: the designer, Sol and the
+ * Marketplace are huge features and must feel it): the design tool with AI over it, Sol, and the Marketplace.
+ */
+function BigThree() {
   return (
-    <section className="px-5 pb-20 lg:px-8 lg:pb-28" aria-label="What RENUABL is">
-      <div className="mx-auto grid w-full max-w-7xl gap-4 md:grid-cols-2">
-        {PILLARS.map((p, i) => {
-          const market = p.id === "marketplace";
-          const linkClass = clsx(
-            "mt-auto inline-flex items-center gap-1.5 pt-8 text-[15px] font-semibold",
-            market ? "text-white hover:text-white/80" : "text-sun-line hover:brightness-110",
+    <div aria-label="The design tool, Sol and RENUABL Marketplace">
+      {BIG_THREE.map((p, i) => {
+        const look =
+          p.id === "designer"
+            ? {
+                band: "bg-canvas text-ink",
+                eyebrow: "text-ink-2",
+                body: "text-ink-2",
+                tick: "text-sun-line",
+                link: "text-sun-line hover:brightness-110",
+              }
+            : p.id === "sol"
+              ? {
+                  band: "bg-primary text-white",
+                  eyebrow: "text-sun-bright",
+                  body: "text-white/75",
+                  tick: "text-sun-bright",
+                  link: "text-white hover:text-white/80",
+                }
+              : {
+                  band: "bg-market text-white",
+                  eyebrow: "text-market-ink",
+                  body: "text-white/80",
+                  tick: "text-market-ink",
+                  link: "text-white hover:text-white/80",
+                };
+        const linkClass = clsx("mt-8 inline-flex items-center gap-1.5 text-[15px] font-semibold", look.link);
+        const mark =
+          p.id === "designer" ? (
+            <span className="grid size-12 place-items-center rounded-full bg-sun-line text-white">
+              <PencilRuler className="size-6" />
+            </span>
+          ) : p.id === "sol" ? (
+            <span className="grid size-12 place-items-center rounded-full bg-white/10">
+              <SolBadge className="size-7" />
+            </span>
+          ) : (
+            <span className="grid size-12 place-items-center rounded-full bg-white text-market">
+              <MarketMark className="size-6" />
+            </span>
           );
-          return (
-            <Reveal
-              key={p.id}
-              className={clsx(
-                "flex flex-col rounded-3xl p-8 lg:p-10",
-                market ? "bg-market text-white" : "bg-surface shadow-[0_30px_80px_-40px_rgba(11,11,12,0.35)] ring-1 ring-line",
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <span
-                  className={clsx(
-                    "grid size-12 place-items-center rounded-full",
-                    market ? "bg-white text-market" : "bg-sun-line text-white",
-                  )}
-                  aria-hidden
-                >
-                  {market ? <MarketMark className="size-6" /> : <Layers className="size-6" />}
-                </span>
-                <span className={clsx("font-mono text-[13px]", market ? "text-white/60" : "text-muted")}>0{i + 1}</span>
+        const visual =
+          p.id === "designer" ? (
+            <ThreeDesignsDemo />
+          ) : p.id === "sol" ? (
+            <Screen
+              src="/design/landing/today-sol.webp"
+              alt="RENUABL's Today screen: Sol writes up the day, the most pressing thing at the top (example data)"
+            />
+          ) : (
+            <div className="overflow-hidden rounded-2xl ring-1 ring-white/15">
+              <ListingRoofExample className="block h-auto w-full" />
+            </div>
+          );
+        return (
+          <section
+            key={p.id}
+            id={p.id === "marketplace" ? "network" : p.id === "designer" ? "designer" : undefined}
+            className={clsx("scroll-mt-16 px-5 py-24 lg:px-8 lg:py-32", look.band)}
+            aria-labelledby={`big-${p.id}`}
+          >
+            <Reveal className="mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <div className={clsx(i % 2 === 1 && "lg:order-2")}>
+                <div className="flex items-center gap-4" aria-hidden>
+                  {mark}
+                  <span className={clsx("font-mono text-[13px]", look.eyebrow)}>0{i + 1}</span>
+                </div>
+                <p className={clsx("mt-8 text-[13px] font-medium uppercase tracking-[0.18em]", look.eyebrow)}>{p.eyebrow}</p>
+                <h2 id={`big-${p.id}`} className="mt-4 text-[clamp(36px,5vw,68px)] font-semibold leading-[0.98] tracking-[-0.04em]">
+                  {p.title}
+                </h2>
+                <p className={clsx("mt-6 max-w-xl text-[18px] leading-relaxed", look.body)}>{p.body}</p>
+                <ul className="mt-7 grid max-w-xl gap-2.5 text-[15px]">
+                  {p.points.map((pt) => (
+                    <li key={pt} className="flex items-start gap-2.5">
+                      <Check className={clsx("mt-1 size-4 shrink-0", look.tick)} aria-hidden />
+                      {pt}
+                    </li>
+                  ))}
+                </ul>
+                {p.link.href.startsWith("#") ? (
+                  <a href={p.link.href} className={linkClass}>
+                    {p.link.label}
+                    <ArrowRight className="size-4" aria-hidden />
+                  </a>
+                ) : (
+                  <Link href={p.link.href} className={linkClass}>
+                    {p.link.label}
+                    <ArrowRight className="size-4" aria-hidden />
+                  </Link>
+                )}
               </div>
-              <p className={clsx("mt-8 text-[13px] font-medium uppercase tracking-[0.18em]", market ? "text-market-ink" : "text-ink-2")}>
-                {p.eyebrow}
-              </p>
-              <h2 className="mt-3 text-[clamp(30px,3.6vw,46px)] font-semibold leading-[1.02] tracking-[-0.035em]">{p.title}</h2>
-              <p className={clsx("mt-5 text-[17px] leading-relaxed", market ? "text-white/80" : "text-ink-2")}>{p.body}</p>
-              <ul className="mt-6 grid gap-2 text-[15px] sm:grid-cols-2">
-                {p.points.map((pt) => (
-                  <li key={pt} className="flex items-start gap-2">
-                    <Check className={clsx("mt-1 size-4 shrink-0", market ? "text-market-ink" : "text-sun-line")} aria-hidden />
-                    {pt}
-                  </li>
-                ))}
-              </ul>
-              {p.link.href.startsWith("#") ? (
-                <a href={p.link.href} className={linkClass}>
-                  {p.link.label}
-                  <ArrowRight className="size-4" aria-hidden />
-                </a>
-              ) : (
-                <Link href={p.link.href} className={linkClass}>
-                  {p.link.label}
-                  <ArrowRight className="size-4" aria-hidden />
-                </Link>
-              )}
+              <div className={clsx("min-w-0", i % 2 === 1 && "lg:order-1")}>{visual}</div>
             </Reveal>
-          );
-        })}
-      </div>
-    </section>
+          </section>
+        );
+      })}
+    </div>
   );
 }
 

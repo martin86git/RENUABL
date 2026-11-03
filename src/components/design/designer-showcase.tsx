@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { AerialScene, PanelDefs, SolarPanel } from "./aerial-home";
+import { SolBadge } from "./sol-icon";
 import { AFTER_STEPS, COMING_SOON_LABEL, type FeatureStatus } from "@/lib/domain/design/landing";
 
 /**
@@ -1157,5 +1158,119 @@ export function ListingRoofExample({ className }: { className?: string }) {
         <SolarPanel key={i} x={p.x} y={p.y} w={p.w} h={p.h} />
       ))}
     </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 5. Just ask: a whole system typed into the design tool's "Ask Sol to change it" bar.
+
+/** The request typed out, then the panels laid one by one, the inverter and the battery, then the reply. */
+const HERO_ASK = { typeFrom: 700, perChar: 55, pressGap: 350, panelEvery: 110, total: 14000 };
+
+/**
+ * The sign-up page's hero (3 Nov 2026, Martin: sell the AI over the designer, not the designer): a request typed into
+ * the design tool's command bar and done, on the made-up home. The words come from the page's copy (`ASK_DEMO`), and
+ * what happens is what the design tool does with them: 17 panels to about 8 kW, an inverter and a battery by rule.
+ */
+export function AskDesignDemo({ label, request, reply }: { label: string; request: string; reply: string }) {
+  const [t, playing] = useTimeline(HERO_ASK.total);
+  const typed = Math.max(0, Math.min(request.length, Math.floor((t - HERO_ASK.typeFrom) / HERO_ASK.perChar)));
+  const pressAt = HERO_ASK.typeFrom + request.length * HERO_ASK.perChar + HERO_ASK.pressGap;
+  const spots = ARRAYS.flatMap((a) => a.spots).slice(0, 17);
+  const laid = t < pressAt + 300 ? 0 : Math.min(spots.length, Math.floor((t - pressAt - 300) / HERO_ASK.panelEvery) + 1);
+  const panelsDone = pressAt + 300 + spots.length * HERO_ASK.panelEvery;
+  const inverterOn = t >= panelsDone + 300;
+  const batteryOn = t >= panelsDone + 800;
+  const replyOn = t >= panelsDone + 1300;
+  const kw = (laid * WATTS) / 1000;
+  const pressing = t >= pressAt && t < pressAt + 350;
+  return (
+    <figure ref={playing} className="w-full min-w-0" aria-label={`${request}: an example in the design tool`}>
+      <div
+        aria-hidden
+        className="pointer-events-none relative select-none overflow-hidden rounded-2xl bg-surface shadow-[0_30px_80px_-30px_rgba(11,11,12,0.35)] ring-1 ring-line [container-type:inline-size]"
+      >
+        <div className="flex h-7 items-center gap-1.5 border-b border-line bg-surface-2 px-3">
+          <span className="size-2.5 rounded-full bg-line-strong" />
+          <span className="size-2.5 rounded-full bg-line-strong" />
+          <span className="size-2.5 rounded-full bg-line-strong" />
+        </div>
+        {/* The figures over the picture, as in the design tool. */}
+        <div className="grid grid-cols-3 gap-px bg-white/10 text-white">
+          {[
+            { k: "Solar", v: laid ? `${kw.toFixed(2)} kW` : "0.00 kW", s: `${laid} panels` },
+            { k: "Inverter", v: inverterOn ? "8 kW" : "–", s: inverterOn ? "hybrid" : "none yet" },
+            { k: "Battery", v: batteryOn ? "16 kWh" : "–", s: batteryOn ? "2 modules" : "none yet" },
+          ].map((f) => (
+            <div key={f.k} className="bg-primary px-[2.4cqw] py-[1.4cqw]">
+              <p className="text-[1.5cqw] uppercase tracking-[0.14em] text-white/55">{f.k}</p>
+              <p className="text-[3cqw] font-medium tabular-nums leading-tight text-sun-line">{f.v}</p>
+              <p className="text-[1.5cqw] text-white/60">{f.s}</p>
+            </div>
+          ))}
+        </div>
+        <div className="relative">
+          <svg viewBox="104 30 520 320" className="block w-full">
+            <AerialScene />
+            <PanelDefs />
+            {spots.slice(0, laid).map((p, i) => (
+              <SolarPanel key={i} x={p.x} y={p.y} w={p.w} h={p.h} picked={i >= laid - 2 && laid < spots.length} />
+            ))}
+            {inverterOn && (
+              <g transform="translate(560 168)">
+                <rect x="-13" y="-11" width="26" height="22" rx="3" fill="#0b0c0e" stroke="var(--sun-line)" strokeWidth="1.2" />
+                <text y="3.5" textAnchor="middle" fontSize="8" fontWeight="600" fill="#fff">
+                  INV
+                </text>
+              </g>
+            )}
+            {batteryOn && (
+              <g transform="translate(592 168)">
+                <rect x="-10" y="-14" width="20" height="28" rx="3" fill="#0b0c0e" stroke="#86efac" strokeWidth="1.2" />
+                <rect x="-5" y="-6" width="10" height="14" rx="1" fill="none" stroke="#86efac" strokeWidth="1" />
+              </g>
+            )}
+          </svg>
+          {/* The command bar, floating over the picture as it does in the design tool. */}
+          <div className="absolute inset-x-[6cqw] top-[3cqw]">
+            <div
+              className={clsx(
+                "flex items-center gap-[1.4cqw] rounded-full bg-surface/95 px-[2cqw] py-[1.4cqw] shadow-lift ring-1 backdrop-blur transition-all duration-300",
+                pressing ? "scale-[0.98] ring-sun-line" : "ring-line",
+              )}
+            >
+              <SolBadge className="size-[3.2cqw] shrink-0" />
+              <span className="min-w-0 flex-1 truncate text-[2.3cqw] text-ink">
+                {typed ? (
+                  <>
+                    {request.slice(0, typed)}
+                    {typed < request.length && <span className="ml-px inline-block h-[2.4cqw] w-px animate-pulse bg-ink align-middle" />}
+                  </>
+                ) : (
+                  <span className="text-muted">{label}…</span>
+                )}
+              </span>
+              <span
+                className={clsx(
+                  "grid size-[3.6cqw] shrink-0 place-items-center rounded-full text-white transition-colors",
+                  typed === request.length ? "bg-sun-line" : "bg-line-strong",
+                )}
+              >
+                <ArrowRight className="size-[2cqw]" />
+              </span>
+            </div>
+            <p
+              className={clsx(
+                "mt-[1.2cqw] inline-flex items-start gap-[1cqw] rounded-2xl bg-surface/95 px-[2cqw] py-[1.2cqw] text-[2cqw] leading-snug text-ink shadow-lift ring-1 ring-line backdrop-blur transition-all duration-500",
+                replyOn ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0",
+              )}
+            >
+              <Check className="mt-[0.3cqw] size-[2.2cqw] shrink-0 text-sun-line" />
+              {reply}
+            </p>
+          </div>
+        </div>
+      </div>
+    </figure>
   );
 }
