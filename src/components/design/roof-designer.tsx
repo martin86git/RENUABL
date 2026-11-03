@@ -518,45 +518,49 @@ function RoofAngle({ pitch, size = 22 }: { pitch: number; size?: number }) {
   );
 }
 
-const PITCH_PICKS = [10, 15, 20, 22, 25, 30, 35];
-
-function PitchStepper({ pitch, onPitch }: { pitch: number; onPitch: (pitch: number) => void }) {
+/** The pitch with − and +, the figure itself a box to tap and type over (3 Nov 2026, Martin). Enter sets it, where it can. */
+function PitchStepper({ pitch, onPitch, onEnter }: { pitch: number; onPitch: (pitch: number) => void; onEnter?: () => void }) {
+  const [typed, setTyped] = useState<string | null>(null);
+  const take = (raw: string) => {
+    setTyped(raw.replace(/[^d]/g, "").slice(0, 2));
+    const n = Number(raw.replace(/[^d]/g, ""));
+    if (raw.trim() && Number.isFinite(n)) onPitch(Math.min(70, Math.max(0, Math.round(n))));
+  };
   return (
-    <div className="mt-2 flex items-center justify-center gap-3">
+    <div className="mt-1.5 flex items-center justify-center gap-2.5">
       <button
         onClick={() => onPitch(Math.max(0, pitch - 1))}
-        className="flex size-9 items-center justify-center rounded-full bg-surface-2 text-lg font-semibold hover:bg-line"
+        className="flex size-8 items-center justify-center rounded-full bg-surface-2 text-lg font-semibold hover:bg-line"
         aria-label="Roof pitch down a degree"
       >
         −
       </button>
-      <span className="min-w-[3.5rem] text-center text-2xl font-semibold tabular-nums">{pitch}°</span>
+      <label className="flex items-baseline rounded-md px-1 ring-1 ring-transparent focus-within:ring-sun-line hover:ring-line">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={typed ?? String(pitch)}
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => take(e.target.value)}
+          onBlur={() => setTyped(null)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && onEnter) {
+              e.preventDefault();
+              onEnter();
+            }
+          }}
+          aria-label="Roof pitch in degrees"
+          className="w-[2.6ch] bg-transparent text-right text-2xl font-semibold tabular-nums outline-none"
+        />
+        <span className="text-2xl font-semibold">°</span>
+      </label>
       <button
         onClick={() => onPitch(Math.min(70, pitch + 1))}
-        className="flex size-9 items-center justify-center rounded-full bg-surface-2 text-lg font-semibold hover:bg-line"
+        className="flex size-8 items-center justify-center rounded-full bg-surface-2 text-lg font-semibold hover:bg-line"
         aria-label="Roof pitch up a degree"
       >
         +
       </button>
-    </div>
-  );
-}
-
-function PitchPicks({ pitch, onPitch }: { pitch: number; onPitch: (pitch: number) => void }) {
-  return (
-    <div className="mt-2 flex flex-wrap justify-center gap-1">
-      {PITCH_PICKS.map((p) => (
-        <button
-          key={p}
-          onClick={() => onPitch(p)}
-          className={clsx(
-            "rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
-            p === pitch ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-2 hover:bg-line",
-          )}
-        >
-          {p}°
-        </button>
-      ))}
     </div>
   );
 }
@@ -585,7 +589,6 @@ function RoofPitchMark(props: { pitch: number; open: boolean; onOpen: (open: boo
             </button>
           </div>
           <PitchStepper pitch={pitch} onPitch={onPitch} />
-          <PitchPicks pitch={pitch} onPitch={onPitch} />
         </div>
       )}
     </div>
@@ -606,31 +609,30 @@ function PitchFirst(props: { pitch: number; flat: boolean; onSet: (pitch: number
   }, []);
   if (!shown) return null;
   return (
-    <div className="absolute right-3 top-1/2 z-30 w-60 -translate-y-1/2">
-      <div className={clsx("p-3.5 text-ink", GLASS)} role="dialog" aria-label="Set the roof pitch">
+    <div className="absolute right-3 top-1/2 z-30 w-52 -translate-y-1/2">
+      <div className={clsx("p-3 text-ink", GLASS)} role="dialog" aria-label="Set the roof pitch">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">First, the roof</p>
-        <h3 className="mt-0.5 text-base font-semibold tracking-tight">What is the roof&apos;s pitch?</h3>
+        <h3 className="mt-0.5 text-[15px] font-semibold tracking-tight">What is the roof&apos;s pitch?</h3>
         <div className="mt-1 flex justify-center text-ink">
-          <RoofAngle pitch={pitch} size={56} />
+          <RoofAngle pitch={pitch} size={44} />
         </div>
-        <PitchStepper pitch={pitch} onPitch={setPitch} />
-        <PitchPicks pitch={pitch} onPitch={setPitch} />
-        <p className="mt-2 text-center text-[11px] leading-snug text-muted">New panels and traced faces start at it.</p>
-        <button
-          onClick={() => props.onSet(pitch)}
-          className="mt-3 w-full rounded-full bg-primary py-2 text-sm font-semibold text-primary-ink hover:bg-forest"
-        >
-          Set {pitch}°
-        </button>
-        {props.flat ? (
-          <button onClick={() => props.onSet(pitch)} className="mt-2 w-full text-xs font-medium text-muted hover:text-ink">
-            It&apos;s set as a flat roof: carry on
+        <PitchStepper pitch={pitch} onPitch={setPitch} onEnter={() => props.onSet(pitch)} />
+        <p className="mt-1.5 text-center text-[11px] leading-snug text-muted">Tap the figure to type it. New panels start at it.</p>
+        {/* The flat roof is a button of its own beside Set (Martin: it was easy to miss as a line of text). */}
+        <div className="mt-2.5 flex gap-1.5">
+          <button
+            onClick={() => (props.flat ? props.onSet(pitch) : props.onSet(props.pitch, "flat"))}
+            className="flex-1 rounded-full bg-surface py-1.5 text-xs font-semibold text-ink ring-1 ring-line hover:bg-surface-2"
+          >
+            {props.flat ? "Flat: carry on" : "It’s flat"}
           </button>
-        ) : (
-          <button onClick={() => props.onSet(props.pitch, "flat")} className="mt-2 w-full text-xs font-medium text-muted hover:text-ink">
-            It&apos;s a flat roof
+          <button
+            onClick={() => props.onSet(pitch)}
+            className="flex-1 rounded-full bg-primary py-1.5 text-xs font-semibold text-primary-ink hover:bg-forest"
+          >
+            Set {pitch}°
           </button>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -2483,14 +2485,9 @@ export function RoofDesigner(props: {
         setLoose([...loose, ...placed]);
         setPicks(placed.map((g): Pick => ({ kind: "loose", id: g.id })));
         changed();
-        // An array dragged out is done: the arrow takes over, with the whole array picked; so is one panel clicked
-        // onto an array (as Primero's). A single panel placed in the open leaves the tool on, to go on adding.
-        const joined = placed.length === 1 && joinedToOthers(placed);
+        // Add a panel stays on, to go on adding (3 Nov 2026, Martin: "I still want to be able to add panels"); the
+        // array just laid stays picked, with its tilt offered, and the arrow over a panel still picks and moves it.
         if (placed.length > 1) setTiltPop(placed.map((g) => g.id));
-        if (placed.length > 1 || joined) {
-          setTool("select");
-          setOnPanel(false);
-        }
       }
       return setGhosts([]);
     }
@@ -2902,7 +2899,9 @@ export function RoofDesigner(props: {
     let modelOffsetM: { x: number; y: number } | undefined;
     if (!faces.length) {
       const found = await googleModelInPlace();
-      if ("note" in found) return setMine({ options: [], notes: [found.note], from: null });
+      // Opened by itself with nothing to design from (Google's roof data missing or older than the photo): it says
+      // nothing (3 Nov 2026, Martin: "we don't need the Google pop up"); pressed by a person, it says why.
+      if ("note" in found) return setMine(auto ? "idle" : { options: [], notes: [found.note], from: null });
       model = found.model;
       modelOffsetM = found.offset;
     }
@@ -2934,6 +2933,7 @@ export function RoofDesigner(props: {
       date: todayInMarket(),
       newId,
     });
+    if (auto && !result.options.length) return setMine("idle");
     // Made by itself as the roof opened: said so on the card, to be checked against the photo.
     setMine(auto ? { ...result, notes: [AUTO_DESIGNED, ...result.notes] } : result);
     setMineOpen(true);
