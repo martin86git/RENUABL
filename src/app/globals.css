@@ -174,7 +174,7 @@ body {
   }
   html.sol-docked .team-pop {
     right: calc(var(--sol-w) + 5rem);
-    width: min(40rem, calc(100vw - var(--sol-w) - 7rem));
+    width: min(50rem, calc(100vw - var(--sol-w) - 7rem));
   }
 }
 .sol-rail,

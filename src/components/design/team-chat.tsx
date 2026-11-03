@@ -1167,7 +1167,7 @@ export function TeamChatButton({ me }: { me: string }) {
       {/* On the page itself, not inside the rail: the rail is moved by a transform, which would carry it along. */}
       {open &&
         createPortal(
-          <div className="theme-studio team-pop fixed right-20 top-1/2 z-30 h-[min(38rem,84dvh)] w-[min(40rem,calc(100vw-7rem))] -translate-y-1/2 overflow-hidden rounded-3xl bg-surface shadow-[0_12px_40px_rgba(20,22,26,0.16)] ring-1 ring-line">
+          <div className="theme-studio team-pop fixed right-20 top-1/2 z-[52] h-[min(48rem,90dvh)] w-[min(50rem,calc(100vw-7rem))] -translate-y-1/2 overflow-hidden rounded-3xl bg-surface shadow-[0_12px_40px_rgba(20,22,26,0.16)] ring-1 ring-line">
             <TeamChatPanel key={start ?? "last"} me={me} start={start} onClose={() => setOpen(false)} />
           </div>,
           document.body,
