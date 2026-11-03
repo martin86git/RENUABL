@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Check, Clock, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Clock, Layers } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
 import {
   ENTERPRISE_FROM,
@@ -25,6 +25,7 @@ import {
   JOURNEY,
   MARKETPLACE,
   OLD_WAY,
+  PILLARS,
   PRICING,
   SALES_HERO,
   SOL,
@@ -33,6 +34,7 @@ import {
 import { askSales, registerInterest, startTrial } from "@/lib/services/billing";
 import { AfterSigningDemo, AutomationDemo, ConversationDemo, ThreeDesignsDemo } from "./designer-showcase";
 import { Reveal } from "./front-hero";
+import { SolIcon } from "./sol-icon";
 
 /**
  * The sign-up page for solar businesses (`/design` signed out; copy in `domain/design/sales-page.ts`, prices in
@@ -46,6 +48,7 @@ export function SalesPage({ notice }: { notice?: string | null }) {
       <Header />
       {notice && <p className="mx-auto max-w-3xl px-5 pt-4 text-center text-sm text-danger">{notice}</p>}
       <Hero />
+      <Pillars />
       <OldWay />
       <Journey />
       <SolSection />
@@ -83,7 +86,7 @@ function Header() {
         {/* RENUABL Business: the network's side for retailers and installers (RENUABL Home, for homeowners, is at /). */}
         <Link href="/business" aria-label="RENUABL Business" className="flex items-baseline gap-2">
           <Wordmark />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sun-line">Business</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-line sm:tracking-[0.2em]">Business</span>
         </Link>
         <nav className="hidden items-center gap-7 text-[14px] text-ink-2 md:flex">
           <a href="#journey" className="hover:text-ink">
@@ -91,6 +94,9 @@ function Header() {
           </a>
           <a href="#sol" className="hover:text-ink">
             Sol
+          </a>
+          <a href="#marketplace" className="hover:text-ink">
+            Marketplace
           </a>
           <a href="#pricing" className="hover:text-ink">
             Pricing
@@ -100,14 +106,15 @@ function Header() {
           <Link href="/" className="hidden text-[14px] text-ink-2 hover:text-ink lg:inline">
             For homeowners
           </Link>
-          <Link href="/design/sign-in" className="text-[14px] text-ink-2 hover:text-ink">
+          <Link href="/design/sign-in" className="whitespace-nowrap text-[14px] text-ink-2 hover:text-ink">
             Sign in
           </Link>
           <a
             href="#start"
-            className="inline-flex h-9 items-center rounded-full bg-sun-line px-4 text-[13px] font-semibold text-white shadow-sm hover:brightness-105"
+            className="inline-flex h-9 items-center whitespace-nowrap rounded-full bg-sun-line px-3.5 text-[13px] font-semibold text-white shadow-sm hover:brightness-105 sm:px-4"
           >
-            Start free trial
+            <span className="sm:hidden">Free trial</span>
+            <span className="hidden sm:inline">Start free trial</span>
           </a>
         </div>
       </div>
@@ -252,9 +259,96 @@ function Hero() {
           </div>
         </div>
         <div className="lg:-mr-24">
-          <Screen src="/design/landing/today.webp" alt="RENUABL's Today screen, with example data" priority />
+          <Screen
+            src="/design/landing/today-sol.webp"
+            alt="RENUABL's Today screen: Sol writes up the day, with RENUABL Marketplace and Sol in the menu (example data)"
+            priority
+          />
           <p className="mt-3 text-center text-xs text-muted">Real screens. Made-up example customers.</p>
         </div>
+      </div>
+    </section>
+  );
+}
+
+/** RENUABL Marketplace's mark: two roofs joined (as on its button in the app's menu). */
+function MarketMark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M2.5 12 8 7l5.5 5" />
+      <path d="M10.5 12 16 7l5.5 5" />
+      <path d="M4.5 12v6h15v-6" />
+    </svg>
+  );
+}
+
+/** The two things RENUABL is, side by side under the hero: the platform, and the Marketplace that connects it. */
+function Pillars() {
+  return (
+    <section className="px-5 pb-20 lg:px-8 lg:pb-28" aria-label="What RENUABL is">
+      <div className="mx-auto grid w-full max-w-7xl gap-4 md:grid-cols-2">
+        {PILLARS.map((p, i) => {
+          const market = p.id === "marketplace";
+          const linkClass = clsx(
+            "mt-auto inline-flex items-center gap-1.5 pt-8 text-[15px] font-semibold",
+            market ? "text-white hover:text-white/80" : "text-sun-line hover:brightness-110",
+          );
+          return (
+            <Reveal
+              key={p.id}
+              className={clsx(
+                "flex flex-col rounded-3xl p-8 lg:p-10",
+                market ? "bg-market text-white" : "bg-surface shadow-[0_30px_80px_-40px_rgba(11,11,12,0.35)] ring-1 ring-line",
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={clsx(
+                    "grid size-12 place-items-center rounded-full",
+                    market ? "bg-white text-market" : "bg-sun-line text-white",
+                  )}
+                  aria-hidden
+                >
+                  {market ? <MarketMark className="size-6" /> : <Layers className="size-6" />}
+                </span>
+                <span className={clsx("font-mono text-[13px]", market ? "text-white/60" : "text-muted")}>0{i + 1}</span>
+              </div>
+              <p className={clsx("mt-8 text-[13px] font-medium uppercase tracking-[0.18em]", market ? "text-market-ink" : "text-ink-2")}>
+                {p.eyebrow}
+              </p>
+              <h2 className="mt-3 text-[clamp(30px,3.6vw,46px)] font-semibold leading-[1.02] tracking-[-0.035em]">{p.title}</h2>
+              <p className={clsx("mt-5 text-[17px] leading-relaxed", market ? "text-white/80" : "text-ink-2")}>{p.body}</p>
+              <ul className="mt-6 grid gap-2 text-[15px] sm:grid-cols-2">
+                {p.points.map((pt) => (
+                  <li key={pt} className="flex items-start gap-2">
+                    <Check className={clsx("mt-1 size-4 shrink-0", market ? "text-market-ink" : "text-sun-line")} aria-hidden />
+                    {pt}
+                  </li>
+                ))}
+              </ul>
+              {p.link.href.startsWith("#") ? (
+                <a href={p.link.href} className={linkClass}>
+                  {p.link.label}
+                  <ArrowRight className="size-4" aria-hidden />
+                </a>
+              ) : (
+                <Link href={p.link.href} className={linkClass}>
+                  {p.link.label}
+                  <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              )}
+            </Reveal>
+          );
+        })}
       </div>
     </section>
   );
@@ -365,7 +459,7 @@ function SolSection() {
       <div className="mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <Reveal>
           <p className="inline-flex items-center gap-2 text-[13px] font-medium uppercase tracking-[0.18em] text-sun-ink">
-            <Sparkles className="size-4" aria-hidden />
+            <SolIcon className="size-4" aria-hidden />
             {SOL.eyebrow}
           </p>
           <h2 id="sol-title" className="mt-5 text-[clamp(32px,4.4vw,56px)] font-semibold leading-[1.04] tracking-[-0.03em]">
@@ -467,23 +561,35 @@ function Marketplace() {
     setState({ ok: a.ok, message: a.message ?? "" });
   };
   return (
-    <section className="bg-primary px-5 py-24 text-white lg:px-8 lg:py-32" aria-labelledby="marketplace">
+    <section id="marketplace" className="scroll-mt-16 bg-market px-5 py-24 text-white lg:px-8 lg:py-32" aria-labelledby="marketplace-title">
       <Reveal className="mx-auto w-full max-w-6xl">
-        <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-sun-bright">{MARKETPLACE.eyebrow}</p>
-        <h2 id="marketplace" className="mt-5 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-semibold leading-[1.02] tracking-[-0.035em]">
+        <p className="inline-flex items-center gap-2.5 text-[13px] font-medium uppercase tracking-[0.18em] text-market-ink">
+          <span className="grid size-8 place-items-center rounded-full bg-white text-market" aria-hidden>
+            <MarketMark className="size-4" />
+          </span>
+          {MARKETPLACE.eyebrow}
+        </p>
+        <h2
+          id="marketplace-title"
+          className="mt-5 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-semibold leading-[1.02] tracking-[-0.035em]"
+        >
           {MARKETPLACE.headline}
         </h2>
-        <p className="mt-5 max-w-2xl text-[18px] leading-relaxed text-white/70">{MARKETPLACE.sub}</p>
-        <div className="mt-12 grid gap-4 md:grid-cols-2">
+        <p className="mt-5 max-w-2xl text-[18px] leading-relaxed text-white/80">{MARKETPLACE.sub}</p>
+        <div className="mt-12 grid gap-4 md:grid-cols-3">
           {MARKETPLACE.sides.map((s) => (
-            <div key={s.title} className="rounded-2xl bg-white/5 p-7 ring-1 ring-white/10">
+            <div key={s.title} className="rounded-2xl bg-white/10 p-7 ring-1 ring-white/15">
               <h3 className="text-[20px] font-semibold">{s.title}</h3>
-              <p className="mt-3 text-[15px] leading-relaxed text-white/70">{s.body}</p>
+              <p className="mt-3 text-[15px] leading-relaxed text-white/80">{s.body}</p>
             </div>
           ))}
         </div>
+        <Link href="/design/marketplace" className="mt-8 inline-flex items-center gap-1.5 text-[15px] font-semibold hover:text-white/80">
+          {MARKETPLACE.look}
+          <ArrowRight className="size-4" aria-hidden />
+        </Link>
         {state?.ok ? (
-          <p className="mt-10 text-[16px] text-sun-bright">{state.message}</p>
+          <p className="mt-10 text-[16px] text-market-ink">{state.message}</p>
         ) : (
           <form
             onSubmit={(e) => void go(e)}
@@ -506,7 +612,7 @@ function Marketplace() {
             </button>
           </form>
         )}
-        {state && !state.ok && <p className="mt-2 text-sm text-sun-bright">{state.message}</p>}
+        {state && !state.ok && <p className="mt-2 text-sm text-market-ink">{state.message}</p>}
       </Reveal>
     </section>
   );

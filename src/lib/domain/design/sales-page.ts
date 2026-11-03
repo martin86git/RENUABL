@@ -7,12 +7,40 @@
 import { ENTERPRISE_FROM, PLAN_WORDS, TRIAL_DAYS, TRIAL_JOBS, TOKEN_CENTS, dollars, SEAT_MONTHLY_CENTS } from "./plans";
 
 export const SALES_HERO = {
-  eyebrow: "The all-in-one platform for solar businesses",
+  eyebrow: "RENUABL Business · for solar retailers and installers",
   headline: "Pay less. Do more.",
-  sub: "Design, quote, sell, approve, book, order, install and get paid, in one place built for Australian solar installers and retailers. With Sol, the AI assistant that works inside your deals.",
+  sub: "Run the whole business in one place, from enquiry to final invoice, with Sol, the AI assistant inside your deals. Then plug into RENUABL Marketplace, the network that connects solar businesses.",
   cta: `Start your ${TRIAL_DAYS}-day free trial`,
   small: [`${PLAN_WORDS.seat}, inc GST`, `${TRIAL_JOBS} design jobs free`, "Cancel any time"],
 } as const;
+
+/**
+ * The two things the page stands on (3 Nov 2026, Martin: the all-in-one platform, and the Marketplace, his vision of an
+ * interconnected ecosystem), side by side under the hero. The Marketplace is labelled coming soon.
+ */
+export const PILLARS = [
+  {
+    id: "platform",
+    eyebrow: "RENUABL Business",
+    title: "The all-in-one platform for solar businesses.",
+    body: "Design, quote, sell, approve, book, order, install and get paid, in one place built for Australian solar retailers and installers. Sol, your AI assistant, works inside every deal.",
+    points: ["Design tool and proposals", "CRM, approvals and ordering", "Install calendar and job cards", "Sol, on every screen"],
+    link: { label: "See a deal start to finish", href: "#journey" },
+  },
+  {
+    id: "marketplace",
+    eyebrow: "RENUABL Marketplace · Coming soon",
+    title: "The solar industry, connected.",
+    body: "One network for retailers, installers and electrical inspectors. Sell a job and find the crew to install it, win work near your base, nominate the inspector, and move spare stock to the business down the road.",
+    points: [
+      "Job listings installers bid on",
+      "Jobs sent to the crews you trust",
+      "Inspectors nominated on the job",
+      "Spare equipment, bought and sold",
+    ],
+    link: { label: "Look inside the Marketplace", href: "/design/marketplace" },
+  },
+] as const;
 
 /** The old way, against this one. Figures for the other side are another platform's published prices, with the date read. */
 export const OLD_WAY = {
@@ -174,9 +202,9 @@ export const COMING_SOON: readonly Feature[] = [
 ];
 
 export const MARKETPLACE = {
-  eyebrow: `Marketplace · ${COMING_SOON_LABEL}`,
-  headline: "The solar marketplace. Register your interest.",
-  sub: "Win work and move stock between solar businesses, without leaving the platform you run on.",
+  eyebrow: `RENUABL Marketplace · ${COMING_SOON_LABEL}`,
+  headline: "Every business that joins makes it worth more to the rest.",
+  sub: "Retailers, installers and inspectors on one network, working jobs through together without leaving the platform they run on. It opens once enough businesses are on board for there to be work and stock near you.",
   sides: [
     {
       title: "Job listings",
@@ -186,8 +214,13 @@ export const MARKETPLACE = {
       title: "Spare equipment",
       body: "Sell surplus panels, inverters and batteries to businesses near you, with photos and a price. Message the seller, pick up or deliver.",
     },
+    {
+      title: "Connections",
+      body: "Find the installers and inspectors you work with in the directory and connect. Send a job to your installer in one press; they nominate the inspector, who books it and uploads the certificate.",
+    },
   ],
   cta: "Register interest",
+  look: "Look inside the Marketplace",
 } as const;
 
 export const PRICING = {
@@ -245,6 +278,7 @@ export function salesCopy(): string[] {
     OLD_WAY.eyebrow,
     OLD_WAY.headline,
     OLD_WAY.sub,
+    ...PILLARS.flatMap((p) => [p.eyebrow, p.title, p.body, ...p.points, p.link.label]),
     ...OLD_WAY.rows.flatMap((r) => [r.what, r.us, r.them]),
     ...JOURNEY.flatMap((j) => [j.step, j.title, j.body]),
     SOL.eyebrow,
@@ -257,6 +291,7 @@ export function salesCopy(): string[] {
     ...EVERYTHING.flatMap((f) => [f.title, f.body]),
     ...COMING_SOON.flatMap((f) => [f.title, f.body]),
     MARKETPLACE.headline,
+    MARKETPLACE.look,
     MARKETPLACE.sub,
     ...MARKETPLACE.sides.flatMap((s) => [s.title, s.body]),
     PRICING.headline,

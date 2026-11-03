@@ -51,9 +51,27 @@ const SOL_EXAMPLE = `window.__clip = "wait"; (async () => {
   return JSON.stringify({ x: pane.left, y: Math.max(pane.top - 70, top), width: pane.width, height: bottom - Math.max(pane.top - 70, top) });
 })().then((v) => (window.__clip = v ?? ""));`;
 
+/**
+ * Today as Sol writes up the day (the sign-up page's hero, 3 Nov 2026, Martin: Sol's chat is the default screen, and
+ * the menu shows RENUABL Marketplace and Sol's round): presses Show me my day, lets him finish, and keeps the whole
+ * window so the top menu is in.
+ */
+const SOL_DAY = `window.__clip = "wait"; (async () => {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const go = [...document.querySelectorAll("button")].find((b) => /show me my day/i.test(b.textContent));
+  if (!go) return null;
+  go.click();
+  await wait(16000);
+  [...document.querySelectorAll("button")].find((b) => /^show it all$/i.test(b.textContent.trim()))?.click();
+  scrollTo(0, 0);
+  await wait(1500);
+  return JSON.stringify({ x: 0, y: scrollY, width: innerWidth, height: innerHeight });
+})().then((v) => (window.__clip = v ?? ""));`;
+
 /** Each screen: the file name, the page, the window size, how long to let it settle, and anything to do first. */
 const SHOTS = [
   { name: "today", path: "/design", width: 1440, height: 900, wait: 5000 },
+  { name: "today-sol", path: "/design", width: 1440, height: 900, wait: 5000, clip: SOL_DAY },
   { name: "deals", path: "/design/sales/pipelines", width: 1440, height: 900, wait: 5000 },
   { name: "approvals", path: "/design/procurement/pre-approvals", width: 1440, height: 900, wait: 4500 },
   { name: "calendar", path: "/design/procurement/scheduler", width: 1440, height: 900, wait: 4500 },
@@ -134,7 +152,7 @@ for (const shot of SHOTS.filter((s) => !only.length || only.includes(s.name))) {
     // Run the framing script, then read what it worked out once it has finished.
     await cdp("Runtime.evaluate", { expression: shot.clip });
     let framed = "wait";
-    for (let i = 0; i < 40 && framed === "wait"; i++) {
+    for (let i = 0; i < 120 && framed === "wait"; i++) {
       await sleep(250);
       framed = (await cdp("Runtime.evaluate", { expression: "window.__clip", returnByValue: true })).result.value;
     }
