@@ -28,6 +28,7 @@ import { PATHS, ui } from "./design-shell";
 import { SolMark, SolStars } from "./sol-icon";
 import { SolDesignView } from "./sol-design-view";
 import { SolThinking } from "./sol-thinking";
+import type { SolFile } from "@/lib/domain/design/sol";
 import { SolBox, SolSays, Typed } from "./today-pad";
 
 const PILL: Record<ServiceState, string> = {
@@ -189,14 +190,14 @@ export function ServicePlanner() {
     if (below > -40 && below < 480) el.scrollIntoView({ block: "end", behavior: "smooth" });
   }, []);
 
-  const ask = async (q: string, on: ServiceLine | null = focus) => {
+  const ask = async (q: string, on: ServiceLine | null = focus, files: SolFile[] = []) => {
     if (asking || !cases) return;
     const id = ++turnNo.current;
     setAsking(true);
     setTurns((t) => [...t, { id, kind: "ask", q, a: null }]);
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
     const page = { path: PATHS.service, title: "Service", about: on ? serviceFocusWords(on, cases) : pipelineWords(cases), screen: "" };
-    const r = await askSol(q, [], page);
+    const r = await askSol(q, files, page);
     setAsking(false);
     let a: { text: string; more: boolean; designs?: SolDesignShown[] };
     if (!r.ok) a = { text: r.message, more: false };
@@ -224,7 +225,7 @@ export function ServicePlanner() {
   const box = (
     <SolBox
       id="service-ask"
-      onAsk={(q) => void ask(q)}
+      onAsk={(q, files) => void ask(q, focus, files)}
       asking={asking || !cases}
       placeholder={focus ? `Ask Sol about ${focus.customer.split(/\s+/)[0]}'s case` : "Ask Sol about your service cases"}
     />

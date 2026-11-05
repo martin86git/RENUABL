@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Bell, Copy, Eye, EyeOff, FileText, History, Mail, MessageSquarePlus, Plus, X, Pin } from "lucide-react";
+import { Bell, Copy, Eye, EyeOff, FileText, History, Mail, MessageSquarePlus, Paperclip, X, Pin } from "lucide-react";
 import { lookingAt } from "@/lib/domain/design/page-context";
 import { pageAt } from "@/lib/domain/design/sections";
 import { PAGE_ABOUT_CHANGED, currentPageContext, pageAboutNow } from "@/lib/services/page-context";
@@ -54,6 +54,8 @@ import { SolMark } from "./sol-icon";
 import { SolThinking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDesignView } from "./sol-design-view";
+import { SolText } from "./sol-text";
+import { solPlain } from "@/lib/domain/design/sol-format";
 
 /** The last message the member chose to carry on from after a while away (sessionStorage). */
 const CARRIED_KEY = "renuabl.design.sol-carried";
@@ -373,7 +375,7 @@ export function SolChat({
                     onClick={() => document.getElementById(turnId(t))?.scrollIntoView({ behavior: "smooth", block: "center" })}
                     className="min-w-0 flex-1 truncate text-left text-ink hover:underline"
                   >
-                    {t.text || "(a chart or drawing)"}
+                    {solPlain(t.text) || "(a chart or drawing)"}
                   </button>
                   <button
                     type="button"
@@ -597,7 +599,7 @@ export function SolChat({
               title="Add a PDF (an electricity bill, a datasheet) or a picture"
               className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-2 transition hover:bg-surface hover:text-ink disabled:text-muted"
             >
-              <Plus className="size-4" aria-hidden />
+              <Paperclip className="size-4" aria-hidden />
             </button>
             <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, MAX_SAID))} />
             <textarea
@@ -755,12 +757,13 @@ function Bubble({ you, text, at, pinned, onPin }: { you: boolean; text: string; 
     <div className={clsx("flex flex-col", you ? "items-end" : "items-start")}>
       <div
         className={clsx(
-          "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 [overflow-wrap:anywhere]",
-          you ? "bg-sun-line text-white" : "bg-canvas text-ink",
+          "max-w-[85%] rounded-2xl px-3 py-2 [overflow-wrap:anywhere]",
+          you ? "whitespace-pre-wrap bg-sun-line text-white" : "bg-canvas text-ink",
           pinned && "ring-2 ring-sun-line/50",
         )}
       >
-        {text}
+        {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
+        {you ? text : <SolText text={text} />}
         {at && <span className={clsx("mt-1 block text-[10px]", you ? "text-white/70" : "text-muted")}>{when(at)}</span>}
       </div>
       {at && (
@@ -773,7 +776,7 @@ function Bubble({ you, text, at, pinned, onPin }: { you: boolean; text: string; 
           <button
             type="button"
             onClick={() => {
-              void navigator.clipboard?.writeText(text).then(() => {
+              void navigator.clipboard?.writeText(solPlain(text)).then(() => {
                 setCopied(true);
                 window.setTimeout(() => setCopied(false), 1500);
               });

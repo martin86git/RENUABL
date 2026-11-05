@@ -10,6 +10,7 @@ import { canvasFacts } from "@/lib/domain/design/canvas";
 import { cleanChart, CHARTS_PER_TURN, type SolChart } from "@/lib/domain/design/sol-charts";
 import { cleanDiagram, DIAGRAMS_PER_TURN, type SolDiagram } from "@/lib/domain/design/sol-diagrams";
 import { DESIGNS_PER_TURN, type SolDesignShown } from "@/lib/domain/design/sol-designs";
+import { solPlain } from "@/lib/domain/design/sol-format";
 import { asBuiltInWords } from "@/lib/domain/design/as-built";
 import { caseInWords } from "@/lib/domain/design/service";
 import { asBuiltOf, jobCard } from "./design-job-card-repo";
@@ -724,7 +725,7 @@ export async function solAnswersInChannel(member: Member, room: string, asked: s
   try {
     const state = await askSol(member, { text: prompt, files: [], routeOn: asked, shared: true }, apiKey, "channel");
     const last = [...state.turns].reverse().find((t) => t.role === "sol");
-    said = last?.text?.trim() || "I couldn't answer that just now.";
+    said = solPlain(last?.text ?? "").trim() || "I couldn't answer that just now.";
     // A channel line is words only: his sources go under them as a short list.
     const sources = sourcesLine(last?.sources ?? []);
     if (sources) said += `\n\n${sources}`;

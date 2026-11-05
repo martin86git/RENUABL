@@ -23,7 +23,7 @@ import {
 } from "@/lib/domain/design/today-pad";
 import type { Activity } from "@/lib/domain/design/crm";
 import { mailMarkWords, type MailMark } from "@/lib/domain/design/email-opens";
-import type { SolReminder } from "@/lib/domain/design/sol";
+import type { SolFile, SolReminder } from "@/lib/domain/design/sol";
 import type { SolDesignShown } from "@/lib/domain/design/sol-designs";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
@@ -39,6 +39,9 @@ import { ReadyForYou, usePrepared } from "./ready-for-you";
 import { SolBadge, SolIcon, SolMark, SolStars } from "./sol-icon";
 import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
 import { SolDesignView } from "./sol-design-view";
+import { SolText } from "./sol-text";
+import { AttachButton, AttachedFiles, solFilesOf, useSolAttach } from "./sol-attach";
+import { DictateButton, withSpoken } from "./dictate";
 import { SolThinking } from "./sol-thinking";
 
 const TAB_ICONS: Record<TodayTab, typeof Sun> = { today: Sun, inbox: Mail, calendar: CalendarDays, pipeline: KanbanSquare };
@@ -139,14 +142,15 @@ export function TodayPad(props: {
     setTab("today");
     if (!dayTold) setTurns((t) => [...t, { id: Date.now(), kind: "day" }]);
   };
-  const ask = async (q: string) => {
+  const ask = async (q: string, files: SolFile[] = []) => {
     if (asking) return;
     const id = Date.now();
     setTab("today");
     setAsking(true);
-    setTurns((t) => [...t, { id, kind: "ask", q, a: null }]);
+    const shownQ = q + (files.length ? `${q ? "\n" : ""}(Attached: ${files.map((f) => f.name).join(", ")})` : "");
+    setTurns((t) => [...t, { id, kind: "ask", q: shownQ, a: null }]);
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
-    const r = await askSol(q, []);
+    const r = await askSol(q, files);
     setAsking(false);
     let a: { text: string; more: boolean; designs?: SolDesignShown[] };
     if (!r.ok) a = { text: r.message, more: false };
@@ -369,7 +373,7 @@ function Hello(props: {
   asking: boolean;
   hidden: boolean;
   onDay: () => void;
-  onAsk: (q: string) => void;
+  onAsk: (q: string, files: SolFile[]) => void;
 }) {
   return (
     <div className="mx-auto flex max-w-3xl flex-col items-center px-1 py-10 text-center" inert={props.hidden}>
@@ -411,47 +415,64 @@ export function SolBox({
   id = "today-ask",
   placeholder = "Ask Sol about your deals, your day, or what to say to a customer",
 }: {
-  onAsk: (q: string) => void;
+  /** The words, and any PDFs or pictures attached (read for Sol). */
+  onAsk: (q: string, files: SolFile[]) => void;
   asking: boolean;
   id?: string;
   placeholder?: string;
 }) {
   const [text, setText] = useState("");
-  const send = () => {
+  const [heard, setHeard] = useState("");
+  // Speak and attach, as in his panel (5 Nov 2026, Martin): the microphone and the paperclip.
+  const attach = useSolAttach();
+  const ready = text.trim().length >= 2 || attach.files.length > 0;
+  const send = async () => {
     const said = text.trim();
-    if (said.length < 2 || asking) return;
+    if (!ready || asking) return;
+    const files = await solFilesOf(attach.files);
+    if (!files) return attach.setProblem("That file couldn't be read: try again.");
     setText("");
-    onAsk(said);
+    setHeard("");
+    attach.clear();
+    onAsk(said, files);
   };
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        send();
+        void send();
       }}
-      className="flex items-center gap-2 rounded-[26px] bg-surface p-2 pl-4 text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line"
+      className="rounded-[26px] bg-surface p-2 pl-4 text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line"
     >
-      <SolBadge className="size-5 shrink-0" />
-      <label className="sr-only" htmlFor={id}>
-        Ask Sol
-      </label>
-      <input
-        id={id}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        maxLength={4000}
-        autoComplete="off"
-        placeholder={placeholder}
-        className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
-      />
-      <button
-        type="submit"
-        disabled={asking || text.trim().length < 2}
-        aria-label="Ask Sol"
-        className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white disabled:bg-surface-2 disabled:text-muted"
-      >
-        <ArrowUp className="size-4" aria-hidden />
-      </button>
+      <AttachedFiles attach={attach} />
+      <div className="flex items-center gap-1.5">
+        <SolBadge className="size-5 shrink-0" />
+        <label className="sr-only" htmlFor={id}>
+          Ask Sol
+        </label>
+        <input
+          id={id}
+          value={heard ? withSpoken(text, heard) : text}
+          onChange={(e) => {
+            setHeard("");
+            setText(e.target.value);
+          }}
+          maxLength={4000}
+          autoComplete="off"
+          placeholder={placeholder}
+          className="ml-1 h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
+        />
+        <AttachButton attach={attach} />
+        <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
+        <button
+          type="submit"
+          disabled={asking || !ready}
+          aria-label="Ask Sol"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white disabled:bg-surface-2 disabled:text-muted"
+        >
+          <ArrowUp className="size-4" aria-hidden />
+        </button>
+      </div>
     </form>
   );
 }
@@ -477,13 +498,19 @@ export function Typed({ text, onDone, instant = false }: { text: string; onDone?
       onDone?.();
     }
   }, [all, onDone]);
+  // Laid out as he writes (sol-text.tsx): paragraphs, round bullets, the key point and any question highlighted.
   return (
-    <span className="whitespace-pre-wrap">
-      {all ? text : text.slice(0, shown)}
-      {!all && (
-        <span className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[0.15em] animate-pulse rounded-full bg-sun-line" aria-hidden />
-      )}
-    </span>
+    <SolText
+      text={all ? text : text.slice(0, shown)}
+      tail={
+        !all && (
+          <span
+            className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[0.15em] animate-pulse rounded-full bg-sun-line"
+            aria-hidden
+          />
+        )
+      }
+    />
   );
 }
 
@@ -648,9 +675,9 @@ function SolDay(props: {
           const done = live ? next : noop;
           if ("say" in b)
             return (
-              <p key={i} className="text-[15.5px] leading-relaxed text-ink">
+              <div key={i} className="text-[15.5px] leading-relaxed text-ink">
                 <Typed text={b.say} onDone={done} instant={instant || !live} />
-              </p>
+              </div>
             );
           const quick = instant || !live;
           if (b.show === "first" && told.first)
