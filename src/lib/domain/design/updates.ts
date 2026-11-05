@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-05",
+    area: "Your account",
+    words: "Your first sign-in asks your name, so Today greets you properly. You can set a password there too, to sign in with next time.",
+  },
+  {
+    day: "2026-11-05",
     area: "Design tool",
     words:
       "On a Nearmap picture, the roof's outline can go down as a face to check (right-click the picture), with panels laid on a flat roof.",

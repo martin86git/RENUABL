@@ -37,6 +37,10 @@ export async function GET() {
       },
       termsVersion: BUSINESS_TERMS_VERSION,
       ...(planDue ? { needsPlan: true } : {}),
+      // About you (profile.ts): their own first name to greet them by, or, until given, that it is still to ask. Not
+      // while viewing as someone, nor in the sample businesses staff look through.
+      ...(member?.firstName ? { firstName: member.firstName } : {}),
+      ...(member && !member.firstName && !member.viewedBy && !sampleByEmail(access.email) ? { needsProfile: true } : {}),
       // The owner viewing as this member: whose own view it really is.
       ...(member?.viewedBy ? { viewedBy: member.viewedBy } : {}),
       // RENUABL staff: Settings offers View as a retailer, installer or inspector; while in a sample, which one.

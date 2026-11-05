@@ -77,6 +77,7 @@ const COMMON_API = [
   "business",
   "members",
   "password",
+  "profile",
   "sign-in",
   "view-as",
   "team",

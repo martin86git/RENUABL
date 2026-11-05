@@ -22,6 +22,7 @@ import {
   type RoofWork,
   type WorkspaceSettings,
 } from "@/lib/domain/design/account";
+import type { Profile } from "@/lib/domain/design/profile";
 import { MAX_SUPPLIER_LISTS, type SupplierList } from "@/lib/domain/design/pricing";
 import type { DesignExtras } from "@/lib/domain/design/quote";
 import { newId, query, transaction } from "./db";
@@ -44,6 +45,8 @@ export interface Member {
   permissions: MemberPermissions;
   /** Set while the owner is viewing the product as this member (read only): the owner's email. */
   viewedBy?: string;
+  /** Their own first name, once given (About you, profile.ts); null until then, and nobody is greeted by a guess. */
+  firstName?: string | null;
 }
 
 /** The business this email belongs to, if any. An email is in one business at most. */
@@ -56,8 +59,9 @@ export async function memberByEmail(email: string): Promise<Member | null> {
     role: MemberRole;
     terms_version: string | null;
     permissions: unknown;
+    first_name: string | null;
   }>(
-    `select m.business_id, b.name, b.kind, m.email, m.role, m.terms_version, m.permissions
+    `select m.business_id, b.name, b.kind, m.email, m.role, m.terms_version, m.permissions, m.first_name
        from business_members m join businesses b on b.id = m.business_id
       where m.email = $1`,
     [email.toLowerCase()],
@@ -72,8 +76,20 @@ export async function memberByEmail(email: string): Promise<Member | null> {
         role: m.role,
         termsVersion: m.terms_version,
         permissions: cleanPermissions(m.permissions),
+        firstName: m.first_name || null,
       }
     : null;
+}
+
+/** Keeps this person's own name and mobile (About you). Only ever their own row, found by business and email. */
+export async function saveProfile(businessId: string, email: string, profile: Profile): Promise<void> {
+  await query(`update business_members set first_name = $3, last_name = $4, mobile = $5 where business_id = $1 and email = $2`, [
+    businessId,
+    email.toLowerCase(),
+    profile.firstName,
+    profile.lastName,
+    profile.mobile || null,
+  ]);
 }
 
 /**

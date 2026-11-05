@@ -9,16 +9,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Check, ChevronLeft } from "lucide-react";
 import clsx from "clsx";
 import { STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
-import {
-  OVERVIEW_VIEWS,
-  PIPELINES,
-  VIEW_PIPELINE,
-  dashboard,
-  greetingName,
-  inTheWorks,
-  power,
-  type OverviewView,
-} from "@/lib/domain/design/deal";
+import { OVERVIEW_VIEWS, PIPELINES, VIEW_PIPELINE, dashboard, inTheWorks, power, type OverviewView } from "@/lib/domain/design/deal";
 import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
 import { journey, type JourneyStop } from "@/lib/domain/design/journey";
 import { dayCleared, dayList, orderDueSoon, sunNow, sunTimes, type DayCounts, type DayItem } from "@/lib/domain/design/today";
@@ -94,7 +85,7 @@ export function DesignHome() {
     return (
       <DesignShell needsAccount>
         {kind === "retailer" ? (
-          <OverviewPage business={account.business?.name ?? ""} email={account.email} />
+          <OverviewPage business={account.business?.name ?? ""} email={account.email} firstName={account.firstName ?? null} />
         ) : kind === "installer" ? (
           // An installer's home is My Jobs (my-jobs.ts, 2 Nov 2026, Martin).
           <MyJobsPage />
@@ -155,7 +146,7 @@ function Delta({ value, against, nothing, dark }: { value: number | null; agains
  * one is picked it opens on a greeting with a line for each. Every figure is
  * worked out from the deals as they stand (`deal.ts`).
  */
-function OverviewPage({ business, email }: { business: string; email: string }) {
+function OverviewPage({ business, email, firstName }: { business: string; email: string; firstName: string | null }) {
   const [data, setData] = useState<Overview | null>(null);
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -184,7 +175,8 @@ function OverviewPage({ business, email }: { business: string; email: string }) 
   }, []);
 
   const today = todayInMarket();
-  const name = greetingName(email);
+  // The name they gave in About you (profile.ts), never one guessed from their email.
+  const name = firstName;
   /** A job changed from one of the lists (its installer or its paperwork), put back in place. */
   const changed = (job: JobLine) => setJobs((all) => (all ?? []).map((j) => (j.id === job.id ? job : j)));
 

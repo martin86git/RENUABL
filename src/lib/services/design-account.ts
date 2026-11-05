@@ -30,6 +30,10 @@ export type DesignAccount =
       viewedBy?: string;
       /** A new retailer's owner who hasn't chosen a plan and paid yet (business-kind.ts `needsPlan`). */
       needsPlan?: boolean;
+      /** Their own first name, once given (About you); nobody is greeted by name before. */
+      firstName?: string;
+      /** About you is still to be given (profile.ts). */
+      needsProfile?: boolean;
       /** RENUABL staff (Settings → View as), and the sample business kind they are looking through. */
       staff?: boolean;
       staffViewing?: "retailer" | "installer" | "inspector";
@@ -70,9 +74,17 @@ async function ask(): Promise<DesignAccount> {
 
 /** Who is using the designer. Asked once for the page; `fresh` asks again (after signing in, naming a business, signing out). */
 export function designAccount(fresh = false): Promise<DesignAccount> {
-  if (fresh || !asked) asked = ask();
+  if (fresh || !asked) {
+    asked = ask();
+    // Asked again: every screen holding the account hears it (useDesignAccount), so a name just given shows at once.
+    if (fresh && typeof window !== "undefined")
+      void asked.then((a) => window.dispatchEvent(new CustomEvent<DesignAccount>(ACCOUNT_EVENT, { detail: a })));
+  }
   return asked;
 }
+
+/** Sent on the window with the account each time it is asked again. */
+export const ACCOUNT_EVENT = "renuabl:account";
 
 /** For the sign-out button: the device stops expecting an account. */
 export function forgetDesignAccount() {
@@ -107,6 +119,14 @@ export async function requestSignInLink(email: string, next?: string): Promise<A
 /** Names a new business and accepts the terms (or only accepts them, for someone added by the owner). Null when done. */
 export async function setUpBusiness(o: { name?: string; kind?: BusinessKind; terms: boolean }): Promise<string | null> {
   const res = await send<Answer>("/api/design/business", "POST", o);
+  if (!res.ok) return res.message ?? UNREACHABLE;
+  await designAccount(true);
+  return null;
+}
+
+/** About you: their own name, a mobile if they like, and a password if they want one. Null when done. */
+export async function saveProfile(o: { firstName: string; lastName: string; mobile: string; password: string }): Promise<string | null> {
+  const res = await send<Answer>("/api/design/profile", "POST", o);
   if (!res.ok) return res.message ?? UNREACHABLE;
   await designAccount(true);
   return null;

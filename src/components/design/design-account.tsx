@@ -4,12 +4,14 @@ import { SignInForm, signInNote } from "./sign-in-form";
 import { PASSWORD_MIN } from "@/lib/domain/design/password";
 import { FIRST_MONTH_CENTS, MAX_SELF_SERVE_SEATS, PLAN_WORDS, SEAT_MONTHLY_CENTS, SEAT_NOTE, dollars } from "@/lib/domain/design/plans";
 import { BUSINESS_KINDS, type BusinessKind } from "@/lib/domain/design/business-kind";
+import { NAME_MAX, PROFILE_WORDS } from "@/lib/domain/design/profile";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Check, Trash2 } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
 import { BUSINESS_TERMS_MISSING, BUSINESS_TERMS_PATH, PERMISSIONS, ROLES, can, type MemberPermissions } from "@/lib/domain/design/account";
 import {
+  ACCOUNT_EVENT,
   addMember,
   choosePlan,
   designAccount,
@@ -17,6 +19,7 @@ import {
   loadMembers,
   passwordState,
   savePassword,
+  saveProfile,
   removeMember,
   setMemberPermissions,
   setMemberRole,
@@ -49,6 +52,11 @@ export function useDesignAccount(): [DesignAccount | null, () => void] {
       gone = true;
     };
   }, [asks]);
+  useEffect(() => {
+    const heard = (e: Event) => setAccount((e as CustomEvent<DesignAccount>).detail);
+    window.addEventListener(ACCOUNT_EVENT, heard);
+    return () => window.removeEventListener(ACCOUNT_EVENT, heard);
+  }, []);
   return [account, () => setAsks((n) => n + 1)];
 }
 
@@ -200,6 +208,97 @@ function SetUp({ account, onDone }: { account: Extract<DesignAccount, { signedIn
   );
 }
 
+/**
+ * About you (5 Nov 2026, Martin: the first sign-in greeted him by a name guessed from his email): first and last name,
+ * a mobile if they like, and a password if they want to sign in with one next time. Asked once of everyone in a
+ * business, owner or not, after the business is set up.
+ */
+function AboutYou({ account, onDone }: { account: Extract<DesignAccount, { signedIn: true }>; onDone: () => void }) {
+  const [first, setFirst] = useState("");
+  const [last, setLast] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [password, setPasswordText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!first.trim() || !last.trim()) return setProblem(PROFILE_WORDS.missingName);
+    setBusy(true);
+    setProblem(null);
+    const failed = await saveProfile({ firstName: first, lastName: last, mobile, password });
+    setBusy(false);
+    if (failed) return setProblem(failed);
+    onDone();
+  };
+  return (
+    <Frame>
+      <p className={eyebrow}>{account.business?.name ?? "Your business"}</p>
+      <h1 className="mt-3 text-[30px] leading-tight tracking-tight text-ink">{PROFILE_WORDS.title}</h1>
+      <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{PROFILE_WORDS.intro}</p>
+      <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm font-medium text-ink">
+            First name
+            <input
+              className={`${input} mt-1.5`}
+              value={first}
+              onChange={(e) => setFirst(e.target.value)}
+              maxLength={NAME_MAX}
+              autoComplete="given-name"
+              autoFocus
+            />
+          </label>
+          <label className="block text-sm font-medium text-ink">
+            Last name
+            <input
+              className={`${input} mt-1.5`}
+              value={last}
+              onChange={(e) => setLast(e.target.value)}
+              maxLength={NAME_MAX}
+              autoComplete="family-name"
+            />
+          </label>
+        </div>
+        <label className="block text-sm font-medium text-ink">
+          Mobile (optional)
+          <input
+            className={`${input} mt-1.5`}
+            value={mobile}
+            onChange={(e) => setMobile(e.target.value)}
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="04XX XXX XXX"
+          />
+        </label>
+        <label className="block text-sm font-medium text-ink">
+          {PROFILE_WORDS.passwordLabel}
+          <input
+            className={`${input} mt-1.5`}
+            type="password"
+            value={password}
+            onChange={(e) => setPasswordText(e.target.value)}
+            autoComplete="new-password"
+            minLength={PASSWORD_MIN}
+          />
+          <span className="mt-1.5 block text-[12px] font-normal leading-snug text-muted">{PROFILE_WORDS.passwordNote}</span>
+        </label>
+        {problem && (
+          <p className="text-[13px] text-danger" role="alert">
+            {problem}
+          </p>
+        )}
+        <button type="submit" className={`${primary} w-full`} disabled={busy}>
+          {busy ? "Saving…" : "Continue"}
+        </button>
+      </form>
+      <div className="mt-8 flex flex-wrap items-center gap-3 text-[13px] text-muted">
+        <span>Signed in as {account.email}.</span>
+        <SignOut />
+      </div>
+    </Frame>
+  );
+}
+
 /** Kept for the tab when RENUABL staff step past choosing a plan, so they can look round a business of their own. */
 const PLAN_SKIP = "renuabl.design.plan-skip";
 
@@ -322,6 +421,7 @@ export function DesignAccountGate({ children }: { children: React.ReactNode }) {
 
   if (!account || (businessId && brought?.id !== businessId)) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (account.signedIn && account.state !== "ready") return <SetUp account={account} onDone={refresh} />;
+  if (account.signedIn && account.needsProfile) return <AboutYou account={account} onDone={refresh} />;
   if (account.signedIn && account.needsPlan && !planSkipped)
     return (
       <PlanStep
