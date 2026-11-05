@@ -39,6 +39,7 @@ import { SolDock, SolNavButton, SolRail } from "./sol-dock";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { TeamChatButton } from "./team-chat";
 import { DayWeather, NotificationsMenu, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
+import { RenuablMark } from "./business-loading";
 
 export { MarketplaceMark };
 
@@ -357,10 +358,16 @@ function Shell({
       >
         {/* The sections sit in the middle of the screen (3 Nov 2026, Martin: on a laptop they didn't): two equal sides round
             them, everything else at the sides, and the icons moved to the rail down the right. */}
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-4 px-2 pt-4">
+        {/* Each side is at least as wide as what it holds (5 Nov 2026, from Primero's), so on a narrower window nothing
+            runs under anything else: the wordmark shrinks to its small mark and the day and weather give way first
+            (`.studio-mark-*`, `.studio-day*` in globals.css). */}
+        <div className="grid grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] items-start gap-4 px-2 pt-4">
           <div className="flex min-w-0 items-start gap-5">
-            <Link href={PATHS.home} aria-label="RENUABL, today" className="mt-[1.45rem] shrink-0">
-              <Wordmark className="text-[17px]" />
+            <Link href={PATHS.home} aria-label="RENUABL, today" className="shrink-0">
+              <span className="studio-mark-full mt-[1.45rem]">
+                <Wordmark className="text-[17px]" />
+              </span>
+              <RenuablMark className="studio-mark-short mt-[1.05rem]" />
             </Link>
           </div>
           <div className="mt-4 flex min-w-0 items-center justify-center">

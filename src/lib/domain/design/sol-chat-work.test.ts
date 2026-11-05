@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { EMPTY_ORDER } from "./orders";
 import {
+  actionDoneWords,
   actionFrom,
+  actionNotYours,
+  actionQuestion,
   actionRefusal,
   actionWords,
   cleanAction,
@@ -8,12 +12,89 @@ import {
   dealTag,
   dealThread,
   handOffLine,
+  matchProduct,
   mayHoldWork,
   othersLines,
   topicWords,
   whoAnswers,
+  withOrderAdd,
   workPrompt,
 } from "./sol-chat-work";
+
+describe("asking Sol by name to change something", () => {
+  it("reads order and stage lines only when he is asked", () => {
+    expect(mayHoldWork(true, "add two more panels to Smith's order", true)).toBe(true);
+    expect(mayHoldWork(true, "mark the Lees as installed please", true)).toBe(true);
+    expect(mayHoldWork(true, "add two more panels to Smith's order")).toBe(false);
+  });
+  it("tells him of the order and stage changes only when asked", () => {
+    const p = { asker: "Sam", line: "x", today: "2026-11-05", deals: "", context: "" };
+    expect(workPrompt({ ...p, asked: true })).toMatch(/order-add/);
+    expect(workPrompt({ ...p, asked: true })).toMatch(/installed: Installed/i);
+    expect(workPrompt(p)).not.toMatch(/order-add/);
+  });
+  it("marks a deal at a stage only when it is a real one", () => {
+    const a = actionFrom({ action: "stage", deal_id: "job_1", stage: "installed" }, base);
+    expect(a).toEqual({ kind: "stage", jobId: "job_1", deal: "Chloe Tran · Solar", stage: "installed", for: "sam@x.com" });
+    expect(actionQuestion(a!)).toBe("Mark Chloe Tran · Solar as Installed?");
+    expect(actionDoneWords(a!)).toBe("Marked Installed");
+    expect(actionFrom({ action: "stage", deal_id: "job_1", stage: "finished" }, base)).toBeNull();
+    expect(cleanAction({ ...a, stage: "nope" })).toBeNull();
+    expect(cleanAction(a)).toEqual(a);
+  });
+  it("adds to an order a number in range of a product in words", () => {
+    const a = actionFrom({ action: "order-add", deal_id: "job_1", text: "Jinko panels", qty: 2 }, base);
+    expect(a).toMatchObject({ kind: "order-add", jobId: "job_1", text: "Jinko panels", qty: 2 });
+    expect(actionFrom({ action: "order-add", deal_id: "job_1", text: "panels", qty: 0 }, base)).toBeNull();
+    expect(actionFrom({ action: "order-add", deal_id: "job_1", text: "panels", qty: 500 }, base)).toBeNull();
+    expect(actionFrom({ action: "order-add", deal_id: "job_1", text: "", qty: 2 }, base)).toBeNull();
+    // Kept only once the server has found the product.
+    expect(cleanAction(a)).toBeNull();
+    const found = { ...a!, sku: "JKM475", item: "Jinko 475 W panel", text: undefined };
+    expect(cleanAction(found)).toMatchObject({ sku: "JKM475", item: "Jinko 475 W panel", qty: 2 });
+    expect(actionQuestion(found)).toBe("Add 2 × Jinko 475 W panel to Chloe Tran · Solar's order?");
+  });
+  it("lets only someone who sees costs answer an order card", () => {
+    const a = { kind: "order-add", jobId: "job_1", deal: "Chloe", item: "Panel", sku: "P", qty: 1, for: "sam@x.com" } as const;
+    expect(actionRefusal(a, "jo@x.com", { costs: false })).toMatch(/Ordering Station/);
+    expect(actionRefusal(a, "jo@x.com", { costs: true })).toBeNull();
+    expect(actionNotYours(a, "jo@x.com", { costs: false })).toMatch(/Ordering Station/);
+    expect(actionNotYours({ ...a, done: { by: "x", at: "y" } }, "jo@x.com", { costs: false })).toBeNull();
+  });
+});
+
+describe("the product an order card adds", () => {
+  const onOrder = [
+    { sku: "JKM475N", item: "Jinko 475 W panel" },
+    { sku: "SIG-8", item: "Sigenergy 8 kWh battery module" },
+  ];
+  const listed = [
+    { sku: "ISO-40", item: "NHP 40 A isolator" },
+    { sku: "ISO-63", item: "NHP 63 A isolator" },
+  ];
+  it("is the one product every word names, the order first", () => {
+    expect(matchProduct("more Jinko panels", onOrder, listed)?.sku).toBe("JKM475N");
+    expect(matchProduct("batteries", onOrder, listed)?.sku).toBe("SIG-8");
+    expect(matchProduct("63 A isolator", onOrder, listed)?.sku).toBe("ISO-63");
+  });
+  it("is nothing when nothing or more than one answers", () => {
+    expect(matchProduct("isolator", onOrder, listed)).toBeNull();
+    expect(matchProduct("EV charger", onOrder, listed)).toBeNull();
+    expect(matchProduct("", onOrder, listed)).toBeNull();
+  });
+});
+
+describe("an order with more of a product", () => {
+  const items = [{ key: "sku:JKM475N", qty: 20, worked: 20 }];
+  it("raises a line the sale worked out", () => {
+    expect(withOrderAdd(EMPTY_ORDER, items, { sku: "JKM475N", item: "Jinko", qty: 2 }).qty).toEqual({ "sku:JKM475N": 22 });
+  });
+  it("adds a product by hand, or more of one added before", () => {
+    const once = withOrderAdd(EMPTY_ORDER, items, { sku: "ISO-40", item: "Isolator", qty: 1 });
+    expect(once.added).toEqual([{ key: "sku:ISO-40", item: "Isolator", sku: "ISO-40", qty: 1 }]);
+    expect(withOrderAdd(once, items, { sku: "ISO-40", item: "Isolator", qty: 2 }).added[0].qty).toBe(3);
+  });
+});
 
 const deals = new Map([["job_1", "Chloe Tran · Solar"]]);
 const base = { asker: "Sam@x.com", deals, today: "2026-11-03", dueAt: (s: string) => (s ? "2026-11-07T22:00:00.000Z" : null) };

@@ -39,6 +39,22 @@
   --info: #3b4f47;
   --info-soft: #e7ece8;
   --focus: #1e3a2e;
+  /* To action's kinds (Today, 5 Nov 2026): a word and a colour each, the ink on its soft ground. Not the signal orange,
+     which stays for what is live or picked, except an install today, the most pressing. */
+  --kind-install: #b53c00;
+  --kind-install-soft: #fff0e6;
+  --kind-message: #5534b0;
+  --kind-message-soft: #efeafc;
+  --kind-lead: #1d56b8;
+  --kind-lead-soft: #e6eefb;
+  --kind-follow-up: #855600;
+  --kind-follow-up-soft: #fbf0d6;
+  --kind-order: #0e6a62;
+  --kind-order-soft: #dff2ef;
+  --kind-date: #9c2757;
+  --kind-date-soft: #fbe6ef;
+  --kind-approvals: #474d63;
+  --kind-approvals-soft: #ebecf2;
   color-scheme: light;
 }
 
@@ -69,6 +85,20 @@
   --info: #c9cdcb;
   --info-soft: #2c3337;
   --focus: #8fd0ad;
+  --kind-install: #ffa274;
+  --kind-install-soft: rgba(255, 122, 51, 0.16);
+  --kind-message: #c3b2f5;
+  --kind-message-soft: rgba(139, 109, 230, 0.18);
+  --kind-lead: #a9c6f5;
+  --kind-lead-soft: rgba(80, 138, 230, 0.18);
+  --kind-follow-up: #f0cd85;
+  --kind-follow-up-soft: rgba(233, 189, 107, 0.16);
+  --kind-order: #8fd6cc;
+  --kind-order-soft: rgba(52, 168, 152, 0.18);
+  --kind-date: #f4a9c6;
+  --kind-date-soft: rgba(225, 92, 146, 0.18);
+  --kind-approvals: #c4c8d6;
+  --kind-approvals-soft: rgba(160, 166, 190, 0.16);
   color-scheme: dark;
 }
 
@@ -246,6 +276,72 @@ html.sol-resizing .team-pop {
     display: none;
   }
 }
+/* A narrower window (5 Nov 2026, from Primero's): the top bar makes room before anything is covered. The wordmark
+   gives way to its small mark under 1536px (under 1920px with Sol's panel open beside the page), and the weather
+   beside the day goes with it, so the day's tile (which opens the calendar) stays and the magnifier and the
+   Marketplace are never covered (measured at 1024, 1280, 1366, 1440 and 1536px, with and without the panel). */
+.studio-mark-short {
+  display: none;
+}
+@media (max-width: 1535px) {
+  .studio-mark-full {
+    display: none;
+  }
+  .studio-mark-short {
+    display: flex;
+  }
+  .studio-day-weather {
+    display: none !important;
+  }
+}
+@media (max-width: 1919px) {
+  html.sol-docked .studio-mark-full {
+    display: none;
+  }
+  html.sol-docked .studio-mark-short {
+    display: flex;
+  }
+  html.sol-docked .studio-day-weather {
+    display: none !important;
+  }
+}
+@media (min-width: 1024px) and (max-width: 1365px) {
+  .studio-sections > a {
+    padding-inline: 0.6rem;
+    font-size: 13px;
+  }
+}
+
+/* The loading screen of RENUABL Business (business-loading.tsx): Sol's sun still, the light going round its ring. */
+@keyframes biz-loading-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes biz-loading-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+.biz-loading-sweep {
+  transform-origin: 50px 50px;
+  animation: biz-loading-turn 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+.biz-loading-glow {
+  background: radial-gradient(circle, rgb(255 138 61 / 0.32) 0%, rgb(255 90 31 / 0) 62%);
+  animation: biz-loading-glow 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .biz-loading-sweep,
+  .biz-loading-glow {
+    animation: none;
+  }
+}
+
 /* A reply from Sol waiting: his count glows. */
 @keyframes sol-glow {
   0%,
@@ -345,6 +441,20 @@ html.sol-resizing .team-pop {
   --color-sun-line-ink: var(--sun-line-ink);
   --color-market: var(--market);
   --color-market-ink: var(--market-ink);
+  --color-kind-install: var(--kind-install);
+  --color-kind-install-soft: var(--kind-install-soft);
+  --color-kind-message: var(--kind-message);
+  --color-kind-message-soft: var(--kind-message-soft);
+  --color-kind-lead: var(--kind-lead);
+  --color-kind-lead-soft: var(--kind-lead-soft);
+  --color-kind-follow-up: var(--kind-follow-up);
+  --color-kind-follow-up-soft: var(--kind-follow-up-soft);
+  --color-kind-order: var(--kind-order);
+  --color-kind-order-soft: var(--kind-order-soft);
+  --color-kind-date: var(--kind-date);
+  --color-kind-date-soft: var(--kind-date-soft);
+  --color-kind-approvals: var(--kind-approvals);
+  --color-kind-approvals-soft: var(--kind-approvals-soft);
   --color-leaf: var(--leaf);
   --color-positive: var(--positive);
   --color-positive-soft: var(--positive-soft);

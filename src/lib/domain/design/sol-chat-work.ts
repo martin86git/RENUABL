@@ -9,13 +9,16 @@
  * 4. **Who answers what**: when a question isn't Sol's to answer, he names the teammate who usually answers that kind.
  */
 
+import { JOB_STAGES, STAGE_LABELS, type JobStage } from "./crm";
+import { itemKey, type OrderState } from "./orders";
+import type { CostGroup } from "./quote";
 import { SOL_BY } from "./team-chat";
 
 // ---------------------------------------------------------------------------
 // 1. Chat into work
 // ---------------------------------------------------------------------------
 
-export const ACTION_KINDS = ["install-date", "note", "reminder"] as const;
+export const ACTION_KINDS = ["install-date", "note", "reminder", "order-add", "stage"] as const;
 export type ActionKind = (typeof ACTION_KINDS)[number];
 
 /** What Sol offers to do, kept with his line. `done`/`dismissed` say what became of it. */
@@ -31,6 +34,12 @@ export interface ChatAction {
   text?: string;
   /** When a reminder is due, as an instant. */
   dueAt?: string;
+  /** The stage the deal is marked at (stage). */
+  stage?: JobStage;
+  /** The product added to the job's order, its code and how many more (order-add). */
+  item?: string;
+  sku?: string;
+  qty?: number;
   /** Who it was suggested to (the person who wrote the line); only they, or someone who may see the deal, presses. */
   for: string;
   done?: { by: string; at: string };
@@ -41,12 +50,22 @@ export interface ChatAction {
 const WORK_WORDS =
   /\b(mov(e|ed|ing)|reschedul\w*|push(ed)? (back|out)|bring forward|brought forward|install(ation)?s? (is|on|for)|book(ed)? (in|for)|now on|remind( me)?|note (on|for|that)|put a note|add a note|log (that|it))\b/i;
 
-/** Whether a line said in a room might hold work for Sol to offer: a channel, a few words, and one of the words above. */
-export function mayHoldWork(isChannel: boolean, text: string): boolean {
+/**
+ * Words that ask for the two changes Sol offers only when asked by name (5 Nov 2026, Martin, from Primero's): more of a
+ * product on a job's order, or a deal marked at a stage.
+ */
+const ASKED_WORDS =
+  /\b(order|add|need|needs|short|extra|another|mark(ed)?|set (it|the deal|them|him|her) (to|as)|move (it|the deal|them|him|her) to|won|lost|signed|installed|stage)\b/i;
+
+/**
+ * Whether a line said in a room might hold work for Sol to offer: a channel, a few words, and one of the words above.
+ * `asked` (the line tags @Sol) widens it to the order and stage changes he offers only when asked.
+ */
+export function mayHoldWork(isChannel: boolean, text: string, asked = false): boolean {
   if (!isChannel) return false;
   const t = text.trim();
   if (t.split(/\s+/).length < 4 || t.length > 1200) return false;
-  return WORK_WORDS.test(t);
+  return WORK_WORDS.test(t) || (asked && ASKED_WORDS.test(t));
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -63,24 +82,38 @@ const words = (v: unknown, max: number) =>
 export const WORK_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["action", "deal_id", "date", "when_local", "text"],
+  required: ["action", "deal_id", "date", "when_local", "text", "stage", "qty"],
   properties: {
     action: { type: "string", enum: ["none", ...ACTION_KINDS] },
     deal_id: { type: "string", description: "The id of the deal from the list, or empty." },
     date: { type: "string", description: "For install-date: the new day as YYYY-MM-DD, or empty." },
     when_local: { type: "string", description: "For reminder: the local time as YYYY-MM-DD HH:mm, or empty." },
-    text: { type: "string", description: "For note: the note's words. For reminder: what to be reminded of. Else empty." },
+    text: {
+      type: "string",
+      description:
+        "For note: the note's words. For reminder: what to be reminded of. For order-add: the product in the line's own words. Else empty.",
+    },
+    stage: { type: "string", description: "For stage: the stage's id from the list, or empty." },
+    qty: { type: "integer", description: "For order-add: how many more, else 0." },
   },
 } as const;
 
-/** What Sol is asked when he reads a line for work. */
-export function workPrompt(input: { asker: string; line: string; today: string; deals: string; context: string }): string {
+/** The stages Sol may mark a deal at, as he is shown them: "won: Won". */
+export const STAGE_CHOICES = JOB_STAGES.map((s) => `${s}: ${STAGE_LABELS[s]}`).join(", ");
+
+/** What Sol is asked when he reads a line for work. `asked`: the line tags him, so the order and stage changes are his too. */
+export function workPrompt(input: { asker: string; line: string; today: string; deals: string; context: string; asked?: boolean }): string {
+  const asked = input.asked
+    ? `- order-add: more of a product is wanted on a deal's order ("add 2 more panels to Smith's order"): put the product in the line's own words in text and how many in qty.\n` +
+      `- stage: a deal should be marked at a stage ("mark the Lees as installed"): give the stage's id from: ${STAGE_CHOICES}.\n`
+    : "";
   return (
-    `You read the team chat of a solar business to spare them typing. ${input.asker} just wrote the line below. Today is ${input.today} (Melbourne).\n` +
+    `You read the team chat of a solar business to spare them typing. ${input.asker} just wrote the line below${input.asked ? ", asking you by name" : ""}. Today is ${input.today} (Melbourne).\n` +
     `Decide whether the line plainly says one of these should be done, and if so fill it in:\n` +
     `- install-date: a deal's installation moves to, or is booked for, a day (give the day as YYYY-MM-DD; a weekday means the next one to come).\n` +
     `- note: something about a deal that should go on its record (put the note in plain words, as the writer would).\n` +
     `- reminder: the writer wants reminding of something at a time (give the local time as YYYY-MM-DD HH:mm; a day with no time is 09:00).\n` +
+    asked +
     `The deal must be one from the list, matched by the customer's name or the job; if it isn't clearly one of them, or the line is a question, a maybe, or about someone else's task, answer action "none". Never invent a deal, a day or a fact. Leave every field you don't use empty.\n\n` +
     `Deals (id: customer · job · install day):\n${input.deals || "(none)"}\n\n` +
     (input.context ? `The lines before it:\n${input.context}\n\n` : "") +
@@ -111,6 +144,16 @@ export function actionFrom(
     if (!DAY.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) || date < input.today) return null;
     return { kind, jobId, deal, date, for: forWho };
   }
+  if (kind === "stage") {
+    const stage = JOB_STAGES.find((s) => s === words(r.stage, 20));
+    return stage ? { kind, jobId, deal, stage, for: forWho } : null;
+  }
+  if (kind === "order-add") {
+    // The product is still in the line's own words here: the server finds it on the job's order or the price lists.
+    const text = words(r.text, 120);
+    const qty = typeof r.qty === "number" && Number.isInteger(r.qty) && r.qty > 0 && r.qty <= MAX_ADD_QTY ? r.qty : 0;
+    return text && qty ? { kind, jobId, deal, text, qty, for: forWho } : null;
+  }
   const text = words(r.text, 1000);
   if (!text) return null;
   return { kind, jobId, deal, text, for: forWho };
@@ -122,6 +165,8 @@ const dayWords = (iso: string) =>
 /** The card's line: what pressing it will do. */
 export function actionWords(a: ChatAction): string {
   if (a.kind === "install-date") return `Move ${a.deal}'s install to ${dayWords(a.date!)}`;
+  if (a.kind === "stage") return `Mark ${a.deal} as ${a.stage ? STAGE_LABELS[a.stage] : "moved on"}`;
+  if (a.kind === "order-add") return `Add ${a.qty} × ${a.item ?? a.text} to ${a.deal}'s order`;
   if (a.kind === "note") return `Add a note to ${a.deal}: "${a.text}"`;
   const when = a.dueAt
     ? new Date(a.dueAt).toLocaleString("en-AU", {
@@ -136,13 +181,29 @@ export function actionWords(a: ChatAction): string {
   return `Remind you ${when}: ${a.text}`;
 }
 
+/** The card's question, answered Yes or No: "Move Chloe Tran · Solar's install to Fri, 6 Nov?". */
+export const actionQuestion = (a: ChatAction) => `${actionWords(a)}?`;
+
 /** What Sol says above the card. */
 export const actionLead = (a: ChatAction) =>
   a.kind === "reminder"
     ? "Want me to set that reminder?"
     : a.kind === "note"
       ? "Want me to put that on the deal?"
-      : "Want me to change the date?";
+      : a.kind === "order-add"
+        ? "Want me to add that to the order?"
+        : a.kind === "stage"
+          ? "Want me to move the deal on?"
+          : "Want me to change the date?";
+
+/** What a Yes did, said on the card for everyone. */
+export function actionDoneWords(a: ChatAction): string {
+  if (a.kind === "install-date") return `Install moved to ${dayWords(a.date!)}`;
+  if (a.kind === "stage") return `Marked ${a.stage ? STAGE_LABELS[a.stage] : "moved on"}`;
+  if (a.kind === "order-add") return "Added to the order";
+  if (a.kind === "note") return "Note added to the deal";
+  return "Reminder set";
+}
 
 /** What a kept action is cleaned to when read back: anything malformed is no action at all. */
 export function cleanAction(v: unknown): ChatAction | null {
@@ -166,6 +227,16 @@ export function cleanAction(v: unknown): ChatAction | null {
   if (kind === "install-date") {
     out.date = words(r.date, 10);
     if (!DAY.test(out.date)) return null;
+  } else if (kind === "stage") {
+    const stage = JOB_STAGES.find((s) => s === r.stage);
+    if (!stage) return null;
+    out.stage = stage;
+  } else if (kind === "order-add") {
+    out.item = words(r.item, 160);
+    out.sku = words(r.sku, 60);
+    out.qty = typeof r.qty === "number" && Number.isInteger(r.qty) && r.qty > 0 && r.qty <= MAX_ADD_QTY ? r.qty : 0;
+    // Only a product found on the order or a price list is ever offered, so a kept one always has its name and how many.
+    if (!out.item || !out.qty) return null;
   } else {
     out.text = words(r.text, 1000);
     if (!out.text) return null;
@@ -181,12 +252,84 @@ export function cleanAction(v: unknown): ChatAction | null {
   return out;
 }
 
-/** Why an action can't be pressed by this person now, or null when it can. A reminder is only its writer's to set. */
-export function actionRefusal(a: ChatAction, me: string): string | null {
+/**
+ * Why an action can't be pressed by this person now, or null when it can. A reminder is only its writer's to set; an
+ * order is only changed by someone who sees costs (the Ordering Station's own rule). Whether they may see the deal is
+ * checked on the server against their own deals.
+ */
+export function actionRefusal(a: ChatAction, me: string, may: { costs: boolean } = { costs: true }): string | null {
   if (a.done) return "That's already done.";
   if (a.dismissed) return "That was set aside.";
   if (a.kind === "reminder" && a.for !== me.toLowerCase()) return "Only the person it's for can set that reminder.";
+  if (a.kind === "order-add" && !may.costs) return "Only someone who sees the Ordering Station can change an order.";
   return null;
+}
+
+/** Who may answer a card, in words, for someone who can't: shown in place of Yes and No. Null when they can. */
+export function actionNotYours(a: ChatAction, me: string, may: { costs: boolean }): string | null {
+  if (a.done || a.dismissed) return null;
+  if (a.kind === "reminder" && a.for !== me.toLowerCase()) return "For the person it's for to set.";
+  if (a.kind === "order-add" && !may.costs) return "For someone who sees the Ordering Station to answer.";
+  return null;
+}
+
+/** The most of one product Sol offers to add to an order in one card. */
+export const MAX_ADD_QTY = 200;
+
+/** A product Sol may add: one on the job's order, or on the business's price lists. */
+export interface ProductChoice {
+  sku: string;
+  item: string;
+}
+
+const productWords = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/\b(more|extra|another|of|the|a|an|some|to|order|on|for)\b/g, " ")
+    .split(/[^a-z0-9.]+/)
+    .map((w) => (w.length > 3 && w.endsWith("ies") ? `${w.slice(0, -3)}y` : w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w))
+    .filter((w) => w.length > 1);
+
+/**
+ * The one product the words name (5 Nov 2026, from Primero's): every word must be in its name or code; the job's own
+ * order is looked at first, then the price lists. Null when nothing, or more than one different product, answers, so a
+ * card never adds a guess.
+ */
+export function matchProduct(text: string, onOrder: readonly ProductChoice[], listed: readonly ProductChoice[]): ProductChoice | null {
+  const want = productWords(text);
+  if (!want.length) return null;
+  const hits = (choices: readonly ProductChoice[]) => {
+    const found = new Map<string, ProductChoice>();
+    for (const c of choices) {
+      const hay = `${c.item} ${c.sku}`.toLowerCase();
+      if (want.every((w) => hay.includes(w))) found.set((c.sku || c.item).toUpperCase(), c);
+    }
+    return [...found.values()];
+  };
+  for (const choices of [onOrder, listed]) {
+    const found = hits(choices);
+    if (found.length === 1) return found[0];
+    if (found.length > 1) return null;
+  }
+  return null;
+}
+
+/**
+ * An order with `qty` more of a product (5 Nov 2026, from Primero's): a line the sale worked out gets its quantity
+ * raised, one added by hand before gets more, anything else is added by hand. Only the hand changes are kept, as the
+ * Ordering Station keeps them.
+ */
+export function withOrderAdd(
+  order: OrderState,
+  items: readonly { key: string; qty: number; worked: number | null }[],
+  add: { sku: string; item: string; qty: number },
+): OrderState {
+  const key = itemKey({ sku: add.sku, item: add.item, group: "Added" as CostGroup });
+  const added = order.added.find((a) => a.key === key);
+  if (added) return { ...order, added: order.added.map((a) => (a.key === key ? { ...a, qty: a.qty + add.qty } : a)) };
+  const sold = items.find((i) => i.key === key && i.worked !== null);
+  if (sold) return { ...order, qty: { ...order.qty, [key]: sold.qty + add.qty } };
+  return { ...order, added: [...order.added, { key, item: add.item, sku: add.sku, qty: add.qty }] };
 }
 
 // ---------------------------------------------------------------------------

@@ -28,7 +28,7 @@ import {
   type SalesFigures,
 } from "@/lib/domain/design/pad";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
-import { nextUp, type NextInput, type NextItem, type NextKind } from "@/lib/domain/design/next-up";
+import { NEXT_KIND_WORDS, nextUp, type NextInput, type NextItem, type NextKind } from "@/lib/domain/design/next-up";
 import { dueFollowUp } from "@/lib/domain/design/proposal-lists";
 import { listOrders, listProposals } from "@/lib/services/after-sale";
 import { loadMessages } from "@/lib/services/chat";
@@ -163,6 +163,31 @@ export function useNextUp(jobs: JobLine[] | null, today: ISODate): NextItem[] | 
 }
 
 /** One thing to do: what, why, and the one button. The most pressing is larger and lit. */
+/** Each kind's colours on To action: its ink on its soft ground (the `--kind-*` tokens), written out for Tailwind. */
+const KIND_TONES: Record<NextKind, string> = {
+  install: "bg-kind-install-soft text-kind-install",
+  message: "bg-kind-message-soft text-kind-message",
+  lead: "bg-kind-lead-soft text-kind-lead",
+  "follow-up": "bg-kind-follow-up-soft text-kind-follow-up",
+  order: "bg-kind-order-soft text-kind-order",
+  date: "bg-kind-date-soft text-kind-date",
+  approvals: "bg-kind-approvals-soft text-kind-approvals",
+};
+
+/** A small pill naming an item's kind in its own colour (Message, Follow-up, Install…), beside its title. */
+export function KindPill({ kind }: { kind: NextKind }) {
+  return (
+    <span
+      className={clsx(
+        "inline-flex h-[18px] shrink-0 items-center rounded-full px-2 text-[10px] font-semibold uppercase tracking-[0.08em]",
+        KIND_TONES[kind],
+      )}
+    >
+      {NEXT_KIND_WORDS[kind]}
+    </span>
+  );
+}
+
 export function NextCard({ item, lead, flush }: { item: NextItem; lead?: boolean; flush?: boolean }) {
   const Icon = KIND_ICONS[item.kind];
   return (
@@ -170,14 +195,17 @@ export function NextCard({ item, lead, flush }: { item: NextItem; lead?: boolean
       <span
         className={clsx(
           "grid shrink-0 place-items-center rounded-full",
-          lead ? "size-11 bg-[#ffb347] text-[#3a1d00] shadow-[0_0_12px_2px_rgb(255_138_61_/_0.4)]" : "size-9 bg-surface-2 text-ink-2",
+          lead ? "size-11 bg-[#ffb347] text-[#3a1d00] shadow-[0_0_12px_2px_rgb(255_138_61_/_0.4)]" : clsx("size-9", KIND_TONES[item.kind]),
         )}
         aria-hidden
       >
         <Icon className={lead ? "size-5" : "size-4"} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className={clsx("block truncate font-medium text-ink", lead ? "text-[16px]" : "text-[14px]")}>{item.title}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className={clsx("truncate font-medium text-ink", lead ? "text-[16px]" : "text-[14px]")}>{item.title}</span>
+          <KindPill kind={item.kind} />
+        </span>
         <span className="mt-0.5 block truncate text-[12.5px] text-ink-2">{item.why}</span>
       </span>
       <Link

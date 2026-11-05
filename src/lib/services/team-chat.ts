@@ -16,6 +16,8 @@ export interface TeamRoomView {
   /** Whether Sol answers a channel's questions nobody has, without being tagged; and whether this member may switch it. */
   solJoinsIn?: boolean;
   maySwitchSol?: boolean;
+  /** Whether this member sees costs, so Sol's order cards are theirs to answer. */
+  seesCosts?: boolean;
 }
 
 export const loadTeamRoom = (room: string) => ask<TeamRoomView>(`/api/design/team?room=${encodeURIComponent(room)}`);

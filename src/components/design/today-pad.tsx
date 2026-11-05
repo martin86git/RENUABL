@@ -15,11 +15,14 @@ import {
   KanbanSquare,
   Mail,
   Phone,
+  Play,
   RefreshCw,
+  Search,
   Sun,
+  X,
 } from "lucide-react";
 import { LAUNCH_MARKET, greeting } from "@/lib/domain/market";
-import { nextHeadline, type NextItem } from "@/lib/domain/design/next-up";
+import { nextHeadline, searchNext, searchWords, workThroughAt, type NextItem } from "@/lib/domain/design/next-up";
 import { WELCOME_TOUR } from "@/lib/domain/design/welcome";
 import { agentFor, type AgentStage } from "@/lib/domain/design/sol-agents";
 import {
@@ -766,28 +769,30 @@ function SolDay(props: {
             const shown = all ? told.rest : told.rest.slice(0, SHOWN);
             return (
               <Made key={i} onDone={done} instant={quick} after={400 + Math.min(told.rest.length, SHOWN) * 110}>
-                <div className="rounded-3xl bg-surface px-4 py-1 ring-1 ring-line sm:px-5">
-                  <ul className="divide-y divide-line">
-                    {shown.map((it, n) => (
-                      <li
-                        key={it.key}
-                        className={clsx(!quick && "motion-safe:animate-[sol-row_450ms_ease-out_both]")}
-                        style={quick ? undefined : { animationDelay: `${200 + n * 110}ms` }}
+                <ToAction all={told.first ? [told.first, ...told.rest] : told.rest}>
+                  <div className="rounded-3xl bg-surface px-4 py-1 ring-1 ring-line sm:px-5">
+                    <ul className="divide-y divide-line">
+                      {shown.map((it, n) => (
+                        <li
+                          key={it.key}
+                          className={clsx(!quick && "motion-safe:animate-[sol-row_450ms_ease-out_both]")}
+                          style={quick ? undefined : { animationDelay: `${200 + n * 110}ms` }}
+                        >
+                          <NextCard item={it} />
+                        </li>
+                      ))}
+                    </ul>
+                    {told.rest.length > SHOWN && (
+                      <button
+                        type="button"
+                        onClick={() => setAll(!all)}
+                        className="tap-area mb-2 mt-1 text-[13px] font-medium text-ink-2 hover:text-ink"
                       >
-                        <NextCard item={it} />
-                      </li>
-                    ))}
-                  </ul>
-                  {told.rest.length > SHOWN && (
-                    <button
-                      type="button"
-                      onClick={() => setAll(!all)}
-                      className="tap-area mb-2 mt-1 text-[13px] font-medium text-ink-2 hover:text-ink"
-                    >
-                      {all ? "Show fewer" : `${told.rest.length - SHOWN} more`}
-                    </button>
-                  )}
-                </div>
+                        {all ? "Show fewer" : `${told.rest.length - SHOWN} more`}
+                      </button>
+                    )}
+                  </div>
+                </ToAction>
               </Made>
             );
           }
@@ -815,6 +820,110 @@ function SolDay(props: {
 }
 
 const noop = () => {};
+
+/**
+ * To action with a search for a customer who has just come to mind and a slim "Work through" pill beside it (5 Nov
+ * 2026, from Primero's): searching shows the matches in place of the list; Work through steps through them (or
+ * everything) one at a time, large, with Back and Next. `children` is the list as Sol laid it out.
+ */
+function ToAction({ all, children }: { all: NextItem[]; children: React.ReactNode }) {
+  const [q, setQ] = useState("");
+  const [working, setWorking] = useState<number | null>(null);
+  const found = searchNext(all, q);
+  const searching = searchWords(q).length > 0;
+  if (!all.length) return <>{children}</>;
+  if (working !== null) {
+    const at = workThroughAt(working, found.length);
+    const item = found[at.at];
+    return (
+      <div className="rounded-3xl bg-surface p-3 ring-1 ring-line sm:p-4">
+        <div className="flex items-center justify-between px-1 text-[12px] text-muted">
+          <span className="tabular-nums">
+            {at.count}
+            {searching ? ` · matching “${q}”` : ""}
+          </span>
+          <button type="button" onClick={() => setWorking(null)} className="tap-area font-medium text-ink-2 hover:text-ink">
+            Back to the list
+          </button>
+        </div>
+        {item ? <NextCard item={item} lead /> : <p className="mt-4 px-1 text-[14px] text-muted">Nothing to work through.</p>}
+        <div className="mt-3 flex items-center justify-between px-1">
+          <button
+            type="button"
+            disabled={at.at === 0}
+            onClick={() => setWorking(at.at - 1)}
+            className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] text-ink-2 ring-1 ring-line hover:ring-ink-2 disabled:text-muted disabled:ring-line"
+          >
+            <ChevronLeft className="size-3.5" aria-hidden /> Back
+          </button>
+          <span className="text-[12px] text-muted">{at.after}</span>
+          <button
+            type="button"
+            disabled={at.at >= found.length - 1}
+            onClick={() => setWorking(at.at + 1)}
+            className="inline-flex h-8 items-center gap-1 rounded-full bg-primary px-3 text-[13px] font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+          >
+            Next <ChevronRight className="size-3.5" aria-hidden />
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <label className="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-full bg-surface px-3 ring-1 ring-line focus-within:ring-sun-line">
+          <Search className="size-3.5 shrink-0 text-muted" aria-hidden />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setQ("");
+            }}
+            placeholder="Search a customer"
+            aria-label="Search To action"
+            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
+          />
+          {q && (
+            <button type="button" onClick={() => setQ("")} aria-label="Clear the search" className="text-muted hover:text-ink">
+              <X className="size-3.5" aria-hidden />
+            </button>
+          )}
+        </label>
+        {found.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setWorking(0)}
+            title={searching ? "One at a time, through the matches" : "One at a time, through everything waiting"}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary pl-2.5 pr-3 text-[12px] font-medium text-primary-ink hover:bg-forest"
+          >
+            <Play className="size-3 fill-sun-line text-sun-line" aria-hidden />
+            {searching ? `Work through ${found.length}` : "Work through"}
+          </button>
+        )}
+      </div>
+      {!searching ? (
+        children
+      ) : found.length ? (
+        <div className="rounded-3xl bg-surface px-4 py-1 ring-1 ring-line sm:px-5">
+          <p className="pt-3 text-[12px] text-muted">
+            {found.length} of {all.length}
+          </p>
+          <ul className="divide-y divide-line">
+            {found.map((it) => (
+              <li key={it.key}>
+                <NextCard item={it} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="px-1 text-[13px] text-muted">Nothing waiting for “{q}”.</p>
+      )}
+    </div>
+  );
+}
 
 function Skip({ onDone }: { onDone: () => void }) {
   useEffect(() => {

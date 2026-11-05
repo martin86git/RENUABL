@@ -1,6 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { nextHeadline, nextUp, suburbIn, type NextInput } from "./next-up";
+import { NEXT_KIND_WORDS, nextHeadline, nextUp, searchNext, suburbIn, workThroughAt, type NextInput, type NextItem } from "./next-up";
 import type { JobStage } from "./crm";
+
+describe("To action's pills, search and Work through", () => {
+  const item = (key: string, kind: NextItem["kind"], title: string, why = ""): NextItem => ({
+    key,
+    kind,
+    title,
+    why,
+    action: "Open",
+    href: "/",
+    weight: 1,
+  });
+  const items = [
+    item("a", "follow-up", "Follow up Chloe Tran", "Proposal sent 3 days ago"),
+    item("b", "lead", "New enquiry from Sam Lee", "Glen Waverley"),
+    item("c", "message", "Chloe wrote: “When is it?”"),
+  ];
+  it("gives every kind a word", () => {
+    for (const k of ["install", "message", "lead", "follow-up", "order", "date", "approvals"] as const)
+      expect(NEXT_KIND_WORDS[k]).toBeTruthy();
+  });
+  it("finds a customer by every word, in the title, the line or the kind", () => {
+    expect(searchNext(items, "chloe").map((i) => i.key)).toEqual(["a", "c"]);
+    expect(searchNext(items, "chloe follow").map((i) => i.key)).toEqual(["a"]);
+    expect(searchNext(items, "glen").map((i) => i.key)).toEqual(["b"]);
+    expect(searchNext(items, "new lead").map((i) => i.key)).toEqual(["b"]);
+    expect(searchNext(items, "  ")).toHaveLength(3);
+    expect(searchNext(items, "nobody")).toEqual([]);
+  });
+  it("steps through one at a time, saying where it is", () => {
+    expect(workThroughAt(0, 3)).toEqual({ at: 0, count: "1 of 3", after: "2 after this" });
+    expect(workThroughAt(2, 3)).toEqual({ at: 2, count: "3 of 3", after: "The last one" });
+    expect(workThroughAt(9, 3).at).toBe(2);
+    expect(workThroughAt(0, 0).count).toBe("0 of 0");
+  });
+});
 
 const TODAY = "2026-10-25";
 const NOW = new Date("2026-10-24T22:00:00Z"); // 9am in Melbourne
