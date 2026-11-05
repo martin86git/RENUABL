@@ -4,9 +4,16 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { AtSign, FileText, Hash, MessagesSquare, Paperclip, Pencil, Reply, SmilePlus, SquareKanban, Trash2, X } from "lucide-react";
+import { AtSign, Check, FileText, Hash, MessagesSquare, Paperclip, Pencil, Reply, SmilePlus, SquareKanban, Trash2, X } from "lucide-react";
 import { cleanKind } from "@/lib/domain/design/business-kind";
-import { CATCH_UP_MIN, actionWords, type CatchUp, type ChatAction } from "@/lib/domain/design/sol-chat-work";
+import {
+  CATCH_UP_MIN,
+  actionDoneWords,
+  actionNotYours,
+  actionQuestion,
+  type CatchUp,
+  type ChatAction,
+} from "@/lib/domain/design/sol-chat-work";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { handleOf } from "@/lib/domain/design/mentions";
@@ -481,7 +488,16 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
                   )
                 )}
                 {l.edited && !isEditing && <p className="px-1 text-[10px] text-muted">edited</p>}
-                {l.action && <ActionCard lineId={l.id} action={l.action} me={me} onDone={() => void load()} onError={setError} />}
+                {l.action && (
+                  <ActionCard
+                    lineId={l.id}
+                    action={l.action}
+                    me={me}
+                    seesCosts={view?.seesCosts !== false}
+                    onDone={() => void load()}
+                    onError={setError}
+                  />
+                )}
                 {(l.diagrams?.length || l.charts?.length) && (
                   <div className="mt-1 w-full max-w-[85%] space-y-2">
                     {l.diagrams?.map((d, k) => (
@@ -878,10 +894,17 @@ function SolJoinsSwitch({ on, may, onChange }: { on: boolean; may: boolean; onCh
 }
 
 /**
- * What Sol offers to do from what was said (sol-chat-work.ts): the work in words, Do it and Not now. Pressed, it is done
- * as the person who pressed it; once done or set aside it says so, for everyone.
+ * What Sol offers to do from what was said (sol-chat-work.ts): the work as a question, Yes and No. Pressed, it is done
+ * as the person who pressed it (the server checks they may); once answered it says what came of it, for everyone.
  */
-function ActionCard(props: { lineId: string; action: ChatAction; me: string; onDone: () => void; onError: (m: string) => void }) {
+function ActionCard(props: {
+  lineId: string;
+  action: ChatAction;
+  me: string;
+  seesCosts: boolean;
+  onDone: () => void;
+  onError: (m: string) => void;
+}) {
   const { action } = props;
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState("");
@@ -890,39 +913,40 @@ function ActionCard(props: { lineId: string; action: ChatAction; me: string; onD
     const r = await pressSolAction(props.lineId, how);
     setBusy(false);
     if (!r.ok) return props.onError(r.message);
-    setSaid(how === "do" ? "Done." : "Set aside.");
+    setSaid(how === "do" ? r.words || actionDoneWords(action) : "Left as it was.");
     props.onDone();
   };
   const settled = action.done ?? action.dismissed;
-  const notMine = action.kind === "reminder" && action.for !== props.me.toLowerCase();
+  const notYours = actionNotYours(action, props.me, { costs: props.seesCosts });
   return (
     <div className="mt-1 w-full max-w-[85%] rounded-2xl bg-surface p-3 text-sm ring-1 ring-sun-line/40">
-      <p className="font-medium text-ink">{actionWords(action)}</p>
+      <p className="font-medium text-ink">{actionQuestion(action)}</p>
       {settled ? (
-        <p className="mt-1 text-xs text-muted">
-          {action.done ? "Done" : "Set aside"} by {nameOf(settled.by)}
+        <p className="mt-1 flex items-center gap-1 text-xs text-muted">
+          {action.done ? <Check className="size-3.5 text-sun-line" aria-hidden /> : <X className="size-3.5" aria-hidden />}
+          {action.done ? actionDoneWords(action) : "Left as it was"} · {nameOf(settled.by)}
         </p>
       ) : said ? (
         <p className="mt-1 text-xs text-muted">{said}</p>
-      ) : notMine ? (
-        <p className="mt-1 text-xs text-muted">For {nameOf(action.for)} to set.</p>
+      ) : notYours ? (
+        <p className="mt-1 text-xs text-muted">{notYours}</p>
       ) : (
         <div className="mt-2 flex gap-2">
           <button
             type="button"
             disabled={busy}
             onClick={() => void press("do")}
-            className="rounded-full bg-sun-line px-3 py-1 text-xs font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+            className="min-w-14 rounded-full bg-sun-line px-3 py-1 text-xs font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
           >
-            Do it
+            Yes
           </button>
           <button
             type="button"
             disabled={busy}
             onClick={() => void press("dismiss")}
-            className="rounded-full px-3 py-1 text-xs font-medium text-ink-2 ring-1 ring-line hover:bg-canvas"
+            className="min-w-14 rounded-full px-3 py-1 text-xs font-medium text-ink-2 ring-1 ring-line hover:bg-canvas"
           >
-            Not now
+            No
           </button>
         </div>
       )}

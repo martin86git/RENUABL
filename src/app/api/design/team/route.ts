@@ -39,18 +39,29 @@ const meOf = (member: Member): TeamMe => ({ businessId: member.businessId, email
 function solHears(member: Member, room: string, text: string, lineId: string) {
   const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);
   // Work said in passing ("Chloe's install moves to Thursday"): Sol offers a card to do it, at once.
-  after(() =>
-    solOffersWork(member, room, lineId, text, apiKey).catch((e) => console.error("sol offering work", e instanceof Error ? e.message : e)),
-  );
   if (!asksSol(room, text)) {
+    after(() =>
+      solOffersWork(member, room, lineId, text, apiKey).catch((e) =>
+        console.error("sol offering work", e instanceof Error ? e.message : e),
+      ),
+    );
     after(() =>
       solStepsIn(member, room, lineId, text, apiKey).catch((e) => console.error("sol joining in", e instanceof Error ? e.message : e)),
     );
     return;
   }
-  after(() =>
-    solAnswersInChannel(member, room, text, apiKey).catch((e) => console.error("sol in the team chat", e instanceof Error ? e.message : e)),
-  );
+  // Asked by name to change something ("@Sol move Chloe's install to Friday", "@Sol mark the Lees installed"): his answer
+  // is a Yes / No card. Anything else he answers in words.
+  after(async () => {
+    const carded = await solOffersWork(member, room, lineId, text, apiKey, true).catch((e) => {
+      console.error("sol offering work", e instanceof Error ? e.message : e);
+      return false;
+    });
+    if (carded) return;
+    await solAnswersInChannel(member, room, text, apiKey).catch((e) =>
+      console.error("sol in the team chat", e instanceof Error ? e.message : e),
+    );
+  });
 }
 
 /**
@@ -71,7 +82,14 @@ export async function GET(request: Request) {
     try {
       const [view, prefs] = await Promise.all([teamRoom(me, room), loadPrefs(who.member.businessId)]);
       const m = who.member;
-      return Response.json({ ok: true, ...view, solJoinsIn: prefs.solJoinsIn, maySwitchSol: can(m.role, "prices", m.permissions) });
+      return Response.json({
+        ok: true,
+        ...view,
+        solJoinsIn: prefs.solJoinsIn,
+        maySwitchSol: can(m.role, "prices", m.permissions),
+        // Whether Sol's order cards are theirs to answer (the server checks again on the press).
+        seesCosts: can(m.role, "costs", m.permissions),
+      });
     } catch (e) {
       return refusal(e);
     }
