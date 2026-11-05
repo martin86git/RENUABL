@@ -12,9 +12,14 @@ export const loadSol = () => ask<{ state: SolState }>("/api/design/sol");
 
 const post = (body: Record<string, unknown>) => ask<{ state: SolState }>("/api/design/sol", { method: "POST", body });
 
-/** A question, with what their screen shows when asked from the side panel (page-context.ts). */
-export const askSol = (text: string, files: SolFile[], page?: PageContext | null, deep = false) =>
-  post({ do: "chat", text, files, ...(page ? { page } : {}), ...(deep ? { deep: true } : {}) });
+/**
+ * A question, with what their screen shows when asked from the side panel (page-context.ts). `shown` is the short line
+ * the chat shows for it when `text` is a long instruction sent for the member.
+ */
+export const askSol = (text: string, files: SolFile[], page?: PageContext | null, deep = false, shown?: string) =>
+  post({ do: "chat", text, files, ...(page ? { page } : {}), ...(deep ? { deep: true } : {}), ...(shown ? { shown } : {}) });
+/** Try another answer: his last answer replaced by a new one to the same question, a different way. */
+export const retrySol = (page?: PageContext | null) => post({ do: "retry", ...(page ? { page } : {}) });
 export const solSeen = () => post({ do: "seen" });
 export const clearSolChat = () => post({ do: "clear" });
 export const remindAt = (id: string, when: WhenChoice) => post({ do: "remind", id, when });
@@ -38,8 +43,14 @@ export const pinTurn = (at: string, role: "you" | "sol", pinned: boolean) => pos
 
 /** Said on the window to open or shut Sol's panel from anywhere (the rail, a "#" link). */
 export const SOL_TOGGLE = "renuabl:sol-toggle";
-/** Said on the window with a question (`detail`, the words): opens Sol's panel and asks him (the search, "Ask Sol"). */
+/**
+ * Said on the window with a question: opens Sol's panel and asks him (the search, "Ask Sol"). `detail` is the words,
+ * or `{ text, shown }` when the words are a long instruction and the chat should show a short line for it.
+ */
 export const SOL_ASK = "renuabl:sol-ask";
+export type SolAsk = string | { text: string; shown?: string };
+/** Asks Sol in his panel from anywhere. */
+export const askSolInPanel = (ask: SolAsk) => window.dispatchEvent(new CustomEvent<SolAsk>(SOL_ASK, { detail: ask }));
 /** Said back whenever the panel opens or shuts, so the rail can light its button. */
 export const SOL_STATE = "renuabl:sol-state";
 /** Said whenever Sol's conversation changes here, so the rail's count follows. */

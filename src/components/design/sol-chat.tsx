@@ -3,7 +3,23 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Bell, Copy, Eye, EyeOff, FileText, History, Mail, MessageSquarePlus, Paperclip, X, Pin } from "lucide-react";
+import {
+  ArrowUpRight,
+  Bell,
+  Copy,
+  Eye,
+  EyeOff,
+  FileText,
+  History,
+  Mail,
+  MessageSquarePlus,
+  Paperclip,
+  RefreshCw,
+  X,
+  Pin,
+} from "lucide-react";
+import type { SolGoTo } from "@/lib/domain/design/sol-goto";
+import { openDesigner } from "./design-drawer";
 import { lookingAt } from "@/lib/domain/design/page-context";
 import { pageAt } from "@/lib/domain/design/sections";
 import { PAGE_ABOUT_CHANGED, currentPageContext, pageAboutNow } from "@/lib/services/page-context";
@@ -20,6 +36,8 @@ import {
   dueWords,
   typingDeal,
   whenChoices,
+  withoutAttachedNote,
+  withoutLastExchange,
   type SolDraft,
   type SolFile,
   type SolReminderAsk,
@@ -42,6 +60,7 @@ import {
   newSolChat,
   resumeSolChat,
   rememberAnswer,
+  retrySol,
 } from "@/lib/services/sol";
 import { askToStartAfresh, worthKeeping } from "@/lib/domain/design/sol-history";
 import { DictateButton, withSpoken } from "./dictate";
@@ -101,18 +120,34 @@ function useSol() {
     };
   }, []);
   /** A request that answers with the state: shown here and said to the rail and any other Sol on screen. */
-  const run = async (go: Promise<{ ok: true; state: SolState } | { ok: false; message: string }>) => {
+  const runFor = async (go: Promise<{ ok: true; state: SolState } | { ok: false; message: string }>): Promise<SolState | null> => {
     const r = await go;
     if (!r.ok) {
       setProblem(r.message);
-      return false;
+      return null;
     }
     setProblem("");
     setState(r.state);
     window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
-    return true;
+    return r.state;
   };
-  return { state, problem, run };
+  const run = async (go: Promise<{ ok: true; state: SolState } | { ok: false; message: string }>) => (await runFor(go)) !== null;
+  return { state, problem, run, runFor };
+}
+
+/**
+ * Opens a page Sol opened for them (sol-goto.ts): the designer slides over the page as its drawer, anything else is
+ * gone to in place, so his panel stays open beside it.
+ */
+export function openSolPage(goTo: SolGoTo, router: { push: (href: string) => void }) {
+  if (goTo.design) openDesigner(goTo.path, router);
+  else router.push(goTo.path);
+}
+
+/** His answer just in: when he opened a page with it, go there. */
+export function goWhereAsked(state: SolState | null, router: { push: (href: string) => void }) {
+  const last = state?.turns[state.turns.length - 1];
+  if (last?.role === "sol" && last.goTo) openSolPage(last.goTo, router);
 }
 
 /**
@@ -129,10 +164,12 @@ export function SolChat({
 }: {
   side?: boolean;
   onClose?: () => void;
-  question?: { id: number; text: string } | null;
+  question?: { id: number; text: string; shown?: string } | null;
 }) {
   const router = useRouter();
-  const { state, problem, run } = useSol();
+  const { state, problem, run, runFor } = useSol();
+  // Try another answer: the conversation from that question on is hidden while he answers it again.
+  const [redoFrom, setRedoFrom] = useState<number | null>(null);
   const [text, setText] = useState("");
   const [heard, setHeard] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -173,6 +210,8 @@ export function SolChat({
 
   const turns = state?.turns ?? [];
   const unread = state?.unread ?? 0;
+  // Only a real answer (one that took credits) to the latest question can be tried again.
+  const canRetry = Boolean(turns[turns.length - 1]?.credits) && withoutLastExchange(turns) !== null;
   // Past conversations, and the question after a while away (sol-history.ts): asked once for the last message there
   // was, until it's answered (kept for the tab).
   const [history, setHistory] = useState(false);
@@ -216,7 +255,8 @@ export function SolChat({
     if (picker.current) picker.current.value = "";
   };
 
-  const send = async (over?: string, deep = false) => {
+  /** `shown`: the short line the chat shows for a long instruction sent for them; the words still go to Sol. */
+  const send = async (over?: string, deep = false, shown?: string) => {
     const said = (over ?? text).trim();
     const sending = over ? [] : files;
     if ((!said && !sending.length) || busy) return;
@@ -234,14 +274,33 @@ export function SolChat({
     }
     setDealAt(null);
     setBusy(true);
-    setPending(said + (sending.length ? `${said ? "\n" : ""}(Attached: ${sending.map((f) => f.name).join(", ")})` : ""));
-    const ok = await run(askSol(said, encoded, side && seePage ? currentPageContext(pageName) : null, deep));
+    setPending((shown || said) + (sending.length ? `${said ? "\n" : ""}(Attached: ${sending.map((f) => f.name).join(", ")})` : ""));
+    const next = await runFor(askSol(said, encoded, side && seePage ? currentPageContext(pageName) : null, deep, shown));
     setPending(null);
     setBusy(false);
-    if (ok) void run(solSeen());
-    else if (!over) {
+    if (next) {
+      void run(solSeen());
+      goWhereAsked(next, router);
+    } else if (!over) {
       setText(said);
       setFiles(sending);
+    }
+  };
+
+  /** Try another answer: his last answer comes off and the same question is asked again, a different way. */
+  const retry = async () => {
+    const taken = withoutLastExchange(turns);
+    if (!taken || busy) return;
+    setRedoFrom(turns.indexOf(taken.question));
+    setBusy(true);
+    setPending(taken.question.shown || taken.question.text);
+    const next = await runFor(retrySol(side && seePage ? currentPageContext(pageName) : null));
+    setPending(null);
+    setRedoFrom(null);
+    setBusy(false);
+    if (next) {
+      void run(solSeen());
+      goWhereAsked(next, router);
     }
   };
 
@@ -250,7 +309,7 @@ export function SolChat({
   useEffect(() => {
     if (!question || asked.current === question.id) return;
     asked.current = question.id;
-    void send(question.text);
+    void send(question.text, false, question.shown);
   }, [question]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pickDeal = (j: JobLine) => {
@@ -345,7 +404,7 @@ export function SolChat({
           renderTurns={(past) =>
             past.map((t, i) => (
               <div key={`${t.at}-${i}`} className="space-y-2">
-                <Bubble you={t.role === "you"} text={t.text} at={t.at} />
+                <Bubble you={t.role === "you"} text={t.shown || t.text} at={t.at} />
                 {t.role === "sol" && t.sources?.length ? <SolSources sources={t.sources} remembered={t.remembered} /> : null}
                 {t.charts?.map((c, k) => (
                   <SolChartView key={k} chart={c} />
@@ -413,11 +472,11 @@ export function SolChat({
             ))}
           </div>
         )}
-        {turns.map((t, i) => (
+        {(redoFrom !== null ? turns.slice(0, redoFrom) : turns).map((t, i) => (
           <div key={`${t.at}-${i}`} id={turnId(t)} className="group/turn space-y-2">
             <Bubble
               you={t.role === "you"}
-              text={t.text}
+              text={t.shown || t.text}
               at={t.at}
               pinned={t.pinned}
               onPin={() => void run(pinTurn(t.at, t.role, !t.pinned))}
@@ -431,11 +490,26 @@ export function SolChat({
                 // Only the latest quick answer offers to think again, asking the same question of the deeper model.
                 again={
                   i === turns.length - 1 && !t.deep && turns[i - 1]?.role === "you" && !busy
-                    ? () => void send(askedText(turns[i - 1].text), true)
+                    ? () =>
+                        void send(
+                          withoutAttachedNote(turns[i - 1].text),
+                          true,
+                          `Think deeper: ${turns[i - 1].shown || withoutAttachedNote(turns[i - 1].text)}`,
+                        )
                     : null
                 }
               />
             ) : null}
+            {/* A page he opened: the chat went there as the answer came in; pressed, it goes again. */}
+            {t.role === "sol" && t.goTo && (
+              <button
+                type="button"
+                onClick={() => openSolPage(t.goTo!, router)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-sun px-3 py-1 text-xs font-medium text-sun-ink ring-1 ring-sun-line/30 transition hover:ring-sun-line"
+              >
+                Opened {t.goTo.label} <ArrowUpRight className="size-3.5" aria-hidden />
+              </button>
+            )}
             {t.charts?.map((c, k) => (
               <SolChartView key={k} chart={c} />
             ))}
@@ -459,15 +533,31 @@ export function SolChat({
                 }}
               />
             )}
-            {t.role === "sol" && i === turns.length - 1 && !pending && offersMore(t.text) && (
-              <button
-                type="button"
-                onClick={() => void send(MORE_DETAIL_ASK)}
-                disabled={busy}
-                className="rounded-full border border-sun-line/60 px-3 py-1 text-xs font-medium text-sun-ink transition hover:bg-sun disabled:text-muted"
-              >
-                Yes, more detail
-              </button>
+            {t.role === "sol" && i === turns.length - 1 && pending === null && (offersMore(t.text) || canRetry) && (
+              <div className="flex flex-wrap items-center gap-2">
+                {offersMore(t.text) && (
+                  <button
+                    type="button"
+                    onClick={() => void send(MORE_DETAIL_ASK)}
+                    disabled={busy}
+                    className="rounded-full border border-sun-line/60 px-3 py-1 text-xs font-medium text-sun-ink transition hover:bg-sun disabled:text-muted"
+                  >
+                    Yes, more detail
+                  </button>
+                )}
+                {/* Not keen on his approach: the same question again, a different way; this answer is replaced. */}
+                {canRetry && (
+                  <button
+                    type="button"
+                    onClick={() => void retry()}
+                    disabled={busy}
+                    title="Sol answers the same question again, a different way. This answer is replaced. It takes credits like any answer."
+                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-sun-line disabled:text-muted"
+                  >
+                    <RefreshCw className="size-3" aria-hidden /> Try another answer
+                  </button>
+                )}
+              </div>
             )}
           </div>
         ))}
@@ -728,9 +818,6 @@ export function SolChat({
 
 const turnId = (t: { role: string; at: string }) => `sol-turn-${t.role}-${t.at.replace(/[^0-9a-z]/gi, "")}`;
 
-/** The question as they asked it, without the note of what was attached (files aren't sent again). */
-const askedText = (text: string) => text.replace(/\n\(Attached: [^)]*\)$/, "").trim();
-
 /** What an answer took, and on the latest quick one, Think deeper (sol-routing.ts). */
 function AnswerCost({ turn, again }: { turn: SolTurn; again: (() => void) | null }) {
   return (
@@ -757,14 +844,17 @@ function Bubble({ you, text, at, pinned, onPin }: { you: boolean; text: string; 
     <div className={clsx("flex flex-col", you ? "items-end" : "items-start")}>
       <div
         className={clsx(
-          "max-w-[85%] rounded-2xl px-3 py-2 [overflow-wrap:anywhere]",
-          you ? "whitespace-pre-wrap bg-sun-line text-white" : "bg-canvas text-ink",
-          pinned && "ring-2 ring-sun-line/50",
+          "rounded-2xl px-3 py-2 [overflow-wrap:anywhere]",
+          // Theirs a notch smaller, in the pale sun with a fine warm edge, so his answers read first (5 Nov 2026, Martin).
+          you
+            ? "max-w-[75%] whitespace-pre-wrap rounded-br-md bg-sun text-[13px] leading-[1.5] text-ink"
+            : "max-w-[85%] bg-canvas text-ink",
+          pinned ? "ring-2 ring-sun-line/50" : you && "ring-1 ring-sun-line/25",
         )}
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
         {you ? text : <SolText text={text} />}
-        {at && <span className={clsx("mt-1 block text-[10px]", you ? "text-white/70" : "text-muted")}>{when(at)}</span>}
+        {at && <span className={clsx("mt-1 block text-[10px]", you ? "text-sun-ink/70" : "text-muted")}>{when(at)}</span>}
       </div>
       {at && (
         <div

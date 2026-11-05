@@ -14,10 +14,17 @@ import { solPlain } from "@/lib/domain/design/sol-format";
 import { asBuiltInWords } from "@/lib/domain/design/as-built";
 import { caseInWords } from "@/lib/domain/design/service";
 import { asBuiltOf, jobCard } from "./design-job-card-repo";
+import { pageAllowed } from "@/lib/domain/design/business-kind";
+import { placesForSol, solGoTo, type SolGoTo } from "@/lib/domain/design/sol-goto";
 import {
   DRAFTS_PER_TURN,
   HISTORY_SENT,
+  anotherAnswerNote,
+  cleanShown,
   dealLine,
+  dropExchange,
+  withoutAttachedNote,
+  withoutLastExchange,
   dealsAtStage,
   dueFor,
   dueWords,
@@ -293,7 +300,29 @@ const PRICE_TOOL: Anthropic.Tool = {
   input_schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
 };
 
+/**
+ * Taking them to a page (5 Nov 2026, Martin, as Primero's): he names a place from the list (sol-goto.ts), never an
+ * address; the server builds it and checks it. Only in the member's own conversation, never a team channel.
+ */
+const OPEN_PAGE_TOOL: Anthropic.Tool = {
+  name: "open_page",
+  description: `When they ask to be taken to, shown or to open a page, a deal, a deal's design or part of RENUABL, open it for them: the chat goes there as soon as your answer is in. Never tell them the way instead. For a deal, find it first (find_deal, or the "(deal ID)" in their message) and pass its id. One page an answer. Say in a few words what you opened. The pages (page: what it is):
+${placesForSol()}`,
+  input_schema: {
+    type: "object",
+    properties: {
+      page: { type: "string", description: "One of the pages above, by the word before its colon." },
+      deal_id: { type: "string", description: "For deal, design and proposal: the deal's id." },
+      tab: { type: "string", description: "For deal only: which tab to open." },
+      label: { type: "string", description: "What it is, in a few words, e.g. Casey Sample's deal." },
+    },
+    required: ["page"],
+  },
+};
+
 interface Turn {
+  /** A page he opened for them (one an answer). */
+  goTo?: SolGoTo;
   charts: SolChart[];
   diagrams: SolDiagram[];
   designs: SolDesignShown[];
@@ -343,6 +372,14 @@ async function runTool(
     );
     shown.remembered.push({ id: kept.id, question: kept.question });
     return `Kept in memory as ${kept.id}.`;
+  }
+  if (name === "open_page") {
+    const g = solGoTo(input);
+    if (!g.ok) return g.message;
+    if (g.jobId && !(await jobById(businessId, g.jobId, viewer))) return "There's no such deal, or this person can't see it.";
+    if (!pageAllowed(member.businessKind ?? "retailer", g.goTo.path.split("?")[0])) return "That page isn't part of their RENUABL account.";
+    shown.goTo = g.goTo;
+    return `Opening ${g.goTo.label} as soon as you answer. Say so in a few words.`;
   }
   if (name === "find_deal") {
     const found = findDeals(jobs, s(input.query), (c) => phones.get(c) ?? "");
@@ -512,6 +549,10 @@ export async function askSol(
     routeOn?: string;
     /** Answered where the whole business reads it (a team channel): no costs, no private history, the shared view. */
     shared?: boolean;
+    /** The short line the chat shows for the question when `text` is a long instruction sent for them. */
+    shown?: string;
+    /** Try another answer: when the question was first asked, and the answer they didn't take (`retrySol`). */
+    retry?: { questionAt: string; answer: string };
   },
   apiKey: string | null,
   use: SolUse = "chat",
@@ -520,17 +561,14 @@ export async function askSol(
   const named = said.files.map((f) => f.name);
   const text = (said.text || "Here's what I've attached.") + (named.length ? `\n(Attached: ${named.join(", ")})` : "");
   const asked = new Date().toISOString();
-  const you: SolTurn = { role: "you", text, at: asked };
-  if (!apiKey) {
-    return addSolTurns(businessId, email, [
-      you,
-      {
-        role: "sol",
-        text: "I can't answer just now: Claude isn't set up on this site yet (ANTHROPIC_API_KEY).",
-        at: new Date().toISOString(),
-      },
-    ]);
-  }
+  const shortLine = cleanShown(said.shown);
+  const you: SolTurn = { role: "you", text, at: asked, ...(shortLine ? { shown: shortLine } : {}) };
+  // Asked again with no answer to come: the old answer stays, and only why is said under it.
+  const asItWas = (why: string) =>
+    said.retry
+      ? addSolTurns(businessId, email, [{ role: "sol", text: why, at: new Date().toISOString() }])
+      : addSolTurns(businessId, email, [you, { role: "sol", text: why, at: new Date().toISOString() }]);
+  if (!apiKey) return asItWas("I can't answer just now: Claude isn't set up on this site yet (ANTHROPIC_API_KEY).");
   // Quick (Sonnet) unless the question needs more (sol-routing.ts). The credits are taken before Claude is asked
   // and given back when no answer comes. A deep answer with too few credits left is answered quickly instead.
   const route = routeQuestion({ text: said.routeOn ?? said.text, files: said.files.length, asked: said.deep });
@@ -542,7 +580,7 @@ export async function askSol(
     reason = "deep, but too few credits left";
     credit = await takeSolCredit(businessId, use, email, TIER_CREDITS.quick);
   }
-  if (!credit) return addSolTurns(businessId, email, [you, { role: "sol", text: SOL_OUT, at: new Date().toISOString() }]);
+  if (!credit) return asItWas(SOL_OUT);
   const viewer = said.shared ? await sharedViewer(businessId) : viewerOf(member);
   const costs = !said.shared && can(member.role, "costs", member.permissions);
   const guard: ToolGuard = { viewer, readCustomerText: false };
@@ -554,22 +592,30 @@ export async function askSol(
   ]);
   const visible = new Set(jobs.map((j) => j.customerId));
   const phones = new Map(customers.filter((c) => visible.has(c.id)).map((c) => [c.id, c.phone]));
-  const system = solSystem({
-    business: member.businessName,
-    member: email,
-    costs,
-    facts: canvasFacts(jobs, serviceOpen, todayInMarket()),
-    prefs: state.prefs,
-    now: new Date(),
-  });
-  const ownTools: Anthropic.ToolUnion[] = [...(costs ? [...TOOLS, PRICE_TOOL] : TOOLS), ...WEB_TOOLS];
+  const system =
+    solSystem({
+      business: member.businessName,
+      member: email,
+      costs,
+      facts: canvasFacts(jobs, serviceOpen, todayInMarket()),
+      prefs: state.prefs,
+      now: new Date(),
+    }) + (said.retry ? `\n\n${anotherAnswerNote(said.retry.answer)}` : "");
+  const ownTools: Anthropic.ToolUnion[] = [
+    ...TOOLS,
+    ...(costs ? [PRICE_TOOL] : []),
+    // Opening a page is for their own conversation, never a channel everyone reads.
+    ...(said.shared ? [] : [OPEN_PAGE_TOOL]),
+    ...WEB_TOOLS,
+  ];
   // A quick answer may hand itself up before it starts; a deep one has nothing to hand up to.
   const toolsFor = (t: SolTier): Anthropic.ToolUnion[] => (t === "quick" ? [THINK_DEEPER_TOOL, ...ownTools] : ownTools);
   const blocks = fileBlocks(said.files);
   // What their screen shows goes with this question only, ahead of it; the conversation keeps just what they said.
   const asking = said.page ? `${pageContextBlock(said.page)}\n\n${text}` : text;
   const messages: Anthropic.MessageParam[] = [
-    ...(said.shared ? [] : state.turns)
+    // Asked again: the conversation as it was before that question, so the answer not taken isn't in it twice.
+    ...(said.shared ? [] : said.retry ? dropExchange(state.turns, said.retry.questionAt) : state.turns)
       .slice(-HISTORY_SENT)
       .map((t) => ({ role: t.role === "you" ? ("user" as const) : ("assistant" as const), content: t.text || "(drawn)" })),
     { role: "user", content: blocks.length ? [...blocks, { type: "text" as const, text: asking }] : asking },
@@ -591,6 +637,8 @@ export async function askSol(
   /** The answer given just before he only kept it in memory: his next words add to it rather than replace it. */
   let keptAfter = "";
   let resumes = 0;
+  /** No answer came (Claude failed before saying anything): its credits were given back. */
+  let failed = false;
   /** Every call's usage, kept as the answer's real cost (ai-costs.ts). */
   const calls: AiUsage[] = [];
   /** The conversation as it was before any step, to start again on the deeper model. */
@@ -651,7 +699,10 @@ export async function askSol(
     }
   } catch (e) {
     console.error("sol failed", redactSecrets(e instanceof Anthropic.APIError ? `Claude API ${e.status}: ${e.message}` : String(e)));
-    if (!answer) await giveBackSolCredit(businessId, credit);
+    if (!answer) {
+      failed = true;
+      await giveBackSolCredit(businessId, credit);
+    }
     answer = answer || "Something went wrong reaching Claude just then. Try again in a moment.";
   }
   // An answer researched online took longer and cost more: its research credits are added (never stopping it).
@@ -673,7 +724,9 @@ export async function askSol(
         ? "Here's the draft."
         : shown.charts.length || shown.diagrams.length || shown.designs.length
           ? "Here it is."
-          : "Done."),
+          : shown.goTo
+            ? `Opening ${shown.goTo.label}.`
+            : "Done."),
     at: new Date().toISOString(),
     ...(shown.charts.length ? { charts: shown.charts } : {}),
     ...(shown.diagrams.length ? { diagrams: shown.diagrams } : {}),
@@ -683,8 +736,35 @@ export async function askSol(
     ...(sources.length ? { sources } : {}),
     ...(shown.remembered.length ? { remembered: shown.remembered } : {}),
     ...(answer ? { credits, ...(tier === "deep" ? { deep: true } : {}) } : {}),
+    ...(shown.goTo ? { goTo: shown.goTo } : {}),
   };
-  return addSolTurns(businessId, email, [you, sol]);
+  // Asked again: the new answer takes the old one's place, only once there is one (a failure leaves the old answer).
+  if (said.retry && failed) return asItWas(sol.text);
+  return addSolTurns(businessId, email, [you, sol], said.retry?.questionAt);
+}
+
+/**
+ * "Try another answer" (5 Nov 2026, Martin, as Primero's): the member's last question asked again, with the answer they
+ * didn't take given to Sol so he comes at it another way. Its credits are taken like any answer's; the new answer
+ * replaces the old one (and its question moves to now). Only the question's words are asked again: files sent with it
+ * aren't sent a second time. Null when there's no answer to try again.
+ */
+export async function retrySol(member: Member, page: PageContext | undefined, apiKey: string | null): Promise<SolState | null> {
+  const taken = withoutLastExchange((await solState(member.businessId, member.email)).turns);
+  if (!taken) return null;
+  return askSol(
+    member,
+    {
+      text: withoutAttachedNote(taken.question.text),
+      files: [],
+      ...(page ? { page } : {}),
+      // A deep answer is asked again deeply.
+      ...(taken.answer.deep ? { deep: true } : {}),
+      ...(taken.question.shown ? { shown: taken.question.shown } : {}),
+      retry: { questionAt: taken.question.at, answer: taken.answer.text },
+    },
+    apiKey,
+  );
 }
 
 /** A time chosen on a reminder card: the reminder is set, and the card on that turn says when. */
@@ -723,7 +803,9 @@ export async function solAnswersInChannel(member: Member, room: string, asked: s
   let said: string;
   let visuals: { charts?: unknown; diagrams?: unknown } = {};
   try {
-    const state = await askSol(member, { text: prompt, files: [], routeOn: asked, shared: true }, apiKey, "channel");
+    // Their own chat with him shows the line they wrote, not the instructions round it.
+    const shown = `@Sol in ${channel.label}: ${asked}`;
+    const state = await askSol(member, { text: prompt, files: [], routeOn: asked, shared: true, shown }, apiKey, "channel");
     const last = [...state.turns].reverse().find((t) => t.role === "sol");
     said = solPlain(last?.text ?? "").trim() || "I couldn't answer that just now.";
     // A channel line is words only: his sources go under them as a short list.
