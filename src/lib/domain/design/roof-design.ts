@@ -162,6 +162,18 @@ export interface RoofDesign {
   guides?: GuideLine[];
   /** Where the main switchboard (MSB) is, marked on the drawing like the inverter and battery (Martin). */
   switchboard?: Point;
+  /** The EV charger, when the design has one (5 Nov 2026): chosen from the business's price lists, and where it will be mounted. */
+  charger?: DesignCharger;
+}
+
+/** The EV charger a design names, as it was when chosen, and the spot on the picture where it will be mounted. */
+export interface DesignCharger {
+  sku: string;
+  name: string;
+  /** Its rating, kW. */
+  kw: number;
+  x: number;
+  y: number;
 }
 
 /** The outcomes "Design it for me" designs for: the quickest payback, the best return, the most independence. */
@@ -680,12 +692,14 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
     inverter?: unknown;
     inverters?: unknown;
     battery?: unknown;
+    charger?: unknown;
     label?: unknown;
     goal?: unknown;
     recommended?: unknown;
     offer?: unknown;
   };
   const battery = cleanBattery(r.battery);
+  const charger = cleanCharger(r.charger);
   const panel = cleanPanel(r.panel);
   // A design saved when there could only be one inverter kept it as `inverter`.
   const inverters = (Array.isArray(r.inverters) ? r.inverters : [r.inverter])
@@ -863,6 +877,7 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
     ...(panel ? { panel } : {}),
     ...(inverters.length ? { inverters } : {}),
     ...(battery ? { battery } : {}),
+    ...(charger ? { charger } : {}),
     ...(label ? { label } : {}),
     ...(DESIGN_GOALS.includes(r.goal as DesignGoal) ? { goal: r.goal as DesignGoal } : {}),
     ...(r.recommended === true ? { recommended: true as const } : {}),
@@ -896,6 +911,24 @@ function cleanBattery(raw: unknown): DesignBattery | undefined {
     y: Math.round(y * 100) / 100,
     ...(p.backup === true ? { backup: true } : {}),
   };
+}
+
+function cleanCharger(raw: unknown): DesignCharger | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const p = raw as Record<string, unknown>;
+  const kw = finite(p.kw, 1, 400);
+  const x = finite(p.x, -LIMITS.metres, LIMITS.metres);
+  const y = finite(p.y, -LIMITS.metres, LIMITS.metres);
+  if (typeof p.sku !== "string" || !/^[\w.+/ -]{1,40}$/.test(p.sku) || kw === null || x === null || y === null) return undefined;
+  const name =
+    typeof p.name === "string"
+      ? p.name
+          .replace(/[\u0000-\u001f\u007f]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 100)
+      : "";
+  return { sku: p.sku, name: name || p.sku, kw, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 };
 }
 
 function cleanInverter(raw: unknown): InverterSpec | undefined {

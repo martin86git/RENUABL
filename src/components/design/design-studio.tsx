@@ -9,7 +9,7 @@ import { AddressEntry } from "@/components/consumer/address-entry";
 import { Wordmark } from "@/components/ui/primitives";
 import { batteryCatalogue, inverterCatalogue, panelCatalogue } from "@/lib/domain/design/catalogue";
 import { MONTHLY_SUN } from "@/lib/domain/design/tilt";
-import { DEFAULT_WORKSPACE, workspaceCatalogue, type Workspace } from "@/lib/domain/design/pricing";
+import { DEFAULT_WORKSPACE, chargerCatalogue, workspaceCatalogue, type Workspace } from "@/lib/domain/design/pricing";
 import { postcodeIn, type DesignExtras } from "@/lib/domain/design/quote";
 import { cleanKind } from "@/lib/domain/design/business-kind";
 import { ROOF_IMAGE, designSummary, type DesignSet } from "@/lib/domain/design/roof-design";
@@ -17,6 +17,9 @@ import { VERIFIED_RATES, type RebateRates } from "@/lib/domain/rebates";
 import { yieldPerKw } from "@/lib/domain/sunshine";
 import type { Address } from "@/lib/domain/types";
 import {
+  dropDraft,
+  keepDraft,
+  loadDraft,
   loadRoofWork,
   loadWorkspace,
   rememberRoof,
@@ -64,11 +67,30 @@ function tellDeal(news: { saved?: boolean; unsaved?: boolean; fold?: boolean }) 
   window.parent.postMessage({ renuablDesign: news }, window.location.origin);
 }
 
+interface RoofOpen {
+  set: DesignSet;
+  extras: DesignExtras;
+  /** When the draft it opens on was kept; null when it opens on what is saved. */
+  draftAt: string | null;
+  saved: { set: DesignSet; extras: DesignExtras };
+}
+
+/** A roof's saved work, and this person's draft of it when one is still drawn over it (`design-store.ts`). */
+async function loadWithDraft(roof: DesignRoof, workspace: Workspace): Promise<RoofOpen> {
+  const saved = await loadRoofWork(roof, workspace);
+  const draft = await loadDraft(roof, workspace).catch(() => null);
+  return draft ? { set: draft.set, extras: draft.extras, draftAt: draft.at, saved } : { ...saved, draftAt: null, saved };
+}
+
 export function DesignStudio() {
   // Null until this device's last roof has been looked up, so the address box doesn't flash before a saved roof.
   const [ready, setReady] = useState(false);
   const [roof, setRoof] = useState<DesignRoof | null>(null);
-  const [work, setWork] = useState<{ set: DesignSet; extras: DesignExtras } | null>(null);
+  // The work the designer opens on: a draft kept from an earlier visit when there is one still drawn over the saved roof
+  // (`draftAt` says when it was kept), with what is saved beside it for Discard.
+  const [work, setWork] = useState<RoofOpen | null>(null);
+  // Bumped when a draft is thrown away, so the designer opens afresh on what is saved.
+  const [fresh, setFresh] = useState(0);
   // The customer's job this roof is being designed for, when the designer was opened from one (/design/roof?job=…).
   const params = useSearchParams();
   const jobId = params.get("job");
@@ -152,7 +174,7 @@ export function DesignStudio() {
       return;
     }
     // The roof opens once its saved work has arrived. If it can't be fetched, say so rather than show an empty roof.
-    loadRoofWork(next, workspace).then(
+    loadWithDraft(next, workspace).then(
       (loaded) => {
         setRoof(next);
         setWork(loaded);
@@ -176,7 +198,7 @@ export function DesignStudio() {
         const [lat, lng] = (at ?? "").split(",").map(Number);
         const named = !jobId && at && Number.isFinite(lat) && Number.isFinite(lng) ? { address: atAddress, lat, lng } : null;
         const last = forJob ?? named;
-        const loaded = last ? await loadRoofWork(last, settings) : null;
+        const loaded = last ? await loadWithDraft(last, settings) : null;
         if (gone) return;
         if (asked?.ok && forJob) {
           setJob({ id: asked.job.id, customerId: asked.customer.id, customerName: asked.customer.name, lat: forJob.lat, lng: forJob.lng });
@@ -218,6 +240,8 @@ export function DesignStudio() {
       panels: withDatasheets(own.panels ?? panelCatalogue(), sheets?.panels),
       inverters: withDatasheets(own.inverters ?? inverterCatalogue(), sheets?.inverters),
       batteries: own.batteries ?? batteryCatalogue(),
+      // EV chargers only ever come from the business's own lists: RENUABL has no range of its own to offer.
+      chargers: chargerCatalogue(workspace),
     };
   }, [workspace, sheets]);
 
@@ -261,11 +285,19 @@ export function DesignStudio() {
       <div className="theme-studio pb-10">
         <RoofDesigner
           // A different roof is a different designer: nothing from the last one carries over.
-          key={`${roof.lat},${roof.lng}`}
+          key={`${roof.lat},${roof.lng},${fresh}`}
           address={roof.address}
           image={pictureMissing ? "" : image}
           set={work.set}
           extras={work.extras}
+          draftAt={work.draftAt}
+          onDraft={(next, extras, closing) => keepDraft(roof, next, extras, closing)}
+          onDiscardDraft={async () => {
+            await dropDraft(roof).catch(() => undefined);
+            setWork({ ...work.saved, draftAt: null, saved: work.saved });
+            setFresh((n) => n + 1);
+          }}
+          chargers={catalogue.chargers}
           workspace={workspace}
           rates={rates}
           postcode={postcodeIn(roof.address)}

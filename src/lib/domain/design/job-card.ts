@@ -176,6 +176,7 @@ export function jobDrawing(design: RoofDesign, mode: "layout" | "strings"): JobD
       ),
     );
     if (design.battery) mark({ x: design.battery.x, y: design.battery.y }, "BAT");
+    if (design.charger) mark({ x: design.charger.x, y: design.charger.y }, "EV");
     mark(design.switchboard, "MSB");
   } else {
     const strung = new Map<string, number>();

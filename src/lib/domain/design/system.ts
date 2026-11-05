@@ -13,7 +13,7 @@ import { MONTHLY_SUN } from "./tilt";
 export const YIELD_PER_KW_DAY = yieldPerKw({ annual: MONTHLY_SUN.reduce((n, m) => n + m, 0) / 12 });
 
 /** What `systemSpecOf` reads of a design: the drawing, and the products named on it. */
-export type SystemSource = Pick<RoofDesign, "faces" | "loose" | "panel" | "inverters" | "battery">;
+export type SystemSource = Pick<RoofDesign, "faces" | "loose" | "panel" | "inverters" | "battery" | "charger">;
 
 /**
  * The system on a drawing: how many panels and which, the inverters and the
@@ -37,6 +37,7 @@ export function systemSpecOf(design: SystemSource, firstListed?: { sku: string; 
     battery: battery
       ? { sku: battery.sku, name: battery.name, kwh: battery.kwh, qty: battery.qty, ...(battery.backup ? { backup: true } : {}) }
       : null,
+    ...(design.charger ? { charger: { sku: design.charger.sku, name: design.charger.name, kw: design.charger.kw } } : {}),
     arrays: arrayCount(design),
     tiltedPanels: tilts.count,
     tiltDegrees: tilts.steepest,

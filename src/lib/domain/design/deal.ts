@@ -157,6 +157,8 @@ export function designDetails(design: RoofDesign | null, form: QuoteForm | null)
     battery: battery?.name ?? null,
     batteryQty: battery ? String(battery.qty) : null,
     batteryStorage: battery ? `${Math.round(battery.kwh * battery.qty * 10) / 10} kWh` : null,
+    // The EV charger on the design (5 Nov 2026): the same detail a person can type, so the EV mark lights from either.
+    evCharger: design?.charger ? `${design.charger.name} (${design.charger.kw} kW)` : null,
     arrays: panels && design ? String(arrayCount(design)) : null,
     strings: strings ? String(strings) : null,
     tiltFrames: tilted ? `${tilted} panels` : null,
@@ -203,7 +205,7 @@ export interface MaterialLine {
 }
 
 /** What is ordered: the hardware. Installation and commission are the business's own costs, not things to buy. */
-const ORDERED: readonly CostGroup[] = ["Panels", "Inverters", "Battery", "Racking", "Electrical"];
+const ORDERED: readonly CostGroup[] = ["Panels", "Inverters", "Battery", "EV charger", "Racking", "Electrical"];
 
 /**
  * A job's bill of materials, as the sheet sent to suppliers: every hardware

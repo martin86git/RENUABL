@@ -49,6 +49,7 @@ export function withoutCosts(
       panels: list.panels.map(hide),
       inverters: list.inverters.map(hide),
       batteries: list.batteries.map(hide),
+      chargers: (list.chargers ?? []).map(hide),
     })),
   };
 }

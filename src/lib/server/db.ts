@@ -1175,6 +1175,26 @@ create table if not exists design_inspections (
 );
 create unique index if not exists design_inspections_live on design_inspections(business_id, job_id) where state not in ('declined','withdrawn');
 create index if not exists design_inspections_inspector on design_inspections(inspector_business, state);
+-- The designer's unsaved work on a roof, kept as a draft as it goes (domain/design/draft.ts): one a person a roof,
+-- never the saved roof itself; base is the saved version it was drawn over, so a later save sets it aside.
+create table if not exists design_drafts (
+  business_id text not null references businesses(id) on delete cascade,
+  member_email text not null,
+  spot text not null,
+  base text not null,
+  design jsonb not null,
+  extras jsonb not null,
+  at timestamptz not null default now(),
+  primary key (business_id, member_email, spot)
+);
+-- Each person's favourite products in the designer's lists (domain/design/favourites.ts): the order of a list only.
+create table if not exists design_favourites (
+  business_id text not null references businesses(id) on delete cascade,
+  member_email text not null,
+  favourites jsonb not null,
+  updated_at timestamptz not null default now(),
+  primary key (business_id, member_email)
+);
 `;
 
 async function ensureSchema() {

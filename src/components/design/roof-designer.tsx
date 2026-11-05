@@ -27,6 +27,7 @@ import {
   PenTool,
   ReceiptText,
   Plus,
+  PlugZap,
   Redo2,
   Ruler,
   SquarePlus,
@@ -52,7 +53,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { DESIGN_TEMPERATURES, HOT_CELL, checkString, type StringCheck } from "@/lib/domain/design/electrical";
-import type { CatalogueBattery, CatalogueInverter, CataloguePanel } from "@/lib/domain/design/catalogue";
+import type { CatalogueBattery, CatalogueCharger, CatalogueInverter, CataloguePanel } from "@/lib/domain/design/catalogue";
+import { DRAFT_WAIT_MS, keptWhen } from "@/lib/domain/design/draft";
+import { FavouriteStar, useFavourites } from "./favourite-star";
 import type { Workspace } from "@/lib/domain/design/pricing";
 import {
   costSystem,
@@ -130,6 +133,7 @@ import {
   planSize,
   stringIsMixed,
   type DesignBattery,
+  type DesignCharger,
   type DesignComment,
   type DesignSet,
   type DesignLabel,
@@ -147,6 +151,11 @@ import {
 } from "@/lib/domain/design/roof-design";
 
 const GOLD = "var(--sun-line)";
+/**
+ * The inverter, battery, main switchboard and EV charger are drawn this much smaller than the picture's other marks
+ * (5 Nov 2026, Martin, as Primero's: they were too big beside the house), so they sit in proportion to it.
+ */
+const KIT_SIZE = 0.6;
 
 /** How much lighter the roof being designed is drawn than the buildings around it, in drawing mode. */
 const OWN_ROOF_LIFT = 62;
@@ -746,6 +755,14 @@ export function RoofDesigner(props: {
   catalogue: CataloguePanel[];
   inverters: CatalogueInverter[];
   batteries: CatalogueBattery[];
+  /** The EV chargers on the business's price lists (none signed out or without a list). Never their costs. */
+  chargers?: CatalogueCharger[];
+  /** When the work it opens on was kept as a draft (an earlier visit's unsaved work); null or left out when it opens on what is saved. */
+  draftAt?: string | null;
+  /** Keeps the work not yet saved as a draft, a moment after it stops changing (`closing`: the page is going). Answers a problem or null. */
+  onDraft?: (set: DesignSet, extras: DesignExtras, closing: boolean) => Promise<string | null>;
+  /** Throws the draft away and opens the roof as it was last saved. */
+  onDiscardDraft?: () => void;
   yieldPerKwDay: number;
   /** The business's price lists, parts, installation rates and margin: what the quote is worked out from. */
   workspace: Workspace;
@@ -806,7 +823,7 @@ export function RoofDesigner(props: {
   const [primary, setPrimary] = useState(props.set.primary);
   // What is typed to narrow a list on the bar (the inverters, the batteries): emptied whenever a list opens or closes.
   const [seek, setSeek] = useState("");
-  const [menu, setMenu] = useState<"designs" | "panels" | "inverters" | "batteries" | "bill" | false>(false);
+  const [menu, setMenu] = useState<"designs" | "panels" | "inverters" | "batteries" | "chargers" | "bill" | false>(false);
   // A press anywhere outside a list's own holder puts the open list away.
   useEffect(() => {
     if (!menu) return;
@@ -826,6 +843,10 @@ export function RoofDesigner(props: {
   };
   // The battery on this design, and where it stands on the picture.
   const [battery, setBattery] = useState<DesignBattery | undefined>(first.battery);
+  // The EV charger on this design, and where it will be mounted (5 Nov 2026): from the business's price lists.
+  const [charger, setCharger] = useState<DesignCharger | undefined>(first.charger);
+  // This person's favourite products: starred ones come first in each list.
+  const favourites = useFavourites();
   // The customer's electricity bill, as typed in from it: what the summary's bill, saving and payback are worked out from.
   const [bill, setBillFields] = useState(props.extras.bill);
   // Sol looking through the deal's file for the customer's usage (1 Nov 2026, as Primero's): the figures go into the box
@@ -842,7 +863,7 @@ export function RoofDesigner(props: {
       const res = await fetch("/api/design/switchboard", { method: "POST", body: form });
       const j = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; read?: SwitchboardRead };
       if (!j.ok || !j.read) return setBoard({ busy: false, error: j.message ?? "The photo couldn't be read." });
-      setBoard({ busy: false, advice: switchboardAdvice(j.read, { battery: Boolean(battery), ev: false }) });
+      setBoard({ busy: false, advice: switchboardAdvice(j.read, { battery: Boolean(battery), ev: Boolean(charger) }) });
     } catch {
       setBoard({ busy: false, error: "We couldn't reach the server." });
     }
@@ -1172,9 +1193,15 @@ export function RoofDesigner(props: {
     if (op.do === "add") setThread(next.length ? { id: next[next.length - 1].id } : null);
     if (op.do === "remove") setThread(null);
   };
-  const [saved, setSaved] = useState<"saved" | "saving" | "changed" | { error: string }>("saved");
+  // Opened on a draft from an earlier visit, the work is there but not yet saved.
+  const [saved, setSaved] = useState<"saved" | "saving" | "changed" | { error: string }>(props.draftAt ? "changed" : "saved");
+  // The draft this designer opened on (when), shown until it is saved or thrown away; and whether the work as it stands is kept as one.
+  const [resumed, setResumed] = useState<string | null>(props.draftAt ?? null);
+  const [drafted, setDrafted] = useState(Boolean(props.draftAt));
+  // Work not kept anywhere yet: what leaving should ask about. Work kept as a draft opens again where it was left.
+  const unkept = (saved === "changed" || typeof saved === "object") && !(drafted && props.onDraft);
   const { onUnsaved } = props;
-  useEffect(() => onUnsaved?.(saved !== "saved"), [onUnsaved, saved]);
+  useEffect(() => onUnsaved?.(saved === "saving" || unkept), [onUnsaved, saved, unkept]);
   const svg = useRef<SVGSVGElement>(null);
   // The whole picture in the first fold (1 Nov 2026, Martin: its foot was cut off): measured from where the figures
   // strip starts on the page to the foot of the window, since the bar above it changes height with what it holds.
@@ -1210,6 +1237,7 @@ export function RoofDesigner(props: {
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
     | { mode: "msb"; dx: number; dy: number }
+    | { mode: "charger"; dx: number; dy: number }
     | { mode: "inverter"; n: number; dx: number; dy: number }
     | { mode: "erase" }
     | { mode: "spin"; centre: Point; from: number; starts: Record<string, LoosePanel> }
@@ -1219,8 +1247,8 @@ export function RoofDesigner(props: {
   // Undo and redo. The drawing (faces, panels, strings, labels) is remembered each time it changes: once for
   // a click, and once for a whole drag however far it went. Comments aren't part of it: they are saved as posted.
   const drawing = useMemo(
-    () => ({ faces, loose, strings, labels, panel, fitted, rules, battery }),
-    [faces, loose, strings, labels, panel, fitted, rules, battery],
+    () => ({ faces, loose, strings, labels, panel, fitted, rules, battery, charger }),
+    [faces, loose, strings, labels, panel, fitted, rules, battery, charger],
   );
   const history = useRef({ past: [] as (typeof drawing)[], future: [] as (typeof drawing)[], last: drawing, restoring: false });
   // Bumped when a drag ends, so the drawing is looked at again once the pointer has let go.
@@ -1267,6 +1295,7 @@ export function RoofDesigner(props: {
     setFitted(to.fitted);
     setRules(to.rules);
     setBattery(to.battery);
+    setCharger(to.charger);
     setRuling(null);
     setPicks([]);
     setGhosts([]);
@@ -1290,6 +1319,8 @@ export function RoofDesigner(props: {
   const scale = metresPerPixel(spot.lat);
   // Line weights and sizes are in picture pixels, so they are thinned as the view is drawn in closer.
   const u = view.w / ROOF_IMAGE.width;
+  // The kit on the roof (inverter, battery, switchboard, EV charger) is drawn smaller, in proportion to the house.
+  const ku = u * KIT_SIZE;
   const px = (p: Point) => [ROOF_IMAGE.width / 2 + p.x / scale, ROOF_IMAGE.height / 2 + p.y / scale] as const;
   const path = (points: readonly Point[]) => points.map((p) => px(p).join(",")).join(" ");
   const design = useMemo(() => ({ faces, loose, panel }), [faces, loose, panel]);
@@ -1310,6 +1341,7 @@ export function RoofDesigner(props: {
     ...(rules.length ? { guides: rules } : {}),
     ...(msb ? { switchboard: msb } : {}),
     ...(battery ? { battery } : {}),
+    ...(charger ? { charger } : {}),
     ...(designLabel.trim() ? { label: designLabel.trim().slice(0, 40) } : {}),
     // What the open design is for, kept as it is worked on: its goal, and whether it is offered or recommended.
     ...(designs[active]?.goal ? { goal: designs[active].goal } : {}),
@@ -1357,6 +1389,7 @@ export function RoofDesigner(props: {
     setRules(next.guides ?? []);
     setMsb(next.switchboard ?? null);
     setBattery(next.battery);
+    setCharger(next.charger);
     setRuling(null);
     setHover(null);
     setDesignLabel(next.label ?? "");
@@ -1480,15 +1513,30 @@ export function RoofDesigner(props: {
   const kitAt = (p: Point): "battery" | number | null => {
     const n = fitted.findIndex((spec, i) => {
       const at = inverterSpot(spec, i, spot.lat);
-      return Math.abs(p.x - at.x) < 13 * u * scale && Math.abs(p.y - at.y) < 17 * u * scale;
+      return Math.abs(p.x - at.x) < 13 * ku * scale && Math.abs(p.y - at.y) < 17 * ku * scale;
     });
     if (n >= 0) return n;
-    if (battery && Math.abs(p.x - battery.x) < 16 * u * scale && Math.abs(p.y - battery.y) < ((batteryLayers * 8) / 2 + 12) * u * scale)
+    if (battery && Math.abs(p.x - battery.x) < 16 * ku * scale && Math.abs(p.y - battery.y) < ((batteryLayers * 8) / 2 + 12) * ku * scale)
       return "battery";
     return null;
   };
   /** Whether the main switchboard's mark is at a point on the drawing. */
-  const msbAt = (p: Point) => msb !== null && Math.abs(p.x - msb.x) < 13 * u * scale && Math.abs(p.y - msb.y) < 16 * u * scale;
+  const msbAt = (p: Point) => msb !== null && Math.abs(p.x - msb.x) < 13 * ku * scale && Math.abs(p.y - msb.y) < 16 * ku * scale;
+  /** Whether the EV charger's mark is at a point on the drawing. */
+  const chargerAt = (p: Point) =>
+    charger !== undefined && Math.abs(p.x - charger.x) < 11 * ku * scale && Math.abs(p.y - charger.y) < 14 * ku * scale;
+  /** An EV charger from the lists: put on the drawing low on the right of what is in view (to be dragged to its wall), or swapped for another in place. */
+  const chooseCharger = (to: CatalogueCharger) => {
+    setCharger({
+      sku: to.sku,
+      name: to.name,
+      kw: to.kw,
+      x: charger?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
+      y: charger?.y ?? cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
+    });
+    openMenu(false);
+    changed();
+  };
   /** The main switchboard: put on the drawing (low on the left of what is in view, to be dragged to its wall), or taken off. */
   const toggleMsb = () => {
     setMsb(
@@ -1954,6 +2002,10 @@ export function RoofDesigner(props: {
       setMsb(null);
       return changed();
     }
+    if (chargerAt(p)) {
+      setCharger(undefined);
+      return changed();
+    }
     const hit = hitAt(p);
     if (hit && !hit.empty) return removePicks([hit.pick]);
     const line = rules.find((g) => {
@@ -2170,6 +2222,13 @@ export function RoofDesigner(props: {
       press.current = { mode: "msb", dx: p.x - msb.x, dy: p.y - msb.y };
       return;
     }
+    if (tool === "select" && charger && chargerAt(p)) {
+      // The EV charger: press it and drag it to the wall it will be mounted on.
+      svg.current?.setPointerCapture(e.pointerId);
+      setPicks([]);
+      press.current = { mode: "charger", dx: p.x - charger.x, dy: p.y - charger.y };
+      return;
+    }
     const grabbed = tool === "select" ? kitAt(p) : null;
     if (grabbed !== null) {
       // The battery or an inverter: press it and drag it to the wall it will go on.
@@ -2382,6 +2441,12 @@ export function RoofDesigner(props: {
       const p = pointAt(e);
       if (!p) return;
       setBattery((b) => (b ? { ...b, x: cm(p.x - held.dx), y: cm(p.y - held.dy) } : b));
+      return changed();
+    }
+    if (held.mode === "charger") {
+      const p = pointAt(e);
+      if (!p) return;
+      setCharger((c) => (c ? { ...c, x: cm(p.x - held.dx), y: cm(p.y - held.dy) } : c));
       return changed();
     }
     if (held.mode === "erase") {
@@ -2662,8 +2727,69 @@ export function RoofDesigner(props: {
       active === primary ? net : null,
     );
     setSaved(problem ? { error: problem } : "saved");
+    // Saved: the draft is gone (the store throws it away), and the next is drawn over this save.
+    if (!problem) {
+      setResumed(null);
+      draftSent.current = "";
+    }
     return !problem;
   };
+
+  // **Drafts** (5 Nov 2026, Martin, as Primero's: interrupted half way, it should open where it was left). Once the work
+  // has stood still across one tick, it is kept as a draft apart from the saved roof (`onDraft`); whatever wasn't kept
+  // yet goes as the page closes. Nobody else sees a draft: Publish is what saves.
+  const draftSent = useRef("");
+  const draftTick = useRef("");
+  const workNow = () => ({
+    set: { designs: everyDesign(), primary, comments } as DesignSet,
+    extras: { bill, quotes: everyQuote() } as DesignExtras,
+  });
+  const latestWork = useRef(workNow);
+  useEffect(() => {
+    latestWork.current = workNow;
+  });
+  const { onDraft } = props;
+  useEffect(() => {
+    if (saved !== "changed" || !onDraft) return;
+    const tick = window.setInterval(() => {
+      const work = latestWork.current();
+      const now = JSON.stringify(work);
+      if (now === draftSent.current) return;
+      setDrafted(false);
+      if (now === draftTick.current)
+        void onDraft(work.set, work.extras, false).then((problem) => {
+          if (problem) return;
+          draftSent.current = now;
+          setDrafted(true);
+        });
+      draftTick.current = now;
+    }, DRAFT_WAIT_MS);
+    return () => window.clearInterval(tick);
+  }, [saved, onDraft]);
+  useEffect(() => {
+    if (!onDraft) return;
+    const flush = () => {
+      if (saved !== "changed") return;
+      const work = latestWork.current();
+      if (JSON.stringify(work) !== draftSent.current) void onDraft(work.set, work.extras, true);
+    };
+    const hidden = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", hidden);
+    };
+  }, [saved, onDraft]);
+  // Leaving with work that isn't kept anywhere asks first; work kept as a draft opens again where it was left.
+  useEffect(() => {
+    if (!unkept) return;
+    const asking = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", asking);
+    return () => window.removeEventListener("beforeunload", asking);
+  }, [unkept]);
 
   const button =
     "inline-flex min-h-10 items-center rounded-md border border-line bg-surface px-4 text-sm font-medium hover:border-forest disabled:bg-surface-2 disabled:text-muted disabled:hover:border-line";
@@ -3572,9 +3698,27 @@ export function RoofDesigner(props: {
               : saved === "saving"
                 ? "Saving…"
                 : saved === "changed"
-                  ? "Not saved yet"
+                  ? drafted && props.onDraft
+                    ? "Kept as a draft, not published"
+                    : "Not saved yet"
                   : saved.error}
           </span>
+          {/* Opened on an earlier visit's unsaved work: said once, with the way back to what is saved. */}
+          {resumed && saved !== "saved" && (
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-ink">
+              Picked up where you left off{keptWhen(resumed) ? ` ${keptWhen(resumed)}` : ""}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!window.confirm("Throw away the unsaved changes and go back to the design as it was last saved?")) return;
+                  props.onDiscardDraft?.();
+                }}
+                className="tap-area rounded px-1 text-muted underline underline-offset-2 hover:text-ink"
+              >
+                Discard
+              </button>
+            </span>
+          )}
           {/* Sol drives the designer: the command bar, opened here or with "/". */}
           <button
             type="button"
@@ -4644,8 +4788,8 @@ export function RoofDesigner(props: {
                   {msb &&
                     (() => {
                       const [mx, my] = px(msb);
-                      const w = 22 * u;
-                      const h = 26 * u;
+                      const w = 22 * ku;
+                      const h = 26 * ku;
                       return (
                         <g pointerEvents="none">
                           <rect
@@ -4653,45 +4797,45 @@ export function RoofDesigner(props: {
                             y={my - h / 2}
                             width={w}
                             height={h}
-                            rx={3 * u}
+                            rx={3 * ku}
                             fill="#0b0c0e"
                             fillOpacity="0.92"
                             stroke={GOLD}
-                            strokeWidth={1.1 * u}
+                            strokeWidth={1.1 * ku}
                           />
                           {[0, 1].map((row) =>
                             Array.from({ length: 4 }, (_, k) => (
                               <rect
                                 key={`${row}-${k}`}
-                                x={mx - w / 2 + 3.2 * u + k * 4.2 * u}
-                                y={my - h / 2 + 4 * u + row * 9 * u}
-                                width={2.6 * u}
-                                height={6 * u}
-                                rx={0.6 * u}
+                                x={mx - w / 2 + 3.2 * ku + k * 4.2 * ku}
+                                y={my - h / 2 + 4 * ku + row * 9 * ku}
+                                width={2.6 * ku}
+                                height={6 * ku}
+                                rx={0.6 * ku}
                                 fill="none"
                                 stroke="#ffffff"
                                 strokeOpacity="0.7"
-                                strokeWidth={0.6 * u}
+                                strokeWidth={0.6 * ku}
                               />
                             )),
                           )}
                           <line
-                            x1={mx - w / 2 + 3 * u}
-                            x2={mx + w / 2 - 3 * u}
-                            y1={my + h / 2 - 4 * u}
-                            y2={my + h / 2 - 4 * u}
+                            x1={mx - w / 2 + 3 * ku}
+                            x2={mx + w / 2 - 3 * ku}
+                            y1={my + h / 2 - 4 * ku}
+                            y2={my + h / 2 - 4 * ku}
                             stroke={GOLD}
-                            strokeWidth={1 * u}
+                            strokeWidth={1 * ku}
                           />
                           <text
                             x={mx}
-                            y={my + h / 2 + 11 * u}
+                            y={my + h / 2 + 11 * ku}
                             textAnchor="middle"
-                            fontSize={8 * u}
+                            fontSize={8 * ku}
                             fontWeight="700"
                             fill="#ffffff"
                             stroke="#0b0c0e"
-                            strokeWidth={2.4 * u}
+                            strokeWidth={2.4 * ku}
                             paintOrder="stroke"
                           >
                             MSB
@@ -4704,8 +4848,8 @@ export function RoofDesigner(props: {
                     (() => {
                       const [bx, by] = px(battery);
                       const layers = batteryLayers;
-                      const w = 24 * u;
-                      const lh = 8 * u;
+                      const w = 24 * ku;
+                      const lh = 8 * ku;
                       const top = by - (layers * lh) / 2;
                       const roof = Object.values(centres);
                       const from = roof.length ? px(middle(roof)) : null;
@@ -4718,34 +4862,34 @@ export function RoofDesigner(props: {
                                 d={run}
                                 fill="none"
                                 stroke={GOLD}
-                                strokeWidth={1.1 * u}
-                                strokeDasharray={`${4 * u} ${4 * u}`}
+                                strokeWidth={1.1 * ku}
+                                strokeDasharray={`${4 * ku} ${4 * ku}`}
                                 opacity="0.9"
                               >
-                                <animate attributeName="stroke-dashoffset" from={8 * u} to="0" dur="0.8s" repeatCount="indefinite" />
+                                <animate attributeName="stroke-dashoffset" from={8 * ku} to="0" dur="0.8s" repeatCount="indefinite" />
                               </path>
                               {[0, 0.8, 1.6].map((begin) => (
-                                <circle key={begin} r={1.8 * u} fill="#ffffff">
+                                <circle key={begin} r={1.8 * ku} fill="#ffffff">
                                   <animateMotion dur="2.4s" begin={`${begin}s`} repeatCount="indefinite" path={run} />
                                 </circle>
                               ))}
                             </>
                           )}
-                          <circle cx={bx} cy={by} r={20 * u} fill={GOLD}>
-                            <animate attributeName="r" values={`${17 * u};${27 * u};${17 * u}`} dur="3s" repeatCount="indefinite" />
+                          <circle cx={bx} cy={by} r={20 * ku} fill={GOLD}>
+                            <animate attributeName="r" values={`${17 * ku};${27 * ku};${17 * ku}`} dur="3s" repeatCount="indefinite" />
                             <animate attributeName="opacity" values="0.26;0.04;0.26" dur="3s" repeatCount="indefinite" />
                           </circle>
-                          <rect x={bx - 4.5 * u} y={top - 7 * u} width={9 * u} height={3 * u} rx={u} fill={GOLD} />
+                          <rect x={bx - 4.5 * ku} y={top - 7 * ku} width={9 * ku} height={3 * ku} rx={ku} fill={GOLD} />
                           <rect
-                            x={bx - w / 2 - 3 * u}
-                            y={top - 4 * u}
-                            width={w + 6 * u}
-                            height={layers * lh + 8 * u}
-                            rx={3.5 * u}
+                            x={bx - w / 2 - 3 * ku}
+                            y={top - 4 * ku}
+                            width={w + 6 * ku}
+                            height={layers * lh + 8 * ku}
+                            rx={3.5 * ku}
                             fill="#0b0c0e"
                             fillOpacity="0.92"
                             stroke={GOLD}
-                            strokeWidth={1.1 * u}
+                            strokeWidth={1.1 * ku}
                           />
                           {Array.from({ length: layers }, (_, i) => {
                             // Counted from the bottom, so the charge climbs.
@@ -4754,24 +4898,24 @@ export function RoofDesigner(props: {
                               <g key={i}>
                                 <rect
                                   x={bx - w / 2}
-                                  y={y + 0.7 * u}
+                                  y={y + 0.7 * ku}
                                   width={w}
-                                  height={lh - 1.4 * u}
-                                  rx={1.2 * u}
+                                  height={lh - 1.4 * ku}
+                                  rx={1.2 * ku}
                                   fill="none"
                                   stroke="#ffffff"
                                   strokeOpacity="0.45"
-                                  strokeWidth={0.5 * u}
+                                  strokeWidth={0.5 * ku}
                                 />
                                 {Array.from({ length: 7 }, (_, k) => (
                                   <line
                                     key={k}
-                                    x1={bx - w / 2 + 2.7 * u + k * 3.1 * u}
-                                    x2={bx - w / 2 + 2.7 * u + k * 3.1 * u}
-                                    y1={y + 1.7 * u}
-                                    y2={y + lh - 1.7 * u}
+                                    x1={bx - w / 2 + 2.7 * ku + k * 3.1 * ku}
+                                    x2={bx - w / 2 + 2.7 * ku + k * 3.1 * ku}
+                                    y1={y + 1.7 * ku}
+                                    y2={y + lh - 1.7 * ku}
                                     stroke={GOLD}
-                                    strokeWidth={0.9 * u}
+                                    strokeWidth={0.9 * ku}
                                     opacity="0.15"
                                   >
                                     <animate
@@ -4789,13 +4933,13 @@ export function RoofDesigner(props: {
                           })}
                           <text
                             x={bx}
-                            y={top + layers * lh + 13 * u}
+                            y={top + layers * lh + 13 * ku}
                             textAnchor="middle"
-                            fontSize={8 * u}
+                            fontSize={8 * ku}
                             fontWeight="700"
                             fill="#ffffff"
                             stroke="#0b0c0e"
-                            strokeWidth={2.4 * u}
+                            strokeWidth={2.4 * ku}
                             paintOrder="stroke"
                           >
                             {batteryKwh} kWh
@@ -4806,8 +4950,8 @@ export function RoofDesigner(props: {
                   {/* The inverters: a box each, in the same line style as the battery, to be dragged to the wall it will go on. */}
                   {fitted.map((spec, n) => {
                     const [ix, iy] = px(inverterSpot(spec, n, spot.lat));
-                    const w = 20 * u;
-                    const h = 28 * u;
+                    const w = 20 * ku;
+                    const h = 28 * ku;
                     const lit = kit === n;
                     return (
                       <g key={n} pointerEvents="none">
@@ -4816,53 +4960,53 @@ export function RoofDesigner(props: {
                           y={iy - h / 2}
                           width={w}
                           height={h}
-                          rx={3 * u}
+                          rx={3 * ku}
                           fill="#0b0c0e"
                           fillOpacity="0.92"
                           stroke={GOLD}
-                          strokeWidth={(lit ? 1.8 : 1.1) * u}
+                          strokeWidth={(lit ? 1.8 : 1.1) * ku}
                         />
                         <rect
-                          x={ix - w / 2 + 3 * u}
-                          y={iy - h / 2 + 3.5 * u}
-                          width={w - 6 * u}
-                          height={6 * u}
-                          rx={1.2 * u}
+                          x={ix - w / 2 + 3 * ku}
+                          y={iy - h / 2 + 3.5 * ku}
+                          width={w - 6 * ku}
+                          height={6 * ku}
+                          rx={1.2 * ku}
                           fill="none"
                           stroke="#ffffff"
                           strokeOpacity="0.6"
-                          strokeWidth={0.5 * u}
+                          strokeWidth={0.5 * ku}
                         />
                         <path
-                          d={`M${ix - w / 2 + 4.5 * u},${iy - h / 2 + 8 * u} q${2.7 * u},${-0.3 * u} ${4 * u},${-2 * u} t${3.6 * u},${-1 * u} t${3.4 * u},${2.4 * u}`}
+                          d={`M${ix - w / 2 + 4.5 * ku},${iy - h / 2 + 8 * ku} q${2.7 * ku},${-0.3 * ku} ${4 * ku},${-2 * ku} t${3.6 * ku},${-1 * ku} t${3.4 * ku},${2.4 * ku}`}
                           fill="none"
                           stroke={GOLD}
-                          strokeWidth={0.6 * u}
+                          strokeWidth={0.6 * ku}
                         />
                         {Array.from({ length: 6 }, (_, k) => (
                           <line
                             key={k}
-                            x1={ix - w / 2 + 3.75 * u + k * 2.5 * u}
-                            x2={ix - w / 2 + 3.75 * u + k * 2.5 * u}
-                            y1={iy - h / 2 + 12.5 * u}
-                            y2={iy + h / 2 - 6 * u}
+                            x1={ix - w / 2 + 3.75 * ku + k * 2.5 * ku}
+                            x2={ix - w / 2 + 3.75 * ku + k * 2.5 * ku}
+                            y1={iy - h / 2 + 12.5 * ku}
+                            y2={iy + h / 2 - 6 * ku}
                             stroke="#ffffff"
                             strokeOpacity="0.32"
-                            strokeWidth={0.5 * u}
+                            strokeWidth={0.5 * ku}
                           />
                         ))}
-                        <circle cx={ix} cy={iy + h / 2 - 3.2 * u} r={1.1 * u} fill={GOLD}>
+                        <circle cx={ix} cy={iy + h / 2 - 3.2 * ku} r={1.1 * ku} fill={GOLD}>
                           <animate attributeName="opacity" values="1;0.3;1" dur="2.6s" repeatCount="indefinite" />
                         </circle>
                         <text
                           x={ix}
-                          y={iy + h / 2 + 9 * u}
+                          y={iy + h / 2 + 9 * ku}
                           textAnchor="middle"
-                          fontSize={8 * u}
+                          fontSize={8 * ku}
                           fontWeight="700"
                           fill="#ffffff"
                           stroke="#0b0c0e"
-                          strokeWidth={2.4 * u}
+                          strokeWidth={2.4 * ku}
                           paintOrder="stroke"
                         >
                           {fitted.length > 1 ? `${n + 1} · ` : ""}
@@ -4871,6 +5015,45 @@ export function RoofDesigner(props: {
                       </g>
                     );
                   })}
+                  {/* The EV charger: a small wall box with a bolt, in the same line style as the inverter, dragged to its wall. */}
+                  {charger &&
+                    (() => {
+                      const [cx, cy] = px(charger);
+                      const w = 16 * ku;
+                      const h = 20 * ku;
+                      return (
+                        <g pointerEvents="none">
+                          <rect
+                            x={cx - w / 2}
+                            y={cy - h / 2}
+                            width={w}
+                            height={h}
+                            rx={4 * ku}
+                            fill="#0b0c0e"
+                            fillOpacity="0.92"
+                            stroke={GOLD}
+                            strokeWidth={1.1 * ku}
+                          />
+                          <path
+                            d={`M${cx + 1.4 * ku},${cy - 6 * ku} L${cx - 3.4 * ku},${cy + 0.8 * ku} H${cx} L${cx - 1.4 * ku},${cy + 6 * ku} L${cx + 3.4 * ku},${cy - 0.8 * ku} H${cx} Z`}
+                            fill={GOLD}
+                          />
+                          <text
+                            x={cx}
+                            y={cy + h / 2 + 9 * ku}
+                            textAnchor="middle"
+                            fontSize={8 * ku}
+                            fontWeight="700"
+                            fill="#ffffff"
+                            stroke="#0b0c0e"
+                            strokeWidth={2.4 * ku}
+                            paintOrder="stroke"
+                          >
+                            EV {charger.kw} kW
+                          </text>
+                        </g>
+                      );
+                    })()}
                   {/* Labels: a pin and its name. */}
                   {labels.map((l) => {
                     const [lx, ly] = px(l);
@@ -5846,30 +6029,143 @@ export function RoofDesigner(props: {
                       <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
                       {[
                         ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
-                        ...props.catalogue.map((p) => ({ ...p, gone: false })),
+                        ...favourites.sorted("panels", props.catalogue).map((p) => ({ ...p, gone: false })),
                       ].map((p) => (
-                        <button
-                          key={p.sku}
-                          onClick={() => {
-                            if (!p.gone) choosePanel(p.sku);
-                            openMenu(false);
-                          }}
-                          className={clsx(
-                            "flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
-                            p.sku === chosen && "bg-canvas",
-                          )}
-                        >
-                          <Check className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")} aria-hidden />
-                          <span className="min-w-0">
-                            <span className="block text-sm font-semibold">{p.name}</span>
-                            <ModelNo sku={p.sku} />
-                            <span className="block text-xs tabular-nums text-muted">
-                              {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
-                              {p.gone ? " · no longer in our range" : ""}
+                        <div key={p.sku} className="group flex items-start gap-1">
+                          <button
+                            onClick={() => {
+                              if (!p.gone) choosePanel(p.sku);
+                              openMenu(false);
+                            }}
+                            className={clsx(
+                              "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
+                              p.sku === chosen && "bg-canvas",
+                            )}
+                          >
+                            <Check className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")} aria-hidden />
+                            <span className="min-w-0">
+                              <span className="block text-sm font-semibold">{p.name}</span>
+                              <ModelNo sku={p.sku} />
+                              <span className="block text-xs tabular-nums text-muted">
+                                {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
+                                {p.gone ? " · no longer in our range" : ""}
+                              </span>
                             </span>
-                          </span>
-                        </button>
+                          </button>
+                          {!p.gone && (
+                            <FavouriteStar
+                              on={favourites.is("panels", p.sku)}
+                              onToggle={() => favourites.toggle("panels", p.sku)}
+                              name={p.name}
+                            />
+                          )}
+                        </div>
                       ))}
+                    </div>
+                  )}
+                </div>
+                {/* The EV charger (5 Nov 2026), beside the inverter as the switchboard is beside the battery: its list is the
+                    chargers on the business's own price lists; chosen, its mark goes on the picture to be dragged to its wall. */}
+                <div className="order-1 mr-1.5">
+                  <button
+                    onClick={() => openMenu(menu === "chargers" ? false : "chargers")}
+                    aria-expanded={menu === "chargers"}
+                    aria-haspopup="true"
+                    title={charger ? `EV charger: ${charger.name}` : "EV charger: add one"}
+                    aria-label="The EV charger on this design"
+                    className={clsx(
+                      "flex size-[2.625rem] items-center justify-center rounded-full border border-line shadow-lift backdrop-blur-md",
+                      menu === "chargers"
+                        ? "bg-primary text-primary-ink"
+                        : charger
+                          ? "bg-surface/90 text-ink hover:bg-surface"
+                          : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
+                    )}
+                  >
+                    <PlugZap className="size-5" aria-hidden />
+                  </button>
+                  {menu === "chargers" && (
+                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift">
+                      <p className={clsx(label, "px-2 py-1")}>On this design</p>
+                      {charger ? (
+                        <div className="rounded-md bg-canvas px-2 py-2">
+                          <div className="flex items-start gap-2">
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold">{charger.name}</span>
+                              <ModelNo sku={charger.sku} />
+                              <span className="block text-xs tabular-nums text-muted">{charger.kw} kW</span>
+                            </span>
+                            <button
+                              className="text-sm font-medium text-danger hover:underline"
+                              onClick={() => {
+                                setCharger(undefined);
+                                changed();
+                              }}
+                            >
+                              Take it off
+                            </button>
+                          </div>
+                          <p className="mt-1.5 text-xs text-muted">
+                            It is on the picture: drag it to the wall it will be mounted on. The quote adds it and its installation.
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="px-2 pb-1 text-sm text-muted">None on this design.</p>
+                      )}
+                      {(props.chargers ?? []).length === 0 ? (
+                        <p className="mt-2 px-2 text-sm text-ink-2">
+                          No EV chargers on your price lists yet. Upload a list with them in Settings, under price lists, and they show
+                          here.
+                        </p>
+                      ) : (
+                        <>
+                          <p className={clsx(label, "mt-2 px-2 py-1")}>
+                            {charger ? "Change it" : "Chargers to choose from"} · {(props.chargers ?? []).length} on your lists
+                          </p>
+                          <input
+                            value={seek}
+                            onChange={(e) => setSeek(e.target.value)}
+                            placeholder="Search EV chargers"
+                            className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                          />
+                          <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                            {favourites
+                              .sorted("chargers", props.chargers ?? [])
+                              .filter((c) =>
+                                seek
+                                  .toLowerCase()
+                                  .split(/\s+/)
+                                  .every((word) => `${c.name} ${c.sku}`.toLowerCase().includes(word)),
+                              )
+                              .map((c) => (
+                                <div key={c.sku} className="group flex items-start gap-1">
+                                  <button
+                                    onClick={() => chooseCharger(c)}
+                                    className={clsx(
+                                      "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
+                                      c.sku === charger?.sku && "bg-canvas",
+                                    )}
+                                  >
+                                    <Check
+                                      className={clsx("mt-0.5 size-4 shrink-0", c.sku === charger?.sku ? "text-ink" : "invisible")}
+                                      aria-hidden
+                                    />
+                                    <span className="min-w-0">
+                                      <span className="block text-sm font-semibold">{c.name}</span>
+                                      <ModelNo sku={c.sku} />
+                                      <span className="block text-xs tabular-nums text-muted">{c.kw} kW</span>
+                                    </span>
+                                  </button>
+                                  <FavouriteStar
+                                    on={favourites.is("chargers", c.sku)}
+                                    onToggle={() => favourites.toggle("chargers", c.sku)}
+                                    name={c.name}
+                                  />
+                                </div>
+                              ))}
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -5986,7 +6282,8 @@ export function RoofDesigner(props: {
                             className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
                           />
                           <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
-                            {props.inverters
+                            {favourites
+                              .sorted("inverters", props.inverters)
                               .filter((i) =>
                                 seek
                                   .toLowerCase()
@@ -5994,23 +6291,29 @@ export function RoofDesigner(props: {
                                   .every((word) => `${i.name} ${i.sku}`.toLowerCase().includes(word)),
                               )
                               .map((i) => (
-                                <button
-                                  key={i.sku}
-                                  onClick={() => addInverter(i)}
-                                  className="flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas"
-                                >
-                                  <Plus className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
-                                  <span className="min-w-0">
-                                    <span className="block text-sm font-semibold">{i.name}</span>
-                                    <ModelNo sku={i.sku} />
-                                    <span className="block text-xs tabular-nums text-muted">
-                                      {i.kw} kW ·{" "}
-                                      {i.electrical
-                                        ? `${i.electrical.mppts.length} inputs, up to ${i.electrical.maxVoltage} V · strings can be checked`
-                                        : "limits not on file: strings can't be checked"}
+                                <div key={i.sku} className="group flex items-start gap-1">
+                                  <button
+                                    onClick={() => addInverter(i)}
+                                    className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas"
+                                  >
+                                    <Plus className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
+                                    <span className="min-w-0">
+                                      <span className="block text-sm font-semibold">{i.name}</span>
+                                      <ModelNo sku={i.sku} />
+                                      <span className="block text-xs tabular-nums text-muted">
+                                        {i.kw} kW ·{" "}
+                                        {i.electrical
+                                          ? `${i.electrical.mppts.length} inputs, up to ${i.electrical.maxVoltage} V · strings can be checked`
+                                          : "limits not on file: strings can't be checked"}
+                                      </span>
                                     </span>
-                                  </span>
-                                </button>
+                                  </button>
+                                  <FavouriteStar
+                                    on={favourites.is("inverters", i.sku)}
+                                    onToggle={() => favourites.toggle("inverters", i.sku)}
+                                    name={i.name}
+                                  />
+                                </div>
                               ))}
                           </div>
                         </>
@@ -6159,7 +6462,8 @@ export function RoofDesigner(props: {
                         className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
                       />
                       <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
-                        {props.batteries
+                        {favourites
+                          .sorted("batteries", props.batteries)
                           .filter((b) =>
                             seek
                               .toLowerCase()
@@ -6167,24 +6471,30 @@ export function RoofDesigner(props: {
                               .every((word) => `${b.name} ${b.sku}`.toLowerCase().includes(word)),
                           )
                           .map((b) => (
-                            <button
-                              key={b.sku}
-                              onClick={() => chooseBattery(b)}
-                              className={clsx(
-                                "flex w-full items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
-                                b.sku === battery?.sku && "bg-canvas",
-                              )}
-                            >
-                              <Check
-                                className={clsx("mt-0.5 size-4 shrink-0", b.sku === battery?.sku ? "text-ink" : "invisible")}
-                                aria-hidden
+                            <div key={b.sku} className="group flex items-start gap-1">
+                              <button
+                                onClick={() => chooseBattery(b)}
+                                className={clsx(
+                                  "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
+                                  b.sku === battery?.sku && "bg-canvas",
+                                )}
+                              >
+                                <Check
+                                  className={clsx("mt-0.5 size-4 shrink-0", b.sku === battery?.sku ? "text-ink" : "invisible")}
+                                  aria-hidden
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-semibold">{b.name}</span>
+                                  <ModelNo sku={b.sku} />
+                                  <span className="block text-xs tabular-nums text-muted">{b.kwh} kWh each</span>
+                                </span>
+                              </button>
+                              <FavouriteStar
+                                on={favourites.is("batteries", b.sku)}
+                                onToggle={() => favourites.toggle("batteries", b.sku)}
+                                name={b.name}
                               />
-                              <span className="min-w-0">
-                                <span className="block text-sm font-semibold">{b.name}</span>
-                                <ModelNo sku={b.sku} />
-                                <span className="block text-xs tabular-nums text-muted">{b.kwh} kWh each</span>
-                              </span>
-                            </button>
+                            </div>
                           ))}
                       </div>
                     </div>

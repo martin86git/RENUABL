@@ -16,6 +16,8 @@ import { PROJECT_CONFLICT, roofKey, type WorkspaceSettings } from "@/lib/domain/
 import { DEFAULT_WORKSPACE, cleanWorkspace, type SupplierList, type Workspace } from "@/lib/domain/design/pricing";
 import { cleanExtras, defaultBill, postcodeIn, type DesignExtras } from "@/lib/domain/design/quote";
 import { cleanDesignSet, packDesignSet, type DesignSet } from "@/lib/domain/design/roof-design";
+import { cleanDraft, draftStillFits, fingerprint } from "@/lib/domain/design/draft";
+import { cleanFavourites, noFavourites, withFavourite, type FavouriteKind, type Favourites } from "@/lib/domain/design/favourites";
 import { designAccount } from "./design-account";
 
 /** The roof being designed: where it is, and the address as it is shown. */
@@ -120,16 +122,29 @@ function deviceRoofWork(roof: Pick<DesignRoof, "lat" | "lng">): { set: DesignSet
   }
 }
 
+/** What this device has saved for a roof, as a fingerprint (a draft's `base`), or "new" when nothing is. */
+function deviceBase(roof: Pick<DesignRoof, "lat" | "lng">): string {
+  try {
+    const saved = window.localStorage.getItem(keyFor(roof));
+    return saved ? fingerprint(saved) : "new";
+  } catch {
+    return "new";
+  }
+}
+
 /** A roof's designs, with the bill and each design's quote settings: what is saved, or an empty design to start on. */
 export async function loadRoofWork(roof: DesignRoof, workspace: Workspace): Promise<{ set: DesignSet; extras: DesignExtras }> {
   const defaults = { bill: defaultBill(workspace.settings.bill), postcode: postcodeIn(roof.address) };
   let set: DesignSet | null = null;
   let extras: unknown;
-  if ((await whereKept()) === "device") ({ set, extras } = deviceRoofWork(roof));
-  else {
+  if ((await whereKept()) === "device") {
+    ({ set, extras } = deviceRoofWork(roof));
+    bases.set(roofKey(roof), deviceBase(roof));
+  } else {
     const res = await call<ServerAnswer & { project: ServerProject | null }>(`/api/design/projects?lat=${roof.lat}&lng=${roof.lng}`);
     if (!res.ok) throw new DesignStoreError(res.message);
     opened.delete(roofKey(roof));
+    bases.set(roofKey(roof), res.project ? `v${res.project.version}` : "new");
     if (res.project) {
       opened.set(roofKey(roof), { id: res.project.id, version: res.project.version });
       set = cleanDesignSet(res.project.design);
@@ -138,6 +153,94 @@ export async function loadRoofWork(roof: DesignRoof, workspace: Workspace): Prom
   }
   set ??= emptyDesignSet(roof);
   return { set, extras: cleanExtras(extras, set.designs.length, defaults) };
+}
+
+// ---------------------------------------------------------------------------
+// Drafts: the work not yet saved, kept as it goes (domain/design/draft.ts)
+// ---------------------------------------------------------------------------
+
+const draftKey = (roof: Pick<DesignRoof, "lat" | "lng">) => `renuabl.design.draft.${roofKey(roof)}`;
+
+/** Which save each roof opened in this visit is drawn over: its version on the server, or a fingerprint of the device's copy. */
+const bases = new Map<string, string>();
+
+/** The save a draft of this roof is drawn over now: as learnt when it was opened or last saved, else none yet. */
+const baseOf = (roof: Pick<DesignRoof, "lat" | "lng">) => bases.get(roofKey(roof)) ?? "new";
+
+/** A draft as the designer opens it: the designs, the bill and quotes, and when it was kept. */
+export interface OpenDraft {
+  set: DesignSet;
+  extras: DesignExtras;
+  at: string;
+}
+
+/**
+ * This person's draft of a roof, when there is one still drawn over what is saved now: null otherwise (none, or the
+ * roof has been saved since it was taken, by anyone). Call after `loadRoofWork`, which learns what is saved.
+ */
+export async function loadDraft(roof: DesignRoof, workspace: Workspace): Promise<OpenDraft | null> {
+  const defaults = { bill: defaultBill(workspace.settings.bill), postcode: postcodeIn(roof.address) };
+  let raw: unknown = null;
+  try {
+    if ((await whereKept()) === "device") raw = JSON.parse(window.localStorage.getItem(draftKey(roof)) ?? "null");
+    else {
+      const res = await call<ServerAnswer & { draft: unknown }>(`/api/design/draft?lat=${roof.lat}&lng=${roof.lng}`);
+      raw = res.ok ? res.draft : null;
+    }
+  } catch {
+    return null;
+  }
+  const draft = raw ? cleanDraft(roof, raw) : null;
+  if (!draft || !draftStillFits(draft, bases.get(roofKey(roof)) ?? baseOf(roof))) return null;
+  const set = cleanDesignSet(draft.design);
+  return set ? { set, extras: cleanExtras(draft.extras, set.designs.length, defaults), at: draft.at } : null;
+}
+
+/** Keeps the work not yet saved as this person's draft of the roof. Null when kept; otherwise what went wrong. */
+export async function keepDraft(roof: DesignRoof, set: DesignSet, extras: DesignExtras, keepalive = false): Promise<string | null> {
+  const body = {
+    lat: roof.lat,
+    lng: roof.lng,
+    address: roof.address,
+    base: bases.get(roofKey(roof)) ?? baseOf(roof),
+    design: packDesignSet(set),
+    extras,
+  };
+  let where: "account" | "device";
+  try {
+    where = await whereKept();
+  } catch (e) {
+    return e instanceof Error ? e.message : CANT_REACH;
+  }
+  if (where === "device") {
+    try {
+      window.localStorage.setItem(draftKey(roof), JSON.stringify({ ...body, at: new Date().toISOString() }));
+      return null;
+    } catch {
+      return CANT_SAVE;
+    }
+  }
+  if (keepalive) {
+    // The page is closing: sent so it can arrive after the page has gone.
+    const text = JSON.stringify(body);
+    if (text.length > 60_000) return null;
+    void fetch("/api/design/draft", { method: "PUT", headers: { "content-type": "application/json" }, body: text, keepalive: true }).catch(
+      () => undefined,
+    );
+    return null;
+  }
+  const res = await call("/api/design/draft", "PUT", body);
+  return res.ok ? null : res.message;
+}
+
+/** Throws this person's draft of the roof away. */
+export async function dropDraft(roof: Pick<DesignRoof, "lat" | "lng">): Promise<void> {
+  try {
+    window.localStorage.removeItem(draftKey(roof));
+  } catch {
+    // Nothing kept on the device to remove.
+  }
+  if ((await whereKept().catch(() => "device")) === "account") await call(`/api/design/draft?lat=${roof.lat}&lng=${roof.lng}`, "DELETE");
 }
 
 async function saveToAccount(roof: DesignRoof, set: DesignSet, extras: DesignExtras): Promise<string | null> {
@@ -152,6 +255,7 @@ async function saveToAccount(roof: DesignRoof, set: DesignSet, extras: DesignExt
     });
     if (!res.ok) return res.message;
     opened.set(key, { id: known.id, version: res.version });
+    bases.set(key, `v${res.version}`);
     return null;
   }
   // The first save of this roof.
@@ -160,6 +264,7 @@ async function saveToAccount(roof: DesignRoof, set: DesignSet, extras: DesignExt
   // Someone in the business saved this roof first, after it was opened here: theirs stands, and this copy isn't put over it.
   if (res.existed) return PROJECT_CONFLICT;
   opened.set(key, { id: res.project.id, version: res.project.version });
+  bases.set(key, `v${res.project.version}`);
   return null;
 }
 
@@ -171,9 +276,17 @@ export async function saveRoofWork(roof: DesignRoof, set: DesignSet, extras: Des
   } catch (e) {
     return e instanceof Error ? e.message : CANT_REACH;
   }
-  if (where === "account") return inTurn(() => saveToAccount(roof, set, extras));
+  if (where === "account") {
+    const problem = await inTurn(() => saveToAccount(roof, set, extras));
+    // Saved: the draft has done its job (and a later one is drawn over this save).
+    if (!problem) void dropDraft(roof);
+    return problem;
+  }
   try {
-    window.localStorage.setItem(keyFor(roof), JSON.stringify({ ...packDesignSet(set), extras }));
+    const text = JSON.stringify({ ...packDesignSet(set), extras });
+    window.localStorage.setItem(keyFor(roof), text);
+    bases.set(roofKey(roof), fingerprint(text));
+    window.localStorage.removeItem(draftKey(roof));
     return null;
   } catch {
     return CANT_SAVE;
@@ -273,6 +386,40 @@ export async function saveWorkspace(workspace: Workspace): Promise<string | null
     return null;
   } catch {
     return CANT_SAVE;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Favourite products: each person's own (domain/design/favourites.ts)
+// ---------------------------------------------------------------------------
+
+const FAVOURITES = "renuabl.design.favourites";
+
+/** This person's favourite products: from their account when signed in, else this device's. */
+export async function loadFavourites(): Promise<Favourites> {
+  if ((await whereKept().catch(() => "device")) === "account") {
+    const res = await call<ServerAnswer & { favourites: unknown }>("/api/design/favourites");
+    return res.ok ? cleanFavourites(res.favourites) : noFavourites();
+  }
+  try {
+    return cleanFavourites(JSON.parse(window.localStorage.getItem(FAVOURITES) ?? "null"));
+  } catch {
+    return noFavourites();
+  }
+}
+
+/** Stars a product or takes its star off: answers with the favourites as kept, or null when they couldn't be. */
+export async function setFavourite(current: Favourites, kind: FavouriteKind, sku: string, on: boolean): Promise<Favourites | null> {
+  if ((await whereKept().catch(() => "device")) === "account") {
+    const res = await call<ServerAnswer & { favourites: unknown }>("/api/design/favourites", "POST", { kind, sku, on });
+    return res.ok ? cleanFavourites(res.favourites) : null;
+  }
+  const next = withFavourite(current, kind, sku, on);
+  try {
+    window.localStorage.setItem(FAVOURITES, JSON.stringify(next));
+    return next;
+  } catch {
+    return null;
   }
 }
 

@@ -98,6 +98,9 @@ const API: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
     "inspections",
     "roof",
     "projects",
+    // Their unsaved work kept as a draft, and their favourite products in the designer's lists.
+    "draft",
+    "favourites",
     "workspace",
     "price-list",
     "datasheets",
