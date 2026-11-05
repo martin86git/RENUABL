@@ -19,6 +19,8 @@ const url = process.env.TEST_DATABASE_URL;
 const A = "owner@alpha-chat.test";
 const B = "owner@beta-chat.test";
 const TODAY = "2026-10-12";
+const asA = { email: A, all: true };
+const asB = { email: B, all: true };
 
 describe.skipIf(!url)("roof designer chat (database)", () => {
   let db: typeof import("./db");
@@ -134,8 +136,8 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
         read: false,
       },
     ]);
-    expect(await chats.unreadCount(a)).toBe(1);
-    expect(await chats.chatThreads(a)).toEqual([
+    expect(await chats.unreadCount(a, asA)).toBe(1);
+    expect(await chats.chatThreads(a, asA)).toEqual([
       { jobId, customerId, customerName: "Alex Example", title: "Solar", last: "Can it go on the garage?", at: lines[0].at, unread: 1 },
     ]);
     const record = (await crm.customerDetail(a, customerId))!.activity[0];
@@ -145,9 +147,9 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
 
   it("keeps each business's conversations, and each job's, to itself", async () => {
     expect(await chats.chatLines(b, jobId)).toEqual([]);
-    expect(await chats.unreadCount(b)).toBe(0);
-    expect(await chats.chatThreads(b)).toEqual([]);
-    expect(await chats.markRead(b, jobId)).toBe(0);
+    expect(await chats.unreadCount(b, asB)).toBe(0);
+    expect(await chats.chatThreads(b, asB)).toEqual([]);
+    expect(await chats.markRead(b, jobId, B)).toBe(0);
     expect(await chats.addReply(b, jobId, "Beta was here", B)).toBeNull();
     expect(await chats.addCustomerLine(b, jobId, "Beta was here")).toBeNull();
     expect(
@@ -156,7 +158,7 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
     // The same customer's other job has its own conversation.
     expect(await chats.chatLines(a, otherJob)).toEqual([]);
     expect((await chats.chatLines(a, jobId)).map((l) => l.text)).toEqual(["Can it go on the garage?"]);
-    expect(await chats.unreadCount(a)).toBe(1);
+    expect(await chats.unreadCount(a, asA)).toBe(1);
   });
 
   it("takes a member's reply, marks the customer's lines read, and says why no email went", async () => {
@@ -166,8 +168,8 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
       ["customer", "Can it go on the garage?", null, true],
       ["business", "It can. We'll redraw it.", A, true],
     ]);
-    expect(await chats.unreadCount(a)).toBe(0);
-    expect((await chats.chatThreads(a))[0].unread).toBe(0);
+    expect(await chats.unreadCount(a, asA)).toBe(0);
+    expect((await chats.chatThreads(a, asA))[0].unread).toBe(0);
     expect((await crm.customerDetail(a, customerId))!.activity[0]).toMatchObject({
       kind: "message",
       text: "Reply sent: It can. We'll redraw it.",
@@ -218,11 +220,11 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
     await chat.customerSays(token, "One more thing", defer);
     await chat.customerSays(token, "And another", defer);
     later.length = 0;
-    expect(await chats.unreadCount(a)).toBe(2);
-    expect((await chats.chatThreads(a))[0]).toMatchObject({ last: "And another", unread: 2 });
-    expect(await chats.markRead(a, jobId)).toBe(2);
-    expect(await chats.markRead(a, jobId)).toBe(0);
-    expect(await chats.unreadCount(a)).toBe(0);
+    expect(await chats.unreadCount(a, asA)).toBe(2);
+    expect((await chats.chatThreads(a, asA))[0]).toMatchObject({ last: "And another", unread: 2 });
+    expect(await chats.markRead(a, jobId, A)).toBe(2);
+    expect(await chats.markRead(a, jobId, A)).toBe(0);
+    expect(await chats.unreadCount(a, asA)).toBe(0);
   });
 
   it("stops taking a customer's lines past the limit for one job", async () => {
@@ -240,14 +242,14 @@ describe.skipIf(!url)("roof designer chat (database)", () => {
     // The conversation is full from the customer's side by now: Sol answers as of this moment, after the team's reply.
     const before = (await chats.chatLines(a, jobId))[0].at;
     const at = new Date().toISOString();
-    const unread = await chats.unreadCount(a);
+    const unread = await chats.unreadCount(a, asA);
     const kept = await chats.addSolLine(a, jobId, "Only the Maximum independence system keeps chosen circuits on.", at);
     expect(kept).toMatchObject({ from: "business", by: SOL_BY, read: true });
     const shown = (await chat.publicChat(token))!.messages;
     expect(shown.at(-1)).toMatchObject({ from: "business", sol: true });
     expect(JSON.stringify(shown)).not.toContain(A);
     // Unlike a member's reply, his answer marks nothing read: the customer's lines wait for someone at the business.
-    expect(await chats.unreadCount(a)).toBe(unread);
+    expect(await chats.unreadCount(a, asA)).toBe(unread);
     // Someone has written since the line he would be answering: his answer is late, and dropped.
     expect(await chats.addSolLine(a, jobId, "Late", at)).toBeNull();
     expect(await chats.addSolLine(a, jobId, "Later still", before)).toBeNull();

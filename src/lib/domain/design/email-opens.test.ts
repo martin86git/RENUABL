@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { PIXEL_GIF, cleanOpens, isOpenToken, mailMark, mailMarkWords, openPixel, openedWords, withOpen, withPixel } from "./email-opens";
+import {
+  NOT_TRACKED,
+  PIXEL_GIF,
+  cleanOpens,
+  isOpenToken,
+  mailMark,
+  mailMarkWords,
+  openPixel,
+  openedWords,
+  ourCopyNote,
+  splitOurCopies,
+  withOpen,
+  withPixel,
+} from "./email-opens";
 
 const zone = "Australia/Melbourne";
 
@@ -24,7 +37,25 @@ describe("email open tracking", () => {
     const now = new Date("2026-11-02T05:00:00Z");
     expect(openedWords([], zone, now)).toBe("Not opened yet");
     expect(openedWords(["2026-11-02T04:15:00Z"], zone, now)).toBe("Opened today at 3:15 pm");
-    expect(openedWords(["2026-10-30T01:00:00Z", "2026-10-31T01:00:00Z"], zone, now)).toMatch(/^Opened 2 times, last on Sat,? 31 Oct$/);
+    expect(openedWords(["2026-10-30T01:00:00Z", "2026-10-31T01:00:00Z"], zone, now)).toMatch(/^Opened 2 times · last on Sat,? 31 Oct$/);
+    expect(openedWords(["2026-11-02T01:00:00Z", "2026-11-02T04:15:00Z"], zone, now, 3)).toBe("Opened 3 times · last today at 3:15 pm");
+    // The count is every open, though only the latest are kept; it is never fewer than the times given.
+    expect(openedWords(["2026-11-02T04:15:00Z"], zone, now, 41)).toBe("Opened 41 times · last today at 3:15 pm");
+    expect(openedWords(["2026-11-02T01:00:00Z", "2026-11-02T04:15:00Z"], zone, now, 0)).toBe("Opened 2 times · last today at 3:15 pm");
+    expect(NOT_TRACKED).toBe("Not tracked");
+  });
+
+  it("sends the business's own people on Cc a copy of their own, so only the customer's opens count", () => {
+    const ours = ["Sam@Example-Solar.com.au", "hello@example-solar.com.au"];
+    expect(
+      splitOurCopies(["sam@example-solar.com.au", "partner@gmail.com", "HELLO@example-solar.com.au", "partner@gmail.com"], ours),
+    ).toEqual({
+      cc: ["partner@gmail.com"],
+      ours: ["sam@example-solar.com.au", "hello@example-solar.com.au"],
+    });
+    expect(splitOurCopies(["partner@gmail.com"], ours)).toEqual({ cc: ["partner@gmail.com"], ours: [] });
+    expect(splitOurCopies([], ours)).toEqual({ cc: [], ours: [] });
+    expect(ourCopyNote("alex@example.com")).toContain("alex@example.com");
   });
 
   it("serves a real GIF", () => {

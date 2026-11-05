@@ -29,12 +29,20 @@ export async function recordSent(businessId: string, token: string, jobId: strin
   ]);
 }
 
-/** A pixel loaded: the email it belongs to gets the time (two within a minute are one). Unknown tokens change nothing. */
+/**
+ * A pixel loaded: the email it belongs to gets the time (two within a minute are one) and one more on its count, which
+ * goes on past the times kept (`OPENS_EACH`). An email sent before the count was kept starts from the times it has.
+ * Unknown tokens change nothing.
+ */
 export async function recordOpen(token: string, now = new Date()): Promise<void> {
   const rows = await query<{ opens: unknown }>(`select opens from design_email_opens where token = $1`, [token]);
   if (!rows[0]) return;
   const next = withOpen(cleanOpens(rows[0].opens), now);
-  if (next) await query(`update design_email_opens set opens = $2::jsonb where token = $1`, [token, JSON.stringify(next)]);
+  if (next)
+    await query(
+      `update design_email_opens set opens = $2::jsonb, open_count = coalesce(open_count, jsonb_array_length(opens)) + 1 where token = $1`,
+      [token, JSON.stringify(next)],
+    );
 }
 
 /** A deal's tracked emails by the record line they were written as: when each went and when it was opened. */
@@ -45,6 +53,16 @@ export async function opensForJob(businessId: string, jobId: string, viewer?: De
     [businessId, jobId],
   );
   return Object.fromEntries(rows.filter((r) => r.activity).map((r) => [r.activity as string, cleanOpens(r.opens)]));
+}
+
+/** How many times each of a deal's tracked emails was opened, by its record line (the caller has checked the deal). */
+export async function openCountsForJob(businessId: string, jobId: string): Promise<Record<string, number>> {
+  const rows = await query<{ activity: string | null; n: number }>(
+    `select activity_id as activity, coalesce(open_count, jsonb_array_length(opens))::int as n from design_email_opens
+      where business_id = $1 and job_id = $2 and activity_id is not null`,
+    [businessId, jobId],
+  );
+  return Object.fromEntries(rows.map((r) => [r.activity as string, Number(r.n)]));
 }
 
 /** Every deal this member may see that an email has gone from, with the mark for its pipeline card (`mailMark`). */

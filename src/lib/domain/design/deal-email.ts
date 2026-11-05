@@ -78,20 +78,50 @@ export const MAX_SUBJECT = 200;
 export const MAX_BODY = 8000;
 const EMAIL = /^[^\s@<>,;"]{1,64}@[^\s@<>,;"]{1,190}\.[a-z]{2,24}$/i;
 
-export type CleanDealEmail = { ok: true; to: string; subject: string; body: string } | { ok: false; message: string };
+/** The most addresses copied in on one email (Cc). */
+export const MAX_CC = 5;
 
-/** What the browser sent, as an email to send: one address, a subject and the words, in range. */
-export function cleanDealEmail(raw: unknown): CleanDealEmail {
+export type CleanDealEmail = { ok: true; to: string; cc: string[]; subject: string; body: string } | { ok: false; message: string };
+
+/**
+ * The addresses to copy in (Cc), as typed in one box ("a@x.com, b@y.com") or sent as a list: each checked, lower
+ * case, none twice, never the address it is sent to, at most `MAX_CC`. A wrong one is named, so it can be put right.
+ */
+export function cleanCc(raw: unknown, to = ""): { ok: true; cc: string[] } | { ok: false; message: string } {
+  const typed = Array.isArray(raw) ? raw.filter((a): a is string => typeof a === "string") : typeof raw === "string" ? [raw] : [];
+  const cc: string[] = [];
+  for (const address of typed.flatMap((t) => t.split(/[\s,;]+/))) {
+    const a = address.trim().replace(/^<|>$/g, "").toLowerCase();
+    if (!a) continue;
+    if (!EMAIL.test(a)) return { ok: false, message: `"${a.slice(0, 80)}" in Cc doesn't look like an email address.` };
+    if (a !== to.toLowerCase() && !cc.includes(a)) cc.push(a);
+  }
+  if (cc.length > MAX_CC) return { ok: false, message: `Copy in at most ${MAX_CC} people.` };
+  return { ok: true, cc };
+}
+
+/**
+ * What the browser sent, as an email to send: one address, anyone copied in, a subject and the words, in range. With
+ * `customer` given (an email Sol drafted, sent from his card), the address is the customer's as the server read it,
+ * and anything the browser sent as `to` is ignored.
+ */
+export function cleanDealEmail(raw: unknown, customer?: string): CleanDealEmail {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const to = typeof r.to === "string" ? r.to.trim() : "";
-  if (!EMAIL.test(to)) return { ok: false, message: "Add the customer's email address." };
+  const to = customer !== undefined ? customer.trim() : typeof r.to === "string" ? r.to.trim() : "";
+  if (!EMAIL.test(to))
+    return {
+      ok: false,
+      message: customer !== undefined ? "This customer has no email address on file yet." : "Add the customer's email address.",
+    };
+  const cc = cleanCc(r.cc, to);
+  if (!cc.ok) return cc;
   const subject = typeof r.subject === "string" ? r.subject.replace(/[\r\n]+/g, " ").trim() : "";
   if (!subject) return { ok: false, message: "Add a subject." };
   if (subject.length > MAX_SUBJECT) return { ok: false, message: `Keep the subject under ${MAX_SUBJECT} characters.` };
   const body = typeof r.body === "string" ? r.body.replace(/\r/g, "").trim() : "";
   if (!body) return { ok: false, message: "Write the email." };
   if (body.length > MAX_BODY) return { ok: false, message: `Keep the email under ${MAX_BODY.toLocaleString("en-AU")} characters.` };
-  return { ok: true, to, subject, body };
+  return { ok: true, to, cc: cc.cc, subject, body };
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -114,5 +144,5 @@ export function dealEmail(input: { business: string; subject: string; body: stri
 }
 
 /** How the email is written on the deal's record, with what went with it before the words (so a long email can't cut it off). */
-export const emailRecord = (to: string, subject: string, body: string, files: readonly string[] = []) =>
-  `Email to ${to}: ${subject}${files.length ? `\nAttached (kept in the deal's Attachments): ${files.join(", ")}` : ""}\n\n${body}`;
+export const emailRecord = (to: string, subject: string, body: string, files: readonly string[] = [], cc: readonly string[] = []) =>
+  `Email to ${to}${cc.length ? ` (Cc ${cc.join(", ")})` : ""}: ${subject}${files.length ? `\nAttached (kept in the deal's Attachments): ${files.join(", ")}` : ""}\n\n${body}`;

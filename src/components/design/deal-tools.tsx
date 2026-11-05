@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Mail, Send } from "lucide-react";
 import clsx from "clsx";
 import type { Activity, Customer, Job } from "@/lib/domain/design/crm";
-import { DEAL_EMAIL_TEMPLATES, MAX_BODY, MAX_SUBJECT, fillTemplate, senderName } from "@/lib/domain/design/deal-email";
+import { DEAL_EMAIL_TEMPLATES, MAX_BODY, MAX_CC, MAX_SUBJECT, fillTemplate, senderName } from "@/lib/domain/design/deal-email";
 import type { SectionLine } from "@/lib/domain/design/deal-sections";
 import { dealEmailStatus, emailDeal } from "@/lib/services/crm";
 import { ui } from "./design-shell";
@@ -20,6 +20,7 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
   const { job, customer, business, onSent } = props;
   const [status, setStatus] = useState<{ canSend: boolean; replyTo: string } | null>(null);
   const [to, setTo] = useState(customer.email);
+  const [cc, setCc] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
@@ -33,12 +34,13 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(DRAFT_KEY);
-      const d = raw ? (JSON.parse(raw) as { jobId?: string; subject?: string; body?: string }) : null;
+      const d = raw ? (JSON.parse(raw) as { jobId?: string; subject?: string; body?: string; cc?: string }) : null;
       if (d?.jobId !== job.id) return;
       sessionStorage.removeItem(DRAFT_KEY);
       queueMicrotask(() => {
         setSubject(String(d.subject ?? "").slice(0, 200));
         setBody(String(d.body ?? "").slice(0, 6000));
+        setCc(String(d.cc ?? "").slice(0, 600));
       });
     } catch {
       // Nothing handed over, or storage refused.
@@ -61,12 +63,13 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
   };
   const send = async () => {
     setSending(true);
-    const res = await emailDeal(job.id, { to, subject, body }, files.files);
+    const res = await emailDeal(job.id, { to, cc, subject, body }, files.files);
     setSending(false);
     if (!res.ok) return setNote({ ok: false, text: res.message });
     setNote({ ok: true, text: res.message });
     setSubject("");
     setBody("");
+    setCc("");
     files.clear();
     onSent(res.activity);
   };
@@ -104,6 +107,17 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
           ))}
         </select>
       </div>
+      <label className="mt-2 flex items-center gap-2 text-xs text-muted">
+        Cc
+        <input
+          className={clsx(ui.input, "h-9 min-h-9")}
+          type="text"
+          inputMode="email"
+          value={cc}
+          onChange={(e) => setCc(e.target.value)}
+          placeholder={`Optional: up to ${MAX_CC} addresses, separated by commas`}
+        />
+      </label>
       <input
         aria-label="Subject"
         className={clsx(ui.input, "mt-2")}

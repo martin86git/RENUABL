@@ -190,5 +190,5 @@ export async function memberReplies(
     });
   if (email === "emailed" && parts.kept.length)
     await quietly("keeping the files on the deal", () => addDealFiles(member.businessId, jobId, parts.kept, member.email));
-  return { lines: await chatLines(member.businessId, jobId), email };
+  return { lines: await chatLines(member.businessId, jobId, member.email), email };
 }
