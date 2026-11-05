@@ -278,8 +278,8 @@ html.sol-resizing .team-pop {
 }
 /* A narrower window (5 Nov 2026, from Primero's): the top bar makes room before anything is covered. The wordmark
    gives way to its small mark under 1536px (under 1920px with Sol's panel open beside the page), and the weather
-   beside the day goes with it; under 1366px with the panel open the day's tile goes too, before the magnifier or the
-   Marketplace would be covered (its calendar is on Today's Calendar tab meanwhile). */
+   beside the day goes with it, so the day's tile (which opens the calendar) stays and the magnifier and the
+   Marketplace are never covered (measured at 1024, 1280, 1366, 1440 and 1536px, with and without the panel). */
 .studio-mark-short {
   display: none;
 }
