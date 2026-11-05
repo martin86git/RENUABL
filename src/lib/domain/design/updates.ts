@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-05",
     area: "Today",
+    words: "Sol at work on each stage of the Pipeline board: see what he has lined up, and when each email goes.",
+  },
+  {
+    day: "2026-11-05",
+    area: "Today",
     words: "On the Pipeline board, an envelope shows a deal has been emailed, with an eye on it once the latest email is opened.",
   },
   {

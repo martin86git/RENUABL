@@ -665,6 +665,13 @@ create table if not exists design_prepared (
   unique (business_id, key),
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
+-- Sol's sales agents (domain/design/sol-agents.ts): a business's send windows, whether Sol sends on his own, pauses.
+create table if not exists design_sol_agents (
+  business_id text primary key references businesses(id) on delete cascade,
+  settings jsonb not null default '{}',
+  updated_at timestamptz not null default now(),
+  updated_by text
+);
 -- Sol's memory (domain/design/sol-knowledge.ts): answers he found on the web, kept for the whole business with the
 -- pages they came from. Never the business's own customers, deals or costs.
 create table if not exists design_sol_knowledge (

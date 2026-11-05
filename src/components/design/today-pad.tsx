@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { ArrowUp, CalendarDays, ChevronLeft, ChevronRight, Eye, HardHat, KanbanSquare, Mail, Phone, Sun } from "lucide-react";
 import { LAUNCH_MARKET, greeting } from "@/lib/domain/market";
 import { nextHeadline, type NextItem } from "@/lib/domain/design/next-up";
+import { agentFor, type AgentStage } from "@/lib/domain/design/sol-agents";
 import {
   TODAY_TABS,
   agendaFor,
@@ -32,6 +33,7 @@ import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { NewLook } from "./new-look";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
 import { SolBadge, SolIcon, SolMark, SolStars } from "./sol-icon";
+import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
 import { SolDesignView } from "./sol-design-view";
 import { SolThinking } from "./sol-thinking";
 
@@ -848,6 +850,10 @@ function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate 
       gone = true;
     };
   }, []);
+  // Sol's sales agents: one outbox behind a round on each column and a chip on each card (sol-agents.tsx).
+  const { box, reload, now } = useOutbox();
+  const [agent, setAgent] = useState<AgentStage | null>(null);
+  const needing = new Set(box?.needsYou.map((n) => n.jobId) ?? []);
   const pill = (on: boolean) =>
     clsx("rounded-full px-3 py-1 text-[13px] transition", on ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink");
   return (
@@ -871,12 +877,13 @@ function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {pipelineBoard(jobs).map((s) => (
               <div key={s.stage} className="rounded-2xl bg-canvas p-3">
-                <p className="flex items-baseline justify-between gap-2 px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
-                  <span>
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
                     {s.label} <span className="tabular-nums">{s.count}</span>
-                  </span>
-                  {s.value > 0 && <span className="tabular-nums normal-case tracking-normal">{dollars(s.value)}</span>}
-                </p>
+                    {s.value > 0 && <span className="ml-2 tabular-nums normal-case tracking-normal">{dollars(s.value)}</span>}
+                  </p>
+                  {agentFor(s.stage) && <AgentRound stage={agentFor(s.stage)!} box={box} onOpen={() => setAgent(agentFor(s.stage))} />}
+                </div>
                 <ul className="mt-2 space-y-1.5">
                   {s.jobs.map((j) => (
                     <li key={j.id}>
@@ -891,6 +898,7 @@ function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate 
                         <span className="block truncate text-[12px] text-ink-2">
                           {[j.title, j.value ? dollars(j.value) : null, j.kw ? `${j.kw} kW` : null].filter(Boolean).join(" · ")}
                         </span>
+                        <OutboxChip entry={entryFor(box, j.id)} needsYou={needing.has(j.id)} now={now} />
                       </Link>
                     </li>
                   ))}
@@ -906,6 +914,7 @@ function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate 
           </div>
         )}
       </div>
+      {agent && box && <AgentCard stage={agent} box={box} now={now} onClose={() => setAgent(null)} reload={reload} />}
     </section>
   );
 }
