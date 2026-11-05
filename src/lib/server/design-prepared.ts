@@ -123,10 +123,14 @@ export async function readyFor(
     rows(businessId),
   ]);
   const seen = seenJobs && new Set(seenJobs.map((j) => j.id));
-  // Every follow-up due now, the business's whole list (the tray is shared; who sees which is decided below).
+  // Every follow-up due now, the business's whole list (the tray is shared; who sees which is decided below). Only on
+  // a proposal that has reached the customer: one published by a save but never sent isn't followed up.
   const due = proposals
-    .filter((p) => p.state === "live" && !p.acceptedAt)
-    .map((p) => ({ p, d: dueFollowUp({ sentAt: p.publishedAt, now, done: p.followUps.map((f) => f.day), lastWord: p.lastWord }) }))
+    .filter((p) => p.state === "live" && !p.acceptedAt && p.sentOut)
+    .map((p) => ({
+      p,
+      d: dueFollowUp({ sentAt: p.publishedAt, now, done: p.followUps.map((f) => f.day), lastWord: p.lastWord, lastTouch: p.lastTouch }),
+    }))
     .filter((x): x is { p: (typeof proposals)[number]; d: NonNullable<typeof x.d> } => Boolean(x.d));
   const dueKeys = new Set(due.map(({ p, d }) => followUpKey(p.jobId, p.version, d.day)));
 

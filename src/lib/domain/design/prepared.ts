@@ -149,12 +149,20 @@ export function followUpPrompt(f: FollowUpFacts): string {
     ...followUpBasis(f).map((l) => `- ${l}`),
     "",
     "How to write it:",
-    "- Australian English, warm and plain, like a person who knows them, not a marketing email. 40 to 110 words.",
+    "- Australian English, warm and plain, like a person who knows them, not a marketing email. About 60 words, a little more only when answering what they asked; every paragraph one sentence.",
     `- Start "Hi ${firstNameOf(f.customer) || "there"},". No sign-off and no link: both are added after your words.`,
-    "- One clear, easy next step (a reply, a quick call, a question answered).",
+    // The shape a follow-up takes (from Primero's, 5 Nov 2026, where Martin rewrote one this way).
+    "- Anything they asked comes first. Otherwise open on the proposal they have, then a sentence each: what did they think, would they change anything, would a quick call help. No recap of the proposal and no explaining how solar works.",
+    "- One clear, easy next step, ending on one question they can answer in a line.",
+    '- Never "no rush", "no pressure", "take your time" or the like, and nothing that reads as a deadline.',
+    "- The record isn't the whole story: refer to past conversations lightly, never imply we didn't follow up, and never point out anything in our records that doesn't match.",
     f.step === 1 ? "- This is the first follow-up: light, helpful." : "",
-    f.step === 2 ? "- This is the second follow-up: offer to walk them through it or answer what's holding them back." : "",
-    f.step === 3 ? "- This is the last follow-up: close the loop kindly, make it easy to say not now, without pressure or guilt." : "",
+    f.step === 2
+      ? "- This is the second follow-up: open differently from the first, and offer to walk them through it or answer what's holding them back."
+      : "",
+    f.step === 3
+      ? "- This is the last follow-up: open differently again, close the loop kindly, make it easy to say not now, without guilt."
+      : "",
     "- Never say or hint that you know whether they opened it: use it only to choose what to say (not opened: it may have got buried; opened: questions they may have).",
     "- If they wrote in the chat, answer the spirit of it briefly or say the team will come back on it; never make up an answer.",
     "- Never mention a price, a figure, a saving, a discount, a date, a rebate or a product, and never promise anything. Never invent facts about their home or the system.",

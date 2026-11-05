@@ -28,15 +28,23 @@ export interface FollowUpDue {
 
 /**
  * The follow-up due on an open proposal, or null: the latest of the follow-up days it has reached, unless that one is
- * done, or the customer has written since it fell due (their word counts as the follow-up).
+ * done, or the customer has written since it fell due (their word counts as the follow-up), or the business has
+ * (`lastTouch`: any email from the deal or reply in the chat counts too; from Primero's, 5 Nov 2026).
  */
-export function dueFollowUp(input: { sentAt: string; now: Date; done: readonly number[]; lastWord: string | null }): FollowUpDue | null {
+export function dueFollowUp(input: {
+  sentAt: string;
+  now: Date;
+  done: readonly number[];
+  lastWord: string | null;
+  lastTouch?: string | null;
+}): FollowUpDue | null {
   const sent = todayInMarket(new Date(input.sentAt));
   const age = dayNumber(todayInMarket(input.now)) - dayNumber(sent);
   const reached = FOLLOW_UP_DAYS.map((day, i) => ({ day, step: i + 1 })).filter((p) => p.day <= age);
   const latest = reached[reached.length - 1];
   if (!latest || input.done.includes(latest.day)) return null;
-  if (input.lastWord && dayNumber(todayInMarket(new Date(input.lastWord))) >= dayNumber(sent) + latest.day) return null;
+  for (const at of [input.lastWord, input.lastTouch])
+    if (at && dayNumber(todayInMarket(new Date(at))) >= dayNumber(sent) + latest.day) return null;
   return { ...latest, age };
 }
 

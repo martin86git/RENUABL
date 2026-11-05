@@ -397,7 +397,13 @@ function YourDay({ jobs, today, serviceOpen }: { jobs: JobLine[] | null; today: 
             ? proposals.proposals.filter(
                 (p) =>
                   p.state === "live" &&
-                  dueFollowUp({ sentAt: p.publishedAt, now: at, done: p.followUps.map((f) => f.day), lastWord: p.lastWord }),
+                  dueFollowUp({
+                    sentAt: p.publishedAt,
+                    now: at,
+                    done: p.followUps.map((f) => f.day),
+                    lastWord: p.lastWord,
+                    lastTouch: p.lastTouch,
+                  }),
               ).length
             : 0,
           ordersToPlace: orders.ok ? orders.orders.filter((o) => orderDueSoon(o.status, o.installDate, today)).length : 0,

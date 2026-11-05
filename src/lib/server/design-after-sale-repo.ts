@@ -106,6 +106,13 @@ export interface ProposalLine {
   followUps: { day: number; how: "call" | "email"; at: string }[];
   /** When the customer last wrote in the chat, if ever. */
   lastWord: string | null;
+  /** When the business last wrote to the customer (a chat reply or an email from the deal), if ever. */
+  lastTouch: string | null;
+  /**
+   * Whether the newest version has reached the customer: opened, or the business wrote to them since publishing.
+   * Publishing alone isn't sending (Primero, 5 Nov 2026): the design tool publishes on every save of a deal's roof.
+   */
+  sentOut: boolean;
   /** The deposit marked received (dollars), else 0; and whether the customer says they paid. */
   depositReceived: number;
   depositSaid: boolean;
@@ -133,6 +140,7 @@ export async function listProposals(businessId: string, today: ISODate): Promise
     said: boolean;
     followUps: { day: number; how: "call" | "email"; at: string }[] | null;
     lastWord: string | null;
+    lastTouch: string | null;
   }>(
     `select distinct on (p.job_id) p.job_id as "jobId", c.id as "customerId", c.name as customer, j.title, j.address, v.version, v.view, v.accepted_option as option,
             p.token, p.withdrawn_at is not null as withdrawn, ${moment("v.published_at")} as "publishedAt",
@@ -141,7 +149,12 @@ export async function listProposals(businessId: string, today: ISODate): Promise
             (select json_agg(json_build_object('day', f.day, 'how', f.how, 'at', f.at) order by f.day) from design_followups f
               where f.business_id = p.business_id and f.job_id = p.job_id) as "followUps",
             (select ${moment("max(m.at)")} from design_messages m
-              where m.business_id = p.business_id and m.job_id = p.job_id and m.from_customer) as "lastWord"
+              where m.business_id = p.business_id and m.job_id = p.job_id and m.from_customer) as "lastWord",
+            ${moment(`greatest(
+              (select max(m.at) from design_messages m
+                where m.business_id = p.business_id and m.job_id = p.job_id and not m.from_customer),
+              (select max(a.at) from design_activity a
+                where a.business_id = p.business_id and a.job_id = p.job_id and a.kind = 'email'))`)} as "lastTouch"
        from design_proposals p
        join design_proposal_versions v on v.business_id = p.business_id and v.proposal_id = p.id
        join design_jobs j on j.business_id = p.business_id and j.id = p.job_id
@@ -176,6 +189,8 @@ export async function listProposals(businessId: string, today: ISODate): Promise
         pdf: `/api/proposal/${r.token}/pdf`,
         followUps: r.followUps ?? [],
         lastWord: r.lastWord,
+        lastTouch: r.lastTouch,
+        sentOut: Boolean(r.openedAt) || Boolean(r.lastTouch && r.lastTouch >= r.publishedAt),
         depositReceived: r.received ? (agreed.terms?.deposit ?? 0) : 0,
         depositSaid: r.said,
       };

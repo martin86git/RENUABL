@@ -20,6 +20,8 @@ describe("the call note-taker", () => {
     expect(p).toContain("Sunny Co");
     expect(p).toContain("Casey");
     expect(p).toContain("never invent a figure");
+    // A neighbour's home or a past job never goes on this customer's system.
+    expect(p).toContain("Whose home is it about?");
   });
 
   it("writes the conversation first, then the system", () => {

@@ -62,6 +62,10 @@ describe("a follow-up Sol prepares", () => {
     const prompt = followUpPrompt(facts);
     expect(prompt).toContain("Never say or hint that you know whether they opened it");
     expect(prompt).toContain("Never mention a price, a figure");
+    // From Primero's, 5 Nov 2026: their questions first, no "no rush", no record mismatches shown to the customer.
+    expect(prompt).toContain("Anything they asked comes first");
+    expect(prompt).toContain('Never "no rush"');
+    expect(prompt).toContain("never imply we didn't follow up");
     expect(followUpPrompt({ ...facts, step: 3 })).toContain("last follow-up");
   });
 

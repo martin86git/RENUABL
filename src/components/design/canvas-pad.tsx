@@ -130,7 +130,13 @@ export function useNextUp(jobs: JobLine[] | null, today: ISODate): NextItem[] | 
         followUps: proposals.ok
           ? proposals.proposals.flatMap((p) => {
               if (p.state !== "live") return [];
-              const due = dueFollowUp({ sentAt: p.publishedAt, now, done: p.followUps.map((x) => x.day), lastWord: p.lastWord });
+              const due = dueFollowUp({
+                sentAt: p.publishedAt,
+                now,
+                done: p.followUps.map((x) => x.day),
+                lastWord: p.lastWord,
+                lastTouch: p.lastTouch,
+              });
               return due ? [{ jobId: p.jobId, customer: p.customer, age: due.age }] : [];
             })
           : [],

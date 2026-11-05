@@ -108,7 +108,9 @@ function SentList({ rows, now }: { rows: ProposalLine[]; now: Date }) {
       ...r,
       at: r.publishedAt,
       due:
-        r.state === "live" ? dueFollowUp({ sentAt: r.publishedAt, now, done: r.followUps.map((f) => f.day), lastWord: r.lastWord }) : null,
+        r.state === "live"
+          ? dueFollowUp({ sentAt: r.publishedAt, now, done: r.followUps.map((f) => f.day), lastWord: r.lastWord, lastTouch: r.lastTouch })
+          : null,
     })),
   );
   const toFollow = lines.filter((l) => l.due).length;

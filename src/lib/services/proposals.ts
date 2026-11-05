@@ -28,9 +28,12 @@ async function ask<T>(path: string, init?: { method: string; body?: unknown; for
     const json = (await res.json().catch(() => null)) as
       (Record<string, unknown> & { ok?: boolean; message?: string; problems?: string[] }) | null;
     if (res.ok && json?.ok) return json as { ok: true } & T;
+    // A reply that isn't the route's own (the server ran out of time, as Primero found publishing several options)
+    // says so, rather than that the server couldn't be reached.
+    const timedOut = !json && res.status >= 500 ? `That took too long (${res.status}). Try again in a moment.` : null;
     return {
       ok: false,
-      message: json?.message ?? UNREACHABLE,
+      message: json?.message ?? timedOut ?? UNREACHABLE,
       ...(json?.problems ? { problems: json.problems } : {}),
       ...(res.status === 401 ? { signedOut: true } : {}),
     };

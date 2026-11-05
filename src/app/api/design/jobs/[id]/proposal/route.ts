@@ -4,6 +4,9 @@ import { jobById } from "@/lib/server/design-crm-repo";
 import { workOutProposal } from "@/lib/server/design-proposal";
 import { NO_DESIGN, proposalVersions, publishProposal, withdrawProposal } from "@/lib/server/design-proposal-repo";
 
+// Each option on offer is priced in full; with several out, leave room (Primero, 5 Nov 2026: a third wouldn't publish).
+export const maxDuration = 60;
+
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
 const notFound = () => Response.json({ ok: false, message: "That job isn't here." }, { status: 404 });
 

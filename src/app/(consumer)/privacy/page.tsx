@@ -70,6 +70,63 @@ export default function PrivacyPage() {
         advertising, customer records or installation partners. You can ask us to delete it at any time.
       </p>
 
+      <h2>Gmail, Google Calendar and Outlook (RENUABL Business)</h2>
+      <p>
+        People at solar businesses who use RENUABL Business can choose to connect their own Gmail, Google Calendar or Outlook calendar. This
+        section explains what we do with that information. It applies only to people who connect one of these accounts.
+      </p>
+      <ul>
+        <li>
+          <strong>Signing in with Google</strong>: we receive your email address, and use it only to sign you in.
+        </li>
+        <li>
+          <strong>Gmail</strong>: we read the emails in your inbox and their attachments, and change their labels when you ask us to
+          (marking an email read or unread, or archiving it). We never send, delete or forward your email.
+        </li>
+        <li>
+          <strong>Google Calendar and Outlook</strong>: we read your calendar events. We never create, change or delete them.
+        </li>
+      </ul>
+      <p>We use this information only to provide these features to you, inside RENUABL:</p>
+      <ul>
+        <li>showing you your own inbox and calendar;</li>
+        <li>showing which of your business&apos;s customers an email is from;</li>
+        <li>marking an email read or unread, or archiving it, when you ask;</li>
+        <li>
+          when you press Summarise or Draft a reply on an email, sending that email to our assistant, Sol, which is powered by
+          Anthropic&apos;s Claude, to write the summary or draft you asked for.
+        </li>
+      </ul>
+      <p>
+        <strong>What we keep.</strong> We keep the sign-in tokens that let us reach your account, encrypted. We don&apos;t keep your emails,
+        attachments or calendar events, and we don&apos;t keep what Sol writes about them. The one exception: if you tag a teammate on an
+        email, we keep a copy of that email&apos;s sender, subject, date and text (up to 8,000 characters) with your notes, so the teammate
+        can read it.
+      </p>
+      <p>
+        <strong>What we never do.</strong> We don&apos;t sell this information, use it for advertising, or use it to train AI models. We
+        share it only with the providers needed to run these features (our hosting and database, and Anthropic for Sol), under terms that
+        don&apos;t allow them to use it for anything else. Our staff don&apos;t read it unless you ask us to for a specific problem,
+        it&apos;s needed for security, or the law requires it.
+      </p>
+      <p>
+        <strong>Disconnecting.</strong> You can disconnect any account at any time in RENUABL, or in your Google or Microsoft account
+        settings. Disconnecting deletes our tokens and asks Google or Microsoft to cancel our access. To have copies of emails you shared
+        with teammates deleted, email us.
+      </p>
+      <p>
+        RENUABL&apos;s use and transfer to any other app of information received from Google APIs will adhere to the{" "}
+        <a
+          href="https://developers.google.com/terms/api-services-user-data-policy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-ink underline underline-offset-4"
+        >
+          Google API Services User Data Policy
+        </a>
+        , including the Limited Use requirements.
+      </p>
+
       <h2>Advertising</h2>
       <p>
         We advertise on Facebook, Instagram and Google, and use the Meta Pixel and the Google tag to see whether our ads work. They run only

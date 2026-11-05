@@ -15,6 +15,22 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-05",
+    area: "Proposals",
+    words:
+      "An email or chat reply to the customer counts as the follow-up due; Sol drafts follow-ups only once a proposal has reached them.",
+  },
+  {
+    day: "2026-11-05",
+    area: "Sol",
+    words: "Sol always answers in words after checking something, and answers each of a customer's questions in its own paragraph.",
+  },
+  {
+    day: "2026-11-05",
+    area: "Deals",
+    words: "The call note-taker keeps a neighbour's home or a past job off this customer's system, and lists anything unclear to check.",
+  },
+  {
+    day: "2026-11-05",
     area: "Design tool",
     words: "The designer slides over the page you're on as a drawer, so you're back where you were the moment it's done.",
   },

@@ -649,6 +649,26 @@ export async function askSol(
       }
       merged.push({ role: "user", content: results });
     }
+    // He used his tools and then said nothing (Primero's Lance, 5 Nov 2026: asked to check something, he answered
+    // "Done."): ask once more, with no tools, for the answer in words.
+    const last = merged[merged.length - 1];
+    if (!answer.trim() && last?.role === "user" && Array.isArray(last.content)) {
+      const model = modelFor(tier);
+      const m = await client.messages.create({
+        model,
+        max_tokens: 4000,
+        system,
+        tools: toolsFor(tier),
+        tool_choice: { type: "none" },
+        messages: merged,
+      });
+      calls.push(usageOf(m.model || model, m.usage));
+      answer = m.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("")
+        .trim();
+    }
   } catch (e) {
     console.error("sol failed", redactSecrets(e instanceof Anthropic.APIError ? `Claude API ${e.status}: ${e.message}` : String(e)));
     if (!answer) await giveBackSolCredit(businessId, credit);

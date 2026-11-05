@@ -12,6 +12,11 @@ describe("Proposals Sent", () => {
     expect(dueFollowUp({ sentAt: sentDaysAgo(8), now, done: [2], lastWord: null })).toMatchObject({ step: 2, day: 7 });
     expect(dueFollowUp({ sentAt: sentDaysAgo(8), now, done: [7], lastWord: null })).toBeNull();
     expect(dueFollowUp({ sentAt: sentDaysAgo(8), now, done: [], lastWord: sentDaysAgo(0) })).toBeNull();
+    // Any email or chat reply from the business since it fell due counts as the follow-up; one before it doesn't.
+    expect(dueFollowUp({ sentAt: sentDaysAgo(8), now, done: [], lastWord: null, lastTouch: sentDaysAgo(0) })).toBeNull();
+    expect(dueFollowUp({ sentAt: sentDaysAgo(8), now, done: [], lastWord: null, lastTouch: sentDaysAgo(7) })).toMatchObject({
+      step: 2,
+    });
     expect(followUpLine({ step: 1, day: 2, age: 3 })).toBe("First follow-up due · day 2, sent 3 days ago");
   });
 
