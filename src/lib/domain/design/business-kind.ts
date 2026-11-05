@@ -81,6 +81,7 @@ const COMMON_API = [
   "updates",
   "feedback",
   "weather",
+  "calendar",
   "marketplace-launch",
   "standards",
   "connections",

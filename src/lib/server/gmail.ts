@@ -39,14 +39,14 @@ const key = () =>
     .update(`renuabl-gmail:${process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? ""}`)
     .digest();
 
-function seal(text: string): string {
+export function seal(text: string): string {
   const iv = randomBytes(12);
   const c = createCipheriv("aes-256-gcm", key(), iv);
   const body = Buffer.concat([c.update(text, "utf8"), c.final()]);
   return [iv, c.getAuthTag(), body].map((b) => b.toString("base64url")).join(".");
 }
 
-function open(sealed: string): string | null {
+export function open(sealed: string): string | null {
   try {
     const [iv, tag, body] = sealed.split(".").map((s) => Buffer.from(s, "base64url"));
     const d = createDecipheriv("aes-256-gcm", key(), iv);

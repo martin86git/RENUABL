@@ -32,6 +32,7 @@ import type { ChatThread } from "@/lib/domain/design/chat";
 import { loadNotifications, loadWeather, markNotificationsRead, shortDate } from "@/lib/services/crm";
 import { lineTime, loadMessages } from "@/lib/services/chat";
 import { SignOut } from "./design-account";
+import { CONNECT_RESULTS, MyCalendar } from "./my-calendar";
 
 /**
  * The menus round the edges of every screen (31 Oct 2026, as Primero's; 3 Nov 2026, Martin: a quieter top right). Top
@@ -129,11 +130,14 @@ const SKY: Record<Sky, { icon: LucideIcon; words: string; tone: string }> = {
 /**
  * The date and the weather as one small tile (3 Nov 2026, Martin: less room, no time): a calendar leaf with the
  * weekday over the day of the month, and the temperature beside it with an icon for the sky (sun, cloud, rain…).
- * The full date, the sky and the place are in its title.
+ * The full date, the sky and the place are in its title. Pressed, it opens the member's own calendar over the page
+ * (5 Nov 2026, Martin; `MyCalendar`), or asks them to connect one.
  */
 export function DayWeather() {
   const [now, setNow] = useState<Date | null>(null);
   const [weather, setWeather] = useState<{ place: string; degrees: number | null; sky: Sky | null } | null>(null);
+  const [open, setOpen, box] = useWindow();
+  const [note, setNote] = useState<string | null>(null);
   useEffect(() => {
     // The day is only known once the page is in the browser.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -141,11 +145,20 @@ export function DayWeather() {
     const tick = window.setInterval(() => setNow(new Date()), 10 * 60_000);
     let gone = false;
     void loadWeather().then((res) => !gone && res.ok && setWeather({ place: res.place, degrees: res.degrees, sky: res.sky ?? null }));
+    // Back from connecting a calendar with Google: open it, say how it went, and tidy the address.
+    const url = new URL(window.location.href);
+    const came = url.searchParams.get("calendar");
+    if (came && came in CONNECT_RESULTS) {
+      setNote(CONNECT_RESULTS[came]);
+      setOpen(true);
+      url.searchParams.delete("calendar");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
     return () => {
       gone = true;
       window.clearInterval(tick);
     };
-  }, []);
+  }, [setOpen]);
   const part = (o: Intl.DateTimeFormatOptions) =>
     now ? new Intl.DateTimeFormat("en-AU", { timeZone: LAUNCH_MARKET.timeZone, ...o }).format(now) : "";
   const degrees = weather?.degrees ?? null;
@@ -157,20 +170,37 @@ export function DayWeather() {
     .filter(Boolean)
     .join(" · ");
   return (
-    <span className="flex items-center gap-1.5 pl-1 pr-1.5" title={title || undefined} role="img" aria-label={title || "Today"}>
-      <span className="flex w-8 flex-col items-center overflow-hidden rounded-md bg-surface ring-1 ring-line" aria-hidden>
-        <span className="w-full bg-sun-line text-center text-[8px] font-semibold uppercase leading-[11px] tracking-wider text-white">
-          {part({ weekday: "short" }) || " "}
+    <div className="relative" ref={box}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-label={`${title || "Today"}. Open your calendar`}
+        title={title || undefined}
+        className={clsx(
+          "flex items-center gap-1.5 rounded-full py-0.5 pl-1 pr-1.5 transition-colors",
+          open ? "bg-canvas" : "hover:bg-canvas",
+        )}
+      >
+        <span className="flex w-8 flex-col items-center overflow-hidden rounded-md bg-surface ring-1 ring-line" aria-hidden>
+          <span className="w-full bg-sun-line text-center text-[8px] font-semibold uppercase leading-[11px] tracking-wider text-white">
+            {part({ weekday: "short" }) || " "}
+          </span>
+          <span className="text-[13px] font-semibold leading-[19px] tabular-nums text-ink">{part({ day: "numeric" })}</span>
         </span>
-        <span className="text-[13px] font-semibold leading-[19px] tabular-nums text-ink">{part({ day: "numeric" })}</span>
-      </span>
-      {degrees !== null && (
-        <span className="flex items-center gap-1 text-[13px] tabular-nums text-ink-2" aria-hidden>
-          {sky && <sky.icon className={clsx("size-4", sky.tone)} strokeWidth={2} />}
-          {degrees}°
-        </span>
+        {degrees !== null && (
+          <span className="flex items-center gap-1 text-[13px] tabular-nums text-ink-2" aria-hidden>
+            {sky && <sky.icon className={clsx("size-4", sky.tone)} strokeWidth={2} />}
+            {degrees}°
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-12 z-50 rounded-3xl bg-surface p-4 shadow-2xl ring-1 ring-line">
+          <MyCalendar note={note} />
+        </div>
       )}
-    </span>
+    </div>
   );
 }
 
