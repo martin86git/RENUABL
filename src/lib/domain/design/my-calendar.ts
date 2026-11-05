@@ -167,6 +167,64 @@ export function eventTime(e: MyEvent, day: ISODate): string {
   return `${time(e.start)} – ${time(e.end)}`;
 }
 
+/** Minutes past the market's midnight an instant falls at. */
+export function marketMinutes(instant: string): number {
+  const parts = new Intl.DateTimeFormat("en-AU", { timeZone: LAUNCH_MARKET.timeZone, hour: "numeric", minute: "numeric", hourCycle: "h23" })
+    .formatToParts(new Date(instant))
+    .reduce<Record<string, string>>((o, p) => ({ ...o, [p.type]: p.value }), {});
+  return Number(parts.hour) * 60 + Number(parts.minute);
+}
+
+/** A timed event placed on the day view: minutes from midnight, and which of the side-by-side columns it takes. */
+export interface PlacedEvent {
+  event: MyEvent;
+  from: number;
+  to: number;
+  column: number;
+  columns: number;
+}
+
+/** The shortest an event is drawn, so a five-minute one can still be read and pressed. */
+export const MIN_BLOCK_MINUTES = 30;
+
+/**
+ * The day view's timed events (all-day ones go above it, `eventsOn`): each clipped to the day, laid in time order, and
+ * events that overlap set side by side, each group of overlapping events sharing the width between them.
+ */
+export function dayLayout(events: readonly MyEvent[], day: ISODate): PlacedEvent[] {
+  const timed = eventsOn(events, day)
+    .filter((e) => !e.allDay)
+    .map((event) => {
+      const { first, last } = daysOf(event);
+      const from = first < day ? 0 : marketMinutes(event.start);
+      const to = last > day ? 24 * 60 : Math.max(from, marketMinutes(event.end) || 24 * 60);
+      return { event, from, to: Math.min(24 * 60, Math.max(to, from + MIN_BLOCK_MINUTES)), column: 0, columns: 1 };
+    })
+    .sort((a, b) => a.from - b.from || b.to - a.to);
+  let group: PlacedEvent[] = [];
+  let ends: number[] = [];
+  const close = () => {
+    for (const p of group) p.columns = ends.length;
+    group = [];
+    ends = [];
+  };
+  for (const p of timed) {
+    if (group.length && p.from >= Math.max(...ends)) close();
+    const free = ends.findIndex((end) => end <= p.from);
+    p.column = free === -1 ? ends.length : free;
+    ends[p.column] = p.to;
+    group.push(p);
+  }
+  close();
+  return timed;
+}
+
+/** Where the day view first scrolls to: an hour before the first event, else 7am. */
+export function dayStartHour(placed: readonly PlacedEvent[]): number {
+  const first = placed[0]?.from;
+  return first === undefined ? 7 : Math.max(0, Math.min(7, Math.floor(first / 60) - 1));
+}
+
 /**
  * The instants to ask Google for, from the first to the last day on screen: a day wider either side, since the server
  * isn't in the market's time zone; `eventsOn` keeps each to its own days.
