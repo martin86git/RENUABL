@@ -4,6 +4,8 @@ import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
 import { loadTerrain } from "@/lib/services/terrain";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
+import { loadNearmapOutline } from "@/lib/services/nearmap";
+import { outlineNote } from "@/lib/domain/design/nearmap";
 import { MOUNT_STANDOFF, clearanceFor, laidAs, packFaces, reorient } from "@/lib/domain/design/pack";
 import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
@@ -769,6 +771,8 @@ export function RoofDesigner(props: {
   pictureMenu?: React.ReactNode;
   /** The picture under the design is Nearmap's: drawn straight down, so Google's roof model needs no shifting onto it. */
   nearmapPicture?: boolean;
+  /** When that Nearmap picture was captured, in words ("25 Apr 2026"), for the notes that name it. */
+  nearmapCaptured?: string | null;
   /** A site with no deal: what Publish opens instead (the way to put it on a deal), since a proposal needs a customer. */
   noDeal?: React.ReactNode;
   /** Who the note goes to, for the box's wording. */
@@ -2950,11 +2954,52 @@ export function RoofDesigner(props: {
   const googleModelInPlace = async (): Promise<{ model: RoofModel; offset?: { x: number; y: number } } | { note: string }> => {
     const [info, fit] = await Promise.all([loadRoofInfo(spot.lat, spot.lng), loadModelFit(spot.lat, spot.lng)]);
     if (!info.model) return { note: "There's no roof data for this address to work from. Trace the roof faces, then ask again." };
-    if (fit.kind === "mismatch") return { note: mismatchNote(info.imageryDate) };
+    if (fit.kind === "mismatch")
+      return { note: mismatchNote(info.imageryDate, props.nearmapPicture ? (props.nearmapCaptured ?? null) : undefined) };
     // On Nearmap's picture, taken straight down like the photo Google measured its model on, no shift is needed: the
     // shift is for Google's satellite picture, which leans. VERIFY on a real Nearmap roof.
     if (props.nearmapPicture) return { model: info.model };
     return { model: info.model, ...(fit.kind === "aligned" ? { offset: modelOffset(fit.shift, spot.lat) } : {}) };
+  };
+  /**
+   * Nearmap's roof outline in the capture on the picture, put down as a traced face (5 Nov 2026, Martin): for a roof
+   * Google's data is older than. Its pitch is the roof's set one; its slope isn't read from Google's heights, which are
+   * of the old roof. Answers the face, or why there is none.
+   */
+  const nearmapFace = async (): Promise<{ face: Face; captured: string | null } | { note: string }> => {
+    const got = await loadNearmapOutline(spot.lat, spot.lng);
+    if (!got.ok) return { note: got.message };
+    if (!got.points) return { note: "Nearmap drew no roof at this address in that capture. Trace the roof faces, then ask again." };
+    const made: Face = {
+      id: newId("f"),
+      points: got.points,
+      angle: 0,
+      landscape: false,
+      setback: 0.3,
+      facing: "N",
+      tilt: homePitch,
+      off: [],
+      plan: true,
+    };
+    return { face: { ...made, angle: angleOfLongestEdge(made) }, captured: got.captured };
+  };
+  /** The outline put on the picture for a person to check: picked, the pitch asked for when it isn't set. */
+  const putOutlineDown = (face: Face) => {
+    setFaces((list) => [...list, face]);
+    changed();
+    setSelected(face.id);
+    setPicks([]);
+    setTool("select");
+    if (homePitch !== 0) setPitchDue((due) => [...due, face.id]);
+  };
+  /** The right click's "Roof outline from Nearmap": the outline down, said in the command bar's reply. */
+  const outlineFromNearmap = async () => {
+    setToolMenu(null);
+    const got = await nearmapFace();
+    setCommandOpen(true);
+    if ("note" in got) return setCommandReply(got.note);
+    putOutlineDown(got.face);
+    setCommandReply(outlineNote(homePitch === 0, got.captured));
   };
   /**
    * "Design it for me": the roof designs itself for three outcomes, the fastest payback, the best return and the most
@@ -2966,19 +3011,32 @@ export function RoofDesigner(props: {
     setMine("busy");
     let model: RoofModel | null = null;
     let modelOffsetM: { x: number; y: number } | undefined;
+    let fromFaces = faces;
+    const notes: string[] = [];
     if (!faces.length) {
       const found = await googleModelInPlace();
       // Opened by itself with nothing to design from (Google's roof data missing or older than the photo): it says
       // nothing (3 Nov 2026, Martin: "we don't need the Google pop up"); pressed by a person, it says why.
-      if ("note" in found) return setMine(auto ? "idle" : { options: [], notes: [found.note], from: null });
-      model = found.model;
-      modelOffsetM = found.offset;
+      if ("note" in found && auto) return setMine("idle");
+      if ("note" in found) {
+        // On a Nearmap picture, the roof's outline in that capture stands in (laid on only when the roof is flat).
+        const outline = props.nearmapPicture ? await nearmapFace() : null;
+        if (!outline || "note" in outline)
+          return setMine({ options: [], notes: [found.note, ...(outline ? [outline.note] : [])], from: null });
+        putOutlineDown(outline.face);
+        if (homePitch !== 0) return setMine({ options: [], notes: [outlineNote(false, outline.captured)], from: null });
+        fromFaces = [outline.face];
+        notes.push(outlineNote(true, outline.captured));
+      } else {
+        model = found.model;
+        modelOffsetM = found.offset;
+      }
     }
     const amount = Number(bill.amount) || 0;
     const rate = Number(bill.rate) || 0;
     const result = selfDesign({
       centre: spot,
-      faces,
+      faces: fromFaces,
       model,
       ...(modelOffsetM ? { modelOffset: modelOffsetM } : {}),
       panel:
@@ -3004,7 +3062,7 @@ export function RoofDesigner(props: {
     });
     if (auto && !result.options.length) return setMine("idle");
     // Made by itself as the roof opened: said so on the card, to be checked against the photo.
-    setMine(auto ? { ...result, notes: [AUTO_DESIGNED, ...result.notes] } : result);
+    setMine(auto ? { ...result, notes: [AUTO_DESIGNED, ...result.notes] } : { ...result, notes: [...notes, ...result.notes] });
     setMineOpen(true);
     if (!result.options.length) return;
     const list = result.options.map((o) => o.design);
@@ -3183,7 +3241,22 @@ export function RoofDesigner(props: {
       };
     }
     const found = await googleModelInPlace();
-    if ("note" in found) return { words: found.note, laid: 0 };
+    if ("note" in found) {
+      // On a Nearmap picture, the roof's outline in that capture stands in: laid on when the roof is flat (a flat
+      // roof looks no way, so a direction asked for doesn't narrow it), else put down for its slopes to be traced.
+      const outline = props.nearmapPicture ? await nearmapFace() : null;
+      if (!outline || "note" in outline) return { words: [found.note, outline?.note].filter(Boolean).join(" "), laid: 0 };
+      putOutlineDown(outline.face);
+      if (homePitch !== 0) return { words: outlineNote(false, outline.captured), laid: 0 };
+      const packed = packFaces([outline.face], size, n, () => newId("p"));
+      setFaces((list) => list.map((fc) => (fc.id === outline.face.id ? (packed.faces[0] ?? fc) : fc)));
+      setLoose(packed.loose);
+      setStrings([]);
+      return {
+        words: `${outlineNote(true, outline.captured, packed.loose.length)} That's ${((packed.loose.length * watts) / 1000).toFixed(2)} kW${packed.loose.length < n ? ": only that many fit" : ""}.`,
+        laid: packed.loose.length,
+      };
+    }
     let laid = suggestPanels(found.model, spot, n, size, () => newId("p"), found.offset);
     if (facing) laid = laid.filter((p) => facesWay(facing, panelFacing(p)));
     if (!laid.length) return { words: "Nothing fits that way round on Google's roof data: trace the roof faces and ask again.", laid: 0 };
@@ -5165,6 +5238,20 @@ export function RoofDesigner(props: {
                           </button>
                         ));
                       })}
+                    {/* On a Nearmap picture: the roof's outline in that capture, put down as a face to check. */}
+                    {props.nearmapPicture && (
+                      <>
+                        <div className="mx-2 my-1 h-px bg-line" aria-hidden />
+                        <button
+                          role="menuitem"
+                          onClick={() => void outlineFromNearmap()}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left hover:bg-canvas"
+                        >
+                          <PenTool className="size-4 shrink-0" aria-hidden />
+                          Roof outline from Nearmap
+                        </button>
+                      </>
+                    )}
                   </div>
                 </>
               )}

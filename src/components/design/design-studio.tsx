@@ -35,6 +35,7 @@ import { DesignToolHome } from "./design-tool-home";
 import { DealNotes, ProposalSide, PutOnDeal } from "./designer-side";
 import { PictureMenu } from "./picture-menu";
 import { loadImagery, nearmapPictureHref, type RoofImagery } from "@/lib/services/nearmap";
+import { capturedWords } from "@/lib/domain/design/nearmap";
 import { RoofDesigner } from "./roof-designer";
 
 /** What a kilowatt of panels makes in a day, from the same sunshine record the designer's months use. */
@@ -119,6 +120,7 @@ export function DesignStudio() {
     };
   }, [roof, spot, business]);
   const roofImagery = imagery && imagery.spot === spot ? imagery.value : null;
+  const nearmapKept = roofImagery && roofImagery.use !== "google" ? roofImagery.kept.find((k) => k.survey === roofImagery.use) : undefined;
   // The picture's shape is part of its address, so a browser never shows one it kept from before the shape changed.
   const image = roof
     ? roofImagery && roofImagery.use !== "google"
@@ -298,6 +300,7 @@ export function DesignStudio() {
             ) : undefined
           }
           nearmapPicture={Boolean(roofImagery && roofImagery.use !== "google")}
+          nearmapCaptured={nearmapKept?.captured ? capturedWords(nearmapKept.captured) : null}
           noDeal={
             signedIn && !onJob ? (
               <PutOnDeal

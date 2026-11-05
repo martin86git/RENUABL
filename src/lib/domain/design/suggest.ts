@@ -271,11 +271,23 @@ export function imageryWhen(date: string | null | undefined): string | null {
   return `${MONTHS[Number(m[2]) - 1]} ${m[1]}`;
 }
 
-/** Why panels aren't placed from Google's model when its photo of the roof doesn't match today's. */
-export function mismatchNote(date: string | null | undefined): string {
+/**
+ * Why panels aren't placed from Google's model when its photo of the roof doesn't match today's. On a Nearmap picture
+ * (`nearmap`: when it was captured, in words, or null) it says where the roof faces come from: Google's measurements,
+ * since Nearmap gives the photo only.
+ */
+export function mismatchNote(date: string | null | undefined, nearmap?: string | null): string {
   const when = imageryWhen(date);
+  const trace = "Trace the roof faces on the picture and ask again: panels are laid on what you trace.";
+  if (nearmap !== undefined) {
+    return (
+      `The roof faces and pitches come from Google's measurements${when ? ` (${when})` : ""}, not Nearmap, which gives the photo only. ` +
+      `That roof doesn't match the roof today, so they can't be laid on this Nearmap photo${nearmap ? ` (${nearmap})` : ""}. ` +
+      trace
+    );
+  }
   return (
     `Google's roof data${when ? ` (photographed ${when})` : ""} doesn't line up with today's photo, so the roof may have changed since. ` +
-    "Trace the roof faces on the picture and ask again: panels are laid on what you trace."
+    trace
   );
 }

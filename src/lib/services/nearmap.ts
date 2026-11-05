@@ -40,3 +40,6 @@ export const chooseImagery = (lat: number, lng: number, use: string) =>
   call<RoofImagery>("/api/design/roof/nearmap", json("PUT", { lat, lng, use }));
 export const nearmapPictureHref = (lat: number, lng: number, survey: string) =>
   `/api/design/roof/nearmap/picture?${at(lat, lng)}&survey=${encodeURIComponent(survey)}`;
+/** The home's roof outline in the Nearmap capture in use, in the designer's frame (points null: none drawn there). */
+export const loadNearmapOutline = (lat: number, lng: number) =>
+  call<{ points: { x: number; y: number }[] | null; captured: string | null }>(`/api/design/roof/nearmap/outline?${at(lat, lng)}`);

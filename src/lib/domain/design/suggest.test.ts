@@ -148,6 +148,13 @@ describe("Google's model against today's photo", () => {
     expect(mismatchNote("2018-12")).toMatch(/photographed December 2018.*Trace the roof faces/);
     expect(mismatchNote(null)).not.toMatch(/photographed/);
   });
+
+  it("on a Nearmap picture, says the roof faces come from Google, not Nearmap", () => {
+    const note = mismatchNote("2018-12", "25 Apr 2026");
+    expect(note).toMatch(/Google's measurements \(December 2018\), not Nearmap, which gives the photo only/);
+    expect(note).toMatch(/this Nearmap photo \(25 Apr 2026\)\. Trace the roof faces/);
+    expect(mismatchNote(null, null)).not.toMatch(/\(/);
+  });
 });
 
 describe("a hip roof cut into many small faces (3 Bill Place)", () => {

@@ -1107,6 +1107,8 @@ alter table voice_calls add column if not exists job_id text;
 alter table voice_calls add column if not exists customer_id text;
 alter table voice_calls add column if not exists mode text not null default 'lead';
 alter table voice_calls add column if not exists asked boolean not null default false;
+-- Nearmap's roof outline in that capture (domain/design/nearmap.ts, homeOutline), kept so it is asked for once: [] none.
+alter table design_nearmap add column if not exists outline jsonb;
 drop index if exists voice_calls_one_open;
 create unique index if not exists voice_calls_one_open_job on voice_calls(business_id, job_id) where status in ('waiting', 'calling');
 create index if not exists voice_calls_vapi on voice_calls(vapi_call_id);

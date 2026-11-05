@@ -13,6 +13,7 @@
  * roof: the test of whether a bigger package is needed for designing by itself.
  */
 import sharp from "sharp";
+import type { LngLatRing } from "@/lib/domain/design/nearmap";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
 
 const nearmapKey = () => process.env.NEARMAP_API_KEY?.trim() || null;
@@ -124,4 +125,55 @@ export async function nearmapPicture(lat: number, lng: number, survey?: string):
     .composite(pieces.filter((p): p is NonNullable<typeof p> => p !== null))
     .jpeg({ quality: 88 })
     .toBuffer();
+}
+
+/**
+ * The roof outlines Nearmap's AI features drew in one capture (by its date, else the newest) round a point: each roof's
+ * outer ring as [lng, lat] pairs. One AI features call over a small box (about 35 m across), which uses the plan's AI
+ * credits, so the designer keeps the answer with the capture (design-nearmap-repo.ts). Null when not set up or not reached.
+ */
+export async function nearmapRoofOutlines(lat: number, lng: number, captured?: string | null): Promise<LngLatRing[] | null> {
+  const key = nearmapKey();
+  if (!key) return null;
+  const d = 0.00016;
+  const box = [
+    [lng - d, lat - d],
+    [lng + d, lat - d],
+    [lng + d, lat + d],
+    [lng - d, lat + d],
+    [lng - d, lat - d],
+  ]
+    .map((p) => p.map((n) => n.toFixed(6)).join(","))
+    .join(",");
+  const day = captured && /^\d{4}-\d{2}-\d{2}$/.test(captured) ? `&since=${captured}&until=${captured}` : "";
+  try {
+    const res = await fetch(`https://api.nearmap.com/ai/features/v4/features.json?polygon=${box}${day}&apikey=${encodeURIComponent(key)}`, {
+      signal: AbortSignal.timeout(15_000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { features?: { description?: string; geometry?: { type?: string; coordinates?: unknown } }[] };
+    const rings: LngLatRing[] = [];
+    for (const f of json.features ?? []) {
+      if (f.description !== "Roof" || !f.geometry) continue;
+      const polys =
+        f.geometry.type === "Polygon"
+          ? [f.geometry.coordinates]
+          : f.geometry.type === "MultiPolygon"
+            ? (f.geometry.coordinates as unknown[])
+            : [];
+      for (const poly of polys) {
+        const outer = Array.isArray(poly) ? poly[0] : null;
+        if (!Array.isArray(outer)) continue;
+        const ring = outer.filter((p): p is [number, number] => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])) as [
+          number,
+          number,
+        ][];
+        if (ring.length >= 4) rings.push(ring);
+      }
+    }
+    return rings;
+  } catch {
+    return null;
+  }
 }

@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-05",
+    area: "Design tool",
+    words:
+      "On a Nearmap picture, the roof's outline can go down as a face to check (right-click the picture), with panels laid on a flat roof.",
+  },
+  {
+    day: "2026-11-05",
     area: "Email",
     words:
       "Opening an email marks it read in Gmail, and you can archive it or mark it unread here. Connected before today? Connect it again once.",

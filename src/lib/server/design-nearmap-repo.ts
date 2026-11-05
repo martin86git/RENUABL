@@ -3,7 +3,9 @@
  * and which picture each roof uses ("google" or a capture's survey). Business id first, from the signed-in member.
  */
 import { query } from "./db";
-import { nearmapPicture, nearmapSurveys } from "./nearmap";
+import { homeOutline } from "@/lib/domain/design/nearmap";
+import type { Point } from "@/lib/domain/design/roof-design";
+import { nearmapPicture, nearmapRoofOutlines, nearmapSurveys } from "./nearmap";
 
 /** A roof's place, to six decimals, as its key. */
 export const spotOf = (lat: number, lng: number) => `${lat.toFixed(6)},${lng.toFixed(6)}`;
@@ -91,4 +93,35 @@ export async function keptPicture(businessId: string, lat: number, lng: number, 
     survey,
   ]);
   return rows[0]?.bytes ?? null;
+}
+
+/**
+ * The home's roof outline in the Nearmap capture this roof uses (domain/design/nearmap.ts `homeOutline`), in the
+ * designer's frame: asked of Nearmap once a capture and kept with it. "google" when Google's picture is in use (the
+ * outline must match the photo it is drawn on); "unreached" when Nearmap couldn't be asked.
+ */
+export async function nearmapOutline(
+  businessId: string,
+  place: { lat: number; lng: number },
+): Promise<{ points: Point[] | null; captured: string | null } | "google" | "unreached"> {
+  const spot = spotOf(place.lat, place.lng);
+  const imagery = await roofImagery(businessId, place.lat, place.lng);
+  if (imagery.use === "google") return "google";
+  const rows = await query<{ captured: string | null; outline: Point[] | null }>(
+    `select captured, outline from design_nearmap where business_id = $1 and spot = $2 and survey = $3`,
+    [businessId, spot, imagery.use],
+  );
+  const row = rows[0];
+  if (!row) return "google";
+  if (row.outline) return { points: row.outline.length ? row.outline : null, captured: row.captured };
+  const rings = await nearmapRoofOutlines(place.lat, place.lng, row.captured);
+  if (!rings) return "unreached";
+  const points = homeOutline(rings, place);
+  await query(`update design_nearmap set outline = $4 where business_id = $1 and spot = $2 and survey = $3`, [
+    businessId,
+    spot,
+    imagery.use,
+    JSON.stringify(points ?? []),
+  ]);
+  return { points, captured: row.captured };
 }
