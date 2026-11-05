@@ -43,7 +43,8 @@ import { ACTIVITY_WORD, StageTag } from "./design-home";
 import { DealChat } from "./chat-panel";
 import { DealService } from "./design-service";
 import { useDesignAccount } from "./design-account";
-import { ContactActions, DealEmail, DesignDrawer, SectionFieldLine } from "./deal-tools";
+import { ContactActions, DealEmail, SectionFieldLine } from "./deal-tools";
+import { DesignDrawer } from "./design-drawer";
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
 import { DealFiles, DealPulseBadges } from "./deal-pulse";
@@ -347,11 +348,14 @@ export function DealPage({ id }: { id: string }) {
     >
       {job.lat !== null && (
         <DesignDrawer
-          jobId={job.id}
+          src={`${PATHS.designer}?job=${encodeURIComponent(job.id)}`}
           open={drawer}
           onOpen={() => setDrawer(true)}
           onFold={() => setDrawer(false)}
           onSaved={() => void load()}
+          // This deal is already underneath; anywhere else goes there.
+          onGo={(href) => !href.startsWith(`${PATHS.deals}/${job.id}`) && router.push(href)}
+          back="Back to the deal"
         />
       )}
       {/* Folded: a tab down the left that brings the deal's column back. */}

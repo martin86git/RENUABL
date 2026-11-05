@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { ArrowRight, Check, Flame, MapPin, PenTool, Plus, Search, Sun, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { goUnderneath, inDrawer, openDesigner } from "./design-drawer";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AddressEntry } from "@/components/consumer/address-entry";
 import { inLaunchMarket, outsideMarketMessage, type AddressSuggestion } from "@/lib/domain/address";
@@ -230,7 +231,12 @@ function FindBar({
     }
     onPick(address);
   };
-  const openDeal = (j: JobLine) => router.push(j.lat !== null ? designHref(j.id) : `/design/deals/${encodeURIComponent(j.id)}`);
+  const openDeal = (j: JobLine) => {
+    if (j.lat !== null) return openDesigner(designHref(j.id), router);
+    const deal = `/design/deals/${encodeURIComponent(j.id)}`;
+    if (inDrawer()) goUnderneath(deal);
+    else router.push(deal);
+  };
   const open = asked.length >= 2;
   return (
     <div className="relative">

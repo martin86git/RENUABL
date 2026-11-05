@@ -32,6 +32,7 @@ import { useChatWaiting } from "./chat-panel";
 import { sendReply, unreadChanged } from "@/lib/services/chat";
 import { DesignKeptNote, DesignRoofList, useDesignAccount } from "./design-account";
 import { DesignToolHome } from "./design-tool-home";
+import { goUnderneath, inDrawer, openDesigner } from "./design-drawer";
 import { DealNotes, ProposalSide, PutOnDeal } from "./designer-side";
 import { PictureMenu } from "./picture-menu";
 import { loadImagery, nearmapPictureHref, type RoofImagery } from "@/lib/services/nearmap";
@@ -227,6 +228,12 @@ export function DesignStudio() {
     tellDeal({ unsaved: value });
   }, []);
 
+  /** From the design home, a roof slides over it in the design drawer (the home stays underneath). */
+  const openOver = (next: DesignRoof) =>
+    openDesigner(`/design/roof?at=${next.lat.toFixed(6)},${next.lng.toFixed(6)}&address=${encodeURIComponent(next.address)}`, router, () =>
+      open(next),
+    );
+
   const pick = (address: Address) => {
     if (typeof address.lat !== "number" || typeof address.lng !== "number")
       return setProblem(
@@ -235,11 +242,13 @@ export function DesignStudio() {
     if (unsaved.current && !window.confirm("This design has changes that aren't saved. Open the other address and lose them?")) return;
     unsaved.current = false;
     setProblem(null);
-    open({
+    const next = {
       address: [address.line, address.suburb, address.state, address.postcode].filter(Boolean).join(", "),
       lat: address.lat,
       lng: address.lng,
-    });
+    };
+    if (roof || jobId) open(next);
+    else openOver(next);
   };
 
   // The job only counts while its own roof is the one open.
@@ -370,12 +379,13 @@ export function DesignStudio() {
                 Design home
               </Link>
               {onJob && (
-                // The customer's name opens their deal (1 Nov 2026, Martin, as Primero's): in the deal's own drawer it folds the
-                // designer away to show the deal underneath; on its own it goes to the deal.
+                // The customer's name opens their deal (1 Nov 2026, Martin, as Primero's): inside the design drawer the deal shows on the
+                // page underneath (the drawer folds); on its own it goes to the deal.
                 <button
                   type="button"
                   onClick={() => {
-                    if (window.parent !== window) return tellDeal({ fold: true });
+                    // In the design drawer, the deal shows on the page underneath.
+                    if (inDrawer()) return goUnderneath(`/design/deals/${onJob.id}`);
                     if (unsaved.current && !window.confirm("This design has changes that aren't saved. Leave it and lose them?")) return;
                     router.push(`/design/deals/${onJob.id}`);
                   }}
@@ -427,7 +437,7 @@ export function DesignStudio() {
             )}
           </div>
         )}
-        {ready && <DesignToolHome onPick={pick} onOpen={open} />}
+        {ready && <DesignToolHome onPick={pick} onOpen={openOver} />}
       </div>
     );
 

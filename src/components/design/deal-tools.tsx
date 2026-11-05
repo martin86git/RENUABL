@@ -1,121 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink, Mail, PenTool, Send, X } from "lucide-react";
+import { Mail, Send } from "lucide-react";
 import clsx from "clsx";
 import type { Activity, Customer, Job } from "@/lib/domain/design/crm";
 import { DEAL_EMAIL_TEMPLATES, MAX_BODY, MAX_SUBJECT, fillTemplate, senderName } from "@/lib/domain/design/deal-email";
 import type { SectionLine } from "@/lib/domain/design/deal-sections";
 import { dealEmailStatus, emailDeal } from "@/lib/services/crm";
-import { PATHS, ui } from "./design-shell";
+import { ui } from "./design-shell";
 import { DRAFT_KEY } from "@/lib/services/sol";
 import { EmailFileChips, EmailFormatBar, listKey, useEmailFiles } from "./email-compose";
-
-/**
- * The design tool as a drawer over the deal (Martin: not a new page; back and forth between the design and the deal's
- * notes). It covers the page but for a strip on the left, slides out of sight when folded and back with its tab, and
- * stays as it was while folded: the designer is the real page in a frame, kept loaded once opened. When the design is
- * saved or published the deal is told (`onSaved`) so its system details fill in from it there and then.
- */
-export function DesignDrawer(props: { jobId: string; open: boolean; onOpen: () => void; onFold: () => void; onSaved: () => void }) {
-  const { jobId, open, onOpen, onFold, onSaved } = props;
-  // Loaded the first time it is opened, then kept: folding it never loses the work.
-  const [loaded, setLoaded] = useState(false);
-  const [unsaved, setUnsaved] = useState(false);
-  const saved = useRef(onSaved);
-  const fold = useRef(onFold);
-  useEffect(() => {
-    saved.current = onSaved;
-    fold.current = onFold;
-  }, [onSaved, onFold]);
-  useEffect(() => {
-    // Opening it is what loads it; from then on it stays.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (open) setLoaded(true);
-  }, [open]);
-  useEffect(() => {
-    const hear = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return;
-      const news = (e.data as { renuablDesign?: { saved?: boolean; unsaved?: boolean; fold?: boolean } } | null)?.renuablDesign;
-      if (!news) return;
-      // The customer's name in the designer: the deal underneath is shown.
-      if (news.fold) fold.current();
-      if (typeof news.unsaved === "boolean") setUnsaved(news.unsaved);
-      if (news.saved) {
-        setUnsaved(false);
-        saved.current();
-      }
-    };
-    window.addEventListener("message", hear);
-    return () => window.removeEventListener("message", hear);
-  }, []);
-  useEffect(() => {
-    if (!open) return;
-    // The page under it doesn't scroll while the design is out; Escape folds it away.
-    const before = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const key = (e: KeyboardEvent) => e.key === "Escape" && onFold();
-    window.addEventListener("keydown", key);
-    return () => {
-      document.body.style.overflow = before;
-      window.removeEventListener("keydown", key);
-    };
-  }, [open, onFold]);
-  useEffect(() => {
-    if (!unsaved) return;
-    const stay = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", stay);
-    return () => window.removeEventListener("beforeunload", stay);
-  }, [unsaved]);
-
-  const src = `${PATHS.designer}?job=${encodeURIComponent(jobId)}&embed=1`;
-  if (!loaded) return null;
-  return (
-    <>
-      <div
-        className={clsx("fixed inset-0 z-[59] bg-ink/25 transition-opacity", open ? "opacity-100" : "pointer-events-none opacity-0")}
-        onClick={onFold}
-        aria-hidden
-      />
-      <section
-        aria-label="Design"
-        aria-hidden={!open}
-        className={clsx(
-          "fixed inset-y-0 left-12 right-0 z-[60] flex flex-col bg-canvas shadow-[-12px_0_40px_rgba(0,0,0,0.18)] transition-transform duration-300 sm:left-16",
-          open ? "translate-x-0" : "translate-x-full",
-        )}
-      >
-        {/* The tab on the drawer's edge: folds it away, and when folded stays at the window's edge to bring it back. */}
-        <button
-          type="button"
-          onClick={open ? onFold : onOpen}
-          className={clsx(
-            "absolute right-full top-1/2 flex -translate-y-1/2 flex-col items-center gap-2 rounded-l-lg border border-r-0 border-line bg-surface px-1.5 py-3 text-[12px] font-medium text-ink shadow-[-4px_0_12px_rgba(0,0,0,0.08)] hover:bg-surface-2",
-          )}
-          aria-label={open ? "Fold the design away" : "Bring the design back"}
-        >
-          <PenTool className="size-4" aria-hidden />
-          <span className="[writing-mode:vertical-rl]">{open ? "Back to the deal" : "Design"}</span>
-          {unsaved && <span className="size-2 rounded-full bg-sun-line" title="Not saved yet" />}
-        </button>
-        <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4">
-          <p className="text-sm font-medium text-ink">
-            Design {unsaved && <span className="ml-2 text-xs font-normal text-sun-ink">Not saved yet</span>}
-          </p>
-          <div className="flex items-center gap-1">
-            <a href={src.replace("&embed=1", "")} target="_blank" rel="noreferrer" className={clsx(ui.quiet, "h-8 text-xs")}>
-              <ExternalLink className="size-3.5" aria-hidden /> Own tab
-            </a>
-            <button type="button" onClick={onFold} className={clsx(ui.quiet, "h-8 text-xs")} aria-label="Fold the design away">
-              <X className="size-4" aria-hidden />
-            </button>
-          </div>
-        </div>
-        <iframe src={src} title="Design tool" className="min-h-0 w-full flex-1 border-0" />
-      </section>
-    </>
-  );
-}
 
 /**
  * Emailing the customer from their deal: to their address, a ready-written start to change (`DEAL_EMAIL_TEMPLATES`),

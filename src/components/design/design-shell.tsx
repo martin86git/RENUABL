@@ -36,6 +36,7 @@ import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail } from "./sol-dock";
+import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { TeamChatButton } from "./team-chat";
 import { DayWeather, NotificationsMenu, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
 
@@ -170,7 +171,7 @@ function Shell({
   children,
   compact: tool,
   needsAccount,
-  bare,
+  bare: bareAsked,
 }: {
   children: React.ReactNode;
   compact?: boolean;
@@ -179,6 +180,8 @@ function Shell({
   bare?: boolean;
 }) {
   const [account] = useDesignAccount();
+  // Inside the design drawer's frame every page is bare, wherever the designer goes within it.
+  const bare = useInDrawer() || bareAsked;
   const on = Boolean(account?.signedIn && account.business);
   // What kind of business this login is (business-kind.ts): an installer or inspector has part of the product, and
   // nothing of the CRM is asked for.
@@ -286,7 +289,13 @@ function Shell({
       </div>
     );
   }
-  if (bare) return <div className="theme-studio min-h-dvh">{children}</div>;
+  if (bare)
+    return (
+      <div className="theme-studio min-h-dvh">
+        <DrawerFrameLinks />
+        {children}
+      </div>
+    );
 
   if (away) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   const here = pageAt(path, kind);
@@ -296,6 +305,8 @@ function Shell({
 
   return (
     <div className="theme-studio studio-frame min-h-dvh pb-24 lg:pb-0">
+      {/* The design tool slides over whatever page this is, never a page of its own. */}
+      <ShellDesignDrawer />
       {/* The owner viewing as someone else: whose view it is, that nothing can be changed, and the way back. */}
       {account.viewedBy && (
         <div className="sticky top-0 z-[45] flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-sun-line px-4 py-2 text-center text-sm text-white print:hidden">
