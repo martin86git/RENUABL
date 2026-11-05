@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PIXEL_GIF, cleanOpens, isOpenToken, openPixel, openedWords, withOpen, withPixel } from "./email-opens";
+import { PIXEL_GIF, cleanOpens, isOpenToken, mailMark, mailMarkWords, openPixel, openedWords, withOpen, withPixel } from "./email-opens";
 
 const zone = "Australia/Melbourne";
 
@@ -29,5 +29,30 @@ describe("email open tracking", () => {
 
   it("serves a real GIF", () => {
     expect(String.fromCharCode(...PIXEL_GIF.slice(0, 6))).toBe("GIF89a");
+  });
+});
+
+describe("mailMark", () => {
+  it("is nothing until an email has gone", () => {
+    expect(mailMark([])).toBeNull();
+  });
+  it("reads the latest email: how many went, when, and whether it was opened", () => {
+    const mark = mailMark([
+      { sentAt: "2026-11-01T01:00:00Z", opens: ["2026-11-01T02:00:00Z"] },
+      { sentAt: "2026-11-04T01:00:00Z", opens: [] },
+    ]);
+    expect(mark).toEqual({ sent: 2, lastSent: "2026-11-04T01:00:00Z", opened: false, lastOpened: null });
+  });
+  it("takes the latest open of the latest email", () => {
+    const mark = mailMark([{ sentAt: "2026-11-04T01:00:00Z", opens: ["2026-11-04T05:00:00Z", "2026-11-04T03:00:00Z"] }]);
+    expect(mark?.opened).toBe(true);
+    expect(mark?.lastOpened).toBe("2026-11-04T05:00:00Z");
+  });
+  it("says it in words", () => {
+    const now = new Date("2026-11-05T04:00:00Z");
+    const sentToday = { sent: 1, lastSent: "2026-11-05T01:00:00Z", opened: true, lastOpened: "2026-11-05T03:15:00Z" };
+    expect(mailMarkWords(sentToday, "Australia/Melbourne", now)).toBe("Email sent today · opened today at 2:15 pm");
+    const older = { sent: 3, lastSent: "2026-11-02T22:00:00Z", opened: false, lastOpened: null };
+    expect(mailMarkWords(older, "Australia/Melbourne", now)).toBe("3 emails sent, the latest on Tue, 3 Nov · not opened yet");
   });
 });

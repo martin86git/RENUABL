@@ -7,7 +7,7 @@
 import { OPEN_STAGES } from "@/lib/domain/design/crm";
 import type { DealViewer } from "@/lib/domain/design/account";
 import { boardPriority, dealClock, dealHeat, rankPulses, type DealPulse } from "@/lib/domain/design/deal-heat";
-import { cleanOpens, withOpen } from "@/lib/domain/design/email-opens";
+import { cleanOpens, mailMark, withOpen, type MailMark } from "@/lib/domain/design/email-opens";
 import { TEAM_FILE_TYPES, teamFileName } from "@/lib/domain/design/team-chat";
 import { query, randomToken } from "./db";
 import { jobById, listJobs } from "./design-crm-repo";
@@ -45,6 +45,24 @@ export async function opensForJob(businessId: string, jobId: string, viewer?: De
     [businessId, jobId],
   );
   return Object.fromEntries(rows.filter((r) => r.activity).map((r) => [r.activity as string, cleanOpens(r.opens)]));
+}
+
+/** Every deal this member may see that an email has gone from, with the mark for its pipeline card (`mailMark`). */
+export async function mailMarks(businessId: string, viewer?: DealViewer): Promise<Record<string, MailMark>> {
+  const ids = (await listJobs(businessId, viewer)).map((j) => j.id);
+  if (!ids.length) return {};
+  const rows = await query<{ job: string; sent: string; opens: unknown }>(
+    `select job_id as job, ${moment("sent_at")} as sent, opens from design_email_opens where business_id = $1 and job_id = any($2)`,
+    [businessId, ids],
+  );
+  const byJob = new Map<string, { sentAt: string; opens: string[] }[]>();
+  for (const r of rows) byJob.set(r.job, [...(byJob.get(r.job) ?? []), { sentAt: r.sent, opens: cleanOpens(r.opens) }]);
+  const out: Record<string, MailMark> = {};
+  for (const [job, emails] of byJob) {
+    const mark = mailMark(emails);
+    if (mark) out[job] = mark;
+  }
+  return out;
 }
 
 // ── Pulses ──────────────────────────────────────────────────────────────────────────────────────────────────────

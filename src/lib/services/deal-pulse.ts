@@ -3,9 +3,12 @@
  * when its emails were opened, and the files kept on it.
  */
 import type { DealPulse } from "@/lib/domain/design/deal-heat";
+import type { MailMark } from "@/lib/domain/design/email-opens";
 import { ask, type Answer } from "./crm";
 
 export const loadPulses = () => ask<{ pulses: Record<string, DealPulse> }>("/api/design/pulse");
+/** Each deal's mail mark (emails sent from it, and whether the latest was opened), for the pipeline cards. */
+export const loadMailMarks = () => ask<{ marks: Record<string, MailMark> }>("/api/design/mail-marks");
 export const loadOpens = (jobId: string) => ask<{ opens: Record<string, string[]> }>(`/api/design/jobs/${encodeURIComponent(jobId)}/opens`);
 
 export interface DealFile {

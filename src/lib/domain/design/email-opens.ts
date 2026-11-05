@@ -55,3 +55,40 @@ export function openedWords(opens: readonly string[], timeZone: string, now = ne
 
 /** A see-through 1×1 GIF. */
 export const PIXEL_GIF = Uint8Array.from(atob("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"), (c) => c.charCodeAt(0));
+
+/**
+ * A deal's emails at a glance, for the mail mark on a pipeline card (5 Nov 2026, Martin: Sol does the reaching out,
+ * so the board shows at a glance that an email went and whether it was opened): how many went, when the latest went,
+ * and whether that latest one has been opened. Null when none has gone.
+ */
+export interface MailMark {
+  sent: number;
+  lastSent: string;
+  opened: boolean;
+  /** The latest open of the latest email. */
+  lastOpened: string | null;
+}
+
+export function mailMark(emails: readonly { sentAt: string; opens: readonly string[] }[]): MailMark | null {
+  const sent = emails.filter((e) => !Number.isNaN(Date.parse(e.sentAt)));
+  if (!sent.length) return null;
+  const latest = sent.reduce((a, b) => (Date.parse(b.sentAt) > Date.parse(a.sentAt) ? b : a));
+  const opens = [...latest.opens].sort((a, b) => Date.parse(a) - Date.parse(b));
+  return { sent: sent.length, lastSent: latest.sentAt, opened: opens.length > 0, lastOpened: opens.at(-1) ?? null };
+}
+
+/** The mark in words, for its title: "Email sent today · opened today at 3:15 pm", "3 emails sent, the latest on Tue, 3 Nov · not opened yet". */
+export function mailMarkWords(mark: MailMark, timeZone: string, now = new Date()): string {
+  const day = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone }).format(d);
+  const sentAt = new Date(mark.lastSent);
+  const yesterday = new Date(now.getTime() - 86_400_000);
+  const when =
+    day(sentAt) === day(now)
+      ? "today"
+      : day(sentAt) === day(yesterday)
+        ? "yesterday"
+        : `on ${new Intl.DateTimeFormat("en-AU", { timeZone, weekday: "short", day: "numeric", month: "short" }).format(sentAt)}`;
+  const sent = mark.sent === 1 ? `Email sent ${when}` : `${mark.sent} emails sent, the latest ${when}`;
+  const opened = mark.lastOpened ? openedWords([mark.lastOpened], timeZone, now).replace(/^Opened/, "opened") : "not opened yet";
+  return `${sent} · ${opened}`;
+}

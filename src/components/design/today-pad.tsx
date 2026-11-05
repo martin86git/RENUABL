@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowUp, CalendarDays, ChevronLeft, ChevronRight, HardHat, KanbanSquare, Mail, Phone, Sun } from "lucide-react";
+import { ArrowUp, CalendarDays, ChevronLeft, ChevronRight, Eye, HardHat, KanbanSquare, Mail, Phone, Sun } from "lucide-react";
 import { LAUNCH_MARKET, greeting } from "@/lib/domain/market";
 import { nextHeadline, type NextItem } from "@/lib/domain/design/next-up";
 import {
@@ -20,10 +20,12 @@ import {
   type TodayTab,
 } from "@/lib/domain/design/today-pad";
 import type { Activity } from "@/lib/domain/design/crm";
+import { mailMarkWords, type MailMark } from "@/lib/domain/design/email-opens";
 import type { SolReminder } from "@/lib/domain/design/sol";
 import type { SolDesignShown } from "@/lib/domain/design/sol-designs";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
+import { loadMailMarks } from "@/lib/services/deal-pulse";
 import { SOL_CHANGED, SOL_TOGGLE, askSol, loadSol } from "@/lib/services/sol";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
@@ -807,9 +809,45 @@ function CalendarView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate 
   );
 }
 
+/**
+ * The mail mark on a pipeline card (5 Nov 2026, Martin: Sol and his helpers do the reaching out, so the board shows it
+ * at a glance): an envelope once an email has gone from the deal, and an eye on its corner, like a notification, once
+ * the latest has been opened. The words are in its title. An open is a mail app loading pictures, a guide, not proof.
+ */
+function MailBadge({ mark }: { mark: MailMark }) {
+  const words = mailMarkWords(mark, LAUNCH_MARKET.timeZone);
+  return (
+    <span
+      className="absolute right-2 top-2 inline-flex size-6 items-center justify-center rounded-full bg-canvas text-ink-2"
+      title={words}
+      role="img"
+      aria-label={words}
+    >
+      <Mail className="size-3.5" aria-hidden />
+      {mark.opened && (
+        <span
+          className="absolute -right-1 -top-1 inline-flex size-3.5 items-center justify-center rounded-full bg-sun-line text-white ring-2 ring-surface"
+          aria-hidden
+        >
+          <Eye className="size-2.5" strokeWidth={2.5} />
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** The deals being sold as a board, or the numbers. */
 function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
   const [numbers, setNumbers] = useState(false);
+  // Which deals an email has gone from, and whether the latest was opened (Sol and the team's emails alike).
+  const [marks, setMarks] = useState<Record<string, MailMark> | null>(null);
+  useEffect(() => {
+    let gone = false;
+    void loadMailMarks().then((r) => !gone && r.ok && setMarks(r.marks));
+    return () => {
+      gone = true;
+    };
+  }, []);
   const pill = (on: boolean) =>
     clsx("rounded-full px-3 py-1 text-[13px] transition", on ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink");
   return (
@@ -844,9 +882,12 @@ function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate 
                     <li key={j.id}>
                       <Link
                         href={`${PATHS.deals}/${j.id}`}
-                        className="block rounded-xl bg-surface px-3 py-2 ring-1 ring-line hover:ring-sun-line"
+                        className="relative block rounded-xl bg-surface px-3 py-2 ring-1 ring-line hover:ring-sun-line"
                       >
-                        <span className="block truncate text-[13px] font-medium text-ink">{j.customerName}</span>
+                        {marks?.[j.id] && <MailBadge mark={marks[j.id]} />}
+                        <span className={clsx("block truncate text-[13px] font-medium text-ink", marks?.[j.id] && "pr-7")}>
+                          {j.customerName}
+                        </span>
                         <span className="block truncate text-[12px] text-ink-2">
                           {[j.title, j.value ? dollars(j.value) : null, j.kw ? `${j.kw} kW` : null].filter(Boolean).join(" · ")}
                         </span>
