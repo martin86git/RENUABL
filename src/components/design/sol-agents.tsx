@@ -9,8 +9,17 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import clsx from "clsx";
-import { Hand, Pause, Play, Send, X } from "lucide-react";
-import { AGENTS, chipWords, countdownWords, windowsWords, type AgentSettings, type AgentStage } from "@/lib/domain/design/sol-agents";
+import { Hand, Send, X } from "lucide-react";
+import {
+  AGENTS,
+  SEND_HOURS,
+  agentOn,
+  chipWords,
+  countdownWords,
+  type AgentSettings,
+  type AgentStage,
+  type SendHours,
+} from "@/lib/domain/design/sol-agents";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { actOnOutbox, editOutbox, loadOutbox, saveAgentSettings, type Outbox, type OutboxEntry } from "@/lib/services/sol-agents";
 import { PATHS } from "./design-shell";
@@ -43,15 +52,13 @@ export function entryFor(box: Outbox | null, jobId: string): OutboxEntry | undef
   return box?.entries.find((e) => e.jobId === jobId);
 }
 
-const pausedFor = (s: AgentSettings, stage: AgentStage) => s.pausedAll || s.paused.includes(stage);
-
 /** The round in a column's header: Sol at work on that stage, with how many emails he has lined up. */
 export function AgentRound({ stage, box, onOpen }: { stage: AgentStage; box: Outbox | null; onOpen: () => void }) {
   const agent = AGENTS[stage];
   const lined = box?.entries.filter((e) => e.stage === stage).length ?? 0;
   const waiting = box?.needsYou.filter((n) => n.stage === stage).length ?? 0;
-  const paused = box ? pausedFor(box.settings, stage) : false;
-  const label = `${agent.name}: ${paused ? "paused" : agent.working ? `${lined} lined up` : "coming soon"}${waiting ? `, ${waiting} need you` : ""}`;
+  const on = box ? agentOn(box.settings, stage) : false;
+  const label = `${agent.name}: ${agent.working ? `${on ? "on" : "off"}, ${lined} lined up` : "coming soon"}${waiting ? `, ${waiting} need you` : ""}`;
   return (
     <button
       type="button"
@@ -64,11 +71,8 @@ export function AgentRound({ stage, box, onOpen }: { stage: AgentStage; box: Out
       )}
     >
       <SolBadge className="size-4" />
-      {paused ? (
-        <span className="absolute -bottom-1 -right-1 inline-flex size-3.5 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line">
-          <Pause className="size-2" strokeWidth={3} aria-hidden />
-        </span>
-      ) : waiting > 0 ? (
+      {on && <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-positive ring-2 ring-surface" aria-hidden />}
+      {waiting > 0 ? (
         <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-danger px-1 text-[10px] font-semibold leading-4 text-white tabular-nums">
           {waiting}
         </span>
@@ -104,13 +108,6 @@ export function OutboxChip({ entry, needsYou, now }: { entry?: OutboxEntry; need
   );
 }
 
-const WINDOW_CHOICES: { label: string; windows: string[] }[] = [
-  { label: "10 am and 2 pm", windows: ["10:00", "14:00"] },
-  { label: "9 am", windows: ["09:00"] },
-  { label: "11 am", windows: ["11:00"] },
-  { label: "9 am, 12 pm and 3 pm", windows: ["09:00", "12:00", "15:00"] },
-];
-
 /** One email lined up: who, when, the words to read, and what can be done. */
 function Lined({ entry, now, onDone }: { entry: OutboxEntry; now: Date; onDone: (message?: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -134,9 +131,7 @@ function Lined({ entry, now, onDone }: { entry: OutboxEntry; now: Date; onDone: 
         ? "Waiting for you to send"
         : entry.state === "held"
           ? "Held: Sol won't send it"
-          : entry.state === "paused"
-            ? "Paused"
-            : "No email on file";
+          : "No email on file";
   return (
     <li className="rounded-2xl bg-canvas p-3 ring-1 ring-line">
       <button
@@ -271,7 +266,7 @@ export function AgentCard({
   const lined = box.entries.filter((e) => e.stage === stage);
   const needs = box.needsYou.filter((n) => n.stage === stage);
   const sent = box.sent.filter((x) => x.stage === stage);
-  const paused = pausedFor(s, stage);
+  const on = agentOn(s, stage);
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -291,16 +286,6 @@ export function AgentCard({
     void reload();
   };
 
-  const status = !box.canSend
-    ? "Email isn't set up on this site, so nothing can be sent yet."
-    : paused
-      ? s.pausedAll
-        ? "Every agent is paused. Nothing goes until you start them again."
-        : "Paused. Nothing goes from this stage until you start it again."
-      : s.sending
-        ? `Sends at ${windowsWords(s.windows)} on working days. Each email waits at least half an hour for you to read it.`
-        : "Drafts wait for you to send. Sending on his own is off.";
-
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-20" onClick={onClose}>
       <div
@@ -316,30 +301,57 @@ export function AgentCard({
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-semibold text-ink">{agent.name}</p>
-            <p className="text-[13px] text-ink-2">{agent.job}</p>
+            <p className="text-[13px] text-ink-2">{agent.what}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="tap-area rounded-full p-1 text-muted hover:text-ink">
             <X className="size-4" />
           </button>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-canvas px-3 py-2.5">
-          <p className="text-[12px] text-ink-2">{status}</p>
-          {agent.working && !s.pausedAll && (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => save({ ...s, paused: paused ? s.paused.filter((p) => p !== stage) : [...s.paused, stage] })}
-              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-[12px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
-            >
-              {paused ? <Play className="size-3" aria-hidden /> : <Pause className="size-3" aria-hidden />}
-              {paused ? "Start" : "Pause"}
-            </button>
+        {/* What it does, and whether Sol does it himself (5 Nov 2026, Martin: what it is, what it does, on or off). */}
+        <section className="mt-4 rounded-2xl bg-canvas p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">What it does</h3>
+              <p className="mt-1 text-[14px] text-ink">{agent.job}</p>
+            </div>
+            <Switch
+              on={on}
+              label={`${agent.name} ${on ? "on" : "off"}`}
+              disabled={!agent.working || !box.owner || saving}
+              onChange={(next) => save({ ...s, on: next ? [...s.on, stage] : s.on.filter((x) => x !== stage) })}
+            />
+          </div>
+          <p className="mt-3 text-[12px] text-ink-2">
+            {!agent.working
+              ? agent.soon
+              : on
+                ? `On: Sol sends these himself in ${SEND_HOURS[s.hours].label.toLowerCase()}. Each shows its countdown, so you can stop or change it first.`
+                : "Off: Sol writes them, and they wait for you to press send."}
+          </p>
+          {agent.working && !box.owner && <p className="mt-1 text-[11px] text-muted">Only the owner can switch Sol on or off.</p>}
+          {agent.working && !box.canSend && (
+            <p className="mt-1 text-[11px] text-muted">Email isn&apos;t set up on this site yet, so nothing can be sent.</p>
           )}
-        </div>
+          {agent.working && (
+            <label className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3 text-[13px] text-ink">
+              <span>When he sends</span>
+              <select
+                value={s.hours}
+                disabled={saving}
+                onChange={(e) => void save({ ...s, hours: e.target.value as SendHours })}
+                className="rounded-full bg-surface px-3 py-1 text-[13px] text-ink ring-1 ring-line"
+              >
+                {(Object.keys(SEND_HOURS) as SendHours[]).map((h) => (
+                  <option key={h} value={h}>
+                    {SEND_HOURS[h].label} ({SEND_HOURS[h].words})
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </section>
         {note && <p className="mt-2 text-[12px] text-ink-2">{note}</p>}
-
-        {!agent.working && <p className="mt-4 text-[13px] text-ink-2">{agent.soon}</p>}
 
         {needs.length > 0 && (
           <section className="mt-5">
@@ -395,56 +407,31 @@ export function AgentCard({
             </ul>
           </section>
         )}
-
-        <section className="mt-6 space-y-3 border-t border-line pt-4">
-          <label className="flex items-center justify-between gap-3 text-[13px] text-ink">
-            <span>
-              Let Sol send at the windows
-              <span className="block text-[11px] text-muted">
-                {!box.owner
-                  ? "Only the owner can change this."
-                  : s.sending
-                    ? "On: each email goes at its window unless someone holds it."
-                    : "Off: every draft waits for someone to press send."}
-              </span>
-            </span>
-            <input
-              type="checkbox"
-              checked={s.sending}
-              disabled={!box.owner || saving}
-              onChange={(e) => save({ ...s, sending: e.target.checked })}
-              className="size-4 accent-[var(--sun-line)]"
-            />
-          </label>
-          <label className="flex items-center justify-between gap-3 text-[13px] text-ink">
-            <span>Send windows</span>
-            <select
-              value={WINDOW_CHOICES.find((c) => c.windows.join() === s.windows.join())?.label ?? ""}
-              disabled={saving}
-              onChange={(e) => {
-                const c = WINDOW_CHOICES.find((x) => x.label === e.target.value);
-                if (c) void save({ ...s, windows: c.windows });
-              }}
-              className="rounded-full bg-canvas px-3 py-1 text-[13px] text-ink ring-1 ring-line"
-            >
-              {!WINDOW_CHOICES.some((c) => c.windows.join() === s.windows.join()) && <option value="">{windowsWords(s.windows)}</option>}
-              {WINDOW_CHOICES.map((c) => (
-                <option key={c.label}>{c.label}</option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => save({ ...s, pausedAll: !s.pausedAll })}
-            className="inline-flex items-center gap-1.5 text-[12px] font-medium text-ink-2 hover:text-ink"
-          >
-            {s.pausedAll ? <Play className="size-3" aria-hidden /> : <Pause className="size-3" aria-hidden />}
-            {s.pausedAll ? "Start every agent again" : "Pause every agent"}
-          </button>
-        </section>
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** An on and off switch. */
+function Switch({ on, label, disabled, onChange }: { on: boolean; label: string; disabled?: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!on)}
+      className={clsx(
+        "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors disabled:opacity-50",
+        on ? "bg-positive" : "bg-line",
+      )}
+    >
+      <span
+        className={clsx("inline-block size-5 rounded-full bg-white shadow transition-transform", on ? "translate-x-6" : "translate-x-1")}
+      />
+      <span className="sr-only">{on ? "On" : "Off"}</span>
+    </button>
   );
 }

@@ -4,10 +4,9 @@ import { fireDue, sendingBusinesses } from "@/lib/server/design-sol-agents";
 export const maxDuration = 300;
 
 /**
- * Vercel cron (vercel.json): Sol's outbox at the default send windows, so his emails go even when nobody has RENUABL
- * open (domain/design/sol-agents.ts). Vercel's crons run in UTC, so "0 0" is 11 am in summer and 10 am in winter in
- * Melbourne, and "0 4" is 3 pm and 2 pm: each inside `SEND_GRACE_MINUTES` of the 10 am and 2 pm windows all year.
- * Only businesses whose owner switched sending on; `fireDue` keeps every other rule (held, paused, stage, grace).
+ * Vercel cron (vercel.json): Sol's outbox every hour, so his emails go in business hours even when nobody has RENUABL
+ * open (domain/design/sol-agents.ts). Only businesses with an agent on; `fireDue` keeps every other rule (inside the
+ * hours, held, stage).
  * Vercel sends CRON_SECRET as a bearer token; without it set, the route does nothing.
  */
 export async function GET(request: Request) {

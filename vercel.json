@@ -8,11 +8,7 @@
     },
     {
       "path": "/api/cron/sol-outbox",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/sol-outbox",
-      "schedule": "0 4 * * *"
+      "schedule": "0 * * * *"
     }
   ]
 }

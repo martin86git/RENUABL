@@ -2,8 +2,8 @@
  * Server only. Sol's sales agents (domain/design/sol-agents.ts): the outbox behind the pipeline's stage agents, under
  * the designer's tenant rule (business id first, from the signed-in member only). The outbox is Ready for you
  * (design-prepared.ts) given a stage and a time to go; a business's settings are kept in `design_sol_agents`. Sol sends
- * an email himself only when the business has switched sending on, its window has come, it isn't held or paused, and
- * the deal is still at the stage his agent works: it then goes as the deal's own email does (RENUABL's sender in the
+ * an email himself only when that stage's agent is on, its time has come inside the business's hours, it isn't held,
+ * and the deal is still at the stage his agent works: it then goes as the deal's own email does (RENUABL's sender in the
  * business's name, replies to the business, written on the deal's record by "sol", its opens tracked, the follow-up
  * marked done). The item is claimed before it is sent, so two readers can't send it twice.
  */
@@ -15,6 +15,7 @@ import {
   sendAt,
   outboxState,
   shouldFire,
+  withinHours,
   type AgentSettings,
   type AgentStage,
   type OutboxState,
@@ -94,13 +95,13 @@ const entryOf = (item: Held, stage: JobStage | undefined, settings: AgentSetting
     ...item,
     stage: agent,
     held,
-    firesAt: sendAt(item.createdAt, settings.windows, now),
+    firesAt: sendAt(item.createdAt, settings.hours, now),
     // With no email service on the site nothing can go, so nothing counts down.
     state: outboxState({
       stage: agent,
       held,
       hasEmail: EMAIL.test(item.to),
-      settings: emailProvider() ? settings : { ...settings, sending: false },
+      settings: emailProvider() ? settings : { ...settings, on: [] },
     }),
   };
 };
@@ -233,13 +234,13 @@ export async function sendOutboxItem(
 }
 
 /**
- * What Sol sends himself now: every ready item whose window has come, while sending is on, nothing is paused and the
+ * What Sol sends himself now: every ready item whose time has come inside the hours, while its agent is on and the
  * deal is still at a stage whose agent works (today Proposals). Called when the outbox or Ready for you is read, and
- * from the daily cron.
+ * from the hourly cron.
  */
 export async function fireDue(business: { id: string; name: string }, now = new Date()): Promise<number> {
   const settings = await agentSettings(business.id);
-  if (!settings.sending || settings.pausedAll || !emailProvider()) return 0;
+  if (!settings.on.length || !emailProvider()) return 0;
   const rows = await query<{ id: string; item: Held; createdAt: string; stage: JobStage }>(
     `select p.id, p.item, ${moment("p.created_at")} as "createdAt", j.stage
        from design_prepared p join design_jobs j on j.business_id = p.business_id and j.id = p.job_id
@@ -250,16 +251,18 @@ export async function fireDue(business: { id: string; name: string }, now = new 
   for (const r of rows) {
     const entry = entryOf({ ...r.item, id: r.id, createdAt: r.item.createdAt ?? r.createdAt }, r.stage, settings, now);
     if (!entry.stage || !AGENTS[entry.stage].working) continue;
-    if (!shouldFire(entry.state, entry.firesAt, now)) continue;
+    if (!shouldFire(entry.state, entry.firesAt, now) || !withinHours(now, settings.hours)) continue;
     if ((await sendOutboxItem(business, r.id, SOL_SENDER)) === "sent") sent++;
   }
   return sent;
 }
 
-/** Every business that has switched sending on (for the daily cron). */
+/** Every business with an agent on (for the hourly cron); older settings had one switch, `sending`. */
 export async function sendingBusinesses(): Promise<{ id: string; name: string }[]> {
   return query(
-    `select b.id, b.name from design_sol_agents a join businesses b on b.id = a.business_id where a.settings->>'sending' = 'true'`,
+    `select b.id, b.name from design_sol_agents a join businesses b on b.id = a.business_id
+      where jsonb_array_length(case when jsonb_typeof(a.settings->'on') = 'array' then a.settings->'on' else '[]'::jsonb end) > 0
+         or a.settings->>'sending' = 'true'`,
   );
 }
 

@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * PUT { settings }: the send windows and pauses (anyone who may publish), and whether Sol sends on his own (the owner
+ * PUT { settings }: the hours Sol sends in (anyone who may publish), and which agents send on their own (the owner
  * only: it decides what goes to customers in the business's name).
  */
 export async function PUT(request: Request) {
@@ -41,8 +41,8 @@ export async function PUT(request: Request) {
     if ("refuse" in read) return read.refuse;
     const asked = cleanAgentSettings(read.body.settings);
     const now = await agentSettings(who.member.businessId);
-    if (asked.sending !== now.sending && who.member.role !== "owner")
-      return fail("Only the business's owner can let Sol send on his own.", 403);
+    if (asked.on.join() !== now.on.join() && who.member.role !== "owner")
+      return fail("Only the business's owner can switch Sol on or off.", 403);
     const settings = await saveAgentSettings(who.member.businessId, asked, who.member.email);
     return Response.json({ ok: true, settings });
   });
