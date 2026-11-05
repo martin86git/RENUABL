@@ -14,6 +14,46 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-06",
+    area: "Sol",
+    words: "Try another answer under Sol's latest reply, and ask him to take you to a page, a deal or a design.",
+  },
+  {
+    day: "2026-11-06",
+    area: "Sol",
+    words: "Sol's draft emails are changed and sent from his card, with Cc, also on a deal's Email tab.",
+  },
+  {
+    day: "2026-11-06",
+    area: "Deals",
+    words: "Email opens count only the customer's, and each email says how many times it was opened.",
+  },
+  {
+    day: "2026-11-06",
+    area: "Messages",
+    words: "In a customer's chat, copy or reply to a message, tell Sol what to write, and keep your own unread count.",
+  },
+  {
+    day: "2026-11-06",
+    area: "Design tool",
+    words: "Unsaved designs are kept as a draft and open where you left off; star products to keep them at the top.",
+  },
+  {
+    day: "2026-11-06",
+    area: "Design tool",
+    words: "Add an EV charger from your price lists to a design, and the kit is drawn smaller on the roof.",
+  },
+  {
+    day: "2026-11-06",
+    area: "Team chat",
+    words: "Ask @Sol to move an install, add to an order or mark a stage, and he answers with a Yes or No card.",
+  },
+  {
+    day: "2026-11-06",
+    area: "Today",
+    words: "To action has coloured pills, a customer search and Work through; the top bar makes room on narrow windows.",
+  },
+  {
     day: "2026-11-05",
     area: "Proposals",
     words:
