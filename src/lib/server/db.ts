@@ -165,51 +165,6 @@ create table if not exists briefs (
 alter table briefs add column if not exists call_slot text;
 alter table briefs add column if not exists hubspot_id text;
 alter table briefs add column if not exists unfinished_noted_at timestamptz;
--- The assistant's phone calls on a CRM deal (server/voice-calls.ts, Vapi): one row a run of calls on a deal (a new
--- lead, or a customer who asked to be called about their proposal), and one event a call ended or a tool used. What
--- happened is also written on the deal's own record. Never HubSpot.
-create table if not exists voice_calls (
-  id text primary key,
-  business_id text references businesses(id) on delete cascade,
-  job_id text,
-  customer_id text,
-  mode text not null default 'lead',
-  asked boolean not null default false,
-  first_name text,
-  mobile text not null,
-  email text,
-  lead jsonb not null default '{}',
-  status text not null default 'waiting',
-  attempts integer not null default 0,
-  vapi_call_id text,
-  outcome text,
-  call_label text,
-  stop_reason text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-alter table voice_calls add column if not exists business_id text references businesses(id) on delete cascade;
-alter table voice_calls add column if not exists job_id text;
-alter table voice_calls add column if not exists customer_id text;
-alter table voice_calls add column if not exists mode text not null default 'lead';
-alter table voice_calls add column if not exists asked boolean not null default false;
-drop index if exists voice_calls_one_open;
-create unique index if not exists voice_calls_one_open_job on voice_calls(business_id, job_id) where status in ('waiting', 'calling');
-create index if not exists voice_calls_vapi on voice_calls(vapi_call_id);
-create index if not exists voice_calls_mobile on voice_calls(mobile, status);
-create table if not exists voice_call_events (
-  id text primary key,
-  voice_call_id text not null references voice_calls(id) on delete cascade,
-  attempt integer not null,
-  kind text not null,
-  outcome text,
-  ended_reason text,
-  summary text,
-  transcript text,
-  vapi_call_id text,
-  at timestamptz not null default now()
-);
-create index if not exists voice_call_events_call on voice_call_events(voice_call_id, at);
 -- The roof designer's own customers: businesses and the people in them. Not RENUABL's installation partners.
 -- Every table below carries business_id, and every query on it filters by it (server/design-repo.ts).
 create table if not exists businesses (
@@ -296,48 +251,6 @@ create table if not exists design_connections (
   unique (a_business, b_business)
 );
 create index if not exists design_connections_b on design_connections(b_business);
--- Jobs a retailer sends to a connected installer (domain/design/job-shares.ts): one live a job at a time, opened in
--- the installer's login through the job card's own installer link (token, installer id "biz:<business>").
-create table if not exists design_job_shares (
-  id text primary key,
-  business_id text not null references businesses(id) on delete cascade,
-  job_id text not null,
-  installer_business text not null references businesses(id) on delete cascade,
-  token text not null,
-  state text not null default 'sent',
-  suburb text not null default '',
-  system text not null default '',
-  sent_by text not null,
-  sent_at timestamptz not null default now(),
-  answered_at timestamptz,
-  answered_by text,
-  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
-);
-create unique index if not exists design_job_shares_live on design_job_shares(business_id, job_id) where state in ('sent','accepted');
-create index if not exists design_job_shares_installer on design_job_shares(installer_business, state);
--- Inspections an installer nominates on a job it accepted (domain/design/inspections.ts): one live a job, opened by the
--- inspector read only while the job's share is accepted and each pair is connected; the certificate kept here.
-create table if not exists design_inspections (
-  id text primary key,
-  business_id text not null references businesses(id) on delete cascade,
-  job_id text not null,
-  share_id text not null references design_job_shares(id) on delete cascade,
-  installer_business text not null references businesses(id) on delete cascade,
-  inspector_business text not null references businesses(id) on delete cascade,
-  state text not null default 'nominated',
-  inspect_on date,
-  notes text not null default '',
-  cert_name text,
-  cert_type text,
-  cert_bytes bytea,
-  nominated_by text not null,
-  nominated_at timestamptz not null default now(),
-  updated_by text,
-  updated_at timestamptz not null default now(),
-  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
-);
-create unique index if not exists design_inspections_live on design_inspections(business_id, job_id) where state not in ('declined','withdrawn');
-create index if not exists design_inspections_inspector on design_inspections(inspector_business, state);
 -- When Sol last started an automatic check of a job's photos (server/design-photo-check.ts): one at a time a job.
 create table if not exists design_photo_claims (
   business_id text not null references businesses(id) on delete cascade,
@@ -1164,6 +1077,94 @@ create table if not exists sessions (
   expires_at timestamptz not null,
   created_at timestamptz not null default now()
 );
+-- The assistant's phone calls on a CRM deal (server/voice-calls.ts, Vapi): one row a run of calls on a deal (a new Kept after the businesses table it points at, so a new database is made in order.
+-- lead, or a customer who asked to be called about their proposal), and one event a call ended or a tool used. What
+-- happened is also written on the deal's own record. Never HubSpot.
+create table if not exists voice_calls (
+  id text primary key,
+  business_id text references businesses(id) on delete cascade,
+  job_id text,
+  customer_id text,
+  mode text not null default 'lead',
+  asked boolean not null default false,
+  first_name text,
+  mobile text not null,
+  email text,
+  lead jsonb not null default '{}',
+  status text not null default 'waiting',
+  attempts integer not null default 0,
+  vapi_call_id text,
+  outcome text,
+  call_label text,
+  stop_reason text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table voice_calls add column if not exists business_id text references businesses(id) on delete cascade;
+alter table voice_calls add column if not exists job_id text;
+alter table voice_calls add column if not exists customer_id text;
+alter table voice_calls add column if not exists mode text not null default 'lead';
+alter table voice_calls add column if not exists asked boolean not null default false;
+drop index if exists voice_calls_one_open;
+create unique index if not exists voice_calls_one_open_job on voice_calls(business_id, job_id) where status in ('waiting', 'calling');
+create index if not exists voice_calls_vapi on voice_calls(vapi_call_id);
+create index if not exists voice_calls_mobile on voice_calls(mobile, status);
+create table if not exists voice_call_events (
+  id text primary key,
+  voice_call_id text not null references voice_calls(id) on delete cascade,
+  attempt integer not null,
+  kind text not null,
+  outcome text,
+  ended_reason text,
+  summary text,
+  transcript text,
+  vapi_call_id text,
+  at timestamptz not null default now()
+);
+create index if not exists voice_call_events_call on voice_call_events(voice_call_id, at);
+-- (Kept after design_jobs, which both point at, so a new database is made in order.)
+-- Jobs a retailer sends to a connected installer (domain/design/job-shares.ts): one live a job at a time, opened in
+-- the installer's login through the job card's own installer link (token, installer id "biz:<business>").
+create table if not exists design_job_shares (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  installer_business text not null references businesses(id) on delete cascade,
+  token text not null,
+  state text not null default 'sent',
+  suburb text not null default '',
+  system text not null default '',
+  sent_by text not null,
+  sent_at timestamptz not null default now(),
+  answered_at timestamptz,
+  answered_by text,
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create unique index if not exists design_job_shares_live on design_job_shares(business_id, job_id) where state in ('sent','accepted');
+create index if not exists design_job_shares_installer on design_job_shares(installer_business, state);
+-- Inspections an installer nominates on a job it accepted (domain/design/inspections.ts): one live a job, opened by the
+-- inspector read only while the job's share is accepted and each pair is connected; the certificate kept here.
+create table if not exists design_inspections (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  share_id text not null references design_job_shares(id) on delete cascade,
+  installer_business text not null references businesses(id) on delete cascade,
+  inspector_business text not null references businesses(id) on delete cascade,
+  state text not null default 'nominated',
+  inspect_on date,
+  notes text not null default '',
+  cert_name text,
+  cert_type text,
+  cert_bytes bytea,
+  nominated_by text not null,
+  nominated_at timestamptz not null default now(),
+  updated_by text,
+  updated_at timestamptz not null default now(),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create unique index if not exists design_inspections_live on design_inspections(business_id, job_id) where state not in ('declined','withdrawn');
+create index if not exists design_inspections_inspector on design_inspections(inspector_business, state);
 `;
 
 async function ensureSchema() {
