@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { ArrowUp, CalendarDays, ChevronLeft, ChevronRight, Eye, HardHat, KanbanSquare, Mail, Phone, Sun } from "lucide-react";
 import { LAUNCH_MARKET, greeting } from "@/lib/domain/market";
 import { nextHeadline, type NextItem } from "@/lib/domain/design/next-up";
+import { WELCOME_TOUR } from "@/lib/domain/design/welcome";
 import { agentFor, type AgentStage } from "@/lib/domain/design/sol-agents";
 import {
   TODAY_TABS,
@@ -32,7 +33,8 @@ import { SOL_CHANGED, SOL_TOGGLE, askSol, loadSol } from "@/lib/services/sol";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { InboxPage } from "./inbox";
-import { NewLook } from "./new-look";
+import { NewLook, Spotlight } from "./new-look";
+import { Welcome } from "./today-welcome";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
 import { SolBadge, SolIcon, SolMark, SolStars } from "./sol-icon";
 import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
@@ -96,8 +98,19 @@ export function TodayPad(props: {
   problem: string | null;
   /** The day's list with the sun (the corner's view). */
   day: React.ReactNode;
+  /** The welcome is still to be shown (welcome.ts): Sol types it in place of the greeting. */
+  welcome?: boolean;
+  /** The owner: the welcome asks them to add the team. */
+  owner?: boolean;
 }) {
   const [tab, setTab] = useState<TodayTab | "day">("today");
+  const [welcoming, setWelcoming] = useState(Boolean(props.welcome));
+  // The welcome's tour, run once the greeting is back on the page so every place it lights is there.
+  const [touring, setTouring] = useState(false);
+  const tour = () => {
+    setWelcoming(false);
+    window.setTimeout(() => setTouring(true), 80);
+  };
   // Gmail's own unread count on the Inbox tab (none until a mailbox is connected).
   const [unread, setUnread] = useState(0);
   useEffect(() => {
@@ -218,13 +231,25 @@ export function TodayPad(props: {
       )}
 
       <div className={clsx("mt-8 flex flex-1 flex-col", tab !== "today" && "hidden")}>
-        <div className="mx-auto w-full max-w-3xl">
-          <NewLook name={props.name} />
-        </div>
+        {welcoming && (
+          <Welcome
+            firstName={props.name}
+            business={props.business}
+            owner={Boolean(props.owner)}
+            onDone={() => setWelcoming(false)}
+            onTour={tour}
+          />
+        )}
+        {!welcoming && (
+          <div className="mx-auto w-full max-w-3xl">
+            <NewLook name={props.name} />
+          </div>
+        )}
         {/* The greeting, in the middle of the screen until the conversation starts, then folded away. */}
         <div
           className={clsx(
             "flex flex-col justify-center transition-[flex-grow,opacity] duration-500 ease-out",
+            welcoming && "hidden",
             talking ? "grow-0 opacity-0" : "grow opacity-100",
           )}
           aria-hidden={talking}
@@ -292,6 +317,8 @@ export function TodayPad(props: {
         </div>
       )}
 
+      {touring && <Spotlight steps={WELCOME_TOUR} onEnd={() => setTouring(false)} />}
+
       {(talking || tab !== "today") && (
         <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-60% to-transparent pb-5 pt-10 print:hidden">
           <div className="mx-auto max-w-3xl">
@@ -358,18 +385,20 @@ function Hello(props: {
         {props.name ? `, ${props.name}` : ""}.
       </h1>
       <p className="mt-3 text-[15px] text-ink-2">{props.count === null ? "Looking at your day…" : nextHeadline(props.count, hourNow())}</p>
-      <button
-        type="button"
-        onClick={props.onDay}
-        className="group mt-7 inline-flex h-12 items-center gap-2.5 rounded-full bg-primary pl-2 pr-5 text-[15px] font-medium text-primary-ink shadow-[0_6px_20px_rgb(20_22_26_/_0.18)] transition hover:shadow-[0_6px_24px_rgb(255_90_31_/_0.35)]"
-      >
-        <span className="inline-flex size-8 items-center justify-center rounded-full bg-white/10">
-          <SolBadge className="size-5 transition-transform duration-300 group-hover:scale-110" />
-        </span>
-        Show me my day
-      </button>
-      <div className="mt-8 w-full">
-        <SolBox onAsk={props.onAsk} asking={props.asking} />
+      <div data-tour="today-sol" className="flex w-full flex-col items-center">
+        <button
+          type="button"
+          onClick={props.onDay}
+          className="group mt-7 inline-flex h-12 items-center gap-2.5 rounded-full bg-primary pl-2 pr-5 text-[15px] font-medium text-primary-ink shadow-[0_6px_20px_rgb(20_22_26_/_0.18)] transition hover:shadow-[0_6px_24px_rgb(255_90_31_/_0.35)]"
+        >
+          <span className="inline-flex size-8 items-center justify-center rounded-full bg-white/10">
+            <SolBadge className="size-5 transition-transform duration-300 group-hover:scale-110" />
+          </span>
+          Show me my day
+        </button>
+        <div className="mt-8 w-full">
+          <SolBox onAsk={props.onAsk} asking={props.asking} />
+        </div>
       </div>
     </div>
   );

@@ -34,6 +34,8 @@ export type DesignAccount =
       firstName?: string;
       /** About you is still to be given (profile.ts). */
       needsProfile?: boolean;
+      /** The welcome on Today is still to be shown (welcome.ts). */
+      welcome?: boolean;
       /** RENUABL staff (Settings → View as), and the sample business kind they are looking through. */
       staff?: boolean;
       staffViewing?: "retailer" | "installer" | "inspector";
@@ -130,6 +132,11 @@ export async function saveProfile(o: { firstName: string; lastName: string; mobi
   if (!res.ok) return res.message ?? UNREACHABLE;
   await designAccount(true);
   return null;
+}
+
+/** The welcome on Today is done (finished or skipped): it isn't shown again. */
+export async function finishWelcome(): Promise<void> {
+  await send<Answer>("/api/design/onboarding", "POST", {});
 }
 
 /** The owner renames the business. Null when done. */

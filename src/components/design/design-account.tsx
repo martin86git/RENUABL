@@ -94,42 +94,115 @@ export function SignOut({ className }: { className?: string }) {
 }
 
 /**
- * The step between signing in and using an account: someone new names their
- * business; everyone accepts the terms with a box that is never ticked for
- * them. Until this is done nothing of theirs is kept on the server.
+ * The step between signing in and using an account, as one form (5 Nov 2026, Martin: the company belongs in the same
+ * form as the name and phone): your first and last name, the company (someone new names their business; an owner
+ * whose business is already named can change it), a mobile and a password if they like, what the business does (a new
+ * one only), and the terms with a box never ticked for them (anyone who hasn't accepted them yet). Shown until all of
+ * it is given: a new business, someone added who hasn't joined, or anyone with no name kept yet (About you,
+ * profile.ts). Nothing of theirs is kept on the server until the business is set up.
  */
 function SetUp({ account, onDone }: { account: Extract<DesignAccount, { signedIn: true }>; onDone: () => void }) {
   const naming = account.state === "no-business";
-  const [name, setName] = useState("");
+  const joining = account.state === "needs-terms";
+  const owner = account.business?.role === "owner";
+  const [first, setFirst] = useState("");
+  const [last, setLast] = useState("");
+  const [company, setCompany] = useState(account.business?.name ?? "");
+  const [mobile, setMobile] = useState("");
+  const [password, setPasswordText] = useState("");
   // What kind of business (business-kind.ts): a retailer has everything; an installer or inspector joins free.
   const [kind, setKind] = useState<BusinessKind>("retailer");
   const [terms, setTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const companyShown = naming || owner;
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!terms) return setProblem(BUSINESS_TERMS_MISSING);
+    if (!first.trim() || !last.trim()) return setProblem(PROFILE_WORDS.missingName);
+    if (companyShown && !company.trim()) return setProblem(PROFILE_WORDS.missingCompany);
+    if ((naming || joining) && !terms) return setProblem(BUSINESS_TERMS_MISSING);
     setBusy(true);
-    const failed = await setUpBusiness({ ...(naming ? { name, kind } : {}), terms });
+    setProblem(null);
+    const failed =
+      (naming || joining ? await setUpBusiness({ ...(naming ? { name: company, kind } : {}), terms }) : null) ??
+      (!naming && owner && company.trim() !== (account.business?.name ?? "") ? await renameBusiness(company) : null) ??
+      (await saveProfile({ firstName: first, lastName: last, mobile, password }));
     setBusy(false);
     if (failed) return setProblem(failed);
     onDone();
   };
   return (
     <Frame>
-      <p className={eyebrow}>Roof designer</p>
+      <p className={eyebrow}>RENUABL</p>
       <h1 className="mt-3 text-[30px] leading-tight tracking-tight text-ink">
-        {naming ? "Set up your business." : `Join ${account.business?.name ?? "your business"}.`}
+        {naming ? "Set up your account." : joining ? `Join ${account.business?.name ?? "your business"}.` : PROFILE_WORDS.title}
       </h1>
       <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
-        {naming
-          ? "Your roofs, price lists and settings will be kept for your business, on any device you sign in on. You can add the people you work with afterwards."
-          : "You've been added to this business. Its roofs, price lists and settings are shared with everyone in it."}
+        {naming ? PROFILE_WORDS.newIntro : joining ? PROFILE_WORDS.joinIntro : PROFILE_WORDS.intro}
       </p>
       <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm font-medium text-ink">
+            First name
+            <input
+              className={`${input} mt-1.5`}
+              value={first}
+              onChange={(e) => setFirst(e.target.value)}
+              maxLength={NAME_MAX}
+              autoComplete="given-name"
+              autoFocus
+            />
+          </label>
+          <label className="block text-sm font-medium text-ink">
+            Last name
+            <input
+              className={`${input} mt-1.5`}
+              value={last}
+              onChange={(e) => setLast(e.target.value)}
+              maxLength={NAME_MAX}
+              autoComplete="family-name"
+            />
+          </label>
+        </div>
+        {companyShown && (
+          <label className="block text-sm font-medium text-ink">
+            Company name
+            <input
+              className={`${input} mt-1.5`}
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              maxLength={80}
+              autoComplete="organization"
+              placeholder="e.g. Example Solar"
+            />
+          </label>
+        )}
+        <label className="block text-sm font-medium text-ink">
+          Mobile (optional)
+          <input
+            className={`${input} mt-1.5`}
+            value={mobile}
+            onChange={(e) => setMobile(e.target.value)}
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="04XX XXX XXX"
+          />
+        </label>
+        <label className="block text-sm font-medium text-ink">
+          {PROFILE_WORDS.passwordLabel}
+          <input
+            className={`${input} mt-1.5`}
+            type="password"
+            value={password}
+            onChange={(e) => setPasswordText(e.target.value)}
+            autoComplete="new-password"
+            minLength={PASSWORD_MIN}
+          />
+          <span className="mt-1.5 block text-[12px] font-normal leading-snug text-muted">{PROFILE_WORDS.passwordNote}</span>
+        </label>
         {naming && (
           <fieldset>
-            <legend className="text-sm font-medium text-ink">What does your business do?</legend>
+            <legend className="text-sm font-medium text-ink">What does your company do?</legend>
             <div className="mt-2 space-y-2">
               {BUSINESS_KINDS.map((k) => (
                 <label
@@ -156,139 +229,37 @@ function SetUp({ account, onDone }: { account: Extract<DesignAccount, { signedIn
             </div>
           </fieldset>
         )}
-        {naming && (
-          <label className="block text-sm font-medium text-ink">
-            Business name
+        {(naming || joining) && (
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-md bg-surface-2 px-3.5 py-3 text-[13px] leading-snug text-ink-2">
             <input
-              className={`${input} mt-1.5`}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={80}
-              autoComplete="organization"
-              placeholder="e.g. Example Solar"
+              type="checkbox"
+              checked={terms}
+              onChange={(e) => {
+                setTerms(e.target.checked);
+                setProblem(null);
+              }}
+              className="mt-px h-4 w-4 shrink-0 accent-[var(--primary)]"
             />
+            <span>
+              I&apos;ve read and accept the{" "}
+              <Link href={BUSINESS_TERMS_PATH} target="_blank" className="underline underline-offset-4 hover:text-ink">
+                roof designer&apos;s terms
+              </Link>{" "}
+              and the{" "}
+              <Link href="/privacy" target="_blank" className="underline underline-offset-4 hover:text-ink">
+                Privacy Policy
+              </Link>
+              .
+            </span>
           </label>
         )}
-        <label className="flex cursor-pointer items-start gap-2.5 rounded-md bg-surface-2 px-3.5 py-3 text-[13px] leading-snug text-ink-2">
-          <input
-            type="checkbox"
-            checked={terms}
-            onChange={(e) => {
-              setTerms(e.target.checked);
-              setProblem(null);
-            }}
-            className="mt-px h-4 w-4 shrink-0 accent-[var(--primary)]"
-          />
-          <span>
-            I&apos;ve read and accept the{" "}
-            <Link href={BUSINESS_TERMS_PATH} target="_blank" className="underline underline-offset-4 hover:text-ink">
-              roof designer&apos;s terms
-            </Link>{" "}
-            and the{" "}
-            <Link href="/privacy" target="_blank" className="underline underline-offset-4 hover:text-ink">
-              Privacy Policy
-            </Link>
-            .
-          </span>
-        </label>
-        {problem && (
-          <p className="text-[13px] text-danger" role="alert">
-            {problem}
-          </p>
-        )}
-        <button type="submit" className={primary} disabled={busy}>
-          {busy ? "Saving…" : naming ? "Start using the designer" : "Join"}
-        </button>
-      </form>
-      <div className="mt-8 flex items-center gap-3 text-[13px] text-muted">
-        <span>Signed in as {account.email}.</span>
-        <SignOut />
-      </div>
-    </Frame>
-  );
-}
-
-/**
- * About you (5 Nov 2026, Martin: the first sign-in greeted him by a name guessed from his email): first and last name,
- * a mobile if they like, and a password if they want to sign in with one next time. Asked once of everyone in a
- * business, owner or not, after the business is set up.
- */
-function AboutYou({ account, onDone }: { account: Extract<DesignAccount, { signedIn: true }>; onDone: () => void }) {
-  const [first, setFirst] = useState("");
-  const [last, setLast] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [password, setPasswordText] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!first.trim() || !last.trim()) return setProblem(PROFILE_WORDS.missingName);
-    setBusy(true);
-    setProblem(null);
-    const failed = await saveProfile({ firstName: first, lastName: last, mobile, password });
-    setBusy(false);
-    if (failed) return setProblem(failed);
-    onDone();
-  };
-  return (
-    <Frame>
-      <p className={eyebrow}>{account.business?.name ?? "Your business"}</p>
-      <h1 className="mt-3 text-[30px] leading-tight tracking-tight text-ink">{PROFILE_WORDS.title}</h1>
-      <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{PROFILE_WORDS.intro}</p>
-      <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-medium text-ink">
-            First name
-            <input
-              className={`${input} mt-1.5`}
-              value={first}
-              onChange={(e) => setFirst(e.target.value)}
-              maxLength={NAME_MAX}
-              autoComplete="given-name"
-              autoFocus
-            />
-          </label>
-          <label className="block text-sm font-medium text-ink">
-            Last name
-            <input
-              className={`${input} mt-1.5`}
-              value={last}
-              onChange={(e) => setLast(e.target.value)}
-              maxLength={NAME_MAX}
-              autoComplete="family-name"
-            />
-          </label>
-        </div>
-        <label className="block text-sm font-medium text-ink">
-          Mobile (optional)
-          <input
-            className={`${input} mt-1.5`}
-            value={mobile}
-            onChange={(e) => setMobile(e.target.value)}
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="04XX XXX XXX"
-          />
-        </label>
-        <label className="block text-sm font-medium text-ink">
-          {PROFILE_WORDS.passwordLabel}
-          <input
-            className={`${input} mt-1.5`}
-            type="password"
-            value={password}
-            onChange={(e) => setPasswordText(e.target.value)}
-            autoComplete="new-password"
-            minLength={PASSWORD_MIN}
-          />
-          <span className="mt-1.5 block text-[12px] font-normal leading-snug text-muted">{PROFILE_WORDS.passwordNote}</span>
-        </label>
         {problem && (
           <p className="text-[13px] text-danger" role="alert">
             {problem}
           </p>
         )}
         <button type="submit" className={`${primary} w-full`} disabled={busy}>
-          {busy ? "Saving…" : "Continue"}
+          {busy ? "Saving…" : joining ? "Join" : "Continue"}
         </button>
       </form>
       <div className="mt-8 flex flex-wrap items-center gap-3 text-[13px] text-muted">
@@ -420,8 +391,7 @@ export function DesignAccountGate({ children }: { children: React.ReactNode }) {
   }, [businessId]);
 
   if (!account || (businessId && brought?.id !== businessId)) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
-  if (account.signedIn && account.state !== "ready") return <SetUp account={account} onDone={refresh} />;
-  if (account.signedIn && account.needsProfile) return <AboutYou account={account} onDone={refresh} />;
+  if (account.signedIn && (account.state !== "ready" || account.needsProfile)) return <SetUp account={account} onDone={refresh} />;
   if (account.signedIn && account.needsPlan && !planSkipped)
     return (
       <PlanStep

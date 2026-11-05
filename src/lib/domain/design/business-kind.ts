@@ -78,6 +78,7 @@ const COMMON_API = [
   "members",
   "password",
   "profile",
+  "onboarding",
   "sign-in",
   "view-as",
   "team",

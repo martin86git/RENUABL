@@ -85,7 +85,13 @@ export function DesignHome() {
     return (
       <DesignShell needsAccount>
         {kind === "retailer" ? (
-          <OverviewPage business={account.business?.name ?? ""} email={account.email} firstName={account.firstName ?? null} />
+          <OverviewPage
+            business={account.business?.name ?? ""}
+            email={account.email}
+            firstName={account.firstName ?? null}
+            welcome={Boolean(account.welcome)}
+            owner={account.business?.role === "owner"}
+          />
         ) : kind === "installer" ? (
           // An installer's home is My Jobs (my-jobs.ts, 2 Nov 2026, Martin).
           <MyJobsPage />
@@ -146,7 +152,19 @@ function Delta({ value, against, nothing, dark }: { value: number | null; agains
  * one is picked it opens on a greeting with a line for each. Every figure is
  * worked out from the deals as they stand (`deal.ts`).
  */
-function OverviewPage({ business, email, firstName }: { business: string; email: string; firstName: string | null }) {
+function OverviewPage({
+  business,
+  email,
+  firstName,
+  welcome,
+  owner,
+}: {
+  business: string;
+  email: string;
+  firstName: string | null;
+  welcome: boolean;
+  owner: boolean;
+}) {
   const [data, setData] = useState<Overview | null>(null);
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -226,6 +244,8 @@ function OverviewPage({ business, email, firstName }: { business: string; email:
       business={business}
       name={name}
       email={email}
+      welcome={welcome}
+      owner={owner}
       mine={data?.mine ?? (problem ? [] : null)}
       problem={problem}
       day={

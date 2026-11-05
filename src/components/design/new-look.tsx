@@ -45,9 +45,12 @@ function boxOf(sel: string): Box | null {
   return r.width && r.height ? { top: r.top, left: r.left, width: r.width, height: r.height } : null;
 }
 
-/** The tour: the page dimmed, one area lit with an orange ring, and a card beside it with Back, Next and Done. */
-function Tour({ onEnd }: { onEnd: () => void }) {
-  const [steps] = useState(() => WHERE.filter((w) => boxOf(w.at)));
+/**
+ * A spotlight tour: the page dimmed, one area lit with an orange ring, and a card beside it with Back, Next and Done.
+ * Used by the new-look note and by the welcome on Today (welcome.ts `WELCOME_TOUR`).
+ */
+export function Spotlight({ steps: all, onEnd }: { steps: readonly { what: string; now: string; at: string }[]; onEnd: () => void }) {
+  const [steps] = useState(() => all.filter((w) => boxOf(w.at)));
   const [n, setN] = useState(0);
   const [box, setBox] = useState<Box | null>(null);
   const step = steps[n];
@@ -124,6 +127,15 @@ function Tour({ onEnd }: { onEnd: () => void }) {
   );
 }
 
+/** Someone just shown round by the welcome on Today doesn't need the new-look note as well. */
+export function skipNewLook() {
+  try {
+    localStorage.setItem(NEW_LOOK_KEY, new Date().toISOString());
+  } catch {
+    // Private window: the note may show once, nothing worse.
+  }
+}
+
 export function NewLook({ name }: { name?: string | null }) {
   const [show, setShow] = useState(false);
   const [touring, setTouring] = useState(false);
@@ -172,7 +184,7 @@ export function NewLook({ name }: { name?: string | null }) {
           Got it
         </button>
       </div>
-      {touring && <Tour onEnd={() => setTouring(false)} />}
+      {touring && <Spotlight steps={WHERE} onEnd={() => setTouring(false)} />}
     </section>
   );
 }

@@ -40,6 +40,8 @@ export async function GET() {
       // About you (profile.ts): their own first name to greet them by, or, until given, that it is still to ask. Not
       // while viewing as someone, nor in the sample businesses staff look through.
       ...(member?.firstName ? { firstName: member.firstName } : {}),
+      // The welcome on Today (welcome.ts), until they finish or skip it. Not while viewing as someone.
+      ...(member && member.welcomed === false && !member.viewedBy ? { welcome: true } : {}),
       ...(member && !member.firstName && !member.viewedBy && !sampleByEmail(access.email) ? { needsProfile: true } : {}),
       // The owner viewing as this member: whose own view it really is.
       ...(member?.viewedBy ? { viewedBy: member.viewedBy } : {}),

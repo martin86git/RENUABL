@@ -47,6 +47,8 @@ export interface Member {
   viewedBy?: string;
   /** Their own first name, once given (About you, profile.ts); null until then, and nobody is greeted by a guess. */
   firstName?: string | null;
+  /** Whether they have been through the welcome on Today (welcome.ts). */
+  welcomed?: boolean;
 }
 
 /** The business this email belongs to, if any. An email is in one business at most. */
@@ -60,8 +62,9 @@ export async function memberByEmail(email: string): Promise<Member | null> {
     terms_version: string | null;
     permissions: unknown;
     first_name: string | null;
+    welcomed: boolean;
   }>(
-    `select m.business_id, b.name, b.kind, m.email, m.role, m.terms_version, m.permissions, m.first_name
+    `select m.business_id, b.name, b.kind, m.email, m.role, m.terms_version, m.permissions, m.first_name, m.welcomed_at is not null as welcomed
        from business_members m join businesses b on b.id = m.business_id
       where m.email = $1`,
     [email.toLowerCase()],
@@ -77,8 +80,17 @@ export async function memberByEmail(email: string): Promise<Member | null> {
         termsVersion: m.terms_version,
         permissions: cleanPermissions(m.permissions),
         firstName: m.first_name || null,
+        welcomed: m.welcomed,
       }
     : null;
+}
+
+/** This person has been through the welcome on Today (or skipped it): it isn't shown to them again. */
+export async function markWelcomed(businessId: string, email: string): Promise<void> {
+  await query(`update business_members set welcomed_at = coalesce(welcomed_at, now()) where business_id = $1 and email = $2`, [
+    businessId,
+    email.toLowerCase(),
+  ]);
 }
 
 /** Keeps this person's own name and mobile (About you). Only ever their own row, found by business and email. */

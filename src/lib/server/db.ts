@@ -191,6 +191,8 @@ alter table business_members add column if not exists permissions jsonb;
 alter table business_members add column if not exists first_name text;
 alter table business_members add column if not exists last_name text;
 alter table business_members add column if not exists mobile text;
+-- The welcome on Today (domain/design/welcome.ts): when this person finished or skipped it; null shows it.
+alter table business_members add column if not exists welcomed_at timestamptz;
 create table if not exists design_settings (
   business_id text primary key references businesses(id) on delete cascade,
   settings jsonb not null,

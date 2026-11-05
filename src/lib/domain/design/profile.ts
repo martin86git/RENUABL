@@ -21,6 +21,9 @@ export const PROFILE_WORDS = {
   passwordLabel: "Password (optional)",
   passwordNote: "Set one to sign in with your email and password next time. Or leave it blank and keep using a link or Google.",
   missingName: "Please enter your first and last name.",
+  missingCompany: "Please enter your company's name.",
+  newIntro: "A few details about you and your company. Your customers only ever see your company's name.",
+  joinIntro: "You've been added to this business. Its roofs, deals and settings are shared with everyone in it.",
   badMobile: "That doesn't look like an Australian mobile number.",
 } as const;
 
