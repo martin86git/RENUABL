@@ -41,3 +41,39 @@ export const disconnectGmail = (address?: string) =>
 export const CONNECT_GMAIL = "/api/auth/gmail";
 /** Connect a further mailbox: Google asks which account. */
 export const ADD_GMAIL = "/api/auth/gmail?add=1";
+
+export type GmailOutcome = "connected" | "failed" | "full" | "off" | "signed-out" | "closed";
+
+/**
+ * Connects a Gmail then and there (5 Nov 2026, Martin: never leave the page to do it): Google's sign-in opens in a
+ * small window over the page, which tells this page how it went and closes itself. Answers "closed" when the person
+ * shuts the window first. Where the browser blocks the window, the page goes to Google and comes back instead.
+ */
+export function connectGmailHere(add = false): Promise<GmailOutcome> {
+  const url = `${CONNECT_GMAIL}?popup=1${add ? "&add=1" : ""}`;
+  const w = 500;
+  const h = 640;
+  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - w) / 2));
+  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - h) / 2));
+  const popup = window.open(url, "renuabl-gmail", `popup=yes,width=${w},height=${h},left=${left},top=${top}`);
+  if (!popup) {
+    window.location.assign(add ? ADD_GMAIL : CONNECT_GMAIL);
+    return new Promise(() => {});
+  }
+  popup.focus();
+  return new Promise((resolve) => {
+    const finish = (outcome: GmailOutcome) => {
+      window.removeEventListener("message", heard);
+      clearInterval(watch);
+      resolve(outcome);
+    };
+    const heard = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      const data = e.data as { source?: string; outcome?: GmailOutcome } | null;
+      if (data?.source === "renuabl-gmail" && data.outcome) finish(data.outcome);
+    };
+    window.addEventListener("message", heard);
+    // Shut before Google finished: nothing changed.
+    const watch = setInterval(() => popup.closed && finish("closed"), 500);
+  });
+}

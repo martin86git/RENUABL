@@ -7,8 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { INBOX_FILTERS, NOTE_MAX, dayGroup, filterInbox, type InboxEmail, type InboxFilter } from "@/lib/domain/design/inbox";
 import {
-  ADD_GMAIL,
-  CONNECT_GMAIL,
+  connectGmailHere,
   disconnectGmail,
   emailFileHref,
   loadInbox,
@@ -53,7 +52,16 @@ export function InboxPage() {
   const [open, setOpen] = useState<{ id: string; owner?: string; box?: string } | null>(null);
   // One mailbox picked out of several (5 Nov 2026: a person may connect more than one); none is every mailbox.
   const [box, setBox] = useState<string | null>(null);
-  const said = useSearchParams().get("gmail");
+  // How connecting went: from the small Google window (connected then and there), else from coming back from Google.
+  const [heard, setHeard] = useState<string | null>(null);
+  const cameBack = useSearchParams().get("gmail");
+  const said = heard ?? cameBack;
+  const connect = async (add = false) => {
+    const outcome = await connectGmailHere(add);
+    if (outcome === "closed") return;
+    setHeard(outcome);
+    setAsks((n) => n + 1);
+  };
   useEffect(() => {
     let gone = false;
     void loadInbox().then((res) => {
@@ -131,13 +139,14 @@ export function InboxPage() {
       ) : data.viewing ? (
         <p className={clsx(ui.card, "p-5 text-sm text-ink-2")}>You&apos;re viewing as someone else: their mailbox isn&apos;t read.</p>
       ) : !data.connected ? (
-        <ConnectCard ready={data.ready !== false} broken={data.broken} />
+        <ConnectCard ready={data.ready !== false} broken={data.broken} onConnect={() => void connect()} />
       ) : (
         <>
           <Mailboxes
             boxes={boxes}
             picked={picked}
             more={data.more !== false}
+            onAdd={() => void connect(true)}
             onPick={(b) => setBox(b)}
             onRemove={async (b) => {
               if (!window.confirm(`Disconnect ${b}? RENUABL stops reading it, and Google is told to forget the connection.`)) return;
@@ -247,10 +256,12 @@ function Mailboxes({
   more,
   onPick,
   onRemove,
+  onAdd,
 }: {
   boxes: string[];
   picked?: string;
   more: boolean;
+  onAdd: () => void;
   onPick: (box: string | null) => void;
   onRemove: (box: string) => void;
 }) {
@@ -283,18 +294,19 @@ function Mailboxes({
         </span>
       ))}
       {more && (
-        <a
-          href={ADD_GMAIL}
+        <button
+          type="button"
+          onClick={onAdd}
           className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
         >
           <Plus className="size-4" aria-hidden /> Add another Gmail
-        </a>
+        </button>
       )}
     </div>
   );
 }
 
-function ConnectCard({ ready, broken }: { ready: boolean; broken?: string }) {
+function ConnectCard({ ready, broken, onConnect }: { ready: boolean; broken?: string; onConnect: () => void }) {
   return (
     <section className={clsx(ui.card, "max-w-xl p-6")}>
       <h2 className="text-lg font-semibold tracking-tight text-ink">Connect your email</h2>
@@ -305,13 +317,16 @@ function ConnectCard({ ready, broken }: { ready: boolean; broken?: string }) {
       </p>
       {broken && <p className="mt-3 text-sm text-warning">{broken}</p>}
       {ready ? (
-        <a href={CONNECT_GMAIL} className={clsx(ui.primary, "mt-4")}>
-          Connect Gmail
-        </a>
+        <button type="button" onClick={onConnect} className={clsx(ui.primary, "mt-4")}>
+          Connect with Google
+        </button>
       ) : (
         <p className="mt-4 text-sm text-muted">Connecting Gmail isn&apos;t set up here yet (it needs the Google sign-in set up).</p>
       )}
-      <p className="mt-3 text-xs text-muted">Until Google has reviewed RENUABL, only test accounts can connect.</p>
+      <p className="mt-3 text-xs text-muted">
+        Google opens in a small window: pick your account and allow read-only access, and your inbox appears here. Until Google has reviewed
+        RENUABL, only test accounts can connect.
+      </p>
     </section>
   );
 }
