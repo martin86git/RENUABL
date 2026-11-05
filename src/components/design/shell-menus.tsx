@@ -171,7 +171,7 @@ export function DayWeather() {
     .filter(Boolean)
     .join(" · ");
   return (
-    <div className="relative" ref={box}>
+    <div className="studio-day relative" ref={box}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -190,7 +190,7 @@ export function DayWeather() {
           <span className="text-[13px] font-semibold leading-[19px] tabular-nums text-ink">{part({ day: "numeric" })}</span>
         </span>
         {degrees !== null && (
-          <span className="flex items-center gap-1 text-[13px] tabular-nums text-ink-2" aria-hidden>
+          <span className="studio-day-weather flex items-center gap-1 text-[13px] tabular-nums text-ink-2" aria-hidden>
             {sky && <sky.icon className={clsx("size-4", sky.tone)} strokeWidth={2} />}
             {degrees}°
           </span>

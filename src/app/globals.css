@@ -276,6 +276,72 @@ html.sol-resizing .team-pop {
     display: none;
   }
 }
+/* A narrower window (5 Nov 2026, from Primero's): the top bar makes room before anything is covered. The wordmark
+   gives way to its small mark under 1536px (under 1920px with Sol's panel open beside the page), and the weather
+   beside the day goes with it; under 1366px with the panel open the day's tile goes too, before the magnifier or the
+   Marketplace would be covered (its calendar is on Today's Calendar tab meanwhile). */
+.studio-mark-short {
+  display: none;
+}
+@media (max-width: 1535px) {
+  .studio-mark-full {
+    display: none;
+  }
+  .studio-mark-short {
+    display: flex;
+  }
+  .studio-day-weather {
+    display: none !important;
+  }
+}
+@media (max-width: 1919px) {
+  html.sol-docked .studio-mark-full {
+    display: none;
+  }
+  html.sol-docked .studio-mark-short {
+    display: flex;
+  }
+  html.sol-docked .studio-day-weather {
+    display: none !important;
+  }
+}
+@media (min-width: 1024px) and (max-width: 1365px) {
+  .studio-sections > a {
+    padding-inline: 0.6rem;
+    font-size: 13px;
+  }
+}
+
+/* The loading screen of RENUABL Business (business-loading.tsx): Sol's sun still, the light going round its ring. */
+@keyframes biz-loading-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes biz-loading-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+.biz-loading-sweep {
+  transform-origin: 50px 50px;
+  animation: biz-loading-turn 2.4s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+.biz-loading-glow {
+  background: radial-gradient(circle, rgb(255 138 61 / 0.32) 0%, rgb(255 90 31 / 0) 62%);
+  animation: biz-loading-glow 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .biz-loading-sweep,
+  .biz-loading-glow {
+    animation: none;
+  }
+}
+
 /* A reply from Sol waiting: his count glows. */
 @keyframes sol-glow {
   0%,
