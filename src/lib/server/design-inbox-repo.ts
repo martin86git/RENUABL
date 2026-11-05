@@ -11,7 +11,7 @@ import { mentionsIn } from "@/lib/domain/design/mentions";
 import { query, transaction } from "./db";
 import { seen, seenParams } from "./design-crm-repo";
 import { listMembers } from "./design-repo";
-import { atOf, attachment, fromOf, fullMessage, inboxMessages, subjectOf } from "./gmail";
+import { atOf, attachment, changeableAddresses, fromOf, fullMessage, inboxMessages, subjectOf } from "./gmail";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 type Who = { businessId: string; email: string };
@@ -119,6 +119,10 @@ export interface OpenedEmail {
   shared: string[];
   /** A shared copy: only its words are kept, so the frame and files aren't there. */
   copy: boolean;
+  /** Unread in Gmail (opening it marks it read where it can be). */
+  unread: boolean;
+  /** RENUABL may mark it read or unread and archive it (its mailbox was connected with gmail.modify). */
+  canChange: boolean;
 }
 
 export interface EmailNote {
@@ -150,9 +154,10 @@ export async function openEmail(member: Who, viewer: DealViewer, id: string, box
     bytes += data.length;
     pictures.push({ cid: p.cid, dataUrl: `data:${p.type};base64,${data.toString("base64")}` });
   }
-  const [deals, talk] = await Promise.all([
+  const [deals, talk, changeable] = await Promise.all([
     dealsBySender(member.businessId, viewer, [from.email]),
     talkOf(member.businessId, member.email, id),
+    changeableAddresses(member),
   ]);
   return {
     id,
@@ -169,6 +174,8 @@ export async function openEmail(member: Who, viewer: DealViewer, id: string, box
     notes: talk?.notes ?? [],
     shared: talk?.shared ?? [],
     copy: false,
+    unread: (m.labelIds ?? []).includes("UNREAD"),
+    canChange: changeable.includes(m.box),
   };
 }
 
@@ -222,6 +229,8 @@ export async function sharedEmail(member: Who, owner: string, id: string): Promi
     notes: talk.notes,
     shared: talk.shared,
     copy: true,
+    unread: false,
+    canChange: false,
   };
 }
 

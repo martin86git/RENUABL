@@ -814,6 +814,8 @@ do $$ begin
     alter table design_gmail add primary key (business_id, email, address);
   end if;
 end $$;
+-- Whether Google granted gmail.modify (5 Nov 2026: mark read and archive from RENUABL); older mailboxes read only.
+alter table design_gmail add column if not exists can_modify boolean not null default false;
 -- Each member's own calendar, Google or Outlook, read only (domain/design/my-calendar.ts), kept as Gmail's is.
 create table if not exists design_calendar (
   business_id text not null references businesses(id) on delete cascade,

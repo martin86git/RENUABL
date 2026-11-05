@@ -92,6 +92,17 @@ describe.skipIf(!url)("several mailboxes for one person (database)", () => {
     await db.resetDbForTests();
   });
 
+  it("marks read and archives only in a mailbox connected for it", async () => {
+    await db.query(`update design_gmail set can_modify = true where business_id = $1 and address = 'sales@gamma-inbox.test'`, [a]);
+    expect(await gmail.changeableAddresses(who())).toEqual(["sales@gamma-inbox.test"]);
+    // Read only (connected before): refused here, nothing asked of Google.
+    await expect(gmail.changeEmail(who(), "owner@gamma-inbox.test", "18c2f0a9b3d4e5f6", "archive")).rejects.toBeInstanceOf(
+      gmail.ReadOnlyMailbox,
+    );
+    // Not one of theirs at all.
+    await expect(gmail.changeEmail(who(), "someone@else.test", "18c2f0a9b3d4e5f6", "read")).rejects.toBeInstanceOf(gmail.GmailOff);
+  });
+
   it("keeps both, and disconnecting one leaves the other", async () => {
     expect(await gmail.gmailAddresses(who())).toEqual(["owner@gamma-inbox.test", "sales@gamma-inbox.test"]);
     await gmail.disconnectGmail(who(), "owner@gamma-inbox.test");

@@ -1,6 +1,6 @@
 /**
- * Server only. Each member's own Gmail, read only (domain/design/inbox.ts): Google's sign-in for the gmail.readonly
- * scope, the refresh token kept encrypted (AES-256-GCM, keyed from the Google client's own secret, so a copy of the
+ * Server only. Each member's own Gmail (domain/design/inbox.ts): Google's sign-in for the gmail.modify scope (read, and
+ * labels changed to mark read, unread and archive; since 5 Nov 2026, older mailboxes read only until connected again), the refresh token kept encrypted (AES-256-GCM, keyed from the Google client's own secret, so a copy of the
  * table alone opens nothing) and never sent to a browser, and the few Gmail API calls the inbox needs. Uses the same
  * Google client as "Continue with Google" (GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET), with
  * <site>/api/auth/gmail/callback as a second authorised redirect and the Gmail API enabled on that project.
@@ -8,7 +8,18 @@
  * Gmail call names the mailbox, and the inbox reads them all as one.
  */
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
-import { GMAIL_SCOPE, INBOX_SIZE, MAX_MAILBOXES, headerOf, mergeInboxes, type MailPart } from "@/lib/domain/design/inbox";
+import {
+  GMAIL_SCOPE,
+  INBOX_SIZE,
+  canChangeMail,
+  canReadMail,
+  MAX_MAILBOXES,
+  headerOf,
+  labelChange,
+  mergeInboxes,
+  type EmailAction,
+  type MailPart,
+} from "@/lib/domain/design/inbox";
 import { siteUrl } from "@/lib/domain/sms";
 import { query } from "./db";
 
@@ -85,7 +96,7 @@ export async function connectGmail(
   });
   if (!res.ok) return false;
   const t = (await res.json()) as { refresh_token?: string; access_token?: string; expires_in?: number; id_token?: string; scope?: string };
-  if (!t.refresh_token || !t.access_token || !t.scope?.includes(GMAIL_SCOPE)) return false;
+  if (!t.refresh_token || !t.access_token || !canReadMail(t.scope)) return false;
   const claims = t.id_token
     ? (JSON.parse(Buffer.from(t.id_token.split(".")[1] ?? "", "base64url").toString("utf8")) as { email?: string })
     : {};
@@ -93,9 +104,10 @@ export async function connectGmail(
   const have = await gmailAddresses(member);
   if (!have.includes(address) && have.length >= MAX_MAILBOXES) return "full";
   await query(
-    `insert into design_gmail (business_id, email, address, token, access, expires_at) values ($1,$2,$3,$4,$5, now() + make_interval(secs => $6))
+    `insert into design_gmail (business_id, email, address, token, access, expires_at, can_modify)
+       values ($1,$2,$3,$4,$5, now() + make_interval(secs => $6), $7)
      on conflict (business_id, email, address) do update set token = excluded.token, access = excluded.access,
-       expires_at = excluded.expires_at`,
+       expires_at = excluded.expires_at, can_modify = excluded.can_modify`,
     [
       member.businessId,
       member.email.toLowerCase(),
@@ -103,6 +115,7 @@ export async function connectGmail(
       seal(t.refresh_token),
       seal(t.access_token),
       Math.max(60, (t.expires_in ?? 3600) - 60),
+      canChangeMail(t.scope),
     ],
   );
   return true;
@@ -112,6 +125,15 @@ export async function connectGmail(
 export async function gmailAddresses(member: Who): Promise<string[]> {
   const rows = await query<{ address: string }>(
     `select address from design_gmail where business_id = $1 and email = $2 order by created_at, address`,
+    [member.businessId, member.email.toLowerCase()],
+  );
+  return rows.map((r) => r.address);
+}
+
+/** The member's mailboxes RENUABL may mark read and archive in (connected with gmail.modify). */
+export async function changeableAddresses(member: Who): Promise<string[]> {
+  const rows = await query<{ address: string }>(
+    `select address from design_gmail where business_id = $1 and email = $2 and can_modify order by created_at, address`,
     [member.businessId, member.email.toLowerCase()],
   );
   return rows.map((r) => r.address);
@@ -178,11 +200,12 @@ export class GmailOff extends Error {}
 /** Gmail has no such email in that mailbox (it may be in another of the member's). */
 class NotThere extends Error {}
 
-async function gmail<T>(member: Who, address: string, path: string): Promise<T> {
+async function gmail<T>(member: Who, address: string, path: string, body?: object): Promise<T> {
   const token = await accessToken(member, address);
   if (!token) throw new GmailOff(`Gmail (${address}) isn't connected.`);
   const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
-    headers: { authorization: `Bearer ${token}` },
+    ...(body ? { method: "POST", body: JSON.stringify(body) } : {}),
+    headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/json" } : {}) },
     signal: AbortSignal.timeout(15_000),
   });
   if (res.status === 401 || res.status === 403) throw new GmailOff(`Gmail turned the request down for ${address}: connect it again.`);
@@ -247,6 +270,23 @@ export async function fullMessage(member: Who, id: string, box?: string): Promis
 export async function attachment(member: Who, box: string, id: string, attachmentId: string): Promise<Buffer> {
   const a = await gmail<{ data?: string }>(member, box, `messages/${id}/attachments/${encodeURIComponent(attachmentId)}`);
   return Buffer.from(a.data ?? "", "base64url");
+}
+
+/** Read only: connected before RENUABL could mark read and archive; connecting it again allows it. */
+export class ReadOnlyMailbox extends Error {}
+
+/**
+ * Marks one of the member's own emails read or unread, or archives it, in Gmail itself (only Gmail's labels change:
+ * nothing is sent or deleted). Only in one of their own mailboxes connected with gmail.modify.
+ */
+export async function changeEmail(member: Who, box: string, id: string, action: EmailAction): Promise<void> {
+  const address = box.toLowerCase();
+  if (!(await changeableAddresses(member)).includes(address)) {
+    if ((await gmailAddresses(member)).includes(address))
+      throw new ReadOnlyMailbox(`Connect ${address} again to mark read and archive from here.`);
+    throw new GmailOff(`Gmail (${address}) isn't connected.`);
+  }
+  await gmail(member, address, `messages/${encodeURIComponent(id)}/modify`, labelChange(action));
 }
 
 /** The unread count of every mailbox the member has connected together, as Gmail keeps each. */

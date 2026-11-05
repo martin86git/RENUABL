@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  GMAIL_READONLY_SCOPE,
+  GMAIL_SCOPE,
+  afterAction,
+  canChangeMail,
+  canReadMail,
+  isEmailAction,
+  labelChange,
   dayGroup,
   filterInbox,
   isAutomated,
@@ -93,6 +100,34 @@ describe("the inbox", () => {
     ]);
     expect(isMessageId("18c2f0a9b3d4e5f6")).toBe(true);
     expect(isMessageId("../etc")).toBe(false);
+  });
+});
+
+describe("marking read and archiving", () => {
+  it("asks Google for modify, and tells a read-only connection from one that can change mail", () => {
+    expect(GMAIL_SCOPE).toBe("https://www.googleapis.com/auth/gmail.modify");
+    const old = `openid email ${GMAIL_READONLY_SCOPE}`;
+    expect([canReadMail(old), canChangeMail(old)]).toEqual([true, false]);
+    expect([canReadMail(`email ${GMAIL_SCOPE}`), canChangeMail(`email ${GMAIL_SCOPE}`)]).toEqual([true, true]);
+    expect(canReadMail("openid email")).toBe(false);
+  });
+
+  it("changes only Gmail's own labels: read, unread, out of the inbox", () => {
+    expect(labelChange("read")).toEqual({ addLabelIds: [], removeLabelIds: ["UNREAD"] });
+    expect(labelChange("unread")).toEqual({ addLabelIds: ["UNREAD"], removeLabelIds: [] });
+    expect(labelChange("archive")).toEqual({ addLabelIds: [], removeLabelIds: ["INBOX"] });
+    expect([isEmailAction("archive"), isEmailAction("delete")]).toEqual([true, false]);
+  });
+
+  it("updates the list in place, the same email in another mailbox left alone", () => {
+    const list = [
+      { id: "1", box: "a", unread: true },
+      { id: "1", box: "b", unread: true },
+      { id: "2", box: "a", unread: false },
+    ];
+    expect(afterAction(list, "1", "a", "read").map((e) => e.unread)).toEqual([false, true, false]);
+    expect(afterAction(list, "2", "a", "unread")[2].unread).toBe(true);
+    expect(afterAction(list, "1", "a", "archive").map((e) => `${e.id}${e.box}`)).toEqual(["1b", "2a"]);
   });
 });
 

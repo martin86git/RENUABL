@@ -1,10 +1,19 @@
-import { cleanEmailNote, isMessageId } from "@/lib/domain/design/inbox";
+import { cleanEmailNote, isEmailAction, isMessageId } from "@/lib/domain/design/inbox";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { addEmailNote, emailFile, inboxFor, openEmail, sharedEmail, sharedWith } from "@/lib/server/design-inbox-repo";
 import { MAX_MAILBOXES } from "@/lib/domain/design/inbox";
-import { GmailOff, disconnectGmail, gmailAddresses, gmailConfig, unreadCount } from "@/lib/server/gmail";
+import {
+  GmailOff,
+  ReadOnlyMailbox,
+  changeEmail,
+  changeableAddresses,
+  disconnectGmail,
+  gmailAddresses,
+  gmailConfig,
+  unreadCount,
+} from "@/lib/server/gmail";
 import { allow } from "@/lib/server/rate-limit";
 import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { withSolCredit } from "@/lib/server/sol-credits";
@@ -19,7 +28,8 @@ const json = (body: object, status = 200) => Response.json(body, { status });
  * - no query: { connected, address, addresses, emails, shared } across every mailbox the member connected (or
  *   { connected: false, ready } when none is)
  * - ?count=1: { unread } (Gmail's own count)
- * - ?id=<message>[&box=<address>]: the email whole, from that mailbox, with its notes; with &owner=<email>, a copy
+ * - ?id=<message>[&box=<address>]: the email whole, from that mailbox, with its notes, marked read in Gmail when it
+ *   was unread and its mailbox allows it (opening an email reads it, as in Gmail); with &owner=<email>, a copy
  *   shared with this member
  * - ?id=<message>&file=<n>: one of its files, from the member's own mailbox only
  * Never while the owner is viewing as someone else: that person's mailbox isn't read.
@@ -70,13 +80,23 @@ export async function GET(request: Request) {
             },
           });
         }
-        return json({ ok: true, email: await openEmail(member, viewerOf(member), id, box) });
+        const email = await openEmail(member, viewerOf(member), id, box);
+        if (email.unread && email.canChange && email.box) {
+          // Opening it reads it, as in Gmail; the email still opens if Gmail doesn't take the change.
+          const marked = await changeEmail(member, email.box, id, "read").then(
+            () => true,
+            (e) => (console.error("mark read failed", e instanceof Error ? e.message : e), false),
+          );
+          if (marked) email.unread = false;
+        }
+        return json({ ok: true, email });
       }
       return json({
         ok: true,
         connected: true,
         address,
         addresses,
+        changeable: await changeableAddresses(member),
         more: addresses.length < MAX_MAILBOXES,
         ...(await inboxFor(member, viewerOf(member))),
       });
@@ -95,6 +115,8 @@ const SOL_SCHEMA = { type: "object", additionalProperties: false, required: ["te
  * POST { do: "note", id, owner, text }: a note on an email (only the member whose inbox it is, and anyone tagged, read
  * them; tagging shares that one email). POST { do: "sol", id, owner?, mode: "summary" | "reply" }: Sol sums it up for
  * the team, or drafts a reply to check and send from the deal or Gmail. Nothing is sent and nothing Sol writes is kept.
+ * POST { do: "read" | "unread" | "archive", id, box }: changes it in Gmail itself, in one of the member's own mailboxes
+ * connected for it (409 with what to do for one connected read only). Never while viewing as someone else.
  */
 export async function POST(request: Request) {
   return answer(async () => {
@@ -108,6 +130,14 @@ export async function POST(request: Request) {
     const owner = typeof b.owner === "string" && b.owner.includes("@") ? b.owner.toLowerCase().slice(0, 254) : member.email.toLowerCase();
     if (!id) return json({ ok: false, message: "That email couldn't be found." }, 404);
     try {
+      if (isEmailAction(b.do)) {
+        if (member.viewedBy) return json({ ok: false, message: "You're viewing as someone else: their mailbox isn't changed." }, 403);
+        if (!allow(request, "inbox-change", 600)) return json({ ok: false, message: "Try again in a little while." }, 429);
+        const box = typeof b.box === "string" ? b.box.toLowerCase().slice(0, 254) : (await gmailAddresses(member))[0];
+        if (!box) return json({ ok: false, message: "Connect your Gmail first." }, 409);
+        await changeEmail(member, box, id, b.do);
+        return json({ ok: true });
+      }
       if (b.do === "note") {
         if (!allow(request, "inbox-note", 240)) return json({ ok: false, message: "Try again in a little while." }, 429);
         const text = cleanEmailNote(b.text);
@@ -152,7 +182,7 @@ export async function POST(request: Request) {
       }
       return json({ ok: false, message: "That couldn't be read." }, 400);
     } catch (e) {
-      if (e instanceof GmailOff) return json({ ok: false, message: e.message }, 409);
+      if (e instanceof GmailOff || e instanceof ReadOnlyMailbox) return json({ ok: false, message: e.message }, 409);
       console.error("inbox action failed", redactSecrets(e instanceof Error ? e.message : String(e)));
       return json({ ok: false, message: "That couldn't be done just now. Try again in a moment." }, 502);
     }

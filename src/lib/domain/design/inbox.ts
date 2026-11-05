@@ -3,13 +3,49 @@
  * their own Gmail once, read only; the inbox shows the newest emails set out by day, each matched to the deal of the
  * customer it came from, machines' emails marked Automated and drawn quieter. An opened email reads as sent, with
  * private notes beside it: only the member and anyone they tag see them, and tagging someone shares that one email
- * with them, never the mailbox. Archiving, marking read and replying stay in Gmail or the deal's Email tab. Pure, tested.
+ * with them, never the mailbox. Opening an email marks it read in Gmail, and it can be marked unread again or archived
+ * from here, the same in Gmail (5 Nov 2026, Martin); replying stays in Gmail or the deal's Email tab, and nothing is
+ * ever sent or deleted. Pure, tested.
  */
 import { todayInMarket } from "../market";
 import { addDaysISO } from "../scheduling";
 import { mondayOf } from "./design-home";
 
-export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+/**
+ * Read, and change labels (5 Nov 2026: read, unread, archive). It can't send, and nothing here deletes. Mailboxes
+ * connected before asked for read only: they still read, and are connected again to mark read and archive from here.
+ */
+export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.modify";
+export const GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+const scopes = (scope: string | undefined) => (scope ?? "").split(/\s+/);
+/** Whether the scopes Google granted let RENUABL mark read and archive (else the mailbox is read only). */
+export const canChangeMail = (scope: string | undefined) => scopes(scope).includes(GMAIL_SCOPE);
+/** Whether the scopes Google granted let RENUABL read the mailbox at all. */
+export const canReadMail = (scope: string | undefined) => canChangeMail(scope) || scopes(scope).includes(GMAIL_READONLY_SCOPE);
+
+/** What can be done to an email from the inbox: each a change of Gmail's own labels, so Gmail shows the same. */
+export const EMAIL_ACTIONS = ["read", "unread", "archive"] as const;
+export type EmailAction = (typeof EMAIL_ACTIONS)[number];
+export const isEmailAction = (v: unknown): v is EmailAction => EMAIL_ACTIONS.includes(v as EmailAction);
+
+/** The labels an action adds and takes off (archiving takes it out of the inbox, as Gmail's own Archive does). */
+export function labelChange(action: EmailAction): { addLabelIds: string[]; removeLabelIds: string[] } {
+  if (action === "unread") return { addLabelIds: ["UNREAD"], removeLabelIds: [] };
+  if (action === "archive") return { addLabelIds: [], removeLabelIds: ["INBOX"] };
+  return { addLabelIds: [], removeLabelIds: ["UNREAD"] };
+}
+
+/** The inbox after an action on one email: read or unread as said, or gone once archived. */
+export function afterAction<T extends { id: string; box?: string; unread: boolean }>(
+  emails: readonly T[],
+  id: string,
+  box: string | undefined,
+  action: EmailAction,
+): T[] {
+  const it = (e: T) => e.id === id && (!box || e.box === box);
+  if (action === "archive") return emails.filter((e) => !it(e));
+  return emails.map((e) => (it(e) ? { ...e, unread: action === "unread" } : e));
+}
 /** How many of the newest emails the inbox shows. */
 export const INBOX_SIZE = 30;
 export const NOTE_MAX = 2000;

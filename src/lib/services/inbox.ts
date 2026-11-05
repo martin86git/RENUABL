@@ -1,7 +1,8 @@
 /**
- * Each member's own Gmail inbox, as the screens reach it (/api/design/inbox): read only, its notes, and Sol on an email.
+ * Each member's own Gmail inbox, as the screens reach it (/api/design/inbox): read, marked read, unread or archived in
+ * Gmail itself, its notes, and Sol on an email.
  */
-import type { InboxEmail } from "@/lib/domain/design/inbox";
+import type { EmailAction, InboxEmail } from "@/lib/domain/design/inbox";
 import type { OpenedEmail, SharedEmail } from "@/lib/server/design-inbox-repo";
 import { ask } from "./crm";
 
@@ -12,6 +13,8 @@ export interface InboxAnswer {
   address?: string;
   /** Every mailbox this member has connected (5 Nov 2026: one or more). */
   addresses?: string[];
+  /** The mailboxes RENUABL may mark read and archive in; the rest were connected read only, before. */
+  changeable?: string[];
   /** Whether another may be connected (under `MAX_MAILBOXES`). */
   more?: boolean;
   /** Google's sign-in is set up here (without it, Connect Gmail can't work). */
@@ -35,6 +38,12 @@ export const noteOnEmail = (id: string, owner: string, text: string) =>
   ask<{ told: string[]; email: OpenedEmail }>(INBOX, { method: "POST", body: { do: "note", id, owner, text } });
 export const solOnEmail = (id: string, owner: string, mode: "summary" | "reply") =>
   ask<{ text: string }>(INBOX, { method: "POST", body: { do: "sol", id, owner, mode } });
+/** Marks an email read or unread, or archives it, in Gmail itself; tells the shell's unread count. */
+export async function changeInboxEmail(id: string, box: string | undefined, action: EmailAction) {
+  const res = await ask<object>(INBOX, { method: "POST", body: { do: action, id, box } });
+  if (res.ok) window.dispatchEvent(new Event("renuabl:inbox"));
+  return res;
+}
 /** Disconnects one mailbox, or every one with none named. */
 export const disconnectGmail = (address?: string) =>
   ask<object>(address ? `${INBOX}?address=${encodeURIComponent(address)}` : INBOX, { method: "DELETE" });
