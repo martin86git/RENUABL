@@ -39,6 +39,22 @@
   --info: #3b4f47;
   --info-soft: #e7ece8;
   --focus: #1e3a2e;
+  /* To action's kinds (Today, 5 Nov 2026): a word and a colour each, the ink on its soft ground. Not the signal orange,
+     which stays for what is live or picked, except an install today, the most pressing. */
+  --kind-install: #b53c00;
+  --kind-install-soft: #fff0e6;
+  --kind-message: #5534b0;
+  --kind-message-soft: #efeafc;
+  --kind-lead: #1d56b8;
+  --kind-lead-soft: #e6eefb;
+  --kind-follow-up: #855600;
+  --kind-follow-up-soft: #fbf0d6;
+  --kind-order: #0e6a62;
+  --kind-order-soft: #dff2ef;
+  --kind-date: #9c2757;
+  --kind-date-soft: #fbe6ef;
+  --kind-approvals: #474d63;
+  --kind-approvals-soft: #ebecf2;
   color-scheme: light;
 }
 
@@ -69,6 +85,20 @@
   --info: #c9cdcb;
   --info-soft: #2c3337;
   --focus: #8fd0ad;
+  --kind-install: #ffa274;
+  --kind-install-soft: rgba(255, 122, 51, 0.16);
+  --kind-message: #c3b2f5;
+  --kind-message-soft: rgba(139, 109, 230, 0.18);
+  --kind-lead: #a9c6f5;
+  --kind-lead-soft: rgba(80, 138, 230, 0.18);
+  --kind-follow-up: #f0cd85;
+  --kind-follow-up-soft: rgba(233, 189, 107, 0.16);
+  --kind-order: #8fd6cc;
+  --kind-order-soft: rgba(52, 168, 152, 0.18);
+  --kind-date: #f4a9c6;
+  --kind-date-soft: rgba(225, 92, 146, 0.18);
+  --kind-approvals: #c4c8d6;
+  --kind-approvals-soft: rgba(160, 166, 190, 0.16);
   color-scheme: dark;
 }
 
@@ -345,6 +375,20 @@ html.sol-resizing .team-pop {
   --color-sun-line-ink: var(--sun-line-ink);
   --color-market: var(--market);
   --color-market-ink: var(--market-ink);
+  --color-kind-install: var(--kind-install);
+  --color-kind-install-soft: var(--kind-install-soft);
+  --color-kind-message: var(--kind-message);
+  --color-kind-message-soft: var(--kind-message-soft);
+  --color-kind-lead: var(--kind-lead);
+  --color-kind-lead-soft: var(--kind-lead-soft);
+  --color-kind-follow-up: var(--kind-follow-up);
+  --color-kind-follow-up-soft: var(--kind-follow-up-soft);
+  --color-kind-order: var(--kind-order);
+  --color-kind-order-soft: var(--kind-order-soft);
+  --color-kind-date: var(--kind-date);
+  --color-kind-date-soft: var(--kind-date-soft);
+  --color-kind-approvals: var(--kind-approvals);
+  --color-kind-approvals-soft: var(--kind-approvals-soft);
   --color-leaf: var(--leaf);
   --color-positive: var(--positive);
   --color-positive-soft: var(--positive-soft);

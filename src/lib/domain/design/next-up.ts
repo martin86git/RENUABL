@@ -178,3 +178,41 @@ export function nextHeadline(count: number, hour: number): string {
   const n = NUMBERS[count] ?? `${count} things`;
   return `${n} ${count === 1 ? "needs" : "need"} you ${when}.`;
 }
+
+/**
+ * Each kind's pill on To action (5 Nov 2026, Martin, from Primero's: "a pill to identify proposal follow up vs say a new
+ * lead... different colors"): a word each, drawn in that kind's own colour (`--kind-*` tokens), so a run of follow-ups
+ * reads apart from a new lead at a glance.
+ */
+export const NEXT_KIND_WORDS: Record<NextKind, string> = {
+  install: "Install",
+  message: "Message",
+  lead: "New lead",
+  "follow-up": "Follow-up",
+  order: "Order",
+  date: "Book a date",
+  approvals: "Approval",
+};
+
+/** The words of a search over To action: lower case, one each. */
+export const searchWords = (q: string) => q.toLowerCase().split(/\s+/).filter(Boolean);
+
+/**
+ * To action searched for a customer who has just come to mind (5 Nov 2026, from Primero's): every word must be in the
+ * item's title, its line or its kind. No words, everything.
+ */
+export function searchNext(items: readonly NextItem[], q: string): NextItem[] {
+  const words = searchWords(q);
+  if (!words.length) return [...items];
+  return items.filter((i) => {
+    const hay = `${i.title} ${i.why} ${NEXT_KIND_WORDS[i.kind]}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
+}
+
+/** Where "Work through" stands: the item at `at` of `total`, and what to say beside it. */
+export function workThroughAt(at: number, total: number): { at: number; count: string; after: string } {
+  const i = Math.max(0, Math.min(at, Math.max(total - 1, 0)));
+  const left = total - i - 1;
+  return { at: i, count: `${total ? i + 1 : 0} of ${total}`, after: left > 0 ? `${left} after this` : "The last one" };
+}
