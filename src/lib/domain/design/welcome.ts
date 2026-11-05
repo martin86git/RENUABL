@@ -51,33 +51,33 @@ export function welcomeLines(firstName: string | null, business: string): Record
 export const WELCOME_TOUR: { what: string; now: string; at: string }[] = [
   {
     what: "Today",
-    now: "is your home. Inbox, Calendar and Pipeline sit beside it, and Your day keeps time with the sun.",
+    now: "is your home screen. Inbox, Calendar and Pipeline sit beside it, and Your day shows what's left to clear before sunset.",
     at: 'nav[aria-label="Today"]',
   },
   {
-    what: "Sol",
-    now: "writes your day up and answers anything about your deals. Ask here, or press Show me my day.",
+    what: "Ask Sol",
+    now: "anything about your deals here, or press Show me my day and he'll write up what needs you.",
     at: '[data-tour="today-sol"]',
   },
   {
     what: "The designer",
-    now: "is the orange round. Draw a roof and the quote builds as you go.",
+    now: "opens from the orange pen button. Draw a roof and the quote builds as you go.",
     at: 'a[aria-label="Design tool"]',
   },
   {
     what: "The menu",
-    now: "has your CRM, procurement, installations and service, each with its pages under it.",
+    now: "takes you to your CRM, procurement, installations and service. Each one's pages show underneath.",
     at: 'nav[aria-label="Sections"]',
   },
   {
-    what: "Sol's panel",
-    now: "opens from his round, beside any page you're on. He can see what you're looking at.",
+    what: "Sol",
+    now: "opens from the dark button with the sun, beside whatever page you're on. He can see what's on your screen.",
     at: 'button[title="Sol, your assistant"]',
   },
   {
     what: "RENUABL Marketplace",
-    now: "is where solar businesses will list jobs, bid on installations and trade equipment. Coming soon.",
+    now: "is the blue button. It's where solar businesses will list jobs, bid on installations and trade equipment. Coming soon.",
     at: 'a[aria-label^="RENUABL Marketplace"]',
   },
-  { what: "The rail", now: "holds team chat, your notifications and email.", at: ".sol-rail" },
+  { what: "The buttons down the right", now: "hold team chat, your notifications and email.", at: ".sol-rail" },
 ];
