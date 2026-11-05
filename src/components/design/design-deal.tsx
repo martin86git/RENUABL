@@ -50,7 +50,7 @@ import { PATHS, ui } from "./design-shell";
 import { DealFiles, DealPulseBadges } from "./deal-pulse";
 import { DealSol } from "./deal-sol";
 import { hasPulse, type DealPulse } from "@/lib/domain/design/deal-heat";
-import { openedWords } from "@/lib/domain/design/email-opens";
+import { NOT_TRACKED, openedWords } from "@/lib/domain/design/email-opens";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
@@ -179,11 +179,11 @@ export function DealPage({ id }: { id: string }) {
   const [members, setMembers] = useState<string[]>([]);
   // The deal's clock and temperature while it is being sold, and when its emails were opened.
   const [pulse, setPulse] = useState<DealPulse | null>(null);
-  const [opens, setOpens] = useState<Record<string, string[]>>({});
+  const [opens, setOpens] = useState<{ times: Record<string, string[]>; counts: Record<string, number> } | null>(null);
   useEffect(() => {
     let gone = false;
     void loadPulses().then((r) => !gone && r.ok && setPulse(r.pulses[id] ?? null));
-    void loadOpens(id).then((r) => !gone && r.ok && setOpens(r.opens));
+    void loadOpens(id).then((r) => !gone && r.ok && setOpens({ times: r.opens, counts: r.counts ?? {} }));
     return () => {
       gone = true;
     };
@@ -775,11 +775,23 @@ export function DealPage({ id }: { id: string }) {
                         </time>
                       </div>
                       <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
-                      {a.kind === "email" && opens[a.id] && (
-                        <p className={clsx("mt-1.5 text-xs", opens[a.id].length ? "font-medium text-positive" : "text-muted")}>
-                          {openedWords(opens[a.id], LAUNCH_MARKET.timeZone)}
-                        </p>
-                      )}
+                      {a.kind === "email" &&
+                        opens &&
+                        (opens.times[a.id] ? (
+                          <p
+                            className={clsx("mt-1.5 text-xs", opens.times[a.id].length ? "font-medium text-positive" : "text-muted")}
+                            title="Only the customer's copy is counted. Apple Mail can open an email by itself when it arrives, so this is a guide."
+                          >
+                            {openedWords(opens.times[a.id], LAUNCH_MARKET.timeZone, new Date(), opens.counts[a.id])}
+                          </p>
+                        ) : (
+                          <p
+                            className="mt-1.5 text-xs text-muted"
+                            title="Opens are counted for emails sent from this deal while the site's address is set up. This one was sent before, or another way."
+                          >
+                            {NOT_TRACKED}
+                          </p>
+                        ))}
                     </li>
                   ))}
                 </ol>

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUp, MessageSquare, X } from "lucide-react";
+import { ArrowUp, Check, Copy, MessageSquare, Reply, X } from "lucide-react";
+import { splitQuote, withQuote } from "@/lib/domain/design/chat-quote";
+import { SolIcon } from "./sol-icon";
 import clsx from "clsx";
 import { MAX_LINE, POLL_SECONDS, SOL_BY, teamName, type ChatThread, type PublicLine } from "@/lib/domain/design/chat";
-import { solLabel } from "@/lib/domain/design/sol-customer";
+import { MAX_DRAFT_ASK, solLabel } from "@/lib/domain/design/sol-customer";
 import { EmailFileChips, EmailFormatBar, listKey, useEmailFiles } from "./email-compose";
 
 /** How long the customer's page waits for Sol's answer, looking every couple of seconds, before going back to its usual pace. */
@@ -21,6 +23,7 @@ import {
 } from "@/lib/domain/design/send-message";
 import {
   UNREAD_CHANGED,
+  draftReply,
   lineTime,
   loadCustomerChat,
   loadDealChat,
@@ -58,8 +61,11 @@ function Bubbles(props: {
   solName?: string;
   /** Sol is writing an answer: three dots where it will come. */
   thinking?: boolean;
+  /** The business's side: each line can be copied, or replied to (quoted in the box), from the actions on hover. */
+  onReply?: (line: PublicLine) => void;
 }) {
   const list = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState<string | null>(null);
   const count = props.lines.length;
   useEffect(() => {
     // The newest line at the foot of the list. The list is scrolled, never the page it sits on.
@@ -82,7 +88,10 @@ function Bubbles(props: {
         const runStarts = i === 0 || breaks.has(i) || props.lines[i - 1].from !== line.from;
         const runEnds = !next || breaks.has(i + 1) || next.from !== line.from;
         return (
-          <div key={line.id} className={clsx("flex flex-col", own ? "items-end" : "items-start", runStarts ? "mt-2.5" : "mt-0.5")}>
+          <div
+            key={line.id}
+            className={clsx("group/line relative flex flex-col", own ? "items-end" : "items-start", runStarts ? "mt-2.5" : "mt-0.5")}
+          >
             {breaks.has(i) && <p className="w-full pb-1.5 pt-2 text-center text-[11px] font-medium text-muted">{lineTime(line.at)}</p>}
             {line.sol && (runStarts || !props.lines[i - 1]?.sol) && (
               <p className="px-3 pb-1 text-[11px] font-medium text-muted">{props.solName ?? "Sol · AI assistant"}</p>
@@ -102,8 +111,11 @@ function Bubbles(props: {
               )}
             >
               <span className="sr-only">{props.names[line.from]}: </span>
-              {line.text}
+              <LineWords text={line.text} own={own} />
             </p>
+            {props.onReply && (
+              <LineActions line={line} own={own} onReply={props.onReply} copied={copied === line.id} onCopied={() => setCopied(line.id)} />
+            )}
             {i === lastOwn && <span className="px-1 pt-1 text-[11px] font-medium text-muted">Sent</span>}
           </div>
         );
@@ -127,6 +139,58 @@ function Bubbles(props: {
   );
 }
 
+/** A line's words, with the message it answers drawn as a quote over them (`splitQuote`). */
+function LineWords({ text, own }: { text: string; own: boolean }) {
+  const { quote, text: words } = splitQuote(text);
+  if (!quote) return <>{text}</>;
+  return (
+    <>
+      <span
+        className={clsx(
+          "mb-1 block truncate border-l-2 pl-2 text-[13px] leading-snug",
+          own ? "border-primary-ink/50 text-primary-ink/80" : "border-line-strong text-muted",
+        )}
+      >
+        {quote}
+      </span>
+      {words}
+    </>
+  );
+}
+
+/** Copy and Reply beside a line, shown on hover (and to the keyboard), on the business's side of the chat. */
+function LineActions(props: {
+  line: PublicLine;
+  own: boolean;
+  onReply: (line: PublicLine) => void;
+  copied: boolean;
+  onCopied: () => void;
+}) {
+  const button =
+    "flex size-7 items-center justify-center rounded-full bg-surface text-muted ring-1 ring-line hover:text-ink focus-visible:text-ink";
+  return (
+    <span
+      className={clsx(
+        "absolute top-1/2 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover/line:opacity-100",
+        props.own ? "left-0" : "right-0",
+      )}
+    >
+      <button
+        type="button"
+        className={button}
+        aria-label="Copy this message"
+        title={props.copied ? "Copied" : "Copy"}
+        onClick={() => void navigator.clipboard?.writeText(splitQuote(props.line.text).text).then(props.onCopied)}
+      >
+        {props.copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+      </button>
+      <button type="button" className={button} aria-label="Reply to this message" title="Reply" onClick={() => props.onReply(props.line)}>
+        <Reply className="size-3.5" aria-hidden />
+      </button>
+    </span>
+  );
+}
+
 /**
  * Where a message is typed: Enter sends it, Shift+Enter starts a new line. A rounded box with the send arrow inside it.
  * Tall (sending a proposal), it is an email composer: lists, symbols, and pictures and files that go with the email.
@@ -141,19 +205,28 @@ function Compose(props: {
   tall?: boolean;
   /** Words on that button. */
   sendLabel?: string;
+  /** The message being replied to: shown over the box, and quoted over the reply as it goes (`withQuote`). */
+  quote?: string | null;
+  onUnquote?: () => void;
 }) {
   const [text, setText] = useState(props.initial ?? "");
   const [busy, setBusy] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
   const files = useEmailFiles();
+  // Replying to a message puts the cursor in the box, ready to write.
+  useEffect(() => {
+    if (props.quote) area.current?.focus();
+  }, [props.quote]);
   const filesOk = !props.tall || (!files.busy && !files.problem);
   const send = async () => {
     const typed = text.trim();
     if (!typed || busy || props.disabled || !filesOk) return;
     setBusy(true);
-    if (await props.onSend(typed, props.tall ? files.files : [])) {
+    const sent = props.quote ? withQuote(typed, props.quote).slice(0, MAX_LINE) : typed;
+    if (await props.onSend(sent, props.tall ? files.files : [])) {
       setText("");
       files.clear();
+      props.onUnquote?.();
     }
     setBusy(false);
   };
@@ -193,6 +266,22 @@ function Compose(props: {
         void send();
       }}
     >
+      {props.quote && (
+        <div className="mb-1.5 flex items-center gap-2 rounded-xl bg-surface-2 py-1.5 pl-3 pr-1.5 text-[13px]">
+          <Reply className="size-3.5 shrink-0 text-muted" aria-hidden />
+          <span className="min-w-0 flex-1 truncate text-ink-2">
+            Replying to &ldquo;{splitQuote(props.quote).text.replace(/\s+/g, " ").trim()}&rdquo;
+          </span>
+          <button
+            type="button"
+            onClick={props.onUnquote}
+            aria-label="Don't quote it"
+            className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink"
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        </div>
+      )}
       {props.tall ? (
         <div className="space-y-2">
           <EmailFormatBar area={area} text={text} setText={setText} files={files} disabled={props.disabled} />
@@ -495,6 +584,20 @@ export function DealChat({
   const business = (account?.signedIn && account.business?.name) || "Your";
   const [chat, setChat] = useState<DealChatData | null>(null);
   const [status, setStatus] = useState<{ text: string; error?: boolean } | null>(null);
+  // The message a reply answers, quoted over it as it goes.
+  const [quote, setQuote] = useState<string | null>(null);
+  /** A reply sent from here (the box, or Sol's draft): the conversation and the counts brought up to date. */
+  const sent = async (text: string, files: readonly File[] = []) => {
+    const res = await sendReply(jobId, text, files);
+    if (!res.ok) {
+      setStatus({ text: res.message, error: true });
+      return false;
+    }
+    setChat((was) => (was ? { ...was, lines: res.lines, unanswered: 0 } : was));
+    setStatus({ text: res.outcome });
+    unreadChanged();
+    return true;
+  };
   const look = useCallback(async () => {
     const res = await loadDealChat(jobId);
     if (!res.ok) return setStatus({ text: res.message, error: true });
@@ -534,6 +637,7 @@ export function DealChat({
           solName="Sol · answered for you"
           mine="business"
           names={names}
+          onReply={(line) => setQuote(line.text)}
           empty="No messages yet. The customer can write to you from their proposal, and you can write first from here."
         />
       </div>
@@ -571,15 +675,10 @@ export function DealChat({
           tall={Boolean(drafts && draft)}
           sendLabel={drafts && draft ? `Send to ${chat.customer}` : undefined}
           placeholder={drafts && draft ? `Message to ${chat.customer}` : "Message"}
+          quote={quote}
+          onUnquote={() => setQuote(null)}
           onSend={async (text, files) => {
-            const res = await sendReply(jobId, text, files);
-            if (!res.ok) {
-              setStatus({ text: res.message, error: true });
-              return false;
-            }
-            setChat({ ...chat, lines: res.lines, unanswered: 0 });
-            setStatus({ text: res.outcome });
-            unreadChanged();
+            if (!(await sent(text, files))) return false;
             // Sent: the box is for replies from here on.
             setDraft(null);
             onSent?.();
@@ -597,6 +696,99 @@ export function DealChat({
           </>
         )}
       </p>
+      {!(drafts && draft) && chat.hasProposal && <SolWritesReply jobId={jobId} customer={chat.customer} onSend={(text) => sent(text)} />}
+    </div>
+  );
+}
+
+/**
+ * Tell Sol what to write (5 Nov 2026, Martin: as Primero's): a few words of what the reply should say, and Sol writes
+ * it from the customer's own copy of the proposal and the conversation. It comes back as a draft to change, and only
+ * **Send into their chat** sends it, as an ordinary reply (emailed to the customer when replies are). Sol never sends
+ * it himself. One Sol credit.
+ */
+function SolWritesReply({ jobId, customer, onSend }: { jobId: string; customer: string; onSend: (text: string) => Promise<boolean> }) {
+  const [ask, setAsk] = useState("");
+  const [draft, setDraft] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"writing" | "sending" | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const write = async () => {
+    if (!ask.trim() || busy) return;
+    setBusy("writing");
+    setProblem(null);
+    const res = await draftReply(jobId, ask.trim());
+    setBusy(null);
+    if (!res.ok) return setProblem(res.message);
+    setDraft(res.text);
+  };
+  const send = async () => {
+    if (!draft?.trim() || busy) return;
+    setBusy("sending");
+    const ok = await onSend(draft.trim().slice(0, MAX_LINE));
+    setBusy(null);
+    if (ok) {
+      setDraft(null);
+      setAsk("");
+    }
+  };
+  return (
+    <div className="mt-4 rounded-2xl bg-sun/60 p-3 ring-1 ring-sun-line/25">
+      <form
+        className="flex items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void write();
+        }}
+      >
+        <SolIcon className="size-4 shrink-0 text-sun-ink" aria-hidden />
+        <input
+          value={ask}
+          onChange={(e) => setAsk(e.target.value)}
+          maxLength={MAX_DRAFT_ASK}
+          disabled={busy !== null}
+          aria-label="Tell Sol what to write"
+          placeholder="Tell Sol what to write, e.g. Tuesday suits and the roof is fine"
+          className="min-w-0 flex-1 bg-transparent py-1 text-[16px] text-ink outline-none placeholder:text-muted sm:text-[13px]"
+        />
+        <button
+          type="submit"
+          disabled={!ask.trim() || busy !== null}
+          className="shrink-0 rounded-full bg-ink px-3 py-1.5 text-xs font-medium text-canvas disabled:bg-surface-2 disabled:text-muted"
+        >
+          {busy === "writing" ? "Writing…" : draft ? "Write again" : "Write it"}
+        </button>
+      </form>
+      {problem && (
+        <p className="mt-2 text-xs text-danger" role="alert">
+          {problem}
+        </p>
+      )}
+      {draft !== null && (
+        <div className="mt-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-ink">Sol&apos;s draft · not sent</p>
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            maxLength={MAX_LINE}
+            aria-label="Sol's draft reply"
+            className="mt-1.5 block min-h-28 w-full resize-y rounded-xl border border-line bg-surface px-3 py-2 text-[16px] leading-relaxed text-ink outline-none focus:border-[var(--primary)] sm:text-sm"
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void send()}
+              disabled={!draft.trim() || busy !== null}
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-medium text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+            >
+              <ArrowUp className="size-3.5" aria-hidden /> {busy === "sending" ? "Sending…" : "Send into their chat"}
+            </button>
+            <button type="button" onClick={() => setDraft(null)} className="rounded-full px-3 py-1.5 text-xs text-ink-2 ring-1 ring-line">
+              Discard
+            </button>
+            <span className="text-[11px] text-muted">Check it first: it goes to {customer} as your team&apos;s reply.</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

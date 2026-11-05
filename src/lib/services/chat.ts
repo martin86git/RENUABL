@@ -54,6 +54,9 @@ export const sendReply = (jobId: string, text: string, files: readonly File[] = 
     method: "POST",
     body: files.length ? withFiles({ text }, files) : { text },
   });
+/** Sol writes a reply as the member asked, for them to change and send; nothing is sent by asking. */
+export const draftReply = (jobId: string, words: string) =>
+  ask<{ text: string }>(`${jobChat(jobId)}/draft`, { method: "POST", body: { ask: words } });
 export const markChatRead = (jobId: string) => ask<{ marked: number }>(jobChat(jobId), { method: "PUT" });
 
 export const loadMessages = () => ask<{ unread: number; threads: ChatThread[] }>("/api/design/messages");

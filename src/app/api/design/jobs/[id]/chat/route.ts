@@ -23,7 +23,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/jobs
     if ("refuse" in who) return who.refuse;
     const found = validId(id) ? await jobById(who.member.businessId, id, viewerOf(who.member)) : null;
     if (!found) return notFound();
-    const lines = await chatLines(who.member.businessId, id);
+    const lines = await chatLines(who.member.businessId, id, who.member.email);
     return Response.json({
       ok: true,
       lines,
@@ -72,13 +72,16 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
   });
 }
 
-/** PUT: marks the customer's lines in this conversation as seen (opening the chat does it; so does the button in Messages). */
+/**
+ * PUT: marks the customer's lines in this conversation as seen by this member (opening the chat does it; so does the
+ * button in Messages). Each member's own: the rest of the team still sees them as new.
+ */
 export async function PUT(_request: Request, ctx: RouteContext<"/api/design/jobs/[id]/chat">) {
   return answer(async () => {
     const { id } = await ctx.params;
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     if (!validId(id) || !(await jobById(who.member.businessId, id, viewerOf(who.member)))) return notFound();
-    return Response.json({ ok: true, marked: await markRead(who.member.businessId, id) });
+    return Response.json({ ok: true, marked: await markRead(who.member.businessId, id, who.member.email) });
   });
 }

@@ -1175,6 +1175,20 @@ create table if not exists design_inspections (
 );
 create unique index if not exists design_inspections_live on design_inspections(business_id, job_id) where state not in ('declined','withdrawn');
 create index if not exists design_inspections_inspector on design_inspections(inspector_business, state);
+-- Every time an email from a deal was opened (only the latest are kept in opens); null on emails sent before it was kept.
+alter table design_email_opens add column if not exists open_count integer;
+-- What each member has seen of each job's customer chat (5 Nov 2026, Martin: unread is each person's own, so one
+-- member reading doesn't clear another's count). A customer's line is unread for a member while it came after their
+-- seen_at; lines marked read_at before this table (read for the whole business, as it was) stay read for everyone.
+create table if not exists design_chat_seen (
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  member_email text not null,
+  seen_at timestamptz not null default now(),
+  primary key (business_id, job_id, member_email),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create index if not exists design_chat_seen_member on design_chat_seen(business_id, member_email);
 `;
 
 async function ensureSchema() {

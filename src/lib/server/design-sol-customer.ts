@@ -10,16 +10,17 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { SOL_HANDED_OVER, solReplied } from "@/lib/domain/design/chat";
-import { readSolReply, solCustomerSystem, solHistory, solMayAnswer } from "@/lib/domain/design/sol-customer";
+import { readSolReply, solCustomerSystem, solDraftAsk, solDraftSystem, solHistory, solMayAnswer } from "@/lib/domain/design/sol-customer";
 import { todayInMarket } from "@/lib/domain/market";
 import { redactSecrets } from "./bill-reader";
 import { transaction } from "./db";
 import { addSolLine, chatLines } from "./design-chat-repo";
 import { record } from "./design-crm-repo";
-import { giveBackSolCredit, keepCost, modelFor, takeSolCredit } from "./sol-credits";
+import { giveBackSolCredit, keepCost, modelFor, takeSolCredit, withSolCredit } from "./sol-credits";
+import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { TIER_CREDITS, USE_TIER } from "@/lib/domain/design/sol-routing";
 import { usageOf } from "@/lib/domain/ai-costs";
-import { loadBrand, proposalJob, publicProposal } from "./design-proposal-repo";
+import { loadBrand, proposalJob, publicProposal, tokenForJob } from "./design-proposal-repo";
 
 /** A customer reads every word: always the deeper model (sol-routing.ts). */
 const TIER = USE_TIER.customer;
@@ -30,6 +31,60 @@ const BY_SOL = "Sol";
 export async function solAnswersFor(businessId: string, businessName: string): Promise<boolean> {
   if (!process.env.ANTHROPIC_API_KEY?.trim()) return false;
   return (await loadBrand(businessId, businessName)).solAnswers;
+}
+
+/**
+ * A reply Sol writes for a member to send in a deal's chat (`solDraftSystem`): from the customer's own copy of the
+ * proposal and the conversation, never a cost. One Sol credit of the customer chat's deep tier, given back when no
+ * answer comes. Nothing is kept or sent: the member changes it and sends it as their own reply.
+ */
+export async function solDraftsReply(
+  businessId: string,
+  jobId: string,
+  ask: string,
+  by: string,
+): Promise<{ text: string } | { problem: string; status: number }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) return { problem: "Sol isn't set up on this site yet, so he can't write a reply.", status: 503 };
+  const token = await tokenForJob(businessId, jobId);
+  const proposal = token ? await publicProposal(token, todayInMarket()) : null;
+  if (!proposal?.view)
+    return {
+      problem: "Sol writes from the customer's proposal, and this deal has none out yet. Publish it first, or write the reply yourself.",
+      status: 409,
+    };
+  const view = proposal.view;
+  const lines = await chatLines(businessId, jobId);
+  try {
+    const raw = await withSolCredit(
+      businessId,
+      "customer",
+      by,
+      async (ai) => {
+        const client = new Anthropic({ apiKey, timeout: 45_000, maxRetries: 1 });
+        const m = await client.messages.create({
+          model: ai.model,
+          max_tokens: 700,
+          system: solDraftSystem(view),
+          messages: [{ role: "user", content: solDraftAsk(lines, ask, view.customer.name.split(/\s+/)[0] || "Customer") }],
+        });
+        ai.onUsage(usageOf(m.model, m.usage));
+        return m.content
+          .filter((b): b is Anthropic.TextBlock => b.type === "text")
+          .map((b) => b.text)
+          .join("")
+          .trim();
+      },
+      TIER,
+      "chat reply drafted",
+    );
+    if (raw === "out") return { problem: SOL_OUT_SHORT, status: 402 };
+    const reply = readSolReply(raw);
+    return reply ? { text: reply.text } : { problem: "Sol couldn't write that one. Try putting it another way.", status: 502 };
+  } catch (e) {
+    console.error("sol couldn't draft a chat reply", redactSecrets(e instanceof Anthropic.APIError ? `Claude API ${e.status}` : String(e)));
+    return { problem: "Sol couldn't write a reply just now. Try again in a moment.", status: 502 };
+  }
 }
 
 /** Sol's answer to the customer behind a link, when he may give one. Every failure stops quietly: the team still has the message. */

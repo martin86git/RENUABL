@@ -37,8 +37,12 @@ export function withPixel(html: string, pixel: string): string {
   return at < 0 ? html + pixel : html.slice(0, at) + pixel + html.slice(at);
 }
 
-/** "Opened today at 3:15 pm", "Opened 3 times, last on Tue 4 Nov", or "Not opened yet". */
-export function openedWords(opens: readonly string[], timeZone: string, now = new Date()): string {
+/**
+ * "Opened today at 3:15 pm", "Opened 3 times · last today at 3:15 pm", "Opened 2 times · last on Tue, 4 Nov", or "Not
+ * opened yet". `count` is every open counted (only the latest `OPENS_EACH` times are kept), so it can be more than the
+ * times given; only the customer's copy is counted (`splitOurCopies`).
+ */
+export function openedWords(opens: readonly string[], timeZone: string, now = new Date(), count = opens.length): string {
   if (!opens.length) return "Not opened yet";
   const last = new Date(opens[opens.length - 1]);
   const day = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone }).format(d);
@@ -50,8 +54,35 @@ export function openedWords(opens: readonly string[], timeZone: string, now = ne
     day(last) === day(now)
       ? `today at ${time}`
       : `on ${new Intl.DateTimeFormat("en-AU", { timeZone, weekday: "short", day: "numeric", month: "short" }).format(last)}`;
-  return opens.length === 1 ? `Opened ${when}` : `Opened ${opens.length} times, last ${when}`;
+  const times = Math.max(count, opens.length);
+  return times === 1 ? `Opened ${when}` : `Opened ${times} times · last ${when}`;
 }
+
+/** Under an email on the deal's record that the site didn't track (sent before tracking, or with no site address set). */
+export const NOT_TRACKED = "Not tracked";
+
+/**
+ * Opens by the business's own people aren't the customer's (5 Nov 2026, Martin: as Primero's). One email has one
+ * pixel, whoever loads it, so a colleague on Cc opening it would count as the customer. So on a tracked email the
+ * addresses on Cc that are the business's own (its members, its brand and notify addresses: `ours`) are taken off the
+ * customer's copy and sent a copy of their own without the pixel; everyone else on Cc stays on the customer's copy.
+ */
+export function splitOurCopies(cc: readonly string[], ours: readonly string[]): { cc: string[]; ours: string[] } {
+  const own = new Set(ours.map((a) => a.trim().toLowerCase()).filter(Boolean));
+  const kept: string[] = [];
+  const split: string[] = [];
+  for (const address of cc) {
+    const a = address.trim().toLowerCase();
+    if (!a) continue;
+    const list = own.has(a) ? split : kept;
+    if (!list.includes(a)) list.push(a);
+  }
+  return { cc: kept, ours: split };
+}
+
+/** The line over the business's own copy of a tracked email, so it is plain why it came apart from the customer's. */
+export const ourCopyNote = (to: string) =>
+  `Your copy of the email to ${to}, sent apart from theirs so your opening it isn't counted as the customer's.`;
 
 /** A see-through 1×1 GIF. */
 export const PIXEL_GIF = Uint8Array.from(atob("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"), (c) => c.charCodeAt(0));

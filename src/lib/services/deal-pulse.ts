@@ -9,7 +9,8 @@ import { ask, type Answer } from "./crm";
 export const loadPulses = () => ask<{ pulses: Record<string, DealPulse> }>("/api/design/pulse");
 /** Each deal's mail mark (emails sent from it, and whether the latest was opened), for the pipeline cards. */
 export const loadMailMarks = () => ask<{ marks: Record<string, MailMark> }>("/api/design/mail-marks");
-export const loadOpens = (jobId: string) => ask<{ opens: Record<string, string[]> }>(`/api/design/jobs/${encodeURIComponent(jobId)}/opens`);
+export const loadOpens = (jobId: string) =>
+  ask<{ opens: Record<string, string[]>; counts: Record<string, number> }>(`/api/design/jobs/${encodeURIComponent(jobId)}/opens`);
 
 export interface DealFile {
   id: string;

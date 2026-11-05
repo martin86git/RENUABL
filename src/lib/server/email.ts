@@ -12,6 +12,8 @@ export interface Email {
   text: string;
   /** With a `contentId`, a picture shown inside the email (`<img src="cid:…">`) rather than listed as an attachment. */
   attachments?: { filename: string; content: string | Buffer; contentType?: string; contentId?: string }[];
+  /** Copied in (Cc), each shown to every reader of the email. */
+  cc?: string[];
   /** Where a reply goes, when not the site's own reply address: e.g. the member who sent a purchase order. */
   replyTo?: string;
 }
@@ -35,7 +37,7 @@ async function viaSendGrid(email: Email, key: string, from: string) {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
     body: JSON.stringify({
-      personalizations: [{ to: [{ email: email.to }] }],
+      personalizations: [{ to: [{ email: email.to }], ...(email.cc?.length ? { cc: email.cc.map((a) => ({ email: a })) } : {}) }],
       from: parseFrom(from),
       ...(replyTo ? { reply_to: parseFrom(replyTo) } : {}),
       subject: email.subject,
@@ -66,6 +68,7 @@ async function viaResend(email: Email, key: string, from: string) {
     body: JSON.stringify({
       from,
       to: [email.to],
+      ...(email.cc?.length ? { cc: email.cc } : {}),
       reply_to: email.replyTo?.trim() || process.env.EMAIL_REPLY_TO?.trim() || undefined,
       subject: email.subject,
       html: email.html,

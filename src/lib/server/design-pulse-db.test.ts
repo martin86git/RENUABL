@@ -55,6 +55,7 @@ describe.skipIf(!url)("deal pulses, email opens and attachments (database)", () 
     await pulse.recordOpen(token, new Date("2026-11-02T00:05:00Z"));
     await pulse.recordOpen("f".repeat(32));
     expect(await pulse.opensForJob(a, jobId, all)).toEqual({ act_1: ["2026-11-02T00:00:00.000Z", "2026-11-02T00:05:00.000Z"] });
+    expect(await pulse.openCountsForJob(a, jobId)).toEqual({ act_1: 2 });
     expect(await pulse.opensForJob(a, jobId, samOnly)).toBeNull();
     expect(await pulse.opensForJob(b, jobId, all)).toBeNull();
   });

@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Bell, Copy, Eye, EyeOff, FileText, History, Mail, MessageSquarePlus, Paperclip, X, Pin } from "lucide-react";
+import { Bell, Copy, Eye, EyeOff, FileText, History, MessageSquarePlus, Paperclip, X, Pin } from "lucide-react";
 import { lookingAt } from "@/lib/domain/design/page-context";
 import { pageAt } from "@/lib/domain/design/sections";
 import { PAGE_ABOUT_CHANGED, currentPageContext, pageAboutNow } from "@/lib/services/page-context";
@@ -20,7 +20,6 @@ import {
   dueWords,
   typingDeal,
   whenChoices,
-  type SolDraft,
   type SolFile,
   type SolReminderAsk,
   type SolState,
@@ -53,6 +52,7 @@ import { STARTER_QUESTIONS } from "@/lib/domain/design/sol-knowledge";
 import { SolMark } from "./sol-icon";
 import { SolThinking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
+import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
 import { SolDesignView } from "./sol-design-view";
 import { SolText } from "./sol-text";
 import { solPlain } from "@/lib/domain/design/sol-format";
@@ -267,9 +267,9 @@ export function SolChat({
     });
   };
 
-  const openDraft = (d: SolDraft) => {
+  const openDraft = (d: DraftAsEdited) => {
     try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ jobId: d.jobId, subject: d.subject, body: d.body }));
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ jobId: d.jobId, subject: d.subject, body: d.body, cc: d.cc }));
     } catch {
       // A private window: the deal's email opens empty, and the card can still be copied.
     }
@@ -446,7 +446,7 @@ export function SolChat({
               <SolDesignView key={d.jobId} shown={d} />
             ))}
             {t.drafts?.map((d, k) => (
-              <DraftCard key={k} draft={d} onOpen={() => openDraft(d)} />
+              <SolDraftCard key={k} draft={d} onOpen={openDraft} />
             ))}
             {t.reminder && (
               <ReminderCard
@@ -796,38 +796,6 @@ function Bubble({ you, text, at, pinned, onPin }: { you: boolean; text: string; 
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-/** An email Sol wrote, to check and send from the deal: "Open in the deal's email" hands it to the deal's Email tab. */
-function DraftCard({ draft, onOpen }: { draft: SolDraft; onOpen: () => void }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="rounded-2xl bg-surface p-4 text-sm ring-1 ring-line">
-      <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-ink">
-        <Mail className="size-3.5" aria-hidden /> Draft email · not sent
-      </p>
-      <p className="mt-2 font-semibold text-ink">{draft.subject || "(no subject)"}</p>
-      <p className="text-xs text-muted">
-        To {draft.customer}
-        {draft.to ? ` <${draft.to}>` : " (no email address yet)"}
-      </p>
-      <p className="mt-2 max-h-56 overflow-y-auto whitespace-pre-wrap text-ink-2">{draft.body}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={onOpen} className="rounded-full bg-ink px-3 py-1.5 text-xs font-medium text-white hover:bg-ink-2">
-          Open in the deal&apos;s email
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            void navigator.clipboard?.writeText(`${draft.subject}\n\n${draft.body}`).then(() => setCopied(true));
-          }}
-          className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs text-ink-2 ring-1 ring-line hover:text-ink"
-        >
-          <Copy className="size-3.5" aria-hidden /> {copied ? "Copied" : "Copy"}
-        </button>
-      </div>
     </div>
   );
 }

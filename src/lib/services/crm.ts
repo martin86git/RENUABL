@@ -148,11 +148,19 @@ export async function loadDealDesign(
 export const dealEmailStatus = (jobId: string) =>
   ask<{ canSend: boolean; replyTo: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/email`);
 /** Emails a deal's customer: sent in the business's name, replies to the member, written on the deal's record. */
-export const emailDeal = (jobId: string, email: { to: string; subject: string; body: string }, files: readonly File[] = []) =>
-  ask<{ message: string; activity: Activity | null }>(`/api/design/jobs/${encodeURIComponent(jobId)}/email`, {
+export const emailDeal = (
+  jobId: string,
+  email: { to?: string; cc?: string; subject: string; body: string; toCustomer?: boolean },
+  files: readonly File[] = [],
+) => {
+  // A Sol draft goes to the customer's address as the server keeps it (`toCustomer`), never one from here.
+  const { toCustomer, ...fields } = email;
+  const form: Record<string, string> = { ...fields, to: fields.to ?? "", cc: fields.cc ?? "", ...(toCustomer ? { toCustomer: "1" } : {}) };
+  return ask<{ message: string; activity: Activity | null }>(`/api/design/jobs/${encodeURIComponent(jobId)}/email`, {
     method: "POST",
-    body: files.length ? withFiles(email, files) : email,
+    body: files.length ? withFiles(form, files) : { ...fields, ...(toCustomer ? { toCustomer: true } : {}) },
   });
+};
 
 /** The business's arrangement of a deal's fields (Settings → Deal fields), and whether it is its own. */
 export const loadDealFields = () =>
