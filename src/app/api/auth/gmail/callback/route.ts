@@ -20,5 +20,5 @@ export async function GET(request: Request) {
   if (access.state !== "ready" || access.member.viewedBy) return back("signed-out");
   if (!config || !code || !kept || !same(kept, state)) return back("failed");
   const ok = await connectGmail(config, code, access.member).catch(() => false);
-  return back(ok ? "connected" : "failed");
+  return back(ok === "full" ? "full" : ok ? "connected" : "failed");
 }

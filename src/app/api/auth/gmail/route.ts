@@ -6,7 +6,8 @@ import { GMAIL_STATE_COOKIE, gmailAuthUrl, gmailConfig } from "@/lib/server/gmai
 
 /**
  * GET: off to Google to connect this member's own Gmail, read only, suggested their own address, with a one-off state
- * kept in a short cookie to match on the way back. Never while the owner is viewing as someone else.
+ * kept in a short cookie to match on the way back. With ?add=1 (another mailbox, 5 Nov 2026) Google asks which account
+ * instead. Never while the owner is viewing as someone else.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -23,5 +24,6 @@ export async function GET(request: Request) {
     path: "/api/auth/gmail",
     maxAge: 600,
   });
-  return NextResponse.redirect(gmailAuthUrl(config, state, access.member.email));
+  const adding = url.searchParams.get("add") === "1";
+  return NextResponse.redirect(gmailAuthUrl(config, state, adding ? null : access.member.email));
 }

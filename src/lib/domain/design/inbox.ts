@@ -15,6 +15,16 @@ export const INBOX_SIZE = 30;
 export const NOTE_MAX = 2000;
 /** What an email shares when someone is tagged on it: its words, up to this many characters. */
 export const SHARED_TEXT_MAX = 8000;
+/** How many Gmail mailboxes one person may connect (5 Nov 2026, Martin: one or more, say their own and sales@). */
+export const MAX_MAILBOXES = 5;
+
+/** Several mailboxes' newest emails as one inbox: newest first, the first `size` of them. */
+export function mergeInboxes<T extends { at: string }>(boxes: readonly (readonly T[])[], size = INBOX_SIZE): T[] {
+  return boxes
+    .flat()
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, size);
+}
 
 export interface InboxEmail {
   id: string;
@@ -30,6 +40,8 @@ export interface InboxEmail {
   deal: { id: string; customer: string } | null;
   /** How many notes are on it. */
   notes: number;
+  /** The connected mailbox it came to (one person may connect several); it is opened from that one. */
+  box?: string;
 }
 
 /** "Sam Sparks <sam@x.example>" → its name and address; a bare address has its own handle as the name. */
@@ -65,9 +77,10 @@ export const INBOX_FILTERS = [
 export type InboxFilter = (typeof INBOX_FILTERS)[number]["id"];
 
 /** The emails a filter and a search leave: every word of the search must be in the sender, subject or line. */
-export function filterInbox(emails: readonly InboxEmail[], filter: InboxFilter, search = ""): InboxEmail[] {
+export function filterInbox(emails: readonly InboxEmail[], filter: InboxFilter, search = "", box?: string): InboxEmail[] {
   const words = search.toLowerCase().split(/\s+/).filter(Boolean);
   return emails.filter((e) => {
+    if (box && e.box !== box) return false;
     if (filter === "customers" && !e.deal) return false;
     if (filter === "unread" && !e.unread) return false;
     if (filter === "automated" && !e.automated) return false;

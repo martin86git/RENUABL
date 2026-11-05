@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-05",
+    area: "Email",
+    words: "Connect more than one Gmail, say your own and sales@, and read them as one inbox. Inbox is also a tab on Today.",
+  },
+  {
+    day: "2026-11-05",
     area: "Everywhere",
     words: "Press the date in the top corner to see your calendar. Connect your Google Calendar once and your events show there.",
   },

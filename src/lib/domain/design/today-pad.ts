@@ -12,6 +12,8 @@ import { VIC_PUBLIC_HOLIDAYS } from "../scheduling";
 
 export const TODAY_TABS = [
   { id: "today", label: "Today" },
+  // 5 Nov 2026, Martin: the member's own email beside their day.
+  { id: "inbox", label: "Inbox" },
   { id: "calendar", label: "Calendar" },
   { id: "pipeline", label: "Pipeline" },
 ] as const;

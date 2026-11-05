@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { dayGroup, filterInbox, isAutomated, isMessageId, mayReadTalk, parseFrom, partsOf, withPictures, type InboxEmail } from "./inbox";
+import {
+  dayGroup,
+  filterInbox,
+  isAutomated,
+  isMessageId,
+  mayReadTalk,
+  mergeInboxes,
+  parseFrom,
+  partsOf,
+  withPictures,
+  type InboxEmail,
+} from "./inbox";
 
 describe("the inbox", () => {
   it("reads who an email is from, and tells a machine's address", () => {
@@ -82,5 +93,17 @@ describe("the inbox", () => {
     ]);
     expect(isMessageId("18c2f0a9b3d4e5f6")).toBe(true);
     expect(isMessageId("../etc")).toBe(false);
+  });
+});
+
+describe("several mailboxes", () => {
+  it("merges them newest first and keeps the inbox's size", () => {
+    const a = [
+      { at: "2026-11-05T01:00:00Z", box: "a" },
+      { at: "2026-11-03T01:00:00Z", box: "a" },
+    ];
+    const b = [{ at: "2026-11-04T01:00:00Z", box: "b" }];
+    expect(mergeInboxes([a, b]).map((e) => e.box)).toEqual(["a", "b", "a"]);
+    expect(mergeInboxes([a, b], 2)).toHaveLength(2);
   });
 });

@@ -1,12 +1,13 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowLeft, Bot, Copy, ExternalLink, Lock, Paperclip, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, Bot, Copy, ExternalLink, Lock, Paperclip, Plus, RefreshCw, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { INBOX_FILTERS, NOTE_MAX, dayGroup, filterInbox, type InboxEmail, type InboxFilter } from "@/lib/domain/design/inbox";
 import {
+  ADD_GMAIL,
   CONNECT_GMAIL,
   disconnectGmail,
   emailFileHref,
@@ -35,6 +36,7 @@ const GMAIL_SAYS: Record<string, string> = {
   failed: "Gmail couldn't be connected. Try again, and allow RENUABL to read your email when Google asks.",
   off: "Connecting Gmail isn't set up here yet.",
   "signed-out": "Sign in to your business first.",
+  full: "That's as many mailboxes as one person can connect. Disconnect one to add another.",
 };
 
 /**
@@ -48,7 +50,9 @@ export function InboxPage() {
   const [asks, setAsks] = useState(0);
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [search, setSearch] = useState("");
-  const [open, setOpen] = useState<{ id: string; owner?: string } | null>(null);
+  const [open, setOpen] = useState<{ id: string; owner?: string; box?: string } | null>(null);
+  // One mailbox picked out of several (5 Nov 2026: a person may connect more than one); none is every mailbox.
+  const [box, setBox] = useState<string | null>(null);
   const said = useSearchParams().get("gmail");
   useEffect(() => {
     let gone = false;
@@ -64,7 +68,9 @@ export function InboxPage() {
     };
   }, [asks]);
   const now = useMemo(() => new Date(), [data]); // eslint-disable-line react-hooks/exhaustive-deps
-  const shown = data ? filterInbox(data.emails, filter, search) : [];
+  const boxes = data?.addresses ?? (data?.address ? [data.address] : []);
+  const picked = box && boxes.includes(box) ? box : undefined;
+  const shown = data ? filterInbox(data.emails, filter, search, picked) : [];
   const groups: { day: string; emails: InboxEmail[] }[] = [];
   for (const e of shown) {
     const day = dayGroup(e.at, now);
@@ -72,29 +78,14 @@ export function InboxPage() {
     else groups.push({ day, emails: [e] });
   }
 
-  if (open) return <EmailView id={open.id} owner={open.owner} onBack={() => setOpen(null)} />;
+  if (open) return <EmailView id={open.id} owner={open.owner} box={open.box} onBack={() => setOpen(null)} />;
   return (
     <div className={clsx(ui.page, "space-y-4")}>
       <PageHead title="Email">
         {data?.connected && (
-          <>
-            <span className="text-sm text-muted">{data.address}</span>
-            <button type="button" className={clsx(ui.quiet, "h-9 px-3")} onClick={() => setAsks((n) => n + 1)}>
-              <RefreshCw className="size-4" aria-hidden /> Refresh
-            </button>
-            <button
-              type="button"
-              className="text-xs text-muted underline underline-offset-4 hover:text-ink"
-              onClick={async () => {
-                if (!window.confirm("Disconnect your Gmail? RENUABL stops reading it, and Google is told to forget the connection."))
-                  return;
-                await disconnectGmail();
-                setAsks((n) => n + 1);
-              }}
-            >
-              Disconnect
-            </button>
-          </>
+          <button type="button" className={clsx(ui.quiet, "h-9 px-3")} onClick={() => setAsks((n) => n + 1)}>
+            <RefreshCw className="size-4" aria-hidden /> Refresh
+          </button>
         )}
       </PageHead>
       {said && GMAIL_SAYS[said] && (
@@ -143,6 +134,18 @@ export function InboxPage() {
         <ConnectCard ready={data.ready !== false} broken={data.broken} />
       ) : (
         <>
+          <Mailboxes
+            boxes={boxes}
+            picked={picked}
+            more={data.more !== false}
+            onPick={(b) => setBox(b)}
+            onRemove={async (b) => {
+              if (!window.confirm(`Disconnect ${b}? RENUABL stops reading it, and Google is told to forget the connection.`)) return;
+              await disconnectGmail(b);
+              if (box === b) setBox(null);
+              setAsks((n) => n + 1);
+            }}
+          />
           <div className="flex flex-wrap items-center gap-3">
             <div role="radiogroup" aria-label="Show" className="flex rounded-md border border-line bg-surface-2 p-0.5 text-sm">
               {INBOX_FILTERS.map((f) => (
@@ -181,10 +184,10 @@ export function InboxPage() {
                   </p>
                   <ul className="divide-y divide-line">
                     {g.emails.map((e) => (
-                      <li key={e.id}>
+                      <li key={`${e.box ?? ""}-${e.id}`}>
                         <button
                           type="button"
-                          onClick={() => setOpen({ id: e.id })}
+                          onClick={() => setOpen({ id: e.id, box: e.box })}
                           className={clsx(
                             "relative flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-surface-2",
                             e.automated && "opacity-70",
@@ -209,6 +212,9 @@ export function InboxPage() {
                             ) : e.automated ? (
                               <span className="block text-[11px] text-muted">Automated</span>
                             ) : null}
+                            {boxes.length > 1 && !picked && e.box && (
+                              <span className="block truncate text-[11px] text-muted">to {e.box}</span>
+                            )}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-sm">
                             <span className={clsx(e.unread ? "font-semibold text-ink" : "text-ink")}>{e.subject}</span>
@@ -225,10 +231,64 @@ export function InboxPage() {
             </div>
           )}
           <p className="text-xs text-muted">
-            The newest {data.emails.length} in your inbox. RENUABL only reads: archive, mark read and reply in Gmail or from the deal&apos;s
-            Email tab.
+            The newest {data.emails.length} {boxes.length > 1 ? "across your inboxes" : "in your inbox"}. RENUABL only reads: archive, mark
+            read and reply in Gmail or from the deal&apos;s Email tab.
           </p>
         </>
+      )}
+    </div>
+  );
+}
+
+/** The mailboxes this person has connected: each picks the inbox down to it, or goes; and room to add another. */
+function Mailboxes({
+  boxes,
+  picked,
+  more,
+  onPick,
+  onRemove,
+}: {
+  boxes: string[];
+  picked?: string;
+  more: boolean;
+  onPick: (box: string | null) => void;
+  onRemove: (box: string) => void;
+}) {
+  const chip = (on: boolean) =>
+    clsx(
+      "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] ring-1 transition",
+      on ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line hover:text-ink",
+    );
+  return (
+    <div className="flex flex-wrap items-center gap-2" aria-label="Your mailboxes">
+      {boxes.length > 1 && (
+        <button type="button" className={chip(!picked)} onClick={() => onPick(null)} aria-pressed={!picked}>
+          All mailboxes
+        </button>
+      )}
+      {boxes.map((b) => (
+        <span key={b} className={clsx(chip(picked === b), "pr-1")}>
+          <button type="button" onClick={() => onPick(picked === b ? null : b)} aria-pressed={picked === b} className="truncate">
+            {b}
+          </button>
+          <button
+            type="button"
+            onClick={() => onRemove(b)}
+            aria-label={`Disconnect ${b}`}
+            title={`Disconnect ${b}`}
+            className="inline-flex size-6 items-center justify-center rounded-full opacity-60 hover:opacity-100"
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        </span>
+      ))}
+      {more && (
+        <a
+          href={ADD_GMAIL}
+          className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
+        >
+          <Plus className="size-4" aria-hidden /> Add another Gmail
+        </a>
       )}
     </div>
   );
@@ -237,10 +297,11 @@ export function InboxPage() {
 function ConnectCard({ ready, broken }: { ready: boolean; broken?: string }) {
   return (
     <section className={clsx(ui.card, "max-w-xl p-6")}>
-      <h2 className="text-lg font-semibold tracking-tight text-ink">Connect your Gmail</h2>
+      <h2 className="text-lg font-semibold tracking-tight text-ink">Connect your email</h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-2">
-        See your inbox here with each customer&apos;s deal beside their emails, keep notes on an email, and share one with a teammate.
-        RENUABL only reads your email: it never sends, deletes or changes anything in it. Only you see your inbox.
+        Connect one Gmail or several (your own and a shared one like sales@) and see them here as one inbox, with each customer&apos;s deal
+        beside their emails. Keep notes on an email, and share one with a teammate. RENUABL only reads your email: it never sends, deletes
+        or changes anything in it. Only you see your inbox.
       </p>
       {broken && <p className="mt-3 text-sm text-warning">{broken}</p>}
       {ready ? (
@@ -255,7 +316,7 @@ function ConnectCard({ ready, broken }: { ready: boolean; broken?: string }) {
   );
 }
 
-function EmailView({ id, owner, onBack }: { id: string; owner?: string; onBack: () => void }) {
+function EmailView({ id, owner, box, onBack }: { id: string; owner?: string; box?: string; onBack: () => void }) {
   const [account] = useDesignAccount();
   const me = account?.signedIn ? account.email.toLowerCase() : "";
   const [email, setEmail] = useState<OpenedEmail | null>(null);
@@ -265,7 +326,7 @@ function EmailView({ id, owner, onBack }: { id: string; owner?: string; onBack: 
   const [sol, setSol] = useState<{ mode: "summary" | "reply"; text: string | null } | null>(null);
   useEffect(() => {
     let gone = false;
-    void openInboxEmail(id, owner).then((res) => {
+    void openInboxEmail(id, owner, box).then((res) => {
       if (gone) return;
       if (res.ok) setEmail(res.email);
       else setProblem(res.message);
@@ -273,7 +334,7 @@ function EmailView({ id, owner, onBack }: { id: string; owner?: string; onBack: 
     return () => {
       gone = true;
     };
-  }, [id, owner]);
+  }, [id, owner, box]);
   const send = async () => {
     if (!email || !note.trim()) return;
     const res = await noteOnEmail(id, email.owner, note.trim());
@@ -354,7 +415,7 @@ function EmailView({ id, owner, onBack }: { id: string; owner?: string; onBack: 
                 {email.files.map((f) => (
                   <li key={f.n}>
                     <a
-                      href={emailFileHref(email.id, f.n)}
+                      href={emailFileHref(email.id, f.n, email.box)}
                       className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs text-ink hover:border-forest"
                     >
                       <Paperclip className="size-3.5" aria-hidden /> {f.name}

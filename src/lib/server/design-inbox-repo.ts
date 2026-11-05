@@ -71,6 +71,7 @@ export async function inboxFor(member: Who, viewer: DealViewer): Promise<{ email
       automated: isAutomated(froms[i].email),
       deal: deals.get(froms[i].email) ?? null,
       notes: n.get(m.id) ?? 0,
+      box: m.box,
     })),
     shared,
   };
@@ -103,6 +104,8 @@ const decode = (b64url: string) => Buffer.from(b64url, "base64url").toString("ut
 export interface OpenedEmail {
   id: string;
   owner: string;
+  /** The member's mailbox it is in (a shared copy has none). */
+  box?: string;
   subject: string;
   from: { name: string; email: string };
   to: string;
@@ -128,9 +131,9 @@ export interface EmailNote {
 const PICTURES = 8;
 const PICTURE_BYTES = 4 * 1024 * 1024;
 
-/** One of the member's own emails, whole, with its notes. */
-export async function openEmail(member: Who, viewer: DealViewer, id: string): Promise<OpenedEmail> {
-  const m = await fullMessage(member, id);
+/** One of the member's own emails, whole, with its notes, from the mailbox named (else whichever holds it). */
+export async function openEmail(member: Who, viewer: DealViewer, id: string, box?: string): Promise<OpenedEmail> {
+  const m = await fullMessage(member, id, box);
   const payload = m.payload ?? {};
   const parts = partsOf(payload);
   const from = parseFrom(fromOf(m));
@@ -141,7 +144,7 @@ export async function openEmail(member: Who, viewer: DealViewer, id: string): Pr
     const data = p.data
       ? Buffer.from(p.data, "base64url")
       : p.attachmentId
-        ? await attachment(member, id, p.attachmentId).catch(() => null)
+        ? await attachment(member, m.box, id, p.attachmentId).catch(() => null)
         : null;
     if (!data || bytes + data.length > PICTURE_BYTES) continue;
     bytes += data.length;
@@ -154,6 +157,7 @@ export async function openEmail(member: Who, viewer: DealViewer, id: string): Pr
   return {
     id,
     owner: member.email.toLowerCase(),
+    box: m.box,
     subject: subjectOf(m),
     from,
     to: (m.payload?.headers ?? []).find((h) => h.name.toLowerCase() === "to")?.value ?? "",
@@ -169,11 +173,16 @@ export async function openEmail(member: Who, viewer: DealViewer, id: string): Pr
 }
 
 /** A file from one of the member's own emails. */
-export async function emailFile(member: Who, id: string, n: number): Promise<{ name: string; type: string; bytes: Buffer } | null> {
-  const m = await fullMessage(member, id);
+export async function emailFile(
+  member: Who,
+  id: string,
+  n: number,
+  box?: string,
+): Promise<{ name: string; type: string; bytes: Buffer } | null> {
+  const m = await fullMessage(member, id, box);
   const file = partsOf(m.payload ?? {}).files.find((f) => f.n === n);
   if (!file) return null;
-  return { name: file.name, type: file.type, bytes: await attachment(member, id, file.attachmentId) };
+  return { name: file.name, type: file.type, bytes: await attachment(member, m.box, id, file.attachmentId) };
 }
 
 async function talkOf(businessId: string, owner: string, id: string) {

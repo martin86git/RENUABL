@@ -10,6 +10,10 @@ export type { OpenedEmail, SharedEmail };
 export interface InboxAnswer {
   connected: boolean;
   address?: string;
+  /** Every mailbox this member has connected (5 Nov 2026: one or more). */
+  addresses?: string[];
+  /** Whether another may be connected (under `MAX_MAILBOXES`). */
+  more?: boolean;
   /** Google's sign-in is set up here (without it, Connect Gmail can't work). */
   ready?: boolean;
   /** The owner is viewing as someone else: their mailbox isn't read. */
@@ -23,12 +27,17 @@ export interface InboxAnswer {
 export const INBOX = "/api/design/inbox";
 export const loadInbox = () => ask<InboxAnswer>(INBOX);
 export const inboxUnread = () => ask<{ unread: number }>(`${INBOX}?count=1`);
-export const openInboxEmail = (id: string, owner?: string) =>
-  ask<{ email: OpenedEmail }>(`${INBOX}?id=${encodeURIComponent(id)}${owner ? `&owner=${encodeURIComponent(owner)}` : ""}`);
-export const emailFileHref = (id: string, n: number) => `${INBOX}?id=${encodeURIComponent(id)}&file=${n}`;
+const boxQuery = (box?: string) => (box ? `&box=${encodeURIComponent(box)}` : "");
+export const openInboxEmail = (id: string, owner?: string, box?: string) =>
+  ask<{ email: OpenedEmail }>(`${INBOX}?id=${encodeURIComponent(id)}${owner ? `&owner=${encodeURIComponent(owner)}` : boxQuery(box)}`);
+export const emailFileHref = (id: string, n: number, box?: string) => `${INBOX}?id=${encodeURIComponent(id)}&file=${n}${boxQuery(box)}`;
 export const noteOnEmail = (id: string, owner: string, text: string) =>
   ask<{ told: string[]; email: OpenedEmail }>(INBOX, { method: "POST", body: { do: "note", id, owner, text } });
 export const solOnEmail = (id: string, owner: string, mode: "summary" | "reply") =>
   ask<{ text: string }>(INBOX, { method: "POST", body: { do: "sol", id, owner, mode } });
-export const disconnectGmail = () => ask<object>(INBOX, { method: "DELETE" });
+/** Disconnects one mailbox, or every one with none named. */
+export const disconnectGmail = (address?: string) =>
+  ask<object>(address ? `${INBOX}?address=${encodeURIComponent(address)}` : INBOX, { method: "DELETE" });
 export const CONNECT_GMAIL = "/api/auth/gmail";
+/** Connect a further mailbox: Google asks which account. */
+export const ADD_GMAIL = "/api/auth/gmail?add=1";

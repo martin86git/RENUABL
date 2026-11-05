@@ -892,8 +892,15 @@ create table if not exists design_gmail (
   access text,
   expires_at timestamptz,
   created_at timestamptz not null default now(),
-  primary key (business_id, email)
+  primary key (business_id, email, address)
 );
+-- One person may connect several mailboxes (5 Nov 2026): a table made before keyed by person alone gains the address.
+do $$ begin
+  if (select count(*) from information_schema.key_column_usage where table_name = 'design_gmail' and constraint_name = 'design_gmail_pkey') = 2 then
+    alter table design_gmail drop constraint design_gmail_pkey;
+    alter table design_gmail add primary key (business_id, email, address);
+  end if;
+end $$;
 -- Each member's own Google Calendar, read only (domain/design/my-calendar.ts), kept as Gmail's is.
 create table if not exists design_calendar (
   business_id text not null references businesses(id) on delete cascade,

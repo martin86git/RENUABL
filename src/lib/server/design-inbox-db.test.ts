@@ -67,3 +67,36 @@ describe.skipIf(!url)("notes on an email (database)", () => {
     expect(forKim?.notes).toHaveLength(2);
   });
 });
+
+describe.skipIf(!url)("several mailboxes for one person (database)", () => {
+  let db: typeof import("./db");
+  let gmail: typeof import("./gmail");
+  let a: string;
+  const OWNER = "owner@gamma-inbox.test";
+  const who = () => ({ businessId: a, email: OWNER });
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL = url;
+    db = await import("./db");
+    await db.resetDbForTests();
+    const repo = await import("./design-repo");
+    gmail = await import("./gmail");
+    await db.query(`delete from businesses where created_by = $1`, [OWNER]);
+    a = (await repo.createBusiness(OWNER, "Gamma Solar", BUSINESS_TERMS_VERSION)).businessId;
+    // Two mailboxes, as two connections would keep them (tokens that open nothing, so nothing is sent to Google).
+    for (const address of ["owner@gamma-inbox.test", "sales@gamma-inbox.test"])
+      await db.query(`insert into design_gmail (business_id, email, address, token) values ($1,$2,$3,'not-a-token')`, [a, OWNER, address]);
+  });
+  afterAll(async () => {
+    await db.query(`delete from businesses where id = $1`, [a]);
+    await db.resetDbForTests();
+  });
+
+  it("keeps both, and disconnecting one leaves the other", async () => {
+    expect(await gmail.gmailAddresses(who())).toEqual(["owner@gamma-inbox.test", "sales@gamma-inbox.test"]);
+    await gmail.disconnectGmail(who(), "owner@gamma-inbox.test");
+    expect(await gmail.gmailAddresses(who())).toEqual(["sales@gamma-inbox.test"]);
+    await gmail.disconnectGmail(who());
+    expect(await gmail.gmailAddresses(who())).toEqual([]);
+  });
+});

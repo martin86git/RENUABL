@@ -27,9 +27,11 @@ import type { SolDesignShown } from "@/lib/domain/design/sol-designs";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { loadMailMarks } from "@/lib/services/deal-pulse";
+import { inboxUnread } from "@/lib/services/inbox";
 import { SOL_CHANGED, SOL_TOGGLE, askSol, loadSol } from "@/lib/services/sol";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
+import { InboxPage } from "./inbox";
 import { NewLook } from "./new-look";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
 import { SolBadge, SolIcon, SolMark, SolStars } from "./sol-icon";
@@ -37,7 +39,7 @@ import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-ag
 import { SolDesignView } from "./sol-design-view";
 import { SolThinking } from "./sol-thinking";
 
-const TAB_ICONS: Record<TodayTab, typeof Sun> = { today: Sun, calendar: CalendarDays, pipeline: KanbanSquare };
+const TAB_ICONS: Record<TodayTab, typeof Sun> = { today: Sun, inbox: Mail, calendar: CalendarDays, pipeline: KanbanSquare };
 /** Items under To action before "N more". */
 const SHOWN = 5;
 /** How long Sol waits for his drafts, and for Before you call, before telling the day without them. */
@@ -96,6 +98,15 @@ export function TodayPad(props: {
   day: React.ReactNode;
 }) {
   const [tab, setTab] = useState<TodayTab | "day">("today");
+  // Gmail's own unread count on the Inbox tab (none until a mailbox is connected).
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    let gone = false;
+    void inboxUnread().then((r) => !gone && r.ok && setUnread(r.unread));
+    return () => {
+      gone = true;
+    };
+  }, [tab]);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [asking, setAsking] = useState(false);
   const items = useNextUp(props.jobs, props.today);
@@ -161,6 +172,16 @@ export function TodayPad(props: {
                 >
                   <Icon className="size-4" aria-hidden />
                   {t.label}
+                  {t.id === "inbox" && unread > 0 && (
+                    <span
+                      className={clsx(
+                        "rounded-full px-1.5 text-[11px] font-semibold tabular-nums",
+                        on ? "bg-white/20" : "bg-sun text-sun-ink",
+                      )}
+                    >
+                      {unread}
+                    </span>
+                  )}
                   {t.id === "today" && items && items.length > 0 && (
                     <span
                       className={clsx(
@@ -264,6 +285,7 @@ export function TodayPad(props: {
 
       {tab !== "today" && (
         <div className="mt-8 flex-1">
+          {tab === "inbox" && <InboxPage />}
           {tab === "calendar" && <CalendarView jobs={props.jobs} today={props.today} />}
           {tab === "pipeline" && <PipelineView jobs={props.jobs} today={props.today} />}
           {tab === "day" && props.day}

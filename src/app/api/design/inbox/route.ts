@@ -3,7 +3,8 @@ import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { addEmailNote, emailFile, inboxFor, openEmail, sharedEmail, sharedWith } from "@/lib/server/design-inbox-repo";
-import { GmailOff, disconnectGmail, gmailAddress, gmailConfig, unreadCount } from "@/lib/server/gmail";
+import { MAX_MAILBOXES } from "@/lib/domain/design/inbox";
+import { GmailOff, disconnectGmail, gmailAddresses, gmailConfig, unreadCount } from "@/lib/server/gmail";
 import { allow } from "@/lib/server/rate-limit";
 import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { withSolCredit } from "@/lib/server/sol-credits";
@@ -15,9 +16,11 @@ const json = (body: object, status = 200) => Response.json(body, { status });
 
 /**
  * GET: this member's own Gmail inbox, read only (domain/design/inbox.ts).
- * - no query: { connected, address, emails, shared } (or { connected: false, ready } when Gmail isn't connected)
+ * - no query: { connected, address, addresses, emails, shared } across every mailbox the member connected (or
+ *   { connected: false, ready } when none is)
  * - ?count=1: { unread } (Gmail's own count)
- * - ?id=<message>: the email whole, with its notes; with &owner=<email>, a copy shared with this member
+ * - ?id=<message>[&box=<address>]: the email whole, from that mailbox, with its notes; with &owner=<email>, a copy
+ *   shared with this member
  * - ?id=<message>&file=<n>: one of its files, from the member's own mailbox only
  * Never while the owner is viewing as someone else: that person's mailbox isn't read.
  */
@@ -35,7 +38,9 @@ export async function GET(request: Request) {
       return shared ? json({ ok: true, email: shared }) : json({ ok: false, message: "That email isn't shared with you." }, 404);
     }
     if (member.viewedBy) return json({ ok: true, connected: false, viewing: true, emails: [], shared: [] });
-    const address = await gmailAddress(member);
+    const addresses = await gmailAddresses(member);
+    const address = addresses[0];
+    const box = q.get("box")?.toLowerCase() || undefined;
     if (!address) {
       if (q.get("count") === "1") return json({ ok: true, unread: 0 });
       // Emails others shared with this member show whether or not their own Gmail is connected.
@@ -53,7 +58,7 @@ export async function GET(request: Request) {
         if (!isMessageId(id)) return json({ ok: false, message: "That email couldn't be found." }, 404);
         const file = q.get("file");
         if (file !== null) {
-          const got = await emailFile(member, id, Number(file));
+          const got = await emailFile(member, id, Number(file), box);
           if (!got) return new Response("Not found", { status: 404 });
           return new Response(new Uint8Array(got.bytes), {
             headers: {
@@ -65,9 +70,16 @@ export async function GET(request: Request) {
             },
           });
         }
-        return json({ ok: true, email: await openEmail(member, viewerOf(member), id) });
+        return json({ ok: true, email: await openEmail(member, viewerOf(member), id, box) });
       }
-      return json({ ok: true, connected: true, address, ...(await inboxFor(member, viewerOf(member))) });
+      return json({
+        ok: true,
+        connected: true,
+        address,
+        addresses,
+        more: addresses.length < MAX_MAILBOXES,
+        ...(await inboxFor(member, viewerOf(member))),
+      });
     } catch (e) {
       if (e instanceof GmailOff)
         return json({ ok: true, connected: false, ready: true, broken: e.message, emails: [], shared: await sharedWith(member) });
@@ -147,12 +159,13 @@ export async function POST(request: Request) {
   });
 }
 
-/** DELETE: disconnects this member's Gmail (Google is told to forget the token). */
-export async function DELETE() {
+/** DELETE [?address=<mailbox>]: disconnects that one of this member's mailboxes, or every one (Google is told to forget each token). */
+export async function DELETE(request: Request) {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    await disconnectGmail(who.member);
+    const address = new URL(request.url).searchParams.get("address")?.toLowerCase() || undefined;
+    await disconnectGmail(who.member, address);
     return json({ ok: true });
   });
 }
