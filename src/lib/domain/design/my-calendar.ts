@@ -1,14 +1,29 @@
 /**
  * Each member's own calendar (5 Nov 2026, Martin: the date tile in the top card opens a calendar over the page with the
- * person's connected calendar, and asks them to connect one when there's none). Google Calendar, read only, the
- * primary calendar of the Google account they connect; only they see it. Days are the market's calendar days. Pure, tested.
+ * person's connected calendar, and asks them to connect one when there's none; Google Calendar or Outlook, connected in a
+ * small window over the page so they never leave it). Read only, the main calendar of the account they connect; only
+ * they see it. Days are the market's calendar days. Pure, tested.
  */
-import { LAUNCH_MARKET } from "../market";
+import { LAUNCH_MARKET, marketDateTime } from "../market";
 import { addDaysISO } from "../scheduling";
 import type { ISODate } from "../types";
 
+export type CalendarProvider = "google" | "outlook";
+export const CALENDAR_PROVIDERS: readonly { id: CalendarProvider; name: string }[] = [
+  { id: "google", name: "Google Calendar" },
+  { id: "outlook", name: "Outlook" },
+];
+export const providerName = (p: CalendarProvider) => CALENDAR_PROVIDERS.find((x) => x.id === p)?.name ?? "Your calendar";
+export const isProvider = (p: unknown): p is CalendarProvider => p === "google" || p === "outlook";
+
 /** Reading events only: nothing is ever added, changed or deleted in their calendar. */
 export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly";
+export const OUTLOOK_SCOPE = "https://graph.microsoft.com/Calendars.Read";
+/**
+ * Outlook is asked for its times in the market's own zone (Windows' name for Melbourne's), so an all-day event keeps
+ * its day and a timed one is read as Melbourne wall time.
+ */
+export const OUTLOOK_TIME_ZONE = "AUS Eastern Standard Time";
 /** The most events read for one month on screen. */
 export const MAX_EVENTS = 250;
 
@@ -20,7 +35,7 @@ export interface MyEvent {
   start: string;
   end: string;
   location: string | null;
-  /** The event in Google Calendar, and its video call, when it has one. Google's own addresses only. */
+  /** The event in its calendar, and its video call, when it has one. The provider's own addresses only. */
   link: string | null;
   call: string | null;
 }
@@ -38,7 +53,7 @@ export interface GoogleEvent {
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const googleLink = (u: string | undefined, host: RegExp): string | null => {
+const ownLink = (u: string | undefined, host: RegExp): string | null => {
   try {
     const url = new URL(u ?? "");
     return url.protocol === "https:" && host.test(url.hostname) ? url.href : null;
@@ -64,8 +79,47 @@ export function cleanEvents(raw: readonly GoogleEvent[]): MyEvent[] {
       start: allDay ? start : new Date(start).toISOString(),
       end: allDay ? end : new Date(end).toISOString(),
       location: e.location?.trim().slice(0, 200) || null,
-      link: googleLink(e.htmlLink, /(^|\.)google\.com$/),
-      call: googleLink(e.hangoutLink, /^meet\.google\.com$/),
+      link: ownLink(e.htmlLink, /(^|\.)google\.com$/),
+      call: ownLink(e.hangoutLink, /^meet\.google\.com$/),
+    });
+  }
+  return out;
+}
+
+/** An event as Microsoft Graph gives it from calendarView (only what we read), its times in `OUTLOOK_TIME_ZONE`. */
+export interface OutlookEvent {
+  id?: string;
+  subject?: string;
+  isCancelled?: boolean;
+  isAllDay?: boolean;
+  start?: { dateTime?: string };
+  end?: { dateTime?: string };
+  location?: { displayName?: string };
+  webLink?: string;
+  onlineMeeting?: { joinUrl?: string } | null;
+}
+
+const WALL = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/;
+
+/** Outlook's events as ours, as `cleanEvents` does Google's. */
+export function cleanOutlookEvents(raw: readonly OutlookEvent[]): MyEvent[] {
+  const out: MyEvent[] = [];
+  for (const e of raw) {
+    if (!e.id || e.isCancelled) continue;
+    const s = e.start?.dateTime?.match(WALL);
+    const f = e.end?.dateTime?.match(WALL);
+    if (!s || !f) continue;
+    const allDay = Boolean(e.isAllDay);
+    const instant = (m: RegExpMatchArray) => marketDateTime(m[1], Number(m[2]), Number(m[3]));
+    out.push({
+      id: e.id,
+      title: (e.subject ?? "").trim().slice(0, 200) || "(No title)",
+      allDay,
+      start: allDay ? s[1] : instant(s),
+      end: allDay ? f[1] : instant(f),
+      location: e.location?.displayName?.trim().slice(0, 200) || null,
+      link: ownLink(e.webLink, /^outlook\.(office365|office|live)\.com$/),
+      call: ownLink(e.onlineMeeting?.joinUrl, /^teams\.(microsoft|live)\.com$/),
     });
   }
   return out;
@@ -127,12 +181,23 @@ export function returnPath(path: string | null | undefined): string {
   return /^\/design(\/[A-Za-z0-9/_-]*)?$/.test(p) ? p : "/design";
 }
 
+/** What the small sign-in window tells the page that opened it (`postMessage`, our own site only). */
+export const CALENDAR_MESSAGE = "renuabl:calendar";
+
+/** How connecting can end, and what the calendar then says (nothing when it worked: the events say it). */
+export const CONNECT_RESULTS: Record<string, string | null> = {
+  connected: null,
+  failed: "Your calendar couldn't be connected. Try again.",
+  "signed-out": "Sign in again to connect your calendar.",
+  "off-google": "Google sign-in isn't set up on this site yet, so Google Calendar can't be connected.",
+  "off-outlook": "Microsoft sign-in isn't set up on this site yet, so Outlook can't be connected.",
+};
+
 export const CALENDAR_WORDS = {
   connectTitle: "Connect your calendar",
-  connectBody: "See your Google Calendar here, beside your work. RENUABL only reads it, and only you see it.",
-  connect: "Connect Google Calendar",
-  notReady: "Google sign-in isn't set up on this site yet, so a calendar can't be connected.",
+  connectBody: "See your calendar here, beside your work. RENUABL only reads it, and only you see it.",
   viewing: "You're viewing as someone else: their calendar isn't shown.",
-  broken: "Google stopped sharing your calendar. Connect it again to see it here.",
+  broken: "Your calendar stopped sharing with RENUABL. Connect it again to see it here.",
+  waiting: "Finish signing in in the window that opened.",
   nothing: "Nothing on.",
 } as const;

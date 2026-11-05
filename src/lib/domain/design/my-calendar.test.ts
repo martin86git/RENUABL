@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { busyDays, cleanEvents, daysOf, eventTime, eventsOn, rangeFor, returnPath } from "./my-calendar";
+import { busyDays, cleanEvents, cleanOutlookEvents, daysOf, eventTime, eventsOn, rangeFor, returnPath } from "./my-calendar";
 
 const [meeting, holiday, late, gone, odd] = [
   {
@@ -51,6 +51,43 @@ describe("my calendar", () => {
     expect(eventTime(events[1], "2026-11-06")).toBe("All day");
     expect(eventTime(events[2], "2026-11-05")).toBe("From 10 pm");
     expect(eventTime(events[2], "2026-11-06")).toBe("Until 1 am");
+  });
+
+  it("reads Outlook's events, given in Melbourne's own time", () => {
+    const outlook = cleanOutlookEvents([
+      {
+        id: "o1",
+        subject: "Call with Sam",
+        start: { dateTime: "2026-11-05T09:30:00.0000000" },
+        end: { dateTime: "2026-11-05T10:00:00.0000000" },
+        location: { displayName: "Office" },
+        webLink: "https://outlook.office365.com/owa/?itemid=1",
+        onlineMeeting: { joinUrl: "https://teams.microsoft.com/l/meetup-join/1" },
+      },
+      {
+        id: "o2",
+        subject: "Leave",
+        isAllDay: true,
+        start: { dateTime: "2026-11-05T00:00:00.0000000" },
+        end: { dateTime: "2026-11-07T00:00:00.0000000" },
+      },
+      { id: "o3", isCancelled: true, start: { dateTime: "2026-11-05T09:00:00" }, end: { dateTime: "2026-11-05T10:00:00" } },
+      {
+        id: "o4",
+        webLink: "https://evil.example/outlook.office.com",
+        start: { dateTime: "2026-11-05T11:00:00" },
+        end: { dateTime: "2026-11-05T12:00:00" },
+      },
+    ]);
+    expect(outlook.map((e) => e.id)).toEqual(["o1", "o2", "o4"]);
+    expect(outlook[0]).toMatchObject({
+      start: "2026-11-04T22:30:00.000Z",
+      location: "Office",
+      call: "https://teams.microsoft.com/l/meetup-join/1",
+    });
+    expect(eventTime(outlook[0], "2026-11-05")).toBe("9:30 am – 10 am");
+    expect(daysOf(outlook[1])).toEqual({ first: "2026-11-05", last: "2026-11-06" });
+    expect(outlook[2]).toMatchObject({ title: "(No title)", link: null });
   });
 
   it("asks Google a day wider either side", () => {

@@ -32,7 +32,8 @@ import type { ChatThread } from "@/lib/domain/design/chat";
 import { loadNotifications, loadWeather, markNotificationsRead, shortDate } from "@/lib/services/crm";
 import { lineTime, loadMessages } from "@/lib/services/chat";
 import { SignOut } from "./design-account";
-import { CONNECT_RESULTS, MyCalendar } from "./my-calendar";
+import { MyCalendar } from "./my-calendar";
+import { CONNECT_RESULTS } from "@/lib/domain/design/my-calendar";
 
 /**
  * The menus round the edges of every screen (31 Oct 2026, as Primero's; 3 Nov 2026, Martin: a quieter top right). Top

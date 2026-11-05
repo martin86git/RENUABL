@@ -901,7 +901,7 @@ do $$ begin
     alter table design_gmail add primary key (business_id, email, address);
   end if;
 end $$;
--- Each member's own Google Calendar, read only (domain/design/my-calendar.ts), kept as Gmail's is.
+-- Each member's own calendar, Google or Outlook, read only (domain/design/my-calendar.ts), kept as Gmail's is.
 create table if not exists design_calendar (
   business_id text not null references businesses(id) on delete cascade,
   email text not null,
@@ -912,6 +912,7 @@ create table if not exists design_calendar (
   created_at timestamptz not null default now(),
   primary key (business_id, email)
 );
+alter table design_calendar add column if not exists provider text not null default 'google';
 create table if not exists design_email_talks (
   business_id text not null references businesses(id) on delete cascade,
   owner_email text not null,

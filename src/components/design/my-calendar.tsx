@@ -1,31 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, MapPin, Video } from "lucide-react";
 import clsx from "clsx";
 import { calendarDays } from "@/lib/domain/design/schedule";
-import { CALENDAR_WORDS, busyDays, eventTime, eventsOn, type MyEvent } from "@/lib/domain/design/my-calendar";
+import {
+  CALENDAR_PROVIDERS,
+  CALENDAR_WORDS,
+  CONNECT_RESULTS,
+  busyDays,
+  eventTime,
+  eventsOn,
+  providerName,
+  type CalendarProvider,
+  type MyEvent,
+} from "@/lib/domain/design/my-calendar";
 import { todayInMarket } from "@/lib/domain/market";
 import type { ISODate } from "@/lib/domain/types";
-import { connectCalendarHref, disconnectMyCalendar, loadMyCalendar, type CalendarAnswer } from "@/lib/services/my-calendar";
+import { connectMyCalendar, disconnectMyCalendar, loadMyCalendar, type CalendarAnswer } from "@/lib/services/my-calendar";
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 const at = (d: ISODate) => new Date(`${d}T00:00:00Z`);
 const dayTitle = (d: ISODate) => at(d).toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 
-/** What came back from connecting with Google, read off the page's address once (`?calendar=`). */
-export const CONNECT_RESULTS: Record<string, string | null> = {
-  connected: null,
-  failed: "Your calendar couldn't be connected. Try again.",
-  off: CALENDAR_WORDS.notReady,
-  "signed-out": "Sign in again to connect your calendar.",
-};
-
 /**
  * The calendar over the page, opened from the date tile (5 Nov 2026, Martin): the month, Monday first, today ringed in
  * the signal orange and a dot under each day with something on, and the picked day's events from the member's own
- * Google Calendar (read only). With no calendar connected it asks them to connect one.
+ * Google Calendar or Outlook (read only). With none connected, one press on either connects it in a small window over
+ * the page, so they never leave what they were doing; the events fill in when it closes.
  */
 export function MyCalendar(props: { note?: string | null }) {
   const path = usePathname();
@@ -34,6 +37,9 @@ export function MyCalendar(props: { note?: string | null }) {
   const [day, setDay] = useState<ISODate>(today);
   const [got, setGot] = useState<CalendarAnswer | null>(null);
   const [problem, setProblem] = useState<string | null>(props.note ?? null);
+  const [waiting, setWaiting] = useState<CalendarProvider | null>(null);
+  const [asked, setAsked] = useState(0);
+  const stopWaiting = useRef<() => void>(() => undefined);
   const grid = calendarDays("month", month);
   const from = grid.days[0];
   const to = grid.days[grid.days.length - 1];
@@ -47,7 +53,18 @@ export function MyCalendar(props: { note?: string | null }) {
     return () => {
       gone = true;
     };
-  }, [from, to]);
+  }, [from, to, asked]);
+  useEffect(() => () => stopWaiting.current(), []);
+  const connect = (provider: CalendarProvider) => {
+    stopWaiting.current();
+    setProblem(null);
+    setWaiting(provider);
+    stopWaiting.current = connectMyCalendar(provider, path, (result) => {
+      setWaiting(null);
+      setProblem(CONNECT_RESULTS[result] ?? null);
+      if (result === "connected") setAsked((n) => n + 1);
+    });
+  };
   const events: MyEvent[] = got?.events ?? [];
   const busy = busyDays(events, grid.days);
   const onDay = eventsOn(events, day);
@@ -59,7 +76,7 @@ export function MyCalendar(props: { note?: string | null }) {
   const disconnect = async () => {
     const res = await disconnectMyCalendar();
     if (!res.ok) return setProblem(res.message);
-    setGot({ connected: false, ready: true, events: [] });
+    setGot({ connected: false, events: [] });
   };
 
   return (
@@ -151,15 +168,28 @@ export function MyCalendar(props: { note?: string | null }) {
               <CalendarDays className="size-[18px]" aria-hidden />
             </span>
             <p className="mt-3 text-[14px] font-semibold">{CALENDAR_WORDS.connectTitle}</p>
-            <p className="mt-1 text-[13px] leading-snug text-ink-2">{got.ready ? CALENDAR_WORDS.connectBody : CALENDAR_WORDS.notReady}</p>
-            {got.ready && (
-              <a
-                href={connectCalendarHref(path)}
-                className="mt-3 inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-white hover:bg-ink/90"
-              >
-                {CALENDAR_WORDS.connect}
-              </a>
-            )}
+            <p className="mt-1 text-[13px] leading-snug text-ink-2">{CALENDAR_WORDS.connectBody}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {CALENDAR_PROVIDERS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => connect(p.id)}
+                  disabled={waiting !== null}
+                  className={clsx(
+                    "rounded-full px-3 py-2 text-[13px] font-medium transition-colors",
+                    waiting === p.id
+                      ? "bg-line text-muted"
+                      : waiting
+                        ? "bg-surface text-muted ring-1 ring-line"
+                        : "bg-ink text-white hover:bg-ink/90",
+                  )}
+                >
+                  {waiting === p.id ? "Connecting…" : p.name}
+                </button>
+              ))}
+            </div>
+            {waiting && <p className="mt-2 text-[12px] text-muted">{CALENDAR_WORDS.waiting}</p>}
           </div>
         ) : (
           <>
@@ -167,9 +197,9 @@ export function MyCalendar(props: { note?: string | null }) {
             {got.broken ? (
               <div className="mt-2 rounded-2xl bg-canvas p-3 text-[13px] text-ink-2">
                 {CALENDAR_WORDS.broken}{" "}
-                <a href={connectCalendarHref(path)} className="font-medium text-ink underline">
-                  Connect again
-                </a>
+                <button type="button" onClick={() => got.provider && connect(got.provider)} className="font-medium text-ink underline">
+                  {waiting ? "Connecting…" : "Connect again"}
+                </button>
               </div>
             ) : onDay.length === 0 ? (
               <p className="px-1 py-2 text-[13px] text-muted">{CALENDAR_WORDS.nothing}</p>
@@ -206,7 +236,7 @@ export function MyCalendar(props: { note?: string | null }) {
                               rel="noreferrer noopener"
                               className="flex items-center gap-1 text-ink-2 hover:underline"
                             >
-                              <ExternalLink className="size-3" aria-hidden /> Open in Google
+                              <ExternalLink className="size-3" aria-hidden /> Open in {got.provider === "outlook" ? "Outlook" : "Google"}
                             </a>
                           )}
                         </div>
@@ -217,7 +247,9 @@ export function MyCalendar(props: { note?: string | null }) {
               </ul>
             )}
             <div className="mt-3 flex items-center justify-between gap-2 px-1 text-[11px] text-muted">
-              <span className="truncate">Google Calendar · {got.address}</span>
+              <span className="truncate">
+                {providerName(got.provider ?? "google")} · {got.address}
+              </span>
               <button type="button" onClick={() => void disconnect()} className="shrink-0 hover:text-ink">
                 Disconnect
               </button>

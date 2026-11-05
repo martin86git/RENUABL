@@ -21,7 +21,8 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-05",
     area: "Everywhere",
-    words: "Press the date in the top corner to see your calendar. Connect your Google Calendar once and your events show there.",
+    words:
+      "Press the date in the top corner to see your calendar. Connect Google Calendar or Outlook in one press, without leaving the page.",
   },
   {
     day: "2026-11-05",
