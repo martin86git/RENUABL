@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { CircleDollarSign, TrendingUp, type LucideIcon } from "lucide-react";
 import type { SolState } from "@/lib/domain/design/sol";
-import { SOL_ASK, SOL_CHANGED, SOL_STATE, SOL_TOGGLE, loadSol } from "@/lib/services/sol";
+import { SOL_ASK, SOL_CHANGED, SOL_STATE, SOL_TOGGLE, loadSol, type SolAsk } from "@/lib/services/sol";
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
 import { SolMark, SolStars } from "./sol-icon";
@@ -25,13 +25,15 @@ const EVERY_MS = 60_000;
  */
 export function SolDock() {
   const [open, setOpen] = useState(false);
-  const [question, setQuestion] = useState<{ id: number; text: string } | null>(null);
+  const [question, setQuestion] = useState<{ id: number; text: string; shown?: string } | null>(null);
   useEffect(() => {
     const toggle = () => setOpen((o) => !o);
     const asked = (e: Event) => {
-      const text = String((e as CustomEvent<string>).detail ?? "").trim();
+      const said = (e as CustomEvent<SolAsk>).detail;
+      const text = String((typeof said === "string" ? said : said?.text) ?? "").trim();
       if (!text) return;
-      setQuestion({ id: Date.now(), text });
+      const shown = typeof said === "object" && said?.shown ? said.shown : undefined;
+      setQuestion({ id: Date.now(), text, ...(shown ? { shown } : {}) });
       setOpen(true);
     };
     window.addEventListener(SOL_TOGGLE, toggle);

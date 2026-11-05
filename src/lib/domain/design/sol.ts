@@ -17,6 +17,7 @@ import { SOL_NETWORKS } from "./networks";
 import { SOL_REGULATIONS } from "./standards";
 import { SOL_ORACLE, cleanSources, type SolSource } from "./sol-knowledge";
 import { SOL_ON_SCREEN, cleanPageContext, type PageContext } from "./page-context";
+import { cleanGoTo, type SolGoTo } from "./sol-goto";
 
 export const SOL_NAME = "Sol";
 /** Turns kept in a member's conversation, and how many of the latest are sent with a question. */
@@ -68,6 +69,66 @@ export interface SolTurn {
   deep?: boolean;
   /** The credits the answer took, shown under it. */
   credits?: number;
+  /**
+   * The member's question as the chat shows it, when it was a long instruction sent for them (5 Nov 2026, Martin, as
+   * Primero's: "@Sol in Deals: …", "Think deeper: …"). `text` is still what Sol was asked.
+   */
+  shown?: string;
+  /** A page Sol opened for them (sol-goto.ts): the chat goes there as the answer comes in. */
+  goTo?: SolGoTo;
+}
+
+/** The longest short line shown for a question. */
+export const SHOWN_MAX = 160;
+
+/** A question's short line as kept: one line, no control characters, at most `SHOWN_MAX`; "" when there's none. */
+export function cleanShown(v: unknown): string {
+  if (typeof v !== "string") return "";
+  const one = v
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return one.length > SHOWN_MAX ? `${one.slice(0, SHOWN_MAX - 1).trimEnd()}…` : one;
+}
+
+/** The question's words without the note of what was attached (files aren't sent a second time). */
+export const withoutAttachedNote = (text: string) => text.replace(/\n\(Attached: [^)]*\)$/, "").trim();
+
+/**
+ * "Try another answer" (5 Nov 2026, Martin, as Primero's): the newest question that has an answer after it, the
+ * answer it got, and the conversation without them (pinned turns stay where they are). Null when there's nothing to try
+ * again.
+ */
+export function withoutLastExchange(turns: readonly SolTurn[]): { turns: SolTurn[]; question: SolTurn; answer: SolTurn } | null {
+  let at = -1;
+  for (let i = turns.length - 1; i >= 0; i--)
+    if (turns[i].role === "you" && !turns[i].pinned) {
+      at = i;
+      break;
+    }
+  if (at < 0) return null;
+  const answer = turns
+    .slice(at + 1)
+    .filter((t) => !t.pinned && t.role === "sol" && t.text.trim())
+    .pop();
+  if (!answer) return null;
+  return { turns: dropExchange(turns, turns[at].at), question: turns[at], answer };
+}
+
+/** The conversation without the question said at `questionAt` and everything not pinned after it. */
+export function dropExchange(turns: readonly SolTurn[], questionAt: string): SolTurn[] {
+  const at = turns.findIndex((t) => t.role === "you" && t.at === questionAt);
+  if (at < 0) return [...turns];
+  return [...turns.slice(0, at), ...turns.slice(at + 1).filter((t) => t.pinned)];
+}
+
+/** What Sol is told when asked again: the answer they didn't take, and to come at it another way. */
+export function anotherAnswerNote(answer: string): string {
+  return `They asked for another answer to this question: they didn't take your last one. It was:
+"""
+${answer.slice(0, 6000)}
+"""
+Come at it a genuinely different way this time (a different angle, order or tone; for an email, a different opening, point and question to end on), within every rule above and only from the facts and tools you have. Don't apologise for or mention the earlier answer. If an email is wanted, write it as a new draft card.`;
 }
 
 /** The turns kept: the latest `CHAT_KEPT`, and any pinned before them (1 Nov 2026, Martin: as Primero's). */
@@ -152,6 +213,8 @@ export function cleanTurns(raw: unknown): SolTurn[] {
           : undefined;
       if (!text && !charts.length && !diagrams.length && !designs.length && !drafts.length) return null;
       const sources = cleanSources(t.sources);
+      const shown = role === "you" ? cleanShown(t.shown) : "";
+      const goTo = role === "sol" ? cleanGoTo(t.goTo) : null;
       const remembered = (Array.isArray(t.remembered) ? t.remembered : [])
         .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object")
         .map((x) => ({ id: str(x.id, 40), question: str(x.question, 300) }))
@@ -171,6 +234,8 @@ export function cleanTurns(raw: unknown): SolTurn[] {
         ...(remembered.length ? { remembered } : {}),
         ...(t.deep === true ? { deep: true } : {}),
         ...(typeof t.credits === "number" && Number.isInteger(t.credits) && t.credits > 0 && t.credits < 100 ? { credits: t.credits } : {}),
+        ...(shown ? { shown } : {}),
+        ...(goTo ? { goTo } : {}),
       };
     })
     .filter((t): t is SolTurn => t !== null);
@@ -325,7 +390,7 @@ export interface SolFile {
 }
 
 /** A message from the browser: its words (to `MAX_SAID`) and up to three files, or null when there is nothing. */
-export function cleanSolInput(raw: unknown): { text: string; files: SolFile[]; page?: PageContext; deep?: boolean } | null {
+export function cleanSolInput(raw: unknown): { text: string; files: SolFile[]; page?: PageContext; deep?: boolean; shown?: string } | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const text = typeof r.text === "string" ? r.text.trim().slice(0, MAX_SAID) : "";
@@ -342,7 +407,9 @@ export function cleanSolInput(raw: unknown): { text: string; files: SolFile[]; p
   if (!text && !files.length) return null;
   // What their screen shows, sent from Sol's side panel (page-context.ts).
   const page = cleanPageContext(r.page);
-  return { text, files, ...(page ? { page } : {}), ...(r.deep === true ? { deep: true } : {}) };
+  // The short line the chat shows for a long instruction sent for them (cleaned and capped).
+  const shown = cleanShown(r.shown);
+  return { text, files, ...(page ? { page } : {}), ...(r.deep === true ? { deep: true } : {}), ...(shown ? { shown } : {}) };
 }
 
 /** "#" in the box finds a deal, as in Primero: the "#" and what follows it, up to the caret, or null. */
@@ -453,6 +520,7 @@ Reminders: when they ask you to remind them of something, keep it with add_remin
 
 Where things are in RENUABL (the sections across the top, each with its pages under it; Search is top left, or Ctrl K; Messages, Notifications, the design tool and Settings are the round icons top right):
 ${whereThingsAre()}
+When they ask to be taken to a page, a deal or a design ("take me to…", "open…", "show me the page"), open it with open_page rather than telling them the way, and say in a few words what you opened.
 If RENUABL doesn't do something, say so plainly in a line.
 
 Their preferences now:

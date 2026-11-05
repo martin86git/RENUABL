@@ -96,7 +96,9 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
         {thread.map((t, i) => (
           <div key={`${t.at}-${i}`} className={t.role === "you" ? "flex justify-end" : "space-y-2"}>
             {t.role === "you" ? (
-              <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-sun-line px-3 py-2 text-white">{t.text}</p>
+              <p className="max-w-[75%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-sun px-3 py-2 text-[13px] leading-[1.5] text-ink ring-1 ring-sun-line/25">
+                {t.shown || t.text}
+              </p>
             ) : (
               <div className="max-w-[90%] rounded-2xl bg-canvas px-3 py-2 text-ink [overflow-wrap:anywhere]">
                 <SolText text={t.text} />

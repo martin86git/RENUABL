@@ -3,7 +3,21 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowUp, CalendarDays, ChevronLeft, ChevronRight, Eye, HardHat, KanbanSquare, Mail, Phone, Sun } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowUp,
+  ArrowUpRight,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  HardHat,
+  KanbanSquare,
+  Mail,
+  Phone,
+  RefreshCw,
+  Sun,
+} from "lucide-react";
 import { LAUNCH_MARKET, greeting } from "@/lib/domain/market";
 import { nextHeadline, type NextItem } from "@/lib/domain/design/next-up";
 import { WELCOME_TOUR } from "@/lib/domain/design/welcome";
@@ -23,13 +37,15 @@ import {
 } from "@/lib/domain/design/today-pad";
 import type { Activity } from "@/lib/domain/design/crm";
 import { mailMarkWords, type MailMark } from "@/lib/domain/design/email-opens";
-import type { SolFile, SolReminder } from "@/lib/domain/design/sol";
+import type { SolFile, SolReminder, SolState } from "@/lib/domain/design/sol";
 import type { SolDesignShown } from "@/lib/domain/design/sol-designs";
+import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { loadMailMarks } from "@/lib/services/deal-pulse";
 import { inboxUnread } from "@/lib/services/inbox";
-import { SOL_CHANGED, SOL_TOGGLE, askSol, loadSol } from "@/lib/services/sol";
+import { SOL_CHANGED, SOL_TOGGLE, askSol, loadSol, retrySol } from "@/lib/services/sol";
+import { goWhereAsked, openSolPage } from "./sol-chat";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { InboxPage } from "./inbox";
@@ -76,9 +92,23 @@ const hourNow = () => Number(new Date().toLocaleString("en-AU", { hour: "numeric
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** One turn of the conversation on Today: Sol telling the day, or a question and his answer. */
-type Turn =
-  | { id: number; kind: "day" }
-  | { id: number; kind: "ask"; q: string; a: { text: string; more: boolean; designs?: SolDesignShown[] } | null };
+type Turn = { id: number; kind: "day" } | { id: number; kind: "ask"; q: string; a: TodayAnswer | null };
+
+/** Sol's answer on Today: `again` when it can be tried again (a real answer), `goTo` a page he opened. */
+type TodayAnswer = { text: string; more: boolean; designs?: SolDesignShown[]; again?: boolean; goTo?: SolGoTo };
+
+/** His latest answer in the conversation, as Today shows it. */
+function todayAnswer(state: SolState): TodayAnswer {
+  const last = [...state.turns].reverse().find((t) => t.role === "sol");
+  return {
+    text: last?.text ?? "Done.",
+    more: Boolean(last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.reminder),
+    // A roof design he shows is drawn here, in the conversation itself (3 Nov 2026, Martin).
+    ...(last?.designs?.length ? { designs: last.designs } : {}),
+    ...(last?.credits ? { again: true } : {}),
+    ...(last?.goTo ? { goTo: last.goTo } : {}),
+  };
+}
 
 /**
  * Today as one chat with Sol (3 Nov 2026, Martin: the pad and Sol's box felt like two things; it should feel like one
@@ -106,6 +136,7 @@ export function TodayPad(props: {
   /** The owner: the welcome asks them to add the team. */
   owner?: boolean;
 }) {
+  const router = useRouter();
   const [tab, setTab] = useState<TodayTab | "day">("today");
   const [welcoming, setWelcoming] = useState(Boolean(props.welcome));
   // The welcome's tour, run once the greeting is back on the page so every place it lights is there.
@@ -152,17 +183,29 @@ export function TodayPad(props: {
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
     const r = await askSol(q, files);
     setAsking(false);
-    let a: { text: string; more: boolean; designs?: SolDesignShown[] };
+    let a: TodayAnswer;
     if (!r.ok) a = { text: r.message, more: false };
     else {
       window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
-      const last = [...r.state.turns].reverse().find((t) => t.role === "sol");
-      a = {
-        text: last?.text ?? "Done.",
-        more: Boolean(last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.reminder),
-        // A roof design he shows is drawn here, in the conversation itself (3 Nov 2026, Martin).
-        ...(last?.designs?.length ? { designs: last.designs } : {}),
-      };
+      a = todayAnswer(r.state);
+      goWhereAsked(r.state, router);
+    }
+    setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a } : t)));
+  };
+  /** Try another answer: his latest answer replaced by a new one to the same question, a different way. */
+  const retry = async (id: number) => {
+    if (asking) return;
+    const before = turns.find((t) => t.id === id);
+    setAsking(true);
+    setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a: null } : t)));
+    const r = await retrySol();
+    setAsking(false);
+    let a: TodayAnswer;
+    if (!r.ok) a = before?.kind === "ask" && before.a ? { ...before.a, again: false } : { text: r.message, more: false };
+    else {
+      window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
+      a = todayAnswer(r.state);
+      goWhereAsked(r.state, router);
     }
     setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a } : t)));
   };
@@ -275,7 +318,7 @@ export function TodayPad(props: {
               ) : (
                 <div key={t.id} className="space-y-4">
                   <div className="flex justify-end">
-                    <p className="max-w-[80%] whitespace-pre-wrap rounded-[20px] rounded-br-md bg-primary px-4 py-2.5 text-[15px] text-primary-ink">
+                    <p className="max-w-[75%] whitespace-pre-wrap rounded-[20px] rounded-br-md bg-sun px-4 py-2 text-[14px] leading-[1.5] text-ink ring-1 ring-sun-line/25">
                       {t.q}
                     </p>
                   </div>
@@ -300,6 +343,31 @@ export function TodayPad(props: {
                           >
                             There is more with it in your conversation with Sol. Open it
                           </button>
+                        )}
+                        {(t.a.goTo || (t.a.again && t.id === turns[turns.length - 1]?.id)) && (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            {t.a.goTo && (
+                              <button
+                                type="button"
+                                onClick={() => openSolPage(t.a!.goTo!, router)}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-sun px-3 py-1 text-[13px] font-medium text-sun-ink ring-1 ring-sun-line/30 transition hover:ring-sun-line"
+                              >
+                                Opened {t.a.goTo.label} <ArrowUpRight className="size-3.5" aria-hidden />
+                              </button>
+                            )}
+                            {/* Not keen on his approach: the same question again, a different way; this answer is replaced. */}
+                            {t.a.again && t.id === turns[turns.length - 1]?.id && (
+                              <button
+                                type="button"
+                                onClick={() => void retry(t.id)}
+                                disabled={asking}
+                                title="Sol answers the same question again, a different way. This answer is replaced. It takes credits like any answer."
+                                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-sun-line disabled:text-muted"
+                              >
+                                <RefreshCw className="size-3.5" aria-hidden /> Try another answer
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}

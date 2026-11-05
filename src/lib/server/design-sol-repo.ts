@@ -10,6 +10,7 @@ import {
   cleanPrefs,
   cleanReminders,
   cleanTurns,
+  dropExchange,
   dueNow,
   reminderNote,
   unreadOf,
@@ -105,9 +106,17 @@ export const markSolSeen = (businessId: string, email: string) =>
 export const clearSol = (businessId: string, email: string) =>
   withSol(businessId, email, (row) => ({ ...row, turns: row.turns.filter((t) => t.pinned), seenAt: new Date().toISOString() }));
 
-/** Adds a question and its answer; the answer counts as unread until the conversation is next on screen. */
-export const addSolTurns = (businessId: string, email: string, turns: SolTurn[]) =>
-  withSol(businessId, email, (row) => ({ ...row, turns: [...row.turns, ...turns], seenAt: row.seenAt ?? turns[0]?.at ?? null }));
+/**
+ * Adds a question and its answer; the answer counts as unread until the conversation is next on screen. `replacing`
+ * (Try another answer) is when the question asked again was first said: it and what followed it come off in the same
+ * step, so the new answer takes the old one's place.
+ */
+export const addSolTurns = (businessId: string, email: string, turns: SolTurn[], replacing?: string) =>
+  withSol(businessId, email, (row) => ({
+    ...row,
+    turns: [...(replacing ? dropExchange(row.turns, replacing) : row.turns), ...turns],
+    seenAt: row.seenAt ?? turns[0]?.at ?? null,
+  }));
 
 export const newSolId = () => randomUUID().slice(0, 12);
 
