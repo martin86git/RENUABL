@@ -28,6 +28,13 @@ export interface CatalogueBattery {
   kwh: number;
 }
 
+/** An EV charger the designer can put on a design (`chargersOf` in pricing.ts): from the business's price lists only. Never its cost. */
+export interface CatalogueCharger {
+  sku: string;
+  name: string;
+  kw: number;
+}
+
 export function panelCatalogue(): CataloguePanel[] {
   return [
     {

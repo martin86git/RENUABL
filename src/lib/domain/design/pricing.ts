@@ -12,7 +12,7 @@
  * read out for the designer's lists.
  */
 import { INVERTER_ELECTRICAL, PANEL_ELECTRICAL } from "./electrical";
-import type { CatalogueBattery, CatalogueInverter, CataloguePanel } from "./catalogue";
+import type { CatalogueBattery, CatalogueCharger, CatalogueInverter, CataloguePanel } from "./catalogue";
 import { PANEL } from "./roof-design";
 
 export const GST = 0.1;
@@ -36,6 +36,10 @@ export interface InverterProduct extends ListItem {
 export interface BatteryProduct extends ListItem {
   kwh: number;
 }
+/** An EV charger on a list, with its rating in kilowatts. */
+export interface ChargerProduct extends ListItem {
+  kw: number;
+}
 
 /** One supplier price list as it was read. Uploading a file of the same name again replaces it. */
 export interface SupplierList {
@@ -46,6 +50,8 @@ export interface SupplierList {
   panels: PanelProduct[];
   inverters: InverterProduct[];
   batteries: BatteryProduct[];
+  /** Its EV chargers (5 Nov 2026). A list kept before then reads them from its rows (`parseItemChargers`). */
+  chargers?: ChargerProduct[];
 }
 
 export const MAX_SUPPLIER_LISTS = 6;
@@ -146,14 +152,41 @@ export function parseSupplierBatteries(rows: string[][]): BatteryProduct[] {
   return batteries;
 }
 
+/**
+ * Whether a row's description is an EV charger itself (5 Nov 2026, as Primero's): it names an EV or electric vehicle
+ * charger, AC or DC ("Goodwe 7kW Single Phase AC EV Charger", "SolarEdge One Electric Vehicle Charger 22kW"). An inverter
+ * that is only "EV charger ready", cables, RFID cards and the like are not.
+ */
+export function isEvCharger(name: string): boolean {
+  return (
+    /\b(ev|electric vehicle)\b.*\bcharg(er|ing)\b/i.test(name) &&
+    !/\binverter\b|\bready\b|\brfid\b|\bcards?\b|\bcable\b|\bcover\b|\bbracket\b|\bpedestal\b|\bstand\b/i.test(name)
+  );
+}
+
+/** The EV chargers among a list's priced rows: each an EV charger (`isEvCharger`) with its kW in its description. */
+export function parseItemChargers(items: readonly ListItem[]): ChargerProduct[] {
+  const out: ChargerProduct[] = [];
+  for (const item of items) {
+    if (!isEvCharger(item.name) || out.some((c) => c.sku === item.sku)) continue;
+    const kw = Number(item.name.match(/([\d.]+)\s?kw\b/i)?.[1]);
+    if (!(kw > 0 && kw <= 400)) continue;
+    out.push({ ...item, kw });
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+
 export function readSupplierList(name: string, rows: string[][], uploadedAt: string): SupplierList {
+  const items = parseListItems(rows);
   return {
     name: name.slice(0, 120),
     uploadedAt,
-    items: parseListItems(rows),
+    items,
     panels: parseSupplierPanels(rows),
     inverters: parseSupplierInverters(rows),
     batteries: parseSupplierBatteries(rows),
+    chargers: parseItemChargers(items),
   };
 }
 
@@ -202,6 +235,7 @@ export const INSTALL_RATES = [
   { key: "extraInverter", label: "Each additional inverter", unit: "$", step: 10, max: 10000 },
   { key: "battery", label: "Battery installation", unit: "$", step: 10, max: 20000 },
   { key: "backup", label: "Backup circuits for blackouts", unit: "$", step: 10, max: 10000 },
+  { key: "evCharger", label: "EV charger installation", unit: "$", step: 10, max: 10000 },
   { key: "inspection", label: "Electrical inspection", unit: "$", step: 10, max: 5000 },
   { key: "smartMeter", label: "Smart meter installation", unit: "$", step: 10, max: 5000 },
   { key: "fallProtection", label: "Fall protection", unit: "$", step: 10, max: 5000 },
@@ -317,6 +351,8 @@ export const DEFAULT_WORKSPACE: Workspace = {
     extraInverter: 0,
     battery: 1800,
     backup: 1000,
+    // A placeholder (5 Nov 2026, as Primero's: $1,000 ex GST); the business sets its own in its installation rates.
+    evCharger: 1000,
     inspection: 0,
     smartMeter: 0,
     fallProtection: 0,
@@ -396,13 +432,16 @@ export function cleanWorkspace(raw: unknown): Workspace {
     const l = bag(entry);
     const name = text(l.name, 120);
     if (!name) continue;
+    const items = cleanItems<ListItem>(l.items, MAX_ITEMS, () => ({}));
     lists.push({
       name,
       uploadedAt: text(l.uploadedAt, 30),
-      items: cleanItems<ListItem>(l.items, MAX_ITEMS, () => ({})),
+      items,
       panels: cleanItems<PanelProduct>(l.panels, 40, sized("watts", 1000)),
       inverters: cleanItems<InverterProduct>(l.inverters, 150, sized("kw", 500)),
       batteries: cleanItems<BatteryProduct>(l.batteries, 60, sized("kwh", 500)),
+      // A list kept before chargers were read has them only in its rows.
+      chargers: Array.isArray(l.chargers) ? cleanItems<ChargerProduct>(l.chargers, 40, sized("kw", 400)) : parseItemChargers(items),
     });
   }
   const components = structuredClone(DEFAULT_WORKSPACE.components);
@@ -486,6 +525,21 @@ export function workspaceCatalogue(workspace: Pick<Workspace, "lists">): {
       : null,
     batteries: batteries.length ? batteries.map((b) => ({ sku: b.sku, name: b.name, kwh: b.kwh })) : null,
   };
+}
+
+/** The EV chargers on the business's price lists, newest list first, each once (5 Nov 2026). None without a list. */
+export function chargersOf(workspace: Pick<Workspace, "lists">): ChargerProduct[] {
+  return once(workspace.lists.flatMap((l) => l.chargers ?? []));
+}
+
+/** The EV chargers the designer offers: only those on the business's own lists. Never a cost. */
+export function chargerCatalogue(workspace: Pick<Workspace, "lists">): CatalogueCharger[] {
+  return chargersOf(workspace).map((c) => ({ sku: c.sku, name: c.name, kw: c.kw }));
+}
+
+/** What one EV charger costs, ex GST, from the lists: as a charger, else any priced row with its code. Null when neither. */
+export function chargerCost(workspace: Pick<Workspace, "lists">, sku: string): number | null {
+  return chargersOf(workspace).find((c) => c.sku === sku)?.cost ?? listed(workspace, sku)?.cost ?? null;
 }
 
 /** Margin: a base (lower for solar only) that grows with system size, never with supplier prices. */

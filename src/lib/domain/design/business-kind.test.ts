@@ -59,6 +59,8 @@ describe("what each login holds", () => {
     ])
       expect(pageAllowed("installer", p)).toBe(false);
     expect(apiAllowed("installer", "/api/design/projects")).toBe(true);
+    expect(apiAllowed("installer", "/api/design/draft")).toBe(true);
+    expect(apiAllowed("installer", "/api/design/favourites")).toBe(true);
     expect(apiAllowed("installer", "/api/design/billing")).toBe(true);
     expect(apiAllowed("installer", "/api/design/marketplace/lst_1/picture")).toBe(true);
     for (const a of ["customers", "jobs", "orders", "proposals", "sol", "inbox", "messages", "brand"])

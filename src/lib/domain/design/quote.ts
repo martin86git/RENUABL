@@ -12,13 +12,14 @@
  */
 import { deemingYears, batteryFactor, taperedKwh, type RebateRates } from "../rebates";
 import { zoneRating } from "../zone-ratings";
-import { GST, commissionFor, componentCost, listed, marginFor, type ComponentKey, type Workspace } from "./pricing";
+import { GST, chargerCost, commissionFor, componentCost, listed, marginFor, type ComponentKey, type Workspace } from "./pricing";
 import { MAX_DESIGNS } from "./roof-design";
 
 export const COST_GROUPS = [
   "Panels",
   "Inverters",
   "Battery",
+  "EV charger",
   "Racking",
   "Electrical",
   "Switchboard",
@@ -76,6 +77,8 @@ export interface SystemSpec {
   inverters: { sku: string; name: string }[];
   /** `backup`: wired for blackouts, which adds the backup wiring to the installation. */
   battery: { sku: string; name: string; kwh: number; qty: number; backup?: boolean } | null;
+  /** The EV charger the design names (5 Nov 2026), priced from the lists with its installation. Left out with none. */
+  charger?: { sku: string; name: string; kw: number } | null;
   /** Separate arrays on the roof, counted from the drawing. */
   arrays: number;
   /** Panels drawn at a tilt, and the steepest of them: on a flat roof they are taken to be on tilt frames. */
@@ -141,6 +144,18 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
   if (panels) product("Panels", spec.panel.sku, spec.panel.name, panels);
   for (const inverter of spec.inverters) product("Inverters", inverter.sku, inverter.name, 1);
   if (spec.battery) product("Battery", spec.battery.sku, spec.battery.name, batteryQty);
+  // The EV charger the design names: its cost from the lists (`chargerCost`), and its installation at the business's rate.
+  if (spec.charger) {
+    const each = chargerCost(workspace, spec.charger.sku);
+    lines.push({
+      group: "EV charger",
+      label: spec.charger.name,
+      qty: 1,
+      sku: spec.charger.sku,
+      amount: each ?? 0,
+      ...(each === null ? { missing: true } : {}),
+    });
+  }
 
   if (panels) {
     // Racking: two rails under each portrait panel, its width and a little more, with some spare; kits per 2 kW.
@@ -196,6 +211,9 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
     }
   }
 
+  // The charger's fitting is installation (so it is the installer's on their invoice), with or without panels.
+  if (spec.charger) lines.push({ group: "Installation", label: "EV charger installation", amount: workspace.install.evCharger ?? 1000 });
+
   const commission = panels ? commissionFor(pvKw, batteryKwh, workspace.settings.commission) : 0;
   if (commission)
     lines.push({
@@ -208,7 +226,7 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
   // A cost decided on each job stays outside the totals until it is included (`editedLines` puts it in).
   const sum = (groups: readonly CostGroup[]) =>
     Math.round(rounded.filter((l) => groups.includes(l.group) && !l.confirm).reduce((s, l) => s + l.amount, 0));
-  const hardware = sum(["Panels", "Inverters", "Battery", "Racking", "Electrical"]);
+  const hardware = sum(["Panels", "Inverters", "Battery", "EV charger", "Racking", "Electrical"]);
   const install = sum(["Switchboard", "Installation"]);
   const cost = hardware + install + commission;
   const margin = panels ? marginFor(pvKw, batteryKwh, workspace.settings.margin) : 0;
