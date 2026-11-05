@@ -8,6 +8,7 @@ import {
   countByKind,
   joinsFree,
   pageAllowed,
+  needsPlan,
   settingsFor,
 } from "./business-kind";
 import { KIND_SECTIONS, designsRoofs, pageAt, sectionAt } from "./sections";
@@ -151,5 +152,23 @@ describe("staff's count of kinds", () => {
       inspector: 0,
     });
     expect(countByKind([])).toEqual({ retailer: 0, installer: 0, inspector: 0 });
+  });
+});
+
+describe("choosing a plan at sign-up", () => {
+  it("stops a retailer's owner with no live plan, and nobody else", () => {
+    expect(needsPlan("retailer", "owner", null)).toBe(true);
+    expect(needsPlan("retailer", "owner", "canceled")).toBe(true);
+    expect(needsPlan("retailer", "owner", "active")).toBe(false);
+    expect(needsPlan("retailer", "owner", "past_due")).toBe(false);
+    expect(needsPlan("retailer", "member", null)).toBe(false);
+    expect(needsPlan("installer", "owner", null)).toBe(false);
+    expect(needsPlan("inspector", "owner", null)).toBe(false);
+  });
+
+  it("says the retailer's price as it is, not the first month alone", () => {
+    expect(BUSINESS_KINDS.find((k) => k.kind === "retailer")!.price).toBe(
+      "$99 a user a month. Your first month, $29 a user. Cancel any time.",
+    );
   });
 });

@@ -9,13 +9,15 @@
  * which of the designer's addresses a member may use (`apiAllowed`, checked in requireMember). Pure, tested.
  */
 import { marketplaceOpen } from "./marketplace-launch";
+import { FIRST_MONTH_CENTS, SEAT_MONTHLY_CENTS, dollars } from "./plans";
 
 export const BUSINESS_KINDS = [
   {
     kind: "retailer",
     label: "Solar retailer",
     about: "You sell and run the whole job: leads, designs, proposals, ordering and installation.",
-    price: "From $29 a user a month.",
+    // 5 Nov 2026, Martin: "From $29" read as the price; it is only the first month.
+    price: `${dollars(SEAT_MONTHLY_CENTS)} a user a month. Your first month, ${dollars(FIRST_MONTH_CENTS)} a user. Cancel any time.`,
   },
   {
     kind: "installer",
@@ -168,4 +170,17 @@ export function countByKind(businesses: readonly { kind: BusinessKind }[]): Reco
   const counts = Object.fromEntries(BUSINESS_KINDS.map((k) => [k.kind, 0])) as Record<BusinessKind, number>;
   for (const b of businesses) counts[b.kind] += 1;
   return counts;
+}
+
+/** A plan that has stopped: as good as none, so the business is asked to choose one again. */
+const ENDED = new Set(["canceled", "incomplete_expired"]);
+
+/**
+ * Whether signing in should stop at choosing a plan and paying (5 Nov 2026, Martin: a new retailer named the business
+ * and went straight in, never shown the pricing or asked for a card). Only a retailer pays a user fee, only its owner
+ * chooses the plan, and never one with a plan that hasn't ended. RENUABL's own business and the sample businesses
+ * staff look through are left out by the caller.
+ */
+export function needsPlan(kind: BusinessKind, role: string, planStatus: string | null): boolean {
+  return billsFor(kind, "plan") && role === "owner" && (planStatus === null || ENDED.has(planStatus));
 }

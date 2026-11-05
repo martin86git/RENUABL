@@ -32,9 +32,11 @@ export function startPlan(o: { email: string; seats: number; interval?: BillingI
 }
 
 /** Back from Stripe: checks the sign-up and sends the sign-in link. */
-export async function welcomeBack(sessionId: string): Promise<{ ok: true; email: string } | { ok: false; message: string }> {
+export async function welcomeBack(
+  sessionId: string,
+): Promise<{ ok: true; email: string; claimed: boolean } | { ok: false; message: string }> {
   const a = await post("/api/design/welcome", { sessionId });
-  return a.ok ? { ok: true, email: String(a.email ?? "") } : a;
+  return a.ok ? { ok: true, email: String(a.email ?? ""), claimed: a.claimed === true } : a;
 }
 
 export function registerInterest(email: string) {

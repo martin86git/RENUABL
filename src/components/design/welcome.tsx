@@ -19,7 +19,11 @@ export function Welcome({ sessionId }: { sessionId: string | null }) {
       setState({ message: "This page is where Stripe sends you after signing up. Start from the pricing." });
       return;
     }
-    void welcomeBack(sessionId).then((a) => setState(a.ok ? { email: a.email } : { message: a.message }));
+    void welcomeBack(sessionId).then((a) => {
+      // Signed in already (a new retailer paying after naming the business): straight in.
+      if (a.ok && a.claimed) return window.location.replace("/design");
+      setState(a.ok ? { email: a.email } : { message: a.message });
+    });
   }, [sessionId]);
 
   return (

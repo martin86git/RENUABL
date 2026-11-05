@@ -165,6 +165,8 @@ export const PLAN_WORDS = {
   offerExplained: `Your first month is ${dollars(FIRST_MONTH_CENTS)} a user, with nothing to sign. Before it ends, choose the ${COMMIT_MONTHS}-month plan and stay at ${dollars(COMMIT_SEAT_CENTS)} a user a month, or do nothing and carry on month to month at ${dollars(SEAT_MONTHLY_CENTS)}, cancel any time.`,
   commitExplained: `${dollars(COMMIT_SEAT_CENTS)} a user a month for ${COMMIT_MONTHS} months, counted from the start of the month you choose it. Leave before the ${COMMIT_MONTHS} months are up and you pay back what you saved: ${dollars(COMMIT_SAVING_CENTS)} a user for each month billed at ${dollars(COMMIT_SEAT_CENTS)} on the plan, after your first month. When the ${COMMIT_MONTHS} months are up it carries on at ${dollars(SEAT_MONTHLY_CENTS)} a month, unless you choose another ${COMMIT_MONTHS}-month plan.`,
   gst: "Prices include GST.",
+  /** Said beside the plan step's button, so trying the first month is plainly free of risk (5 Nov 2026, Martin). */
+  tryFirstMonth: `Try your first month for ${dollars(FIRST_MONTH_CENTS)} a user. Not for you? Cancel any time in Settings → Billing: no lock-in contract, and nothing more is charged.`,
   yearly: `${Math.round(YEARLY_DISCOUNT * 100)}% off when you pay for the year`,
   yearlySeat: `${dollars(Math.round(seatPriceCents("year") / 12))} a user a month, billed yearly`,
   token: `${dollars(TOKEN_CENTS)} a design, ${dollars(BATTERY_DESIGN_CENTS)} with a battery`,

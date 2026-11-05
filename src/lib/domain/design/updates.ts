@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-05",
+    area: "Billing",
+    words:
+      "A new retailer chooses its users and pays for its plan right after signing in. Your first month is $29 a user, and you can cancel any time.",
+  },
+  {
+    day: "2026-11-05",
     area: "Email",
     words: "Connect more than one Gmail, say your own and sales@, and read them as one inbox. Inbox is also a tab on Today.",
   },

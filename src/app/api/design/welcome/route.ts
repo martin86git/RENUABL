@@ -2,7 +2,8 @@ import { LOGIN_LINK_MINUTES, signInDelivery } from "@/lib/domain/accounts";
 import { designSignInEmail } from "@/lib/domain/emails";
 import { siteUrl } from "@/lib/domain/sms";
 import { createLoginToken } from "@/lib/server/accounts";
-import { recordSubscription } from "@/lib/server/design-billing-repo";
+import { claimSubscriptions, recordSubscription } from "@/lib/server/design-billing-repo";
+import { designAccess } from "@/lib/server/design-context";
 import { dbConfigured, query } from "@/lib/server/db";
 import { emailProvider, sendEmail } from "@/lib/server/email";
 import { allow } from "@/lib/server/rate-limit";
@@ -38,6 +39,14 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, message: "We couldn't check your sign-up just now. Refresh to try again." }, { status: 502 });
   }
   if (!email) return Response.json({ ok: false, message: "Stripe didn't give us an email for this sign-up." }, { status: 422 });
+
+  // Already signed in as the owner who paid (a new retailer choosing a plan straight after naming the business): the
+  // plan is theirs at once, and they go in without an email.
+  const access = await designAccess().catch(() => null);
+  if (access?.state === "ready" && access.member.email.toLowerCase() === email && access.member.role === "owner") {
+    await claimSubscriptions(access.member.businessId, email);
+    return Response.json({ ok: true, email, claimed: true });
+  }
 
   const delivery = signInDelivery({
     emailReady: Boolean(emailProvider()),

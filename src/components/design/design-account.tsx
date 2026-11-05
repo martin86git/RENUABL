@@ -2,15 +2,16 @@
 
 import { SignInForm, signInNote } from "./sign-in-form";
 import { PASSWORD_MIN } from "@/lib/domain/design/password";
-import { SEAT_NOTE } from "@/lib/domain/design/plans";
+import { FIRST_MONTH_CENTS, MAX_SELF_SERVE_SEATS, PLAN_WORDS, SEAT_MONTHLY_CENTS, SEAT_NOTE, dollars } from "@/lib/domain/design/plans";
 import { BUSINESS_KINDS, type BusinessKind } from "@/lib/domain/design/business-kind";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
 import { BUSINESS_TERMS_MISSING, BUSINESS_TERMS_PATH, PERMISSIONS, ROLES, can, type MemberPermissions } from "@/lib/domain/design/account";
 import {
   addMember,
+  choosePlan,
   designAccount,
   forgetDesignAccount,
   loadMembers,
@@ -199,6 +200,98 @@ function SetUp({ account, onDone }: { account: Extract<DesignAccount, { signedIn
   );
 }
 
+/** Kept for the tab when RENUABL staff step past choosing a plan, so they can look round a business of their own. */
+const PLAN_SKIP = "renuabl.design.plan-skip";
+
+/**
+ * After naming a retailer business (5 Nov 2026, Martin: it went straight in, never showing the pricing or asking for a
+ * card): how many users, what it costs, and on to Stripe's secure page for the card. Coming back, the plan is the
+ * business's and the designer opens. Staff may step past it for the tab.
+ */
+function PlanStep({ account, onSkip }: { account: Extract<DesignAccount, { signedIn: true }>; onSkip: () => void }) {
+  const [seats, setSeats] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const go = async () => {
+    setBusy(true);
+    setProblem(null);
+    const failed = await choosePlan(account.email, seats);
+    if (failed) {
+      setBusy(false);
+      setProblem(failed);
+    }
+  };
+  const step = (by: number) => setSeats((n) => Math.min(MAX_SELF_SERVE_SEATS, Math.max(1, n + by)));
+  return (
+    <Frame>
+      <p className={eyebrow}>{account.business?.name ?? "Your business"}</p>
+      <h1 className="mt-3 text-[30px] leading-tight tracking-tight text-ink">Choose your plan.</h1>
+      <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{PLAN_WORDS.offer}</p>
+      <div className={`${card} mt-6 space-y-4`}>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-medium text-ink">Users</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 p-1">
+            <button
+              type="button"
+              className="h-8 w-8 rounded-full text-lg text-ink-2 hover:bg-surface"
+              onClick={() => step(-1)}
+              aria-label="One fewer user"
+            >
+              −
+            </button>
+            <span className="w-8 text-center text-[15px] font-medium tabular-nums text-ink" aria-live="polite">
+              {seats}
+            </span>
+            <button
+              type="button"
+              className="h-8 w-8 rounded-full text-lg text-ink-2 hover:bg-surface"
+              onClick={() => step(1)}
+              aria-label="One more user"
+            >
+              +
+            </button>
+          </span>
+        </div>
+        <dl className="space-y-1.5 border-t border-line pt-4 text-[14px]">
+          <div className="flex justify-between gap-3">
+            <dt className="text-ink-2">Your first month</dt>
+            <dd className="font-medium tabular-nums text-ink">{dollars(FIRST_MONTH_CENTS * seats)}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-ink-2">Then each month</dt>
+            <dd className="tabular-nums text-ink">{dollars(SEAT_MONTHLY_CENTS * seats)}</dd>
+          </div>
+        </dl>
+        <p className="text-[12px] leading-relaxed text-muted">
+          {PLAN_WORDS.startExplained} {PLAN_WORDS.gst}
+        </p>
+      </div>
+      {problem && (
+        <p className="mt-4 text-[13px] text-danger" role="alert">
+          {problem}
+        </p>
+      )}
+      <p className="mt-6 flex items-start gap-2 rounded-xl bg-surface-2 px-4 py-3 text-[14px] leading-relaxed text-ink">
+        <Check className="mt-0.5 h-4 w-4 shrink-0 text-positive" aria-hidden />
+        <span>{PLAN_WORDS.tryFirstMonth}</span>
+      </p>
+      <button type="button" className={`${primary} mt-4 w-full`} onClick={() => void go()} disabled={busy}>
+        {busy ? "Opening the secure payment page…" : "Continue to payment"}
+      </button>
+      <p className="mt-3 text-center text-[12px] text-muted">{PLAN_WORDS.enterprise}</p>
+      <div className="mt-8 flex flex-wrap items-center gap-3 text-[13px] text-muted">
+        <span>Signed in as {account.email}.</span>
+        <SignOut />
+        {account.staff && (
+          <button type="button" className={textLink} onClick={onSkip}>
+            Skip for now (RENUABL staff)
+          </button>
+        )}
+      </div>
+    </Frame>
+  );
+}
+
 /**
  * Wraps the designer's pages. Signed out, they work as they always have, on
  * this device. Signed in, it makes sure the person has a business and has
@@ -209,6 +302,13 @@ export function DesignAccountGate({ children }: { children: React.ReactNode }) {
   const [account, refresh] = useDesignAccount();
   // What came across from this device, and for which business: the page waits for it, so it loads the account's data once.
   const [brought, setBrought] = useState<{ id: string; roofs: number; settings: boolean } | null>(null);
+  const [planSkipped, setPlanSkipped] = useState(() => {
+    try {
+      return typeof window !== "undefined" && sessionStorage.getItem(PLAN_SKIP) === "1";
+    } catch {
+      return false;
+    }
+  });
   const business = account?.signedIn && account.state === "ready" ? account.business : null;
   const businessId = business?.id;
   useEffect(() => {
@@ -222,6 +322,18 @@ export function DesignAccountGate({ children }: { children: React.ReactNode }) {
 
   if (!account || (businessId && brought?.id !== businessId)) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (account.signedIn && account.state !== "ready") return <SetUp account={account} onDone={refresh} />;
+  if (account.signedIn && account.needsPlan && !planSkipped)
+    return (
+      <PlanStep
+        account={account}
+        onSkip={() => {
+          try {
+            sessionStorage.setItem(PLAN_SKIP, "1");
+          } catch {}
+          setPlanSkipped(true);
+        }}
+      />
+    );
   const came = [
     brought && brought.roofs > 0 ? `${brought.roofs} roof${brought.roofs === 1 ? "" : "s"}` : "",
     brought?.settings ? "your prices and settings" : "",

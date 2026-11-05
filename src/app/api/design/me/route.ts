@@ -1,5 +1,7 @@
 import { BUSINESS_TERMS_VERSION, can } from "@/lib/domain/design/account";
+import { cleanKind, needsPlan } from "@/lib/domain/design/business-kind";
 import { sampleByEmail } from "@/lib/domain/design/staff-view";
+import { subscriptionOf } from "@/lib/server/design-billing-repo";
 import { answer, designAccess } from "@/lib/server/design-context";
 import { staffBehind } from "@/lib/server/design-staff-view";
 
@@ -15,6 +17,12 @@ export async function GET() {
     if (access.state === "signed-out") return Response.json({ signedIn: false });
     const member = access.state === "no-business" ? null : access.member;
     const staff = await staffBehind().catch(() => null);
+    // A new retailer's owner chooses a plan and pays before going in (needsPlan). Not RENUABL's own business, nor the
+    // sample businesses staff look through.
+    const exempt =
+      !member || Boolean(sampleByEmail(access.email)) || access.email.toLowerCase() === process.env.RENUABL_CRM_EMAIL?.trim().toLowerCase();
+    const plan = exempt ? null : await subscriptionOf(member.businessId).catch(() => undefined);
+    const planDue = !exempt && plan !== undefined && needsPlan(cleanKind(member.businessKind), member.role, plan?.status ?? null);
     return Response.json({
       signedIn: true,
       state: access.state,
@@ -28,6 +36,7 @@ export async function GET() {
         members: can(member.role, "members", member.permissions),
       },
       termsVersion: BUSINESS_TERMS_VERSION,
+      ...(planDue ? { needsPlan: true } : {}),
       // The owner viewing as this member: whose own view it really is.
       ...(member?.viewedBy ? { viewedBy: member.viewedBy } : {}),
       // RENUABL staff: Settings offers View as a retailer, installer or inspector; while in a sample, which one.

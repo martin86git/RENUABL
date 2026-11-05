@@ -28,6 +28,8 @@ export type DesignAccount =
       may?: { costs: boolean; prices: boolean; publish: boolean; members: boolean } | null;
       /** The owner viewing the product as this member (read only): the owner's email. */
       viewedBy?: string;
+      /** A new retailer's owner who hasn't chosen a plan and paid yet (business-kind.ts `needsPlan`). */
+      needsPlan?: boolean;
       /** RENUABL staff (Settings → View as), and the sample business kind they are looking through. */
       staff?: boolean;
       staffViewing?: "retailer" | "installer" | "inspector";
@@ -183,4 +185,12 @@ export async function viewAs(email: string): Promise<string | null> {
 }
 export async function stopViewing(): Promise<void> {
   await fetch("/api/design/view-as", { method: "DELETE" }).catch(() => undefined);
+}
+
+/** Off to Stripe's secure page to pay for the plan; answers a problem in words, or goes. */
+export async function choosePlan(email: string, seats: number): Promise<string | null> {
+  const res = await send<Answer & { url?: string }>("/api/design/subscribe", "POST", { email, seats });
+  if (!res.ok || !res.url) return res.message ?? UNREACHABLE;
+  window.location.assign(res.url);
+  return null;
 }
