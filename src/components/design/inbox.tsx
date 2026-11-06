@@ -45,6 +45,8 @@ const GMAIL_SAYS: Record<string, string> = {
   failed: "Gmail couldn't be connected. Try again, and allow RENUABL to read and organise your email when Google asks.",
   off: "Connecting Gmail isn't set up here yet.",
   "signed-out": "Sign in to your business first.",
+  "read-only":
+    "Gmail is connected, but read only: Google wasn't given permission to organise your email. Connect it again and leave every box ticked on Google's page to mark read and archive from here.",
   full: "That's as many mailboxes as one person can connect. Disconnect one to add another.",
 };
 

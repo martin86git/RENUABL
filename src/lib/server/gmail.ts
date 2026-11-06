@@ -75,13 +75,15 @@ export function open(sealed: string): string | null {
 
 /**
  * Swaps Google's code for the tokens and keeps them for this member beside any mailbox they connected before (the same
- * mailbox again replaces its tokens). "full" past `MAX_MAILBOXES`; false when Google says no or gave no refresh token.
+ * mailbox again replaces its tokens). "full" past `MAX_MAILBOXES`; "read-only" when it is kept but Google left out the
+ * permission to mark read and archive (its consent screen lets that box be unticked); false when Google says no or gave
+ * no refresh token.
  */
 export async function connectGmail(
   config: { clientId: string; secret: string; redirect: string },
   code: string,
   member: Who,
-): Promise<boolean | "full"> {
+): Promise<boolean | "full" | "read-only"> {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -118,7 +120,7 @@ export async function connectGmail(
       canChangeMail(t.scope),
     ],
   );
-  return true;
+  return canChangeMail(t.scope) ? true : "read-only";
 }
 
 /** The addresses of the mailboxes a member has connected, the first connected first. */

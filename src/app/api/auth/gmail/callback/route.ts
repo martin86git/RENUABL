@@ -5,7 +5,7 @@ import { designAccess } from "@/lib/server/design-context";
 import { GMAIL_STATE_COOKIE, connectGmail, gmailConfig } from "@/lib/server/gmail";
 
 const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
-const OUTCOMES = new Set(["connected", "failed", "full", "off", "signed-out"]);
+const OUTCOMES = new Set(["connected", "failed", "full", "off", "signed-out", "read-only"]);
 
 /**
  * The small window's last page: tells the inbox that opened it how it went (same site only) and closes itself; if it
@@ -27,7 +27,7 @@ function closeWindow(why: string, origin: string): Response {
   });
 }
 
-/** GET ?code&state from Google: checks the state and keeps this member's Gmail connection (read only). */
+/** GET ?code&state from Google: checks the state and keeps this member's Gmail connection. */
 export async function GET(request: Request) {
   const url = new URL(request.url);
   // A small window sent straight here (nothing to connect: not set up, signed out) only needs closing.
@@ -46,5 +46,5 @@ export async function GET(request: Request) {
   if (access.state !== "ready" || access.member.viewedBy) return back("signed-out");
   if (!config || !code || !kept || !same(kept, state)) return back("failed");
   const ok = await connectGmail(config, code, access.member).catch(() => false);
-  return back(ok === "full" ? "full" : ok ? "connected" : "failed");
+  return back(ok === "full" || ok === "read-only" ? ok : ok ? "connected" : "failed");
 }

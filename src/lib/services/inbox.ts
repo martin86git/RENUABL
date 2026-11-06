@@ -51,7 +51,7 @@ export const CONNECT_GMAIL = "/api/auth/gmail";
 /** Connect a further mailbox: Google asks which account. */
 export const ADD_GMAIL = "/api/auth/gmail?add=1";
 
-export type GmailOutcome = "connected" | "failed" | "full" | "off" | "signed-out" | "closed";
+export type GmailOutcome = "connected" | "failed" | "full" | "off" | "signed-out" | "read-only" | "closed";
 
 /**
  * Connects a Gmail then and there (5 Nov 2026, Martin: never leave the page to do it): Google's sign-in opens in a

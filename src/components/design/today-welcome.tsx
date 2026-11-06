@@ -25,6 +25,8 @@ const GMAIL_WORDS: Partial<Record<GmailOutcome, string>> = {
   failed: "Your Gmail couldn't be connected. Try again.",
   off: "Google sign-in isn't set up on this site yet, so Gmail can't be connected.",
   "signed-out": "Sign in again to connect your Gmail.",
+  "read-only":
+    "Gmail is connected, but read only: Google wasn't given permission to organise your email. Connect it again and leave every box ticked on Google's page to mark read and archive from here.",
 };
 
 /**
@@ -130,10 +132,11 @@ function ConnectStep({ onNext, current }: { onNext: () => void; current: boolean
     setProblem(null);
     const outcome = await connectGmailHere(false);
     setBusy(null);
-    if (outcome === "connected") {
+    if (outcome === "connected" || outcome === "read-only") {
       const r = await loadInbox();
       setGmail(r.ok ? (r.addresses?.[0] ?? r.address ?? "Gmail") : "Gmail");
-    } else setProblem(GMAIL_WORDS[outcome] ?? null);
+    }
+    if (outcome !== "connected") setProblem(GMAIL_WORDS[outcome] ?? null);
   };
   const calendarNow = (provider: CalendarProvider) => {
     setBusy(provider);
