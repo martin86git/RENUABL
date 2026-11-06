@@ -46,15 +46,22 @@ const addressLine = (a: Address) => [a.line, a.suburb, a.state, a.postcode].filt
  * Where a customer or a job is: found with the address search, so it comes with its place on the map and its roof
  * can be designed. Once chosen it is shown, with the way to change it.
  */
-function AddressField(props: {
+export function AddressField(props: {
   value: string;
   placed: boolean;
   onChange: (place: { address: string; lat: number | null; lng: number | null }) => void;
+  /** The whole address over as many lines as it takes, for a narrow column (the deal's header card). */
+  wrap?: boolean;
 }) {
   if (props.value)
     return (
-      <div className="mt-1.5 flex min-h-10 items-center gap-3 rounded-md border border-line bg-surface-2 px-3 text-sm text-ink">
-        <span className="min-w-0 flex-1 truncate">{props.value}</span>
+      <div
+        className={clsx(
+          "flex min-h-10 items-center gap-3 rounded-md border border-line bg-surface-2 px-3 text-sm text-ink",
+          props.wrap ? "py-1.5" : "mt-1.5",
+        )}
+      >
+        <span className={clsx("min-w-0 flex-1", props.wrap ? "leading-snug" : "truncate")}>{props.value}</span>
         {!props.placed && <span className="shrink-0 text-xs text-muted">not on the map</span>}
         <button
           type="button"
