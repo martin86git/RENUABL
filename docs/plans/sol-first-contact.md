@@ -28,11 +28,12 @@ The first outreach links to a page for this deal, with no sign-in (like the prop
   - a battery (small, recommended, large);
   - blackout backup (only with a battery);
   - an EV charger.
-  
+
   Each tap shows:
   - what it adds to the price;
   - what it changes for them, e.g. "your evenings run on the sun";
   - how it works with the rest, e.g. "the battery fills from your panels in the afternoon".
+
 - **A running total** like a basket: the indicative price after rebates, the yearly saving and the payback, updating as they tap.
 - **Only combinations that work.** This isn't a catalogue. A battery brings the hybrid inverter it needs, and backup only appears with a battery. It is still one recommended system with sensible choices around it, matching the rule that customers never browse catalogues.
 - **"Talk to Sol" sits beside it**, like a stylist next to the fitting room. Questions go to the deal's conversation.
@@ -52,12 +53,14 @@ Without a bill, the first design is sized from the roof and a typical home for t
 ## How Sol replies (not a script)
 
 For each customer message (a reply, a question or a tap), Sol is given:
+
 - **Goal:** help them find a system they're happy with, then get them to the 15-minute call or a site visit.
 - **What he knows:** the deal, the roof, the bill if there is one, the conversation so far, and their taps.
 - **Rules:** see principle 5.
 - **Hand-offs:** when he needs a person, he asks the team in the deal chat (for example "a design with the battery outside on the east wall") and tells the customer "I've asked the team to draw that for you".
 
 Each reply aims to:
+
 - answer every question they asked;
 - address the need behind the question;
 - end with one easy next step.
@@ -66,15 +69,15 @@ Replies are short, so they read like a text. Writing quality matters here, so th
 
 ## What exists vs what is needed
 
-| Piece | Today | Needed |
-| --- | --- | --- |
-| Roof and an automatic design | Design it for me | Run on lead arrival, before anyone opens the deal |
-| Bill from a photo | `readBillWithClaude` | Reachable from the customer's page |
-| Customer conversation | Proposal chat only, Sol off by default | A lead-stage page and chat, before any proposal |
-| The basket page | Proposal options (Choose your system) | Add-on taps, a running total, signals to Sol |
-| Sending | Outbox, hourly cron | First message within minutes of the lead |
-| Reading email replies | None | Later; the page link works first |
-| Team visibility | Deal chat (being built) | Sol's notes, asks and the customer's taps there |
+| Piece                        | Today                                  | Needed                                            |
+| ---------------------------- | -------------------------------------- | ------------------------------------------------- |
+| Roof and an automatic design | Design it for me                       | Run on lead arrival, before anyone opens the deal |
+| Bill from a photo            | `readBillWithClaude`                   | Reachable from the customer's page                |
+| Customer conversation        | Proposal chat only, Sol off by default | A lead-stage page and chat, before any proposal   |
+| The basket page              | Proposal options (Choose your system)  | Add-on taps, a running total, signals to Sol      |
+| Sending                      | Outbox, hourly cron                    | First message within minutes of the lead          |
+| Reading email replies        | None                                   | Later; the page link works first                  |
+| Team visibility              | Deal chat (being built)                | Sol's notes, asks and the customer's taps there   |
 
 ## Order to build
 
@@ -103,6 +106,7 @@ On the deal (the feed card and the deal chat), Sol shows "I'm going to reply wit
 ### When Sol sends is the business's choice, nothing built in
 
 Sol has no hours of his own. Each business sets them:
+
 - **Always on (24/7)**, or
 - **Its own business hours:** which days, and from and to each day.
 
@@ -111,6 +115,7 @@ These replace the two fixed choices the sales agents have today (`SEND_HOURS`: b
 ### Before a bill: what similar homes paid, then the bill makes it exact
 
 The first message and page say, in effect:
+
 1. "Here's what a system on your home could look like" (the design on their roof).
 2. "We've estimated your bill at about $X–$Y a quarter" (a range, from a typical home of that size in the suburb).
 3. "Here's what customers with similar systems paid us" (real prices from the business's own signed proposals).
@@ -119,12 +124,14 @@ The first message and page say, in effect:
 **Why real prices beat a calculated price:** they're evidence, not a claim. They also show the business has done this before, which is social proof without reviews.
 
 **How "similar" is chosen** (`domain/design/similar-prices.ts`, to build):
+
 - Signed proposals of this business only.
 - Same kind of system (solar only, or solar and battery), within about 1.5 kW and, with a battery, about 5 kWh of it.
 - From the last 12 months.
 - Shown as what those customers paid after rebates: the middle figure and the spread ("most paid $11,800 to $13,400").
 
 **Rules:**
+
 - **Never identify a customer.** No names, no streets, no exact dates. "Around Glen Waverley" at most, and only when several come from there.
 - **A minimum number before showing**, e.g. 3 similar systems. With fewer, it falls back to the price of the design on their roof, labelled indicative.
 - **Real figures only.** Exactly what was signed, and it says how "similar" was chosen and over what period, so it's true under Australian Consumer Law.
