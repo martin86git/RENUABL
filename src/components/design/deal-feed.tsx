@@ -37,6 +37,7 @@ import { exampleDeals, loadFeed, solCalls, writeWithSol, type FeedAnswer } from 
 import { sayInTeam, TEAM_OPEN } from "@/lib/services/team-chat";
 import { AerialRoof, type AerialRoofSpec, type RoofFinish, type RoofForm } from "./aerial-roof";
 import { PATHS } from "./design-shell";
+import { DealTeamChat } from "./deal-team-chat";
 import { SolIcon } from "./sol-icon";
 
 const FEED_VIEW_KEY = "renuabl.design.feed-view";
@@ -109,7 +110,7 @@ export function DealFeed({ me }: { me: string }) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="mx-auto w-full max-w-5xl">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-[13px] text-ink-2">
           {data ? (
@@ -200,80 +201,100 @@ function DealCard(props: {
   const toggle = (p: Panel) => setPanel((cur) => (cur === p ? null : p));
   const first = d.customer.split(/\s+/)[0] || "them";
   return (
-    <article className={clsx("rounded-2xl bg-surface p-4 ring-1 sm:p-5", need ? "ring-sun-line/50" : "ring-line")}>
-      <div className="flex gap-4">
-        <RoofThumb deal={d} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <Link href={`${PATHS.deals}/${d.jobId}`} className="truncate text-[15px] font-semibold text-ink hover:underline">
-              {d.customer}
-            </Link>
-            {d.suburb && <span className="text-[13px] text-muted">· {d.suburb}</span>}
-            <HeatChip deal={d} />
-            <span className="ml-auto text-[12px] text-muted">{agoWords(d.events[0]?.at ?? d.createdAt, now)}</span>
-          </div>
-          <p className="mt-0.5 text-[13px] text-ink-2">
-            {systemLine(d) || d.title || "Solar"} · <span className="text-ink">{STAGE_LABELS[d.stage]}</span>
-            {d.clock && OPEN_STAGES.includes(d.stage) ? ` · ${d.clock}` : ""}
-          </p>
-          {need && (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-sun px-2.5 py-0.5 text-[12px] font-medium text-sun-ink">
-              {need}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {d.events.length > 0 && (
-        <ul className="mt-3 space-y-1.5 border-t border-line pt-3">
-          {d.events.map((e, i) => {
-            const Icon = EVENT_ICONS[e.kind];
-            return (
-              <li key={i} className="flex items-start gap-2 text-[13.5px] leading-snug">
-                <Icon className={clsx("mt-0.5 size-3.5 shrink-0", e.kind === "message" ? "text-sun-line" : "text-muted")} />
-                <span className="min-w-0 flex-1">
-                  {e.by && <span className={clsx("font-medium", e.kind === "message" ? "text-ink" : "text-ink-2")}>{e.by}: </span>}
-                  <span className={e.kind === "message" ? "text-ink" : "text-ink-2"}>{e.text}</span>
-                </span>
-                <span className="shrink-0 text-[11.5px] text-muted">{agoWords(e.at, now)}</span>
-              </li>
-            );
-          })}
-        </ul>
+    <article
+      className={clsx(
+        "grid gap-4 rounded-2xl bg-surface p-4 ring-1 sm:p-5 lg:grid-cols-[minmax(0,1fr)_17.5rem]",
+        need ? "ring-sun-line/50" : "ring-line",
       )}
+    >
+      <div className="min-w-0">
+        <div className="flex gap-4">
+          <RoofThumb deal={d} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <Link href={`${PATHS.deals}/${d.jobId}`} className="truncate text-[15px] font-semibold text-ink hover:underline">
+                {d.customer}
+              </Link>
+              {d.suburb && <span className="text-[13px] text-muted">· {d.suburb}</span>}
+              <HeatChip deal={d} />
+              <span className="ml-auto text-[12px] text-muted">{agoWords(d.events[0]?.at ?? d.createdAt, now)}</span>
+            </div>
+            <p className="mt-0.5 text-[13px] text-ink-2">
+              {systemLine(d) || d.title || "Solar"} · <span className="text-ink">{STAGE_LABELS[d.stage]}</span>
+              {d.clock && OPEN_STAGES.includes(d.stage) ? ` · ${d.clock}` : ""}
+            </p>
+            {need && (
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-sun px-2.5 py-0.5 text-[12px] font-medium text-sun-ink">
+                {need}
+              </p>
+            )}
+          </div>
+        </div>
 
-      <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface-2 px-3 py-2">
-        <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
-        <p className="text-[13px] leading-snug text-ink">
-          {caption(d, now)}
-          {d.sol && !d.sol.held && <span className="text-muted"> Goes {countdownWords(d.sol.firesAt, now)}.</span>}
+        {d.events.length > 0 && (
+          <ul className="mt-3 space-y-1.5 border-t border-line pt-3">
+            {d.events.map((e, i) => {
+              const Icon = EVENT_ICONS[e.kind];
+              return (
+                <li key={i} className="flex items-start gap-2 text-[13.5px] leading-snug">
+                  <Icon className={clsx("mt-0.5 size-3.5 shrink-0", e.kind === "message" ? "text-sun-line" : "text-muted")} />
+                  <span className="min-w-0 flex-1">
+                    {e.by && <span className={clsx("font-medium", e.kind === "message" ? "text-ink" : "text-ink-2")}>{e.by}: </span>}
+                    <span className={e.kind === "message" ? "text-ink" : "text-ink-2"}>{e.text}</span>
+                  </span>
+                  <span className="shrink-0 text-[11.5px] text-muted">{agoWords(e.at, now)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface-2 px-3 py-2">
+          <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
+          <p className="text-[13px] leading-snug text-ink">
+            {caption(d, now)}
+            {d.sol && !d.sol.held && <span className="text-muted"> Goes {countdownWords(d.sol.firesAt, now)}.</span>}
+          </p>
+        </div>
+
+        <div className="mt-3 flex items-center gap-1.5">
+          <Control label={`Write to ${first} with Sol`} on={panel === "write"} onClick={() => toggle("write")}>
+            <SolIcon className="size-4" />
+            <span className="hidden sm:inline">Write</span>
+          </Control>
+          <Control label={`Have Sol call ${first}`} on={panel === "call"} onClick={() => toggle("call")}>
+            <Phone className="size-4" />
+            <span className="hidden sm:inline">Call</span>
+          </Control>
+          <Control label="Bring in a teammate" on={panel === "team"} onClick={() => toggle("team")}>
+            <UserPlus className="size-4" />
+            <span className="hidden sm:inline">Teammate</span>
+          </Control>
+          <Link
+            href={`${PATHS.deals}/${d.jobId}`}
+            className="ml-auto inline-flex h-9 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
+          >
+            Open <ArrowUpRight className="size-3.5" />
+          </Link>
+        </div>
+
+        {panel === "write" && <WritePanel deal={d} onDone={() => (setPanel(null), props.onChanged())} />}
+        {panel === "call" && <CallPanel deal={d} callsOn={props.callsOn} onDone={() => (setPanel(null), props.onChanged())} />}
+        {panel === "team" && <TeamPanel deal={d} me={props.me} team={props.team} onDone={() => setPanel(null)} />}
+      </div>
+      {/* The request pad: the deal's team chat, its latest lines and a box (deal-team.ts). */}
+      <aside
+        className="flex min-w-0 flex-col gap-2 rounded-xl bg-canvas p-3 ring-1 ring-line"
+        aria-label={`Team chat on ${d.customer}'s deal`}
+      >
+        <p className="flex items-center justify-between text-[11.5px] font-medium uppercase tracking-wide text-muted">
+          Team chat
+          <Link href={`${PATHS.deals}/${d.jobId}?tab=team`} className="normal-case tracking-normal text-ink-2 hover:text-ink">
+            All
+          </Link>
         </p>
-      </div>
-
-      <div className="mt-3 flex items-center gap-1.5">
-        <Control label={`Write to ${first} with Sol`} on={panel === "write"} onClick={() => toggle("write")}>
-          <SolIcon className="size-4" />
-          <span className="hidden sm:inline">Write</span>
-        </Control>
-        <Control label={`Have Sol call ${first}`} on={panel === "call"} onClick={() => toggle("call")}>
-          <Phone className="size-4" />
-          <span className="hidden sm:inline">Call</span>
-        </Control>
-        <Control label="Bring in a teammate" on={panel === "team"} onClick={() => toggle("team")}>
-          <UserPlus className="size-4" />
-          <span className="hidden sm:inline">Teammate</span>
-        </Control>
-        <Link
-          href={`${PATHS.deals}/${d.jobId}`}
-          className="ml-auto inline-flex h-9 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
-        >
-          Open <ArrowUpRight className="size-3.5" />
-        </Link>
-      </div>
-
-      {panel === "write" && <WritePanel deal={d} onDone={() => (setPanel(null), props.onChanged())} />}
-      {panel === "call" && <CallPanel deal={d} callsOn={props.callsOn} onDone={() => (setPanel(null), props.onChanged())} />}
-      {panel === "team" && <TeamPanel deal={d} me={props.me} team={props.team} onDone={() => setPanel(null)} />}
+        <DealTeamChat jobId={d.jobId} pad initial={d.team?.lines ?? []} onChanged={props.onChanged} />
+      </aside>
     </article>
   );
 }

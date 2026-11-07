@@ -28,7 +28,7 @@ export interface Notification {
  */
 export async function notifyMentions(
   businessId: string,
-  note: { jobId: string; customerId: string; text: string; by: string },
+  note: { jobId: string; customerId: string; text: string; by: string; tab?: "team" },
 ): Promise<string[]> {
   const members = await query<{ email: string }>(`select email from business_members where business_id = $1`, [businessId]);
   const to = mentionsIn(
@@ -52,7 +52,7 @@ export async function notifyMentions(
       by: note.by,
       customer: rows[0]?.name ?? "a customer",
       text: note.text,
-      link: `${site}/design/deals/${note.jobId}`,
+      link: `${site}/design/deals/${note.jobId}${note.tab ? `?tab=${note.tab}` : ""}`,
     });
     for (const address of to)
       await sendEmail({ to: address, ...email, replyTo: note.by }).catch(() => console.error("a mention email couldn't be sent"));

@@ -49,6 +49,13 @@ describe("deal feed", () => {
     expect(caption(d, now)).toMatch(/Sol has a follow-up lined up/);
   });
 
+  it("counts an open request in the deal's team chat as needing someone", () => {
+    const d = deal({ team: { lines: [], openAsks: [{ id: "dl_1", type: "design" }] } });
+    expect(needsYou(d, now)).toBe("Sol needs a design");
+    expect(caption(d, now)).toBe("Sol has asked the team for a design.");
+    expect(needsYou(deal({ team: { lines: [], openAsks: [] } }), now)).toBeNull();
+  });
+
   it("orders by the latest activity and filters each view", () => {
     const a = deal({ jobId: "a", events: [{ kind: "opened", text: "", at: ago(5) }] });
     const b = deal({ jobId: "b", events: [{ kind: "message", text: "?", at: ago(1) }] });

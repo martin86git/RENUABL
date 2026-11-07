@@ -644,6 +644,22 @@ create table if not exists design_team_seen (
   seen_at timestamptz not null,
   primary key (business_id, email, room)
 );
+-- The team chat on each deal (domain/design/deal-team.ts): the business's own people and Sol, never the customer. Sol's
+-- requests ("asks") carry what he wants and the customer's words in ask; done once a person marks it. Gone with the deal.
+create table if not exists design_deal_lines (
+  business_id text not null references businesses(id) on delete cascade,
+  id text not null,
+  job_id text not null,
+  by_email text not null,
+  kind text not null default 'line',
+  text text not null default '',
+  ask jsonb,
+  at timestamptz not null default now(),
+  primary key (business_id, id),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create index if not exists design_deal_lines_job on design_deal_lines(business_id, job_id, at);
+create index if not exists design_deal_lines_open on design_deal_lines(business_id, job_id) where kind = 'ask' and not (ask ? 'done');
 -- Emails sent from a deal and when the customer's mail app loaded their pixel (domain/design/email-opens.ts). The token
 -- alone opens the row (the pixel's address carries nothing else); gone with the deal.
 create table if not exists design_email_opens (

@@ -10,6 +10,7 @@ import { ListOnMarketplace } from "./marketplace";
 import { suburbAlone } from "@/lib/domain/design/marketplace";
 import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import clsx from "clsx";
+import { DealTeamChat } from "./deal-team-chat";
 import {
   JOB_STAGES,
   STAGE_LABELS,
@@ -59,7 +60,7 @@ import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
 type Written = "note" | "call" | "email";
-type Tab = "overview" | "activities" | "email" | "chat" | "sol" | "files" | "service";
+type Tab = "overview" | "activities" | "team" | "email" | "chat" | "sol" | "files" | "service";
 /** Whether this person keeps the deal's left column folded away, on their device. */
 const ABOUT_FOLDED = "renuabl.design.deal-about";
 const FILTERS: { key: "all" | ActivityKind; label: string }[] = [
@@ -229,7 +230,17 @@ export function DealPage({ id }: { id: string }) {
   // (a draft Sol wrote) on its Email tab.
   const asked = useSearchParams().get("tab");
   const [tab, setTab] = useState<Tab>(
-    asked === "chat" ? "chat" : asked === "email" ? "email" : asked === "sol" ? "sol" : asked === "service" ? "service" : "activities",
+    asked === "chat"
+      ? "chat"
+      : asked === "email"
+        ? "email"
+        : asked === "sol"
+          ? "sol"
+          : asked === "service"
+            ? "service"
+            : asked === "team"
+              ? "team"
+              : "activities",
   );
   // The design tool as a drawer over the deal (?design=1 opens it), and the left column folded away.
   const [drawer, setDrawer] = useState(useSearchParams().get("design") === "1");
@@ -751,6 +762,10 @@ export function DealPage({ id }: { id: string }) {
           >
             Activities
           </button>
+          {/* The deal's team chat: the business's own people and Sol, never the customer. */}
+          <button role="tab" aria-selected={tab === "team"} className={pill(tab === "team")} onClick={() => setTab("team")}>
+            Team
+          </button>
           <button role="tab" aria-selected={tab === "email"} className={pill(tab === "email")} onClick={() => setTab("email")}>
             Email
           </button>
@@ -781,7 +796,14 @@ export function DealPage({ id }: { id: string }) {
           </button>
         </div>
 
-        {tab === "email" ? (
+        {tab === "team" ? (
+          <section className={clsx(ui.card, "mt-5 p-5")}>
+            <h2 className="text-[15px] font-medium text-ink">Team chat on this deal</h2>
+            <div className="mt-3">
+              <DealTeamChat jobId={id} />
+            </div>
+          </section>
+        ) : tab === "email" ? (
           <div className="mt-5">
             <DealEmail job={job} customer={customer} business={business} onSent={(a) => a && setActivity((all) => [a, ...all])} />
           </div>

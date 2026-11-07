@@ -4,6 +4,7 @@ import { withDatasheets, type Datasheets } from "@/lib/domain/design/datasheets"
 import { findDatasheetOnline, loadDatasheets } from "@/lib/services/datasheets";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { DesignBrief } from "./design-brief";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddressEntry } from "@/components/consumer/address-entry";
 import { Wordmark } from "@/components/ui/primitives";
@@ -94,6 +95,8 @@ export function DesignStudio() {
   // The customer's job this roof is being designed for, when the designer was opened from one (/design/roof?job=…).
   const params = useSearchParams();
   const jobId = params.get("job");
+  // Sol's design request from the deal's team chat, shown as a brief over the designer (?ask=…).
+  const askId = params.get("ask");
   // A roof opened from the home is kept in the address (?at=lat,lng&address=…), so a reload opens it again.
   const at = params.get("at");
   const atAddress = params.get("address") ?? "";
@@ -283,6 +286,7 @@ export function DesignStudio() {
   if (roof && work && image)
     return (
       <div className="theme-studio pb-10">
+        {jobId && askId && <DesignBrief jobId={jobId} askId={askId} />}
         <RoofDesigner
           // A different roof is a different designer: nothing from the last one carries over.
           key={`${roof.lat},${roof.lng},${fresh}`}
@@ -451,6 +455,8 @@ export function DesignStudio() {
   if (signedIn)
     return (
       <div className="theme-studio">
+        {/* The brief stays in view when the deal has no roof to open yet, so the designer can start from it. */}
+        {jobId && askId && <DesignBrief jobId={jobId} askId={askId} />}
         {problem && (
           <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
             <span>{problem}</span>

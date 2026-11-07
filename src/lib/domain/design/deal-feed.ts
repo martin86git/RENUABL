@@ -1,5 +1,6 @@
 import type { Heat } from "./deal-heat";
 import { STAGE_LABELS, type JobStage } from "./crm";
+import { askNeedWords, type AskType, type DealLine } from "./deal-team";
 
 /**
  * The deal feed on Today (6 Nov 2026, Martin: Sol runs the deals, the feed is the controls, and the owner's judgement
@@ -50,6 +51,8 @@ export interface FeedDeal {
   phone: string | null;
   /** Where the home is, for the roof picture; null when it has no place on the map. */
   place: { lat: number; lng: number } | null;
+  /** The deal's team chat (deal-team.ts): the pad's lines, oldest first, and the requests still waiting for a person. */
+  team?: { lines: DealLine[]; openAsks: { id: string; type: AskType }[] };
 }
 
 export type FeedView = "needs" | "all" | "sol";
@@ -77,6 +80,9 @@ export function needsYou(d: FeedDeal, now = new Date()): string | null {
   const latest = d.events[0];
   const name = first(d.customer);
   if (latest?.kind === "message") return `${name} is waiting on a reply`;
+  // A request Sol left in the deal's team chat, still open.
+  const ask = d.team?.openAsks[0];
+  if (ask) return askNeedWords(ask);
   if (d.stage === "lead" && !d.events.some((e) => e.kind === "call" || e.kind === "email" || e.kind === "reply")) {
     const age = now.getTime() - Date.parse(d.createdAt);
     return age < 3 * DAY ? "New lead: nobody has been in touch yet" : "Lead with no contact yet";
@@ -92,6 +98,8 @@ export function caption(d: FeedDeal, now = new Date()): string {
   const name = first(d.customer);
   const need = needsYou(d, now);
   if (need?.endsWith("waiting on a reply")) return `${name} asked something and hasn't heard back.`;
+  const ask = d.team?.openAsks[0];
+  if (ask) return ask.type === "design" ? "Sol has asked the team for a design." : "Sol has asked the team for a hand.";
   if (d.sol && !d.sol.held) return `Sol has a follow-up lined up${d.sol.subject ? `: "${d.sol.subject}"` : ""}.`;
   switch (d.stage) {
     case "lead":

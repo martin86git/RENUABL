@@ -1,0 +1,348 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import clsx from "clsx";
+import { Check, PencilRuler, RotateCcw, SendHorizonal } from "lucide-react";
+import {
+  ASK_TYPES,
+  DEAL_TEAM_POLL_MS,
+  SOL_WRITER,
+  briefHref,
+  saidWhen,
+  typingMention,
+  writerName,
+  type DealLine,
+} from "@/lib/domain/design/deal-team";
+import { handleOf, mentionText } from "@/lib/domain/design/mentions";
+import { agoWords } from "@/lib/domain/design/deal-feed";
+import { DEAL_TEAM_CHANGED, loadDealTeam, markAskDone, sayOnDeal, type DealTeamView } from "@/lib/services/deal-team";
+import { openDesigner } from "./design-drawer";
+import { SolIcon } from "./sol-icon";
+
+type Person = { email: string; name: string };
+const SOL_PERSON: Person = { email: SOL_WRITER, name: "Sol" };
+/** How long to look for Sol's answer after he's tagged, and how often. */
+const SOL_WAIT_MS = 90_000;
+const SOL_LOOK_MS = 3_000;
+
+/**
+ * The team chat on a deal (deal-team.ts; 8 Nov 2026, Martin): the business's own people and Sol, never the customer.
+ * `pad` is the small version beside a card on Today's deal feed (the latest lines and a box); otherwise the whole
+ * conversation, as the deal's Team tab. Sol's requests show what he wants, the customer's words it rests on, one
+ * button to act and Mark done.
+ */
+export function DealTeamChat(props: { jobId: string; pad?: boolean; initial?: DealLine[]; onChanged?: () => void }) {
+  const { jobId, pad } = props;
+  const [view, setView] = useState<DealTeamView | null>(null);
+  const [lines, setLines] = useState<DealLine[]>(props.initial ?? []);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [waitingOnSol, setWaitingOnSol] = useState<number | null>(null);
+  const onChanged = useRef(props.onChanged);
+  useEffect(() => {
+    onChanged.current = props.onChanged;
+  }, [props.onChanged]);
+
+  const load = useCallback(async () => {
+    const r = await loadDealTeam(jobId);
+    if (r.ok) {
+      setView(r);
+      setLines(r.lines);
+      setProblem(null);
+      return r.lines;
+    }
+    setProblem(r.message);
+    return null;
+  }, [jobId]);
+
+  // The full chat reads itself and keeps up; the pad reads itself only once it is used (the feed brings its lines).
+  useEffect(() => {
+    if (pad) return;
+    const first = window.setTimeout(() => void load(), 0);
+    const t = window.setInterval(() => document.visibilityState === "visible" && void load(), DEAL_TEAM_POLL_MS);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(t);
+    };
+  }, [pad, load]);
+  // After @Sol, look for his answer for a while.
+  useEffect(() => {
+    if (waitingOnSol === null) return;
+    const t = window.setInterval(async () => {
+      const got = await load();
+      const answered = got?.some((l) => l.by === SOL_WRITER && Date.parse(l.at) > waitingOnSol);
+      if (answered || Date.now() - waitingOnSol > SOL_WAIT_MS) {
+        setWaitingOnSol(null);
+        onChanged.current?.();
+      }
+    }, SOL_LOOK_MS);
+    return () => window.clearInterval(t);
+  }, [waitingOnSol, load]);
+
+  const changed = () => {
+    window.dispatchEvent(new CustomEvent(DEAL_TEAM_CHANGED, { detail: { jobId } }));
+    onChanged.current?.();
+  };
+
+  const send = async (text: string): Promise<boolean> => {
+    const r = await sayOnDeal(jobId, text);
+    if (!r.ok) {
+      setProblem(r.message);
+      return false;
+    }
+    setProblem(null);
+    setLines((all) => [...all, r.line]);
+    if (r.solAnswering) setWaitingOnSol(Date.now() - 2_000);
+    await load();
+    changed();
+    return true;
+  };
+
+  const settle = async (lineId: string, done: boolean) => {
+    const r = await markAskDone(jobId, lineId, done);
+    if (!r.ok) setProblem(r.message);
+    await load();
+    changed();
+  };
+
+  // The pad shows the feed's lines until it has read the chat itself (once used).
+  const current = view ? lines : (props.initial ?? lines);
+  const shown = pad ? current.slice(-4) : current;
+  const people: Person[] = view?.members ?? [];
+
+  return (
+    <div className={clsx("flex min-w-0 flex-col", pad ? "gap-2" : "gap-3")}>
+      {!pad && (
+        <p className="text-[12.5px] text-muted">
+          For your team and Sol only: the customer never sees this. Type @ to bring someone in, or @Sol to ask him.
+        </p>
+      )}
+      <ul className={clsx("flex flex-col", pad ? "gap-1.5" : "gap-3")}>
+        {shown.length === 0 && (
+          <li className={clsx("text-muted", pad ? "text-[12px]" : "rounded-xl bg-surface-2 px-4 py-6 text-center text-[13.5px]")}>
+            {pad ? "Nothing said here yet." : "Nothing said about this deal yet. Leave the team a note, or ask Sol."}
+          </li>
+        )}
+        {shown.map((l) =>
+          l.kind === "ask" && l.ask ? (
+            <AskCard key={l.id} line={l} jobId={jobId} pad={pad} onSettle={settle} />
+          ) : (
+            <Line key={l.id} line={l} pad={pad} />
+          ),
+        )}
+        {waitingOnSol !== null && (
+          <li className="flex items-center gap-1.5 text-[12px] text-muted" role="status">
+            <SolIcon className="size-3.5 text-sun-line" /> Sol is answering…
+          </li>
+        )}
+      </ul>
+      {problem && (
+        <p className="text-[12.5px] text-danger" role="alert">
+          {problem}
+        </p>
+      )}
+      <Composer pad={pad} people={people} onNeedPeople={() => !view && void load()} onSend={send} />
+    </div>
+  );
+}
+
+function Line({ line: l, pad }: { line: DealLine; pad?: boolean }) {
+  const sol = l.by === SOL_WRITER;
+  return (
+    <li className={clsx("min-w-0", pad ? "text-[12.5px] leading-snug" : "text-[13.5px] leading-relaxed")}>
+      <div className={clsx("rounded-xl", pad ? "px-2.5 py-1.5" : "px-3 py-2", sol ? "bg-sun ring-1 ring-sun-line/25" : "bg-surface-2")}>
+        <p className="flex items-baseline gap-1.5">
+          {sol && <SolIcon className="size-3.5 shrink-0 self-center text-sun-ink" />}
+          <span className={clsx("font-semibold", sol ? "text-sun-ink" : "text-ink")}>{writerName(l.by)}</span>
+          {l.kind === "note" && <span className="text-[11px] text-sun-ink/80">note</span>}
+          <span className="ml-auto shrink-0 text-[11px] text-muted">{agoWords(l.at)}</span>
+        </p>
+        <p className={clsx("whitespace-pre-wrap break-words text-ink", pad && "line-clamp-3")}>{l.text}</p>
+      </div>
+    </li>
+  );
+}
+
+/** One of Sol's requests: what he wants, the customer's words, one button to act, and Mark done. */
+function AskCard(props: { line: DealLine; jobId: string; pad?: boolean; onSettle: (id: string, done: boolean) => Promise<void> }) {
+  const { line: l, jobId, pad } = props;
+  const ask = l.ask!;
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const type = ASK_TYPES[ask.type];
+  const done = ask.done;
+  const settle = async (to: boolean) => {
+    setBusy(true);
+    await props.onSettle(l.id, to);
+    setBusy(false);
+  };
+  return (
+    <li
+      className={clsx(
+        "min-w-0 rounded-xl ring-1",
+        pad ? "p-2.5 text-[12.5px]" : "p-3.5 text-[13.5px]",
+        done ? "bg-surface-2 ring-line" : "bg-surface ring-sun-line/60",
+      )}
+    >
+      <p className="flex flex-wrap items-center gap-1.5">
+        <SolIcon className="size-3.5 text-sun-line" />
+        <span className="font-semibold text-ink">Sol needs</span>
+        <span className="rounded-full bg-sun px-2 py-0.5 text-[11px] font-medium text-sun-ink">
+          {type.label} · {type.forWho}
+        </span>
+        <span className="ml-auto text-[11px] text-muted">{agoWords(l.at)}</span>
+      </p>
+      <p className={clsx("mt-1.5 text-ink", done && "text-ink-2", pad && !done && "line-clamp-4")}>{l.text}</p>
+      {!pad && ask.why.length > 0 && (
+        <div className="mt-2.5">
+          <p className="text-[11.5px] font-medium uppercase tracking-wide text-muted">What it rests on</p>
+          <ul className="mt-1 space-y-1.5">
+            {ask.why.map((q, i) => (
+              <li key={i} className="border-l-2 border-sun-line/60 pl-2.5 text-ink-2">
+                &ldquo;{q.text}&rdquo;{" "}
+                <span className="text-[12px] text-muted">
+                  ({q.where}, {saidWhen(q.at)})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        {done ? (
+          <>
+            <span className="inline-flex items-center gap-1 text-[12px] text-positive">
+              <Check className="size-3.5" /> Done by {writerName(done.by)}
+            </span>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void settle(false)}
+              className="inline-flex items-center gap-1 text-[12px] font-medium text-ink-2 hover:text-ink"
+            >
+              <RotateCcw className="size-3" /> Open again
+            </button>
+          </>
+        ) : (
+          <>
+            {ask.type === "design" && type.action && (
+              <button
+                type="button"
+                onClick={() => openDesigner(briefHref(jobId, l.id), router)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3 text-[12.5px] font-medium text-primary-ink hover:brightness-110"
+              >
+                <PencilRuler className="size-3.5" /> {pad ? "Open the designer" : type.action}
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void settle(true)}
+              className="inline-flex h-8 items-center gap-1 rounded-full bg-surface px-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:ring-ink-2 disabled:text-muted"
+            >
+              <Check className="size-3.5" /> Mark done
+            </button>
+          </>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** The box: Enter sends, Shift+Enter a new line; "@" offers the business's people and Sol. */
+function Composer(props: { pad?: boolean; people: Person[]; onNeedPeople: () => void; onSend: (text: string) => Promise<boolean> }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [caret, setCaret] = useState(0);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const tag = typingMention(text, caret);
+  const offered = tag
+    ? [SOL_PERSON, ...props.people]
+        .filter((p) => {
+          const q = tag.query.toLowerCase();
+          return (
+            !q || handleOf(p.email).startsWith(q) || p.name.toLowerCase().startsWith(q) || (p.email === SOL_WRITER && "sol".startsWith(q))
+          );
+        })
+        .slice(0, 6)
+    : [];
+  const pick = (p: Person) => {
+    if (!tag) return;
+    const put = p.email === SOL_WRITER ? "@Sol " : mentionText(p.email);
+    const next = text.slice(0, tag.start) + put + text.slice(caret);
+    setText(next);
+    const at = tag.start + put.length;
+    window.setTimeout(() => {
+      box.current?.focus();
+      box.current?.setSelectionRange(at, at);
+      setCaret(at);
+    }, 0);
+  };
+  const send = async () => {
+    const words = text.trim();
+    if (!words || busy) return;
+    setBusy(true);
+    const ok = await props.onSend(words);
+    setBusy(false);
+    if (ok) setText("");
+  };
+  return (
+    <div className="relative">
+      {offered.length > 0 && (
+        <ul className="absolute bottom-full left-0 z-20 mb-1 w-56 overflow-hidden rounded-xl bg-surface py-1 shadow-lg ring-1 ring-line">
+          {offered.map((p) => (
+            <li key={p.email}>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(p);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-ink hover:bg-surface-2"
+              >
+                {p.email === SOL_WRITER ? <SolIcon className="size-3.5 text-sun-line" /> : null}
+                <span className="font-medium">{p.name}</span>
+                {p.email !== SOL_WRITER && <span className="truncate text-[11.5px] text-muted">@{handleOf(p.email)}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex items-end gap-1.5 rounded-2xl bg-surface px-2.5 py-1.5 ring-1 ring-line focus-within:ring-2 focus-within:ring-sun-line">
+        <textarea
+          ref={box}
+          rows={1}
+          value={text}
+          aria-label="Write to the team"
+          placeholder={props.pad ? "Note to the team, or @Sol…" : "Write to the team on this deal… (@ to bring someone in)"}
+          onFocus={props.onNeedPeople}
+          onChange={(e) => {
+            setText(e.target.value);
+            setCaret(e.target.selectionStart ?? e.target.value.length);
+          }}
+          onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (offered.length) pick(offered[0]);
+              else void send();
+            }
+          }}
+          className={clsx(
+            "max-h-32 min-h-[28px] flex-1 resize-none bg-transparent py-1 text-ink placeholder:text-muted focus:outline-none",
+            props.pad ? "text-[13px]" : "text-[14px]",
+          )}
+        />
+        <button
+          type="button"
+          aria-label="Send"
+          disabled={busy || !text.trim()}
+          onClick={() => void send()}
+          className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-primary-ink transition hover:brightness-110 disabled:bg-surface-2 disabled:text-muted"
+        >
+          <SendHorizonal className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -1,4 +1,5 @@
 import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
+import { solAsksForDesigns } from "@/lib/server/design-deal-team-repo";
 import { dealFeed, exampleCount, feedExtras } from "@/lib/server/design-feed";
 
 /**
@@ -9,6 +10,9 @@ export async function GET() {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
+    // Sol looks over the deals not yet designed whose customers have said what they want, and asks for a design in
+    // the deal's team chat (at most every few minutes a business; by rule, no credit).
+    await solAsksForDesigns(who.member.businessId).catch((e) => console.error("sol's design requests", e instanceof Error ? e.message : e));
     const [deals, extras, examples] = await Promise.all([
       dealFeed(who.member, viewerOf(who.member)),
       feedExtras(who.member.businessId, who.member.email),

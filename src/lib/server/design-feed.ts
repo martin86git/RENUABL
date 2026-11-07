@@ -16,6 +16,7 @@ import { redactSecrets } from "./bill-reader";
 import { batteryOf, CARD_EVENTS, suburbOfAddress, type FeedDeal, type FeedEvent, type FeedEventKind } from "@/lib/domain/design/deal-feed";
 import { newId, query, transaction } from "./db";
 import { jobById, listJobs } from "./design-crm-repo";
+import { padsFor } from "./design-deal-team-repo";
 import { dealPulses } from "./design-pulse-repo";
 import { outbox } from "./design-sol-agents";
 import { withSolCredit } from "./sol-credits";
@@ -30,6 +31,8 @@ function eventOfActivity(kind: string, text: string, at: string, by: string): Fe
   const map: Partial<Record<string, FeedEventKind>> = { call: "call", email: "email", note: "note", stage: "stage", proposal: "proposal" };
   const k = map[kind];
   if (!k) return null;
+  // Sol's notes and requests are written on the record from the deal's team chat, which the card's pad already shows.
+  if (k === "note" && by === "sol") return null;
   if (k === "proposal" && /opened/i.test(words)) return { kind: "opened", text: words, at, by: handle(by) };
   return { kind: by === "sol" ? (k === "email" ? "sol" : k) : k, text: words, at, by: handle(by) };
 }
@@ -42,7 +45,7 @@ export async function dealFeed(
   const jobs = (await listJobs(businessId, viewer)).filter((j) => OPEN_STAGES.includes(j.stage) || PRE_INSTALL_STAGES.includes(j.stage));
   if (!jobs.length) return [];
   const ids = jobs.map((j) => j.id);
-  const [pulses, box, customers, activity, messages, proposals] = await Promise.all([
+  const [pulses, box, customers, activity, messages, proposals, pads] = await Promise.all([
     dealPulses(businessId, viewer).catch(() => ({}) as Awaited<ReturnType<typeof dealPulses>>),
     outbox(member, viewer, true).catch(() => null),
     query<{ id: string; phone: string; email: string; sample: boolean }>(
@@ -69,6 +72,7 @@ export async function dealFeed(
         where p.business_id = $1 and p.job_id = any($2) and p.withdrawn_at is null group by p.job_id`,
       [businessId, ids],
     ),
+    padsFor(businessId, ids).catch(() => ({}) as Awaited<ReturnType<typeof padsFor>>),
   ]);
   const byCustomer = new Map(customers.map((c) => [c.id, c]));
   return jobs.map((j): FeedDeal => {
@@ -120,6 +124,7 @@ export async function dealFeed(
       canEmail: Boolean(c?.email),
       phone: c?.phone || null,
       place: j.lat !== null && j.lng !== null ? { lat: j.lat, lng: j.lng } : null,
+      ...(pads[j.id] ? { team: pads[j.id] } : {}),
     };
   });
 }
