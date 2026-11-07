@@ -14,6 +14,12 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-07",
+    area: "Today",
+    words:
+      "Today opens on your deals as a live feed. Write to a customer with Sol, have Sol call, or bring in a teammate, right on the card.",
+  },
+  {
     day: "2026-11-06",
     area: "Deals",
     words: "A deal opens on a card of who it's for, each line changed where it is. Service is the spanner at the end of the tabs.",

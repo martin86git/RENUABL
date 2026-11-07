@@ -52,6 +52,7 @@ import { goWhereAsked, openSolPage } from "./sol-chat";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { InboxPage } from "./inbox";
+import { DealFeed } from "./deal-feed";
 import { NewLook, Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
@@ -142,6 +143,9 @@ export function TodayPad(props: {
   const router = useRouter();
   const [tab, setTab] = useState<TodayTab | "day">("today");
   const [welcoming, setWelcoming] = useState(Boolean(props.welcome));
+  // After the first visit Today opens on the deal feed (deal-feed.ts, 6 Nov 2026, Martin): Sol's typed greeting is for
+  // the first time only. Asking Sol, or Show me my day, turns to the conversation; "Your deals" comes back.
+  const [onFeed, setOnFeed] = useState(!props.welcome);
   // The welcome's tour, run once the greeting is back on the page so every place it lights is there.
   const [touring, setTouring] = useState(false);
   const tour = () => {
@@ -174,12 +178,14 @@ export function TodayPad(props: {
 
   const showDay = () => {
     setTab("today");
+    setOnFeed(false);
     if (!dayTold) setTurns((t) => [...t, { id: Date.now(), kind: "day" }]);
   };
   const ask = async (q: string, files: SolFile[] = []) => {
     if (asking) return;
     const id = Date.now();
     setTab("today");
+    setOnFeed(false);
     setAsking(true);
     const shownQ = q + (files.length ? `${q ? "\n" : ""}(Attached: ${files.map((f) => f.name).join(", ")})` : "");
     setTurns((t) => [...t, { id, kind: "ask", q: shownQ, a: null }]);
@@ -295,11 +301,20 @@ export function TodayPad(props: {
             <NewLook name={props.name} />
           </div>
         )}
+        {!welcoming && onFeed && (
+          <div className="pb-6">
+            <p className="mx-auto mb-4 w-full max-w-3xl text-[22px] font-light tracking-[-0.01em] text-ink">
+              {greeting()}
+              {props.name ? `, ${props.name}` : ""}.
+            </p>
+            <DealFeed me={props.email} />
+          </div>
+        )}
         {/* The greeting, in the middle of the screen until the conversation starts, then folded away. */}
         <div
           className={clsx(
             "flex flex-col justify-center transition-[flex-grow,opacity] duration-500 ease-out",
-            welcoming && "hidden",
+            (welcoming || onFeed) && "hidden",
             talking ? "grow-0 opacity-0" : "grow opacity-100",
           )}
           aria-hidden={talking}
@@ -313,7 +328,7 @@ export function TodayPad(props: {
           </div>
         </div>
 
-        {talking && (
+        {talking && !onFeed && (
           <div className="mx-auto w-full max-w-3xl flex-1 space-y-7 pb-4 pt-2" aria-live="polite">
             {turns.map((t) =>
               t.kind === "day" ? (
@@ -394,9 +409,18 @@ export function TodayPad(props: {
 
       {touring && <Spotlight steps={WELCOME_TOUR} onEnd={() => setTouring(false)} />}
 
-      {(talking || tab !== "today") && (
+      {(talking || tab !== "today" || onFeed) && (
         <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-60% to-transparent pb-5 pt-10 print:hidden">
           <div className="mx-auto max-w-3xl">
+            {tab === "today" && !welcoming && (!onFeed || talking) && (
+              <button
+                type="button"
+                onClick={() => setOnFeed(!onFeed)}
+                className="mb-2.5 mr-2 inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
+              >
+                {onFeed ? "Back to the conversation" : "Your deals"}
+              </button>
+            )}
             {!dayTold && (
               <button
                 type="button"
