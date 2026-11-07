@@ -7,6 +7,7 @@
 - `docs/design/` holds the approved visual design (brand sheet, desktop + mobile customer screens, installer portal). **Match it.** It overrides any earlier styling in this repo.
 
 - `docs/product-contract/` is the UX contract (master prompt + four surface specs). When anything is ambiguous, prefer simplicity and those principles over adding features.
+- `docs/product-contract/LIVE_SOFTWARE.md` (8 Nov 2026, Martin): RENUABL Business is live software, not a store of records. Every screen answers what has been done, what is about to happen and what is needed from me; Sol gives notice with a countdown instead of asking permission; he shows his work; the screen stays calm. Build every new screen this way. The next build in that direction is planned in `docs/plans/sol-first-contact.md`.
 - `docs/BUSINESS_MODEL.md`: the household, not the lead or the job, is the core entity. Solar is product 1 of a catalogue.
 
 ## Product rules to preserve
