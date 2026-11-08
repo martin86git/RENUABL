@@ -35,6 +35,8 @@ export type DesignCommand =
   | { do: "rows"; rows: number; landscape?: boolean }
   /** The same number of panels laid again on the roof by the rules, to fit it (8 Nov 2026, Martin). */
   | { do: "relay" }
+  /** The panels taken off the design (the picked ones, else all). */
+  | { do: "removePanels" }
   | { do: "undo" }
   | { do: "redo" }
   /**
@@ -135,6 +137,13 @@ export function parseCommand(raw: string): DesignCommand | null {
     )
   )
     return { do: "relay" };
+  // Taking panels away (8 Nov 2026, Martin: he asked, and Sol only said he had).
+  if (
+    /\b(delete|remove|clear|erase|take (?:off|away|out)|get rid of)\b/.test(t) &&
+    /\b(panels?|pv|solar|them|everything|all of it|the roof)\b/.test(t) &&
+    !/\b(battery|batteries|storage|inverter|string|label|comment|face)\b/.test(t)
+  )
+    return { do: "removePanels" };
   const kw = t.match(/(\d+(?:\.\d+)?)\s*kw\b/);
   // A whole system: the kW asked for in a part of its own, not inside a product's name ("the Sungrow 8 kW inverter").
   const kwOnItsOwn = partsOf(t).some((p) => /\d\s*kw\b/.test(p) && !/\b(inverters?|batter(y|ies))\b/.test(p));
@@ -250,6 +259,7 @@ export const DESIGN_COMMAND_SCHEMA = {
         "move",
         "rows",
         "relay",
+        "removePanels",
         "choose",
         "undo",
         "redo",
@@ -381,7 +391,8 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
         : { do: "answer", words };
     }
     case "relay":
-      return { do: "relay" };
+    case "removePanels":
+      return { do: read.do };
     case "undo":
     case "redo":
       return { do: read.do };
@@ -420,4 +431,6 @@ export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roo
 - To place panels somewhere, targetKw with a facing lays them on the faces looking that way. To string them, stringAuto.
 - explainString: show the check for a string, by its letter; put the reason in words too, from the string checks above.
 - choose: when the request could fairly mean different things (which face, how many kW, portrait or landscape, which battery), don't guess: ask a short question with two or three options, each a label, a line on what it means and the request to carry out if chosen, written as the person would say it ("fit 10 kW on the north face"). Only when it is truly unclear.
+- removePanels: take the panels off (the picked ones, else all), when asked to delete, remove or clear them.
+- Never say you have changed something in words alone: only a change done above changes the design. If none of these does what is asked, say plainly that you can't do that yet, with "answer".
 - Always put one short sentence in words. Never invent a figure, product or price that isn't above. Nothing is sent to anyone.`;

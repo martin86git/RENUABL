@@ -3875,6 +3875,12 @@ export function RoofDesigner(props: {
         changed();
         return `${on.length} panels in ${Math.min(command.rows, on.length)} ${command.rows === 1 ? "row" : "rows"}${command.landscape === undefined ? "" : command.landscape ? ", landscape" : ", portrait"}, where they stood. Drag them into place if they need it, and check the strings.`;
       }
+      case "removePanels": {
+        const on = panelPicks.length ? panelPicks : everyPanel();
+        if (!on.length) return "There are no panels on this design.";
+        removePicks(on);
+        return `${panelPicks.length ? "The picked" : "All"} ${on.length} panels taken off. Ctrl+Z puts them back.`;
+      }
       case "relay": {
         if (!summary.panels) return "There are no panels to lay again yet.";
         return (await fillTo(summary.kw)).words;
