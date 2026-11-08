@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
     area: "Proposals",
+    words: "A proposal with a battery opens on the battery: your customer's evenings laid over the roof, or their home's day when it's a battery alone.",
+  },
+  {
+    day: "2026-11-08",
+    area: "Proposals",
     words: "A deal's proposal opens in the same window as the designer, from the deal, its card on Today or the menu, and you can switch between them.",
   },
   {

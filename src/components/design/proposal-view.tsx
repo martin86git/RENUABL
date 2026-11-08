@@ -31,6 +31,7 @@ import {
 import type { OptionKey } from "@/lib/domain/design/proposal";
 import { money } from "@/lib/domain/design/deposit";
 import { ROOF_IMAGE, metresPerPixel } from "@/lib/domain/design/roof-design";
+import { HERO_DARK, batteryHero, heroGlow, type BatteryHero } from "@/lib/domain/design/battery-hero";
 
 const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -79,7 +80,7 @@ export interface ProposalActions {
 }
 
 /** The roof from above with the panels where they were placed: the same picture and scale the design was drawn on. */
-function Roof({ view, src }: { view: ProposalView; src: string | null }) {
+function Roof({ view, src, hero }: { view: ProposalView; src: string | null; hero?: BatteryHero | null }) {
   // The picture is shown only once it is known to have come: a picture that can't be had (no map service here, or
   // the place has none) must leave the plain ground, not a broken image.
   const [arrived, setArrived] = useState(false);
@@ -95,14 +96,25 @@ function Roof({ view, src }: { view: ProposalView; src: string | null }) {
   const scale = metresPerPixel(view.roof.lat);
   const { width, height } = ROOF_IMAGE;
   const at = (x: number, y: number) => `${(width / 2 + x / scale).toFixed(1)},${(height / 2 + y / scale).toFixed(1)}`;
+  // With a battery laid over it: a soft flow from the middle of the panels to the corner the battery sits in.
+  const corners = view.roof.panels.flatMap((p) => [0, 2, 4, 6].map((k) => [width / 2 + p[k] / scale, height / 2 + p[k + 1] / scale]));
+  const mid = corners.length
+    ? corners.reduce(([sx, sy], [x, y]) => [sx + x / corners.length, sy + y / corners.length], [0, 0])
+    : [width / 2, height / 2];
+  const flow = ([tx, ty]: [number, number]) =>
+    `M${mid[0].toFixed(1)},${mid[1].toFixed(1)} Q${((mid[0] + tx) / 2).toFixed(1)},${(Math.min(mid[1], ty) - 40).toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
   return (
     // A dark ground under the picture, so the layout still reads when the picture from above can't be had.
-    <div className="overflow-hidden rounded-lg border border-line bg-ink">
+    <div
+      className="bh relative overflow-hidden rounded-lg border border-line bg-ink"
+      style={hero ? ({ "--bh-glow": heroGlow(view.theme.primary) } as React.CSSProperties) : undefined}
+    >
+      {hero && <style>{HERO_CSS}</style>}
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="block h-auto w-full"
         role="img"
-        aria-label={`${view.system.panels} panels on the roof, seen from above`}
+        aria-label={hero ? hero.label : `${view.system.panels} panels on the roof, seen from above`}
       >
         {src && arrived && <image href={src} width={width} height={height} preserveAspectRatio="xMidYMid slice" />}
         {view.roof.panels.map((p, i) => (
@@ -114,7 +126,235 @@ function Roof({ view, src }: { view: ProposalView; src: string | null }) {
             strokeWidth={0.8}
           />
         ))}
+        {hero && (
+          <>
+            {/* The dark the battery sits on, so it reads over any roof: deepest in the corner, gone by the middle. */}
+            <defs>
+              <radialGradient id="bh-fade" cx="1" cy="1" r="0.95">
+                <stop offset="0" stopColor={HERO_DARK} stopOpacity={0.85} />
+                <stop offset="0.55" stopColor={HERO_DARK} stopOpacity={0.4} />
+                <stop offset="1" stopColor={HERO_DARK} stopOpacity={0} />
+              </radialGradient>
+            </defs>
+            <rect className="hidden sm:inline" width={width} height={height} fill="url(#bh-fade)" />
+            {(
+              [
+                { to: [width * 0.97, height * 0.99], cls: "sm:hidden" },
+                { to: [width * 0.72, height * 0.4], cls: "hidden sm:inline" },
+              ] as { to: [number, number]; cls: string }[]
+            ).map(({ to, cls }) => (
+              <g key={cls} className={cls}>
+                <path d={flow(to)} fill="none" stroke={HERO_DARK} strokeOpacity={0.5} strokeWidth={5} strokeLinecap="round" />
+                <path
+                  className="bh-flow bh-by-day"
+                  d={flow(to)}
+                  fill="none"
+                  stroke="var(--bh-glow)"
+                  strokeWidth={2}
+                  strokeDasharray="2 7"
+                  strokeLinecap="round"
+                />
+              </g>
+            ))}
+            <circle cx={mid[0]} cy={mid[1]} r={4} fill="var(--bh-glow)" />
+          </>
+        )}
       </svg>
+      {hero && <BatteryOverlay hero={hero} />}
+    </div>
+  );
+}
+
+/**
+ * The battery's day, shared by the overlay on the roof and the home's day: one fourteen-second day on a loop (the sun
+ * crossing, the battery filling in the afternoon and running the evening, the grid in the small hours). Each part's
+ * resting look is the still picture shown with reduced motion: late afternoon going into the evening, the battery full
+ * and running the home.
+ */
+const HERO_CSS = `
+.bh .bh-sun{transform-box:view-box;transform-origin:320px 214px;transform:rotate(150deg);animation:bh-sun 14s linear infinite}
+.bh .bh-sun-dot{animation:bh-sun-dot 14s linear infinite}
+.bh .bh-fill{transform-box:fill-box;transform-origin:50% 100%;transform:scaleY(.85);animation:bh-fill 14s ease-in-out infinite}
+.bh .bh-bar{transform-origin:0 50%;transform:scaleX(.85);animation:bh-bar 14s ease-in-out infinite}
+.bh .bh-lit{animation:bh-lit 14s linear infinite}
+.bh .bh-dusk{opacity:.5;animation:bh-dusk 14s linear infinite}
+.bh .bh-evening{animation:bh-evening 14s linear infinite}
+.bh .bh-grid{opacity:.3;animation:bh-grid 14s linear infinite}
+.bh .bh-flow{animation:bh-dash 1.2s linear infinite}
+.bh .bh-by-day{animation:bh-dash 1.2s linear infinite,bh-day 14s linear infinite}
+.bh .bh-evening.bh-flow{animation:bh-dash 1.2s linear infinite,bh-evening 14s linear infinite}
+.bh .bh-grid.bh-flow{animation:bh-dash 1.2s linear infinite,bh-grid 14s linear infinite}
+.bh .bh-stage-afternoon{animation:bh-st-a 14s linear infinite}
+.bh .bh-stage-evening{animation:bh-st-e 14s linear infinite}
+.bh .bh-stage-night{animation:bh-st-n 14s linear infinite}
+@keyframes bh-sun{0%{transform:rotate(0)}50%,100%{transform:rotate(180deg)}}
+@keyframes bh-sun-dot{0%{opacity:0}4%,48%{opacity:1}53%,100%{opacity:0}}
+@keyframes bh-fill{0%,18%{transform:scaleY(.15)}48%,58%{transform:scaleY(1)}86%,100%{transform:scaleY(.15)}}
+@keyframes bh-bar{0%,18%{transform:scaleX(.15)}48%,58%{transform:scaleX(1)}86%,100%{transform:scaleX(.15)}}
+@keyframes bh-lit{0%,46%{opacity:0}54%,90%{opacity:.7}97%,100%{opacity:0}}
+@keyframes bh-dusk{0%,46%{opacity:0}58%,92%{opacity:1}100%{opacity:0}}
+@keyframes bh-evening{0%,52%{opacity:0}56%,84%{opacity:1}88%,100%{opacity:0}}
+@keyframes bh-grid{0%,84%{opacity:.3}88%,97%{opacity:1}100%{opacity:.3}}
+@keyframes bh-day{0%,16%{opacity:.2}22%,48%{opacity:1}54%,100%{opacity:.2}}
+@keyframes bh-dash{to{stroke-dashoffset:-9}}
+@keyframes bh-st-a{0%,16%{opacity:.4}20%,50%{opacity:1}54%,100%{opacity:.4}}
+@keyframes bh-st-e{0%,50%{opacity:.4}54%,84%{opacity:1}88%,100%{opacity:.4}}
+@keyframes bh-st-n{0%,84%{opacity:.4}88%,98%{opacity:1}100%{opacity:.4}}
+@media (prefers-reduced-motion:reduce){.bh *{animation:none!important}}
+`;
+
+/** The battery's charge through the day, as one fine bar. */
+function ChargeBar({ dark }: { dark?: boolean }) {
+  return (
+    <div aria-hidden className={clsx("h-1.5 overflow-hidden rounded-full", dark ? "bg-white/20" : "bg-[color:var(--line)]")}>
+      <div className="bh-bar h-full w-full rounded-full" style={{ background: dark ? "var(--bh-glow)" : "var(--primary)" }} />
+    </div>
+  );
+}
+
+/** Over the roof picture's corner (under it on a phone): "and your evenings", the battery filling by day and running the evening. */
+function BatteryOverlay({ hero }: { hero: BatteryHero }) {
+  return (
+    <div className="bg-[#111827] px-4 py-4 text-white sm:absolute sm:bottom-4 sm:right-4 sm:w-[19rem] sm:rounded-xl sm:bg-[#111827]/70 sm:backdrop-blur-md">
+      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/70">{hero.headline}</p>
+      <div className="mt-2 flex items-center gap-3">
+        <BatteryGlyph />
+        <p className="text-[24px] leading-none tracking-tight [font-variant-numeric:tabular-nums]">
+          {hero.kwh.toLocaleString("en-AU")} <span className="text-[14px] text-white/75">kWh battery</span>
+        </p>
+      </div>
+      <div className="mt-3">
+        <ChargeBar dark />
+      </div>
+      <ol className="mt-2 grid grid-cols-3 gap-2 text-[11px] leading-snug text-white/80">
+        {hero.stages.map((s) => (
+          <li key={s.id} className={`bh-stage-${s.id}`}>
+            <span className="block font-medium text-white">{s.when}</span>
+            {s.words}
+          </li>
+        ))}
+      </ol>
+      <ul className="mt-3 space-y-1 border-t border-white/15 pt-3 text-[12.5px] leading-snug text-white/90">
+        {hero.says.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** A small battery, its charge rising and falling with the day. */
+function BatteryGlyph() {
+  return (
+    <svg viewBox="0 0 20 32" className="h-8 w-5 shrink-0" aria-hidden>
+      <rect x={7} y={0.5} width={6} height={3} rx={1} fill="rgb(255 255 255 / 0.7)" />
+      <rect x={1} y={3.5} width={18} height={28} rx={3} fill="none" stroke="rgb(255 255 255 / 0.8)" strokeWidth={1.2} />
+      <rect className="bh-fill" x={3.5} y={6} width={13} height={23} rx={1.5} fill="var(--bh-glow)" />
+    </svg>
+  );
+}
+
+/**
+ * The home's day, for a battery without new solar on the roof: a home under the sun's arc. The afternoon sun fills the
+ * battery, the battery runs the evening, and the grid is left for the small hours. Fine lines and one colour, the
+ * business's own.
+ */
+function BatteryDay({ hero }: { hero: BatteryHero }) {
+  // A 640 × 250 frame, the ground at 214, the sun's arc centred over the home.
+  const ground = 214;
+  return (
+    <div className={clsx(card, "bh overflow-hidden")}>
+      <style>{HERO_CSS}</style>
+      <p className={eyebrow}>Your battery</p>
+      <p className={clsx(h2, "mt-2")}>{hero.headline}</p>
+      <svg viewBox="0 0 640 250" className="mt-5 block h-auto w-full text-ink" role="img" aria-label={hero.label}>
+        {/* The evening coming in over the picture. */}
+        <rect className="bh-dusk" width={640} height={250} rx={10} fill="currentColor" fillOpacity={0.05} />
+        {/* The sun's path across the day, and the sun on it. */}
+        <path d={`M140,${ground} A180,180 0 0 1 500,${ground}`} fill="none" stroke="var(--muted)" strokeWidth={1} strokeDasharray="2 6" />
+        <g className="bh-sun">
+          <g className="bh-sun-dot">
+            <circle cx={140} cy={ground} r={20} fill="var(--primary)" opacity={0.15} />
+            <circle cx={140} cy={ground} r={11} fill="var(--primary)" />
+          </g>
+        </g>
+        {/* Spare sun from the roof into the battery by day. */}
+        <path
+          className="bh-by-day"
+          d="M352,128 Q400,112 413,144"
+          fill="none"
+          stroke="var(--primary)"
+          strokeWidth={1.6}
+          strokeDasharray="2 7"
+          strokeLinecap="round"
+        />
+        {/* The home. */}
+        <g fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinejoin="round">
+          <path d="M248,150 L308,108 L368,150" />
+          <path d={`M258,146 L258,${ground} L358,${ground} L358,146`} />
+          <path d={`M296,${ground} L296,182 L318,182 L318,${ground}`} />
+          <rect x={328} y={160} width={20} height={16} />
+          <rect x={268} y={160} width={20} height={16} />
+        </g>
+        <g className="bh-lit" fill="var(--primary)" opacity={0.7}>
+          <rect x={329} y={161} width={18} height={14} />
+          <rect x={269} y={161} width={18} height={14} />
+        </g>
+        {/* The battery on the wall beside it, and the evening's power back into the home. */}
+        <rect x={406} y={146} width={18} height={4} rx={1} fill="currentColor" />
+        <rect x={398} y={150} width={34} height={60} rx={5} fill="none" stroke="currentColor" strokeWidth={1.4} />
+        <rect className="bh-fill" x={403} y={155} width={24} height={50} rx={2.5} fill="var(--primary)" />
+        <path
+          className="bh-flow bh-evening"
+          d="M396,190 L362,190"
+          fill="none"
+          stroke="var(--primary)"
+          strokeWidth={1.8}
+          strokeDasharray="2 7"
+          strokeLinecap="round"
+        />
+        <text x={415} y={234} textAnchor="middle" fontSize={16} fill="currentColor" style={{ fontVariantNumeric: "tabular-nums" }}>
+          {hero.kwh.toLocaleString("en-AU")} kWh
+        </text>
+        {/* The grid, for the small hours. */}
+        <path
+          d={`M560,${ground} L572,120 L584,${ground} M564,172 L580,172 M556,132 L588,132 M567,152 L577,152`}
+          fill="none"
+          stroke="var(--muted)"
+          strokeWidth={1.2}
+          strokeLinejoin="round"
+        />
+        <path
+          className="bh-flow bh-grid"
+          d="M556,134 Q460,150 360,168"
+          fill="none"
+          stroke="var(--muted)"
+          strokeWidth={1.4}
+          strokeDasharray="2 7"
+          strokeLinecap="round"
+        />
+        <text x={572} y={234} textAnchor="middle" fontSize={16} fill="var(--muted)">
+          Grid
+        </text>
+        <line x1={20} y1={ground} x2={620} y2={ground} stroke="var(--line-strong)" strokeWidth={1} />
+      </svg>
+      <div className="mt-2">
+        <ChargeBar />
+      </div>
+      <ol className="mt-3 grid grid-cols-3 gap-3">
+        {hero.stages.map((s) => (
+          <li key={s.id} className={`bh-stage-${s.id}`}>
+            <p className="text-[11.5px] font-medium uppercase tracking-[0.12em] text-ink">{s.when}</p>
+            <p className="mt-0.5 text-[13.5px] leading-snug text-muted">{s.words}</p>
+          </li>
+        ))}
+      </ol>
+      <ul className="mt-5 space-y-1.5 border-t border-line pt-4 text-[15px] leading-snug text-ink">
+        {hero.says.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      <p className={clsx(fine, "mt-3")}>{hero.note}</p>
     </div>
   );
 }
@@ -216,7 +456,10 @@ const Line = ({ label, value, strong }: { label: string; value: string; strong?:
 /** The three figures that sum a proposal up, wherever the template puts them. */
 function Headline({ view }: { view: ProposalView }) {
   const figures: [string, string][] = [
-    [`${view.system.kw} kW`, `${view.system.panels} panels${view.system.batteryKwh ? ` · ${view.system.batteryKwh} kWh battery` : ""}`],
+    // A battery with no new solar leads with the battery, not "0 kW".
+    view.system.kw > 0 || !view.system.batteryKwh
+      ? [`${view.system.kw} kW`, `${view.system.panels} panels${view.system.batteryKwh ? ` · ${view.system.batteryKwh} kWh battery` : ""}`]
+      : [`${view.system.batteryKwh} kWh`, "battery storage"],
     ...(view.bill && view.bill.saving > 0
       ? ([[`about ${dollars(view.bill.saving)}`, "estimated saving a year"]] as [string, string][])
       : []),
@@ -501,6 +744,20 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
   // Each block's own content, by its id. Null when there is nothing to show for it on this proposal (no bill was
   // entered, no terms are set): the block is then left out, unless the business gave it words or a picture of its own.
   const terms = view.terms;
+  const blocks = viewBlocks(view);
+  // With a battery, the proposal opens on it (8 Nov 2026, Martin: the proposal is about the battery, not the array):
+  // the roof with the battery laid over it, or the home's day when there is no solar on the design (or the roof is
+  // switched off). The roof then isn't shown a second time in its own block.
+  const hero = batteryHero(view, { roofShown: blocks.some((block) => block.id === "roof"), chosen: choice?.chosen });
+  const roofPicture = (withHero: BatteryHero | null) => (
+    <>
+      <Roof view={view} src={urls.roof} hero={withHero} />
+      <p className={clsx(fine, "mt-3")}>
+        The {view.system.panels} panels as designed, seen from above. {ROOF_NOTE}
+        {withHero && ` ${withHero.note}`}
+      </p>
+    </>
+  );
   const content: Record<BlockId, () => React.ReactNode> = {
     cover: () => null,
     system: () => (
@@ -510,15 +767,7 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
         ))}
       </div>
     ),
-    roof: () =>
-      view.roof.panels.length > 0 ? (
-        <>
-          <Roof view={view} src={urls.roof} />
-          <p className={clsx(fine, "mt-3")}>
-            The {view.system.panels} panels as designed, seen from above. {ROOF_NOTE}
-          </p>
-        </>
-      ) : null,
+    roof: () => (view.roof.panels.length > 0 && hero?.kind !== "roof" ? roofPicture(null) : null),
     production: () =>
       view.production ? (
         <div className={card}>
@@ -782,7 +1031,6 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
     conditions: () => (b.conditions ? <p className="whitespace-pre-line text-[13.5px] leading-relaxed text-ink">{b.conditions}</p> : null),
   };
 
-  const blocks = viewBlocks(view);
   const cover = blocks.find((block) => block.id === "cover");
   /** A block's own words and picture, as the business set them in the customiser. */
   const own = (block: ViewBlock) => (
@@ -845,6 +1093,7 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
           {greeting && <div className="mt-6">{greeting}</div>}
           {view.note && <p className="mt-6 max-w-2xl whitespace-pre-line text-[16px] leading-relaxed text-ink">{view.note}</p>}
           {cover && (cover.words || cover.image) && <div className="mt-6">{own(cover)}</div>}
+          {hero && <div className="mt-8">{hero.kind === "roof" ? roofPicture(hero) : <BatteryDay hero={hero} />}</div>}
           {view.indicative && (
             <div className="mt-8">
               <p className="max-w-2xl text-[16px] leading-relaxed text-ink">{INDICATIVE_INTRO}</p>

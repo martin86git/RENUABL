@@ -18,6 +18,7 @@
 import { Document, Image, Page, Polygon, Polyline, Rect, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
 import { contrast, inkOn, lookOf, shownAbn, shownBsb, shownWebsite, type ChartStyle } from "@/lib/domain/design/brand";
+import { batteryHero } from "@/lib/domain/design/battery-hero";
 import { money } from "@/lib/domain/design/deposit";
 import {
   BANK_NOTE,
@@ -478,6 +479,8 @@ function ProposalDocument({
 
   const blocks = viewBlocks(view);
   const coverBlock = blocks.find((block) => block.id === "cover");
+  // With a battery, the cover carries the battery's day as a still (the page draws it moving): the same words.
+  const hero = batteryHero(view, { roofShown: blocks.some((block) => block.id === "roof") });
   /** A block's own words and picture, as the business set them in the customiser. */
   const own = (block: ViewBlock) => {
     const image = picture(block.image?.id);
@@ -533,7 +536,7 @@ function ProposalDocument({
         {coverBlock && (coverBlock.words || coverBlock.image) ? <View style={{ marginTop: 14 }}>{own(coverBlock)}</View> : null}
         <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
           {[
-            [`${view.system.kw} kW`, `${view.system.panels} panels`],
+            ...(view.system.kw > 0 ? [[`${view.system.kw} kW`, `${view.system.panels} panels`]] : []),
             ...(view.system.batteryKwh ? [[`${view.system.batteryKwh} kWh`, "battery storage"]] : []),
             ...(view.production ? [[`${view.production.yearKwh.toLocaleString("en-AU")} kWh`, "a year, estimated"]] : []),
             [dollars(view.price.youPay), "you pay, after the federal rebate"],
@@ -544,6 +547,34 @@ function ProposalDocument({
             </View>
           ))}
         </View>
+        {hero && (
+          <View style={[s.card, { marginTop: 14 }]} wrap={false}>
+            <Text style={s.eyebrow}>Your battery</Text>
+            <Text style={{ fontSize: 13, fontFamily: headingFace, marginTop: 4 }}>
+              {hero.kind === "roof" ? `${hero.headline}: a ${hero.kwh} kWh battery.` : hero.headline}
+            </Text>
+            {/* The charge through the day: filling by afternoon, full into the evening, low by the small hours. */}
+            <Svg width={483} height={8} viewBox="0 0 483 8" style={{ marginTop: 10 }}>
+              <Rect x={0} y={0} width={483} height={8} rx={4} fill={LINE} />
+              <Rect x={0} y={0} width={161} height={8} rx={4} fill={accent} fillOpacity={0.45} />
+              <Rect x={161} y={0} width={161} height={8} fill={accent} />
+            </Svg>
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
+              {hero.stages.map((stage) => (
+                <View key={stage.id} style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 8, fontFamily: "Helvetica-Bold" }}>{stage.when}</Text>
+                  <Text style={s.small}>{stage.words}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={{ marginTop: 8 }}>
+              {hero.says.map((line) => (
+                <Text key={line}>{line}</Text>
+              ))}
+            </View>
+            <Text style={[s.small, { marginTop: 6 }]}>{hero.note}</Text>
+          </View>
+        )}
         {footer}
       </Page>
 
