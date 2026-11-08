@@ -57,6 +57,7 @@ import { DealSol } from "./deal-sol";
 import { hasPulse, type DealPulse } from "@/lib/domain/design/deal-heat";
 import { NOT_TRACKED, openedWords } from "@/lib/domain/design/email-opens";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
+import { systemSummary } from "@/lib/domain/design/system-summary";
 import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
@@ -164,6 +165,64 @@ const HEAD_INPUT =
   "h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm text-ink outline-none placeholder:text-muted hover:bg-surface-2 focus:border-line focus:bg-surface";
 
 /** One row of the deal's header card: the label on the left, its value beside it. */
+/**
+ * The deal's system on its Overview (8 Nov 2026, Martin: the flat list was hard to read): the home first (what is going
+ * in, storeys, roof, phase), then the system a part a line with its product, how many and its size together, then the
+ * layout and the site when they are known. The same lines as Details, typed-in values included.
+ */
+function SystemSetOut({ lines }: { lines: readonly DealDetail[] }) {
+  const s = systemSummary(lines);
+  const head = "text-[11px] font-medium uppercase tracking-[0.14em] text-muted";
+  const pairs = (title: string, list: { label: string; value: string }[]) =>
+    list.length > 0 && (
+      <div className="mt-5">
+        <h3 className={head}>{title}</h3>
+        <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+          {list.map((p) => (
+            <div key={p.label}>
+              <dt className="text-xs text-muted">{p.label}</dt>
+              <dd className="mt-0.5 text-sm text-ink">{p.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    );
+  return (
+    <>
+      {pairs("Home", s.home)}
+      {s.parts.length > 0 && (
+        <div className="mt-5">
+          <h3 className={head}>System</h3>
+          <ul className="mt-2 divide-y divide-line border-y border-line">
+            {s.parts.map((p) => (
+              <li
+                key={p.name}
+                className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-0.5 py-2.5 sm:grid-cols-[6rem_minmax(0,26rem)_3.5rem_6rem]"
+              >
+                {/* Narrow: the part and its size on top, the product and how many under. Wider: one row a part. */}
+                <span className="order-1 text-xs font-medium text-muted">{p.name}</span>
+                <span className="order-2 whitespace-nowrap text-right text-sm font-medium tabular-nums text-ink sm:order-4">
+                  {p.size ?? ""}
+                </span>
+                <span className="order-3 col-span-2 min-w-0 text-sm text-ink sm:order-2 sm:col-span-1">
+                  {p.product ?? <span className="text-muted">Not chosen</span>}
+                  {p.qty && <span className="tabular-nums text-ink-2 sm:hidden"> {p.qty}</span>}
+                  {p.extra && <span className="block text-xs text-ink-2">Also {p.extra}</span>}
+                </span>
+                <span className="order-4 hidden whitespace-nowrap text-right text-sm tabular-nums text-ink-2 sm:order-3 sm:block">
+                  {p.qty ?? ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {pairs("Layout", s.layout)}
+      {pairs("Site", s.site)}
+    </>
+  );
+}
+
 function HeadRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-2">
@@ -866,20 +925,7 @@ export function DealPage({ id }: { id: string }) {
             </dl>
             <section className={clsx(ui.card, "p-5")}>
               <h2 className="text-[15px] font-medium text-ink">The system</h2>
-              {known ? (
-                <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
-                  {details
-                    .filter((d) => d.value)
-                    .map((d) => (
-                      <div key={d.label}>
-                        <dt className="text-xs text-muted">{d.label}</dt>
-                        <dd className="mt-0.5 text-sm text-ink">{d.value}</dd>
-                      </div>
-                    ))}
-                </dl>
-              ) : (
-                <p className="mt-2 text-sm text-ink-2">Nothing designed yet.</p>
-              )}
+              {known ? <SystemSetOut lines={details} /> : <p className="mt-2 text-sm text-ink-2">Nothing designed yet.</p>}
             </section>
             <section className={clsx(ui.card, "p-5")}>
               <div className="flex items-center justify-between gap-3">
