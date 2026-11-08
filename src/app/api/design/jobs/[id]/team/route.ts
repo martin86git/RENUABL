@@ -2,7 +2,17 @@ import { after } from "next/server";
 import { asksSolOnDeal, cleanDealWords, isDealLineId } from "@/lib/domain/design/deal-team";
 import { parseApiKey } from "@/lib/server/bill-reader";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
-import { DealTeamRefusal, dealAsk, dealTeam, markAskDone, sayOnDeal, type DealTeamMe } from "@/lib/server/design-deal-team-repo";
+import {
+  DealTeamRefusal,
+  dealAsk,
+  dealTeam,
+  followDeal,
+  markAskDone,
+  markDealSeen,
+  openDealChat,
+  sayOnDeal,
+  type DealTeamMe,
+} from "@/lib/server/design-deal-team-repo";
 import { solAnswersOnDeal } from "@/lib/server/design-sol";
 import type { Member } from "@/lib/server/design-repo";
 import { allow } from "@/lib/server/rate-limit";
@@ -17,7 +27,8 @@ const gone = () => Response.json({ ok: false, message: "That deal isn't here." }
 /**
  * The team chat on a deal (deal-team.ts): the business's own people and Sol, never the customer, for everyone who may
  * see the deal. GET → its lines and the people to @mention; GET ?ask=<line> → one of Sol's requests (the designer's
- * brief). POST { text } says something (an "@Sol" in it has him answer there); POST { done: <line>, undo? } marks a
+ * brief). POST { text } says something (an "@Sol" in it has him answer there); POST { follow } follows it or stops,
+ * { open: true } opens it from the team chat window (following it), { seen: true } reads it; POST { done: <line>, undo? } marks a
  * request done or opens it again.
  */
 export async function GET(request: Request, ctx: RouteContext<"/api/design/jobs/[id]/team">) {
@@ -35,7 +46,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/design/jobs/
           ? Response.json({ ok: true, line })
           : Response.json({ ok: false, message: "That request isn't here." }, { status: 404 });
       }
-      return Response.json({ ok: true, ...(await dealTeam(meOf(who.member), id)), me: who.member.email.toLowerCase() });
+      const seen = new URL(request.url).searchParams.get("seen") === "1";
+      return Response.json({ ok: true, ...(await dealTeam(meOf(who.member), id, { seen })), me: who.member.email.toLowerCase() });
     } catch (e) {
       if (e instanceof DealTeamRefusal) return gone();
       throw e;
@@ -54,6 +66,15 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     const b = read.body;
     const me = meOf(who.member);
     try {
+      if (typeof b.follow === "boolean") return Response.json({ ok: true, following: await followDeal(me, id, b.follow) });
+      if (b.open === true) {
+        await openDealChat(me, id);
+        return Response.json({ ok: true });
+      }
+      if (b.seen === true) {
+        await markDealSeen(me, id);
+        return Response.json({ ok: true });
+      }
       if (isDealLineId(b.done)) {
         const changed = await markAskDone(me, id, b.done, b.undo !== true);
         return changed

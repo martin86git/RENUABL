@@ -59,6 +59,9 @@ import {
   teamSeen,
   type TeamRoomView,
 } from "@/lib/services/team-chat";
+import { dealRoom, jobOfRoom, writerName, type DealChatLine } from "@/lib/domain/design/deal-team";
+import { DEAL_TEAM_CHANGED, openDealChat } from "@/lib/services/deal-team";
+import { DealTeamChat } from "./deal-team-chat";
 import { useDesignAccount } from "./design-account";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolChat } from "./sol-chat";
@@ -145,7 +148,7 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
   };
 
   const load = useCallback(async () => {
-    const withSol = room === SOL_ROOM;
+    const withSol = room === SOL_ROOM || jobOfRoom(room) !== null;
     const r = await loadTeamRoom(withSol ? "deals" : room);
     if (!r.ok) {
       setError(r.message);
@@ -197,8 +200,24 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
     if (dealAt && jobs === null) void listJobs().then((r) => setJobs(r.ok ? r.jobs : []));
   }, [dealAt, jobs]);
 
+  // A deal's chat read elsewhere (the feed's pad, the deal's Team tab) changes the Deals list and its counts here.
+  useEffect(() => {
+    const changed = () => void load();
+    window.addEventListener(DEAL_TEAM_CHANGED, changed);
+    return () => window.removeEventListener(DEAL_TEAM_CHANGED, changed);
+  }, [load]);
+
   const members = view?.members ?? [];
   const channel = TEAM_CHANNELS.find((c) => c.id === room);
+  const dealJob = jobOfRoom(room);
+  const dealOpen = dealJob ? (view?.dealChats?.find((d) => d.jobId === dealJob) ?? null) : null;
+  const elsewhere = solOpen || dealJob !== null;
+  /** Opens a deal's chat here (# and its name, or Open its chat on a deal card): it joins the Deals list. */
+  const openDeal = async (jobId: string) => {
+    const r = await openDealChat(jobId);
+    if (!r.ok) return setError(r.message);
+    setRoom(dealRoom(jobId));
+  };
   const other = dmWith(room, me);
 
   const addFiles = (list: File[]) => {
@@ -315,6 +334,14 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
   return (
     <div className="flex h-full min-h-0 bg-surface text-ink">
       <nav aria-label="Conversations" className="flex w-44 shrink-0 flex-col border-r border-line bg-canvas/60 sm:w-48">
+        <DealChatsList
+          deals={view?.dealChats ?? []}
+          room={room}
+          onPick={(id) => setRoom(dealRoom(id))}
+          onStart={(id) => void openDeal(id)}
+          jobs={jobs}
+          needJobs={() => jobs === null && void listJobs().then((r) => setJobs(r.ok ? r.jobs : []))}
+        />
         <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Channels</p>
         {(view?.channels ?? TEAM_CHANNELS.map((c) => ({ room: c.id as string, label: c.label, unread: 0 }))).map((c) => (
           <RoomButton key={c.room} on={room === c.room} unread={c.unread} onClick={() => setRoom(c.room)}>
@@ -347,8 +374,42 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
           <SolChat side onClose={onClose} />
         </div>
       )}
+      {dealJob && (
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
+                <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
+                {dealOpen ? `${dealOpen.customer} · ${dealOpen.title}` : "Deal chat"}
+              </p>
+              <p className="truncate text-[11px] text-muted">Everyone who may see the deal · never seen by customers</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <Link
+                href={`/design/deals/${dealJob}?tab=team`}
+                className="rounded-full px-2.5 py-1 text-[12px] font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+              >
+                Open deal
+              </Link>
+              {onClose && (
+                <button
+                  type="button"
+                  aria-label="Close"
+                  onClick={onClose}
+                  className="rounded-full p-1.5 text-muted hover:bg-surface-2 hover:text-ink"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
+            </div>
+          </header>
+          <div className="min-h-0 flex-1 px-4 py-3">
+            <DealTeamChat key={dealJob} jobId={dealJob} fill />
+          </div>
+        </div>
+      )}
       <div
-        className={clsx("relative flex min-w-0 flex-1 flex-col", dropping && "ring-2 ring-inset ring-sun-line", solOpen && "hidden")}
+        className={clsx("relative flex min-w-0 flex-1 flex-col", dropping && "ring-2 ring-inset ring-sun-line", elsewhere && "hidden")}
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes("Files")) {
             e.preventDefault();
@@ -508,7 +569,7 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
                     ))}
                   </div>
                 )}
-                {l.deals?.length ? <Deals deals={l.deals} /> : null}
+                {l.deals?.length ? <Deals deals={l.deals} onOpenChat={(id) => void openDeal(id)} /> : null}
                 {l.reactions && (
                   <div className={clsx("mt-1 flex max-w-[85%] flex-wrap gap-1", mine && "justify-end")}>
                     {Object.entries(l.reactions).map(([emoji, who]) => (
@@ -1068,22 +1129,127 @@ function EmojiGrid({ onPick, onClose }: { onPick: (emoji: string) => void; onClo
   );
 }
 
-function Deals({ deals }: { deals: TeamDeal[] }) {
+function Deals({ deals, onOpenChat }: { deals: TeamDeal[]; onOpenChat: (jobId: string) => void }) {
   return (
     <div className="mt-1 flex max-w-[85%] flex-col gap-1">
       {deals.map((d) => (
-        <Link
+        <div
           key={d.id}
-          href={`/design/deals/${d.id}`}
           className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-left text-sm ring-1 ring-line hover:ring-sun-line"
         >
           <SquareKanban className="size-4 shrink-0 text-sun-line" aria-hidden />
-          <span className="min-w-0">
+          <Link href={`/design/deals/${d.id}`} className="min-w-0 flex-1">
             <span className="block truncate font-medium text-ink">{d.name}</span>
             <span className="block truncate text-xs text-muted">{[d.stage, d.address].filter(Boolean).join(" · ")}</span>
-          </span>
-        </Link>
+          </Link>
+          <button
+            type="button"
+            onClick={() => onOpenChat(d.id)}
+            className="shrink-0 rounded-full px-2 py-0.5 text-[11.5px] font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+          >
+            Open its chat
+          </button>
+        </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The Deals section of the team chat window (deal-team.ts): the deal chats this person follows, unread first, each
+ * with the customer, the deal, the latest line and its count; and "# a deal" to open any deal's chat by its name.
+ */
+function DealChatsList(props: {
+  deals: DealChatLine[];
+  room: string;
+  onPick: (jobId: string) => void;
+  onStart: (jobId: string) => void;
+  jobs: JobLine[] | null;
+  needJobs: () => void;
+}) {
+  const [finding, setFinding] = useState(false);
+  const [q, setQ] = useState("#");
+  const words = q.replace(/^#/, "").trim();
+  const found =
+    finding && words && props.jobs
+      ? props.jobs.filter((j) => matches({ words: [j.customerName, j.title, j.address] }, words)).slice(0, 6)
+      : [];
+  return (
+    <div className="border-b border-line pb-2">
+      <p className="flex items-center justify-between px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+        Deals
+        <button
+          type="button"
+          title="Open a deal's chat: type # and its name"
+          aria-label="Open a deal's chat"
+          onClick={() => {
+            setFinding((f) => !f);
+            setQ("#");
+            props.needJobs();
+          }}
+          className="rounded-full p-0.5 normal-case tracking-normal text-ink-2 hover:bg-surface-2 hover:text-ink"
+        >
+          <Hash className="size-3.5" />
+        </button>
+      </p>
+      {finding && (
+        <div className="px-2 pb-1">
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value.startsWith("#") ? e.target.value : `#${e.target.value}`)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setFinding(false);
+              if (e.key === "Enter" && found[0]) {
+                props.onStart(found[0].id);
+                setFinding(false);
+              }
+            }}
+            aria-label="A deal's customer or name"
+            placeholder="# a deal"
+            className="w-full rounded-lg bg-surface px-2 py-1 text-[12.5px] text-ink ring-1 ring-line focus:outline-none focus:ring-2 focus:ring-sun-line"
+          />
+          {words && props.jobs === null && <p className="px-1 pt-1 text-[11px] text-muted">Looking…</p>}
+          {found.map((j) => (
+            <button
+              key={j.id}
+              type="button"
+              onClick={() => {
+                props.onStart(j.id);
+                setFinding(false);
+              }}
+              className="mt-0.5 block w-full rounded-lg px-2 py-1 text-left hover:bg-surface-2"
+            >
+              <span className="block truncate text-[12.5px] font-medium text-ink">{j.customerName}</span>
+              <span className="block truncate text-[11px] text-muted">{j.title}</span>
+            </button>
+          ))}
+          {words && props.jobs && !found.length && <p className="px-1 pt-1 text-[11px] text-muted">No deal by that name.</p>}
+        </div>
+      )}
+      <div className="staff-scroll max-h-56 overflow-y-auto">
+        {props.deals.length === 0 && !finding && (
+          <p className="px-3 pt-1 text-[11.5px] leading-snug text-muted">
+            Deal chats you take part in show here. Press # to open one by its name.
+          </p>
+        )}
+        {props.deals.map((d) => (
+          <RoomButton
+            key={d.jobId}
+            on={props.room === dealRoom(d.jobId)}
+            unread={d.unread}
+            onClick={() => props.onPick(d.jobId)}
+            title={d.last ? `${writerName(d.last.by)}: ${d.last.text}` : undefined}
+          >
+            <span className="min-w-0">
+              <span className="block truncate">{d.customer}</span>
+              <span className="block truncate text-[11px] font-normal text-muted">
+                {d.last ? `${writerName(d.last.by)}: ${d.last.text}` : d.title}
+              </span>
+            </span>
+          </RoomButton>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1127,10 +1293,12 @@ export function useTeamUnread(): number {
     const t = window.setInterval(() => document.visibilityState === "visible" && read(), TEAM_POLL_MS * 3);
     const changed = (e: Event) => setN(Number((e as CustomEvent<number>).detail) || 0);
     window.addEventListener(TEAM_CHANGED, changed);
+    window.addEventListener(DEAL_TEAM_CHANGED, read);
     return () => {
       live = false;
       window.clearInterval(t);
       window.removeEventListener(TEAM_CHANGED, changed);
+      window.removeEventListener(DEAL_TEAM_CHANGED, read);
     };
   }, []);
   return n;

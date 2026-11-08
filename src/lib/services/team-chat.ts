@@ -2,6 +2,7 @@
  * The team chat, as the screens ask for it (`/api/design/team`): a room and the rooms down the side, the unread count,
  * and each thing a member does in it.
  */
+import type { DealChatLine } from "@/lib/domain/design/deal-team";
 import type { TeamLine } from "@/lib/domain/design/team-chat";
 import type { CatchUp } from "@/lib/domain/design/sol-chat-work";
 import { ask, type Answer } from "./crm";
@@ -12,7 +13,10 @@ export interface TeamRoomView {
   members: string[];
   channels: { room: string; label: string; unread: number }[];
   people: { room: string; email: string; label: string; unread: number; last: string }[];
+  /** With the deal chats followed (deal-team.ts). */
   unread: number;
+  /** The deal chats this member follows, for the window's Deals section. */
+  dealChats?: DealChatLine[];
   /** Whether Sol answers a channel's questions nobody has, without being tagged; and whether this member may switch it. */
   solJoinsIn?: boolean;
   maySwitchSol?: boolean;

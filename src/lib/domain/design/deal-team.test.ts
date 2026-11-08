@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  askFollowers,
   askNeedWords,
   asksSolOnDeal,
   briefHref,
   briefLines,
   cleanAsk,
+  dealChatOrder,
+  dealRoom,
+  dealUnread,
   designAskFor,
+  isFollowing,
+  jobOfRoom,
   openAsks,
   padOf,
   saidWhen,
@@ -114,5 +120,61 @@ describe("requests and lines", () => {
   it("says when in Melbourne's days", () => {
     expect(saidWhen(ago(0.5), now)).toBe("today");
     expect(saidWhen("2026-11-03T02:00:00Z", now)).toBe("3 Nov");
+  });
+});
+
+describe("following a deal's chat", () => {
+  it("lets a choice win over being the owner", () => {
+    expect(isFollowing(null, true)).toBe(true);
+    expect(isFollowing(null, false)).toBe(false);
+    expect(isFollowing(false, true)).toBe(false);
+    expect(isFollowing(true, false)).toBe(true);
+  });
+
+  it("sends a request to the people whose job it is", () => {
+    const members = [
+      { email: "Owner@x.example", role: "owner", prices: true },
+      { email: "dee@x.example", role: "designer", prices: false },
+      { email: "pat@x.example", role: "member", prices: true },
+      { email: "sam@x.example", role: "member", prices: false },
+    ];
+    expect(askFollowers("design", members)).toEqual(["dee@x.example"]);
+    expect(
+      askFollowers(
+        "design",
+        members.filter((m) => m.role !== "designer"),
+      ),
+    ).toEqual(["owner@x.example"]);
+    expect(askFollowers("price", members)).toEqual(["owner@x.example", "pat@x.example"]);
+    expect(askFollowers("other", members)).toEqual(["owner@x.example"]);
+  });
+
+  it("counts others' lines since last seen, a day back when never seen", () => {
+    const lines = [
+      { by: "sol", at: ago(30) },
+      { by: "sol", at: ago(2) },
+      { by: "me@x.example", at: ago(1) },
+      { by: "sam@x.example", at: ago(0.5) },
+    ];
+    expect(dealUnread(lines, null, "Me@x.example", now)).toBe(2);
+    expect(dealUnread(lines, ago(1), "me@x.example", now)).toBe(1);
+  });
+
+  it("puts unread first, then the latest, and names its room", () => {
+    const line = (jobId: string, unread: number, at: string) => ({
+      jobId,
+      customer: "",
+      title: "",
+      unread,
+      last: { by: "", text: "", at },
+    });
+    expect(dealChatOrder([line("a", 0, ago(1)), line("b", 2, ago(5)), line("c", 0, ago(0.5))]).map((d) => d.jobId)).toEqual([
+      "b",
+      "c",
+      "a",
+    ]);
+    expect(dealRoom("job_abc12345")).toBe("deal:job_abc12345");
+    expect(jobOfRoom("deal:job_abc12345")).toBe("job_abc12345");
+    expect(jobOfRoom("deals")).toBeNull();
   });
 });

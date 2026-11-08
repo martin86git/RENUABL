@@ -21,6 +21,7 @@ import {
 } from "@/lib/server/design-team-repo";
 import type { Member } from "@/lib/server/design-repo";
 import { allow } from "@/lib/server/rate-limit";
+import { dealChats } from "@/lib/server/design-deal-team-repo";
 
 // Sol, tagged in a channel, answers after the line is in: his tools can take a minute.
 export const maxDuration = 180;
@@ -66,7 +67,7 @@ function solHears(member: Member, room: string, text: string, lineId: string) {
 
 /**
  * The team chat (domain/design/team-chat.ts). GET ?room= → the room as this member sees it (Deals when left out);
- * GET ?count=1 → only how many lines are unread. POST JSON { room, text, deals } says something, { room, seen: true }
+ * GET ?count=1 → only how many lines are unread (with the deal chats followed); GET ?deals=1 → those deal chats. POST JSON { room, text, deals } says something, { room, seen: true }
  * marks it read, { edit: id, text }, { delete: id }, { react: id, emoji }; POST a form (room, text, deal…, file…) sends
  * files with the words.
  */
@@ -76,7 +77,10 @@ export async function GET(request: Request) {
     if ("refuse" in who) return who.refuse;
     const me = meOf(who.member);
     const url = new URL(request.url);
-    if (url.searchParams.get("count")) return Response.json({ ok: true, unread: await teamUnread(me) });
+    // The deal chats this member follows (deal-team.ts) count with the team chat, and are listed in its Deals section.
+    const deals = await dealChats({ ...me, viewer: viewerOf(who.member) }).catch(() => ({ deals: [], unread: 0 }));
+    if (url.searchParams.get("count")) return Response.json({ ok: true, unread: (await teamUnread(me)) + deals.unread });
+    if (url.searchParams.get("deals")) return Response.json({ ok: true, ...deals });
     const room = cleanRoom(url.searchParams.get("room") ?? "deals");
     if (!room) return Response.json({ ok: false, message: "There's no such conversation." }, { status: 404 });
     try {
@@ -85,6 +89,8 @@ export async function GET(request: Request) {
       return Response.json({
         ok: true,
         ...view,
+        unread: view.unread + deals.unread,
+        dealChats: deals.deals,
         solJoinsIn: prefs.solJoinsIn,
         maySwitchSol: can(m.role, "prices", m.permissions),
         // Whether Sol's order cards are theirs to answer (the server checks again on the press).

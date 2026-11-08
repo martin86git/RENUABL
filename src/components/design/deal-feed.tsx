@@ -35,6 +35,7 @@ import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { dmRoom } from "@/lib/domain/design/team-chat";
 import { emailDeal } from "@/lib/services/crm";
 import { exampleDeals, loadFeed, solCalls, writeWithSol, type FeedAnswer } from "@/lib/services/deal-feed";
+import { DEAL_TEAM_CHANGED } from "@/lib/services/deal-team";
 import { sayInTeam, TEAM_OPEN } from "@/lib/services/team-chat";
 import { AerialRoof, type AerialRoofSpec, type RoofFinish, type RoofForm } from "./aerial-roof";
 import { PATHS } from "./design-shell";
@@ -83,9 +84,13 @@ export function DealFeed({ me }: { me: string }) {
   useEffect(() => {
     const first = window.setTimeout(() => void load(), 0);
     const t = window.setInterval(() => document.visibilityState === "visible" && void load(), POLL_MS);
+    // A deal's team chat changed somewhere else (the team chat window, the deal's Team tab): its pad follows at once.
+    const changed = () => void load();
+    window.addEventListener(DEAL_TEAM_CHANGED, changed);
     return () => {
       window.clearTimeout(first);
       window.clearInterval(t);
+      window.removeEventListener(DEAL_TEAM_CHANGED, changed);
     };
   }, [load]);
   const pick = (v: FeedView) => {

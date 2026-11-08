@@ -660,6 +660,26 @@ create table if not exists design_deal_lines (
 );
 create index if not exists design_deal_lines_job on design_deal_lines(business_id, job_id, at);
 create index if not exists design_deal_lines_open on design_deal_lines(business_id, job_id) where kind = 'ask' and not (ask ? 'done');
+-- Who follows a deal's chat by their own choice or by taking part (wrote in it, was @mentioned, a request was for
+-- them); the owner follows without a row unless they chose not to. And when each member last had it open.
+create table if not exists design_deal_follows (
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  email text not null,
+  following boolean not null,
+  at timestamptz not null default now(),
+  primary key (business_id, job_id, email),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create index if not exists design_deal_follows_email on design_deal_follows(business_id, email);
+create table if not exists design_deal_seen (
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  email text not null,
+  seen_at timestamptz not null,
+  primary key (business_id, job_id, email),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
 -- Emails sent from a deal and when the customer's mail app loaded their pixel (domain/design/email-opens.ts). The token
 -- alone opens the row (the pixel's address carries nothing else); gone with the deal.
 create table if not exists design_email_opens (

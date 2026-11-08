@@ -96,6 +96,31 @@ describe.skipIf(!url)("the team chat on a deal (database)", () => {
     expect(await team.solAsksForDesigns(a, true)).toBe(0);
   });
 
+  it("lists a deal's chat for those who follow it, counts what they haven't read, and lets them stop", async () => {
+    // The owner follows their own deal; their own lines aren't unread.
+    await team.markDealSeen(owner(), dealId);
+    let mine = await team.dealChats(owner());
+    expect(mine.deals.map((d) => d.jobId)).toEqual([dealId]);
+    expect(mine.unread).toBe(0);
+    // Sam was @mentioned, so follows it; Sam writes, and the owner has one to read.
+    expect((await team.dealChats(sam())).deals.map((d) => d.jobId)).toEqual([dealId]);
+    await team.sayOnDeal(sam(), dealId, "Switchboard looks fine from the photo.");
+    mine = await team.dealChats(owner());
+    expect(mine.unread).toBe(1);
+    expect(mine.deals[0].last?.text).toBe("Switchboard looks fine from the photo.");
+    // Read in one place, read everywhere.
+    expect((await team.dealTeam(owner(), dealId, { seen: true })).following).toBe(true);
+    expect((await team.dealChats(owner())).unread).toBe(0);
+    // Stopping takes it out of Sam's list; opening it again by name brings it back.
+    await team.followDeal(sam(), dealId, false);
+    expect((await team.dealChats(sam())).deals).toEqual([]);
+    await team.openDealChat(sam(), dealId);
+    expect((await team.dealChats(sam())).deals).toHaveLength(1);
+    // Another business sees none of it, and can't follow it.
+    expect((await team.dealChats(outsider())).deals).toEqual([]);
+    await expect(team.followDeal(outsider(), dealId, true)).rejects.toThrow("That deal isn't here.");
+  });
+
   it("keeps Sol's lines apart from another business", async () => {
     expect(await team.solPostsOnDeal(b, dealId, { kind: "note", text: "Not yours" })).toBeNull();
     expect(await team.padsFor(b, [dealId])).toEqual({});

@@ -5,23 +5,28 @@
  * reaches any of it. Sol writes through `solPostsOnDeal` (a note, or a request with the customer's words), never
  * through a member's functions.
  */
-import type { DealViewer } from "@/lib/domain/design/account";
+import { can, cleanPermissions, type DealViewer, type MemberRole } from "@/lib/domain/design/account";
+import { mentionsIn } from "@/lib/domain/design/mentions";
 import {
   DEAL_LINES_SHOWN,
   PAD_LINES,
   SOL_WRITER,
+  askFollowers,
   cleanAsk,
+  dealChatOrder,
   designAskFor,
+  isFollowing,
   openAsks,
   padOf,
   writerName,
   type DealAsk,
+  type DealChatLine,
   type DealLine,
   type DealLineKind,
   type SaidSomewhere,
 } from "@/lib/domain/design/deal-team";
 import { newId, query, transaction } from "./db";
-import { jobById } from "./design-crm-repo";
+import { jobById, listJobs } from "./design-crm-repo";
 import { notifyMentions } from "./design-notifications-repo";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -68,18 +73,22 @@ async function linesOf(businessId: string, jobId: string, n = DEAL_LINES_SHOWN):
 }
 
 /** A deal's team chat as this member sees it: its lines (oldest first), and the business's people to @mention. */
-export async function dealTeam(me: DealTeamMe, jobId: string) {
+export async function dealTeam(me: DealTeamMe, jobId: string, opts: { seen?: boolean } = {}) {
   const found = await dealFor(me, jobId);
-  const [lines, members] = await Promise.all([
+  if (opts.seen) await markSeen(me.businessId, jobId, me.email);
+  const [lines, members, following] = await Promise.all([
     linesOf(me.businessId, jobId),
     query<{ email: string; first_name: string | null; role: string }>(
       `select email, first_name, role from business_members where business_id = $1 order by first_name nulls last, email`,
       [me.businessId],
     ),
+    follows(me.businessId, jobId, me.email, found.job.owner),
   ]);
   return {
     jobId,
     customer: found.customer.name,
+    title: found.job.title,
+    following,
     lines,
     members: members.map((m) => ({ email: m.email.toLowerCase(), name: m.first_name || writerName(m.email), role: m.role })),
   };
@@ -100,6 +109,13 @@ export async function sayOnDeal(me: DealTeamMe, jobId: string, text: string): Pr
     me.email.toLowerCase(),
     text,
   ]);
+  // Writing in it follows it, and has it read; those @mentioned follow it unless they chose not to.
+  await setFollow(me.businessId, jobId, me.email, true);
+  await markSeen(me.businessId, jobId, me.email);
+  const everyone = (await query<{ email: string }>(`select email from business_members where business_id = $1`, [me.businessId])).map(
+    (m) => m.email,
+  );
+  for (const who of mentionsIn(text, everyone, me.email)) await joinFollow(me.businessId, jobId, who);
   const told = await notifyMentions(me.businessId, {
     jobId,
     customerId: found.customer.id,
@@ -161,8 +177,125 @@ export async function solPostsOnDeal(
     return true;
   });
   if (!written) return null;
+  if (ask) {
+    // The request goes to whose job it is: they follow the deal's chat unless they chose not to.
+    const members = await query<{ email: string; role: string; permissions: unknown }>(
+      `select email, role, permissions from business_members where business_id = $1`,
+      [businessId],
+    );
+    const people = members.map((m) => ({
+      email: m.email,
+      role: m.role,
+      prices: can(m.role as MemberRole, "prices", m.permissions ? cleanPermissions(m.permissions) : undefined),
+    }));
+    for (const who of askFollowers(ask.type, people)) await joinFollow(businessId, jobId, who);
+  }
   const rows = await query<Row>(`select ${LINE} from design_deal_lines where business_id = $1 and id = $2`, [businessId, id]);
   return lineOf(rows[0]);
+}
+
+// ---------------------------------------------------------------------------
+// Following, read marks, and the team chat window's Deals section
+// ---------------------------------------------------------------------------
+
+/** A member's own choice to follow a deal's chat or not (also taking part in it, which follows). */
+async function setFollow(businessId: string, jobId: string, email: string, following: boolean): Promise<void> {
+  await query(
+    `insert into design_deal_follows (business_id, job_id, email, following, at) values ($1,$2,$3,$4,now())
+       on conflict (business_id, job_id, email) do update set following = excluded.following, at = now()`,
+    [businessId, jobId, email.toLowerCase(), following],
+  );
+}
+
+/** Brought in (@mentioned, or a request is for them): following, unless they already chose. */
+async function joinFollow(businessId: string, jobId: string, email: string): Promise<void> {
+  await query(`insert into design_deal_follows (business_id, job_id, email, following) values ($1,$2,$3,true) on conflict do nothing`, [
+    businessId,
+    jobId,
+    email.toLowerCase(),
+  ]);
+}
+
+async function markSeen(businessId: string, jobId: string, email: string): Promise<void> {
+  await query(
+    `insert into design_deal_seen (business_id, job_id, email, seen_at) values ($1,$2,$3,now())
+       on conflict (business_id, job_id, email) do update set seen_at = now()`,
+    [businessId, jobId, email.toLowerCase()],
+  );
+}
+
+async function follows(businessId: string, jobId: string, email: string, owner: string | null): Promise<boolean> {
+  const rows = await query<{ following: boolean }>(
+    `select following from design_deal_follows where business_id = $1 and job_id = $2 and email = $3`,
+    [businessId, jobId, email.toLowerCase()],
+  );
+  return isFollowing(rows[0]?.following ?? null, (owner ?? "").toLowerCase() === email.toLowerCase());
+}
+
+/** The Following toggle, for a member who may see the deal. Answers with where it now stands. */
+export async function followDeal(me: DealTeamMe, jobId: string, following: boolean): Promise<boolean> {
+  await dealFor(me, jobId);
+  await setFollow(me.businessId, jobId, me.email, following);
+  return following;
+}
+
+/** Opening a deal's chat from the team chat window (# and its name): it joins their Deals, and is read. */
+export async function openDealChat(me: DealTeamMe, jobId: string): Promise<void> {
+  await dealFor(me, jobId);
+  await setFollow(me.businessId, jobId, me.email, true);
+  await markSeen(me.businessId, jobId, me.email);
+}
+
+/** The deal's chat has been on screen: read. */
+export async function markDealSeen(me: DealTeamMe, jobId: string): Promise<void> {
+  await dealFor(me, jobId);
+  await markSeen(me.businessId, jobId, me.email);
+}
+
+/**
+ * The deal chats this member follows, for the team chat window's Deals section: only deals they may see (the deal
+ * viewer rules), each with the customer and deal, its latest line and how many lines from others they haven't seen
+ * (never opened, the last day's). Followed by choice or by taking part, or as the owner of a deal whose chat has
+ * something in it.
+ */
+export async function dealChats(me: DealTeamMe): Promise<{ deals: DealChatLine[]; unread: number }> {
+  const self = me.email.toLowerCase();
+  const rows = await query<{ job: string; by: string | null; text: string | null; at: string | null; unread: number }>(
+    `with mine as (
+       select j.id from design_jobs j
+         left join design_deal_follows f on f.business_id = j.business_id and f.job_id = j.id and f.email = $2
+        where j.business_id = $1
+          and (f.following is true
+               or (f.following is null and lower(coalesce(j.owner_email, '')) = $2
+                   and exists (select 1 from design_deal_lines l where l.business_id = j.business_id and l.job_id = j.id)))
+     )
+     select m.id as job, last.by_email as by, last.text, ${moment("last.at")} as at,
+            (select count(*)::int from design_deal_lines l
+               left join design_deal_seen s on s.business_id = l.business_id and s.job_id = l.job_id and s.email = $2
+              where l.business_id = $1 and l.job_id = m.id and l.by_email <> $2
+                and l.at > coalesce(s.seen_at, now() - interval '1 day')) as unread
+       from mine m
+       left join lateral (select by_email, text, at from design_deal_lines l
+                            where l.business_id = $1 and l.job_id = m.id order by at desc, id desc limit 1) last on true`,
+    [me.businessId, self],
+  );
+  if (!rows.length) return { deals: [], unread: 0 };
+  const seen = new Map((await listJobs(me.businessId, me.viewer)).map((j) => [j.id, j]));
+  const deals = dealChatOrder(
+    rows
+      .filter((r) => seen.has(r.job))
+      .map((r) => {
+        const j = seen.get(r.job)!;
+        return {
+          jobId: r.job,
+          customer: j.customerName,
+          title: j.title,
+          last: r.by && r.at ? { by: r.by, text: (r.text ?? "").replace(/\s+/g, " ").slice(0, 160), at: r.at } : null,
+          unread: r.unread,
+        };
+      }),
+  );
+  return { deals, unread: deals.reduce((n, d) => n + d.unread, 0) };
 }
 
 /** A request marked done (or opened again) by a member who may see the deal; written on the record. False when it isn't there. */

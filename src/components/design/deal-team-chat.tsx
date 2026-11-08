@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, PencilRuler, RotateCcw, SendHorizonal } from "lucide-react";
+import { Bell, Check, PencilRuler, RotateCcw, SendHorizonal } from "lucide-react";
 import {
   ASK_TYPES,
   DEAL_TEAM_POLL_MS,
@@ -16,7 +16,7 @@ import {
 } from "@/lib/domain/design/deal-team";
 import { handleOf, mentionText } from "@/lib/domain/design/mentions";
 import { agoWords } from "@/lib/domain/design/deal-feed";
-import { DEAL_TEAM_CHANGED, loadDealTeam, markAskDone, sayOnDeal, type DealTeamView } from "@/lib/services/deal-team";
+import { DEAL_TEAM_CHANGED, followDealChat, loadDealTeam, markAskDone, sayOnDeal, type DealTeamView } from "@/lib/services/deal-team";
 import { openDesigner } from "./design-drawer";
 import { SolIcon } from "./sol-icon";
 
@@ -32,8 +32,18 @@ const SOL_LOOK_MS = 3_000;
  * conversation, as the deal's Team tab. Sol's requests show what he wants, the customer's words it rests on, one
  * button to act and Mark done.
  */
-export function DealTeamChat(props: { jobId: string; pad?: boolean; initial?: DealLine[]; onChanged?: () => void }) {
-  const { jobId, pad } = props;
+export function DealTeamChat(props: {
+  jobId: string;
+  pad?: boolean;
+  /** Filling a window (the team chat window): the lines scroll, the box stays at the foot. */
+  fill?: boolean;
+  initial?: DealLine[];
+  onChanged?: () => void;
+}) {
+  const { jobId, pad, fill } = props;
+  const [following, setFollowing] = useState<boolean | null>(null);
+  const lastSeen = useRef(-1);
+  const end = useRef<HTMLLIElement>(null);
   const [view, setView] = useState<DealTeamView | null>(null);
   const [lines, setLines] = useState<DealLine[]>(props.initial ?? []);
   const [problem, setProblem] = useState<string | null>(null);
@@ -44,16 +54,23 @@ export function DealTeamChat(props: { jobId: string; pad?: boolean; initial?: De
   }, [props.onChanged]);
 
   const load = useCallback(async () => {
-    const r = await loadDealTeam(jobId);
+    // The whole chat on screen reads it; the pad does not.
+    const r = await loadDealTeam(jobId, !pad);
     if (r.ok) {
       setView(r);
       setLines(r.lines);
+      setFollowing(r.following);
       setProblem(null);
+      // Read here is read everywhere: the team chat window and its count follow.
+      if (!pad && r.lines.length !== lastSeen.current) {
+        lastSeen.current = r.lines.length;
+        window.dispatchEvent(new CustomEvent(DEAL_TEAM_CHANGED, { detail: { jobId } }));
+      }
       return r.lines;
     }
     setProblem(r.message);
     return null;
-  }, [jobId]);
+  }, [jobId, pad]);
 
   // The full chat reads itself and keeps up; the pad reads itself only once it is used (the feed brings its lines).
   useEffect(() => {
@@ -105,19 +122,49 @@ export function DealTeamChat(props: { jobId: string; pad?: boolean; initial?: De
     changed();
   };
 
-  // The pad shows the feed's lines until it has read the chat itself (once used).
-  const current = view ? lines : (props.initial ?? lines);
+  // Once it has read the chat itself, the pad still takes the feed's lines when they are newer (written elsewhere since).
+  const newest = (l: readonly DealLine[] | undefined) => l?.at(-1)?.at ?? "";
+  const current = view && (!pad || newest(lines) >= newest(props.initial)) ? lines : (props.initial ?? lines);
   const shown = pad ? current.slice(-4) : current;
   const people: Person[] = view?.members ?? [];
+  useEffect(() => {
+    if (fill) end.current?.scrollIntoView({ block: "end" });
+  }, [fill, shown.length]);
+  const toggleFollow = async () => {
+    const next = !following;
+    setFollowing(next);
+    const r = await followDealChat(jobId, next);
+    if (!r.ok) {
+      setFollowing(!next);
+      setProblem(r.message);
+    } else changed();
+  };
 
   return (
-    <div className={clsx("flex min-w-0 flex-col", pad ? "gap-2" : "gap-3")}>
+    <div className={clsx("flex min-w-0 flex-col", pad ? "gap-2" : "gap-3", fill && "h-full min-h-0")}>
       {!pad && (
-        <p className="text-[12.5px] text-muted">
-          For your team and Sol only: the customer never sees this. Type @ to bring someone in, or @Sol to ask him.
-        </p>
+        <div className="flex items-start gap-3">
+          <p className="flex-1 text-[12.5px] text-muted">
+            For your team and Sol only: the customer never sees this. Type @ to bring someone in, or @Sol to ask him.
+          </p>
+          {following !== null && (
+            <button
+              type="button"
+              aria-pressed={following}
+              title={following ? "It shows in your team chat and counts there. Press to stop." : "Show it in your team chat"}
+              onClick={() => void toggleFollow()}
+              className={clsx(
+                "inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12px] font-medium ring-1 transition",
+                following ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line hover:text-ink",
+              )}
+            >
+              {following ? <Check className="size-3.5" /> : <Bell className="size-3.5" />}
+              {following ? "Following" : "Follow"}
+            </button>
+          )}
+        </div>
       )}
-      <ul className={clsx("flex flex-col", pad ? "gap-1.5" : "gap-3")}>
+      <ul className={clsx("flex flex-col", pad ? "gap-1.5" : "gap-3", fill && "staff-scroll min-h-0 flex-1 overflow-y-auto pr-1")}>
         {shown.length === 0 && (
           <li className={clsx("text-muted", pad ? "text-[12px]" : "rounded-xl bg-surface-2 px-4 py-6 text-center text-[13.5px]")}>
             {pad ? "Nothing said here yet." : "Nothing said about this deal yet. Leave the team a note, or ask Sol."}
@@ -135,6 +182,7 @@ export function DealTeamChat(props: { jobId: string; pad?: boolean; initial?: De
             <SolIcon className="size-3.5 text-sun-line" /> Sol is answering…
           </li>
         )}
+        {fill && <li ref={end} aria-hidden />}
       </ul>
       {problem && (
         <p className="text-[12.5px] text-danger" role="alert">

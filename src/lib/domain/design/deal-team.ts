@@ -196,6 +196,57 @@ export function padOf(lines: readonly DealLine[], n = PAD_LINES): DealLine[] {
   return [open, ...(n > 1 ? lines.slice(-(n - 1)) : [])];
 }
 
+// ---------------------------------------------------------------------------
+// Following a deal's chat, and the team chat window (8 Nov 2026, Martin: one conversation shown in two places)
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether a member follows a deal's chat. A choice they made (the Following toggle) wins; else the deal's owner does.
+ * Writing in it, being @mentioned in it, or being the one a request of Sol's is for, is kept as a choice to follow.
+ */
+export function isFollowing(choice: boolean | null, isOwner: boolean): boolean {
+  return choice ?? isOwner;
+}
+
+/**
+ * Who a request of Sol's is for: design to the business's designers, else the owners; a price to whoever may change
+ * prices; anything else to the owners. Only from the members given (who may see the deal is checked by the caller).
+ */
+export function askFollowers(type: AskType, members: readonly { email: string; role: string; prices: boolean }[]): string[] {
+  const owners = members.filter((m) => m.role === "owner").map((m) => m.email.toLowerCase());
+  if (type === "design") {
+    const designers = members.filter((m) => m.role === "designer").map((m) => m.email.toLowerCase());
+    return designers.length ? designers : owners;
+  }
+  if (type === "price") return members.filter((m) => m.prices).map((m) => m.email.toLowerCase());
+  return owners;
+}
+
+/** Lines from others since this member last had the deal's chat open; never opened, the last day's. */
+export function dealUnread(lines: readonly Pick<DealLine, "by" | "at">[], seenAt: string | null, me: string, now = new Date()): number {
+  const self = me.toLowerCase();
+  const since = Date.parse(seenAt ?? "") || now.getTime() - 24 * 3600_000;
+  return lines.filter((l) => l.by !== self && Date.parse(l.at) > since).length;
+}
+
+/** A deal's chat as it is listed in the team chat window's Deals section. */
+export interface DealChatLine {
+  jobId: string;
+  customer: string;
+  title: string;
+  last: { by: string; text: string; at: string } | null;
+  unread: number;
+}
+
+/** The Deals section's order: unread first, then the latest line. */
+export function dealChatOrder(list: readonly DealChatLine[]): DealChatLine[] {
+  return [...list].sort((a, b) => Number(b.unread > 0) - Number(a.unread > 0) || (b.last?.at ?? "").localeCompare(a.last?.at ?? ""));
+}
+
+/** The team chat window's room for a deal's chat, and back. */
+export const dealRoom = (jobId: string) => `deal:${jobId}`;
+export const jobOfRoom = (room: string): string | null => /^deal:(job_[a-f0-9]{8,64})$/.exec(room)?.[1] ?? null;
+
 /** The @word being typed at the caret, for the people to offer; null when the caret isn't in one. */
 export function typingMention(text: string, caret: number): { start: number; query: string } | null {
   const m = text.slice(0, caret).match(/(^|\s)@([\w.-]{0,40})$/);
