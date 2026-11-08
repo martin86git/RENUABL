@@ -676,7 +676,12 @@ export function angleOfLongestEdge(face: Pick<Face, "points">): number {
   return Math.round(degrees);
 }
 
-const LIMITS = { faces: 16, points: 16, metres: 80, off: 400, loose: 300 } as const;
+/**
+ * A face keeps up to 48 corners: more than a Nearmap outline brings (`OUTLINE_MAX_POINTS`, 40). At 16 an outline was cut
+ * short on saving and closed straight across the roof (8 Nov 2026, 2 Hanwell Court).
+ */
+export const FACE_MAX_POINTS = 48;
+const LIMITS = { faces: 16, points: FACE_MAX_POINTS, metres: 80, off: 400, loose: 300 } as const;
 
 const finite = (n: unknown, min: number, max: number): number | null =>
   typeof n === "number" && Number.isFinite(n) && n >= min && n <= max ? n : null;

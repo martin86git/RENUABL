@@ -1,6 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { capturedWords, homeOutline, offersOf, outlineArea, recentCaptures, ringToPoints, simplifyOutline } from "./nearmap";
-import { metresPerPixel } from "./roof-design";
+import {
+  OUTLINE_MAX_POINTS,
+  capturedWords,
+  homeOutline,
+  offersOf,
+  outlineArea,
+  recentCaptures,
+  ringToPoints,
+  simplifyOutline,
+} from "./nearmap";
+import { FACE_MAX_POINTS, cleanDesign, metresPerPixel } from "./roof-design";
+
+describe("an outline kept as a face", () => {
+  it("keeps every corner when the design is saved, so it never closes straight across the roof", () => {
+    expect(FACE_MAX_POINTS).toBeGreaterThanOrEqual(OUTLINE_MAX_POINTS);
+    // 2 Hanwell Court: Nearmap's outline came to 22 corners; cut to 16 on saving, it closed across the roof.
+    const points = Array.from({ length: 22 }, (_, i) => ({
+      x: Math.round(100 * Math.cos(i / 3.5)) / 10,
+      y: Math.round(100 * Math.sin(i / 3.5)) / 10,
+    }));
+    const kept = cleanDesign({
+      lat: -37.89,
+      lng: 145.18,
+      faces: [{ id: "f", points, angle: 0, landscape: false, setback: 0, facing: "N", off: [] }],
+    });
+    expect(kept?.faces[0].points).toHaveLength(22);
+  });
+});
 
 describe("Nearmap in the designer", () => {
   it("says a capture's date in words", () => {
