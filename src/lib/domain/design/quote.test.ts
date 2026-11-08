@@ -65,6 +65,31 @@ describe("a business's supplier price lists", () => {
     expect(listed(withList, "ANTRAIL4800/B")?.cost).toBe(24.81);
     expect(listed(withList, "NOT-A-CODE")).toBeNull();
   });
+  it("finds a part whose code the list writes differently, but never one of two that could be meant", () => {
+    // AWM's newer list writes the roof kits "ANTTILE2.0" and "ANTTIN2.0"; the parts start as "ANTTILE20" and "ANTTIN20".
+    const newer = readSupplierList(
+      "awm-new.csv",
+      [
+        ["ANTTILE2.0", "Antai 2.0kW Tile Kit (Black)", "99.80"],
+        ["ANTTIN2.0", "Antai Tin Kit", "49"],
+      ],
+      "2026-11-08",
+    );
+    const ws: Workspace = { ...DEFAULT_WORKSPACE, lists: [newer] };
+    expect(componentCost(ws, "tileKit")).toBe(99.8);
+    expect(componentCost(ws, "tinKit")).toBe(49);
+    expect(listed(ws, "anttile-2.0")?.sku).toBe("ANTTILE2.0");
+    const two = readSupplierList(
+      "two.csv",
+      [
+        ["AB-12", "One", "1"],
+        ["AB12", "Two", "2"],
+      ],
+      "2026-11-08",
+    );
+    expect(listed({ lists: [two] }, "AB 12")).toBeNull();
+    expect(listed({ lists: [two] }, "AB12")?.name).toBe("Two");
+  });
   it("finds every part the quote adds on that list by the codes it starts with", () => {
     expect(COMPONENTS.filter((c) => componentCost(withList, c.key) === null).map((c) => c.key)).toEqual([]);
   });

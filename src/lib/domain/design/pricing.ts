@@ -462,14 +462,24 @@ export function cleanWorkspace(raw: unknown): Workspace {
 // Looking things up
 // ---------------------------------------------------------------------------
 
-/** A product's row on the uploaded lists, the newest list that has it. */
+/** A product code as compared loosely: letters and digits only, any case ("ANTTILE2.0" and "ANTTILE20" alike). */
+export const looseCode = (sku: string) => sku.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+/**
+ * A product's row on the uploaded lists, the newest list that has it. The code exactly, else the same code written
+ * differently (8 Nov 2026, Martin: the roof kits weren't found; AWM's newer list writes "ANTTILE2.0" where ours said
+ * "ANTTILE20"), but only when one product on the lists matches it that way, so two products are never mixed up.
+ */
 export function listed(workspace: Pick<Workspace, "lists">, sku: string): ListItem | null {
   if (!sku) return null;
   for (const list of workspace.lists) {
     const hit = list.items.find((i) => i.sku === sku);
     if (hit) return hit;
   }
-  return null;
+  const key = looseCode(sku);
+  if (!key) return null;
+  const loose = workspace.lists.flatMap((l) => l.items.filter((i) => looseCode(i.sku) === key));
+  return new Set(loose.map((i) => i.sku)).size === 1 ? loose[0] : null;
 }
 
 /** What a part costs: the figure typed in, else the price list's. Null when neither is there. */
