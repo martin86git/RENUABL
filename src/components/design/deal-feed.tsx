@@ -15,6 +15,7 @@ import {
   Phone,
   Snowflake,
   StickyNote,
+  PenTool,
   UserPlus,
   X,
 } from "lucide-react";
@@ -270,6 +271,22 @@ function DealCard(props: {
             <UserPlus className="size-4" />
             <span className="hidden sm:inline">Teammate</span>
           </Control>
+          {/* The designer for this deal (8 Nov 2026, Martin: Sol asks for a design, so the card opens it). Orange while
+              a deal being sold has no design yet; a link to the designer opens over the page wherever the frame shows it. */}
+          <Link
+            href={`${PATHS.designer}?job=${encodeURIComponent(d.jobId)}`}
+            aria-label={d.projectId ? `Open ${first}'s design` : `Design ${first}'s roof`}
+            title={d.projectId ? "Open the design" : "Design this roof"}
+            className={clsx(
+              "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors",
+              !d.projectId && OPEN_STAGES.includes(d.stage)
+                ? "bg-sun-line text-white hover:brightness-105"
+                : "text-ink ring-1 ring-line hover:bg-surface-2",
+            )}
+          >
+            <PenTool className="size-4" aria-hidden />
+            <span className="hidden sm:inline">{d.projectId ? "Design" : "Design it"}</span>
+          </Link>
           <Link
             href={`${PATHS.deals}/${d.jobId}`}
             className="ml-auto inline-flex h-9 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
