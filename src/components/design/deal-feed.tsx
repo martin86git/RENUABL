@@ -6,17 +6,19 @@ import clsx from "clsx";
 import {
   ArrowRight,
   ArrowUp,
-  ArrowUpRight,
+  CalendarPlus,
   CornerUpLeft,
   Eye,
   FileText,
   Flame,
+  Handshake,
   Mail,
   MessageCircle,
   Phone,
   Snowflake,
   StickyNote,
   PenTool,
+  Plus,
   X,
 } from "lucide-react";
 import {
@@ -25,7 +27,10 @@ import {
   caption,
   feedOf,
   needsYou,
+  nextMove,
   systemLine,
+  type MoveKind,
+  type NextMove,
   type FeedDeal,
   type FeedEventKind,
   type FeedView,
@@ -33,11 +38,14 @@ import {
 import { OPEN_STAGES, STAGE_LABELS } from "@/lib/domain/design/crm";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { emailDeal } from "@/lib/services/crm";
+import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
+import { briefHref } from "@/lib/domain/design/deal-team";
 import { exampleDeals, loadFeed, writeWithSol, type FeedAnswer } from "@/lib/services/deal-feed";
 import { DEAL_TEAM_CHANGED } from "@/lib/services/deal-team";
 import { AerialRoof, type AerialRoofSpec, type RoofFinish, type RoofForm } from "./aerial-roof";
 import { PATHS } from "./design-shell";
 import { DealTeamChat } from "./deal-team-chat";
+import { NewDeal } from "./design-customers";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { SolIcon } from "./sol-icon";
 
@@ -107,6 +115,7 @@ export function DealFeed({ me }: { me: string }) {
   const open = deals.filter((d) => OPEN_STAGES.includes(d.stage));
   const openValue = open.reduce((sum, d) => sum + (d.value ?? 0), 0);
   const [filling, setFilling] = useState(false);
+  const [adding, setAdding] = useState(false);
   const examples = async (what: "add" | "clear") => {
     setFilling(true);
     await exampleDeals(what);
@@ -133,25 +142,36 @@ export function DealFeed({ me }: { me: string }) {
             "Looking over your deals…"
           )}
         </p>
-        <div role="tablist" aria-label="What to show" className="inline-flex rounded-full bg-surface p-1 ring-1 ring-line">
-          {FEED_VIEWS.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              role="tab"
-              aria-selected={view === v.id}
-              onClick={() => pick(v.id)}
-              className={clsx(
-                "rounded-full px-3 py-1 text-[12.5px] font-medium transition",
-                view === v.id ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
-              )}
-            >
-              {v.label}
-              {v.id === "needs" && needs > 0 && <span className="ml-1 tabular-nums">{needs}</span>}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          {/* A new deal from Today (8 Nov 2026, Martin: how do I add new leads?): the same short form as on Deals. */}
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2"
+          >
+            <Plus className="size-4" aria-hidden /> New deal
+          </button>
+          <div role="tablist" aria-label="What to show" className="inline-flex rounded-full bg-surface p-1 ring-1 ring-line">
+            {FEED_VIEWS.map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                role="tab"
+                aria-selected={view === v.id}
+                onClick={() => pick(v.id)}
+                className={clsx(
+                  "rounded-full px-3 py-1 text-[12.5px] font-medium transition",
+                  view === v.id ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+                )}
+              >
+                {v.label}
+                {v.id === "needs" && needs > 0 && <span className="ml-1 tabular-nums">{needs}</span>}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+      {adding && <NewDeal onClose={() => setAdding(false)} />}
       {data?.examples !== null && data?.examples !== undefined && (
         <p className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] text-ink-2">
           {data.examples > 0
@@ -200,7 +220,8 @@ function DealCard(props: {
 }) {
   const { deal: d, now } = props;
   const need = needsYou(d, now);
-  const first = d.customer.split(/\s+/)[0] || "them";
+  const move = nextMove(d, now);
+  const [reviewing, setReviewing] = useState(false);
   // The note-taker for this deal, started from Call (8 Nov 2026, Martin: the call is made on the phone while it listens).
   const notetaker = useRef<NotetakerHandle>(null);
   const call = () => {
@@ -258,60 +279,64 @@ function DealCard(props: {
           </ul>
         )}
 
+        {/* Sol's line: why the next move is the next move, or where the deal is at when nothing is needed. */}
         <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface-2 px-3 py-2">
           <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
-          <p className="text-[13px] leading-snug text-ink">
-            {caption(d, now)}
-            {d.sol && !d.sol.held && <span className="text-muted"> Goes {countdownWords(d.sol.firesAt, now)}.</span>}
-          </p>
+          <p className="text-[13px] leading-snug text-ink">{move ? move.why : caption(d, now)}</p>
         </div>
 
         {/* The foot of the card, kept at the bottom however tall the chat beside it makes the row: tell Sol what to write,
-            then the tools. */}
+            then the one thing to do now, lit, with the deal's tools quiet beside it (8 Nov 2026, Martin). */}
         <div className="mt-auto pt-3">
           <SolWrite deal={d} onSent={props.onChanged} />
+          {reviewing && d.sol?.id && (
+            <ReviewSol
+              deal={d}
+              now={now}
+              onClose={() => setReviewing(false)}
+              onDone={() => {
+                setReviewing(false);
+                props.onChanged();
+              }}
+            />
+          )}
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={call}
-              title={d.phone ? `Call ${d.phone} with the note-taker listening` : "No phone on file"}
-              disabled={!d.phone}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2 disabled:text-muted"
-            >
-              <Phone className="size-4" aria-hidden />
-              <span className="hidden sm:inline">Call</span>
-            </button>
-            {/* The designer for this deal: orange while a deal being sold has no design yet; it opens over the page. */}
-            <Link
-              href={`${PATHS.designer}?job=${encodeURIComponent(d.jobId)}`}
-              aria-label={d.projectId ? `Open ${first}'s design` : `Design ${first}'s roof`}
-              title={d.projectId ? "Open the design" : "Design this roof"}
-              className={clsx(
-                "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors",
-                !d.projectId && OPEN_STAGES.includes(d.stage)
-                  ? "bg-sun-line text-white hover:brightness-105"
-                  : "text-ink ring-1 ring-line hover:bg-surface-2",
-              )}
-            >
-              <PenTool className="size-4" aria-hidden />
-              <span className="hidden sm:inline">{d.projectId ? "Design" : "Design it"}</span>
-            </Link>
-            {/* The proposal, the deal's other tool: what the customer sees, over the page like the designer. */}
-            <Link
-              href={`${PATHS.deals}/${encodeURIComponent(d.jobId)}/proposal`}
-              aria-label={`${first}'s proposal`}
-              title="Proposal"
-              className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2"
-            >
-              <FileText className="size-4 text-sun-line" aria-hidden />
-              <span className="hidden sm:inline">Proposal</span>
-            </Link>
-            <Link
-              href={`${PATHS.deals}/${d.jobId}`}
-              className="ml-auto inline-flex h-9 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
-            >
-              Open <ArrowUpRight className="size-3.5" />
-            </Link>
+            {move && (
+              <MoveButton deal={d} move={move} now={now} reviewing={reviewing} onReview={() => setReviewing((r) => !r)} onCall={call} />
+            )}
+            {move?.kind !== "call" && (
+              <Tool
+                quiet={Boolean(move)}
+                label="Call"
+                title={d.phone ? `Call ${d.phone} with the note-taker listening` : "No phone on file"}
+                onClick={d.phone ? call : undefined}
+              >
+                <Phone className="size-4" aria-hidden />
+              </Tool>
+            )}
+            {move?.kind !== "design" && (
+              <Tool
+                quiet={Boolean(move)}
+                label="Design"
+                title={d.projectId ? "Open the design" : "Design this roof"}
+                href={`${PATHS.designer}?job=${encodeURIComponent(d.jobId)}`}
+              >
+                <PenTool className="size-4" aria-hidden />
+              </Tool>
+            )}
+            {move?.kind !== "proposal" && (
+              <Tool
+                quiet={Boolean(move)}
+                label="Proposal"
+                title="The proposal"
+                href={`${PATHS.deals}/${encodeURIComponent(d.jobId)}/proposal`}
+              >
+                <FileText className={clsx("size-4", !move && "text-sun-line")} aria-hidden />
+              </Tool>
+            )}
+            <Tool quiet={Boolean(move)} label="Deal" title={`${d.customer}'s deal`} href={`${PATHS.deals}/${d.jobId}`}>
+              <Handshake className="size-4" aria-hidden />
+            </Tool>
           </div>
         </div>
         <CallNotetaker handle={notetaker} button={false} jobId={d.jobId} customerId="" phone={d.phone ?? ""} onAdded={props.onChanged} />
@@ -342,6 +367,227 @@ const dark =
  * Tell Sol what to write (8 Nov 2026, Martin: a field, not a Write button): the member says what to say, Sol writes the
  * email from the record (never a cost), and it opens under the field to change and send through the deal's own email.
  */
+/** One of the deal's tools: labelled while nothing needs doing; a quiet grey round while another is the next move. */
+function Tool(props: { quiet: boolean; label: string; title: string; href?: string; onClick?: () => void; children: React.ReactNode }) {
+  const look = clsx(
+    "inline-flex h-9 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium ring-1 ring-line transition-colors",
+    props.quiet ? "w-9 text-muted hover:bg-surface-2 hover:text-ink" : "px-3.5 text-ink hover:bg-surface-2",
+    !props.href && !props.onClick && "pointer-events-none opacity-60",
+  );
+  const inner = (
+    <>
+      {props.children}
+      {!props.quiet && <span className="hidden sm:inline">{props.label}</span>}
+    </>
+  );
+  return props.href ? (
+    <Link href={props.href} title={props.title} aria-label={props.label} className={look}>
+      {inner}
+    </Link>
+  ) : (
+    <button type="button" onClick={props.onClick} disabled={!props.onClick} title={props.title} aria-label={props.label} className={look}>
+      {inner}
+    </button>
+  );
+}
+
+const MOVE_ICONS: Record<MoveKind, React.ComponentType<{ className?: string }>> = {
+  reply: MessageCircle,
+  review: Mail,
+  design: PenTool,
+  proposal: FileText,
+  call: Phone,
+  book: CalendarPlus,
+  deal: Handshake,
+};
+
+/** The one thing to do now, lit in the signal orange, with its countdown when it is Sol's email. */
+function MoveButton(props: { deal: FeedDeal; move: NextMove; now: Date; reviewing: boolean; onReview: () => void; onCall: () => void }) {
+  const { deal: d, move } = props;
+  const Icon = MOVE_ICONS[move.kind];
+  const look = clsx(
+    "inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold transition",
+    props.reviewing ? "bg-primary text-primary-ink" : "bg-sun-line text-white hover:brightness-105",
+  );
+  const ask = d.team?.openAsks.find((a) => a.type === "design");
+  const counting = Boolean(d.sol) && (d.sol?.state ?? (d.sol?.held ? "held" : "counting")) === "counting";
+  const inner = (
+    <>
+      {move.kind === "review" && counting && d.sol ? <Countdown sol={d.sol} now={props.now} /> : <Icon className="size-4" />}
+      {move.label}
+      {move.kind === "review" && counting && d.sol && (
+        <span className="font-normal opacity-90">· {countdownWords(d.sol.firesAt, props.now)}</span>
+      )}
+    </>
+  );
+  if (move.kind === "review")
+    return (
+      <button type="button" onClick={props.onReview} aria-expanded={props.reviewing} className={look}>
+        {inner}
+      </button>
+    );
+  if (move.kind === "call")
+    return (
+      <button
+        type="button"
+        onClick={props.onCall}
+        title={d.phone ? `Call ${d.phone} with the note-taker listening` : undefined}
+        className={look}
+      >
+        {inner}
+      </button>
+    );
+  const href =
+    move.kind === "reply"
+      ? `${PATHS.deals}/${d.jobId}?tab=chat`
+      : move.kind === "design"
+        ? ask
+          ? briefHref(d.jobId, ask.id)
+          : `${PATHS.designer}?job=${encodeURIComponent(d.jobId)}`
+        : move.kind === "proposal"
+          ? `${PATHS.deals}/${encodeURIComponent(d.jobId)}/proposal`
+          : move.kind === "book"
+            ? `${PATHS.deals}/${d.jobId}?tab=details`
+            : `${PATHS.deals}/${d.jobId}?tab=team`;
+  return (
+    <Link href={href} className={look}>
+      {inner}
+    </Link>
+  );
+}
+
+/** A ring that empties as Sol's email nears its time. */
+function Countdown({ sol, now }: { sol: NonNullable<FeedDeal["sol"]>; now: Date }) {
+  const end = Date.parse(sol.firesAt);
+  const start = Date.parse(sol.readyAt ?? "") || end - 30 * 60_000;
+  const left = Math.max(0, Math.min(1, (end - now.getTime()) / Math.max(1, end - start)));
+  const c = 2 * Math.PI * 6;
+  return (
+    <svg viewBox="0 0 16 16" className="size-4 -rotate-90" aria-hidden>
+      <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2.2" />
+      <circle
+        cx="8"
+        cy="8"
+        r="6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeDasharray={c}
+        strokeDashoffset={c * (1 - left)}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * What Sol has lined up, opened in the card: its words to change, and when it goes, which is the person's to change
+ * (LIVE_SOFTWARE.md: Sol gives notice with a countdown instead of asking permission). Send now, an hour later,
+ * tomorrow at 9, hold it, or don't send it.
+ */
+function ReviewSol(props: { deal: FeedDeal; now: Date; onClose: () => void; onDone: () => void }) {
+  const sol = props.deal.sol!;
+  const first = props.deal.customer.split(/\s+/)[0] || "them";
+  const [subject, setSubject] = useState(sol.subject);
+  const [body, setBody] = useState(sol.body ?? "");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const changed = subject !== sol.subject || body !== (sol.body ?? "");
+  const state = sol.state ?? (sol.held ? "held" : "counting");
+  const when =
+    state === "counting"
+      ? `Sol sends it ${countdownWords(sol.firesAt, props.now)} unless you change it.`
+      : state === "held"
+        ? "Held: it goes only when you send it."
+        : state === "no-email"
+          ? `There's no email for ${first} on their record.`
+          : "Sol's agent for this stage is off, so it waits for you to send it.";
+  const run = async (fn: () => Promise<{ ok: boolean; message?: string }>) => {
+    setBusy(true);
+    setNote(null);
+    // Words changed in the box go with whatever is pressed next.
+    if (changed) {
+      const saved = await editOutbox(sol.id!, { subject, body });
+      if (!saved.ok) {
+        setBusy(false);
+        return setNote("message" in saved && typeof saved.message === "string" ? saved.message : "It couldn't be saved. Try again.");
+      }
+    }
+    const r = await fn();
+    setBusy(false);
+    if (!r.ok) return setNote(r.message ?? "That couldn't be done. Try again.");
+    props.onDone();
+  };
+  const small =
+    "inline-flex h-8 items-center rounded-full px-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted";
+  return (
+    <div className="mt-2.5 space-y-2 rounded-xl bg-canvas p-3 ring-1 ring-line" role="group" aria-label={`Sol's email to ${first}`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[12.5px] font-semibold text-ink">
+          Sol&apos;s email to {first}
+          {sol.to ? <span className="font-normal text-muted"> · {sol.to}</span> : null}
+        </p>
+        <button type="button" aria-label="Close" onClick={props.onClose} className="rounded-full p-1 text-muted hover:text-ink">
+          <X className="size-4" />
+        </button>
+      </div>
+      <p className={clsx("text-[12.5px]", state === "counting" ? "text-sun-ink" : "text-ink-2")}>{when}</p>
+      <input
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        aria-label="Subject"
+        className="w-full rounded-lg bg-surface px-3 py-2 text-[13.5px] font-medium text-ink ring-1 ring-line focus:outline-none focus:ring-2 focus:ring-sun-line"
+      />
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        rows={7}
+        aria-label="The email"
+        className="w-full resize-y rounded-lg bg-surface px-3 py-2 text-[13.5px] leading-relaxed text-ink ring-1 ring-line focus:outline-none focus:ring-2 focus:ring-sun-line"
+      />
+      {note && <p className="text-[12.5px] text-warning">{note}</p>}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          disabled={busy || !sol.to}
+          onClick={() => void run(() => actOnOutbox(sol.id!, "send"))}
+          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[12.5px] font-semibold text-primary-ink hover:brightness-110 disabled:bg-surface-2 disabled:text-muted"
+        >
+          <ArrowUp className="size-3.5" /> Send now
+        </button>
+        <button type="button" disabled={busy} className={small} onClick={() => void run(() => putOffOutbox(sol.id!, "hour"))}>
+          In an hour
+        </button>
+        <button type="button" disabled={busy} className={small} onClick={() => void run(() => putOffOutbox(sol.id!, "tomorrow"))}>
+          Tomorrow at 9
+        </button>
+        {state === "held" ? (
+          <button type="button" disabled={busy} className={small} onClick={() => void run(() => actOnOutbox(sol.id!, "release"))}>
+            Let Sol send it
+          </button>
+        ) : (
+          <button type="button" disabled={busy} className={small} onClick={() => void run(() => actOnOutbox(sol.id!, "hold"))}>
+            Hold
+          </button>
+        )}
+        {changed && (
+          <button type="button" disabled={busy} className={small} onClick={() => void run(async () => ({ ok: true }))}>
+            Save changes
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void run(() => actOnOutbox(sol.id!, "skip"))}
+          className="ml-auto inline-flex h-8 items-center rounded-full px-3 text-[12.5px] font-medium text-muted hover:text-danger"
+        >
+          Don&apos;t send
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SolWrite({ deal: d, onSent }: { deal: FeedDeal; onSent: () => void }) {
   const first = d.customer.split(/\s+/)[0] || "them";
   const [askText, setAskText] = useState("");

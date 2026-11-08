@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
+import { fireDue } from "@/lib/server/design-sol-agents";
 import { solAsksForDesigns } from "@/lib/server/design-deal-team-repo";
 import { dealFeed, exampleCount, feedExtras } from "@/lib/server/design-feed";
 
@@ -18,6 +20,11 @@ export async function GET() {
       feedExtras(who.member.businessId, who.member.email),
       exampleCount(who.member.businessId).catch(() => null),
     ]);
+    // What has come due in Sol's outbox goes after the answer, as when the board is read (not while viewing as someone).
+    if (!who.member.viewedBy) {
+      const business = { id: who.member.businessId, name: who.member.businessName };
+      after(() => fireDue(business).catch((e) => console.error("Sol's outbox couldn't send", e instanceof Error ? e.message : e)));
+    }
     return Response.json({ ok: true, deals, ...extras, examples });
   });
 }

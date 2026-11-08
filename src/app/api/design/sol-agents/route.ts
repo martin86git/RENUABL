@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { cleanAgentSettings } from "@/lib/domain/design/sol-agents";
+import { cleanAgentSettings, laterAt } from "@/lib/domain/design/sol-agents";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { closePrepared, draftPending, preparedById } from "@/lib/server/design-prepared";
 import { agentSettings, changeOutboxItem, fireDue, outbox, saveAgentSettings, sendOutboxItem } from "@/lib/server/design-sol-agents";
@@ -88,6 +88,13 @@ export async function POST(request: Request) {
       const b = typeof body === "string" ? body.trim().slice(0, 10_000) : "";
       if (!s || !b) return fail("Add a subject and some words.", 422);
       await changeOutboxItem(businessId, id, { subject: s, body: b });
+      return Response.json({ ok: true });
+    }
+    // "later" with { when: "hour" | "tomorrow" } puts it off (and lets Sol send it then); the countdown is the person's.
+    if (act === "later") {
+      const when = read.body.when;
+      if (when !== "hour" && when !== "tomorrow") return fail("That couldn't be done. Try again.", 422);
+      await changeOutboxItem(businessId, id, { held: false, notBefore: laterAt(when) });
       return Response.json({ ok: true });
     }
     if (act === "skip") {

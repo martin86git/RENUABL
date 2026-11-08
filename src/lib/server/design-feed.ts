@@ -119,7 +119,18 @@ export async function dealFeed(
       clock: pulse?.clock.words ?? null,
       proposal: proposal ? { opened: proposal.opened } : null,
       events,
-      sol: lined ? { subject: lined.subject ?? "", firesAt: lined.firesAt, held: lined.held } : null,
+      sol: lined
+        ? {
+            id: lined.id,
+            subject: lined.subject ?? "",
+            body: lined.body ?? "",
+            to: lined.to ?? "",
+            firesAt: lined.firesAt,
+            readyAt: lined.createdAt,
+            held: lined.held,
+            state: lined.state,
+          }
+        : null,
       canCall: Boolean(c?.phone),
       canEmail: Boolean(c?.email),
       phone: c?.phone || null,

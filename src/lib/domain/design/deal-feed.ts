@@ -1,4 +1,5 @@
 import type { Heat } from "./deal-heat";
+import { countdownWords, type OutboxState } from "./sol-agents";
 import { STAGE_LABELS, type JobStage } from "./crm";
 import { askNeedWords, type AskType, type DealLine } from "./deal-team";
 
@@ -43,8 +44,11 @@ export interface FeedDeal {
   proposal: { opened: boolean } | null;
   /** Newest first. */
   events: FeedEvent[];
-  /** What Sol has lined up on it, when anything. */
-  sol: { subject: string; firesAt: string; held: boolean } | null;
+  /**
+   * What Sol has lined up on it, when anything: the outbox item, its words, when it goes and where it stands
+   * (counting down while its agent is on; waiting for a press while it is off; held).
+   */
+  sol: { id?: string; subject: string; body?: string; to?: string; firesAt: string; readyAt?: string; held: boolean; state?: OutboxState } | null;
   canCall: boolean;
   canEmail: boolean;
   /** The customer's phone as kept on their record, for the member to ring themselves. */
@@ -116,6 +120,61 @@ export function caption(d: FeedDeal, now = new Date()): string {
       return STAGE_LABELS[d.stage];
   }
 }
+
+/** What the card's lit button does. */
+export type MoveKind = "reply" | "review" | "design" | "proposal" | "call" | "book" | "deal";
+
+export interface NextMove {
+  kind: MoveKind;
+  /** The button's words: "Design the roof", "Review", "Call Alex". */
+  label: string;
+  /** Why, in a sentence, as Sol says it on the card. */
+  why: string;
+}
+
+/**
+ * The one thing to do on a deal now, or null when Sol and the record have it in hand (8 Nov 2026, Martin: four
+ * buttons that all look the same don't say what to do; light the one that's needed). Most pressing first: a customer
+ * waiting on a reply, something Sol has written to check, a design Sol asked for or a lead with no roof, a priced
+ * design with no proposal, a lead nobody has spoken to or a hot deal not called lately, a sale with no install day.
+ * By rule from the record, so it is free and instant.
+ */
+export function nextMove(d: FeedDeal, now = new Date()): NextMove | null {
+  const name = first(d.customer);
+  if (d.events[0]?.kind === "message") return { kind: "reply", label: `Reply to ${name}`, why: `${name} asked something and is waiting on a reply.` };
+  if (d.sol) {
+    const state = d.sol.state ?? (d.sol.held ? "held" : "counting");
+    const what = d.sol.subject ? `: "${d.sol.subject}"` : "";
+    const why =
+      state === "counting"
+        ? `Sol has written to ${name}${what}. It goes ${countdownWords(d.sol.firesAt, now)} unless you change it.`
+        : state === "held"
+          ? `Sol's email to ${name} is held${what}. Yours to send.`
+          : `Sol has written to ${name}${what}. It waits for you to send it.`;
+    return { kind: "review", label: "Review", why };
+  }
+  const ask = d.team?.openAsks[0];
+  if (ask?.type === "design" || (d.stage === "lead" && !d.projectId))
+    return {
+      kind: "design",
+      label: d.projectId ? "Open the design" : "Design the roof",
+      why: ask ? "Sol has asked for a design. The brief is in the deal's chat." : `New lead. ${name}'s roof isn't designed yet.`,
+    };
+  if (ask) return { kind: "deal", label: "See what Sol needs", why: `${askNeedWords(ask)}. It's in the deal's chat.` };
+  if ((d.stage === "designed" || (d.stage === "lead" && d.projectId)) && !d.proposal)
+    return { kind: "proposal", label: "Send the proposal", why: "Designed and priced. The proposal hasn't gone yet." };
+  const called = d.events.some((e) => e.kind === "call" && now.getTime() - Date.parse(e.at) < 3 * DAY);
+  if (d.stage === "lead" && !d.events.some((e) => e.kind === "call" || e.kind === "email" || e.kind === "reply"))
+    return d.phone
+      ? { kind: "call", label: `Call ${name}`, why: `Nobody has been in touch with ${name} yet.` }
+      : { kind: "deal", label: "Get in touch", why: `Nobody has been in touch with ${name} yet, and there's no phone on file.` };
+  if (d.heat === "hot" && !called && d.phone && OPEN.includes(d.stage))
+    return { kind: "call", label: `Call ${name}`, why: `${name} is warm to it and hasn't had a call in three days.` };
+  if (d.stage === "won" && !d.installDate) return { kind: "book", label: "Book the install", why: "Signed. It needs an installation day." };
+  return null;
+}
+
+const OPEN: readonly JobStage[] = ["lead", "designed", "proposal"];
 
 /** The cards for a view, the most recent activity first. */
 export function feedOf(deals: readonly FeedDeal[], view: FeedView, now = new Date()): FeedDeal[] {

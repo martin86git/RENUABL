@@ -12,7 +12,7 @@ import {
   SOL_SENDER,
   agentFor,
   cleanAgentSettings,
-  sendAt,
+  firesAtFor,
   outboxState,
   shouldFire,
   withinHours,
@@ -86,7 +86,7 @@ export interface Outbox {
   canSend: boolean;
 }
 
-type Held = PreparedItem & { held?: boolean };
+type Held = PreparedItem & { held?: boolean; notBefore?: string };
 
 const entryOf = (item: Held, stage: JobStage | undefined, settings: AgentSettings, now = new Date()): OutboxEntry => {
   const agent = stage ? agentFor(stage) : null;
@@ -95,13 +95,14 @@ const entryOf = (item: Held, stage: JobStage | undefined, settings: AgentSetting
     ...item,
     stage: agent,
     held,
-    firesAt: sendAt(item.createdAt, settings.hours, now),
+    firesAt: firesAtFor(item, settings.hours, now),
     // With no email service on the site nothing can go, so nothing counts down.
     state: outboxState({
       stage: agent,
       held,
       hasEmail: EMAIL.test(item.to),
       settings: emailProvider() ? settings : { ...settings, on: [] },
+      scheduled: Boolean(item.notBefore) && Boolean(emailProvider()),
     }),
   };
 };
@@ -240,7 +241,7 @@ export async function sendOutboxItem(
  */
 export async function fireDue(business: { id: string; name: string }, now = new Date()): Promise<number> {
   const settings = await agentSettings(business.id);
-  if (!settings.on.length || !emailProvider()) return 0;
+  if (!emailProvider()) return 0;
   const rows = await query<{ id: string; item: Held; createdAt: string; stage: JobStage }>(
     `select p.id, p.item, ${moment("p.created_at")} as "createdAt", j.stage
        from design_prepared p join design_jobs j on j.business_id = p.business_id and j.id = p.job_id
@@ -250,19 +251,23 @@ export async function fireDue(business: { id: string; name: string }, now = new 
   let sent = 0;
   for (const r of rows) {
     const entry = entryOf({ ...r.item, id: r.id, createdAt: r.item.createdAt ?? r.createdAt }, r.stage, settings, now);
-    if (!entry.stage || !AGENTS[entry.stage].working) continue;
+    // A time a person picked sends whatever the agent; otherwise only an agent that works sends on its own.
+    if (!r.item.notBefore && (!entry.stage || !AGENTS[entry.stage].working)) continue;
     if (!shouldFire(entry.state, entry.firesAt, now) || !withinHours(now, settings.hours)) continue;
     if ((await sendOutboxItem(business, r.id, SOL_SENDER)) === "sent") sent++;
   }
   return sent;
 }
 
-/** Every business with an agent on (for the hourly cron); older settings had one switch, `sending`. */
+/** Every business with an agent on, or with an email someone put off to a time (for the hourly cron); older settings had one switch, `sending`. */
 export async function sendingBusinesses(): Promise<{ id: string; name: string }[]> {
   return query(
-    `select b.id, b.name from design_sol_agents a join businesses b on b.id = a.business_id
-      where jsonb_array_length(case when jsonb_typeof(a.settings->'on') = 'array' then a.settings->'on' else '[]'::jsonb end) > 0
-         or a.settings->>'sending' = 'true'`,
+    `select b.id, b.name from businesses b
+      where exists (
+              select 1 from design_sol_agents a where a.business_id = b.id
+                 and (jsonb_array_length(case when jsonb_typeof(a.settings->'on') = 'array' then a.settings->'on' else '[]'::jsonb end) > 0
+                      or a.settings->>'sending' = 'true'))
+         or exists (select 1 from design_prepared p where p.business_id = b.id and p.status = 'ready' and p.item ? 'notBefore')`,
   );
 }
 
@@ -270,7 +275,7 @@ export async function sendingBusinesses(): Promise<{ id: string; name: string }[
 export async function changeOutboxItem(
   businessId: string,
   id: string,
-  change: { held: boolean } | { subject: string; body: string },
+  change: { held: boolean; notBefore?: string } | { subject: string; body: string },
 ): Promise<boolean> {
   const done = await query(
     `update design_prepared set item = item || $3::jsonb where business_id = $1 and id = $2 and status in ('preparing', 'ready') returning id`,

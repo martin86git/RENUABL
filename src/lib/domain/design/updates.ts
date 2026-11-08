@@ -15,6 +15,21 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Today",
+    words: "Each deal card lights the one thing to do now: reply, review, design, send the proposal, call or book. The rest go quiet.",
+  },
+  {
+    day: "2026-11-08",
+    area: "Today",
+    words: "Review Sol's email on the card: change it, send now, put it off an hour or to tomorrow at 9, hold it, or don't send it.",
+  },
+  {
+    day: "2026-11-08",
+    area: "Today",
+    words: "New deal is on Today, and each card has a Deal button in place of Open.",
+  },
+  {
+    day: "2026-11-08",
     area: "Service",
     words:
       "Start a new service case with the + by the cases, or ask Sol: a card finds the deal as you type. Sol on Service keeps to its own chat.",

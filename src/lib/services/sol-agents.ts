@@ -30,5 +30,8 @@ export const saveAgentSettings = (settings: AgentSettings) =>
 export const actOnOutbox = (id: string, act: "send" | "hold" | "release" | "skip") =>
   ask<{ message?: string }>("/api/design/sol-agents", { method: "POST", body: { id, do: act } });
 
+export const putOffOutbox = (id: string, when: "hour" | "tomorrow") =>
+  ask<object>("/api/design/sol-agents", { method: "POST", body: { id, do: "later", when } });
+
 export const editOutbox = (id: string, words: { subject: string; body: string }) =>
   ask<object>("/api/design/sol-agents", { method: "POST", body: { id, do: "edit", ...words } });

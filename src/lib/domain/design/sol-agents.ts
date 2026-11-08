@@ -146,6 +146,24 @@ export function sendAt(readyAt: string, hours: SendHours, now = new Date()): str
   return now.getTime() > Date.parse(at) && !withinHours(now, hours) ? nextOpen(now, hours) : at;
 }
 
+/** "Later" on an email Sol has lined up: in an hour, or 9 am on the next working day. */
+export type Later = "hour" | "tomorrow";
+
+/** When an email put off by "Later" may go, as an ISO time (still only inside the business's hours). */
+export function laterAt(later: Later, now = new Date()): string {
+  if (later === "hour") return new Date(now.getTime() + 60 * 60_000).toISOString();
+  return marketDateTime(nextWorkingDay(todayInMarket(now)), 9);
+}
+
+/**
+ * When an outbox email goes: the usual time after it was ready, or, when someone put it off, the first open time
+ * from then (8 Nov 2026, Martin: the countdown is the person's to change).
+ */
+export function firesAtFor(item: { createdAt: string; notBefore?: string }, hours: SendHours, now = new Date()): string {
+  if (item.notBefore && !Number.isNaN(Date.parse(item.notBefore))) return nextOpen(new Date(item.notBefore), hours);
+  return sendAt(item.createdAt, hours, now);
+}
+
 /** A clock time in the market as people say it: "10 am", "2:30 pm". */
 function clock(at: Date): string {
   const parts = new Intl.DateTimeFormat("en-AU", {
@@ -186,13 +204,20 @@ function nextWorkingDayOrTomorrow(day: string): string {
 export type OutboxState = "counting" | "waiting" | "held" | "no-email";
 
 /**
- * Where it stands: counting down while its agent is on; waiting for a press while it is off; held when someone held
- * it; no-email when the customer has no address.
+ * Where it stands: counting down while its agent is on, or when a person picked when it goes (In an hour, Tomorrow at
+ * 9: choosing the time is saying send it then); waiting for a press otherwise; held when someone held it; no-email
+ * when the customer has no address.
  */
-export function outboxState(input: { stage: AgentStage | null; held: boolean; hasEmail: boolean; settings: AgentSettings }): OutboxState {
+export function outboxState(input: {
+  stage: AgentStage | null;
+  held: boolean;
+  hasEmail: boolean;
+  settings: AgentSettings;
+  scheduled?: boolean;
+}): OutboxState {
   if (!input.hasEmail) return "no-email";
   if (input.held) return "held";
-  return agentOn(input.settings, input.stage) ? "counting" : "waiting";
+  return input.scheduled || agentOn(input.settings, input.stage) ? "counting" : "waiting";
 }
 
 /** Whether Sol sends it now on his own: counting down, and its time has come. */
