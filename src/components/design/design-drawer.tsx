@@ -216,7 +216,12 @@ export function DesignDrawer(props: {
         >
           <button
             type="button"
-            onClick={() => tool.kind !== "design" && onSwitch(designHref(tool.job!))}
+            onClick={() =>
+              // Already designing: the round brings the Designer view (the home, Sol, the switchboard, the notes) out or away.
+              tool.kind === "design"
+                ? frameEl.current?.contentWindow?.postMessage({ renuablDesign: { side: "designer" } }, window.location.origin)
+                : onSwitch(designHref(tool.job!))
+            }
             aria-pressed={tool.kind === "design"}
             aria-label="Design"
             title="Design"
