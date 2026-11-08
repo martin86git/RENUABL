@@ -660,88 +660,6 @@ function ComposeEmail({
             <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={COMPOSE_LIMITS.subject} className={field} />
           </label>
 
-          {/* The tools for the words: attach, lists and symbols, link, size, then Sol's two on the right. */}
-          <div className="flex flex-wrap items-center gap-0.5 border-b border-line py-1.5">
-            <EmailFormatBar area={area} text={body} setText={setBody} files={files} plus />
-            <div className="relative">
-              <button
-                type="button"
-                className={clsx(tool, linking && "bg-surface-2 text-ink")}
-                title="Make a link of what you've picked"
-                aria-label="Add a link"
-                aria-expanded={Boolean(linking)}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => (linking ? setLinking(null) : openLink())}
-              >
-                <Link2 className="size-4" aria-hidden />
-              </button>
-              {linking && (
-                <div
-                  role="dialog"
-                  aria-label="Add a link"
-                  className="absolute left-0 top-full z-30 mt-1 flex w-80 items-center gap-1.5 rounded-lg border border-line bg-surface p-1.5 shadow-lg"
-                >
-                  <input
-                    autoFocus
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addLink();
-                      }
-                    }}
-                    placeholder="Paste or type the address"
-                    aria-label="Link address"
-                    className={clsx(ui.input, "h-8 min-h-8 flex-1 text-[13px]")}
-                  />
-                  <button type="button" onClick={addLink} className={clsx(ui.primary, "h-8 px-3 text-[13px]")}>
-                    Add
-                  </button>
-                </div>
-              )}
-            </div>
-            <label className="ml-1 flex items-center gap-1 rounded-md px-1.5 text-ink-2 hover:bg-surface-2" title="Text size">
-              <Type className="size-4" aria-hidden />
-              <select
-                value={size}
-                onChange={(e) => setSize(e.target.value as EmailSize)}
-                aria-label="Text size"
-                className="h-8 cursor-pointer bg-transparent text-[13px] text-ink-2 outline-none"
-              >
-                {EMAIL_SIZES.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <span className="ml-auto flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => void sol("polish")}
-                disabled={Boolean(solBusy) || !body.trim()}
-                title="Sol tidies up your words: spelling, grammar, clearer"
-                className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-ink-2 ring-1 ring-line hover:text-ink disabled:text-muted"
-              >
-                <Sparkles className="size-3.5" aria-hidden /> {solBusy === "polish" ? "Polishing…" : "Polish"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setAsking((v) => !v)}
-                aria-expanded={asking}
-                title="Tell Sol what the email should say"
-                aria-label="Ask Sol to write it"
-                className={clsx(
-                  "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium ring-1",
-                  asking ? "bg-primary text-primary-ink ring-primary" : "text-ink-2 ring-line hover:text-ink",
-                )}
-              >
-                <SolIcon className="size-3.5" aria-hidden /> Sol
-              </button>
-            </span>
-          </div>
-
           {asking && (
             <div className="mt-3 rounded-lg bg-sun/60 p-2.5 ring-1 ring-sun-line/25">
               <div className="flex items-start gap-2">
@@ -827,6 +745,88 @@ function ComposeEmail({
           </div>
           <div className="pb-2">
             <EmailFileChips files={files} />
+          </div>
+          {/* The tools along the foot of the words (8 Nov 2026, Martin: under the words, as in Gmail): attach, lists and
+              symbols, link, size, then Sol's two on the right. */}
+          <div className="flex flex-wrap items-center gap-0.5 border-t border-line py-1.5">
+            <EmailFormatBar area={area} text={body} setText={setBody} files={files} plus />
+            <div className="relative">
+              <button
+                type="button"
+                className={clsx(tool, linking && "bg-surface-2 text-ink")}
+                title="Make a link of what you've picked"
+                aria-label="Add a link"
+                aria-expanded={Boolean(linking)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => (linking ? setLinking(null) : openLink())}
+              >
+                <Link2 className="size-4" aria-hidden />
+              </button>
+              {linking && (
+                <div
+                  role="dialog"
+                  aria-label="Add a link"
+                  className="absolute bottom-full left-0 z-30 mb-1 flex w-80 items-center gap-1.5 rounded-lg border border-line bg-surface p-1.5 shadow-lg"
+                >
+                  <input
+                    autoFocus
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addLink();
+                      }
+                    }}
+                    placeholder="Paste or type the address"
+                    aria-label="Link address"
+                    className={clsx(ui.input, "h-8 min-h-8 flex-1 text-[13px]")}
+                  />
+                  <button type="button" onClick={addLink} className={clsx(ui.primary, "h-8 px-3 text-[13px]")}>
+                    Add
+                  </button>
+                </div>
+              )}
+            </div>
+            <label className="ml-1 flex items-center gap-1 rounded-md px-1.5 text-ink-2 hover:bg-surface-2" title="Text size">
+              <Type className="size-4" aria-hidden />
+              <select
+                value={size}
+                onChange={(e) => setSize(e.target.value as EmailSize)}
+                aria-label="Text size"
+                className="h-8 cursor-pointer bg-transparent text-[13px] text-ink-2 outline-none"
+              >
+                {EMAIL_SIZES.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="ml-auto flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => void sol("polish")}
+                disabled={Boolean(solBusy) || !body.trim()}
+                title="Sol tidies up your words: spelling, grammar, clearer"
+                className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-ink-2 ring-1 ring-line hover:text-ink disabled:text-muted"
+              >
+                <Sparkles className="size-3.5" aria-hidden /> {solBusy === "polish" ? "Polishing…" : "Polish"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAsking((v) => !v)}
+                aria-expanded={asking}
+                title="Tell Sol what the email should say"
+                aria-label="Ask Sol to write it"
+                className={clsx(
+                  "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium ring-1",
+                  asking ? "bg-primary text-primary-ink ring-primary" : "text-ink-2 ring-line hover:text-ink",
+                )}
+              >
+                <SolIcon className="size-3.5" aria-hidden /> Sol
+              </button>
+            </span>
           </div>
         </div>
       )}
