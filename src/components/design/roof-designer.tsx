@@ -47,6 +47,8 @@ import {
   Trash2,
   X,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Undo2,
   Zap,
   ZoomIn,
@@ -3765,26 +3767,20 @@ export function RoofDesigner(props: {
   };
 
   return (
-    <div>
+    <div className={clsx(props.tight && "relative")}>
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
           and the address being designed; then which design this is and its quote on the left, and publishing it and
           its proposal on the right. A firmer line under it sets it off from the work below. */}
       <header
         className={clsx(
-          "relative z-40 text-ink",
-          // In the pop-up (8 Nov 2026, Martin: no menu bar, the map taller and wider): one slim row, no card, the window's
-          // close kept clear on the right.
-          props.tight ? "pr-11" : "rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
+          "z-40 text-ink",
+          // In the pop-up (8 Nov 2026, Martin: no menu bar, the map taller and wider; the buttons can run down one side):
+          // a rail of rounds down the left, beside the picture, each saying what it is on hover.
+          props.tight ? "absolute left-0 top-0 w-11" : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
         )}
       >
-        <div
-          className={clsx(
-            "flex flex-wrap items-center gap-y-2",
-            props.tight ? "gap-x-2 py-0.5 xl:flex-nowrap" : "gap-x-5 py-2.5 lg:flex-nowrap",
-          )}
-        >
+        <div className={clsx("flex items-center", props.tight ? "flex-col gap-2" : "flex-wrap gap-x-5 gap-y-2 py-2.5 lg:flex-nowrap")}>
           {props.bar}
-          {props.tight && <span className="flex-1" aria-hidden />}
           <dl
             className={clsx(
               "min-w-0 flex-1 basis-56 items-center gap-x-6 overflow-hidden border-line lg:border-l lg:pl-5",
@@ -3816,31 +3812,37 @@ export function RoofDesigner(props: {
             disabled={saved === "saved" || saved === "saving"}
             title="Save this roof's designs (Ctrl+S). Publishing is separate."
             className={clsx(
-              "inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold ring-1",
+              "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full text-xs font-semibold ring-1",
+              props.tight ? "size-10" : "h-9 px-3.5",
               saved === "saved" || saved === "saving"
                 ? "bg-surface text-muted ring-line"
                 : "bg-ink text-canvas ring-ink hover:brightness-110",
             )}
           >
             {saved === "saved" ? <Check className="size-3.5" aria-hidden /> : <Save className="size-3.5" aria-hidden />}
-            {saved === "saved" ? "Saved" : saved === "saving" ? "Saving…" : "Save"}
-            {saved !== "saved" && saved !== "saving" && (
+            <span className={clsx(props.tight && "sr-only")}>{saved === "saved" ? "Saved" : saved === "saving" ? "Saving…" : "Save"}</span>
+            {!props.tight && saved !== "saved" && saved !== "saving" && (
               <kbd className="rounded border border-current/30 px-1 text-[10px] font-normal opacity-70">Ctrl S</kbd>
             )}
           </button>
           {/* Opened on an earlier visit's unsaved work: said once, with the way back to what is saved. */}
           {resumed && saved !== "saved" && (
             <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-ink">
-              {props.tight ? "Draft" : `Picked up where you left off${keptWhen(resumed) ? ` ${keptWhen(resumed)}` : ""}`}
+              {!props.tight && `Picked up where you left off${keptWhen(resumed) ? ` ${keptWhen(resumed)}` : ""}`}
               <button
                 type="button"
                 onClick={() => {
                   if (!window.confirm("Throw away the unsaved changes and go back to the design as it was last saved?")) return;
                   props.onDiscardDraft?.();
                 }}
-                className="tap-area rounded px-1 text-muted underline underline-offset-2 hover:text-ink"
+                title="Picked up where you left off. Discard the draft and go back to what is saved"
+                className={clsx(
+                  props.tight
+                    ? "flex size-10 items-center justify-center rounded-full bg-sun text-sun-ink ring-1 ring-sun-line/40"
+                    : "tap-area rounded px-1 text-muted underline underline-offset-2 hover:text-ink",
+                )}
               >
-                Discard
+                {props.tight ? <Undo2 className="size-4" aria-label="Discard the draft" /> : "Discard"}
               </button>
             </span>
           )}
@@ -3851,7 +3853,10 @@ export function RoofDesigner(props: {
               setCommandOpen(!commandOpen);
               requestAnimationFrame(() => commandBox.current?.focus());
             }}
-            className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full bg-surface px-3 text-xs font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+            className={clsx(
+              "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-surface text-xs font-medium text-ink-2 ring-1 ring-line hover:text-ink",
+              props.tight ? "size-10" : "h-9 px-3",
+            )}
             title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
           >
             <SolIcon className="size-4" />
@@ -3865,17 +3870,37 @@ export function RoofDesigner(props: {
               onClick={() => setReadyOpen(!readyOpen)}
               aria-expanded={readyOpen}
               className={clsx(
-                "inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-full px-3 text-xs font-semibold ring-1",
+                "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-xs font-semibold ring-1",
+                props.tight ? "size-10" : "h-9 px-3",
                 light.ready ? "bg-positive-soft text-positive ring-positive/30" : "bg-sun text-sun-ink ring-sun-line/40",
               )}
-              title="Every check the design must clear before it goes to site"
+              title={
+                light.ready
+                  ? "Ready to install: every check the design must clear before it goes to site"
+                  : `${light.fix} to fix${light.check ? `, ${light.check} to check` : ""}: every check the design must clear before it goes to site`
+              }
             >
-              <span className={clsx("size-2 rounded-full", light.ready ? "bg-positive" : "bg-sun-line")} aria-hidden />
-              {light.ready ? "Ready to install" : `${light.fix} to fix`}
-              {light.check > 0 && <span className="font-normal opacity-80">· {light.check} to check</span>}
+              {props.tight ? (
+                light.ready ? (
+                  <Check className="size-4" aria-hidden />
+                ) : (
+                  <span className="tabular-nums">{light.fix}</span>
+                )
+              ) : (
+                <>
+                  <span className={clsx("size-2 rounded-full", light.ready ? "bg-positive" : "bg-sun-line")} aria-hidden />
+                  {light.ready ? "Ready to install" : `${light.fix} to fix`}
+                  {light.check > 0 && <span className="font-normal opacity-80">· {light.check} to check</span>}
+                </>
+              )}
             </button>
             {readyOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-[24rem] max-w-[85vw] rounded-lg bg-surface p-3 shadow-lift ring-1 ring-line">
+              <div
+                className={clsx(
+                  "absolute z-50 w-[24rem] max-w-[85vw] rounded-lg bg-surface p-3 shadow-lift ring-1 ring-line",
+                  props.tight ? "left-full top-0 ml-2" : "right-0 top-full mt-2",
+                )}
+              >
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Ready to install</p>
                 <ul className="mt-2 space-y-1.5">
                   {ready.map((item) => (
@@ -3924,12 +3949,13 @@ export function RoofDesigner(props: {
                   : "Make the open design the primary: the one priced on the deal and sent first"
               }
               className={clsx(
-                "inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-sm font-medium ring-1",
+                "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium ring-1",
+                props.tight ? "size-10 rounded-full" : "h-10 rounded-md px-3",
                 active === primary ? "bg-sun text-sun-ink ring-sun-line/30" : "bg-surface text-ink ring-line hover:ring-ink/40",
               )}
             >
               <Star className={clsx("size-4", active === primary ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
-              {active === primary ? "Primary" : "Make primary"}
+              <span className={clsx(props.tight && "sr-only")}>{active === primary ? "Primary" : "Make primary"}</span>
             </button>
           )}
           {/* Which of the roof's designs is open: here in the bar, off the picture. */}
@@ -3941,18 +3967,22 @@ export function RoofDesigner(props: {
               title={`Design ${active + 1} of ${designs.length}${active === primary ? " (primary)" : ""}${designLabel.trim() ? `: ${designLabel.trim()}` : ""}`}
               aria-label={`Designs: design ${active + 1} of ${designs.length}`}
               className={clsx(
-                "inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-md border px-3 text-sm font-medium tabular-nums",
+                "inline-flex items-center justify-center gap-2 whitespace-nowrap border font-medium tabular-nums",
+                props.tight ? "size-10 flex-col gap-0 rounded-full text-[10px] leading-none" : "h-10 rounded-md px-3 text-sm",
                 menu === "designs" ? "border-primary bg-surface-2 text-ink" : "border-line bg-surface text-ink hover:border-forest",
               )}
             >
-              <Layers className="size-4" aria-hidden />
-              <span>
-                Design {active + 1} of {designs.length}
-              </span>
-              {active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-hidden />}
+              <Layers className={clsx(props.tight ? "size-3.5" : "size-4")} aria-hidden />
+              <span>{props.tight ? `${active + 1}/${designs.length}` : `Design ${active + 1} of ${designs.length}`}</span>
+              {!props.tight && active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-hidden />}
             </button>
             {menu === "designs" && (
-              <div className="absolute left-0 top-full z-40 mt-2 max-h-[70vh] w-[24rem] max-w-[85vw] overflow-y-auto shadow-lift space-y-3 rounded-lg border border-line bg-surface p-3">
+              <div
+                className={clsx(
+                  "absolute z-40 max-h-[70vh] w-[24rem] max-w-[85vw] space-y-3 overflow-y-auto rounded-lg border border-line bg-surface p-3 shadow-lift",
+                  props.tight ? "left-full top-0 ml-2" : "left-0 top-full mt-2",
+                )}
+              >
                 <ul className="space-y-1.5">
                   {everyDesign().map((d, i) => {
                     const sum = designSummary(d);
@@ -4068,7 +4098,7 @@ export function RoofDesigner(props: {
               </div>
             )}
           </div>
-          <span className="hidden flex-1 lg:block" aria-hidden />
+          {!props.tight && <span className="hidden flex-1 lg:block" aria-hidden />}
           {/* Share live: the customer watches the design on their phone during the call, and says which they'd like. */}
           <div className="relative">
             <button
@@ -4087,7 +4117,12 @@ export function RoofDesigner(props: {
               {live ? (liveChoice !== null ? "Chosen" : "Live") : null}
             </button>
             {liveOpen && (
-              <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line">
+              <div
+                className={clsx(
+                  "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
+                  props.tight ? "left-full top-0 ml-2" : "right-0 top-12",
+                )}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-sm font-medium text-ink">Design it live with the customer</p>
                   <button type="button" onClick={() => setLiveOpen(false)} aria-label="Close" className="text-muted hover:text-ink">
@@ -4173,27 +4208,47 @@ export function RoofDesigner(props: {
                     setNoDealOpen(!noDealOpen);
                   }}
                   aria-expanded={noDealOpen}
-                  className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md bg-surface-2 px-4 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+                  title="Publish: put it on a deal first"
+                  className={clsx(
+                    "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap bg-surface-2 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink",
+                    props.tight ? "size-10 rounded-full" : "h-10 rounded-md px-4",
+                  )}
                 >
-                  <Send className="size-4" aria-hidden /> Publish · put it on a deal first
+                  <Send className="size-4" aria-hidden />{" "}
+                  <span className={clsx(props.tight && "sr-only")}>Publish · put it on a deal first</span>
                 </button>
               ) : (
                 <button
                   onClick={() => (props.onNote ? setSending(!sending) : void publish())}
                   aria-expanded={props.onNote ? sending : undefined}
                   disabled={saved === "saving" || publishing}
-                  className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+                  title="Publish design: saves it and brings the customer's proposal up to date"
+                  className={clsx(
+                    "inline-flex items-center justify-center gap-2 bg-primary text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted",
+                    props.tight ? "size-10 rounded-full" : "h-10 rounded-md px-5",
+                  )}
                 >
-                  <Send className="size-4" aria-hidden /> {publishing ? "Publishing…" : "Publish design"}
+                  <Send className="size-4" aria-hidden />{" "}
+                  <span className={clsx(props.tight && "sr-only")}>{publishing ? "Publishing…" : "Publish design"}</span>
                 </button>
               )}
               {noDealOpen && props.noDeal && (
-                <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line">
+                <div
+                  className={clsx(
+                    "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
+                    props.tight ? "bottom-0 left-full ml-2" : "right-0 top-12",
+                  )}
+                >
                   {props.noDeal}
                 </div>
               )}
               {sending && props.onNote && (
-                <div className="absolute right-0 top-12 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line">
+                <div
+                  className={clsx(
+                    "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
+                    props.tight ? "bottom-0 left-full ml-2" : "right-0 top-12",
+                  )}
+                >
                   <p className="text-sm font-medium text-ink">Send the proposal{props.customerName ? ` to ${props.customerName}` : ""}</p>
                   <p className="mt-0.5 text-xs text-muted">
                     Your note goes in their chat on the proposal, and by email when replies are emailed. It is kept on the deal.
@@ -4240,58 +4295,88 @@ export function RoofDesigner(props: {
         </div>
       </header>
 
-      <div className={clsx("relative", props.tight ? "mt-2" : "mt-5")}>
+      <div className={clsx("relative", props.tight ? "pl-14 pr-11" : "mt-5")}>
         <div className="min-w-0">
           <div>
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
                   that does to this home's bill. Each has one large figure in the same place every time, with its detail under it. */}
             <section
               ref={stripBox}
-              className="relative z-30 mx-auto mb-2 flex flex-wrap items-stretch rounded-lg bg-primary text-white"
+              className={clsx(
+                "relative z-30 mx-auto flex items-stretch rounded-lg bg-primary text-white",
+                props.tight ? "mb-1.5 flex-nowrap" : "mb-2 flex-wrap",
+              )}
               style={{ maxWidth: fit }}
               aria-label="This design in figures"
             >
               {/* Three boxes (1 Nov 2026, Martin, as Primero's): Solar (kW and panels, with the daily yield beside them), Battery
                   (kWh and modules), then what it does for this home on white, so the money reads apart from the system. */}
-              <div className="relative flex flex-[1.2] items-center justify-around gap-6 border-r border-white/15 px-5 py-1">
-                <div>
-                  <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-sun-bright">Solar</p>
-                  <p className="whitespace-nowrap leading-tight">
-                    <span className="text-xl font-semibold tabular-nums tracking-[-0.02em] text-sun-bright">{summary.kw.toFixed(2)}</span>
-                    <span className="ml-1 text-xs text-white/60">kW</span>
-                  </p>
-                  <p className="whitespace-nowrap text-xs leading-tight tabular-nums text-white/60">
-                    {summary.panels} {summary.panels === 1 ? "panel" : "panels"} of {panelOf(design).watts} W
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/60">Daily yield</p>
-                  <p className="whitespace-nowrap leading-tight">
-                    <span className="text-xl font-semibold tabular-nums tracking-[-0.02em]">{summary.kwhPerDay}</span>
-                    <span className="ml-1 text-xs text-white/60">kWh</span>
-                  </p>
-                  <p
-                    className={clsx(
-                      "whitespace-nowrap text-xs tabular-nums",
-                      oversize?.over ? "font-medium text-sun-bright" : "text-white/60",
-                    )}
+              {props.tight ? (
+                <div className="flex shrink-0 items-center gap-4 border-r border-white/15 px-3.5 py-1.5 text-xs tabular-nums text-white/60">
+                  <span className="whitespace-nowrap" title={`${summary.panels} panels of ${panelOf(design).watts} W`}>
+                    <b className="text-[15px] font-semibold text-sun-bright">{summary.kw.toFixed(2)}</b> kW · {summary.panels} ×{" "}
+                    {panelOf(design).watts} W
+                  </span>
+                  <span
+                    className={clsx("whitespace-nowrap", oversize?.over && "text-sun-bright")}
+                    title={
+                      fitted.length ? `${fittedKw} kW of inverter${oversize ? `, panels ${oversize.percent}%` : ""}` : "No inverter chosen"
+                    }
                   >
-                    {fitted.length ? `${fittedKw} kW of inverter${oversize ? ` · panels ${oversize.percent}%` : ""}` : "no inverter chosen"}
-                  </p>
+                    <b className="text-[15px] font-semibold text-white">{summary.kwhPerDay}</b> kWh/day
+                  </span>
+                  <span className="whitespace-nowrap" title={battery ? `${battery.qty} modules` : "No battery"}>
+                    <b className="text-[15px] font-semibold text-white">{battery ? batteryKwh : "–"}</b>{" "}
+                    {battery ? "kWh battery" : "no battery"}
+                  </span>
                 </div>
-              </div>
-              <div className="relative flex flex-[0.6] flex-col justify-center border-r border-white/15 px-4 py-1">
-                <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-sun-bright">Battery</p>
-                <p className="whitespace-nowrap leading-tight">
-                  <span className="text-xl font-semibold tabular-nums tracking-[-0.02em]">{battery ? batteryKwh : "–"}</span>
-                  <span className="ml-1 text-xs text-white/60">{battery ? "kWh" : "no battery"}</span>
-                </p>
-                {battery && (
-                  <p className="whitespace-nowrap text-xs leading-tight tabular-nums text-white/60">
-                    {battery.qty} {battery.qty === 1 ? "module" : "modules"}
-                  </p>
-                )}
-              </div>
+              ) : (
+                <>
+                  <div className="relative flex flex-[1.2] items-center justify-around gap-6 border-r border-white/15 px-5 py-1">
+                    <div>
+                      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-sun-bright">Solar</p>
+                      <p className="whitespace-nowrap leading-tight">
+                        <span className="text-xl font-semibold tabular-nums tracking-[-0.02em] text-sun-bright">
+                          {summary.kw.toFixed(2)}
+                        </span>
+                        <span className="ml-1 text-xs text-white/60">kW</span>
+                      </p>
+                      <p className="whitespace-nowrap text-xs leading-tight tabular-nums text-white/60">
+                        {summary.panels} {summary.panels === 1 ? "panel" : "panels"} of {panelOf(design).watts} W
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/60">Daily yield</p>
+                      <p className="whitespace-nowrap leading-tight">
+                        <span className="text-xl font-semibold tabular-nums tracking-[-0.02em]">{summary.kwhPerDay}</span>
+                        <span className="ml-1 text-xs text-white/60">kWh</span>
+                      </p>
+                      <p
+                        className={clsx(
+                          "whitespace-nowrap text-xs tabular-nums",
+                          oversize?.over ? "font-medium text-sun-bright" : "text-white/60",
+                        )}
+                      >
+                        {fitted.length
+                          ? `${fittedKw} kW of inverter${oversize ? ` · panels ${oversize.percent}%` : ""}`
+                          : "no inverter chosen"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="relative flex flex-[0.6] flex-col justify-center border-r border-white/15 px-4 py-1">
+                    <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-sun-bright">Battery</p>
+                    <p className="whitespace-nowrap leading-tight">
+                      <span className="text-xl font-semibold tabular-nums tracking-[-0.02em]">{battery ? batteryKwh : "–"}</span>
+                      <span className="ml-1 text-xs text-white/60">{battery ? "kWh" : "no battery"}</span>
+                    </p>
+                    {battery && (
+                      <p className="whitespace-nowrap text-xs leading-tight tabular-nums text-white/60">
+                        {battery.qty} {battery.qty === 1 ? "module" : "modules"}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
               {/* What it does for this home. Until the customer's bill is in, this part asks for it; once it is, the part
                   shows what the bill works out to, and a press on it opens the bill again. */}
               <div className="relative min-w-0 flex-[2.4] rounded-r-lg bg-surface text-ink" data-menu-host>
@@ -4311,7 +4396,8 @@ export function RoofDesigner(props: {
                     openMenu(menu === "bill" ? false : "bill");
                   }}
                   className={clsx(
-                    "h-full cursor-pointer rounded-r-lg px-3.5 py-1.5",
+                    "h-full cursor-pointer rounded-r-lg",
+                    props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
                     // Red until the bill is in (as Primero's: it was easy to skip past), since saving and payback wait on it.
                     finance ? "hover:bg-surface-2" : "bg-danger/10 ring-2 ring-inset ring-danger hover:bg-danger/15",
                   )}
@@ -4320,12 +4406,38 @@ export function RoofDesigner(props: {
                     className={clsx(
                       "flex items-center gap-1.5 text-[9px] font-medium uppercase tracking-[0.2em]",
                       finance ? "text-muted" : "text-danger",
+                      props.tight && "hidden",
                     )}
                   >
                     {!finance && <span className="size-1.5 animate-ping rounded-full bg-danger" aria-hidden />}
                     For this home{!finance && " · Needed"}
                   </p>
-                  {finance ? (
+                  {finance && props.tight ? (
+                    <p
+                      className="flex items-center gap-3 whitespace-nowrap text-xs tabular-nums text-muted"
+                      title="What it does for this home: open the bill"
+                    >
+                      <span>
+                        Bill{" "}
+                        <b className="text-[14px] font-semibold text-ink">
+                          {dollars(finance.billNow)} → {dollars(finance.billAfter)}
+                        </b>
+                      </span>
+                      <span>
+                        Saves <b className="text-[14px] font-semibold text-positive">{dollars(finance.saving)}</b>/yr
+                      </span>
+                      <span>
+                        Payback{" "}
+                        <b className="text-[14px] font-semibold text-ink">
+                          {net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–"}
+                        </b>
+                      </span>
+                    </p>
+                  ) : !finance && props.tight ? (
+                    <p className="flex items-center gap-2 whitespace-nowrap text-[13px] font-semibold text-danger">
+                      <ReceiptText className="size-4 shrink-0" aria-hidden /> Add the customer&apos;s bill
+                    </p>
+                  ) : finance ? (
                     <dl className="mt-0.5 flex gap-x-4">
                       {(
                         [
@@ -6126,6 +6238,40 @@ export function RoofDesigner(props: {
                 )
               )}
 
+              {/* Flicking through the roof's designs, on the map itself (8 Nov 2026, Martin), under the kit. */}
+              {designs.length > 1 && (
+                <div
+                  className={clsx(GLASS, "absolute left-1/2 top-[4.9rem] z-10 flex -translate-x-1/2 items-center gap-0.5 p-1")}
+                  role="group"
+                  aria-label="Designs on this roof"
+                >
+                  <button
+                    type="button"
+                    onClick={() => show(everyDesign(), (active - 1 + designs.length) % designs.length)}
+                    aria-label="The design before"
+                    className="flex size-7 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink"
+                  >
+                    <ChevronLeft className="size-4" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openMenu(menu === "designs" ? false : "designs")}
+                    title="Every design on this roof"
+                    className="flex h-7 items-center gap-1 whitespace-nowrap rounded-full px-2 text-xs font-semibold tabular-nums text-ink hover:bg-surface"
+                  >
+                    Design {active + 1} of {designs.length}
+                    {active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-label="primary" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => show(everyDesign(), (active + 1) % designs.length)}
+                    aria-label="The next design"
+                    className="flex size-7 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink"
+                  >
+                    <ChevronRight className="size-4" aria-hidden />
+                  </button>
+                </div>
+              )}
               {/* The system, centred along the top of the picture, as three rounds: the panel, the largest, in the middle, with
                   the inverter and the battery as half-rounds growing out of it either side. Each opens its choices
                   beneath, centred under the three. (Which design is open is in the bar at the top of the page, and
@@ -7261,7 +7407,7 @@ export function RoofDesigner(props: {
                 </div>
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className={clsx("flex flex-wrap items-center gap-2", props.tight ? "mt-1" : "mt-3")}>
               {/* In the pop-up the tool's hint goes (its name and keys are on the tool itself), so the picture fits the window. */}
               {!props.tight && (
                 <>

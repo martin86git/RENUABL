@@ -20,7 +20,7 @@ export default async function DesignRoofPage({ searchParams }: PageProps<"/desig
     <DesignShell bare={embed}>
       <Suspense>
         {embed ? (
-          <div className="px-3 pt-3 sm:px-4">
+          <div className="px-3 pt-2 sm:px-4">
             <DesignStudio />
           </div>
         ) : (

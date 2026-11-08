@@ -289,7 +289,7 @@ export function DesignStudio() {
 
   if (roof && work && image)
     return (
-      <div className="theme-studio pb-10">
+      <div className={popped ? "theme-studio" : "theme-studio pb-10"}>
         {jobId && askId && <DesignBrief jobId={jobId} askId={askId} />}
         <RoofDesigner
           // A different roof is a different designer: nothing from the last one carries over.
@@ -435,11 +435,27 @@ export function DesignStudio() {
                     if (unsaved.current && !window.confirm("This design has changes that aren't saved. Leave it and lose them?")) return;
                     router.push(`/design/deals/${onJob.id}`);
                   }}
-                  className="inline-flex max-w-52 shrink-0 items-center gap-1.5 rounded-full bg-sun-line px-3 py-1.5 text-[13px] font-medium text-white hover:brightness-105"
-                  title="Open the deal"
+                  className={
+                    popped
+                      ? "flex size-10 shrink-0 items-center justify-center rounded-full bg-sun-line text-[13px] font-semibold text-white hover:brightness-105"
+                      : "inline-flex max-w-52 shrink-0 items-center gap-1.5 rounded-full bg-sun-line px-3 py-1.5 text-[13px] font-medium text-white hover:brightness-105"
+                  }
+                  title={`${onJob.customerName}: open the deal`}
                 >
-                  <span className="truncate">{onJob.customerName}</span>
-                  <span className="shrink-0 text-white/80">· Open deal</span>
+                  {popped ? (
+                    // In the pop-up's rail, their initials.
+                    onJob.customerName
+                      .split(/s+/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((w) => w[0]!.toUpperCase())
+                      .join("")
+                  ) : (
+                    <>
+                      <span className="truncate">{onJob.customerName}</span>
+                      <span className="shrink-0 text-white/80">· Open deal</span>
+                    </>
+                  )}
                 </button>
               )}
               {/* Another roof, without leaving the designer; in the pop-up behind a round, for the odd wrong address. */}
@@ -456,7 +472,7 @@ export function DesignStudio() {
                     <MapPin className="size-4" aria-hidden />
                   </button>
                   {finding && (
-                    <div className="absolute left-0 top-11 z-50 w-80 rounded-lg bg-surface p-2 shadow-lift ring-1 ring-line">
+                    <div className="absolute left-full top-0 z-50 ml-2 w-80 rounded-lg bg-surface p-2 shadow-lift ring-1 ring-line">
                       <AddressEntry compact placeholder="The right address" onPick={pick} />
                     </div>
                   )}
