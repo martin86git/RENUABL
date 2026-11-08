@@ -4,8 +4,9 @@ import clsx from "clsx";
 import { Check, Loader2, Mic, NotebookPen, Square, X } from "lucide-react";
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { createPortal } from "react-dom";
-import { MIN_WORDS, wordsIn, type CallNotes, type HeardLine } from "@/lib/domain/design/call-notes";
+import { MIN_WORDS, pointsDue, wordsIn, type CallNotes, type HeardLine } from "@/lib/domain/design/call-notes";
 import { MAX_REMIND_DAYS, type DetailChange } from "@/lib/domain/design/prepared";
+import { callPoints } from "@/lib/services/call-points";
 import { writeUpCall } from "@/lib/services/crm";
 import { PREPARED_CHANGED, applyCall } from "@/lib/services/prepared";
 import { SolIcon } from "./sol-icon";
@@ -17,8 +18,10 @@ const stamp = () => new Date().toLocaleTimeString("en-AU", { hour: "numeric", mi
  * The call note-taker on a deal (1 Nov 2026, Martin: Primero's copied across, wave 7). "Note-taker" switches the
  * computer's microphone on for a call taken on the phone: the browser's own speech recognition turns the member's side
  * into words in the page (Chrome and Edge send the sound to Google or Microsoft for that; nothing is recorded or kept).
- * A dark bar at the foot shows what is heard, with Add a note (what is said until Note done is marked as a note), a
- * box to type one, and End and write up: Claude distils it, the member checks the notes and adds them to the deal.
+ * A dark bar at the foot shows the salient points so far (8 Nov 2026, Martin: summarised as it listens, not dictated
+ * word for word; the words themselves behind "What was heard"), with Add a note (what is said until Note done is
+ * marked as a note), a box to type one, and End and write up: Claude arranges it under Design, Proposal, Price, Next
+ * step and To check, the member checks the notes and adds them to the deal.
  */
 /** Starts the note-taker from elsewhere on the page: the deal's call button (8 Nov 2026, Martin). */
 export interface NotetakerHandle {
@@ -59,6 +62,17 @@ export function CallNotetaker({
   const [recapOn, setRecapOn] = useState(false);
   const [recapOpen, setRecapOpen] = useState(false);
   const [done, setDone] = useState<string[]>([]);
+  // Live points (call-notes.ts `pointsDue`): asked again as the call goes, one ask out at a time.
+  const [points, setPoints] = useState<string[]>([]);
+  const [pointsNote, setPointsNote] = useState<string | null>(null);
+  const [pointsOff, setPointsOff] = useState(false);
+  const ask = useRef({ pending: false, wordsAtLast: 0, at: 0, round: 0 });
+  const linesRef = useRef(lines);
+  const pointsRef = useRef(points);
+  useEffect(() => {
+    linesRef.current = lines;
+    pointsRef.current = points;
+  }, [lines, points]);
   const rec = useRef<Recognition | null>(null);
   const live = useRef(false);
   const notingRef = useRef(noting);
@@ -117,14 +131,51 @@ export function CallNotetaker({
     setLines([]);
     setNotes("");
     setProblem(null);
+    setPoints([]);
+    setPointsNote(null);
+    setPointsOff(false);
+    ask.current = { pending: false, wordsAtLast: 0, at: Date.now(), round: ask.current.round + 1 };
     setState("listening");
     setOn(true);
     listen();
   };
   const close = () => {
     stopListening();
+    ask.current.round += 1;
     setOn(false);
   };
+
+  // Sum the call up again every so often while listening: after enough new words and long enough since the last ask
+  // (`pointsDue`), never while one is out. A tick looks again when the words stop, so the last few still get in.
+  const listening = on && state === "listening" && !pointsOff;
+  useEffect(() => {
+    if (!listening) return;
+    const look = () => {
+      const a = ask.current;
+      const now = linesRef.current;
+      const words = wordsIn(now);
+      if (!pointsDue({ words, wordsAtLast: a.wordsAtLast, msSinceLast: Date.now() - a.at, pending: a.pending })) return;
+      const round = a.round;
+      a.pending = true;
+      a.wordsAtLast = words;
+      a.at = Date.now();
+      void callPoints(jobId, now, pointsRef.current).then((res) => {
+        if (ask.current.round !== round) return; // A call closed or started again since: drop it.
+        ask.current.pending = false;
+        ask.current.at = Date.now();
+        if (res.ok) {
+          setPoints(res.points);
+          setPointsNote(null);
+        } else {
+          setPointsNote(res.message);
+          if (!res.again) setPointsOff(true);
+        }
+      });
+    };
+    look();
+    const tick = window.setInterval(look, 4_000);
+    return () => window.clearInterval(tick);
+  }, [listening, lines, jobId]);
   useImperativeHandle(handle, () => ({
     start: () => {
       if (!supported) return false;
@@ -213,7 +264,7 @@ export function CallNotetaker({
                       : "Added to the deal"}
               </p>
               {phone && state === "listening" && (
-                <a href={`tel:${phone.replace(/s/g, "")}`} className="hidden text-sm text-white/80 sm:inline">
+                <a href={`tel:${phone.replace(/\s/g, "")}`} className="hidden text-sm text-white/80 sm:inline">
                   Ring <span className="font-medium tabular-nums text-white">{phone}</span> on your phone, held to your ear
                 </a>
               )}
@@ -229,19 +280,50 @@ export function CallNotetaker({
             {state === "listening" && (
               <>
                 <p className="mt-1 text-xs text-white/60">
-                  Take the call on your phone, to your ear or on a headset, never on speaker: this hears your side only. Nothing is
-                  recorded.
+                  Take the call on your phone, to your ear or on a headset, never on speaker: this hears your side only. Nothing is recorded
+                  or kept.
                 </p>
-                <div className="mt-3 max-h-28 overflow-y-auto rounded-lg bg-white/5 px-3 py-2 text-sm text-white/85">
-                  {lines.slice(-6).map((l, i) => (
-                    <p key={i} className={clsx(l.note && "text-sun-line")}>
-                      {l.note ? (l.design ? "Design note: " : "Note: ") : ""}
-                      {l.text}
-                    </p>
-                  ))}
-                  {hearing && <p className="text-white/50">{hearing}</p>}
-                  {!lines.length && !hearing && <p className="text-white/50">Nothing heard yet.</p>}
-                </div>
+                {pointsOff || (pointsNote && !points.length) ? (
+                  // No live points to be had: the words as heard, as before, and why.
+                  <HeardWords lines={lines} hearing={hearing} className="mt-3 max-h-28" />
+                ) : (
+                  <div className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-sm text-white/85" aria-live="polite">
+                    {points.length ? (
+                      <>
+                        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
+                          <SolIcon className="size-3.5 text-sun-line" aria-hidden /> So far
+                        </p>
+                        <ul className="mt-1 space-y-0.5">
+                          {points.map((p) => (
+                            <li key={p} className="flex gap-2">
+                              <span className="mt-[0.55em] size-1 shrink-0 rounded-full bg-sun-line" aria-hidden />
+                              <span>{p}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : (
+                      <p className="text-white/50">Listening…</p>
+                    )}
+                    {lines
+                      .filter((l) => l.note)
+                      .slice(-2)
+                      .map((l, i) => (
+                        <p key={i} className="mt-1 text-sun-line">
+                          {l.design ? "Design note: " : "Note: "}
+                          {l.text}
+                        </p>
+                      ))}
+                    {noting && hearing && <p className="mt-1 text-white/50">{hearing}</p>}
+                  </div>
+                )}
+                {pointsNote && <p className="mt-1.5 text-xs text-white/60">{pointsNote}</p>}
+                {!pointsOff && !(pointsNote && !points.length) && (
+                  <details className="mt-2 text-xs text-white/60">
+                    <summary className="cursor-pointer select-none hover:text-white/80">What was heard</summary>
+                    <HeardWords lines={lines} hearing={hearing} className="mt-1.5 max-h-32" />
+                  </details>
+                )}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {(["general", "design"] as const).map((k) => (
                     <button
@@ -277,7 +359,8 @@ export function CallNotetaker({
             )}
             {state === "writing" && (
               <p className="mt-3 flex items-center gap-2 text-sm text-white/70">
-                <Loader2 className="size-4 animate-spin" aria-hidden /> Sol is distilling the call into notes.
+                <Loader2 className="size-4 animate-spin" aria-hidden /> Sol is arranging the call into Design, Proposal, Price and Next
+                step.
               </p>
             )}
             {state === "ready" && (
@@ -329,6 +412,22 @@ export function CallNotetaker({
           document.body,
         )}
     </>
+  );
+}
+
+/** The words as heard, latest last: shown when there are no live points, else behind "What was heard". */
+function HeardWords({ lines, hearing, className }: { lines: HeardLine[]; hearing: string; className?: string }) {
+  return (
+    <div className={clsx("overflow-y-auto rounded-lg bg-white/5 px-3 py-2 text-sm text-white/85", className)}>
+      {lines.slice(-30).map((l, i) => (
+        <p key={i} className={clsx(l.note && "text-sun-line")}>
+          {l.note ? (l.design ? "Design note: " : "Note: ") : ""}
+          {l.text}
+        </p>
+      ))}
+      {hearing && <p className="text-white/50">{hearing}</p>}
+      {!lines.length && !hearing && <p className="text-white/50">Nothing heard yet.</p>}
+    </div>
   );
 }
 
