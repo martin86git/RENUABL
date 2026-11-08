@@ -102,3 +102,26 @@ export function solPlain(text: string): string {
     .map((l) => l.replace(KEY, "").replace(ASK, ""))
     .join("\n");
 }
+
+/**
+ * A question of Sol's that a Yes or a No answers (8 Nov 2026, Martin: his questions had no way to be answered): it
+ * opens the way such questions do and offers no choice between things ("this or that?").
+ */
+export function isYesNoQuestion(question: string): boolean {
+  const q = question.trim().replace(/^[^A-Za-z]+/, "");
+  if (!q.endsWith("?")) return false;
+  if (/\bor\b/i.test(q)) return false;
+  return /^(do|does|did|want|shall|should|can|could|would|will|is|are|was|were|have|has|may|happy|ok|okay)\b/i.test(q);
+}
+
+/**
+ * What goes to Sol when a question of his is answered from his message (a Yes, a No or a reply typed to it): the
+ * question named, so he knows which one even from earlier in the chat. The chat shows only the answer.
+ */
+export function answerFor(question: string, answer: string): string {
+  const q = question
+    .trim()
+    .replace(/^\?\s+/, "")
+    .slice(0, 300);
+  return `Answering your question "${q}": ${answer.trim()}`;
+}

@@ -9,7 +9,8 @@ import { SolBadge } from "./sol-icon";
 import { SolSources } from "./sol-sources";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDesignView } from "./sol-design-view";
-import { SolText } from "./sol-text";
+import { SolText, type OnAnswer } from "./sol-text";
+import { answerFor } from "@/lib/domain/design/sol-format";
 
 /** What the empty thread offers to ask, all answered from this deal. */
 const STARTERS = [
@@ -27,6 +28,9 @@ const STARTERS = [
 export function DealSol({ jobId, name }: { jobId: string; name: string }) {
   const [turns, setTurns] = useState<SolTurn[] | null>(null);
   const [text, setText] = useState("");
+  // A question of Sol's being answered in the box: named in what goes to him, the chat shows only the answer.
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
   const [heard, setHeard] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
@@ -52,17 +56,26 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
     end.current?.scrollIntoView({ block: "end" });
   }, [thread.length]);
 
-  const send = async (words: string) => {
-    const q = words.trim();
-    if (!q || busy) return;
+  const send = async (words: string, about: string | null = null) => {
+    const typed = words.trim();
+    if (!typed || busy) return;
+    const q = about ? answerFor(about, typed) : typed;
     setBusy(true);
     setProblem("");
-    const r = await askSol(`${dealTag({ id: jobId, name })}\n${q}`, []);
+    const r = await askSol(`${dealTag({ id: jobId, name })}\n${q}`, [], null, false, about ? typed : undefined);
     setBusy(false);
     if (!r.ok) return setProblem(r.message);
     setText("");
+    setReplyTo(null);
     setTurns(r.state.turns);
     window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
+  };
+
+  /** A Yes or No goes straight to Sol; Reply answers the question in the box. */
+  const answer: OnAnswer = (question, yes) => {
+    if (yes) return void send(yes, question);
+    setReplyTo(question);
+    field.current?.focus();
   };
 
   return (
@@ -101,7 +114,7 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
               </p>
             ) : (
               <div className="max-w-[90%] rounded-2xl bg-canvas px-3 py-2 text-ink [overflow-wrap:anywhere]">
-                <SolText text={t.text} />
+                <SolText text={t.text} onAnswer={busy ? undefined : answer} />
               </div>
             )}
             {t.role === "sol" && (
@@ -133,20 +146,31 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
         <div ref={end} />
       </div>
       {problem && <p className="px-4 pb-1 text-xs text-danger">{problem}</p>}
+      {replyTo && (
+        <p className="mx-3 mt-1 flex items-start gap-2 rounded-xl bg-canvas px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
+          <span className="min-w-0 flex-1">
+            Replying to <span className="font-medium text-ink">{replyTo}</span>
+          </span>
+          <button type="button" onClick={() => setReplyTo(null)} className="shrink-0 hover:text-ink">
+            Cancel
+          </button>
+        </p>
+      )}
       <form
         className="flex items-end gap-2 border-t border-line p-3"
         onSubmit={(e) => {
           e.preventDefault();
-          void send(text);
+          void send(text, replyTo);
         }}
       >
         <textarea
+          ref={field}
           value={heard ? withSpoken(text, heard) : text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              void send(text);
+              void send(text, replyTo);
             }
           }}
           rows={1}

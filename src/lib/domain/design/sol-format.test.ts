@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LONG_PARAGRAPH, brokenUp, solBlocks, solPlain } from "./sol-format";
+import { LONG_PARAGRAPH, answerFor, brokenUp, isYesNoQuestion, solBlocks, solPlain } from "./sol-format";
 import { MORE_DETAIL } from "./sol-charts";
 
 describe("Sol's answers laid out", () => {
@@ -58,5 +58,23 @@ describe("Sol's answers laid out", () => {
 
   it("takes the marks off for copying", () => {
     expect(solPlain("! Key point\n? A question?\n- item")).toBe("Key point\nA question?\n- item");
+  });
+});
+
+describe("answering Sol's questions", () => {
+  it("knows a yes or no question", () => {
+    expect(isYesNoQuestion("Want me to do that swap now?")).toBe(true);
+    expect(isYesNoQuestion("Do you want me to open Settings, Product datasheets for you?")).toBe(true);
+    expect(isYesNoQuestion("Shall I draft a reply to him?")).toBe(true);
+  });
+
+  it("isn't fooled by an open question or a choice", () => {
+    expect(isYesNoQuestion("Which customer is the case for?")).toBe(false);
+    expect(isYesNoQuestion("Do you want the 10 kW or the 13 kW design?")).toBe(false);
+    expect(isYesNoQuestion("Want me to do that swap now")).toBe(false);
+  });
+
+  it("names the question in what goes to Sol", () => {
+    expect(answerFor("Want me to do that swap now?", "Yes")).toBe('Answering your question "Want me to do that swap now?": Yes');
   });
 });

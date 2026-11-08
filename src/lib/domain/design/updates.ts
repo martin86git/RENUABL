@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Sol",
+    words: "Sol's questions can be answered where they are: Yes or No in one press, or Reply to answer one from earlier in the chat.",
+  },
+  {
+    day: "2026-11-08",
     area: "Design tool",
     words: "The quote stays open until you go back to the design. Its lines run down one side and scroll in their own box.",
   },

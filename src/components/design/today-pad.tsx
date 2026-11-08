@@ -59,7 +59,8 @@ import { ReadyForYou, usePrepared } from "./ready-for-you";
 import { SolBadge, SolIcon, SolMark, SolStars } from "./sol-icon";
 import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
 import { SolDesignView } from "./sol-design-view";
-import { SolText } from "./sol-text";
+import { SolText, type OnAnswer } from "./sol-text";
+import { answerFor } from "@/lib/domain/design/sol-format";
 import { AttachButton, AttachedFiles, solFilesOf, useSolAttach } from "./sol-attach";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolThinking } from "./sol-thinking";
@@ -181,8 +182,11 @@ export function TodayPad(props: {
     setOnFeed(false);
     if (!dayTold) setTurns((t) => [...t, { id: Date.now(), kind: "day" }]);
   };
-  const ask = async (q: string, files: SolFile[] = []) => {
+  // A question of Sol's being answered in the box (8 Nov 2026, Martin): named in what goes to him.
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const ask = async (q: string, files: SolFile[] = [], about: string | null = null) => {
     if (asking) return;
+    setReplyTo(null);
     const id = Date.now();
     setTab("today");
     setOnFeed(false);
@@ -190,7 +194,7 @@ export function TodayPad(props: {
     const shownQ = q + (files.length ? `${q ? "\n" : ""}(Attached: ${files.map((f) => f.name).join(", ")})` : "");
     setTurns((t) => [...t, { id, kind: "ask", q: shownQ, a: null }]);
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
-    const r = await askSol(q, files);
+    const r = await askSol(about ? answerFor(about, q) : q, files, null, false, about ? q : undefined);
     setAsking(false);
     let a: TodayAnswer;
     if (!r.ok) a = { text: r.message, more: false };
@@ -201,6 +205,13 @@ export function TodayPad(props: {
     }
     setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a } : t)));
   };
+  /** A Yes or No goes straight to Sol; Reply answers the question in the box. */
+  const answer: OnAnswer = (question, yes) => {
+    if (yes) return void ask(yes, [], question);
+    setReplyTo(question);
+    window.setTimeout(() => document.getElementById("today-ask")?.focus(), 0);
+  };
+  const askIn = (q: string, files: SolFile[]) => void ask(q, files, replyTo);
   /** Try another answer: his latest answer replaced by a new one to the same question, a different way. */
   const retry = async (id: number) => {
     if (asking) return;
@@ -345,7 +356,7 @@ export function TodayPad(props: {
                       <SolThinking />
                     ) : (
                       <div className="text-[15px] leading-relaxed text-ink">
-                        <Typed text={t.a.text} onDone={follow} />
+                        <Typed text={t.a.text} onDone={follow} onAnswer={asking ? undefined : answer} />
                         {t.a.designs?.length ? (
                           <div className="mt-3 max-w-2xl space-y-3">
                             {t.a.designs.map((d) => (
@@ -430,7 +441,7 @@ export function TodayPad(props: {
                 <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Show me my day
               </button>
             )}
-            <SolBox onAsk={ask} asking={asking} />
+            <SolBox onAsk={askIn} asking={asking} replyTo={replyTo} onStopReply={() => setReplyTo(null)} />
           </div>
         </div>
       )}
@@ -509,7 +520,12 @@ export function SolBox({
   asking,
   id = "today-ask",
   placeholder = "Ask Sol about your deals, your day, or what to say to a customer",
+  replyTo = null,
+  onStopReply,
 }: {
+  /** One of Sol's questions being answered, shown over the box. */
+  replyTo?: string | null;
+  onStopReply?: () => void;
   /** The words, and any PDFs or pictures attached (read for Sol). */
   onAsk: (q: string, files: SolFile[]) => void;
   asking: boolean;
@@ -539,6 +555,16 @@ export function SolBox({
       }}
       className="rounded-[26px] bg-surface p-2 pl-4 text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line"
     >
+      {replyTo && (
+        <p className="mb-1.5 mr-2 flex items-start gap-2 rounded-xl bg-canvas px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
+          <span className="min-w-0 flex-1">
+            Replying to <span className="font-medium text-ink">{replyTo}</span>
+          </span>
+          <button type="button" onClick={onStopReply} className="shrink-0 hover:text-ink">
+            Cancel
+          </button>
+        </p>
+      )}
       <AttachedFiles attach={attach} />
       <div className="flex items-center gap-1.5">
         <SolBadge className="size-5 shrink-0" />
@@ -573,7 +599,18 @@ export function SolBox({
 }
 
 /** Words Sol is writing, a few letters at a time with his caret, then done. Instant with reduced motion. */
-export function Typed({ text, onDone, instant = false }: { text: string; onDone?: () => void; instant?: boolean }) {
+export function Typed({
+  text,
+  onDone,
+  instant = false,
+  onAnswer,
+}: {
+  text: string;
+  onDone?: () => void;
+  instant?: boolean;
+  /** Answering his questions, once he has finished writing. */
+  onAnswer?: OnAnswer;
+}) {
   const [shown, setShown] = useState(0);
   const done = useRef(false);
   const all = instant || shown >= text.length;
@@ -597,6 +634,7 @@ export function Typed({ text, onDone, instant = false }: { text: string; onDone?
   return (
     <SolText
       text={all ? text : text.slice(0, shown)}
+      onAnswer={all ? onAnswer : undefined}
       tail={
         !all && (
           <span

@@ -3,7 +3,21 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowUpRight, Bell, Copy, Eye, EyeOff, FileText, History, MessageSquarePlus, Paperclip, RefreshCw, X, Pin } from "lucide-react";
+import {
+  ArrowUpRight,
+  Bell,
+  Copy,
+  CornerUpLeft,
+  Eye,
+  EyeOff,
+  FileText,
+  History,
+  MessageSquarePlus,
+  Paperclip,
+  RefreshCw,
+  X,
+  Pin,
+} from "lucide-react";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import { openDesigner } from "./design-drawer";
 import { lookingAt } from "@/lib/domain/design/page-context";
@@ -59,8 +73,8 @@ import { SolThinking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
 import { SolDesignView } from "./sol-design-view";
-import { SolText } from "./sol-text";
-import { solPlain } from "@/lib/domain/design/sol-format";
+import { SolText, type OnAnswer } from "./sol-text";
+import { answerFor, solPlain } from "@/lib/domain/design/sol-format";
 
 /** The last message the member chose to carry on from after a while away (sessionStorage). */
 const CARRIED_KEY = "renuabl.design.sol-carried";
@@ -157,6 +171,8 @@ export function SolChat({
   // Try another answer: the conversation from that question on is hidden while he answers it again.
   const [redoFrom, setRedoFrom] = useState<number | null>(null);
   const [text, setText] = useState("");
+  // A question of Sol's being answered in the box (8 Nov 2026, Martin): named in what goes to him.
+  const [replyTo, setReplyTo] = useState<string | null>(null);
   const [heard, setHeard] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [fileProblem, setFileProblem] = useState("");
@@ -242,8 +258,11 @@ export function SolChat({
   };
 
   /** `shown`: the short line the chat shows for a long instruction sent for them; the words still go to Sol. */
-  const send = async (over?: string, deep = false, shown?: string) => {
-    const said = (over ?? text).trim();
+  const send = async (over?: string, deep = false, shownAs?: string) => {
+    const typed = (over ?? text).trim();
+    const answering = !over && replyTo && typed ? replyTo : null;
+    const said = answering ? answerFor(answering, typed) : typed;
+    const shown = shownAs ?? (answering ? typed : undefined);
     const sending = over ? [] : files;
     if ((!said && !sending.length) || busy) return;
     let encoded: SolFile[];
@@ -257,6 +276,7 @@ export function SolChat({
       setText("");
       setFiles([]);
       setFileProblem("");
+      setReplyTo(null);
     }
     setDealAt(null);
     setBusy(true);
@@ -268,9 +288,17 @@ export function SolChat({
       void run(solSeen());
       goWhereAsked(next, router);
     } else if (!over) {
-      setText(said);
+      setText(typed);
+      if (answering) setReplyTo(answering);
       setFiles(sending);
     }
+  };
+
+  /** A Yes or No goes straight to Sol; Reply puts the question over the box to answer in his own words. */
+  const answer: OnAnswer = (question, yes) => {
+    if (yes) return void send(answerFor(question, yes), false, yes);
+    setReplyTo(question);
+    box.current?.focus();
   };
 
   /** Try another answer: his last answer comes off and the same question is asked again, a different way. */
@@ -464,6 +492,7 @@ export function SolChat({
               you={t.role === "you"}
               text={t.shown || t.text}
               at={t.at}
+              onAnswer={t.role === "sol" && !busy ? answer : undefined}
               pinned={t.pinned}
               onPin={() => void run(pinTurn(t.at, t.role, !t.pinned))}
             />
@@ -627,6 +656,17 @@ export function SolChat({
             >
               {seePage ? <Eye className="size-3 shrink-0" aria-hidden /> : <EyeOff className="size-3 shrink-0" aria-hidden />}
               <span className="truncate">{seePage ? `Looking at ${seeing}` : seeing}</span>
+            </button>
+          </div>
+        )}
+        {replyTo && (
+          <div className="mb-1.5 flex items-start gap-2 rounded-xl bg-surface px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
+            <CornerUpLeft className="mt-px size-3.5 shrink-0 text-sun-line" aria-hidden />
+            <span className="min-w-0 flex-1">
+              Replying to <span className="font-medium text-ink">{replyTo}</span>
+            </span>
+            <button type="button" onClick={() => setReplyTo(null)} aria-label="Stop replying" className="shrink-0 hover:text-ink">
+              <X className="size-3.5" aria-hidden />
             </button>
           </div>
         )}
@@ -823,7 +863,21 @@ function AnswerCost({ turn, again }: { turn: SolTurn; again: (() => void) | null
 }
 
 /** One message, with Copy and Pin beside it (1 Nov 2026, Martin: as Primero's) once it has been said. */
-function Bubble({ you, text, at, pinned, onPin }: { you: boolean; text: string; at: string; pinned?: boolean; onPin?: () => void }) {
+function Bubble({
+  you,
+  text,
+  at,
+  pinned,
+  onPin,
+  onAnswer,
+}: {
+  you: boolean;
+  text: string;
+  at: string;
+  pinned?: boolean;
+  onPin?: () => void;
+  onAnswer?: OnAnswer;
+}) {
   const [copied, setCopied] = useState(false);
   if (!text) return null;
   return (
@@ -839,7 +893,7 @@ function Bubble({ you, text, at, pinned, onPin }: { you: boolean; text: string; 
         )}
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
-        {you ? text : <SolText text={text} />}
+        {you ? text : <SolText text={text} onAnswer={onAnswer} />}
         {at && <span className={clsx("mt-1 block text-[10px]", you ? "text-sun-ink/70" : "text-muted")}>{when(at)}</span>}
       </div>
       {at && (
