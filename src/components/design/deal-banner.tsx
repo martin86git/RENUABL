@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Mail, MapPin, PenTool, Phone } from "lucide-react";
+import { Mail, MapPin, Phone } from "lucide-react";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
 import { STAGE_LABELS, type Customer, type Job } from "@/lib/domain/design/crm";
 import type { JobDrawing } from "@/lib/domain/design/job-card";
@@ -134,17 +134,9 @@ export function DealBanner({
         )}
         {/* A soft fade at the foot so the words read on any roof. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/75 via-black/35 to-transparent" />
-
-        {onDesign && !compact && (
-          <button
-            type="button"
-            onClick={onDesign}
-            className="absolute right-4 top-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-white/90 px-3.5 text-[13px] font-medium text-ink shadow-sm backdrop-blur hover:bg-white"
-          >
-            <PenTool className="size-3.5 text-sun-line" aria-hidden />
-            {job.projectId ? "Open design" : "Design this roof"}
-          </button>
-        )}
+        {/* And from the left, where the name and its details sit (Martin: clearly visible on a busy roof). The design itself
+            is opened by the orange round under the banner, or by pressing the picture. */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/80 via-black/45 via-40% to-transparent sm:w-2/3" />
         {!placed && !compact && (
           <button
             type="button"

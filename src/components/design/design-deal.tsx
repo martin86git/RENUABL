@@ -3,7 +3,20 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, NotebookPen, ClipboardList, FileText, PenTool, Search, Trash2, Wrench } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ClipboardList,
+  FileText,
+  HardHat,
+  MessagesSquare,
+  Paperclip,
+  PenTool,
+  Search,
+  Trash2,
+  Wrench,
+} from "lucide-react";
+import { SolIcon } from "./sol-icon";
 import { JobCardDialog } from "./job-card";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { ListOnMarketplace } from "./marketplace";
@@ -62,17 +75,19 @@ import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
 type Written = "note" | "call" | "email";
-type Tab = "overview" | "activities" | "team" | "email" | "chat" | "sol" | "files" | "service" | "details";
-/** The deal's tabs under its banner, in order; Service sits apart after them. */
-const DEAL_TABS: [Exclude<Tab, "service">, string][] = [
-  ["overview", "Overview"],
-  ["activities", "Activity"],
-  ["team", "Team"],
-  ["email", "Email"],
-  ["chat", "Chat"],
-  ["sol", "Sol"],
-  ["files", "Files"],
-  ["details", "Details"],
+type Tab = "activities" | "team" | "email" | "chat" | "sol" | "files" | "service" | "details";
+/**
+ * The deal's tabs under its banner, in order; Service sits apart after them. Activity is the deal at a glance and its
+ * record (8 Nov 2026, Martin: Overview folded into it); the team's chat, Sol and the files are their icons.
+ */
+const DEAL_TABS: { key: Exclude<Tab, "service">; label: string; icon?: (p: { className?: string }) => React.ReactNode }[] = [
+  { key: "activities", label: "Activity" },
+  { key: "team", label: "Team chat", icon: ({ className }) => <MessagesSquare className={className} aria-hidden /> },
+  { key: "email", label: "Email" },
+  { key: "chat", label: "Chat" },
+  { key: "sol", label: "Sol", icon: ({ className }) => <SolIcon className={className} aria-hidden /> },
+  { key: "files", label: "Files", icon: ({ className }) => <Paperclip className={className} aria-hidden /> },
+  { key: "details", label: "Details" },
 ];
 const FILTERS: { key: "all" | ActivityKind; label: string }[] = [
   { key: "all", label: "All activities" },
@@ -312,9 +327,9 @@ export function DealPage({ id }: { id: string }) {
               ? "team"
               : asked === "details"
                 ? "details"
-                : asked === "activities"
-                  ? "activities"
-                  : "overview",
+                : asked === "files"
+                  ? "files"
+                  : "activities",
   );
   // The designer as a centred pop-up over the deal (8 Nov 2026, Martin: in the same space, the page's grey either side, so
   // it reads as quick); ?design=1 opens it. Kept loaded once opened, so closing never loses the work.
@@ -534,10 +549,10 @@ export function DealPage({ id }: { id: string }) {
             setDesignVersion((v) => v + 1);
           }}
           onGo={(href) => {
-            // This deal: the tab asked for (the customer's name in the designer comes back to Overview).
+            // This deal: the tab asked for (the customer's name in the designer comes back to Activity).
             if (href.startsWith(`${PATHS.deals}/${job.id}`)) {
               const want = new URL(href, window.location.origin).searchParams.get("tab");
-              return setTab(want && (DEAL_TABS.some(([k]) => k === want) || want === "service") ? (want as Tab) : "overview");
+              return setTab(want && (DEAL_TABS.some((t) => t.key === want) || want === "service") ? (want as Tab) : "activities");
             }
             router.push(href);
           }}
@@ -570,7 +585,7 @@ export function DealPage({ id }: { id: string }) {
         designVersion={designVersion}
         customer={customer}
         pulse={pulse && hasPulse(job.stage) ? pulse : null}
-        compact={tab !== "overview"}
+        compact={tab !== "activities"}
         onDesign={job.lat !== null ? () => openTool("design") : null}
         onEmail={() => setTab("email")}
         onCall={() => {
@@ -624,21 +639,35 @@ export function DealPage({ id }: { id: string }) {
             className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto rounded-full bg-surface p-1 ring-1 ring-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             role="tablist"
           >
-            {DEAL_TABS.map(([key, label]) => (
+            {DEAL_TABS.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
                 role="tab"
                 aria-selected={tab === key}
+                aria-label={Icon ? label : undefined}
+                title={Icon ? label : undefined}
                 onClick={() => setTab(key)}
                 className={clsx(
-                  "h-9 shrink-0 rounded-full px-4 text-sm transition-colors",
+                  "flex h-9 shrink-0 items-center justify-center rounded-full text-sm transition-colors",
+                  Icon ? "w-11" : "px-4",
                   tab === key ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
                 )}
               >
-                {label}
+                {Icon ? <Icon className="size-[18px]" /> : label}
               </button>
             ))}
+            {/* The job card opens over the page, so it sits at the end of the row rather than being a tab of its own. */}
+            <button
+              type="button"
+              aria-label="Job card"
+              title="Job card"
+              onClick={() => setCard(true)}
+              className="ml-auto flex h-9 w-11 shrink-0 items-center justify-center rounded-full text-ink-2 transition-colors hover:text-ink"
+            >
+              <HardHat className="size-[18px]" aria-hidden />
+            </button>
           </div>
+          {card && <JobCardDialog jobId={job.id} onClose={() => setCard(false)} />}
           {/* Service sits apart at the end, in its own colour: putting something right after the sale. */}
           <button
             role="tab"
@@ -888,27 +917,24 @@ export function DealPage({ id }: { id: string }) {
               </Block>
             </section>
           </div>
-        ) : tab === "overview" ? (
+        ) : (
+          // Activity: the deal at a glance, then its record (8 Nov 2026, Martin: Overview folded into it).
           <div className="mt-5 space-y-5">
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => notetaker.current?.start()} className={ui.quiet}>
-                <NotebookPen className="size-4" aria-hidden /> Note-taker
-              </button>
-              {job.projectId && (
-                <Link href={`${PATHS.deals}/${job.id}/materials`} className={ui.quiet}>
-                  <ClipboardList className="size-4" aria-hidden /> Materials order
-                </Link>
-              )}
-              <button type="button" onClick={() => setCard(true)} className={ui.quiet}>
-                <Wrench className="size-4" aria-hidden /> Job card
-              </button>
-              {marketplaceOpen() && PRE_INSTALL_STAGES.includes(job.stage) && (
-                <ListOnMarketplace jobId={job.id} suburb={suburbAlone(job.address || customer.address)} />
-              )}
-            </div>
-            {card && <JobCardDialog jobId={job.id} onClose={() => setCard(false)} />}
-            <section className={clsx(ui.card, "overflow-hidden [&>div]:border-t-0")}>
-              <DealProposal jobId={job.id} hasDesign={Boolean(job.projectId)} />
+            {(job.projectId || (marketplaceOpen() && PRE_INSTALL_STAGES.includes(job.stage))) && (
+              <div className="flex flex-wrap gap-2">
+                {job.projectId && (
+                  <Link href={`${PATHS.deals}/${job.id}/materials`} className={ui.quiet}>
+                    <ClipboardList className="size-4" aria-hidden /> Materials order
+                  </Link>
+                )}
+                {marketplaceOpen() && PRE_INSTALL_STAGES.includes(job.stage) && (
+                  <ListOnMarketplace jobId={job.id} suburb={suburbAlone(job.address || customer.address)} />
+                )}
+              </div>
+            )}
+            {/* What was sent and its deposit, once a proposal is out; the Proposal round opens it. */}
+            <section className={clsx(ui.card, "overflow-hidden empty:hidden [&>div]:border-t-0")}>
+              <DealProposal jobId={job.id} hasDesign={Boolean(job.projectId)} statusOnly />
             </section>
             <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {[
@@ -927,152 +953,130 @@ export function DealPage({ id }: { id: string }) {
               <h2 className="text-[15px] font-medium text-ink">The system</h2>
               {known ? <SystemSetOut lines={details} /> : <p className="mt-2 text-sm text-ink-2">Nothing designed yet.</p>}
             </section>
-            <section className={clsx(ui.card, "p-5")}>
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[15px] font-medium text-ink">Latest activity</h2>
-                <button className={clsx(ui.link, "text-[13px]")} onClick={() => setTab("activities")}>
-                  See all {activity.length}
+            <div>
+              <div className="flex flex-wrap gap-x-5 border-b border-line" role="group" aria-label="Kind of activity">
+                {FILTERS.map((f) => (
+                  <button
+                    key={f.key}
+                    aria-pressed={filter === f.key}
+                    onClick={() => setFilter(f.key)}
+                    className={clsx(
+                      "-mb-px h-10 border-b-[3px] text-sm font-medium",
+                      filter === f.key ? "border-ink text-ink" : "border-transparent text-ink-2 hover:text-ink",
+                    )}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <label className="relative block w-64 max-w-full">
+                  <span className="sr-only">Search activities</span>
+                  <input
+                    className={clsx(ui.input, "rounded-full pl-4 pr-9")}
+                    value={find}
+                    onChange={(e) => setFind(e.target.value)}
+                    placeholder="Search activities"
+                  />
+                  <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+                </label>
+                <p className="text-xs tabular-nums text-muted">
+                  Showing {shown.length} of {activity.length}
+                </p>
+              </div>
+
+              <div className={clsx(ui.card, "mt-4 flex flex-wrap gap-2 p-3")}>
+                <select
+                  aria-label="What happened"
+                  className={clsx(ui.input, "w-28 appearance-auto")}
+                  value={kind}
+                  onChange={(e) => setKind(e.target.value as Written)}
+                >
+                  <option value="note">Note</option>
+                  <option value="call">Call</option>
+                  <option value="email">Email</option>
+                </select>
+                <input
+                  aria-label="What was said or done"
+                  className={clsx(ui.input, "min-w-0 flex-1")}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && void say()}
+                  maxLength={1000}
+                  placeholder="Write a note, or log a call or an email. Type @ to mention someone"
+                />
+                {members.length > 1 && (
+                  <select
+                    aria-label="Mention someone"
+                    className={clsx(ui.input, "w-36 appearance-auto")}
+                    value=""
+                    onChange={(e) => {
+                      const who = e.target.value;
+                      if (who) setText((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${mentionText(who)}`);
+                    }}
+                  >
+                    <option value="">Mention…</option>
+                    {members.map((m) => (
+                      <option key={m} value={m}>
+                        @{handleOf(m)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button className={ui.primary} onClick={say} disabled={!text.trim()}>
+                  Add
                 </button>
               </div>
-              {activity.length === 0 ? (
-                <p className="mt-2 text-sm text-ink-2">Nothing yet.</p>
-              ) : (
-                <ol className="mt-2 divide-y divide-line">
-                  {activity.slice(0, 3).map((a) => (
-                    <li key={a.id} className="flex items-start gap-3 py-2.5 text-sm">
-                      <span className="mt-0.5 w-12 shrink-0 text-[11px] font-medium uppercase tracking-[0.08em] text-muted">
-                        {ACTIVITY_WORD[a.kind]}
-                      </span>
-                      <span className="min-w-0 flex-1 text-ink">{a.text}</span>
-                      <span className="shrink-0 text-xs tabular-nums text-muted">{shortDate(a.at)}</span>
-                    </li>
-                  ))}
-                </ol>
+
+              {months.length === 0 && (
+                <p className="mt-6 text-sm text-ink-2">{activity.length ? "Nothing matches that." : "Nothing yet."}</p>
               )}
-            </section>
-          </div>
-        ) : (
-          <div className="mt-4">
-            <div className="flex flex-wrap gap-x-5 border-b border-line" role="group" aria-label="Kind of activity">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  aria-pressed={filter === f.key}
-                  onClick={() => setFilter(f.key)}
-                  className={clsx(
-                    "-mb-px h-10 border-b-[3px] text-sm font-medium",
-                    filter === f.key ? "border-ink text-ink" : "border-transparent text-ink-2 hover:text-ink",
-                  )}
-                >
-                  {f.label}
-                </button>
+              {months.map(({ month, items }) => (
+                <section key={month} className="mt-6">
+                  <h2 className="text-[15px] text-ink-2">{month}</h2>
+                  <ol className="mt-2.5 space-y-2.5">
+                    {items.map((a) => (
+                      <li key={a.id} className={clsx(ui.card, "px-5 py-4")}>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="text-sm text-ink">
+                            <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
+                            <span className="text-ink-2">by {a.by.split("@")[0]}</span>
+                          </p>
+                          <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={a.at}>
+                            {new Date(a.at).toLocaleString("en-AU", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
+                          </time>
+                        </div>
+                        <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
+                        {a.kind === "email" &&
+                          opens &&
+                          (opens.times[a.id] ? (
+                            <p
+                              className={clsx("mt-1.5 text-xs", opens.times[a.id].length ? "font-medium text-positive" : "text-muted")}
+                              title="Only the customer's copy is counted. Apple Mail can open an email by itself when it arrives, so this is a guide."
+                            >
+                              {openedWords(opens.times[a.id], LAUNCH_MARKET.timeZone, new Date(), opens.counts[a.id])}
+                            </p>
+                          ) : (
+                            <p
+                              className="mt-1.5 text-xs text-muted"
+                              title="Opens are counted for emails sent from this deal while the site's address is set up. This one was sent before, or another way."
+                            >
+                              {NOT_TRACKED}
+                            </p>
+                          ))}
+                      </li>
+                    ))}
+                  </ol>
+                </section>
               ))}
             </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <label className="relative block w-64 max-w-full">
-                <span className="sr-only">Search activities</span>
-                <input
-                  className={clsx(ui.input, "rounded-full pl-4 pr-9")}
-                  value={find}
-                  onChange={(e) => setFind(e.target.value)}
-                  placeholder="Search activities"
-                />
-                <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
-              </label>
-              <p className="text-xs tabular-nums text-muted">
-                Showing {shown.length} of {activity.length}
-              </p>
-            </div>
-
-            <div className={clsx(ui.card, "mt-4 flex flex-wrap gap-2 p-3")}>
-              <select
-                aria-label="What happened"
-                className={clsx(ui.input, "w-28 appearance-auto")}
-                value={kind}
-                onChange={(e) => setKind(e.target.value as Written)}
-              >
-                <option value="note">Note</option>
-                <option value="call">Call</option>
-                <option value="email">Email</option>
-              </select>
-              <input
-                aria-label="What was said or done"
-                className={clsx(ui.input, "min-w-0 flex-1")}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && void say()}
-                maxLength={1000}
-                placeholder="Write a note, or log a call or an email. Type @ to mention someone"
-              />
-              {members.length > 1 && (
-                <select
-                  aria-label="Mention someone"
-                  className={clsx(ui.input, "w-36 appearance-auto")}
-                  value=""
-                  onChange={(e) => {
-                    const who = e.target.value;
-                    if (who) setText((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${mentionText(who)}`);
-                  }}
-                >
-                  <option value="">Mention…</option>
-                  {members.map((m) => (
-                    <option key={m} value={m}>
-                      @{handleOf(m)}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button className={ui.primary} onClick={say} disabled={!text.trim()}>
-                Add
-              </button>
-            </div>
-
-            {months.length === 0 && <p className="mt-6 text-sm text-ink-2">{activity.length ? "Nothing matches that." : "Nothing yet."}</p>}
-            {months.map(({ month, items }) => (
-              <section key={month} className="mt-6">
-                <h2 className="text-[15px] text-ink-2">{month}</h2>
-                <ol className="mt-2.5 space-y-2.5">
-                  {items.map((a) => (
-                    <li key={a.id} className={clsx(ui.card, "px-5 py-4")}>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <p className="text-sm text-ink">
-                          <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
-                          <span className="text-ink-2">by {a.by.split("@")[0]}</span>
-                        </p>
-                        <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={a.at}>
-                          {new Date(a.at).toLocaleString("en-AU", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
-                        </time>
-                      </div>
-                      <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
-                      {a.kind === "email" &&
-                        opens &&
-                        (opens.times[a.id] ? (
-                          <p
-                            className={clsx("mt-1.5 text-xs", opens.times[a.id].length ? "font-medium text-positive" : "text-muted")}
-                            title="Only the customer's copy is counted. Apple Mail can open an email by itself when it arrives, so this is a guide."
-                          >
-                            {openedWords(opens.times[a.id], LAUNCH_MARKET.timeZone, new Date(), opens.counts[a.id])}
-                          </p>
-                        ) : (
-                          <p
-                            className="mt-1.5 text-xs text-muted"
-                            title="Opens are counted for emails sent from this deal while the site's address is set up. This one was sent before, or another way."
-                          >
-                            {NOT_TRACKED}
-                          </p>
-                        ))}
-                    </li>
-                  ))}
-                </ol>
-              </section>
-            ))}
           </div>
         )}
       </div>

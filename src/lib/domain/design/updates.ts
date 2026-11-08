@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Deals",
+    words: "A deal opens on Activity, with the deal at a glance above its record. Team chat, Sol, files and the job card are icons.",
+  },
+  {
+    day: "2026-11-08",
     area: "Installation",
     words: "The install calendar, Upcoming and In the works are one Installations page, shown as a calendar or a list.",
   },

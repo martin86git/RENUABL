@@ -151,7 +151,11 @@ function SendToCustomer(props: {
  * The proposal block on a deal's page: whether one is out, where it stands,
  * and the way to the screen that previews and sends it.
  */
-export function DealProposal({ jobId, hasDesign }: { jobId: string; hasDesign: boolean }) {
+/**
+ * A deal's proposal in a card. With `statusOnly` (the deal page, where the Proposal round opens the proposal) there is
+ * no button, and nothing at all until one has been sent: what was sent, where it stands and its deposit.
+ */
+export function DealProposal({ jobId, hasDesign, statusOnly = false }: { jobId: string; hasDesign: boolean; statusOnly?: boolean }) {
   const [versions, setVersions] = useState<ProposalStatus[] | null>(null);
   const [account] = useDesignAccount();
   // Marking a deposit is for whoever may publish proposals; the server checks it again.
@@ -164,6 +168,7 @@ export function DealProposal({ jobId, hasDesign }: { jobId: string; hasDesign: b
     };
   }, [jobId]);
   const latest = versions?.[0];
+  if (statusOnly && !latest) return null;
   return (
     <div className="border-t border-line px-5 py-4">
       <p className={ui.eyebrow}>Proposal</p>
@@ -183,13 +188,15 @@ export function DealProposal({ jobId, hasDesign }: { jobId: string; hasDesign: b
             : "Design the roof first: a proposal is worked out from the design."}
         </p>
       )}
-      <Link
-        href={proposalScreen(jobId)}
-        className={clsx(ui.quiet, "mt-3 w-full", !hasDesign && "pointer-events-none text-muted")}
-        aria-disabled={!hasDesign}
-      >
-        <FileText className="size-4" aria-hidden /> {latest ? "View proposal" : "Create proposal"}
-      </Link>
+      {!statusOnly && (
+        <Link
+          href={proposalScreen(jobId)}
+          className={clsx(ui.quiet, "mt-3 w-full", !hasDesign && "pointer-events-none text-muted")}
+          aria-disabled={!hasDesign}
+        >
+          <FileText className="size-4" aria-hidden /> {latest ? "View proposal" : "Create proposal"}
+        </Link>
+      )}
     </div>
   );
 }

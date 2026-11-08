@@ -244,170 +244,174 @@ export function CallNotetaker({
       {on &&
         typeof document !== "undefined" &&
         createPortal(
-          <div className="theme-studio fixed inset-x-3 bottom-3 z-[55] mx-auto max-w-3xl rounded-2xl bg-primary p-4 text-white shadow-lift sm:inset-x-6">
-            <div className="flex items-center gap-2">
-              {state === "listening" ? (
-                <span className="relative flex size-2.5">
-                  <span className="absolute inset-0 animate-ping rounded-full bg-sun-line/60 motion-reduce:hidden" />
-                  <span className="relative size-2.5 rounded-full bg-sun-line" />
-                </span>
-              ) : (
-                <Mic className="size-4 text-white/60" aria-hidden />
-              )}
-              <p className="flex-1 text-sm font-medium">
-                {state === "listening"
-                  ? `Listening · ${words} ${words === 1 ? "word" : "words"}`
-                  : state === "writing"
-                    ? "Writing up…"
-                    : state === "ready"
-                      ? "Check the notes, then add them to the deal"
-                      : "Added to the deal"}
-              </p>
-              {phone && state === "listening" && (
-                <a href={`tel:${phone.replace(/\s/g, "")}`} className="hidden text-sm text-white/80 sm:inline">
-                  Ring <span className="font-medium tabular-nums text-white">{phone}</span> on your phone, held to your ear
-                </a>
-              )}
-              <button
-                type="button"
-                onClick={close}
-                aria-label="Close the note-taker"
-                className="flex size-8 items-center justify-center rounded-md text-white/70 hover:bg-white/10"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-            </div>
-            {state === "listening" && (
-              <>
-                <p className="mt-1 text-xs text-white/60">
-                  Take the call on your phone, to your ear or on a headset, never on speaker: this hears your side only. Nothing is recorded
-                  or kept.
-                </p>
-                {pointsOff || (pointsNote && !points.length) ? (
-                  // No live points to be had: the words as heard, as before, and why.
-                  <HeardWords lines={lines} hearing={hearing} className="mt-3 max-h-28" />
+          // The studio's tokens come from a wrapper that draws nothing: .theme-studio paints its own page background and ink,
+          // which would win over the bar's graphite and white and wash it out.
+          <div className="theme-studio contents">
+            <div className="fixed inset-x-3 bottom-3 z-[55] mx-auto max-w-3xl rounded-2xl bg-primary p-4 text-white shadow-lift sm:inset-x-6">
+              <div className="flex items-center gap-2">
+                {state === "listening" ? (
+                  <span className="relative flex size-2.5">
+                    <span className="absolute inset-0 animate-ping rounded-full bg-sun-line/60 motion-reduce:hidden" />
+                    <span className="relative size-2.5 rounded-full bg-sun-line" />
+                  </span>
                 ) : (
-                  <div className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-sm text-white/85" aria-live="polite">
-                    {points.length ? (
-                      <>
-                        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
-                          <SolIcon className="size-3.5 text-sun-line" aria-hidden /> So far
-                        </p>
-                        <ul className="mt-1 space-y-0.5">
-                          {points.map((p) => (
-                            <li key={p} className="flex gap-2">
-                              <span className="mt-[0.55em] size-1 shrink-0 rounded-full bg-sun-line" aria-hidden />
-                              <span>{p}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    ) : (
-                      <p className="text-white/50">Listening…</p>
-                    )}
-                    {lines
-                      .filter((l) => l.note)
-                      .slice(-2)
-                      .map((l, i) => (
-                        <p key={i} className="mt-1 text-sun-line">
-                          {l.design ? "Design note: " : "Note: "}
-                          {l.text}
-                        </p>
-                      ))}
-                    {noting && hearing && <p className="mt-1 text-white/50">{hearing}</p>}
-                  </div>
+                  <Mic className="size-4 text-white/60" aria-hidden />
                 )}
-                {pointsNote && <p className="mt-1.5 text-xs text-white/60">{pointsNote}</p>}
-                {!pointsOff && !(pointsNote && !points.length) && (
-                  <details className="mt-2 text-xs text-white/60">
-                    <summary className="cursor-pointer select-none hover:text-white/80">What was heard</summary>
-                    <HeardWords lines={lines} hearing={hearing} className="mt-1.5 max-h-32" />
-                  </details>
+                <p className="flex-1 text-sm font-medium">
+                  {state === "listening"
+                    ? `Listening · ${words} ${words === 1 ? "word" : "words"}`
+                    : state === "writing"
+                      ? "Writing up…"
+                      : state === "ready"
+                        ? "Check the notes, then add them to the deal"
+                        : "Added to the deal"}
+                </p>
+                {phone && state === "listening" && (
+                  <a href={`tel:${phone.replace(/\s/g, "")}`} className="hidden text-sm text-white/80 sm:inline">
+                    Ring <span className="font-medium tabular-nums text-white">{phone}</span> on your phone, held to your ear
+                  </a>
                 )}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {(["general", "design"] as const).map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setNoting(noting === k ? "" : k)}
-                      className={clsx(
-                        "h-8 rounded-md px-3 text-xs font-medium",
-                        noting === k ? "bg-sun-line text-white" : "bg-white/10 text-white hover:bg-white/15",
+                <button
+                  type="button"
+                  onClick={close}
+                  aria-label="Close the note-taker"
+                  className="flex size-8 items-center justify-center rounded-md text-white/70 hover:bg-white/10"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              </div>
+              {state === "listening" && (
+                <>
+                  <p className="mt-1 text-xs text-white/60">
+                    Take the call on your phone, to your ear or on a headset, never on speaker: this hears your side only. Nothing is
+                    recorded or kept.
+                  </p>
+                  {pointsOff || (pointsNote && !points.length) ? (
+                    // No live points to be had: the words as heard, as before, and why.
+                    <HeardWords lines={lines} hearing={hearing} className="mt-3 max-h-28" />
+                  ) : (
+                    <div className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-sm text-white/85" aria-live="polite">
+                      {points.length ? (
+                        <>
+                          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
+                            <SolIcon className="size-3.5 text-sun-line" aria-hidden /> So far
+                          </p>
+                          <ul className="mt-1 space-y-0.5">
+                            {points.map((p) => (
+                              <li key={p} className="flex gap-2">
+                                <span className="mt-[0.55em] size-1 shrink-0 rounded-full bg-sun-line" aria-hidden />
+                                <span>{p}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      ) : (
+                        <p className="text-white/50">Listening…</p>
                       )}
+                      {lines
+                        .filter((l) => l.note)
+                        .slice(-2)
+                        .map((l, i) => (
+                          <p key={i} className="mt-1 text-sun-line">
+                            {l.design ? "Design note: " : "Note: "}
+                            {l.text}
+                          </p>
+                        ))}
+                      {noting && hearing && <p className="mt-1 text-white/50">{hearing}</p>}
+                    </div>
+                  )}
+                  {pointsNote && <p className="mt-1.5 text-xs text-white/60">{pointsNote}</p>}
+                  {!pointsOff && !(pointsNote && !points.length) && (
+                    <details className="mt-2 text-xs text-white/60">
+                      <summary className="cursor-pointer select-none hover:text-white/80">What was heard</summary>
+                      <HeardWords lines={lines} hearing={hearing} className="mt-1.5 max-h-32" />
+                    </details>
+                  )}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {(["general", "design"] as const).map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setNoting(noting === k ? "" : k)}
+                        className={clsx(
+                          "h-8 rounded-md px-3 text-xs font-medium",
+                          noting === k ? "bg-sun-line text-white" : "bg-white/10 text-white hover:bg-white/15",
+                        )}
+                      >
+                        {noting === k ? "Note done" : k === "general" ? "Add a note" : "Add a design note"}
+                      </button>
+                    ))}
+                    <input
+                      value={typed}
+                      onChange={(e) => setTyped(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addTyped()}
+                      placeholder="Or type a note, then Enter"
+                      className="h-8 min-w-0 flex-1 rounded-md bg-white/10 px-2.5 text-sm text-white placeholder:text-white/40 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void writeUp()}
+                      disabled={words < MIN_WORDS}
+                      title={words < MIN_WORDS ? "Not enough heard yet" : "End the call and write up the notes"}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white px-3 text-xs font-medium text-ink disabled:bg-white/20 disabled:text-white/50"
                     >
-                      {noting === k ? "Note done" : k === "general" ? "Add a note" : "Add a design note"}
+                      <Square className="size-3" aria-hidden /> End and write up
                     </button>
+                  </div>
+                </>
+              )}
+              {state === "writing" && (
+                <p className="mt-3 flex items-center gap-2 text-sm text-white/70">
+                  <Loader2 className="size-4 animate-spin" aria-hidden /> Sol is arranging the call into Design, Proposal, Price and Next
+                  step.
+                </p>
+              )}
+              {state === "ready" && (
+                <>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="mt-3 block max-h-[45dvh] min-h-48 w-full rounded-lg bg-white px-3 py-2 text-sm text-ink outline-none"
+                  />
+                  {found && (
+                    <SolFound
+                      found={found}
+                      ticks={ticks}
+                      setTicks={setTicks}
+                      remind={{ on: remindOn, setOn: setRemindOn, days: remindDays, setDays: setRemindDays }}
+                      recap={{ on: recapOn, setOn: setRecapOn, open: recapOpen, setOpen: setRecapOpen }}
+                    />
+                  )}
+                  <div className="mt-3 flex justify-end gap-2">
+                    <button type="button" onClick={close} className="h-9 rounded-md px-3 text-sm text-white/80 hover:bg-white/10">
+                      Discard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void save()}
+                      disabled={!notes.trim()}
+                      className="h-9 rounded-md bg-sun-line px-4 text-sm font-medium text-white"
+                    >
+                      {applyLabel(found, ticks, remindOn, recapOn)}
+                    </button>
+                  </div>
+                </>
+              )}
+              {state === "saved" && (
+                <ul className="mt-2 space-y-0.5 text-sm text-white/80">
+                  {(done.length ? done : ["The notes are on the deal's record as a call."]).map((d) => (
+                    <li key={d} className="flex items-center gap-1.5">
+                      <Check className="size-3.5 text-sun-line" aria-hidden /> {d}
+                    </li>
                   ))}
-                  <input
-                    value={typed}
-                    onChange={(e) => setTyped(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addTyped()}
-                    placeholder="Or type a note, then Enter"
-                    className="h-8 min-w-0 flex-1 rounded-md bg-white/10 px-2.5 text-sm text-white placeholder:text-white/40 outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void writeUp()}
-                    disabled={words < MIN_WORDS}
-                    title={words < MIN_WORDS ? "Not enough heard yet" : "End the call and write up the notes"}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white px-3 text-xs font-medium text-ink disabled:bg-white/20 disabled:text-white/50"
-                  >
-                    <Square className="size-3" aria-hidden /> End and write up
-                  </button>
-                </div>
-              </>
-            )}
-            {state === "writing" && (
-              <p className="mt-3 flex items-center gap-2 text-sm text-white/70">
-                <Loader2 className="size-4 animate-spin" aria-hidden /> Sol is arranging the call into Design, Proposal, Price and Next
-                step.
-              </p>
-            )}
-            {state === "ready" && (
-              <>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="mt-3 block max-h-[45dvh] min-h-48 w-full rounded-lg bg-white px-3 py-2 text-sm text-ink outline-none"
-                />
-                {found && (
-                  <SolFound
-                    found={found}
-                    ticks={ticks}
-                    setTicks={setTicks}
-                    remind={{ on: remindOn, setOn: setRemindOn, days: remindDays, setDays: setRemindDays }}
-                    recap={{ on: recapOn, setOn: setRecapOn, open: recapOpen, setOpen: setRecapOpen }}
-                  />
-                )}
-                <div className="mt-3 flex justify-end gap-2">
-                  <button type="button" onClick={close} className="h-9 rounded-md px-3 text-sm text-white/80 hover:bg-white/10">
-                    Discard
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void save()}
-                    disabled={!notes.trim()}
-                    className="h-9 rounded-md bg-sun-line px-4 text-sm font-medium text-white"
-                  >
-                    {applyLabel(found, ticks, remindOn, recapOn)}
-                  </button>
-                </div>
-              </>
-            )}
-            {state === "saved" && (
-              <ul className="mt-2 space-y-0.5 text-sm text-white/80">
-                {(done.length ? done : ["The notes are on the deal's record as a call."]).map((d) => (
-                  <li key={d} className="flex items-center gap-1.5">
-                    <Check className="size-3.5 text-sun-line" aria-hidden /> {d}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {problem && (
-              <p className="mt-2 text-sm text-sun-line" role="alert">
-                {problem}
-              </p>
-            )}
+                </ul>
+              )}
+              {problem && (
+                <p className="mt-2 text-sm text-sun-line" role="alert">
+                  {problem}
+                </p>
+              )}
+            </div>
           </div>,
           document.body,
         )}
