@@ -1284,12 +1284,9 @@ export function RoofDesigner(props: {
     if (op.do === "remove") setThread(null);
   };
   // Opened on a draft from an earlier visit, the work is there but not yet saved.
-  // Opened on a draft, or with designs whose home had to be brought into line (`sharedHome`): there is work to save.
-  const [saved, setSaved] = useState<"saved" | "saving" | "changed" | { error: string }>(() =>
-    props.draftAt || JSON.stringify(sharedHome(props.extras.quotes, props.set.primary)) !== JSON.stringify(props.extras.quotes)
-      ? "changed"
-      : "saved",
-  );
+  // Opened on a draft: there is work to save. (Designs brought into line with the primary's home as the roof opens are
+  // not: the proposal does the same with what is saved, so nothing waits on a save; 8 Nov 2026, Martin.)
+  const [saved, setSaved] = useState<"saved" | "saving" | "changed" | { error: string }>(props.draftAt ? "changed" : "saved");
   // The draft this designer opened on (when), shown until it is saved or thrown away; and whether the work as it stands is kept as one.
   const [resumed, setResumed] = useState<string | null>(props.draftAt ?? null);
   const [drafted, setDrafted] = useState(Boolean(props.draftAt));
