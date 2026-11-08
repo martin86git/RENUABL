@@ -8,6 +8,7 @@ import {
   ArrowRight,
   ArrowUp,
   CalendarPlus,
+  ChevronDown,
   CornerUpLeft,
   Eye,
   FileText,
@@ -26,6 +27,7 @@ import {
   FEED_VIEWS,
   agoWords,
   caption,
+  feedFilter,
   feedOf,
   needsYou,
   nextMove,
@@ -34,11 +36,13 @@ import {
   type NextMove,
   type FeedDeal,
   type FeedEventKind,
+  type FeedPipeline,
   type FeedView,
 } from "@/lib/domain/design/deal-feed";
 import { OPEN_STAGES, STAGE_LABELS } from "@/lib/domain/design/crm";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
-import { emailDeal } from "@/lib/services/crm";
+import { emailDeal, listPipelines } from "@/lib/services/crm";
+import { PIPELINES, type Pipeline } from "@/lib/domain/design/deal";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
 import { briefHref } from "@/lib/domain/design/deal-team";
 import { exampleDeals, loadFeed, writeWithSol, type FeedAnswer } from "@/lib/services/deal-feed";
@@ -51,6 +55,7 @@ import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { SolIcon } from "./sol-icon";
 
 const FEED_VIEW_KEY = "renuabl.design.feed-view";
+const FEED_PICK_KEY = "renuabl.design.feed-pipeline";
 const POLL_MS = 60_000;
 
 const EVENT_ICONS: Record<FeedEventKind, React.ComponentType<{ className?: string }>> = {
@@ -109,8 +114,47 @@ export function DealFeed({ me }: { me: string }) {
       // Private window: the view resets next time.
     }
   };
+  // Which pipeline, and whose deals (8 Nov 2026, Martin: an admin sees every deal), kept on the device.
+  const [feedPick, setFeedPick] = useState<{ pipeline: FeedPipeline; mine: boolean }>(() => {
+    try {
+      const kept = typeof window !== "undefined" ? JSON.parse(localStorage.getItem(FEED_PICK_KEY) ?? "null") : null;
+      return {
+        pipeline: typeof kept?.pipeline === "string" ? kept.pipeline : "all",
+        mine: kept?.mine === true,
+      };
+    } catch {
+      return { pipeline: "all", mine: false };
+    }
+  });
+  const choosePick = (next: { pipeline: FeedPipeline; mine: boolean }) => {
+    setFeedPick(next);
+    try {
+      localStorage.setItem(FEED_PICK_KEY, JSON.stringify(next));
+    } catch {
+      // Private window: it resets next time.
+    }
+  };
+  const [saved, setSaved] = useState<Pipeline[]>([]);
+  useEffect(() => {
+    let gone = false;
+    void listPipelines().then((r) => !gone && r.ok && setSaved(r.pipelines));
+    return () => {
+      gone = true;
+    };
+  }, []);
+  const pipelines: readonly Pipeline[] = [...PIPELINES, ...saved];
+  const pickedPipeline = pipelines.find((p) => p.id === feedPick.pipeline) ?? null;
   const now = new Date();
-  const deals = useMemo(() => data?.deals ?? [], [data]);
+  const deals = useMemo(
+    () =>
+      feedFilter(data?.deals ?? [], {
+        pipeline: feedPick.pipeline,
+        stages: pickedPipeline?.stages ?? null,
+        mine: feedPick.mine,
+        me,
+      }),
+    [data, feedPick, pickedPipeline, me],
+  );
   const shown = feedOf(deals, view, now);
   const needs = deals.filter((d) => needsYou(d, now)).length;
   const open = deals.filter((d) => OPEN_STAGES.includes(d.stage));
@@ -136,6 +180,44 @@ export function DealFeed({ me }: { me: string }) {
           >
             <Plus className="size-4" aria-hidden /> New deal
           </button>
+          <label className="relative inline-flex h-9 items-center rounded-full bg-surface pl-3.5 pr-8 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2">
+            <span className="sr-only">Pipeline</span>
+            <select
+              value={pickedPipeline ? feedPick.pipeline : "all"}
+              onChange={(e) => choosePick({ ...feedPick, pipeline: e.target.value })}
+              className="cursor-pointer appearance-none bg-transparent focus:outline-none"
+            >
+              <option value="all">All deals</option>
+              {pipelines.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 size-3.5 text-muted" aria-hidden />
+          </label>
+          <div role="radiogroup" aria-label="Whose deals" className="inline-flex rounded-full bg-surface p-1 ring-1 ring-line">
+            {(
+              [
+                [false, "Everyone's"],
+                [true, "Mine"],
+              ] as const
+            ).map(([mine, label]) => (
+              <button
+                key={label}
+                type="button"
+                role="radio"
+                aria-checked={feedPick.mine === mine}
+                onClick={() => choosePick({ ...feedPick, mine })}
+                className={clsx(
+                  "rounded-full px-3 py-1 text-[12.5px] font-medium transition",
+                  feedPick.mine === mine ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <p className="text-[13px] text-ink-2">
             {data ? (
               <>

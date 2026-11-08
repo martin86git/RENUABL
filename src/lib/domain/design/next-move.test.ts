@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextMove, type FeedDeal } from "./deal-feed";
+import { feedFilter, nextMove, type FeedDeal } from "./deal-feed";
 import { firesAtFor, laterAt, outboxState } from "./sol-agents";
 
 const now = new Date("2026-11-06T03:00:00Z"); // Friday 2 pm in Melbourne
@@ -90,5 +90,26 @@ describe("putting off what Sol sends", () => {
     expect(outboxState({ stage: "proposal", held: false, hasEmail: true, settings: off })).toBe("waiting");
     expect(outboxState({ stage: "proposal", held: false, hasEmail: true, settings: off, scheduled: true })).toBe("counting");
     expect(outboxState({ stage: "proposal", held: true, hasEmail: true, settings: off, scheduled: true })).toBe("held");
+  });
+});
+
+describe("filtering the feed", () => {
+  const deals = [
+    deal({ jobId: "a", stage: "lead", owner: "Sam@example.com" }),
+    deal({ jobId: "b", stage: "won", owner: "jo@example.com" }),
+    deal({ jobId: "c", stage: "scheduled", owner: null }),
+  ];
+  const ids = (d: FeedDeal[]) => d.map((x) => x.jobId);
+  it("keeps the deals at a stage of the pipeline picked", () => {
+    expect(ids(feedFilter(deals, { pipeline: "all", stages: null, mine: false, me: "sam@example.com" }))).toEqual(["a", "b", "c"]);
+    expect(ids(feedFilter(deals, { pipeline: "sales", stages: ["lead", "designed", "proposal", "won"], mine: false, me: "" }))).toEqual([
+      "a",
+      "b",
+    ]);
+    // A pipeline that is no longer there shows every deal.
+    expect(ids(feedFilter(deals, { pipeline: "gone", stages: null, mine: false, me: "" }))).toEqual(["a", "b", "c"]);
+  });
+  it("keeps only the person's own deals with Mine on", () => {
+    expect(ids(feedFilter(deals, { pipeline: "all", stages: null, mine: true, me: "sam@example.com" }))).toEqual(["a"]);
   });
 });

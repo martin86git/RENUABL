@@ -106,6 +106,7 @@ export async function dealFeed(
       customer: j.customerName,
       suburb: suburbOfAddress(j.address),
       address: j.address,
+      owner: j.owner ?? null,
       title: j.title,
       stage: j.stage,
       value: j.value,

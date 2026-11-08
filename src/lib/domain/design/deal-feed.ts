@@ -27,6 +27,8 @@ export interface FeedDeal {
   suburb: string;
   /** The deal's address as kept on it, for the heading of its chat. */
   address?: string;
+  /** Who owns the deal (a member's email), or null: for "Mine". */
+  owner?: string | null;
   title: string;
   stage: JobStage;
   value: number | null;
@@ -187,6 +189,25 @@ export function nextMove(d: FeedDeal, now = new Date()): NextMove | null {
 }
 
 const OPEN: readonly JobStage[] = ["lead", "designed", "proposal"];
+
+/** "All deals", or a pipeline's id (one of the set ones or one the business saved). */
+export type FeedPipeline = string;
+
+/**
+ * The deals a person has chosen to see on the feed (8 Nov 2026, Martin: an admin sees every deal, so filter by
+ * pipeline): those at a stage of the pipeline picked (every deal for "all", or for a pipeline no longer there), and
+ * only their own when Mine is on.
+ */
+export function feedFilter(
+  deals: readonly FeedDeal[],
+  pick: { pipeline: FeedPipeline; stages: readonly JobStage[] | null; mine: boolean; me: string },
+): FeedDeal[] {
+  const me = pick.me.toLowerCase();
+  return deals.filter(
+    (d) =>
+      (pick.pipeline === "all" || !pick.stages || pick.stages.includes(d.stage)) && (!pick.mine || (d.owner ?? "").toLowerCase() === me),
+  );
+}
 
 /** The cards for a view, the most recent activity first. */
 export function feedOf(deals: readonly FeedDeal[], view: FeedView, now = new Date()): FeedDeal[] {
