@@ -3855,6 +3855,170 @@ export function RoofDesigner(props: {
     );
   };
 
+  const designsMenu = (
+    <div
+      className={clsx(
+        "absolute z-40 max-h-[70vh] w-[24rem] max-w-[85vw] space-y-3 overflow-y-auto rounded-lg border border-line bg-surface p-3 text-ink shadow-lift",
+        props.tight ? "right-0 top-full mt-2" : "left-0 top-full mt-2",
+      )}
+    >
+      <ul className="space-y-1.5">
+        {everyDesign().map((d, i) => {
+          const sum = designSummary(d);
+          return (
+            <li key={i} className={clsx("rounded-md border", i === active ? "border-forest" : "border-line")}>
+              <div className="flex items-center gap-1 p-1">
+                <button
+                  onClick={() => (i === active ? openMenu(false) : show(everyDesign(), i))}
+                  className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left hover:bg-canvas"
+                >
+                  <span className="block truncate text-sm font-semibold">
+                    Design {i + 1}
+                    {d.label ? <span className="font-normal text-ink-2"> · {d.label}</span> : null}
+                  </span>
+                  <span className="block truncate text-xs tabular-nums text-muted">
+                    {sum.panels} panels · {sum.kw.toFixed(2)} kW · {d.panel?.name ?? props.catalogue[0]?.name ?? "Panel"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    setPrimary(i);
+                    changed();
+                  }}
+                  disabled={i === primary}
+                  title={i === primary ? "The primary design" : "Make this the primary design"}
+                  aria-label={i === primary ? `Design ${i + 1} is the primary` : `Make design ${i + 1} the primary`}
+                  className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
+                >
+                  <Star className={clsx("size-4", i === primary ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
+                </button>
+                {designs.length > 1 && i !== primary && (
+                  <button
+                    onClick={() => flagDesign(i, "offer")}
+                    title={
+                      d.offer
+                        ? "Offered to the customer as an option: press to stop"
+                        : "Offer it to the customer as an option, beside the primary"
+                    }
+                    aria-pressed={Boolean(d.offer)}
+                    className={clsx(
+                      "h-8 rounded-full px-2.5 text-[11px] font-semibold",
+                      d.offer ? "bg-primary text-primary-ink" : "text-muted ring-1 ring-line hover:text-ink",
+                    )}
+                  >
+                    {d.offer ? "Offered" : "Offer"}
+                  </button>
+                )}
+                {designs.length > 1 && (d.offer || i === primary) && everyDesign().some((x, j) => x.offer && j !== primary) && (
+                  <button
+                    onClick={() => flagDesign(i, "recommended")}
+                    title={d.recommended ? "Recommended to the customer: press to stop" : "Recommend this one to the customer"}
+                    aria-label={d.recommended ? `Design ${i + 1} is recommended` : `Recommend design ${i + 1}`}
+                    aria-pressed={Boolean(d.recommended)}
+                    className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
+                  >
+                    <ThumbsUp className={clsx("size-4", d.recommended ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
+                  </button>
+                )}
+                {designs.length > 1 && (
+                  <button
+                    onClick={() => setDoomed(doomed === i ? null : i)}
+                    title="Delete this design"
+                    aria-label={`Delete design ${i + 1}`}
+                    className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-canvas hover:text-danger"
+                  >
+                    <Trash2 className="size-4" aria-hidden />
+                  </button>
+                )}
+              </div>
+              {doomed === i && (
+                <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2 text-sm">
+                  <span>Delete design {i + 1}? It can&apos;t be undone.</span>
+                  <button className="font-semibold text-danger" onClick={() => removeDesign(i)}>
+                    Delete
+                  </button>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <label className="block text-sm">
+        A label for design {active + 1}
+        <input
+          value={designLabel}
+          onChange={(e) => {
+            setDesignLabel(e.target.value);
+            changed();
+          }}
+          maxLength={40}
+          placeholder="e.g. All on the north face"
+          className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-3 outline-none focus:border-forest"
+        />
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(false)}>
+          <Plus className="mr-1.5 size-4" aria-hidden /> New design
+        </button>
+        <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(true)}>
+          <Copy className="mr-1.5 size-4" aria-hidden /> Copy this one
+        </button>
+        <span className="self-center text-xs tabular-nums text-muted">
+          {designs.length} of {MAX_DESIGNS}
+        </span>
+      </div>
+      <p className="text-xs text-muted">
+        The starred design is the primary: the one this roof opens on. Offer up to {MAX_PROPOSAL_OPTIONS - 1} more to the customer as
+        options on the next proposal published, and mark the one you recommend.
+      </p>
+      {props.tight && !props.sitesOnly && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+          {props.noDeal ? (
+            <button
+              type="button"
+              onClick={() => {
+                openMenu(false);
+                if (saved === "changed") void save();
+                setNoDealOpen(true);
+              }}
+              className="inline-flex h-10 items-center gap-2 rounded-md bg-surface-2 px-4 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+            >
+              <Send className="size-4" aria-hidden /> Publish · put it on a deal first
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => void publish()}
+                disabled={saved === "saving" || publishing}
+                className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-semibold text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+              >
+                <Send className="size-4" aria-hidden /> {publishing ? "Publishing…" : "Publish design"}
+              </button>
+              {props.onNote && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    openMenu(false);
+                    setSending(true);
+                  }}
+                  className="text-sm font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
+                >
+                  With a note to {props.customerName ?? "the customer"}
+                </button>
+              )}
+            </>
+          )}
+          {sent && !sending && (
+            <p className={clsx("w-full text-xs", sent.ok ? "text-positive" : "text-warning")} role="status">
+              {sent.message}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className={clsx(props.tight && "relative")}>
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
@@ -3887,7 +4051,7 @@ export function RoofDesigner(props: {
                 <Leg label="Redo (Ctrl+Shift+Z)" onClick={redo}>
                   <Redo2 className="size-5" aria-hidden />
                 </Leg>
-                <Leg label="Show the whole picture" onClick={() => setView(WHOLE)}>
+                <Leg label="Whole picture" onClick={() => setView(WHOLE)}>
                   <Maximize className="size-5" aria-hidden />
                 </Leg>
                 <Leg label="Add a label (L)" on={tool === "label"} onClick={() => pickTool(tool === "label" ? "select" : "label")}>
@@ -3897,7 +4061,7 @@ export function RoofDesigner(props: {
             ) : undefined
           }
           tight={props.tight}
-          hold={readyOpen || menu === "designs" || liveOpen || sending || noDealOpen}
+          hold={readyOpen || (menu === "designs" && !props.tight) || liveOpen || sending || noDealOpen}
           unsaved={saved !== "saved" && saved !== "saving"}
           waiting={props.waiting ?? 0}
         >
@@ -4066,6 +4230,7 @@ export function RoofDesigner(props: {
                 changed();
               }}
               disabled={active === primary}
+              data-leg={active === primary ? "The primary design" : "Make it the primary"}
               title={
                 active === primary
                   ? "This is the primary design"
@@ -4099,127 +4264,7 @@ export function RoofDesigner(props: {
               <span>{props.tight ? `${active + 1}/${designs.length}` : `Design ${active + 1} of ${designs.length}`}</span>
               {!props.tight && active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-hidden />}
             </button>
-            {menu === "designs" && (
-              <div
-                className={clsx(
-                  "absolute z-40 max-h-[70vh] w-[24rem] max-w-[85vw] space-y-3 overflow-y-auto rounded-lg border border-line bg-surface p-3 shadow-lift",
-                  props.tight ? "left-full top-0 ml-2" : "left-0 top-full mt-2",
-                )}
-              >
-                <ul className="space-y-1.5">
-                  {everyDesign().map((d, i) => {
-                    const sum = designSummary(d);
-                    return (
-                      <li key={i} className={clsx("rounded-md border", i === active ? "border-forest" : "border-line")}>
-                        <div className="flex items-center gap-1 p-1">
-                          <button
-                            onClick={() => (i === active ? openMenu(false) : show(everyDesign(), i))}
-                            className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left hover:bg-canvas"
-                          >
-                            <span className="block truncate text-sm font-semibold">
-                              Design {i + 1}
-                              {d.label ? <span className="font-normal text-ink-2"> · {d.label}</span> : null}
-                            </span>
-                            <span className="block truncate text-xs tabular-nums text-muted">
-                              {sum.panels} panels · {sum.kw.toFixed(2)} kW · {d.panel?.name ?? props.catalogue[0]?.name ?? "Panel"}
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setPrimary(i);
-                              changed();
-                            }}
-                            disabled={i === primary}
-                            title={i === primary ? "The primary design" : "Make this the primary design"}
-                            aria-label={i === primary ? `Design ${i + 1} is the primary` : `Make design ${i + 1} the primary`}
-                            className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
-                          >
-                            <Star className={clsx("size-4", i === primary ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
-                          </button>
-                          {designs.length > 1 && i !== primary && (
-                            <button
-                              onClick={() => flagDesign(i, "offer")}
-                              title={
-                                d.offer
-                                  ? "Offered to the customer as an option: press to stop"
-                                  : "Offer it to the customer as an option, beside the primary"
-                              }
-                              aria-pressed={Boolean(d.offer)}
-                              className={clsx(
-                                "h-8 rounded-full px-2.5 text-[11px] font-semibold",
-                                d.offer ? "bg-primary text-primary-ink" : "text-muted ring-1 ring-line hover:text-ink",
-                              )}
-                            >
-                              {d.offer ? "Offered" : "Offer"}
-                            </button>
-                          )}
-                          {designs.length > 1 && (d.offer || i === primary) && everyDesign().some((x, j) => x.offer && j !== primary) && (
-                            <button
-                              onClick={() => flagDesign(i, "recommended")}
-                              title={d.recommended ? "Recommended to the customer: press to stop" : "Recommend this one to the customer"}
-                              aria-label={d.recommended ? `Design ${i + 1} is recommended` : `Recommend design ${i + 1}`}
-                              aria-pressed={Boolean(d.recommended)}
-                              className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
-                            >
-                              <ThumbsUp
-                                className={clsx("size-4", d.recommended ? "fill-sun-line text-sun-line" : "text-muted")}
-                                aria-hidden
-                              />
-                            </button>
-                          )}
-                          {designs.length > 1 && (
-                            <button
-                              onClick={() => setDoomed(doomed === i ? null : i)}
-                              title="Delete this design"
-                              aria-label={`Delete design ${i + 1}`}
-                              className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-canvas hover:text-danger"
-                            >
-                              <Trash2 className="size-4" aria-hidden />
-                            </button>
-                          )}
-                        </div>
-                        {doomed === i && (
-                          <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2 text-sm">
-                            <span>Delete design {i + 1}? It can&apos;t be undone.</span>
-                            <button className="font-semibold text-danger" onClick={() => removeDesign(i)}>
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-                <label className="block text-sm">
-                  A label for design {active + 1}
-                  <input
-                    value={designLabel}
-                    onChange={(e) => {
-                      setDesignLabel(e.target.value);
-                      changed();
-                    }}
-                    maxLength={40}
-                    placeholder="e.g. All on the north face"
-                    className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-3 outline-none focus:border-forest"
-                  />
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(false)}>
-                    <Plus className="mr-1.5 size-4" aria-hidden /> New design
-                  </button>
-                  <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(true)}>
-                    <Copy className="mr-1.5 size-4" aria-hidden /> Copy this one
-                  </button>
-                  <span className="self-center text-xs tabular-nums text-muted">
-                    {designs.length} of {MAX_DESIGNS}
-                  </span>
-                </div>
-                <p className="text-xs text-muted">
-                  The starred design is the primary: the one this roof opens on. Offer up to {MAX_PROPOSAL_OPTIONS - 1} more to the customer
-                  as options on the next proposal published, and mark the one you recommend.
-                </p>
-              </div>
-            )}
+            {menu === "designs" && !props.tight && designsMenu}
           </div>
           {!props.tight && <span className="hidden flex-1 lg:block" aria-hidden />}
           {/* Share live: the customer watches the design on their phone during the call, and says which they'd like. */}
@@ -4765,10 +4810,12 @@ export function RoofDesigner(props: {
               {/* Flicking through the roof's designs, at the end of the figures (8 Nov 2026, Martin: it was in the way on the map). */}
               {designs.length > 1 && (
                 <div
-                  className="flex shrink-0 items-center gap-0.5 rounded-r-lg border-l border-white/15 px-1.5 text-white"
+                  className="relative flex shrink-0 items-center gap-0.5 rounded-r-lg border-l border-white/15 px-1.5 text-white"
                   role="group"
                   aria-label="Designs on this roof"
+                  data-menu-host
                 >
+                  {menu === "designs" && props.tight && designsMenu}
                   <button
                     type="button"
                     onClick={() => show(everyDesign(), (active - 1 + designs.length) % designs.length)}

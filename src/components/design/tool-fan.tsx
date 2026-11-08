@@ -33,7 +33,7 @@ function KnifeRow({ children, delay, open }: { children: React.ReactNode; delay:
   const [name, setName] = useState("");
   useEffect(() => {
     // Read from the control as it stands each time the knife opens (a count or a state may have changed).
-     
+
     if (open) setName(nameOf(row.current));
   }, [open]);
   return (
@@ -123,7 +123,7 @@ export function KnifeMenu({
         )}
       >
         {sections.map((section, s) => (
-          <div key={section.title} className={clsx("w-52", s > 0 && "border-l border-line pl-1")}>
+          <div key={section.title} className={clsx("w-56", s > 0 && "border-l border-line pl-1")}>
             <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">{section.title}</p>
             <div className="space-y-0.5">
               {legsOf(section.children).map((leg, i) => (
