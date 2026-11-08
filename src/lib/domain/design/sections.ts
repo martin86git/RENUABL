@@ -72,6 +72,8 @@ export const SECTIONS: readonly Section[] = [
         also: ["/design/procurement/scheduler", "/design/installations/underway"],
       },
       { id: "completed", label: "After install", href: "/design/installations/completed" },
+      // 8 Nov 2026, Martin: installed and inspected, waiting to be connected, with the retailer and the distributor.
+      { id: "grid", label: "Grid connections", href: "/design/installations/grid" },
       { id: "invoices", label: "Installer invoices", href: "/design/installations/invoices" },
       // The installers and inspectors this retailer works with (connections.ts).
       { id: "connections", label: "Connections", href: "/design/connections" },

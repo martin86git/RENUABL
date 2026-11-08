@@ -89,3 +89,99 @@ What usually applies (as read in late 2026; say it is the usual rule and to chec
 - Batteries count toward the inverter capacity the distributor approves; an AC-coupled battery adds its inverter's rating.
 - After the install: the electrician lodges the certificate of electrical safety and the electrical works request; the retailer arranges the meter to be reconfigured; exports start only then.
 Never say a site will be approved, nor give a figure as the network's for that home: the distributor decides. When asked something specific you aren't sure of for that network (a fee, a form's name, a limit on a particular feeder), say so and send them to the distributor's connection guide or its customer team.`;
+
+/**
+ * Which distributor most of a Victorian postcode is on (8 Nov 2026, Martin: the Distributor field fills itself once the
+ * deal's address is known). A best guess for the deal's Distributor field until someone types it: the boundaries run
+ * through postcodes, so a home near one can be on the next network. The NMI on the bill settles it, and wins whenever
+ * it is on the deal. VERIFY against the distributors' own maps before relying on a postcode near a boundary. Ranges
+ * are inclusive, first match wins (the exceptions come before the wide ranges they sit in).
+ */
+const VIC_POSTCODES: readonly [from: number, to: number, id: string][] = [
+  // CitiPower: the CBD and inner suburbs.
+  [3000, 3008, "citipower"],
+  [3010, 3010, "citipower"],
+  [3050, 3054, "citipower"],
+  [3065, 3068, "citipower"],
+  [3101, 3103, "citipower"],
+  [3121, 3124, "citipower"],
+  [3126, 3126, "citipower"],
+  [3141, 3144, "citipower"],
+  [3146, 3146, "citipower"],
+  [3181, 3183, "citipower"],
+  [3205, 3207, "citipower"],
+  // Jemena: Melbourne's north and north-west.
+  [3011, 3013, "jemena"],
+  [3031, 3049, "jemena"],
+  [3055, 3064, "jemena"],
+  [3070, 3075, "jemena"],
+  [3078, 3081, "jemena"],
+  [3084, 3085, "jemena"],
+  // United Energy: the south-east and the Mornington Peninsula.
+  [3104, 3104, "united-energy"],
+  [3125, 3125, "united-energy"],
+  [3127, 3133, "united-energy"],
+  [3145, 3145, "united-energy"],
+  [3147, 3153, "united-energy"],
+  [3161, 3204, "united-energy"],
+  [3910, 3944, "united-energy"],
+  [3975, 3977, "united-energy"],
+  // AusNet: the outer east and north, Gippsland and the north-east.
+  [3076, 3077, "ausnet"],
+  [3082, 3083, "ausnet"],
+  [3086, 3099, "ausnet"],
+  [3105, 3116, "ausnet"],
+  [3134, 3140, "ausnet"],
+  [3154, 3160, "ausnet"],
+  [3658, 3749, "ausnet"],
+  [3750, 3909, "ausnet"],
+  [3945, 3974, "ausnet"],
+  [3978, 3999, "ausnet"],
+  // Powercor: the western suburbs and central and western Victoria.
+  [3014, 3030, "powercor"],
+  [3208, 3657, "powercor"],
+];
+
+/** The states and territories with one distributor for (nearly) every home. */
+const ONE_NETWORK: Record<string, string> = {
+  SA: "SA Power Networks",
+  TAS: "TasNetworks",
+  ACT: "Evoenergy",
+  NT: "Power and Water",
+};
+
+/** How a deal's distributor was found: its NMI (certain), its state (one network there), or its postcode (a guess). */
+export type DistributorBasis = "nmi" | "state" | "postcode";
+export interface DistributorGuess {
+  name: string;
+  how: DistributorBasis;
+}
+
+export const DISTRIBUTOR_BASIS_WORDS: Record<DistributorBasis, string> = {
+  nmi: "From the NMI",
+  state: "The state's network",
+  postcode: "From the postcode, check the NMI",
+};
+
+/** The postcode and state in an address ("12 Example St, Glen Waverley VIC 3150"). */
+function placeIn(address: string): { postcode: number | null; state: string | null } {
+  const postcode = [...address.matchAll(/(?<![\d/-])(\d{4})(?![\d/-])/g)].map((m) => Number(m[1])).filter((p) => p >= 200);
+  const state = /\b(VIC|NSW|QLD|SA|WA|TAS|NT|ACT)\b/i.exec(address)?.[1]?.toUpperCase() ?? null;
+  return { postcode: postcode.length ? postcode[postcode.length - 1] : null, state };
+}
+
+/**
+ * The distributor a deal's home is on, as far as can be told without asking anyone: by its NMI when the deal has one,
+ * else by the state where there is only one network, else by a Victorian postcode. Null when none of those say.
+ */
+export function distributorFor(o: { address?: string | null; nmi?: string | null }): DistributorGuess | null {
+  const byNmi = distributorForNmi(o.nmi);
+  if (byNmi) return { name: byNmi.name, how: "nmi" };
+  const { postcode, state } = placeIn(o.address ?? "");
+  if (state && ONE_NETWORK[state]) return { name: ONE_NETWORK[state], how: "state" };
+  const victorian = postcode !== null && postcode >= 3000 && postcode <= 3999 && (state === null || state === "VIC");
+  if (!victorian) return null;
+  const id = VIC_POSTCODES.find(([from, to]) => postcode >= from && postcode <= to)?.[2];
+  const d = VIC_DISTRIBUTORS.find((x) => x.id === id);
+  return d ? { name: d.name, how: "postcode" } : null;
+}

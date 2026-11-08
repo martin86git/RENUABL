@@ -200,7 +200,7 @@ export function SectionFieldLine({ line, onSave }: { line: SectionLine; onSave: 
     setText(null);
   };
   const box = clsx(
-    "mt-0.5 block w-[calc(100%+1rem)] -mx-2 rounded-md border bg-transparent px-2 text-sm text-ink outline-none placeholder:text-muted focus:border-forest focus:bg-surface",
+    "mt-0.5 block w-[calc(100%+1rem)] -mx-2 rounded-md border bg-transparent px-2 text-sm text-ink outline-none focus:border-forest focus:bg-surface",
     line.typed && line.filled ? "border-sun-line" : "border-transparent hover:border-line",
   );
   return (
@@ -216,7 +216,7 @@ export function SectionFieldLine({ line, onSave }: { line: SectionLine; onSave: 
           </select>
         ) : field.kind === "long" ? (
           <textarea
-            className={clsx(box, "min-h-16 py-1.5 leading-relaxed")}
+            className={clsx(box, "min-h-16 py-1.5 leading-relaxed placeholder:text-muted")}
             value={text ?? stored}
             placeholder="--"
             maxLength={2000}
@@ -225,11 +225,17 @@ export function SectionFieldLine({ line, onSave }: { line: SectionLine; onSave: 
           />
         ) : (
           <input
-            className={clsx(box, "h-8", field.kind === "money" && "tabular-nums")}
+            className={clsx(
+              box,
+              "h-8",
+              field.kind === "money" && "tabular-nums",
+              field.kind === "text" && line.filled ? "placeholder:text-ink" : "placeholder:text-muted",
+            )}
             type={field.kind === "date" ? "date" : "text"}
             inputMode={field.kind === "money" ? "decimal" : undefined}
             value={text ?? (field.kind === "money" && !line.typed ? "" : stored)}
-            placeholder={field.kind === "money" ? (line.filled ?? "$") : "--"}
+            // A value worked out for the deal (the proposal's dollars, the distributor from the address) shows until one is typed.
+            placeholder={field.kind === "money" ? (line.filled ?? "$") : (line.filled ?? "--")}
             maxLength={120}
             onChange={(e) => (field.kind === "date" ? onSave(e.target.value) : setText(e.target.value))}
             onBlur={field.kind === "date" ? undefined : done}
@@ -242,7 +248,9 @@ export function SectionFieldLine({ line, onSave }: { line: SectionLine; onSave: 
       </label>
       {line.typed && line.filled && (
         <button className="mt-1 text-[11px] text-sun-ink underline underline-offset-2" onClick={() => onSave("")}>
-          Typed in by hand: use the proposal&apos;s ({line.filled})
+          {field.key === "distributor"
+            ? `Typed in by hand: use the one worked out (${line.filled})`
+            : `Typed in by hand: use the proposal's (${line.filled})`}
         </button>
       )}
     </div>

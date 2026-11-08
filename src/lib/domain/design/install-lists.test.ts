@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { cleanJobDetails } from "./crm";
-import { installRevenueThisMonth, installedOn, installerBooked, nextAfterStep, paperworkDone, type JobExtra } from "./deal";
+import {
+  gridConnectionJobs,
+  gridStateOf,
+  installRevenueThisMonth,
+  installedOn,
+  installerBooked,
+  nextAfterStep,
+  paperworkDone,
+  type JobExtra,
+} from "./deal";
 
 const TODAY = "2026-10-18";
 const job = (id: string, over: Record<string, unknown> = {}) =>
@@ -63,5 +72,22 @@ describe("the Installations lists", () => {
         evCharger: "7 kW",
       }),
     ).toEqual({ installer: "Sparky Pty Ltd", customerInvoice: "paid", gridConnection: "underway", evCharger: "7 kW" });
+  });
+});
+
+describe("Grid connections", () => {
+  it("lists installed deals once the inspection is done, still to raise first", () => {
+    const jobs = [
+      job("waiting", { stage: "installed", installDate: "2026-10-01" }),
+      job("booked", { stage: "inspection", installDate: "2026-10-01" }),
+      job("raised", { stage: "coes", installDate: "2026-09-01", details: { gridConnection: "underway" } }),
+      job("coes", { stage: "installed", installDate: "2026-10-05", details: { coes: "received" } }),
+      job("grid", { stage: "grid", installDate: "2026-10-02" }),
+      job("done", { stage: "claimed", installDate: "2026-08-01", details: { gridConnection: "completed" } }),
+      job("sold", { stage: "won", details: { coes: "received" } }),
+    ];
+    expect(gridConnectionJobs(jobs).map((j: { id: string }) => j.id)).toEqual(["grid", "coes", "raised", "done"]);
+    expect(gridStateOf(job("x", { details: { gridConnection: "underway" } }))).toBe("raised");
+    expect(gridStateOf(job("x"))).toBe("to-raise");
   });
 });

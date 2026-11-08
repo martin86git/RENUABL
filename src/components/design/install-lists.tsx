@@ -9,6 +9,11 @@ import { INSTALLED_STAGES, PROGRESS, PROGRESS_LABELS, type ProgressKey } from "@
 import {
   AFTER_INSTALL_STEPS,
   AFTER_STEP_WORDS,
+  GRID_STATE_WORDS,
+  gridConnectionJobs,
+  gridStateOf,
+  inspectionDone,
+  type GridState,
   afterStepDone,
   completedInstalls,
   daysUntil,
@@ -24,6 +29,7 @@ import {
   type JobExtra,
 } from "@/lib/domain/design/deal";
 import { todayInMarket } from "@/lib/domain/market";
+import { DISTRIBUTOR_BASIS_WORDS, distributorFor } from "@/lib/domain/design/networks";
 import type { ISODate } from "@/lib/domain/types";
 import { loadInstallExtras } from "@/lib/services/after-sale";
 import { dollars, listJobs, saveJob, shortDate, type JobLine } from "@/lib/services/crm";
@@ -505,6 +511,203 @@ export function AfterInstallPage() {
       </p>
       <Problem text={problem} />
       <CompletedInstallsView jobs={jobs} today={todayInMarket()} onJob={changed} />
+    </div>
+  );
+}
+
+type GridFilter = "open" | "connected" | "all";
+
+/** A deal detail typed in a row's cell, saved when the box is left (or on Enter); Escape puts it back. */
+function DetailCell({
+  job,
+  field,
+  label,
+  placeholder,
+  filled,
+  onJob,
+}: {
+  job: JobLine;
+  field: string;
+  label: string;
+  placeholder?: string;
+  /** The placeholder is a value worked out for the deal, so it reads as one. */
+  filled?: boolean;
+  onJob: ListProps["onJob"];
+}) {
+  const [text, setText] = useState<string | null>(null);
+  const saved = job.details?.[field] ?? "";
+  const done = () => {
+    if (text !== null && text.trim() !== saved) void setDetail(job, field, text.trim(), onJob);
+    setText(null);
+  };
+  return (
+    <input
+      value={text ?? saved}
+      placeholder={placeholder ?? "–"}
+      maxLength={120}
+      aria-label={`${label} for ${job.customerName}`}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={done}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") setText(null);
+      }}
+      className={clsx(
+        "h-8 w-full min-w-[8rem] rounded border border-transparent bg-transparent px-1.5 text-[12.5px] text-ink outline-none hover:border-line focus:border-ink focus:bg-surface",
+        filled ? "placeholder:text-ink" : "placeholder:text-muted",
+      )}
+    />
+  );
+}
+
+/**
+ * The distributor's cell: what is typed on the deal, else the network worked out from its NMI or address
+ * (`distributorFor`), shown as filled in with how it was found. Typing over it keeps what is typed.
+ */
+function DistributorCell({ job, onJob }: { job: JobLine; onJob: ListProps["onJob"] }) {
+  const typed = job.details?.distributor ?? "";
+  const guess = typed ? null : distributorFor({ address: job.address, nmi: job.details?.nmi });
+  return (
+    <div>
+      <DetailCell
+        job={job}
+        field="distributor"
+        label="Distributor"
+        placeholder={guess?.name ?? "–"}
+        filled={Boolean(guess)}
+        onJob={onJob}
+      />
+      {guess && (
+        <span
+          className={clsx("block px-1.5 text-[10.5px]", guess.how === "postcode" ? "text-warning" : "text-muted")}
+          title={guess.how === "postcode" ? "A postcode can sit on two networks: the NMI on the bill settles it." : undefined}
+        >
+          {DISTRIBUTOR_BASIS_WORDS[guess.how]}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const GRID_VALUE: Record<GridState, string> = { "to-raise": "pending", raised: "underway", connected: "completed" };
+
+/**
+ * /design/installations/grid: Grid connections (8 Nov 2026, Martin). Every deal installed whose inspection is done,
+ * until it is connected, with the electricity retailer it is with and the network distributor (filled from the NMI or
+ * the address until one is typed), the NMI, and where the connection stands.
+ */
+export function GridConnectionsPage() {
+  const { jobs, problem, changed } = useJobs();
+  const extras = useExtras();
+  const today = todayInMarket();
+  const [filter, setFilter] = useState<GridFilter>("open");
+  const listed = jobs ? gridConnectionJobs(jobs) : null;
+  const waiting = jobs ? jobs.filter((j) => INSTALLED_STAGES.includes(j.stage) && !inspectionDone(j)).length : 0;
+  const open = listed?.filter((j) => gridStateOf(j) !== "connected") ?? [];
+  const shown =
+    listed?.filter((j) =>
+      filter === "all" ? true : filter === "connected" ? gridStateOf(j) === "connected" : gridStateOf(j) !== "connected",
+    ) ?? null;
+  return (
+    <div className={ui.page}>
+      <PageHead title="Grid connections" />
+      <p className="mt-1 text-[13.5px] text-ink-2">
+        Installed and inspected, waiting to be connected to the grid.
+        {waiting > 0 && ` ${waiting} more installed ${waiting === 1 ? "is" : "are"} still waiting on the inspection.`}
+      </p>
+      <Problem text={problem} />
+      <div className="mt-5">
+        <Segmented
+          label="Show"
+          size="sm"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: "open", label: `To connect${listed ? ` · ${open.length}` : ""}` },
+            { value: "connected", label: "Connected" },
+            { value: "all", label: "All" },
+          ]}
+        />
+      </div>
+      <div className={clsx(ui.card, "mt-3 overflow-x-auto")}>
+        <table className="w-full min-w-[62rem]">
+          <thead>
+            <tr className="border-b border-line">
+              <th className={clsx(head, "pl-4")}>Job</th>
+              <th className={head}>System</th>
+              <th className={head}>Installed</th>
+              <th className={head}>Electricity retailer</th>
+              <th className={head}>Distributor</th>
+              <th className={head}>NMI</th>
+              <th className={clsx(head, "pr-4")}>Grid connection</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {!shown && (
+              <tr>
+                <td colSpan={7} className="p-4 text-[13px] text-muted">
+                  Loading…
+                </td>
+              </tr>
+            )}
+            {shown?.length === 0 && (
+              <tr>
+                <td colSpan={7} className="p-4 text-[13px] text-ink-2">
+                  {filter === "connected" ? "None connected yet." : "Nothing waiting to be connected."}
+                </td>
+              </tr>
+            )}
+            {shown?.map((j) => {
+              const on = installedOn(j);
+              const state = gridStateOf(j);
+              return (
+                <tr key={j.id}>
+                  <JobCell job={j} />
+                  <td className={cell}>
+                    <SystemMarks job={j} extra={extras?.find((e) => e.jobId === j.id)} />
+                  </td>
+                  <td className={clsx(cell, "text-[12.5px] tabular-nums text-ink-2")}>
+                    {on ? shortDate(on) : "–"}
+                    {on && state !== "connected" && daysUntil(on, today) < 0 && (
+                      <span className="block text-[11px] text-muted">{-daysUntil(on, today)} days ago</span>
+                    )}
+                  </td>
+                  <td className={cell}>
+                    <DetailCell job={j} field="retailer" label="Electricity retailer" onJob={changed} />
+                  </td>
+                  <td className={cell}>
+                    <DistributorCell job={j} onJob={changed} />
+                  </td>
+                  <td className={cell}>
+                    <DetailCell job={j} field="nmi" label="NMI" onJob={changed} />
+                  </td>
+                  <td className={clsx(cell, "pr-4")}>
+                    <select
+                      value={GRID_VALUE[state]}
+                      onChange={(e) => void setDetail(j, "gridConnection", e.target.value, changed)}
+                      aria-label={`Grid connection for ${j.customerName}`}
+                      className={clsx(
+                        "rounded border px-1.5 py-1 text-[12.5px]",
+                        state === "connected"
+                          ? "border-positive/40 bg-positive-soft text-positive"
+                          : state === "raised"
+                            ? "border-line bg-surface text-ink"
+                            : "border-sun-line bg-surface font-medium text-ink ring-1 ring-sun-line",
+                      )}
+                    >
+                      {(Object.keys(GRID_VALUE) as GridState[]).map((s) => (
+                        <option key={s} value={GRID_VALUE[s]}>
+                          {GRID_STATE_WORDS[s]}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

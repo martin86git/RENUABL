@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { distributorFor } from "@/lib/domain/design/networks";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -513,6 +514,8 @@ export function DealPage({ id }: { id: string }) {
     installDate: job.installDate ? shortDate(job.installDate) : null,
     installer: job.details?.[INSTALLER_KEY] ?? null,
     designed: fromDesign,
+    // 8 Nov 2026, Martin: the Distributor fills itself once the address is known (the NMI wins when there is one).
+    distributor: distributorFor({ address: job.address, nmi: job.details?.nmi })?.name ?? null,
     signed: extra
       ? {
           incGst: extra.incGst ?? null,

@@ -356,7 +356,14 @@ const PROGRESS_WORDS: Record<string, string> = {
 export function fieldLine(
   f: ResolvedField,
   details: Record<string, string>,
-  ctx: { installDate: string | null; installer: string | null; signed: SignedFigures | null; designed?: Record<string, string> },
+  ctx: {
+    installDate: string | null;
+    installer: string | null;
+    signed: SignedFigures | null;
+    designed?: Record<string, string>;
+    /** The distributor worked out from the deal's NMI or address (networks.ts `distributorFor`), until one is typed. */
+    distributor?: string | null;
+  },
 ): SectionLine {
   const s = ctx.signed;
   if (f.source === "known") {
@@ -383,7 +390,9 @@ export function fieldLine(
         ? money(s.solarVicRebate)
         : f.key === "solarVicLoan" && s?.solarVicLoan
           ? money(s.solarVicLoan)
-          : null;
+          : f.key === "distributor"
+            ? (ctx.distributor ?? null)
+            : null;
   const raw = details[f.key];
   const shown = raw ? (f.kind === "money" ? money(Number(raw)) : raw) : null;
   return { key: f.key, label: f.label, source: f.source, value: shown ?? filled, filled, typed: Boolean(raw), field };

@@ -584,6 +584,24 @@ export const nextAfterStep = (j: AfterJob): AfterInstallStep | null => AFTER_INS
 /** After the install, whether all four steps are done: paid, CoES in, STCs claimed, grid connection raised. */
 export const paperworkDone = (j: AfterJob) => nextAfterStep(j) === null;
 
+/**
+ * Grid connections (8 Nov 2026, Martin): every deal installed whose inspection is done, until it is connected. The
+ * inspection counts as done once the CoES is in (it follows the inspection), on the deal or by its stage. Lost deals
+ * aren't listed.
+ */
+export const inspectionDone = (j: AfterJob): boolean => afterStepDone(j, "coes");
+export type GridState = "to-raise" | "raised" | "connected";
+export const GRID_STATE_WORDS: Record<GridState, string> = { "to-raise": "To raise", raised: "Raised", connected: "Connected" };
+export const gridStateOf = (j: Pick<Job, "details">): GridState =>
+  j.details?.gridConnection === "completed" ? "connected" : j.details?.gridConnection === "underway" ? "raised" : "to-raise";
+/** The deals for the Grid connections page: installed, inspection done; still to raise first, then raised, then connected, longest installed first. */
+export function gridConnectionJobs<J extends Pick<Job, "details" | "stage" | "installDate" | "installedAt">>(jobs: readonly J[]): J[] {
+  const order: Record<GridState, number> = { "to-raise": 0, raised: 1, connected: 2 };
+  return jobs
+    .filter((j) => INSTALLED_STAGES.includes(j.stage) && inspectionDone(j))
+    .sort((a, b) => order[gridStateOf(a)] - order[gridStateOf(b)] || (installedOn(a) ?? "9").localeCompare(installedOn(b) ?? "9"));
+}
+
 /** The days a job was installed on, for the calendar: its install date, else the day it was marked installed. */
 export const installedOn = (j: Pick<Job, "installDate" | "installedAt">): ISODate | null =>
   j.installDate ?? (j.installedAt ? (j.installedAt.slice(0, 10) as ISODate) : null);
