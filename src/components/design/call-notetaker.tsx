@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, Loader2, Mic, NotebookPen, Square, X } from "lucide-react";
+import { Check, Loader2, Mic, MicOff, NotebookPen, Square, X } from "lucide-react";
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { MIN_WORDS, pointsDue, wordsIn, type CallNotes, type HeardLine } from "@/lib/domain/design/call-notes";
@@ -16,7 +16,8 @@ const stamp = () => new Date().toLocaleTimeString("en-AU", { hour: "numeric", mi
 
 /**
  * The call note-taker on a deal (1 Nov 2026, Martin: Primero's copied across, wave 7). "Note-taker" switches the
- * computer's microphone on for a call taken on the phone: the browser's own speech recognition turns the member's side
+ * computer's microphone on for a call taken on the phone (since 8 Nov 2026, Martin: the bar opens with the microphone
+ * off, Start listening / Pause switch it on and off by hand, and what is said is typed up live in the bar): the browser's own speech recognition turns the member's side
  * into words in the page (Chrome and Edge send the sound to Google or Microsoft for that; nothing is recorded or kept).
  * A dark bar at the foot shows the salient points so far (8 Nov 2026, Martin: summarised as it listens, not dictated
  * word for word; the words themselves behind "What was heard"), with Add a note (what is said until Note done is
@@ -49,6 +50,9 @@ export function CallNotetaker({
   const [on, setOn] = useState(false);
   const [lines, setLines] = useState<HeardLine[]>([]);
   const [hearing, setHearing] = useState("");
+  const hearingRef = useRef("");
+  /** The microphone, switched on and off by the member (8 Nov 2026, Martin: start it by hand, pause it, start again). */
+  const [mic, setMic] = useState(false);
   const [noting, setNoting] = useState<"" | "general" | "design">("");
   const [typed, setTyped] = useState("");
   const [state, setState] = useState<"listening" | "writing" | "ready" | "saved">("listening");
@@ -80,6 +84,14 @@ export function CallNotetaker({
     notingRef.current = noting;
   }, [noting]);
 
+  /** Whatever was still being made out when a recogniser stops is kept as a line rather than lost with it. */
+  const keepHearing = () => {
+    const h = hearingRef.current;
+    hearingRef.current = "";
+    setHearing("");
+    const n = notingRef.current;
+    if (h) setLines((all) => [...all, { at: stamp(), text: h, ...(n ? { note: true } : {}), ...(n === "design" ? { design: true } : {}) }]);
+  };
   const listen = () => {
     const R = recognitionClass();
     if (!R) return;
@@ -97,36 +109,52 @@ export function CallNotetaker({
           setLines((all) => [...all, { at: stamp(), text, ...(n ? { note: true } : {}), ...(n === "design" ? { design: true } : {}) }]);
         } else now += ` ${text}`;
       }
-      setHearing(now.trim());
+      hearingRef.current = now.trim();
+      setHearing(hearingRef.current);
     };
-    // Recognition stops itself after a pause: start it again while the call is on.
+    // Recognition stops itself after a pause (and after a network or no-speech error): while the mic is on, start a
+    // fresh one a moment later. Restarting the same object straight from onend often throws in Chrome and left the
+    // note-taker deaf after the first sentence (8 Nov 2026, Martin: only a fragment of the call was captured).
     r.onend = () => {
-      if (live.current) {
-        try {
-          r.start();
-        } catch {
-          // Already starting.
-        }
-      }
+      if (rec.current !== r) return;
+      keepHearing();
+      if (live.current) window.setTimeout(() => live.current && rec.current === r && listen(), 250);
     };
     r.onerror = (e) => {
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         live.current = false;
-        setProblem("The microphone isn't allowed for this page. Allow it in the browser's address bar and start again.");
+        setMic(false);
+        setProblem("The microphone isn't allowed for this page. Allow it in the browser's address bar and press Start listening.");
       }
     };
     rec.current = r;
     live.current = true;
-    r.start();
+    try {
+      r.start();
+    } catch {
+      // Already starting.
+    }
   };
   const stopListening = () => {
     live.current = false;
-    rec.current?.stop();
+    const r = rec.current;
     rec.current = null;
-    setHearing("");
+    r?.stop();
+    keepHearing();
   };
   useEffect(() => () => stopListening(), []);
 
+  const micOn = () => {
+    setProblem(null);
+    setMic(true);
+    listen();
+  };
+  const micOff = () => {
+    setMic(false);
+    stopListening();
+  };
+
+  /** Opens the bar with the microphone off: the member dials, then presses Start listening. */
   const start = () => {
     setLines([]);
     setNotes("");
@@ -136,18 +164,18 @@ export function CallNotetaker({
     setPointsOff(false);
     ask.current = { pending: false, wordsAtLast: 0, at: Date.now(), round: ask.current.round + 1 };
     setState("listening");
+    setMic(false);
     setOn(true);
-    listen();
   };
   const close = () => {
-    stopListening();
+    micOff();
     ask.current.round += 1;
     setOn(false);
   };
 
   // Sum the call up again every so often while listening: after enough new words and long enough since the last ask
   // (`pointsDue`), never while one is out. A tick looks again when the words stop, so the last few still get in.
-  const listening = on && state === "listening" && !pointsOff;
+  const listening = on && mic && state === "listening" && !pointsOff;
   useEffect(() => {
     if (!listening) return;
     const look = () => {
@@ -189,7 +217,7 @@ export function CallNotetaker({
     setTyped("");
   };
   const writeUp = async () => {
-    stopListening();
+    micOff();
     setState("writing");
     const res = await writeUpCall(jobId, lines);
     if (!res.ok) {
@@ -249,7 +277,7 @@ export function CallNotetaker({
           <div className="theme-studio contents">
             <div className="fixed inset-x-3 bottom-3 z-[55] mx-auto max-w-3xl rounded-2xl bg-primary p-4 text-white shadow-lift sm:inset-x-6">
               <div className="flex items-center gap-2">
-                {state === "listening" ? (
+                {state === "listening" && mic ? (
                   <span className="relative flex size-2.5">
                     <span className="absolute inset-0 animate-ping rounded-full bg-sun-line/60 motion-reduce:hidden" />
                     <span className="relative size-2.5 rounded-full bg-sun-line" />
@@ -259,7 +287,11 @@ export function CallNotetaker({
                 )}
                 <p className="flex-1 text-sm font-medium">
                   {state === "listening"
-                    ? `Listening · ${words} ${words === 1 ? "word" : "words"}`
+                    ? mic
+                      ? `Listening · ${words} ${words === 1 ? "word" : "words"}`
+                      : words
+                        ? `Paused · ${words} ${words === 1 ? "word" : "words"}`
+                        : "Note-taker ready: the microphone is off"
                     : state === "writing"
                       ? "Writing up…"
                       : state === "ready"
@@ -286,15 +318,14 @@ export function CallNotetaker({
                     Take the call on your phone, to your ear or on a headset, never on speaker: this hears your side only. Nothing is
                     recorded or kept.
                   </p>
-                  {pointsOff || (pointsNote && !points.length) ? (
-                    // No live points to be had: the words as heard, as before, and why.
-                    <HeardWords lines={lines} hearing={hearing} className="mt-3 max-h-28" />
-                  ) : (
-                    <div className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-sm text-white/85" aria-live="polite">
-                      {points.length ? (
+                  {/* The words as they are said, typed up live (8 Nov 2026, Martin), the latest always in view. */}
+                  <LiveWords lines={lines} hearing={hearing} mic={mic} />
+                  {(points.length > 0 || pointsNote) && (
+                    <div className="mt-2 rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white/85" aria-live="polite">
+                      {points.length > 0 && (
                         <>
                           <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
-                            <SolIcon className="size-3.5 text-sun-line" aria-hidden /> So far
+                            <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Sol&rsquo;s points so far
                           </p>
                           <ul className="mt-1 space-y-0.5">
                             {points.map((p) => (
@@ -305,29 +336,23 @@ export function CallNotetaker({
                             ))}
                           </ul>
                         </>
-                      ) : (
-                        <p className="text-white/50">Listening…</p>
                       )}
-                      {lines
-                        .filter((l) => l.note)
-                        .slice(-2)
-                        .map((l, i) => (
-                          <p key={i} className="mt-1 text-sun-line">
-                            {l.design ? "Design note: " : "Note: "}
-                            {l.text}
-                          </p>
-                        ))}
-                      {noting && hearing && <p className="mt-1 text-white/50">{hearing}</p>}
+                      {pointsNote && <p className="text-xs text-white/60">{pointsNote}</p>}
                     </div>
                   )}
-                  {pointsNote && <p className="mt-1.5 text-xs text-white/60">{pointsNote}</p>}
-                  {!pointsOff && !(pointsNote && !points.length) && (
-                    <details className="mt-2 text-xs text-white/60">
-                      <summary className="cursor-pointer select-none hover:text-white/80">What was heard</summary>
-                      <HeardWords lines={lines} hearing={hearing} className="mt-1.5 max-h-32" />
-                    </details>
-                  )}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={mic ? micOff : micOn}
+                      aria-pressed={mic}
+                      className={clsx(
+                        "inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold",
+                        mic ? "bg-sun-line text-white" : "bg-white text-ink hover:bg-white/90",
+                      )}
+                    >
+                      {mic ? <MicOff className="size-3.5" aria-hidden /> : <Mic className="size-3.5" aria-hidden />}
+                      {mic ? "Pause" : words ? "Listen again" : "Start listening"}
+                    </button>
                     {(["general", "design"] as const).map((k) => (
                       <button
                         key={k}
@@ -419,18 +444,37 @@ export function CallNotetaker({
   );
 }
 
-/** The words as heard, latest last: shown when there are no live points, else behind "What was heard". */
-function HeardWords({ lines, hearing, className }: { lines: HeardLine[]; hearing: string; className?: string }) {
+/** The words as they are said, latest last and kept in view: what is still being made out shows lighter as it comes. */
+function LiveWords({ lines, hearing, mic }: { lines: HeardLine[]; hearing: string; mic: boolean }) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = box.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [lines, hearing]);
   return (
-    <div className={clsx("overflow-y-auto rounded-lg bg-white/5 px-3 py-2 text-sm text-white/85", className)}>
-      {lines.slice(-30).map((l, i) => (
-        <p key={i} className={clsx(l.note && "text-sun-line")}>
+    <div
+      ref={box}
+      aria-live="polite"
+      className="mt-3 max-h-44 min-h-20 overflow-y-auto rounded-lg bg-white/5 px-3 py-2 text-[15px] leading-relaxed text-white"
+    >
+      {lines.slice(-60).map((l, i) => (
+        <span key={i} className={clsx(l.note && "text-sun-line")}>
           {l.note ? (l.design ? "Design note: " : "Note: ") : ""}
-          {l.text}
-        </p>
+          {l.text}{" "}
+        </span>
       ))}
-      {hearing && <p className="text-white/50">{hearing}</p>}
-      {!lines.length && !hearing && <p className="text-white/50">Nothing heard yet.</p>}
+      {hearing && <span className="text-white/55">{hearing}</span>}
+      {mic && (
+        <span
+          className="ml-0.5 inline-block h-[1.05em] w-0.5 translate-y-[0.15em] animate-pulse bg-sun-line motion-reduce:animate-none"
+          aria-hidden
+        />
+      )}
+      {!lines.length && !hearing && (
+        <p className="text-white/50">
+          {mic ? "Listening… start talking." : "Press Start listening when the call begins. What you say is typed here as you say it."}
+        </p>
+      )}
     </div>
   );
 }

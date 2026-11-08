@@ -313,7 +313,7 @@ function DealCard(props: {
               <Tool
                 quiet={Boolean(move)}
                 label="Call"
-                title={d.phone ? `Call ${d.phone} with the note-taker listening` : "No phone on file"}
+                title={d.phone ? `Call ${d.phone} with the note-taker open` : "No phone on file"}
                 onClick={d.phone ? call : undefined}
               >
                 <Phone className="size-4" aria-hidden />
@@ -445,7 +445,7 @@ function MoveButton(props: { deal: FeedDeal; move: NextMove; now: Date; reviewin
       <button
         type="button"
         onClick={props.onCall}
-        title={d.phone ? `Call ${d.phone} with the note-taker listening` : undefined}
+        title={d.phone ? `Call ${d.phone} with the note-taker open` : undefined}
         className={look}
       >
         {inner}

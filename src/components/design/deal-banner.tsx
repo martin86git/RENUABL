@@ -184,7 +184,7 @@ export function DealBanner({
               <Mail className="size-[18px]" aria-hidden />
             </Round>
             <Round
-              label={phone ? `Call ${customer.phone} with the note-taker listening` : "No phone on file"}
+              label={phone ? `Call ${customer.phone} with the note-taker open` : "No phone on file"}
               off={!phone}
               onClick={() => {
                 // A phone dials; a computer opens the note-taker, and the call is made on the phone beside it.
