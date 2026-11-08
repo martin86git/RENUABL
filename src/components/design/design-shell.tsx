@@ -40,6 +40,7 @@ import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawe
 import { TeamChatButton } from "./team-chat";
 import { DayWeather, NotificationsMenu, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
+import { SectionFold } from "./section-fold";
 
 export { MarketplaceMark };
 
@@ -372,46 +373,100 @@ function Shell({
           </div>
           <div className="mt-4 flex min-w-0 items-center justify-center">
             <nav aria-label="Sections" className="studio-sections flex items-center gap-0.5 rounded-full bg-surface-2 p-1">
-              {sections.map((sec, i) => {
-                const lit = sec.id === current.id;
-                const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);
-                const design =
-                  i === 1 && designsRoofs(kind) ? (
-                    // The design tool, the main tool, as an orange round between Today and CRM: larger than the pill (it
-                    // stands out of it without making it taller), centred between Today's white pill and the word CRM.
+              {(() => {
+                // The business's own sections (CRM, Procurement, Installation, Service) fold behind one layers icon
+                // (section-fold.tsx, 8 Nov 2026, Martin): Today, the designer and Sol are the surface; the sections are
+                // the engine, opened on hover, kept open inside one of them, or pinned. Only where there are enough of
+                // them to be worth folding (a retailer's); an installer's or inspector's few stay as they are.
+                const foldable = sections.filter((s, i) => i > 0 && s.id !== "marketplace");
+                if (foldable.length < 3) return null;
+                const link = (sec: (typeof sections)[number]) => {
+                  const lit = sec.id === current.id;
+                  const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);
+                  return (
                     <Link
-                      key="design"
-                      href={PATHS.designer}
-                      aria-label="Design tool"
-                      title="Design tool"
-                      aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
+                      key={sec.id}
+                      href={sec.pages[0].href}
+                      aria-current={lit ? "true" : undefined}
                       className={clsx(
-                        "-my-2 flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
-                        current.id === sections[0].id ? "ml-3.5" : "mx-0",
-                        path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface-2",
+                        "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
+                        lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
                       )}
                     >
-                      <PenTool className="size-5" aria-hidden />
+                      {sec.label}
+                      {waiting > 0 && <span className="size-1.5 rounded-full bg-sun-line" aria-label={`${waiting} waiting`} />}
                     </Link>
-                  ) : null;
-                // The Marketplace is the network, not the business's own work: it has its own button beside the pill.
-                if (sec.id === "marketplace") return design;
-                return [
-                  design,
-                  <Link
-                    key={sec.id}
-                    href={sec.pages[0].href}
-                    aria-current={lit ? "true" : undefined}
-                    className={clsx(
-                      "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
-                      lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                  );
+                };
+                const onToday = current.id === sections[0].id;
+                return (
+                  <>
+                    {link(sections[0])}
+                    {designsRoofs(kind) && (
+                      <Link
+                        href={PATHS.designer}
+                        aria-label="Design tool"
+                        title="Design tool"
+                        aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
+                        className={clsx(
+                          "-my-2 mx-1.5 flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
+                          onToday && "ml-3.5",
+                          path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface-2",
+                        )}
+                      >
+                        <PenTool className="size-5" aria-hidden />
+                      </Link>
                     )}
-                  >
-                    {sec.label}
-                    {waiting > 0 && <span className="size-1.5 rounded-full bg-sun-line" aria-label={`${waiting} waiting`} />}
-                  </Link>,
-                ];
-              })}
+                    <SectionFold
+                      inside={foldable.some((s) => s.id === current.id)}
+                      waiting={foldable.reduce((n, s) => n + s.pages.reduce((m, p) => m + count(p.id), 0), 0)}
+                    >
+                      {foldable.map(link)}
+                    </SectionFold>
+                  </>
+                );
+              })()}
+              {sections.filter((s, i) => i > 0 && s.id !== "marketplace").length < 3 &&
+                sections.map((sec, i) => {
+                  const lit = sec.id === current.id;
+                  const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);
+                  const design =
+                    i === 1 && designsRoofs(kind) ? (
+                      // The design tool, the main tool, as an orange round between Today and CRM: larger than the pill (it
+                      // stands out of it without making it taller), centred between Today's white pill and the word CRM.
+                      <Link
+                        key="design"
+                        href={PATHS.designer}
+                        aria-label="Design tool"
+                        title="Design tool"
+                        aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
+                        className={clsx(
+                          "-my-2 flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
+                          current.id === sections[0].id ? "ml-3.5" : "mx-0",
+                          path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface-2",
+                        )}
+                      >
+                        <PenTool className="size-5" aria-hidden />
+                      </Link>
+                    ) : null;
+                  // The Marketplace is the network, not the business's own work: it has its own button beside the pill.
+                  if (sec.id === "marketplace") return design;
+                  return [
+                    design,
+                    <Link
+                      key={sec.id}
+                      href={sec.pages[0].href}
+                      aria-current={lit ? "true" : undefined}
+                      className={clsx(
+                        "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
+                        lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                      )}
+                    >
+                      {sec.label}
+                      {waiting > 0 && <span className="size-1.5 rounded-full bg-sun-line" aria-label={`${waiting} waiting`} />}
+                    </Link>,
+                  ];
+                })}
               {/* Sol, the other tool, as the graphite round at the far end: the two rounds frame the sections. */}
               {retail && (
                 <span className="ml-1">

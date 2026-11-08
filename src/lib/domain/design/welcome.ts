@@ -66,7 +66,7 @@ export const WELCOME_TOUR: { what: string; now: string; at: string }[] = [
   },
   {
     what: "The menu",
-    now: "takes you to your CRM, procurement, installations and service. Each one's pages show underneath.",
+    now: "is the layers button. Rest on it to open your CRM, procurement, installations and service; the pin keeps them open.",
     at: 'nav[aria-label="Sections"]',
   },
   {
