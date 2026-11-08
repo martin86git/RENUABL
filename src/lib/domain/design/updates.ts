@@ -16,14 +16,12 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
     area: "Email",
-    words:
-      "Compact, beside Refresh, makes the inbox smaller so you see more emails at once. It stays as you left it.",
+    words: "Compact, beside Refresh, makes the inbox smaller so you see more emails at once. It stays as you left it.",
   },
   {
     day: "2026-11-08",
     area: "Today",
-    words:
-      "Today's first tab is Deals, with Sol's mark. Calls beside it logs Sol's phone calls and the ones your team logs on a deal.",
+    words: "Today's first tab is Deals, with Sol's mark. Calls beside it logs Sol's phone calls and the ones your team logs on a deal.",
   },
   {
     day: "2026-11-08",
@@ -34,14 +32,12 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
     area: "Today",
-    words:
-      "Type in a deal's team chat on Today and it opens larger over the page, headed by the deal, its address and roof.",
+    words: "Type in a deal's team chat on Today and it opens larger over the page, headed by the deal, its address and roof.",
   },
   {
     day: "2026-11-08",
     area: "Today",
-    words:
-      "The box at the foot of Your deals is gone: ask Sol in a deal's chat or from his round. Show me my day sits by the greeting.",
+    words: "The box at the foot of Your deals is gone: ask Sol in a deal's chat or from his round. Show me my day sits by the greeting.",
   },
   {
     day: "2026-11-08",
@@ -52,20 +48,17 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
     area: "Deals",
-    words:
-      "Proposals sent and Proposals signed are on the bar down the right: a paper plane, and a proposal with a tick.",
+    words: "Proposals sent and Proposals signed are on the bar down the right: a paper plane, and a proposal with a tick.",
   },
   {
     day: "2026-11-08",
     area: "Deals",
-    words:
-      "A deal opens on Activity, with the deal at a glance above its record. Team chat, Sol, files and the job card are icons.",
+    words: "A deal opens on Activity, with the deal at a glance above its record. Team chat, Sol, files and the job card are icons.",
   },
   {
     day: "2026-11-08",
     area: "Installation",
-    words:
-      "The install calendar, Upcoming and In the works are one Installations page, shown as a calendar or a list.",
+    words: "The install calendar, Upcoming and In the works are one Installations page, shown as a calendar or a list.",
   },
   {
     day: "2026-11-08",
@@ -76,32 +69,27 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
     area: "Deals",
-    words:
-      "A deal's system reads at a glance: the home first, then solar, inverter and battery a line each with how many and the size.",
+    words: "A deal's system reads at a glance: the home first, then solar, inverter and battery a line each with how many and the size.",
   },
   {
     day: "2026-11-08",
     area: "Email",
-    words:
-      "Write a new email from the inbox with Compose (or press C). It goes through your own Gmail and lands in your Sent.",
+    words: "Write a new email from the inbox with Compose (or press C). It goes through your own Gmail and lands in your Sent.",
   },
   {
     day: "2026-11-08",
     area: "Today",
-    words:
-      "Each deal card lights the one thing to do now: reply, review, design, send the proposal, call or book. The rest go quiet.",
+    words: "Each deal card lights the one thing to do now: reply, review, design, send the proposal, call or book. The rest go quiet.",
   },
   {
     day: "2026-11-08",
     area: "Today",
-    words:
-      "Review Sol's email on the card: change it, send now, put it off an hour or to tomorrow at 9, hold it, or don't send it.",
+    words: "Review Sol's email on the card: change it, send now, put it off an hour or to tomorrow at 9, hold it, or don't send it.",
   },
   {
     day: "2026-11-08",
     area: "Today",
-    words:
-      "New deal is on Today, and each card has a Deal button in place of Open.",
+    words: "New deal is on Today, and each card has a Deal button in place of Open.",
   },
   {
     day: "2026-11-08",
@@ -112,50 +100,42 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
     area: "Everywhere",
-    words:
-      "The section you're in is now marked in orange in the menu at the top.",
+    words: "The section you're in is now marked in orange in the menu at the top.",
   },
   {
     day: "2026-11-08",
     area: "Sol",
-    words:
-      "Sol's questions can be answered where they are: Yes or No in one press, or Reply to answer one from earlier in the chat.",
+    words: "Sol's questions can be answered where they are: Yes or No in one press, or Reply to answer one from earlier in the chat.",
   },
   {
     day: "2026-11-08",
     area: "Design tool",
-    words:
-      "The quote stays open until you go back to the design. Its lines run down one side and scroll in their own box.",
+    words: "The quote stays open until you go back to the design. Its lines run down one side and scroll in their own box.",
   },
   {
     day: "2026-11-08",
     area: "Design tool",
-    words:
-      "What needs deciding on the quote sits beside the lines: roof, storeys, phase, Solar Victoria and costs decided on each job.",
+    words: "What needs deciding on the quote sits beside the lines: roof, storeys, phase, Solar Victoria and costs decided on each job.",
   },
   {
     day: "2026-11-08",
     area: "Today",
-    words:
-      "The first tab on Today is now Your deals, and the RENUABL logo lines up with the menu beside it.",
+    words: "The first tab on Today is now Your deals, and the RENUABL logo lines up with the menu beside it.",
   },
   {
     day: "2026-11-08",
     area: "Sol",
-    words:
-      "Ask Sol to fix a product's datasheet and he finds, reads and swaps it himself, Australian sheet first, marked to check.",
+    words: "Ask Sol to fix a product's datasheet and he finds, reads and swaps it himself, Australian sheet first, marked to check.",
   },
   {
     day: "2026-11-08",
     area: "Calls",
-    words:
-      "The note-taker sums up the call as it listens, then sorts the points for the design, proposal and price when you finish.",
+    words: "The note-taker sums up the call as it listens, then sorts the points for the design, proposal and price when you finish.",
   },
   {
     day: "2026-11-08",
     area: "Today",
-    words:
-      "Each deal's team chat is its own card beside it. Tell Sol what to write in the card's field, and Call opens the note-taker.",
+    words: "Each deal's team chat is its own card beside it. Tell Sol what to write in the card's field, and Call opens the note-taker.",
   },
   {
     day: "2026-11-08",
@@ -178,32 +158,27 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
     area: "Design tool",
-    words:
-      "Save (or Ctrl+S) and Make primary are in the bar. The side panel tucks away: hover the tab on the right.",
+    words: "Save (or Ctrl+S) and Make primary are in the bar. The side panel tucks away: hover the tab on the right.",
   },
   {
     day: "2026-11-08",
     area: "Team chat",
-    words:
-      "Deal chats you follow are in the team chat window too, with their unread. Press # there to open any deal's chat.",
+    words: "Deal chats you follow are in the team chat window too, with their unread. Press # there to open any deal's chat.",
   },
   {
     day: "2026-11-08",
     area: "Deals",
-    words:
-      "A deal's design is its first tab, the orange round: the roof opens right there in the deal.",
+    words: "A deal's design is its first tab, the orange round: the roof opens right there in the deal.",
   },
   {
     day: "2026-11-08",
     area: "Design tool",
-    words:
-      "With Select, point just past a panel's edge to see the next one: click to add it, or drag for a row.",
+    words: "With Select, point just past a panel's edge to see the next one: click to add it, or drag for a row.",
   },
   {
     day: "2026-11-08",
     area: "Deals",
-    words:
-      "A deal's call button opens the note-taker: ring the customer from your phone while it listens and writes up the call.",
+    words: "A deal's call button opens the note-taker: ring the customer from your phone while it listens and writes up the call.",
   },
   {
     day: "2026-11-08",
@@ -232,56 +207,47 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-06",
     area: "Deals",
-    words:
-      "A deal opens on a card of who it's for, each line changed where it is. Service is the spanner at the end of the tabs.",
+    words: "A deal opens on a card of who it's for, each line changed where it is. Service is the spanner at the end of the tabs.",
   },
   {
     day: "2026-11-06",
     area: "Sol",
-    words:
-      "Try another answer under Sol's latest reply, and ask him to take you to a page, a deal or a design.",
+    words: "Try another answer under Sol's latest reply, and ask him to take you to a page, a deal or a design.",
   },
   {
     day: "2026-11-06",
     area: "Sol",
-    words:
-      "Sol's draft emails are changed and sent from his card, with Cc, also on a deal's Email tab.",
+    words: "Sol's draft emails are changed and sent from his card, with Cc, also on a deal's Email tab.",
   },
   {
     day: "2026-11-06",
     area: "Deals",
-    words:
-      "Email opens count only the customer's, and each email says how many times it was opened.",
+    words: "Email opens count only the customer's, and each email says how many times it was opened.",
   },
   {
     day: "2026-11-06",
     area: "Messages",
-    words:
-      "In a customer's chat, copy or reply to a message, tell Sol what to write, and keep your own unread count.",
+    words: "In a customer's chat, copy or reply to a message, tell Sol what to write, and keep your own unread count.",
   },
   {
     day: "2026-11-06",
     area: "Design tool",
-    words:
-      "Unsaved designs are kept as a draft and open where you left off; star products to keep them at the top.",
+    words: "Unsaved designs are kept as a draft and open where you left off; star products to keep them at the top.",
   },
   {
     day: "2026-11-06",
     area: "Design tool",
-    words:
-      "Add an EV charger from your price lists to a design, and the kit is drawn smaller on the roof.",
+    words: "Add an EV charger from your price lists to a design, and the kit is drawn smaller on the roof.",
   },
   {
     day: "2026-11-06",
     area: "Team chat",
-    words:
-      "Ask @Sol to move an install, add to an order or mark a stage, and he answers with a Yes or No card.",
+    words: "Ask @Sol to move an install, add to an order or mark a stage, and he answers with a Yes or No card.",
   },
   {
     day: "2026-11-06",
     area: "Today",
-    words:
-      "To action has coloured pills, a customer search and Work through; the top bar makes room on narrow windows.",
+    words: "To action has coloured pills, a customer search and Work through; the top bar makes room on narrow windows.",
   },
   {
     day: "2026-11-05",
@@ -292,26 +258,22 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-05",
     area: "Sol",
-    words:
-      "Sol always answers in words after checking something, and answers each of a customer's questions in its own paragraph.",
+    words: "Sol always answers in words after checking something, and answers each of a customer's questions in its own paragraph.",
   },
   {
     day: "2026-11-05",
     area: "Deals",
-    words:
-      "The call note-taker keeps a neighbour's home or a past job off this customer's system, and lists anything unclear to check.",
+    words: "The call note-taker keeps a neighbour's home or a past job off this customer's system, and lists anything unclear to check.",
   },
   {
     day: "2026-11-05",
     area: "Design tool",
-    words:
-      "The designer slides over the page you're on as a drawer, so you're back where you were the moment it's done.",
+    words: "The designer slides over the page you're on as a drawer, so you're back where you were the moment it's done.",
   },
   {
     day: "2026-11-05",
     area: "Today",
-    words:
-      "Each Sol on the pipeline says what it does, with an on and off switch, and sends in business hours.",
+    words: "Each Sol on the pipeline says what it does, with an on and off switch, and sends in business hours.",
   },
   {
     day: "2026-11-05",
@@ -322,14 +284,12 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-05",
     area: "Today",
-    words:
-      "Sol welcomes you on your first visit: connect email and calendar, add your team as Admin or User, then a quick tour.",
+    words: "Sol welcomes you on your first visit: connect email and calendar, add your team as Admin or User, then a quick tour.",
   },
   {
     day: "2026-11-05",
     area: "Your account",
-    words:
-      "Your first sign-in asks your name, so Today greets you properly. You can set a password there too, to sign in with next time.",
+    words: "Your first sign-in asks your name, so Today greets you properly. You can set a password there too, to sign in with next time.",
   },
   {
     day: "2026-11-05",
@@ -352,8 +312,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-05",
     area: "Email",
-    words:
-      "Connect more than one Gmail, say your own and sales@, and read them as one inbox. Inbox is also a tab on Today.",
+    words: "Connect more than one Gmail, say your own and sales@, and read them as one inbox. Inbox is also a tab on Today.",
   },
   {
     day: "2026-11-05",
@@ -364,20 +323,17 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-05",
     area: "Today",
-    words:
-      "Sol at work on each stage of the Pipeline board: see what he has lined up, and when each email goes.",
+    words: "Sol at work on each stage of the Pipeline board: see what he has lined up, and when each email goes.",
   },
   {
     day: "2026-11-05",
     area: "Today",
-    words:
-      "On the Pipeline board, an envelope shows a deal has been emailed, with an eye on it once the latest email is opened.",
+    words: "On the Pipeline board, an envelope shows a deal has been emailed, with an eye on it once the latest email is opened.",
   },
   {
     day: "2026-11-03",
     area: "Design tool",
-    words:
-      "The three designs follow the bill: change it and they are made again for it, unless you have changed them by hand.",
+    words: "The three designs follow the bill: change it and they are made again for it, unless you have changed them by hand.",
   },
   {
     day: "2026-11-03",
@@ -400,69 +356,54 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-03",
     area: "Today",
-    words:
-      "Today is one conversation with Sol: press Show me my day and he writes it up for you, then answers your questions below.",
+    words: "Today is one conversation with Sol: press Show me my day and he writes it up for you, then answers your questions below.",
   },
   {
     day: "2026-11-03",
     area: "Design tool",
-    words:
-      "A pitch for each roof: add a garage or patio at its own angle; the pitch card is smaller and you can type the figure.",
+    words: "A pitch for each roof: add a garage or patio at its own angle; the pitch card is smaller and you can type the figure.",
   },
   {
     day: "2026-11-03",
     area: "Design tool",
-    words:
-      "Panels and inverters with no datasheet figures: RENUABL finds the datasheet online, reads it and marks it to check.",
+    words: "Panels and inverters with no datasheet figures: RENUABL finds the datasheet online, reads it and marks it to check.",
   },
   {
     day: "2026-11-03",
     area: "Everywhere",
-    words:
-      "RENUABL Marketplace has its own blue button beside the sections, and Sol a new mark: a sun, with the AI's stars above it.",
+    words: "RENUABL Marketplace has its own blue button beside the sections, and Sol a new mark: a sun, with the AI's stars above it.",
   },
   {
     day: "2026-11-03",
     area: "Design tool",
-    words:
-      "Nearmap pictures in the designer: choose a capture date, fetch it once, and see what your plan includes at the roof.",
+    words: "Nearmap pictures in the designer: choose a capture date, fetch it once, and see what your plan includes at the roof.",
   },
   {
     day: "2026-11-03",
     area: "My Jobs",
-    words:
-      "Installers open on My Jobs: today, tomorrow, this week or this month, each job with its roof, the kit and where to collect it.",
+    words: "Installers open on My Jobs: today, tomorrow, this week or this month, each job with its roof, the kit and where to collect it.",
   },
   {
     day: "2026-11-03",
     area: "Marketplace",
-    words:
-      "Equipment trading is now Buy & sell, and Messages gathers every conversation you have with other businesses.",
+    words: "Equipment trading is now Buy & sell, and Messages gathers every conversation you have with other businesses.",
   },
   {
     day: "2026-11-02",
     area: "Design tool",
-    words:
-      "Designing a large roof no longer freezes the page: laying panels on hundreds of roof spots now takes a moment.",
+    words: "Designing a large roof no longer freezes the page: laying panels on hundreds of roof spots now takes a moment.",
   },
   {
     day: "2026-11-02",
     area: "Deals",
-    words:
-      "Emails to customers take bullets, numbering, symbols, pictures and files. Paste a screenshot or drop it on the box.",
+    words: "Emails to customers take bullets, numbering, symbols, pictures and files. Paste a screenshot or drop it on the box.",
   },
   {
     day: "2026-11-02",
     area: "Sol",
-    words:
-      "Sol's side panel sees the page beside it: ask about the design or deal you have open. Press Looking at to leave it out.",
+    words: "Sol's side panel sees the page beside it: ask about the design or deal you have open. Press Looking at to leave it out.",
   },
-  {
-    day: "2026-11-02",
-    area: "Sol",
-    words:
-      "Drag the left edge of Sol's panel to make it wider or narrower; double-click it to reset.",
-  },
+  { day: "2026-11-02", area: "Sol", words: "Drag the left edge of Sol's panel to make it wider or narrower; double-click it to reset." },
   {
     day: "2026-11-02",
     area: "Settings",
@@ -472,74 +413,62 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-02",
     area: "Today",
-    words:
-      "An installer's and an inspector's Today now says what waits: jobs to answer, inspections to book and requests to connect.",
+    words: "An installer's and an inspector's Today now says what waits: jobs to answer, inspections to book and requests to connect.",
   },
   {
     day: "2026-11-02",
     area: "Design tool",
-    words:
-      "For installers the design tool is for sites: no deal search, publishing or proposals, and a job card no longer asks your name.",
+    words: "For installers the design tool is for sites: no deal search, publishing or proposals, and a job card no longer asks your name.",
   },
   {
     day: "2026-11-02",
     area: "Design tool",
-    words:
-      "Share live: the customer watches their roof designed on their phone during the call, switches designs and picks one.",
+    words: "Share live: the customer watches their roof designed on their phone during the call, switches designs and picks one.",
   },
   {
     day: "2026-11-02",
     area: "Design tool",
-    words:
-      "Publishing a site with no deal now says why and puts the design on a deal from the Publish button.",
+    words: "Publishing a site with no deal now says why and puts the design on a deal from the Publish button.",
   },
   {
     day: "2026-11-02",
     area: "Marketplace",
-    words:
-      "Installers bid on job listings and inspectors trade equipment; a bid won by an installer lands in its Jobs as the job card.",
+    words: "Installers bid on job listings and inspectors trade equipment; a bid won by an installer lands in its Jobs as the job card.",
   },
   {
     day: "2026-11-02",
     area: "Installation",
-    words:
-      "Installers nominate the inspector: they see the design and photos, then book, pass or note defects, with the certificate.",
+    words: "Installers nominate the inspector: they see the design and photos, then book, pass or note defects, with the certificate.",
   },
   {
     day: "2026-11-02",
     area: "Installation",
-    words:
-      "Send a job to an installer you're connected with: it waits in their Jobs, and once they accept they see its job card.",
+    words: "Send a job to an installer you're connected with: it waits in their Jobs, and once they accept they see its job card.",
   },
   {
     day: "2026-11-02",
     area: "Connections",
-    words:
-      "Find the installers and inspectors you work with and connect, like a friend request. Listing your business is up to you.",
+    words: "Find the installers and inspectors you work with and connect, like a friend request. Listing your business is up to you.",
   },
   {
     day: "2026-11-02",
     area: "Design tool",
-    words:
-      "Keyboard shortcuts: a key for each tool, arrows to nudge, Ctrl+A for every panel, and ? to see them all.",
+    words: "Keyboard shortcuts: a key for each tool, arrows to nudge, Ctrl+A for every panel, and ? to see them all.",
   },
   {
     day: "2026-11-02",
     area: "Installation",
-    words:
-      "As built on the job card: the installer records what went on the roof with every serial, held against the design.",
+    words: "As built on the job card: the installer records what went on the roof with every serial, held against the design.",
   },
   {
     day: "2026-11-02",
     area: "Design tool",
-    words:
-      "A photo of the switchboard: Sol reads it and suggests the switchboard upgrade and RCBO, put on the quote in one press.",
+    words: "A photo of the switchboard: Sol reads it and suggests the switchboard upgrade and RCBO, put on the quote in one press.",
   },
   {
     day: "2026-11-02",
     area: "Design tool",
-    words:
-      "The bill box reads a photo or PDF of the customer's bill, then one press sizes the system to it.",
+    words: "The bill box reads a photo or PDF of the customer's bill, then one press sizes the system to it.",
   },
   {
     day: "2026-11-02",
@@ -550,44 +479,37 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-01",
     area: "Design tool",
-    words:
-      "A new roof designs itself as it opens: the three designs are ready to check, unless Google's roof data is out of date.",
+    words: "A new roof designs itself as it opens: the three designs are ready to check, unless Google's roof data is out of date.",
   },
   {
     day: "2026-11-01",
     area: "Sol",
-    words:
-      "Sol searches the web for networks, rebates, approvals, products and wholesalers, with a sources icon under each answer.",
+    words: "Sol searches the web for networks, rebates, approvals, products and wholesalers, with a sources icon under each answer.",
   },
   {
     day: "2026-11-01",
     area: "Sol",
-    words:
-      "Sol keeps what he finds for the whole team, with its sources: see What Sol knows on his page, or press Remember this.",
+    words: "Sol keeps what he finds for the whole team, with its sources: see What Sol knows on his page, or press Remember this.",
   },
   {
     day: "2026-11-01",
     area: "Design tool",
-    words:
-      "A Ready to install light in the bar: green only when the design would pass, with what to fix and a button to each.",
+    words: "A Ready to install light in the bar: green only when the design would pass, with what to fix and a button to each.",
   },
   {
     day: "2026-11-01",
     area: "Sol",
-    words:
-      "Ready for you on Today: Sol drafts each proposal follow-up as it falls due, ready to check and send in one press.",
+    words: "Ready for you on Today: Sol drafts each proposal follow-up as it falls due, ready to check and send in one press.",
   },
   {
     day: "2026-11-01",
     area: "Deals",
-    words:
-      "After a call, one press adds the notes, fills in the deal's fields, sets your reminder and drafts the recap email.",
+    words: "After a call, one press adds the notes, fills in the deal's fields, sets your reminder and drafts the recap email.",
   },
   {
     day: "2026-11-01",
     area: "Sol",
-    words:
-      "Past conversations behind the clock in Sol's chat; after a while away he asks whether to carry on or start afresh.",
+    words: "Past conversations behind the clock in Sol's chat; after a while away he asks whether to carry on or start afresh.",
   },
   {
     day: "2026-11-01",
@@ -598,38 +520,32 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-01",
     area: "Settings",
-    words:
-      "Billing shows your Sol credits, every invoice as a tax invoice to download, and the business details printed on them.",
+    words: "Billing shows your Sol credits, every invoice as a tax invoice to download, and the business details printed on them.",
   },
   {
     day: "2026-11-01",
     area: "Settings",
-    words:
-      "A Standards library: upload the standards you've bought (AS/NZS 3000, 3008, 5139 and more) for your whole team to download.",
+    words: "A Standards library: upload the standards you've bought (AS/NZS 3000, 3008, 5139 and more) for your whole team to download.",
   },
   {
     day: "2026-11-01",
     area: "Sol",
-    words:
-      "Sol helps with the electrical rules, names the clause to look up in your copy, and reads your datasheets' figures.",
+    words: "Sol helps with the electrical rules, names the clause to look up in your copy, and reads your datasheets' figures.",
   },
   {
     day: "2026-11-01",
     area: "Settings",
-    words:
-      "Product datasheets now keep the sheet itself, for anyone in your team to open again.",
+    words: "Product datasheets now keep the sheet itself, for anyone in your team to open again.",
   },
   {
     day: "2026-11-01",
     area: "Sol",
-    words:
-      "Sol has a new mark and his own round at the end of the sections; the search asks him too, and on a phone he's mid-bar.",
+    words: "Sol has a new mark and his own round at the end of the sections; the search asks him too, and on a phone he's mid-bar.",
   },
   {
     day: "2026-11-01",
     area: "Design tool",
-    words:
-      "A landscape panel clicks flush against a portrait one (and back), the shared edge lit; a joined panel faces its array's way.",
+    words: "A landscape panel clicks flush against a portrait one (and back), the shared edge lit; a joined panel faces its array's way.",
   },
   {
     day: "2026-11-01",
@@ -640,38 +556,32 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-01",
     area: "Proposals",
-    words:
-      "Up to ten designs a roof; offer up to four beside the primary as options, and mark the one you recommend.",
+    words: "Up to ten designs a roof; offer up to four beside the primary as options, and mark the one you recommend.",
   },
   {
     day: "2026-11-01",
     area: "Design tool",
-    words:
-      "A new home: one bar for a deal or an address, the orange + for a new design, Up next on its roof, and the queue as roof cards.",
+    words: "A new home: one bar for a deal or an address, the orange + for a new design, Up next on its roof, and the queue as roof cards.",
   },
   {
     day: "2026-11-01",
     area: "Design tool",
-    words:
-      "The bill box takes kWh as well as dollars, and Sol can find the customer's usage in their file.",
+    words: "The bill box takes kWh as well as dollars, and Sol can find the customer's usage in their file.",
   },
   {
     day: "2026-11-01",
     area: "Design tool",
-    words:
-      "The customer's name in the bar opens their deal; a chat round lights orange while the customer is waiting.",
+    words: "The customer's name in the bar opens their deal; a chat round lights orange while the customer is waiting.",
   },
   {
     day: "2026-11-01",
     area: "Proposals",
-    words:
-      "Send a new lead an indicative proposal: systems to compare, a site visit, then the final one. They reply in the chat.",
+    words: "Send a new lead an indicative proposal: systems to compare, a site visit, then the final one. They reply in the chat.",
   },
   {
     day: "2026-11-01",
     area: "Proposals",
-    words:
-      "Sol can answer customers in their proposal's chat as they write, saying he's an AI (Settings, Emails).",
+    words: "Sol can answer customers in their proposal's chat as they write, saying he's an AI (Settings, Emails).",
   },
   {
     day: "2026-11-01",
@@ -688,170 +598,86 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-01",
     area: "Design tool",
-    words:
-      "Opens zoomed in on the roof; the hand drags the picture at any zoom; model numbers in the panel, inverter and battery lists.",
+    words: "Opens zoomed in on the roof; the hand drags the picture at any zoom; model numbers in the panel, inverter and battery lists.",
   },
   {
     day: "2026-11-01",
     area: "Design tool",
-    words:
-      "A new site asks for the roof pitch first (or that it is flat), then keeps it as a small mark on the picture to change.",
+    words: "A new site asks for the roof pitch first (or that it is flat), then keeps it as a small mark on the picture to change.",
+  },
+  { day: "2026-11-01", area: "Design tool", words: "Add a panel opens a card: portrait, landscape, or follow the roof face." },
+  {
+    day: "2026-11-01",
+    area: "Design tool",
+    words: "The whole roof picture fits on the screen, and scrolling moves the page: hold Ctrl (⌘ on a Mac) to zoom.",
   },
   {
     day: "2026-11-01",
     area: "Design tool",
-    words:
-      "Add a panel opens a card: portrait, landscape, or follow the roof face.",
+    words: "Designer, Quote and Proposal sit at the top of the column beside the picture; right click the picture for every tool.",
   },
-  {
-    day: "2026-11-01",
-    area: "Design tool",
-    words:
-      "The whole roof picture fits on the screen, and scrolling moves the page: hold Ctrl (⌘ on a Mac) to zoom.",
-  },
-  {
-    day: "2026-11-01",
-    area: "Design tool",
-    words:
-      "Designer, Quote and Proposal sit at the top of the column beside the picture; right click the picture for every tool.",
-  },
-  {
-    day: "2026-11-01",
-    area: "Sol",
-    words:
-      "Copy or pin any message in Sol's chat; pinned ones stay at the top and through Clear.",
-  },
+  { day: "2026-11-01", area: "Sol", words: "Copy or pin any message in Sol's chat; pinned ones stay at the top and through Clear." },
   {
     day: "2026-11-01",
     area: "Everywhere",
-    words:
-      "The design tool is an orange button in the top bar, and search is the round magnifier beside it.",
+    words: "The design tool is an orange button in the top bar, and search is the round magnifier beside it.",
   },
   {
     day: "2026-11-01",
     area: "Marketplace",
-    words:
-      "Equipment: sell spare panels, inverters and batteries to other businesses, or buy theirs, and message about it.",
+    words: "Equipment: sell spare panels, inverters and batteries to other businesses, or buy theirs, and message about it.",
   },
-  {
-    day: "2026-11-01",
-    area: "Marketplace",
-    words:
-      "Job listings: list a sold job for installers to bid on, or bid on jobs near you.",
-  },
+  { day: "2026-11-01", area: "Marketplace", words: "Job listings: list a sold job for installers to bid on, or bid on jobs near you." },
   {
     day: "2026-11-01",
     area: "Email",
-    words:
-      "Your own Gmail inbox in RENUABL: each email with its customer's deal, private notes, and Sol to sum up or draft a reply.",
+    words: "Your own Gmail inbox in RENUABL: each email with its customer's deal, private notes, and Sol to sum up or draft a reply.",
   },
-  {
-    day: "2026-11-01",
-    area: "Deals",
-    words:
-      "The note-taker: listens to your side of a call and writes up the notes for the deal.",
-  },
-  {
-    day: "2026-11-01",
-    area: "Users",
-    words:
-      "View as: the owner sees RENUABL exactly as someone in the team does, read only.",
-  },
+  { day: "2026-11-01", area: "Deals", words: "The note-taker: listens to your side of a call and writes up the notes for the deal." },
+  { day: "2026-11-01", area: "Users", words: "View as: the owner sees RENUABL exactly as someone in the team does, read only." },
   {
     day: "2026-11-01",
     area: "Settings",
-    words:
-      "Updates and Feedback, under the gear: what's new, and a place to raise ideas and issues.",
+    words: "Updates and Feedback, under the gear: what's new, and a place to raise ideas and issues.",
   },
   {
     day: "2026-11-01",
     area: "Procurement",
-    words:
-      "Pre-approvals, Solar Victoria and Book an installation: every sold job at the approval it's waiting on.",
+    words: "Pre-approvals, Solar Victoria and Book an installation: every sold job at the approval it's waiting on.",
   },
+  { day: "2026-11-01", area: "Installation", words: "The install calendar shows the next six weeks booked against what you can do." },
   {
     day: "2026-11-01",
     area: "Installation",
-    words:
-      "The install calendar shows the next six weeks booked against what you can do.",
+    words: "Job cards: the system, layout and strings for each install, emailed to your installer with a link for their phone.",
   },
-  {
-    day: "2026-11-01",
-    area: "Installation",
-    words:
-      "Job cards: the system, layout and strings for each install, emailed to your installer with a link for their phone.",
-  },
+  { day: "2026-11-01", area: "Design tool", words: "A design home: deals waiting for a design, designs done this week, recent designs." },
   {
     day: "2026-11-01",
     area: "Design tool",
-    words:
-      "A design home: deals waiting for a design, designs done this week, recent designs.",
+    words: "Designer, Quote and Proposal beside the roof, with a timeline of every proposal sent.",
   },
-  {
-    day: "2026-11-01",
-    area: "Design tool",
-    words:
-      "Designer, Quote and Proposal beside the roof, with a timeline of every proposal sent.",
-  },
-  {
-    day: "2026-11-01",
-    area: "Users",
-    words:
-      "A Designer role: sees every deal, designs and publishes, no settings.",
-  },
+  { day: "2026-11-01", area: "Users", words: "A Designer role: sees every deal, designs and publishes, no settings." },
   {
     day: "2026-11-01",
     area: "Customers",
-    words:
-      "Customers and contacts apart, with solar, battery and EV marks, and a group email with unsubscribe.",
+    words: "Customers and contacts apart, with solar, battery and EV marks, and a group email with unsubscribe.",
   },
-  {
-    day: "2026-11-01",
-    area: "Deals",
-    words:
-      "The deal clock and hot, warm or cold with reasons; email opens; attachments on each deal.",
-  },
-  {
-    day: "2026-11-01",
-    area: "Today",
-    words:
-      "Today: up first, before you call, to action, a calendar and your pipeline in one pad.",
-  },
-  {
-    day: "2026-11-01",
-    area: "Team chat",
-    words:
-      "Team chat: channels and direct messages, deal cards, files, and @Sol.",
-  },
-  {
-    day: "2026-11-01",
-    area: "Sol",
-    words:
-      "Sol, your assistant: finds deals, drafts emails, keeps reminders, draws charts.",
-  },
-  {
-    day: "2026-10-31",
-    area: "Everywhere",
-    words:
-      "A new look: sections across the top, search with Ctrl K, and every page on one pad.",
-  },
+  { day: "2026-11-01", area: "Deals", words: "The deal clock and hot, warm or cold with reasons; email opens; attachments on each deal." },
+  { day: "2026-11-01", area: "Today", words: "Today: up first, before you call, to action, a calendar and your pipeline in one pad." },
+  { day: "2026-11-01", area: "Team chat", words: "Team chat: channels and direct messages, deal cards, files, and @Sol." },
+  { day: "2026-11-01", area: "Sol", words: "Sol, your assistant: finds deals, drafts emails, keeps reminders, draws charts." },
+  { day: "2026-10-31", area: "Everywhere", words: "A new look: sections across the top, search with Ctrl K, and every page on one pad." },
 ];
 
 /** The days, newest first, each with its changes. */
-export function updatesByDay(
-  list: readonly Update[] = UPDATES,
-): { day: ISODate; items: Update[] }[] {
-  const days = [...new Set(list.map((u) => u.day))].sort((a, b) =>
-    b.localeCompare(a),
-  );
+export function updatesByDay(list: readonly Update[] = UPDATES): { day: ISODate; items: Update[] }[] {
+  const days = [...new Set(list.map((u) => u.day))].sort((a, b) => b.localeCompare(a));
   return days.map((day) => ({ day, items: list.filter((u) => u.day === day) }));
 }
 
 /** How many changes came in after the day someone last opened Updates; never opened, the newest day's. */
-export function unseenUpdates(
-  seenDay: ISODate | null,
-  list: readonly Update[] = UPDATES,
-): number {
+export function unseenUpdates(seenDay: ISODate | null, list: readonly Update[] = UPDATES): number {
   if (!list.length) return 0;
   if (!seenDay) {
     const newest = list.reduce((d, u) => (u.day > d ? u.day : d), list[0].day);
@@ -862,6 +688,4 @@ export function unseenUpdates(
 
 /** The newest day on the list: what opening Updates marks as seen. */
 export const newestDay = (list: readonly Update[] = UPDATES): ISODate | null =>
-  list.length
-    ? list.reduce((d, u) => (u.day > d ? u.day : d), list[0].day)
-    : null;
+  list.length ? list.reduce((d, u) => (u.day > d ? u.day : d), list[0].day) : null;
