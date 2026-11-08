@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Design tool",
+    words: "Save (or Ctrl+S) and Make primary are in the bar. The side panel tucks away: hover the tab on the right.",
+  },
+  {
+    day: "2026-11-08",
     area: "Team chat",
     words: "Deal chats you follow are in the team chat window too, with their unread. Press # there to open any deal's chat.",
   },

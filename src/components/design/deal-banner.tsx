@@ -65,6 +65,7 @@ export function DealBanner({
   onCall,
   onSol,
   onPlace,
+  compact = false,
 }: {
   job: Job;
   customer: Customer;
@@ -77,6 +78,8 @@ export function DealBanner({
   onCall: () => void;
   onSol: () => void;
   onPlace: () => void;
+  /** A slim strip (8 Nov 2026, Martin: on any tab but Overview the tab's own work, an email say, belongs in the first fold). */
+  compact?: boolean;
 }) {
   const placed = job.lat !== null && job.lng !== null;
   const [drawing, setDrawing] = useState<JobDrawing | null>(null);
@@ -99,7 +102,12 @@ export function DealBanner({
 
   return (
     <section className="relative overflow-hidden rounded-[24px] bg-[#1f2937] shadow-[0_8px_30px_rgba(11,11,12,0.10)]">
-      <div className="relative flex min-h-[17rem] flex-col justify-end sm:aspect-[3.2/1] sm:min-h-0">
+      <div
+        className={clsx(
+          "relative flex flex-col justify-end transition-[min-height] duration-300",
+          compact ? "min-h-[7rem]" : "min-h-[15rem] sm:aspect-[4/1] sm:min-h-0",
+        )}
+      >
         {picture ? (
           <svg
             viewBox={bannerView(drawing?.viewBox ?? null)}
@@ -127,7 +135,7 @@ export function DealBanner({
         {/* A soft fade at the foot so the words read on any roof. */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/75 via-black/35 to-transparent" />
 
-        {onDesign && (
+        {onDesign && !compact && (
           <button
             type="button"
             onClick={onDesign}
@@ -137,7 +145,7 @@ export function DealBanner({
             {job.projectId ? "Open design" : "Design this roof"}
           </button>
         )}
-        {!placed && (
+        {!placed && !compact && (
           <button
             type="button"
             onClick={onPlace}
@@ -148,14 +156,21 @@ export function DealBanner({
           </button>
         )}
 
-        <div className="pointer-events-none relative flex flex-wrap items-end justify-between gap-4 p-5 pt-20 sm:p-6">
+        <div
+          className={clsx(
+            "pointer-events-none relative flex flex-wrap items-end justify-between gap-4",
+            compact ? "px-5 py-3.5 sm:px-6" : "p-5 pt-16 sm:p-6",
+          )}
+        >
           <div className="min-w-0 text-white">
-            <h1 className="truncate text-[26px] leading-tight tracking-tight sm:text-[30px]">{customer.name}</h1>
+            <h1 className={clsx("truncate leading-tight tracking-tight", compact ? "text-[22px]" : "text-[26px] sm:text-[30px]")}>
+              {customer.name}
+            </h1>
             <p className="mt-0.5 truncate text-sm text-white/80">
               {where || "No address yet"}
               {job.title ? ` · ${job.title}` : ""}
             </p>
-            <div className="pointer-events-auto mt-3 flex flex-wrap items-center gap-2">
+            <div className={clsx("pointer-events-auto flex flex-wrap items-center gap-2", compact ? "mt-2" : "mt-3")}>
               <Chip>{STAGE_LABELS[job.stage]}</Chip>
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
               {job.kw ? <Chip>{job.kw} kW</Chip> : null}

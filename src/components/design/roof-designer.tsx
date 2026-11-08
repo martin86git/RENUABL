@@ -31,6 +31,7 @@ import {
   Redo2,
   Ruler,
   SquarePlus,
+  Save,
   Star,
   Tag,
   TriangleAlert,
@@ -252,6 +253,7 @@ const TOOL_KEYS: Record<string, Tool> = {
   c: "comment",
 };
 const SHORTCUTS: [keys: string, does: string][] = [
+  ["Ctrl S", "Save"],
   ["V", "Select"],
   ["P", "Add a panel (portrait, landscape or follow the roof)"],
   ["S", "String panels"],
@@ -1015,7 +1017,17 @@ export function RoofDesigner(props: {
       // Nothing to do: it still changes for this visit.
     }
   };
+  // The column beside the picture lies over it (8 Nov 2026, Martin: the picture as large as the first fold allows, the
+  // column revealed by hovering the handle on the right edge), out only while looked at or worked in.
+  const [peek, setPeek] = useState(false);
+  const peekTimer = useRef<number | null>(null);
+  const holdPeek = () => {
+    if (peekTimer.current) window.clearTimeout(peekTimer.current);
+    peekTimer.current = null;
+  };
   const showSide = (view: SideView) => {
+    holdPeek();
+    setPeek(true);
     setSide(view);
     try {
       window.localStorage.setItem(SIDE_KEY, view);
@@ -2154,6 +2166,7 @@ export function RoofDesigner(props: {
         setRuling(null);
         setChecking(null);
         setFanOpen(false);
+        setPeek(false);
         if (tool === "string") setTool("select");
       }
     };
@@ -2777,6 +2790,17 @@ export function RoofDesigner(props: {
   const [noDealOpen, setNoDealOpen] = useState(false);
   const [note, setNote] = useState("");
   const [sent, setSent] = useState<{ ok: boolean; message: string } | null>(null);
+  // Ctrl+S (or Cmd+S) saves, from anywhere in the designer, even while typing in the quote (8 Nov 2026, Martin).
+  const saveNow = useRef<() => Promise<boolean>>(async () => false);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "s") return;
+      e.preventDefault();
+      void saveNow.current();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
   const save = async () => {
     setSaved("saving");
     // The price after STCs goes with it only when the primary design is the one open: that is the one a job is quoted on.
@@ -2797,6 +2821,9 @@ export function RoofDesigner(props: {
   // **Drafts** (5 Nov 2026, Martin, as Primero's: interrupted half way, it should open where it was left). Once the work
   // has stood still across one tick, it is kept as a draft apart from the saved roof (`onDraft`); whatever wasn't kept
   // yet goes as the page closes. Nobody else sees a draft: Publish is what saves.
+  useEffect(() => {
+    saveNow.current = save;
+  });
   const draftSent = useRef("");
   const draftTick = useRef("");
   const workNow = () => ({
@@ -3762,6 +3789,25 @@ export function RoofDesigner(props: {
                     : "Not saved yet"
                   : saved.error}
           </span>
+          {/* Save, without publishing (8 Nov 2026, Martin: there was no way but Publish); Ctrl+S does the same. */}
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={saved === "saved" || saved === "saving"}
+            title="Save this roof's designs (Ctrl+S). Publishing is separate."
+            className={clsx(
+              "inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold ring-1",
+              saved === "saved" || saved === "saving"
+                ? "bg-surface text-muted ring-line"
+                : "bg-ink text-canvas ring-ink hover:brightness-110",
+            )}
+          >
+            {saved === "saved" ? <Check className="size-3.5" aria-hidden /> : <Save className="size-3.5" aria-hidden />}
+            {saved === "saved" ? "Saved" : saved === "saving" ? "Saving…" : "Save"}
+            {saved !== "saved" && saved !== "saving" && (
+              <kbd className="rounded border border-current/30 px-1 text-[10px] font-normal opacity-70">Ctrl S</kbd>
+            )}
+          </button>
           {/* Opened on an earlier visit's unsaved work: said once, with the way back to what is saved. */}
           {resumed && saved !== "saved" && (
             <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-ink">
@@ -3843,6 +3889,29 @@ export function RoofDesigner(props: {
               </div>
             )}
           </div>
+          {/* The open design as the primary in one press (8 Nov 2026, Martin): the one priced on the deal and sent first. */}
+          {designs.length > 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                setPrimary(active);
+                changed();
+              }}
+              disabled={active === primary}
+              title={
+                active === primary
+                  ? "This is the primary design"
+                  : "Make the open design the primary: the one priced on the deal and sent first"
+              }
+              className={clsx(
+                "inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-sm font-medium ring-1",
+                active === primary ? "bg-sun text-sun-ink ring-sun-line/30" : "bg-surface text-ink ring-line hover:ring-ink/40",
+              )}
+            >
+              <Star className={clsx("size-4", active === primary ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
+              {active === primary ? "Primary" : "Make primary"}
+            </button>
+          )}
           {/* Which of the roof's designs is open: here in the bar, off the picture. */}
           <div className="relative" data-menu-host>
             <button
@@ -4151,15 +4220,7 @@ export function RoofDesigner(props: {
         </div>
       </header>
 
-      <div
-        className={clsx(
-          "relative mt-5 grid items-start gap-5",
-          shown &&
-            (shown === "quote" && quoteShort
-              ? "xl:grid-cols-[minmax(0,1fr)_13rem]"
-              : "xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]"),
-        )}
-      >
+      <div className="relative mt-5">
         <div className="min-w-0">
           <div>
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
@@ -7370,45 +7431,99 @@ export function RoofDesigner(props: {
             out the figures above while another view (or none) is open. In Proposal view the column lies over the picture's
             right half, so the proposal, its chat and timeline have room (3 Nov 2026, Martin, as Primero's); the picture
             keeps its size underneath. */}
+        {/* The handle on the right edge: hovering a view (or pressing it) brings the column out over the picture. */}
+        {!peek && shown && (
+          <div
+            className="absolute right-0 top-24 z-40 flex flex-col gap-1 rounded-l-2xl bg-surface/95 p-1 shadow-[-6px_6px_24px_rgba(20,22,26,0.16)] ring-1 ring-line backdrop-blur"
+            aria-label="Beside the picture"
+          >
+            {SIDE_VIEWS.filter((v) => (v.id !== "quote" || !costsHidden) && (v.id !== "proposal" || !props.sitesOnly)).map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                onMouseEnter={() => showSide(v.id)}
+                onClick={() => showSide(v.id)}
+                title={v.hint}
+                className="relative flex w-9 flex-col items-center gap-1.5 rounded-xl py-2.5 text-[11px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
+              >
+                {v.id === "designer" ? (
+                  <PenTool className="size-4" aria-hidden />
+                ) : v.id === "quote" ? (
+                  <ReceiptText className="size-4" aria-hidden />
+                ) : (
+                  <FileText className="size-4" aria-hidden />
+                )}
+                <span className="[writing-mode:vertical-rl]">{v.label}</span>
+                {v.id === "proposal" && (props.waiting ?? 0) > 0 && (
+                  <span className="absolute -left-1.5 -top-1 min-w-5 rounded-full bg-sun-line px-1 text-center text-[10px] font-semibold leading-5 text-white">
+                    {props.waiting}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
         <div
+          onMouseEnter={holdPeek}
+          onMouseLeave={(e) => {
+            // Leaving it folds it away, unless something in it is being typed in.
+            const box = e.currentTarget;
+            holdPeek();
+            peekTimer.current = window.setTimeout(() => {
+              const typing =
+                box.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? "");
+              if (!typing) setPeek(false);
+            }, 450);
+          }}
           className={clsx(
-            shown === "proposal" && "xl:absolute xl:inset-y-0 xl:right-0 xl:z-40 xl:w-[calc(50%+10rem)] 2xl:w-[calc(50%+11rem)]",
+            "absolute right-0 top-0 z-40 transition duration-200 ease-out motion-reduce:transition-none",
+            shown === "proposal"
+              ? "w-[min(calc(50%+10rem),100%)]"
+              : shown === "quote" && quoteShort
+                ? "w-[min(15rem,100%)]"
+                : "w-[min(26rem,100%)]",
+            peek ? "translate-x-0 opacity-100" : "pointer-events-none invisible translate-x-6 opacity-0",
             !shown && "hidden",
           )}
         >
-          <div
-            className={clsx(
-              "space-y-3 xl:sticky xl:top-[5.5rem] xl:max-h-[calc(100dvh-6.5rem)] xl:overflow-y-auto",
-              shown === "proposal" &&
-                "xl:rounded-3xl xl:bg-canvas/95 xl:p-3 xl:shadow-[0_12px_40px_rgba(20,22,26,0.22)] xl:ring-1 xl:ring-line xl:backdrop-blur",
-            )}
-          >
-            {/* One view at a time, chosen at the top of the column (as Primero's). */}
-            <div role="tablist" aria-label="Beside the picture" className="flex rounded-lg border border-line bg-surface-2 p-1">
-              {SIDE_VIEWS.filter((v) => (v.id !== "quote" || !costsHidden) && (v.id !== "proposal" || !props.sitesOnly)).map((v) => (
-                <button
-                  key={v.id}
-                  role="tab"
-                  aria-selected={shown === v.id}
-                  onClick={() => showSide(v.id)}
-                  title={v.hint}
-                  className={clsx(
-                    "inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium tabular-nums",
-                    shown === v.id ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
-                  )}
-                >
-                  {v.label}
-                  {v.id === "quote" && net !== null ? <span className="text-ink-2">· {dollars(net)}</span> : null}
-                  {v.id === "proposal" && (props.waiting ?? 0) > 0 && (
-                    <span
-                      className="rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white"
-                      aria-label={`${props.waiting} waiting`}
-                    >
-                      {props.waiting}
-                    </span>
-                  )}
-                </button>
-              ))}
+          <div className="max-h-[calc(100dvh-7rem)] space-y-3 overflow-y-auto rounded-3xl bg-canvas/95 p-3 shadow-[0_12px_40px_rgba(20,22,26,0.22)] ring-1 ring-line backdrop-blur">
+            {/* One view at a time, chosen at the top of the column (as Primero's); the cross folds it away. */}
+            <div className="flex items-center gap-1.5">
+              <div role="tablist" aria-label="Beside the picture" className="flex flex-1 rounded-lg border border-line bg-surface-2 p-1">
+                {SIDE_VIEWS.filter((v) => (v.id !== "quote" || !costsHidden) && (v.id !== "proposal" || !props.sitesOnly)).map((v) => (
+                  <button
+                    key={v.id}
+                    role="tab"
+                    aria-selected={shown === v.id}
+                    onClick={() => showSide(v.id)}
+                    title={v.hint}
+                    className={clsx(
+                      "inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium tabular-nums",
+                      shown === v.id ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                    )}
+                  >
+                    {v.label}
+                    {v.id === "quote" && net !== null ? <span className="text-ink-2">· {dollars(net)}</span> : null}
+                    {v.id === "proposal" && (props.waiting ?? 0) > 0 && (
+                      <span
+                        className="rounded-full bg-sun-line px-1.5 text-[11px] font-semibold leading-5 text-white"
+                        aria-label={`${props.waiting} waiting`}
+                      >
+                        {props.waiting}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPeek(false)}
+                aria-label="Fold it away"
+                title="Fold it away"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
             </div>
 
             <div className={clsx("space-y-3", shown !== "designer" && "hidden")}>
