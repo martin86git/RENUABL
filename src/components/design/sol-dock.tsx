@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { CircleDollarSign, TrendingUp, type LucideIcon } from "lucide-react";
+import { FileCheck, Send, TrendingUp, type LucideIcon } from "lucide-react";
 import type { SolState } from "@/lib/domain/design/sol";
 import { SOL_ASK, SOL_CHANGED, SOL_STATE, SOL_TOGGLE, loadSol, type SolAsk } from "@/lib/services/sol";
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
@@ -285,7 +285,9 @@ export function SolRail({ team, tools }: { team?: React.ReactNode; tools?: React
       )}
       <span className="my-1 h-px w-6 bg-line" aria-hidden />
       {link("/design?view=sales", "Sales this month", TrendingUp, false)}
-      {link("/design/sales/signed", "Proposals signed", CircleDollarSign, path.startsWith("/design/sales/signed"))}
+      {/* The proposals out and those signed (8 Nov 2026, Martin): a paper plane for sent, the proposal's page with a tick for sold. */}
+      {link("/design/sales/proposals", "Proposals sent", Send, path.startsWith("/design/sales/proposals"))}
+      {link("/design/sales/signed", "Proposals signed", FileCheck, path.startsWith("/design/sales/signed"))}
     </aside>
   );
 }

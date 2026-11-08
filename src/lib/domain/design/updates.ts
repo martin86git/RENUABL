@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
     area: "Deals",
+    words: "Proposals sent and Proposals signed are on the bar down the right: a paper plane, and a proposal with a tick.",
+  },
+  {
+    day: "2026-11-08",
+    area: "Deals",
     words: "A deal opens on Activity, with the deal at a glance above its record. Team chat, Sol, files and the job card are icons.",
   },
   {
