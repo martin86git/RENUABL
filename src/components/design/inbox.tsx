@@ -11,7 +11,6 @@ import {
   Mail,
   MailOpen,
   Paperclip,
-  PenLine,
   Plus,
   RefreshCw,
   Search,
@@ -79,6 +78,14 @@ export function InboxPage() {
   const [data, setData] = useState<InboxAnswer | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [asks, setAsks] = useState(0);
+  // Refresh says what it's doing (8 Nov 2026, Martin: a press showed nothing): spinning while Gmail is asked, then when.
+  const [refreshing, setRefreshing] = useState(false);
+  const [checkedAt, setCheckedAt] = useState<number | null>(null);
+  const refresh = () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    setAsks((n) => n + 1);
+  };
   const [filter, setFilter] = useState<InboxFilter>("all");
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<{ id: string; owner?: string; box?: string } | null>(null);
@@ -98,9 +105,11 @@ export function InboxPage() {
     let gone = false;
     void loadInbox().then((res) => {
       if (gone) return;
+      setRefreshing(false);
       if (res.ok) {
         setData(res);
         setProblem(null);
+        setCheckedAt(Date.now());
       } else setProblem(res.message);
     });
     return () => {
@@ -165,18 +174,7 @@ export function InboxPage() {
     );
   return (
     <div className={clsx(ui.page, "space-y-4")}>
-      <PageHead title="Email">
-        {data?.connected && (
-          <span className="flex items-center gap-2">
-            <button type="button" className={clsx(ui.primary, "h-9 px-3")} title="Write a new email (c)" onClick={compose}>
-              <PenLine className="size-4" aria-hidden /> Compose
-            </button>
-            <button type="button" className={clsx(ui.quiet, "h-9 px-3")} onClick={() => setAsks((n) => n + 1)}>
-              <RefreshCw className="size-4" aria-hidden /> Refresh
-            </button>
-          </span>
-        )}
-      </PageHead>
+      <PageHead title="Email" />
       {said && GMAIL_SAYS[said] && (
         <p
           className={clsx(
@@ -287,7 +285,7 @@ export function InboxPage() {
                 </button>
               ))}
             </div>
-            <div className="relative min-w-48 flex-1">
+            <div className="relative min-w-48 max-w-md flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
               <input
                 value={search}
@@ -296,6 +294,24 @@ export function InboxPage() {
                 className={clsx(ui.input, "h-9 min-h-9 pl-9")}
               />
             </div>
+            {/* Refresh and Compose on the same row as the filters and search (8 Nov 2026, Martin). */}
+            <span className="ml-auto flex items-center gap-2">
+              {checkedAt && !refreshing && <CheckedWhen at={checkedAt} />}
+              <button
+                type="button"
+                className={clsx(ui.quiet, "h-9 px-3")}
+                onClick={refresh}
+                disabled={refreshing}
+                aria-busy={refreshing}
+                title="Check Gmail for new email"
+              >
+                <RefreshCw className={clsx("size-4", refreshing && "animate-spin motion-reduce:animate-none")} aria-hidden />
+                {refreshing ? "Checking…" : "Refresh"}
+              </button>
+              <button type="button" className={clsx(ui.primary, "h-9 px-3")} title="Write a new email (c)" onClick={compose}>
+                <Plus className="size-4" aria-hidden /> Compose
+              </button>
+            </span>
           </div>
           {!shown.length ? (
             <p className="text-sm text-ink-2">Nothing here.</p>
@@ -372,6 +388,21 @@ export function InboxPage() {
         </>
       )}
     </div>
+  );
+}
+
+/** When the inbox was last checked with Gmail, kept current while the page is open: "Checked just now", "2 min ago". */
+function CheckedWhen({ at }: { at: number }) {
+  const [now, setNow] = useState(at);
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(t);
+  }, []);
+  const mins = Math.floor(Math.max(0, now - at) / 60_000);
+  return (
+    <span className="text-xs text-muted" role="status">
+      Checked {mins < 1 ? "just now" : `${mins} min ago`}
+    </span>
   );
 }
 
