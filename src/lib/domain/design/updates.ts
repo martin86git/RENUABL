@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Sol",
+    words: "New chat at the top of Sol's panel starts afresh in one press; the last conversation is kept in Past conversations.",
+  },
+  {
+    day: "2026-11-08",
     area: "Email",
     words: "Compact, beside Refresh, makes the inbox smaller so you see more emails at once. It stays as you left it.",
   },

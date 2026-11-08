@@ -365,6 +365,18 @@ export function SolChat({
           Sol {!side && <span className="font-normal text-muted">· your conversation is yours alone</span>}
         </p>
         <span className="ml-auto" />
+        {/* A new chat in one press (8 Nov 2026, Martin): the current one is filed away under Past conversations. */}
+        <button
+          type="button"
+          onClick={() => void run(newSolChat()).then((ok) => ok && setHistory(false))}
+          disabled={busy || turns.length === 0}
+          aria-label="New chat"
+          title="New chat"
+          className="inline-flex h-7 items-center gap-1.5 rounded-full px-2 text-xs text-muted transition-colors hover:bg-canvas hover:text-ink disabled:text-line-strong disabled:hover:bg-transparent"
+        >
+          <MessageSquarePlus className="size-4" aria-hidden />
+          New chat
+        </button>
         {/* Past conversations (1 Nov 2026, Martin): the clock wound back, on the right. */}
         <button
           type="button"
