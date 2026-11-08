@@ -1290,6 +1290,8 @@ export function RoofDesigner(props: {
   // strip starts on the page to the foot of the window, since the bar above it changes height with what it holds.
   // The strip may arrive after the designer mounts, so it is watched from its own ref.
   const [fitPx, setFitPx] = useState<number | null>(null);
+  // The first fold from the top of the figures strip, which the column beside the picture keeps within.
+  const [foldPx, setFoldPx] = useState<number | null>(null);
   const stripBox = useCallback((strip: HTMLElement | null) => {
     if (!strip) return;
     const measure = () => {
@@ -1297,6 +1299,7 @@ export function RoofDesigner(props: {
       const top = box.top + window.scrollY;
       const room = window.innerHeight - top - box.height - 8 - 16;
       setFitPx(Math.max(360, Math.round(room * (ROOF_IMAGE.width / ROOF_IMAGE.height))));
+      setFoldPx(Math.max(320, Math.round(window.innerHeight - top - 16)));
     };
     // Measured at once too: a tab in the background gets no resize callbacks until it is shown.
     measure();
@@ -7738,6 +7741,8 @@ export function RoofDesigner(props: {
             // Leaving it folds it away, unless something in it is being typed in.
             const box = e.currentTarget;
             holdPeek();
+            // The quote stays out until another view is chosen or it is closed (8 Nov 2026, Martin): it is worked in.
+            if (sideNow.current.side === "quote") return;
             peekTimer.current = window.setTimeout(() => {
               const typing =
                 box.contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? "");
@@ -7751,14 +7756,18 @@ export function RoofDesigner(props: {
               : shown === "quote" && quoteShort
                 ? "w-[min(15rem,100%)]"
                 : shown === "quote"
-                  ? // The quote across most of the picture, its groups side by side (8 Nov 2026, Martin), to flick to and from.
-                    "w-[min(calc(100%-5rem),72rem)]"
+                  ? // The quote's lines down one side, what needs deciding on the other (8 Nov 2026, Martin).
+                    "w-[min(calc(100%-5rem),56rem)]"
                   : "w-[min(26rem,100%)]",
             peek ? "translate-x-0 opacity-100" : "pointer-events-none invisible translate-x-6 opacity-0",
             !shown && "hidden",
           )}
         >
-          <div className="max-h-[calc(100dvh-7rem)] space-y-3 overflow-y-auto rounded-3xl bg-canvas/95 p-3 shadow-[0_12px_40px_rgba(20,22,26,0.22)] ring-1 ring-line backdrop-blur">
+          <div
+            className="max-h-[calc(100dvh-7rem)] space-y-3 overflow-y-auto overscroll-contain rounded-3xl bg-canvas/95 p-3 shadow-[0_12px_40px_rgba(20,22,26,0.22)] ring-1 ring-line backdrop-blur"
+            // No taller than the first fold, so it scrolls inside itself and never the page under it.
+            style={foldPx ? { maxHeight: foldPx } : undefined}
+          >
             {/* One view at a time, chosen at the top of the column (as Primero's); the cross folds it away. */}
             <div className="flex items-center gap-1.5">
               <div role="tablist" aria-label="Beside the picture" className="flex flex-1 rounded-lg border border-line bg-surface-2 p-1">

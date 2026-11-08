@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Design tool",
+    words: "The quote stays open until you go back to the design. Its lines run down one side and scroll in their own box.",
+  },
+  {
+    day: "2026-11-08",
+    area: "Design tool",
+    words: "What needs deciding on the quote sits beside the lines: roof, storeys, phase, Solar Victoria and costs decided on each job.",
+  },
+  {
+    day: "2026-11-08",
     area: "Today",
     words: "The first tab on Today is now Your deals, and the RENUABL logo lines up with the menu beside it.",
   },
@@ -36,17 +46,20 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
     area: "Proposals",
-    words: "A proposal with a battery opens on the battery: your customer's evenings laid over the roof, or their home's day when it's a battery alone.",
+    words:
+      "A proposal with a battery opens on the battery: your customer's evenings laid over the roof, or their home's day when it's a battery alone.",
   },
   {
     day: "2026-11-08",
     area: "Proposals",
-    words: "A deal's proposal opens in the same window as the designer, from the deal, its card on Today or the menu, and you can switch between them.",
+    words:
+      "A deal's proposal opens in the same window as the designer, from the deal, its card on Today or the menu, and you can switch between them.",
   },
   {
     day: "2026-11-08",
     area: "Designer",
-    words: "The designer opens as a window in the middle of the page, from a deal, Today or anywhere else, and closes back to where you were.",
+    words:
+      "The designer opens as a window in the middle of the page, from a deal, Today or anywhere else, and closes back to where you were.",
   },
   {
     day: "2026-11-08",

@@ -177,6 +177,383 @@ export function DesignQuote(props: {
     );
   }
 
+  // Laid out across a wide space: the lines down one side, everything to switch or decide beside them (8 Nov 2026, Martin).
+  const split = Boolean(props.wide) && !empty;
+  const confirms = all.filter((l) => l.confirm);
+  const homeBox = (
+    <div className="mt-2.5">
+      <HomeToggles
+        form={form}
+        onPick={(name, value) => props.onChange({ form: { ...form, [name]: value } as QuoteFields["form"], edits })}
+      />
+    </div>
+  );
+  const solarVicBox = (
+    <div className="mt-2 rounded-md border border-line bg-canvas px-2 py-1.5" role="group" aria-label="Solar Victoria">
+      <div className="flex items-center gap-3 text-[11px] font-medium text-ink">
+        <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">Solar Vic</span>
+        {(
+          [
+            ["Rebate", Boolean(form.solarVicRebate), (on: boolean) => setSolarVic(on, on && Boolean(form.solarVicLoan))],
+            ["Loan", Boolean(form.solarVicLoan), (on: boolean) => setSolarVic(Boolean(form.solarVicRebate) || on, on)],
+          ] as const
+        ).map(([name, on, set]) => (
+          <label
+            key={name}
+            className="flex cursor-pointer items-center gap-1.5"
+            title={`Solar Victoria ${name.toLowerCase()}: subject to eligibility and approval`}
+          >
+            <span className="relative inline-flex shrink-0">
+              <input
+                type="checkbox"
+                role="switch"
+                aria-label={`Solar Victoria ${name.toLowerCase()}`}
+                className="peer sr-only"
+                checked={on}
+                onChange={(e) => set(e.target.checked)}
+              />
+              <span className="h-4 w-7 rounded-full bg-line-strong peer-checked:bg-sun-line peer-focus-visible:ring-2 peer-focus-visible:ring-ink" />
+              <span className="absolute left-0.5 top-0.5 size-3 rounded-full bg-surface shadow-[var(--shadow-soft)] peer-checked:translate-x-3" />
+            </span>
+            {name}
+          </label>
+        ))}
+        <span className="ml-auto whitespace-nowrap text-[10px] text-muted">If approved</span>
+      </div>
+      {form.solarVicRebate && solarVicOff && <p className="mt-1 text-[11px] text-sun-ink">{solarVicOff} Nothing is added to this quote.</p>}
+    </div>
+  );
+  const tableBlock = (
+    <>
+      {COST_GROUPS.map((group) => {
+        // A cost decided on each job stays in the list when left out, so it can be included again.
+        const rows = all.filter((l) => l.group === group && (l.confirm || !edits[lineKey(l)]?.removed));
+        if (!rows.length) return null;
+        return (
+          <table key={group} className="mt-4 w-full table-fixed text-sm first:mt-0">
+            <thead>
+              <tr className="border-b-2 border-forest text-xs font-semibold uppercase tracking-[0.12em] text-forest">
+                <th className="pb-1 text-left">{group}</th>
+                <th className="w-10 pb-1 text-right">Qty</th>
+                <th className="w-[5.5rem] pb-1 text-right">Cost</th>
+                <th className="w-6 pb-1" aria-label="Take out" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((l, i) => {
+                const typed = edits[lineKey(l)]?.amount;
+                const typedQty = edits[lineKey(l)]?.qty;
+                // The line as it stands with any hand changes: a quantity typed over it prices it again.
+                const shown = editedLines([l], edits)[0] ?? l;
+                const unset = l.missing && typed === undefined;
+                const on = Boolean(edits[lineKey(l)]?.on);
+                const out = Boolean(edits[lineKey(l)]?.removed);
+                return (
+                  <tr
+                    key={`${l.label}${i}`}
+                    className={
+                      l.confirm && !on && !out
+                        ? "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
+                        : l.confirm && out
+                          ? "group border-b border-line align-top text-muted last:border-0"
+                          : unset
+                            ? // A line with no cost asks to be dealt with: priced, or knowingly left at nothing.
+                              "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
+                            : "group border-b border-line align-top last:border-0"
+                    }
+                  >
+                    <td className={unset || (l.confirm && !on && !out) ? "py-1.5 pl-2.5 pr-2" : "py-1.5 pr-2"}>
+                      {l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label}
+                      {l.confirm && split && (
+                        <span
+                          className={
+                            on ? "mt-0.5 block text-xs text-positive" : out ? "mt-0.5 block text-xs" : "mt-0.5 block text-xs text-sun-ink"
+                          }
+                        >
+                          {on ? "Included" : out ? "Left out: the proposal says it may apply" : "To decide, beside the quote"}
+                        </span>
+                      )}
+                      {l.confirm && !split && (
+                        <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
+                          {on ? (
+                            <>
+                              <span className="font-medium text-positive">Included</span>
+                              <button className="underline underline-offset-2 hover:text-ink" onClick={() => edit(l, { removed: true })}>
+                                leave it out
+                              </button>
+                            </>
+                          ) : out ? (
+                            <>
+                              <span>Left out: the proposal says it may apply</span>
+                              <button className="underline underline-offset-2 hover:text-ink" onClick={() => edit(l, { on: true })}>
+                                include it
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-sun-ink">Decided on each job:</span>
+                              <button
+                                className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-ink"
+                                onClick={() => edit(l, { on: true })}
+                              >
+                                Include
+                              </button>
+                              <button
+                                className="rounded-full px-2 py-0.5 font-semibold text-ink ring-1 ring-line hover:ring-ink-2"
+                                onClick={() => edit(l, { removed: true })}
+                              >
+                                Leave out
+                              </button>
+                            </>
+                          )}
+                        </span>
+                      )}
+                      {l.sku && <span className="block text-xs text-muted">{l.sku}</span>}
+                      {unset && (
+                        <span className="mt-0.5 block text-xs text-sun-ink">
+                          <strong className="font-semibold">No cost on file.</strong> Type one, or{" "}
+                          <button className="font-semibold underline underline-offset-2" onClick={() => edit(l, { amount: 0 })}>
+                            leave it at $0
+                          </button>
+                        </span>
+                      )}
+                      {(typed !== undefined || typedQty !== undefined) &&
+                        (l.missing && typed === 0 && typedQty === undefined ? (
+                          <button className="block text-xs text-muted underline underline-offset-2" onClick={() => edit(l, null)}>
+                            Left at $0 (no cost on file): undo
+                          </button>
+                        ) : (
+                          <button className="block text-xs text-sun-ink underline underline-offset-2" onClick={() => edit(l, null)}>
+                            Changed by hand: back to {typedQty !== undefined ? `${l.qty} at ` : ""}
+                            {l.missing ? "no cost" : money(l.amount)}
+                          </button>
+                        ))}
+                    </td>
+                    <td className="py-1 text-right tabular-nums text-ink-2">
+                      {l.qty === undefined ? (
+                        ""
+                      ) : (
+                        <input
+                          type="number"
+                          min="0"
+                          max={MAX_LINE_QTY}
+                          step="1"
+                          value={typedQty ?? l.qty}
+                          onChange={(e) => edit(l, { qty: Math.max(0, Math.min(MAX_LINE_QTY, Math.round(Number(e.target.value) || 0))) })}
+                          aria-label={`How many: ${l.label}`}
+                          style={{ width: `${String(typedQty ?? l.qty).length + 1.6}ch` }}
+                          className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
+                            typedQty !== undefined ? "border-sun-line font-semibold text-ink" : "border-transparent hover:border-line"
+                          }`}
+                        />
+                      )}
+                    </td>
+                    <td className="py-1 pl-1 text-right">
+                      <span className="inline-flex items-center justify-end gap-px">
+                        <span className="text-muted">$</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={Math.round(typed ?? shown.amount)}
+                          onChange={(e) => edit(l, { amount: Math.max(0, Number(e.target.value) || 0) })}
+                          aria-label={`Cost of ${l.label}`}
+                          style={{ width: `${String(Math.round(typed ?? shown.amount)).length + 1.6}ch` }}
+                          className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
+                            typed !== undefined
+                              ? "border-sun-line font-semibold"
+                              : unset
+                                ? "border-warning"
+                                : "border-transparent hover:border-line"
+                          }`}
+                        />
+                      </span>
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <button
+                        hidden={Boolean(l.confirm)}
+                        className="text-base leading-none text-muted hover:text-danger"
+                        onClick={() => edit(l, { removed: true })}
+                        aria-label={`Take out ${l.label}`}
+                        title="Take this line out"
+                      >
+                        ×
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        );
+      })}
+    </>
+  );
+  const changedBox = changed > 0 && (
+    <p className="mt-3 rounded-md bg-sun p-2.5 text-xs text-sun-ink">
+      {changed} {changed === 1 ? "line has" : "lines have"} been changed by hand
+      {removed ? `, ${removed} taken out` : ""}. They stay as you set them while the design changes.{" "}
+      <button className="font-semibold underline underline-offset-2" onClick={() => props.onChange({ form, edits: {} })}>
+        Put them all back
+      </button>
+    </p>
+  );
+  const totalsBox = (
+    <dl className="mt-4 space-y-1 rounded-md bg-canvas p-3 text-sm">
+      {[
+        ["Your cost", money(totals.cost)],
+        ["Margin", `${money(costing.margin)} (${totals.priceExGst > 0 ? Math.round((costing.margin / totals.priceExGst) * 100) : 0}%)`],
+        ["Price inc. GST", money(totals.priceIncGst)],
+        [`After STCs (${money(stc)})`, money(totals.priceIncGst - stc)],
+      ].map(([k, v], i) => (
+        <div key={k} className={i >= 2 ? "flex justify-between font-semibold" : "flex justify-between"}>
+          <dt className={i >= 2 ? "" : "text-muted"}>{k}</dt>
+          <dd className="tabular-nums">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+  const solarVicBlock = solarVic && (
+    <div className="mt-2 rounded-md border border-sun-line bg-sun p-3 text-sm">
+      <dl className="space-y-1">
+        <div className="flex justify-between">
+          <dt className="text-sun-ink">Solar Victoria rebate, if approved</dt>
+          <dd className="tabular-nums text-sun-ink">-{money(solarVic.rebate)}</dd>
+        </div>
+        <div className="flex justify-between font-semibold">
+          <dt>After the rebate</dt>
+          <dd className="tabular-nums">{money(solarVic.afterRebate)}</dd>
+        </div>
+        {solarVic.loan > 0 && (
+          <>
+            <div className="flex justify-between">
+              <dt className="text-sun-ink">Interest-free loan, if approved</dt>
+              <dd className="tabular-nums text-sun-ink">-{money(solarVic.loan)}</dd>
+            </div>
+            <div className="flex justify-between font-semibold">
+              <dt>To pay up front</dt>
+              <dd className="tabular-nums">{money(solarVic.upfront)}</dd>
+            </div>
+            <div className="flex justify-between text-ink-2">
+              <dt>Then, for {solarVic.loanMonths} months</dt>
+              <dd className="tabular-nums">${solarVic.monthly.toFixed(2)} a month</dd>
+            </div>
+          </>
+        )}
+      </dl>
+      <p className="mt-2 text-xs leading-snug text-sun-ink">{solarVicNote(solarVic)}</p>
+    </div>
+  );
+  const footBox = (
+    <p className="mt-2 text-xs text-muted">
+      {costing.panels} panels, {costing.pvKw} kW
+      {costing.batteryKwh ? `, ${costing.batteryKwh} kWh battery` : ""}. Costs are ex GST: type over one to change it, or take a line out
+      with its cross. An inverter or a battery is costed only when one is chosen on the design. STCs use the rules as at {rates.asOf}
+      {form.postcode ? `, postcode ${form.postcode} (from the address)` : ""} and your price per certificate.
+      {workspace.lists.length ? ` Prices from: ${workspace.lists.map((l) => l.name).join(", ")}.` : " No price list uploaded yet."}
+    </p>
+  );
+
+  if (split)
+    return (
+      <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className={label}>Quote builder · {props.design}</p>
+          <span className="flex items-baseline gap-3">
+            {props.onCompact && (
+              <button
+                className="text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
+                onClick={() => props.onCompact?.(true)}
+                title="A short view of the quote, so the picture has more room"
+              >
+                Short view
+              </button>
+            )}
+            <Link href="/design/settings" className="text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
+              Prices and settings
+            </Link>
+          </span>
+        </div>
+        <div className="mt-3 grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_17rem]">
+          <div className="min-w-0 [&>table:first-child]:mt-0">
+            {tableBlock}
+            {footBox}
+          </div>
+          <aside className="space-y-2.5 md:sticky md:top-0 [&>*]:mt-0" aria-label="To switch and decide">
+            {homeBox}
+            {solarVicBox}
+            {confirms.length > 0 && (
+              <div className="rounded-md border border-line bg-canvas p-2.5" role="group" aria-label="Decided on each job">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">Decided on each job</p>
+                <p className="mt-0.5 text-[11px] leading-snug text-muted">
+                  Include it in the price, or leave it out and the proposal says it may apply. Nothing is published until each is decided.
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {confirms.map((l) => {
+                    const on = Boolean(edits[lineKey(l)]?.on);
+                    const out = Boolean(edits[lineKey(l)]?.removed);
+                    return (
+                      <li
+                        key={lineKey(l)}
+                        className={
+                          on || out
+                            ? "flex items-center gap-2 rounded-md px-1.5 py-1"
+                            : "flex items-center gap-2 rounded-md bg-sun px-1.5 py-1 shadow-[inset_3px_0_0_var(--sun-line)]"
+                        }
+                      >
+                        <span className="min-w-0 flex-1 text-xs text-ink">{l.label}</span>
+                        <span
+                          role="radiogroup"
+                          aria-label={l.label}
+                          className="flex shrink-0 rounded-md border border-line bg-surface p-0.5 text-[11px] font-medium"
+                        >
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={on}
+                            onClick={() => edit(l, { on: true })}
+                            className={
+                              on ? "rounded-[5px] bg-ink px-2 py-0.5 text-canvas" : "rounded-[5px] px-2 py-0.5 text-ink-2 hover:text-ink"
+                            }
+                          >
+                            Include
+                          </button>
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={out}
+                            onClick={() => edit(l, { removed: true })}
+                            className={
+                              out ? "rounded-[5px] bg-ink px-2 py-0.5 text-canvas" : "rounded-[5px] px-2 py-0.5 text-ink-2 hover:text-ink"
+                            }
+                          >
+                            Leave out
+                          </button>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {missing > 0 && (
+              <p className="mb-3 rounded-md bg-warning-soft p-2.5 text-xs text-warning" role="status">
+                {missing} {missing === 1 ? "line has" : "lines have"} no cost on file, so {missing === 1 ? "it counts" : "they count"} as
+                $0. Each is highlighted below: type a cost over it, leave it at $0, or{" "}
+                <Link href="/design/settings" className="font-semibold underline underline-offset-2">
+                  upload a price list or set the part&apos;s cost
+                </Link>
+                .
+              </p>
+            )}
+            {totalsBox}
+            {solarVicBlock}
+            {changedBox}
+          </aside>
+        </div>
+      </section>
+    );
+
   return (
     <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder">
       <div className="flex items-baseline justify-between gap-2">
@@ -196,53 +573,8 @@ export function DesignQuote(props: {
           </Link>
         </span>
       </div>
-      {/* The three things about the home that change the price; in the design tool they sit in its Designer view. */}
-      {!props.homeless && (
-        <div className="mt-2.5">
-          <HomeToggles
-            form={form}
-            onPick={(name, value) => props.onChange({ form: { ...form, [name]: value } as QuoteFields["form"], edits })}
-          />
-        </div>
-      )}
-
-      {/* Solar Victoria: switched on, the rebate (and loan) go on the quote and on its proposal, always as "if approved". */}
-      <div className="mt-2 rounded-md border border-line bg-canvas px-2 py-1.5" role="group" aria-label="Solar Victoria">
-        <div className="flex items-center gap-3 text-[11px] font-medium text-ink">
-          <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">Solar Vic</span>
-          {(
-            [
-              ["Rebate", Boolean(form.solarVicRebate), (on: boolean) => setSolarVic(on, on && Boolean(form.solarVicLoan))],
-              ["Loan", Boolean(form.solarVicLoan), (on: boolean) => setSolarVic(Boolean(form.solarVicRebate) || on, on)],
-            ] as const
-          ).map(([name, on, set]) => (
-            <label
-              key={name}
-              className="flex cursor-pointer items-center gap-1.5"
-              title={`Solar Victoria ${name.toLowerCase()}: subject to eligibility and approval`}
-            >
-              <span className="relative inline-flex shrink-0">
-                <input
-                  type="checkbox"
-                  role="switch"
-                  aria-label={`Solar Victoria ${name.toLowerCase()}`}
-                  className="peer sr-only"
-                  checked={on}
-                  onChange={(e) => set(e.target.checked)}
-                />
-                <span className="h-4 w-7 rounded-full bg-line-strong peer-checked:bg-sun-line peer-focus-visible:ring-2 peer-focus-visible:ring-ink" />
-                <span className="absolute left-0.5 top-0.5 size-3 rounded-full bg-surface shadow-[var(--shadow-soft)] peer-checked:translate-x-3" />
-              </span>
-              {name}
-            </label>
-          ))}
-          <span className="ml-auto whitespace-nowrap text-[10px] text-muted">If approved</span>
-        </div>
-        {form.solarVicRebate && solarVicOff && (
-          <p className="mt-1 text-[11px] text-sun-ink">{solarVicOff} Nothing is added to this quote.</p>
-        )}
-      </div>
-
+      {!props.homeless && <div className="mt-2.5">{homeBox}</div>}
+      {solarVicBox}
       {empty ? (
         <p className="mt-4 text-sm text-ink-2">Put panels on the roof and they appear here, costed as you go.</p>
       ) : (
@@ -264,230 +596,11 @@ export function DesignQuote(props: {
               published until each is decided.
             </p>
           )}
-          <div className={props.wide ? "grid items-start gap-x-8 gap-y-5 xl:grid-cols-2 2xl:grid-cols-3 [&>table]:mt-0" : ""}>
-            {COST_GROUPS.map((group) => {
-              // A cost decided on each job stays in the list when left out, so it can be included again.
-              const rows = all.filter((l) => l.group === group && (l.confirm || !edits[lineKey(l)]?.removed));
-              if (!rows.length) return null;
-              return (
-                <table key={group} className="mt-4 w-full table-fixed text-sm first:mt-0">
-                  <thead>
-                    <tr className="border-b-2 border-forest text-xs font-semibold uppercase tracking-[0.12em] text-forest">
-                      <th className="pb-1 text-left">{group}</th>
-                      <th className="w-10 pb-1 text-right">Qty</th>
-                      <th className="w-[5.5rem] pb-1 text-right">Cost</th>
-                      <th className="w-6 pb-1" aria-label="Take out" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((l, i) => {
-                      const typed = edits[lineKey(l)]?.amount;
-                      const typedQty = edits[lineKey(l)]?.qty;
-                      // The line as it stands with any hand changes: a quantity typed over it prices it again.
-                      const shown = editedLines([l], edits)[0] ?? l;
-                      const unset = l.missing && typed === undefined;
-                      const on = Boolean(edits[lineKey(l)]?.on);
-                      const out = Boolean(edits[lineKey(l)]?.removed);
-                      return (
-                        <tr
-                          key={`${l.label}${i}`}
-                          className={
-                            l.confirm && !on && !out
-                              ? "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
-                              : l.confirm && out
-                                ? "group border-b border-line align-top text-muted last:border-0"
-                                : unset
-                                  ? // A line with no cost asks to be dealt with: priced, or knowingly left at nothing.
-                                    "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
-                                  : "group border-b border-line align-top last:border-0"
-                          }
-                        >
-                          <td className={unset || (l.confirm && !on && !out) ? "py-1.5 pl-2.5 pr-2" : "py-1.5 pr-2"}>
-                            {l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label}
-                            {l.confirm && (
-                              <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
-                                {on ? (
-                                  <>
-                                    <span className="font-medium text-positive">Included</span>
-                                    <button
-                                      className="underline underline-offset-2 hover:text-ink"
-                                      onClick={() => edit(l, { removed: true })}
-                                    >
-                                      leave it out
-                                    </button>
-                                  </>
-                                ) : out ? (
-                                  <>
-                                    <span>Left out: the proposal says it may apply</span>
-                                    <button className="underline underline-offset-2 hover:text-ink" onClick={() => edit(l, { on: true })}>
-                                      include it
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="text-sun-ink">Decided on each job:</span>
-                                    <button
-                                      className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-ink"
-                                      onClick={() => edit(l, { on: true })}
-                                    >
-                                      Include
-                                    </button>
-                                    <button
-                                      className="rounded-full px-2 py-0.5 font-semibold text-ink ring-1 ring-line hover:ring-ink-2"
-                                      onClick={() => edit(l, { removed: true })}
-                                    >
-                                      Leave out
-                                    </button>
-                                  </>
-                                )}
-                              </span>
-                            )}
-                            {l.sku && <span className="block text-xs text-muted">{l.sku}</span>}
-                            {unset && (
-                              <span className="mt-0.5 block text-xs text-sun-ink">
-                                <strong className="font-semibold">No cost on file.</strong> Type one, or{" "}
-                                <button className="font-semibold underline underline-offset-2" onClick={() => edit(l, { amount: 0 })}>
-                                  leave it at $0
-                                </button>
-                              </span>
-                            )}
-                            {(typed !== undefined || typedQty !== undefined) &&
-                              (l.missing && typed === 0 && typedQty === undefined ? (
-                                <button className="block text-xs text-muted underline underline-offset-2" onClick={() => edit(l, null)}>
-                                  Left at $0 (no cost on file): undo
-                                </button>
-                              ) : (
-                                <button className="block text-xs text-sun-ink underline underline-offset-2" onClick={() => edit(l, null)}>
-                                  Changed by hand: back to {typedQty !== undefined ? `${l.qty} at ` : ""}
-                                  {l.missing ? "no cost" : money(l.amount)}
-                                </button>
-                              ))}
-                          </td>
-                          <td className="py-1 text-right tabular-nums text-ink-2">
-                            {l.qty === undefined ? (
-                              ""
-                            ) : (
-                              <input
-                                type="number"
-                                min="0"
-                                max={MAX_LINE_QTY}
-                                step="1"
-                                value={typedQty ?? l.qty}
-                                onChange={(e) =>
-                                  edit(l, { qty: Math.max(0, Math.min(MAX_LINE_QTY, Math.round(Number(e.target.value) || 0))) })
-                                }
-                                aria-label={`How many: ${l.label}`}
-                                style={{ width: `${String(typedQty ?? l.qty).length + 1.6}ch` }}
-                                className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
-                                  typedQty !== undefined ? "border-sun-line font-semibold text-ink" : "border-transparent hover:border-line"
-                                }`}
-                              />
-                            )}
-                          </td>
-                          <td className="py-1 pl-1 text-right">
-                            <span className="inline-flex items-center justify-end gap-px">
-                              <span className="text-muted">$</span>
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                value={Math.round(typed ?? shown.amount)}
-                                onChange={(e) => edit(l, { amount: Math.max(0, Number(e.target.value) || 0) })}
-                                aria-label={`Cost of ${l.label}`}
-                                style={{ width: `${String(Math.round(typed ?? shown.amount)).length + 1.6}ch` }}
-                                className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
-                                  typed !== undefined
-                                    ? "border-sun-line font-semibold"
-                                    : unset
-                                      ? "border-warning"
-                                      : "border-transparent hover:border-line"
-                                }`}
-                              />
-                            </span>
-                          </td>
-                          <td className="py-1.5 text-right">
-                            <button
-                              hidden={Boolean(l.confirm)}
-                              className="text-base leading-none text-muted hover:text-danger"
-                              onClick={() => edit(l, { removed: true })}
-                              aria-label={`Take out ${l.label}`}
-                              title="Take this line out"
-                            >
-                              ×
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              );
-            })}
-          </div>
-          {changed > 0 && (
-            <p className="mt-3 rounded-md bg-sun p-2.5 text-xs text-sun-ink">
-              {changed} {changed === 1 ? "line has" : "lines have"} been changed by hand
-              {removed ? `, ${removed} taken out` : ""}. They stay as you set them while the design changes.{" "}
-              <button className="font-semibold underline underline-offset-2" onClick={() => props.onChange({ form, edits: {} })}>
-                Put them all back
-              </button>
-            </p>
-          )}
-          <dl className="mt-4 space-y-1 rounded-md bg-canvas p-3 text-sm">
-            {[
-              ["Your cost", money(totals.cost)],
-              [
-                "Margin",
-                `${money(costing.margin)} (${totals.priceExGst > 0 ? Math.round((costing.margin / totals.priceExGst) * 100) : 0}%)`,
-              ],
-              ["Price inc. GST", money(totals.priceIncGst)],
-              [`After STCs (${money(stc)})`, money(totals.priceIncGst - stc)],
-            ].map(([k, v], i) => (
-              <div key={k} className={i >= 2 ? "flex justify-between font-semibold" : "flex justify-between"}>
-                <dt className={i >= 2 ? "" : "text-muted"}>{k}</dt>
-                <dd className="tabular-nums">{v}</dd>
-              </div>
-            ))}
-          </dl>
-          {solarVic && (
-            <div className="mt-2 rounded-md border border-sun-line bg-sun p-3 text-sm">
-              <dl className="space-y-1">
-                <div className="flex justify-between">
-                  <dt className="text-sun-ink">Solar Victoria rebate, if approved</dt>
-                  <dd className="tabular-nums text-sun-ink">-{money(solarVic.rebate)}</dd>
-                </div>
-                <div className="flex justify-between font-semibold">
-                  <dt>After the rebate</dt>
-                  <dd className="tabular-nums">{money(solarVic.afterRebate)}</dd>
-                </div>
-                {solarVic.loan > 0 && (
-                  <>
-                    <div className="flex justify-between">
-                      <dt className="text-sun-ink">Interest-free loan, if approved</dt>
-                      <dd className="tabular-nums text-sun-ink">-{money(solarVic.loan)}</dd>
-                    </div>
-                    <div className="flex justify-between font-semibold">
-                      <dt>To pay up front</dt>
-                      <dd className="tabular-nums">{money(solarVic.upfront)}</dd>
-                    </div>
-                    <div className="flex justify-between text-ink-2">
-                      <dt>Then, for {solarVic.loanMonths} months</dt>
-                      <dd className="tabular-nums">${solarVic.monthly.toFixed(2)} a month</dd>
-                    </div>
-                  </>
-                )}
-              </dl>
-              <p className="mt-2 text-xs leading-snug text-sun-ink">{solarVicNote(solarVic)}</p>
-            </div>
-          )}
-          <p className="mt-2 text-xs text-muted">
-            {costing.panels} panels, {costing.pvKw} kW
-            {costing.batteryKwh ? `, ${costing.batteryKwh} kWh battery` : ""}. Costs are ex GST: type over one to change it, or take a line
-            out with its cross. An inverter or a battery is costed only when one is chosen on the design. STCs use the rules as at{" "}
-            {rates.asOf}
-            {form.postcode ? `, postcode ${form.postcode} (from the address)` : ""} and your price per certificate.
-            {workspace.lists.length ? ` Prices from: ${workspace.lists.map((l) => l.name).join(", ")}.` : " No price list uploaded yet."}
-          </p>
+          {tableBlock}
+          {changedBox}
+          {totalsBox}
+          {solarVicBlock}
+          {footBox}
         </div>
       )}
     </section>
