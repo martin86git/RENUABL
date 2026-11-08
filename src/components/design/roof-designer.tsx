@@ -324,33 +324,42 @@ function BarRow(props: {
   waiting: number;
   /** In the pop-up, the drawing tools: a second leg out to the right (8 Nov 2026, Martin: fewer icons on the map). */
   tools?: React.ReactNode;
+  /** In the pop-up, the tools used most, as rounds beneath the knife (8 Nov 2026, Martin: stringing and shade). */
+  quick?: React.ReactNode;
   children: React.ReactNode;
 }) {
   if (!props.tight) return <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-2.5 lg:flex-nowrap">{props.children}</div>;
   return (
-    <KnifeMenu
-      label="Save, publish, the designs and the checks; stringing, tracing, the guide line, undo and redo"
-      hold={props.hold}
-      sections={[{ title: "This design", children: props.children }, ...(props.tools ? [{ title: "Draw", children: props.tools }] : [])]}
-      main={({ open }) => (
-        <span
-          className={clsx(
-            "relative flex size-11 items-center justify-center rounded-full shadow-lift ring-1 transition",
-            open ? "bg-ink text-canvas ring-ink" : "bg-surface text-ink ring-line hover:bg-canvas",
-          )}
-        >
-          <Settings2 className="size-5" aria-hidden />
-          {props.unsaved && (
-            <span className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-sun-line ring-2 ring-surface" aria-label="not saved" />
-          )}
-          {props.waiting > 0 && (
-            <span className="absolute -bottom-1 -right-1 min-w-5 rounded-full bg-sun-line px-1 text-center text-[10px] font-semibold leading-5 text-white ring-2 ring-surface">
-              {props.waiting}
-            </span>
-          )}
-        </span>
+    <div className="flex flex-col items-center gap-2.5">
+      <KnifeMenu
+        label="Save, publish, the designs and the checks; stringing, tracing, the guide line, undo and redo"
+        hold={props.hold}
+        sections={[{ title: "This design", children: props.children }, ...(props.tools ? [{ title: "Draw", children: props.tools }] : [])]}
+        main={({ open }) => (
+          <span
+            className={clsx(
+              "relative flex size-11 items-center justify-center rounded-full shadow-lift ring-1 transition",
+              open ? "bg-ink text-canvas ring-ink" : "bg-surface text-ink ring-line hover:bg-canvas",
+            )}
+          >
+            <Settings2 className="size-5" aria-hidden />
+            {props.unsaved && (
+              <span className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-sun-line ring-2 ring-surface" aria-label="not saved" />
+            )}
+            {props.waiting > 0 && (
+              <span className="absolute -bottom-1 -right-1 min-w-5 rounded-full bg-sun-line px-1 text-center text-[10px] font-semibold leading-5 text-white ring-2 ring-surface">
+                {props.waiting}
+              </span>
+            )}
+          </span>
+        )}
+      />
+      {props.quick && (
+        <div className="flex flex-col items-center gap-2 border-t border-line pt-2.5" role="toolbar" aria-label="Quick tools">
+          {props.quick}
+        </div>
       )}
-    />
+    </div>
   );
 }
 
@@ -4078,12 +4087,29 @@ export function RoofDesigner(props: {
         )}
       >
         <BarRow
-          tools={
+          quick={
             props.tight ? (
               <>
                 <Leg label="String panels (S)" on={tool === "string"} onClick={() => pickTool(tool === "string" ? "select" : "string")}>
                   <Cable className="size-5" aria-hidden />
                 </Leg>
+                <Leg label="Shade analysis" on={shadeOn} onClick={toggleShade}>
+                  <SunMedium className="size-5" aria-hidden />
+                </Leg>
+              </>
+            ) : undefined
+          }
+          tools={
+            props.tight ? (
+              <>
+                <Leg label="Comment (C)" on={tool === "comment"} onClick={() => pickTool(tool === "comment" ? "select" : "comment")}>
+                  <MessageCircle className="size-5" aria-hidden />
+                </Leg>
+                {!costsHidden && (
+                  <Leg label="Design it for me" on={mineIntro || mine === "busy"} onClick={() => setMineIntro(!mineIntro)}>
+                    <WandSparkles className={clsx("size-5", mine === "busy" && "animate-pulse")} aria-hidden />
+                  </Leg>
+                )}
                 <Leg label="Trace a roof face (T)" on={tool === "trace"} onClick={() => pickTool(tool === "trace" ? "select" : "trace")}>
                   <PenTool className="size-5" aria-hidden />
                 </Leg>
@@ -4177,23 +4203,25 @@ export function RoofDesigner(props: {
               </button>
             </span>
           )}
-          {/* Sol drives the designer: the command bar, opened here or with "/". */}
-          <button
-            type="button"
-            onClick={() => {
-              setCommandOpen(!commandOpen);
-              requestAnimationFrame(() => commandBox.current?.focus());
-            }}
-            className={clsx(
-              "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-surface text-xs font-medium text-ink-2 ring-1 ring-line hover:text-ink",
-              props.tight ? "size-10" : "h-9 px-3",
-            )}
-            title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
-          >
-            <SolIcon className="size-4" />
-            {props.tight ? <span className="sr-only">Ask Sol to change it</span> : "Ask Sol to change it"}
-            {!props.tight && <kbd className="rounded border border-line px-1 text-[10px] text-muted">/</kbd>}
-          </button>
+          {/* Sol drives the designer: the command bar, opened here or with "/". In the pop-up, from the foot of the picture. */}
+          {!props.tight && (
+            <button
+              type="button"
+              onClick={() => {
+                setCommandOpen(!commandOpen);
+                requestAnimationFrame(() => commandBox.current?.focus());
+              }}
+              className={clsx(
+                "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-surface text-xs font-medium text-ink-2 ring-1 ring-line hover:text-ink",
+                props.tight ? "size-10" : "h-9 px-3",
+              )}
+              title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
+            >
+              <SolIcon className="size-4" />
+              {props.tight ? <span className="sr-only">Ask Sol to change it</span> : "Ask Sol to change it"}
+              {!props.tight && <kbd className="rounded border border-line px-1 text-[10px] text-muted">/</kbd>}
+            </button>
+          )}
           {/* Ready to install: green only when the design would pass; pressed, every check with what to fix. */}
           <div className="relative" data-menu-host>
             <button
@@ -7366,96 +7394,118 @@ export function RoofDesigner(props: {
                   redo, the whole picture and the label to its left, and the two ways of looking to its right (the roof
                   as a drawing, and the shade analysis). */}
               <div className="pointer-events-none absolute inset-x-2 bottom-7 z-10 flex items-end gap-2">
-                <div
-                  className={clsx(GLASS, "pointer-events-auto absolute bottom-0 left-1/2 flex -translate-x-1/2 items-center gap-1 p-1.5")}
-                  role="toolbar"
-                  aria-label="Design tools"
-                >
-                  {/* Either side of the comment round the same width, so it sits dead centre whatever stands beside it. */}
-                  {/* Undo, redo, the whole picture and the label, folded into one round (8 Nov 2026, Martin). */}
-                  <div className={clsx("flex items-center justify-end gap-1", props.tight ? "w-[4.5rem]" : "w-[5.5rem]")}>
-                    {!props.tight && (
-                      <ToolFan
-                        label="Undo, redo, the whole picture and a label"
-                        direction="up"
-                        main={({ open }) => (
-                          <span
-                            className={clsx(
-                              "flex size-9 items-center justify-center rounded-xl",
-                              open || tool === "label" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
-                            )}
-                          >
-                            <Ellipsis className="size-5" aria-hidden />
-                          </span>
+                {/* In the pop-up the foot of the picture is Sol alone (8 Nov 2026, Martin): ask him to change the design. */}
+                {props.tight ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCommandOpen(!commandOpen);
+                      requestAnimationFrame(() => commandBox.current?.focus());
+                    }}
+                    aria-expanded={commandOpen}
+                    title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
+                    className="pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110"
+                  >
+                    <span className="flex size-10 items-center justify-center rounded-full bg-white/10">
+                      <SolIcon className="size-6" />
+                    </span>
+                    <span className="text-[15px] font-medium">Ask Sol</span>
+                    <kbd className="rounded border border-white/25 px-1.5 text-[11px] text-white/60">/</kbd>
+                  </button>
+                ) : (
+                  <div
+                    className={clsx(GLASS, "pointer-events-auto absolute bottom-0 left-1/2 flex -translate-x-1/2 items-center gap-1 p-1.5")}
+                    role="toolbar"
+                    aria-label="Design tools"
+                  >
+                    {/* Either side of the comment round the same width, so it sits dead centre whatever stands beside it. */}
+                    {/* Undo, redo, the whole picture and the label, folded into one round (8 Nov 2026, Martin). */}
+                    <div className={clsx("flex items-center justify-end gap-1", props.tight ? "w-[4.5rem]" : "w-[5.5rem]")}>
+                      {!props.tight && (
+                        <ToolFan
+                          label="Undo, redo, the whole picture and a label"
+                          direction="up"
+                          main={({ open }) => (
+                            <span
+                              className={clsx(
+                                "flex size-9 items-center justify-center rounded-xl",
+                                open || tool === "label" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                              )}
+                            >
+                              <Ellipsis className="size-5" aria-hidden />
+                            </span>
+                          )}
+                        >
+                          <Leg label="Undo (Ctrl+Z)" onClick={undo}>
+                            <Undo2 className="size-5" aria-hidden />
+                          </Leg>
+                          <Leg label="Redo (Ctrl+Shift+Z)" onClick={redo}>
+                            <Redo2 className="size-5" aria-hidden />
+                          </Leg>
+                          <Leg label="Show the whole picture" onClick={() => setView(WHOLE)}>
+                            <Maximize className="size-5" aria-hidden />
+                          </Leg>
+                          {(() => {
+                            const { icon: Icon, name } = TOOLS.find((x) => x.tool === "label")!;
+                            return (
+                              <Leg label={name} on={tool === "label"} onClick={() => pickTool(tool === "label" ? "select" : "label")}>
+                                <Icon className="size-5" aria-hidden />
+                              </Leg>
+                            );
+                          })()}
+                        </ToolFan>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => pickTool(tool === "comment" ? "select" : "comment")}
+                      title="Comment"
+                      aria-label="Comment"
+                      aria-pressed={tool === "comment"}
+                      className={clsx(
+                        "-my-3 mx-1 flex size-[3.25rem] shrink-0 items-center justify-center rounded-full border shadow-lift",
+                        tool === "comment"
+                          ? "border-primary bg-primary text-primary-ink"
+                          : "border-line bg-surface text-ink hover:bg-canvas",
+                      )}
+                    >
+                      <MessageCircle className="size-7" aria-hidden />
+                    </button>
+                    <div className={clsx("flex items-center justify-start gap-1", props.tight ? "w-[4.5rem]" : "w-[5.5rem]")}>
+                      <button
+                        onClick={toggleShade}
+                        title={shadeOn ? "Put the shade analysis away" : "Shade analysis: how open each panel is to the sun"}
+                        aria-label="Shade analysis"
+                        aria-pressed={shadeOn}
+                        className={clsx(
+                          "flex size-9 items-center justify-center rounded-xl",
+                          shadeOn ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                         )}
                       >
-                        <Leg label="Undo (Ctrl+Z)" onClick={undo}>
-                          <Undo2 className="size-5" aria-hidden />
-                        </Leg>
-                        <Leg label="Redo (Ctrl+Shift+Z)" onClick={redo}>
-                          <Redo2 className="size-5" aria-hidden />
-                        </Leg>
-                        <Leg label="Show the whole picture" onClick={() => setView(WHOLE)}>
-                          <Maximize className="size-5" aria-hidden />
-                        </Leg>
-                        {(() => {
-                          const { icon: Icon, name } = TOOLS.find((x) => x.tool === "label")!;
-                          return (
-                            <Leg label={name} on={tool === "label"} onClick={() => pickTool(tool === "label" ? "select" : "label")}>
-                              <Icon className="size-5" aria-hidden />
-                            </Leg>
-                          );
-                        })()}
-                      </ToolFan>
-                    )}
+                        <SunMedium className="size-5" aria-hidden />
+                      </button>
+                      {/* Design it for me (Martin: part of the dock): three designs for three outcomes, said first, made on "Make the three designs". */}
+                      <button
+                        onClick={() => setMineIntro(!mineIntro)}
+                        aria-expanded={mineIntro}
+                        disabled={mine === "busy" || costsHidden}
+                        title={
+                          costsHidden
+                            ? "Design it for me designs against prices, which your account can't see. Ask the owner."
+                            : mine === "busy"
+                              ? "Designing…"
+                              : "Design it for me: three designs for this home, the fastest payback, the best return and the most independence"
+                        }
+                        aria-label="Design it for me"
+                        className={clsx(
+                          "flex size-9 items-center justify-center rounded-xl disabled:text-muted",
+                          mineIntro || mine === "busy" ? "bg-primary text-primary-ink" : "text-sun-ink hover:bg-canvas",
+                        )}
+                      >
+                        <WandSparkles className={clsx("size-5", mine === "busy" && "animate-pulse")} aria-hidden />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => pickTool(tool === "comment" ? "select" : "comment")}
-                    title="Comment"
-                    aria-label="Comment"
-                    aria-pressed={tool === "comment"}
-                    className={clsx(
-                      "-my-3 mx-1 flex size-[3.25rem] shrink-0 items-center justify-center rounded-full border shadow-lift",
-                      tool === "comment" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
-                    )}
-                  >
-                    <MessageCircle className="size-7" aria-hidden />
-                  </button>
-                  <div className={clsx("flex items-center justify-start gap-1", props.tight ? "w-[4.5rem]" : "w-[5.5rem]")}>
-                    <button
-                      onClick={toggleShade}
-                      title={shadeOn ? "Put the shade analysis away" : "Shade analysis: how open each panel is to the sun"}
-                      aria-label="Shade analysis"
-                      aria-pressed={shadeOn}
-                      className={clsx(
-                        "flex size-9 items-center justify-center rounded-xl",
-                        shadeOn ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
-                      )}
-                    >
-                      <SunMedium className="size-5" aria-hidden />
-                    </button>
-                    {/* Design it for me (Martin: part of the dock): three designs for three outcomes, said first, made on "Make the three designs". */}
-                    <button
-                      onClick={() => setMineIntro(!mineIntro)}
-                      aria-expanded={mineIntro}
-                      disabled={mine === "busy" || costsHidden}
-                      title={
-                        costsHidden
-                          ? "Design it for me designs against prices, which your account can't see. Ask the owner."
-                          : mine === "busy"
-                            ? "Designing…"
-                            : "Design it for me: three designs for this home, the fastest payback, the best return and the most independence"
-                      }
-                      aria-label="Design it for me"
-                      className={clsx(
-                        "flex size-9 items-center justify-center rounded-xl disabled:text-muted",
-                        mineIntro || mine === "busy" ? "bg-primary text-primary-ink" : "text-sun-ink hover:bg-canvas",
-                      )}
-                    >
-                      <WandSparkles className={clsx("size-5", mine === "busy" && "animate-pulse")} aria-hidden />
-                    </button>
-                  </div>
-                </div>
+                )}
                 <span className="flex-1" aria-hidden />
                 {/* What Design it for me (in the dock) says before it starts, and the three designs it made. */}
                 <div className="pointer-events-auto flex max-w-80 shrink-0 flex-col items-end gap-1.5">
