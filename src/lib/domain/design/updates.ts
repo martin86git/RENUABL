@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Design tool",
+    words: "With Select, point just past a panel's edge to see the next one: click to add it, or drag for a row.",
+  },
+  {
+    day: "2026-11-08",
     area: "Deals",
     words:
       "A deal opens on its roof: the design across the top with the customer over it, and the tabs underneath. Its fields are under Details.",

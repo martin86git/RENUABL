@@ -1746,6 +1746,49 @@ export function RoofDesigner(props: {
   };
 
   /**
+   * With Select, the panel that would go next beside a panel when the pointer comes just past one of its edges (8 Nov 2026,
+   * Martin: adjusting panels, he had to go back to Add a panel for one more; the outline should show itself at an edge
+   * where he is likely to want one). Only in the band half a panel deep along a side, never at a corner, never where a
+   * panel already stands; the nearest panel's edge wins. A press places it (dragging pulls out a row, as Add a panel does).
+   */
+  const edgeGhostAt = (p: Point): Ghost | null => {
+    const standingNow = [
+      ...loose,
+      ...faces.flatMap((f) =>
+        panelPlaces(f, size)
+          .filter((place) => !f.off.includes(place.index))
+          .map((place) => freed(f, place, "x")),
+      ),
+    ];
+    const taken = designPanels(design).map((panel) => middle(panel.corners));
+    let best: { ghost: Ghost; out: number } | null = null;
+    for (const from of standingNow) {
+      const plan = planSize(from, size);
+      const a = (from.angle * Math.PI) / 180;
+      const dx = p.x - from.x;
+      const dy = p.y - from.y;
+      if (Math.hypot(dx, dy) > plan.h * 1.2 + plan.w) continue;
+      const lx = dx * Math.cos(a) + dy * Math.sin(a);
+      const ly = -dx * Math.sin(a) + dy * Math.cos(a);
+      const pastX = Math.abs(lx) - plan.w / 2;
+      const pastY = Math.abs(ly) - plan.h / 2;
+      // Past a side and still alongside it: beside it across, or a row on along.
+      const across = pastX > 0 && pastX <= plan.w / 2 && pastY <= 0;
+      const along = pastY > 0 && pastY <= plan.h / 2 && pastX <= 0;
+      if (!across && !along) continue;
+      const out = across ? pastX : pastY;
+      if (best && out >= best.out) continue;
+      const ox = across ? Math.sign(lx) * (plan.w + size.gap) : 0;
+      const oy = along ? Math.sign(ly) * (plan.h + size.gap) : 0;
+      const x = cm(from.x + ox * Math.cos(a) - oy * Math.sin(a));
+      const y = cm(from.y + ox * Math.sin(a) + oy * Math.cos(a));
+      if (taken.some((c) => Math.hypot(c.x - x, c.y - y) < 0.4)) continue;
+      best = { ghost: { ...from, id: "ghost", x, y }, out };
+    }
+    return best?.ghost ?? null;
+  };
+
+  /**
    * The panels a drag would place: from the first one, out to the pointer. Dragging across adds panels to the
    * row; dragging up or down adds rows. Everything is in the first panel's own frame, so a turned panel makes a
    * turned array. Places where a panel already stands are left out.
@@ -2383,6 +2426,12 @@ export function RoofDesigner(props: {
       press.current = { mode: "move", at: p, picks: group, starts: null };
       return;
     }
+    // Just past a panel's edge, the next panel's outline is showing: a press puts it down (a drag pulls out a row).
+    const edge = edgeGhostAt(p);
+    if (edge) {
+      press.current = { mode: "array", anchor: edge };
+      return setGhosts([edge]);
+    }
     const on = [...faces].reverse().find((f) => inside(p, f.points));
     press.current = { mode: "band", at: p, face: on?.id ?? null, add: e.shiftKey, moved: false };
   };
@@ -2419,6 +2468,16 @@ export function RoofDesigner(props: {
         const p = pointAt(e);
         const next = p && !key && !onArrayHint(p) ? ghostAt(p) : null;
         setGhosts(next ? [next] : []);
+      }
+      // Selecting, the next panel shows itself just past a panel's edge (not over a panel, the round, the kit or a handle).
+      if (tool === "select") {
+        const p = pointer.current;
+        const handle =
+          p &&
+          ((grip && Math.hypot(p.x - grip.turn.x, p.y - grip.turn.y) < 8 * u * scale) ||
+            (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale));
+        const next = p && !under && !on && !handle && !onArrayHint(p) ? edgeGhostAt(p) : null;
+        if (next || ghosts.length) setGhosts(next ? [next] : []);
       }
       return;
     }
@@ -5102,7 +5161,7 @@ export function RoofDesigner(props: {
                     </g>
                   )}
                   {/* The panel a click would place, as an outline. */}
-                  {tool === "panel" &&
+                  {(tool === "panel" || tool === "select") &&
                     ghosts.map((ghost, i) => (
                       <g key={i} pointerEvents="none">
                         <polygon
