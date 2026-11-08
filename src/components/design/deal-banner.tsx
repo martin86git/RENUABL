@@ -136,7 +136,9 @@ export function DealBanner({
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/75 via-black/35 to-transparent" />
         {/* And from the left, where the name and its details sit (Martin: clearly visible on a busy roof). The design itself
             is opened by the orange round under the banner, or by pressing the picture. */}
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/80 via-black/45 via-40% to-transparent sm:w-2/3" />
+        {/* A soft blur and a deep shade behind the words, easing away to the right so the design stays clear. */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-full backdrop-blur-md [mask-image:linear-gradient(to_right,black_35%,transparent_65%)] sm:w-3/4" />
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-full bg-gradient-to-r from-black/90 via-black/70 via-35% to-transparent sm:w-3/4" />
         {!placed && !compact && (
           <button
             type="button"
