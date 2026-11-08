@@ -169,6 +169,17 @@ describe("traced faces", () => {
     for (const p of loose) expect(inside(p, traced.points)).toBe(true);
   });
 
+  it("can be laid again: a grid switched off whole by the first laying isn't taken for obstacles", () => {
+    // 8 Nov 2026, 2 Hanwell Court: "fit 10 kW" a second time laid 0 panels, every place read as a vent.
+    const once = packFaces([traced], PANEL, 6, id);
+    const again = packFaces(once.faces, PANEL, 12, id);
+    expect(again.loose).toHaveLength(12);
+    // Mostly off (the face reshaped after it was laid) is the same; a few off are obstacles still.
+    const places = facePanels({ ...traced, off: [] }, PANEL).length;
+    const most = { ...traced, off: Array.from({ length: Math.ceil(places * 0.7) }, (_, i) => i) };
+    expect(packFaces([most], PANEL, 12, id).loose).toHaveLength(12);
+  });
+
   it("keep the face's own distance from its edges when it asks for more than the wind rule", () => {
     const wide = packArea(tracedArea({ ...traced, setback: 0.6 }), 30, PANEL, id);
     for (const p of wide) for (const c of looseCorners(p, PANEL)) expect(toEdge(c, traced.points)).toBeGreaterThanOrEqual(0.6 - 1e-6);

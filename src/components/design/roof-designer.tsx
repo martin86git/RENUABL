@@ -3331,7 +3331,10 @@ export function RoofDesigner(props: {
           const points = mendCutOutline(f.points, outline);
           if (!points) return f;
           mended = true;
-          return { ...f, points };
+          // A face laid by hand (its grid switched off) stays so in its new shape, every place off, not a few at random.
+          const byHand = f.off.length > panelPlaces(f, size).length / 2;
+          const reshaped = { ...f, points };
+          return byHand ? { ...reshaped, off: panelPlaces(reshaped, size).map((p) => p.index) } : reshaped;
         }),
       );
       if (mended) changed();

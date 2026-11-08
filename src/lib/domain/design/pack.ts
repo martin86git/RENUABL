@@ -296,11 +296,13 @@ export function packAreas(areas: Area[], n: number, size: PanelSize, newId: () =
 /** A traced face as an area: on it means inside its outline and off any place switched off; its own distance from the edges, never under the wind rule. */
 export function tracedArea(face: Face, size: PanelSize = PANEL): Area {
   const tilt = face.tilt ?? TILT.roof;
-  // A place someone switched off (over a vent or a skylight, say) stays clear: panels are laid round it.
+  // A place someone switched off (over a vent or a skylight, say) stays clear: panels are laid round it. A grid switched
+  // off whole, or mostly (a face reshaped since), is the face laid by hand (`packFaces` leaves it so), not a roof of
+  // obstacles: then nothing is blocked (8 Nov 2026: laying a face a second time found no room at all).
   const off = new Set(face.off);
-  const blocked = panelPlaces(face, size)
-    .filter((place) => off.has(place.index))
-    .map((place) => place.corners);
+  const places = panelPlaces(face, size);
+  const whole = places.length > 0 && places.filter((place) => off.has(place.index)).length > places.length / 2;
+  const blocked = whole ? [] : places.filter((place) => off.has(place.index)).map((place) => place.corners);
   return {
     facing: faceFacing(face),
     pitch: tilt,
