@@ -132,3 +132,11 @@ describe("adding a battery with none named", () => {
     expect(allByQuery(list, "")).toEqual([]);
   });
 });
+
+describe("a battery asked for beside the system's size", () => {
+  it("is a battery, never a call to lay the panels again", () => {
+    expect(parseCommand("add a battery to this 8.55 kW system")?.do).toBe("battery");
+    expect(parseCommand("add a battery for the 8.55kW of panels")?.do).toBe("battery");
+    expect(parseCommand("fit 10 kW")).toEqual({ do: "targetKw", kw: 10 });
+  });
+});

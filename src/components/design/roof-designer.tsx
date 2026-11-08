@@ -3730,9 +3730,16 @@ export function RoofDesigner(props: {
   const runCommand = async (command: DesignCommand): Promise<string> => {
     switch (command.do) {
       case "targetKw":
+        if (!command.facing && summary.panels > 0 && Math.abs(summary.kw - command.kw) <= Math.max(0.5, command.kw * 0.05))
+          return `The panels already make ${summary.kw.toFixed(2)} kW: left as they are.`;
         return (await fillTo(command.kw, command.facing)).words;
       case "system": {
-        const done = await fillTo(command.kw, command.facing);
+        // The panels already make about that size, and no direction was asked for: they stay as they are, and only the
+        // inverter and battery follow (8 Nov 2026, Martin: adding a battery re-laid his panels).
+        const keep = !command.facing && summary.panels > 0 && Math.abs(summary.kw - command.kw) <= Math.max(0.5, command.kw * 0.05);
+        const done = keep
+          ? { words: `Panels kept as they are (${summary.kw.toFixed(2)} kW).`, laid: summary.panels }
+          : await fillTo(command.kw, command.facing);
         if (!done.laid) return done.words;
         systemAsk.current = {
           ...(command.inverter !== undefined ? { inverter: command.inverter } : {}),

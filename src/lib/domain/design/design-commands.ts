@@ -134,7 +134,14 @@ export function parseCommand(raw: string): DesignCommand | null {
       };
     }
   }
-  if (kw && /\b(fit|make|size|design|put|lay|give|go|target|want|load|add)\b/.test(t)) {
+  // A size of solar asked for on its own: a kW said beside a battery ("add a battery to this 8.55 kW system") is about
+  // the battery, never a call to lay the panels again (8 Nov 2026, Martin: adding a battery re-laid his panels).
+  if (
+    kw &&
+    kwOnItsOwn &&
+    !/\b(battery|batteries|storage)\b/.test(t) &&
+    /\b(fit|make|size|design|put|lay|give|go|target|want|load|add)\b/.test(t)
+  ) {
     const facing = FACINGS.find(([re]) => re.test(t))?.[1];
     return { do: "targetKw", kw: Number(kw[1]), ...(facing ? { facing } : {}) };
   }
@@ -374,6 +381,7 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
 export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roof designer. Above is the design as it stands. Read the person's request and answer with one change the designer can make, or, for a question, do "answer" with the answer in words.
 
 - targetKw: fill the roof (or the faces facing a direction) to about that many kW.
+- Never change the panels (targetKw or system) unless the person asks for panels or a size of solar. Adding a battery or changing the inverter is battery or inverter alone: the panels stay as they are.
 - system: a whole system at once ("load 8 kW of panels, an inverter and a battery"): kw, then inverter and battery, each the product's words from the lists, "" to choose one by rule, or null when it wasn't asked for.
 - battery / inverter / panel: choose that product; query holds its maker and model words as named in the lists above. For a battery with no product named ("add a battery", "the storage it needs"), query is "": the designer picks the inverter maker's battery and stacks it to the home.
 - noBattery, stringAuto (string the panels by rule), designForMe (make the three designs), flat (the roof is flat), pitch (the roof's pitch in degrees), phase, storeys, undo, redo.
