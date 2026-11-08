@@ -14,6 +14,8 @@ import {
   Paperclip,
   Plus,
   RefreshCw,
+  Rows2,
+  Rows3,
   Search,
   Send,
   Sparkles,
@@ -68,6 +70,8 @@ const when = (iso: string) => {
   });
 };
 const handle = (email: string) => email.split("@")[0];
+/** The inbox's smaller view, kept on this device. */
+const COMPACT_KEY = "renuabl.design.inbox-compact";
 const GMAIL_SAYS: Record<string, string> = {
   connected: "Gmail is connected.",
   failed: "Gmail couldn't be connected. Try again, and allow RENUABL to read and organise your email when Google asks.",
@@ -91,6 +95,25 @@ export function InboxPage() {
   // Refresh says what it's doing (8 Nov 2026, Martin: a press showed nothing): spinning while Gmail is asked, then when.
   const [refreshing, setRefreshing] = useState(false);
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
+  // A smaller view, to see more of the inbox in one fold (8 Nov 2026, Martin): kept on this device.
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (localStorage.getItem(COMPACT_KEY) === "1") setCompact(true);
+    } catch {
+      // No storage (a private window): the usual view.
+    }
+  }, []);
+  const toggleCompact = () =>
+    setCompact((v) => {
+      try {
+        localStorage.setItem(COMPACT_KEY, v ? "0" : "1");
+      } catch {
+        // Kept for this visit only.
+      }
+      return !v;
+    });
   const refresh = () => {
     if (refreshing) return;
     setRefreshing(true);
@@ -309,6 +332,16 @@ export function InboxPage() {
               {checkedAt && !refreshing && <CheckedWhen at={checkedAt} />}
               <button
                 type="button"
+                onClick={toggleCompact}
+                aria-pressed={compact}
+                title={compact ? "Back to the usual view" : "A smaller view, to see more emails at once"}
+                className={clsx(ui.quiet, "h-9 px-3", compact && "border-ink text-ink")}
+              >
+                {compact ? <Rows3 className="size-4" aria-hidden /> : <Rows2 className="size-4" aria-hidden />}
+                Compact
+              </button>
+              <button
+                type="button"
                 className={clsx(ui.quiet, "h-9 px-3")}
                 onClick={refresh}
                 disabled={refreshing}
@@ -329,7 +362,12 @@ export function InboxPage() {
             <div className={clsx(ui.card, "overflow-hidden")}>
               {groups.map((g) => (
                 <section key={g.day}>
-                  <p className="border-b border-line bg-surface-2 px-4 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
+                  <p
+                    className={clsx(
+                      "border-b border-line bg-surface-2 px-4 font-medium uppercase tracking-[0.14em] text-muted",
+                      compact ? "py-1 text-[10px]" : "py-1.5 text-[11px]",
+                    )}
+                  >
                     {g.day}
                   </p>
                   <ul className="divide-y divide-line">
@@ -339,39 +377,51 @@ export function InboxPage() {
                           type="button"
                           onClick={() => setOpen({ id: e.id, box: e.box })}
                           className={clsx(
-                            "relative flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-surface-2",
+                            "relative flex w-full items-center px-4 text-left hover:bg-surface-2",
+                            compact ? "gap-2.5 py-1.5" : "gap-3 py-2.5",
                             e.automated && "opacity-70",
                           )}
                         >
                           {e.unread && <span className="absolute inset-y-1 left-0 w-1 rounded-r bg-sun-line" aria-label="Unread" />}
                           <span
                             className={clsx(
-                              "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                              "flex shrink-0 items-center justify-center rounded-full font-semibold",
+                              compact ? "size-6 text-[10px]" : "size-8 text-xs",
                               e.deal ? "bg-sun-line text-white" : e.automated ? "bg-surface-2 text-muted" : "bg-ink text-white",
                             )}
                             aria-hidden
                           >
-                            {e.automated ? <Bot className="size-4" /> : (e.from.name[0] ?? "?").toUpperCase()}
+                            {e.automated ? <Bot className={compact ? "size-3.5" : "size-4"} /> : (e.from.name[0] ?? "?").toUpperCase()}
                           </span>
-                          <span className="w-44 shrink-0 truncate">
-                            <span className={clsx("block truncate text-sm", e.unread ? "font-semibold text-ink" : "text-ink")}>
+                          <span className={clsx("shrink-0 truncate", compact ? "w-40" : "w-44")}>
+                            <span
+                              className={clsx(
+                                "block truncate",
+                                compact ? "text-[13px]" : "text-sm",
+                                e.unread ? "font-semibold text-ink" : "text-ink",
+                              )}
+                            >
                               {e.from.name}
                             </span>
-                            {e.deal ? (
+                            {compact ? null : e.deal ? (
                               <span className="block truncate text-[11px] text-sun-ink">{e.deal.customer}&apos;s deal</span>
                             ) : e.automated ? (
                               <span className="block text-[11px] text-muted">Automated</span>
                             ) : null}
-                            {boxes.length > 1 && !picked && e.box && (
+                            {!compact && boxes.length > 1 && !picked && e.box && (
                               <span className="block truncate text-[11px] text-muted">to {e.box}</span>
                             )}
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-sm">
+                          <span className={clsx("min-w-0 flex-1 truncate", compact ? "text-[13px]" : "text-sm")}>
+                            {/* Compact: the deal stays in the row, before the subject. */}
+                            {compact && e.deal && <span className="text-sun-ink">{e.deal.customer}&apos;s deal · </span>}
                             <span className={clsx(e.unread ? "font-semibold text-ink" : "text-ink")}>{e.subject}</span>
                             <span className="text-muted"> · {e.snippet}</span>
                           </span>
                           {e.notes > 0 && <span className="shrink-0 rounded-full bg-sun px-2 text-[11px] text-sun-ink">{e.notes}</span>}
-                          <span className="w-16 shrink-0 text-right text-xs text-muted">{when(e.at)}</span>
+                          <span className={clsx("w-16 shrink-0 text-right text-muted", compact ? "text-[11px]" : "text-xs")}>
+                            {when(e.at)}
+                          </span>
                         </button>
                         {e.box && changeable.includes(e.box) && (
                           <button
@@ -379,7 +429,10 @@ export function InboxPage() {
                             onClick={() => void archiveRow(e)}
                             aria-label={`Archive "${e.subject}"`}
                             title="Archive"
-                            className="absolute right-2 top-1/2 hidden size-8 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink-2 shadow-[0_1px_3px_rgba(11,11,12,0.16)] hover:text-ink group-focus-within:flex group-hover:flex"
+                            className={clsx(
+                              "absolute right-2 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-surface text-ink-2 shadow-[0_1px_3px_rgba(11,11,12,0.16)] hover:text-ink group-focus-within:flex group-hover:flex",
+                              compact ? "size-6" : "size-8",
+                            )}
                           >
                             <Archive className="size-4" aria-hidden />
                           </button>
