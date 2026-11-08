@@ -44,6 +44,9 @@ export async function changeInboxEmail(id: string, box: string | undefined, acti
   if (res.ok) window.dispatchEvent(new Event("renuabl:inbox"));
   return res;
 }
+/** Sends a new email from one of this person's own mailboxes, through Gmail (it lands in their Sent). */
+export const sendNewEmail = (mail: { box?: string; to: string; cc: string; subject: string; body: string }) =>
+  ask<{ from: string }>(INBOX, { method: "POST", body: { do: "send", ...mail } });
 /** Disconnects one mailbox, or every one with none named. */
 export const disconnectGmail = (address?: string) =>
   ask<object>(address ? `${INBOX}?address=${encodeURIComponent(address)}` : INBOX, { method: "DELETE" });

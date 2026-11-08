@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Email",
+    words: "Write a new email from the inbox with Compose (or press C). It goes through your own Gmail and lands in your Sent.",
+  },
+  {
+    day: "2026-11-08",
     area: "Today",
     words: "Each deal card lights the one thing to do now: reply, review, design, send the proposal, call or book. The rest go quiet.",
   },

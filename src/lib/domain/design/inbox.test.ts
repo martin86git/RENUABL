@@ -5,6 +5,8 @@ import {
   afterAction,
   canChangeMail,
   canReadMail,
+  cleanCompose,
+  rawEmail,
   isEmailAction,
   labelChange,
   dayGroup,
@@ -128,6 +130,38 @@ describe("marking read and archiving", () => {
     expect(afterAction(list, "1", "a", "read").map((e) => e.unread)).toEqual([false, true, false]);
     expect(afterAction(list, "2", "a", "unread")[2].unread).toBe(true);
     expect(afterAction(list, "1", "a", "archive").map((e) => `${e.id}${e.box}`)).toEqual(["1b", "2a"]);
+  });
+});
+
+describe("writing a new email", () => {
+  it("checks who it's to, keeps Cc apart and needs something to say", () => {
+    expect(
+      cleanCompose({ to: "Sam@X.example, sam@x.example; kim@y.example", cc: "kim@y.example lee@z.example", subject: "Hi", body: "" }),
+    ).toEqual({
+      ok: true,
+      mail: { to: ["sam@x.example", "kim@y.example"], cc: ["lee@z.example"], subject: "Hi", body: "" },
+    });
+    expect(cleanCompose({ to: "", subject: "Hi" })).toMatchObject({ ok: false });
+    expect(cleanCompose({ to: "not an address", subject: "Hi" })).toMatchObject({ ok: false });
+    expect(cleanCompose({ to: "sam@x.example" })).toMatchObject({ ok: false });
+  });
+
+  it("never lets a typed subject add a header", () => {
+    const c = cleanCompose({ to: "sam@x.example", subject: "Hi\r\nBcc: eve@evil.example", body: "x" });
+    expect(c.ok && c.mail.subject).toBe("Hi Bcc: eve@evil.example");
+    if (!c.ok) return;
+    const text = Buffer.from(rawEmail("me@x.example", c.mail), "base64url").toString("utf8");
+    expect(text.split("\r\n").filter((l) => /^bcc:/i.test(l))).toEqual([]);
+  });
+
+  it("builds the email Gmail sends, any language in the subject and words", () => {
+    const c = cleanCompose({ to: "sam@x.example", cc: "kim@y.example", subject: "Café quote", body: "G'day,\nSee you Tuesday ☀" });
+    if (!c.ok) throw new Error(c.message);
+    const text = Buffer.from(rawEmail("me@x.example", c.mail), "base64url").toString("utf8");
+    expect(text).toContain("From: me@x.example\r\nTo: sam@x.example\r\nCc: kim@y.example\r\n");
+    expect(text).toContain(`Subject: =?UTF-8?B?${Buffer.from("Café quote").toString("base64")}?=`);
+    const body = text.split("\r\n\r\n")[1].replace(/\r\n/g, "");
+    expect(Buffer.from(body, "base64").toString("utf8")).toBe("G'day,\r\nSee you Tuesday ☀");
   });
 });
 

@@ -1,4 +1,4 @@
-import { cleanEmailNote, isEmailAction, isMessageId } from "@/lib/domain/design/inbox";
+import { cleanCompose, cleanEmailNote, isEmailAction, isMessageId } from "@/lib/domain/design/inbox";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
@@ -12,6 +12,7 @@ import {
   disconnectGmail,
   gmailAddresses,
   gmailConfig,
+  sendFromGmail,
   unreadCount,
 } from "@/lib/server/gmail";
 import { allow } from "@/lib/server/rate-limit";
@@ -117,15 +118,36 @@ const SOL_SCHEMA = { type: "object", additionalProperties: false, required: ["te
  * the team, or drafts a reply to check and send from the deal or Gmail. Nothing is sent and nothing Sol writes is kept.
  * POST { do: "read" | "unread" | "archive", id, box }: changes it in Gmail itself, in one of the member's own mailboxes
  * connected for it (409 with what to do for one connected read only). Never while viewing as someone else.
+ * POST { do: "send", box, to, cc, subject, body }: a new email from one of the member's own mailboxes through Gmail,
+ * so it comes from their address and is kept in their Sent (8 Nov 2026). Never while viewing as someone else.
  */
 export async function POST(request: Request) {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const { member } = who;
-    const read = await readBody(request, 6_000);
+    // A new email's words can run to COMPOSE_LIMITS.body characters; everything else here is short.
+    const read = await readBody(request, 90_000);
     if ("refuse" in read) return read.refuse;
     const b = read.body;
+    if (b.do === "send") {
+      if (member.viewedBy) return json({ ok: false, message: "You're viewing as someone else: nothing is sent from their mailbox." }, 403);
+      if (!allow(request, "inbox-send", 60))
+        return json({ ok: false, message: "That's a lot of emails in an hour. Try again shortly." }, 429);
+      const clean = cleanCompose(b);
+      if (!clean.ok) return json({ ok: false, message: clean.message }, 422);
+      const box =
+        typeof b.box === "string" && b.box.includes("@") ? b.box.toLowerCase().slice(0, 254) : (await changeableAddresses(member))[0];
+      if (!box) return json({ ok: false, message: "Connect your Gmail first." }, 409);
+      try {
+        await sendFromGmail(member, box, clean.mail);
+        return json({ ok: true, from: box });
+      } catch (e) {
+        if (e instanceof GmailOff || e instanceof ReadOnlyMailbox) return json({ ok: false, message: e.message }, 409);
+        console.error("inbox send failed", redactSecrets(e instanceof Error ? e.message : String(e)));
+        return json({ ok: false, message: "Gmail didn't take that email just now. It wasn't sent: try again in a moment." }, 502);
+      }
+    }
     const id = typeof b.id === "string" && isMessageId(b.id) ? b.id : null;
     const owner = typeof b.owner === "string" && b.owner.includes("@") ? b.owner.toLowerCase().slice(0, 254) : member.email.toLowerCase();
     if (!id) return json({ ok: false, message: "That email couldn't be found." }, 404);

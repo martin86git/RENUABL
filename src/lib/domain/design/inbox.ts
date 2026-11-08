@@ -28,6 +28,79 @@ export const EMAIL_ACTIONS = ["read", "unread", "archive"] as const;
 export type EmailAction = (typeof EMAIL_ACTIONS)[number];
 export const isEmailAction = (v: unknown): v is EmailAction => EMAIL_ACTIONS.includes(v as EmailAction);
 
+/**
+ * Writing a new email from the inbox (8 Nov 2026, Martin): sent through the member's own Gmail, so it comes from their
+ * address and sits in their Sent. gmail.modify already allows sending; a mailbox connected read only can't.
+ */
+export const COMPOSE_LIMITS = { to: 10, cc: 10, subject: 200, body: 20_000 } as const;
+
+export interface ComposedEmail {
+  to: string[];
+  cc: string[];
+  subject: string;
+  body: string;
+}
+
+const ADDRESS = /^[^\s@<>,;"]{1,64}@[^\s@<>,;"]{1,190}\.[a-z]{2,24}$/i;
+
+/** Addresses typed in one box ("a@x.com, b@y.com") or sent as a list: each checked, lower case, none twice. */
+function addressesIn(raw: unknown, label: string, max: number): { ok: true; list: string[] } | { ok: false; message: string } {
+  const typed = Array.isArray(raw) ? raw.filter((a): a is string => typeof a === "string") : typeof raw === "string" ? [raw] : [];
+  const list: string[] = [];
+  for (const piece of typed.flatMap((t) => t.split(/[\s,;]+/))) {
+    const a = piece.trim().replace(/^<|>$/g, "").toLowerCase();
+    if (!a) continue;
+    if (!ADDRESS.test(a)) return { ok: false, message: `"${a.slice(0, 80)}" in ${label} doesn't look like an email address.` };
+    if (!list.includes(a)) list.push(a);
+  }
+  if (list.length > max) return { ok: false, message: `${label} takes at most ${max} addresses.` };
+  return { ok: true, list };
+}
+
+/** What the browser sent, as an email to send: someone to send it to, a subject or words, and nothing out of range. */
+export function cleanCompose(raw: unknown): { ok: true; mail: ComposedEmail } | { ok: false; message: string } {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const to = addressesIn(r.to, "To", COMPOSE_LIMITS.to);
+  if (!to.ok) return to;
+  if (!to.list.length) return { ok: false, message: "Who is it to? Add an email address." };
+  const cc = addressesIn(r.cc, "Cc", COMPOSE_LIMITS.cc);
+  if (!cc.ok) return cc;
+  // One line, no control characters: nothing typed can add a header.
+  const subject = (typeof r.subject === "string" ? r.subject : "")
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .trim()
+    .slice(0, COMPOSE_LIMITS.subject);
+  const body = (typeof r.body === "string" ? r.body : "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "")
+    .trimEnd();
+  if (body.length > COMPOSE_LIMITS.body) return { ok: false, message: "That email is too long to send from here." };
+  if (!subject && !body.trim()) return { ok: false, message: "Write a subject or a message first." };
+  return { ok: true, mail: { to: to.list, cc: cc.list.filter((a) => !to.list.includes(a)), subject, body } };
+}
+
+/** A header word that may hold any character (RFC 2047), plain when it is already plain ASCII. */
+const headerWord = (text: string) => (/^[\x20-\x7e]*$/.test(text) ? text : `=?UTF-8?B?${Buffer.from(text, "utf8").toString("base64")}?=`);
+
+/** The email as Gmail's send takes it: RFC 2822 text, base64url, plain words in UTF-8. */
+export function rawEmail(from: string, mail: ComposedEmail): string {
+  const body = Buffer.from(mail.body.replace(/\n/g, "\r\n"), "utf8")
+    .toString("base64")
+    .replace(/.{1,76}/g, "$&\r\n");
+  const lines = [
+    `From: ${from}`,
+    `To: ${mail.to.join(", ")}`,
+    ...(mail.cc.length ? [`Cc: ${mail.cc.join(", ")}`] : []),
+    `Subject: ${headerWord(mail.subject)}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    body,
+  ];
+  return Buffer.from(lines.join("\r\n"), "utf8").toString("base64url");
+}
+
 /** The labels an action adds and takes off (archiving takes it out of the inbox, as Gmail's own Archive does). */
 export function labelChange(action: EmailAction): { addLabelIds: string[]; removeLabelIds: string[] } {
   if (action === "unread") return { addLabelIds: ["UNREAD"], removeLabelIds: [] };

@@ -1,11 +1,28 @@
 "use client";
 
 import clsx from "clsx";
-import { Archive, ArrowLeft, Bot, Copy, ExternalLink, Lock, Mail, MailOpen, Paperclip, Plus, RefreshCw, Search, X } from "lucide-react";
+import {
+  Archive,
+  ArrowLeft,
+  Bot,
+  Copy,
+  ExternalLink,
+  Lock,
+  Mail,
+  MailOpen,
+  Paperclip,
+  PenLine,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  COMPOSE_LIMITS,
   INBOX_FILTERS,
   NOTE_MAX,
   afterAction,
@@ -23,11 +40,13 @@ import {
   loadInbox,
   noteOnEmail,
   openInboxEmail,
+  sendNewEmail,
   solOnEmail,
   type InboxAnswer,
   type OpenedEmail,
 } from "@/lib/services/inbox";
 import { useDesignAccount } from "./design-account";
+import { DictateButton, withSpoken } from "./dictate";
 import { PATHS, PageHead, ui } from "./design-shell";
 import { SolIcon } from "./sol-icon";
 
@@ -96,6 +115,28 @@ export function InboxPage() {
   const changed = (id: string, b: string | undefined, action: EmailAction) =>
     setData((d) => (d ? { ...d, emails: afterAction(d.emails, id, b, action) } : d));
   const [rowProblem, setRowProblem] = useState<string | null>(null);
+  // A new email being written (8 Nov 2026, Martin): opened by Compose, or C as in Gmail.
+  const [composing, setComposing] = useState(false);
+  const [sentFrom, setSentFrom] = useState<string | null>(null);
+  const compose = () => {
+    setSentFrom(null);
+    setComposing(true);
+  };
+  const canCompose = Boolean(data?.connected) && !open;
+  useEffect(() => {
+    if (!canCompose) return;
+    const key = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || t?.closest("input, textarea, select, [contenteditable]")) return;
+      if (e.key === "c") {
+        e.preventDefault();
+        setSentFrom(null);
+        setComposing(true);
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [canCompose]);
   const archiveRow = async (e: InboxEmail) => {
     setRowProblem(null);
     const res = await changeInboxEmail(e.id, e.box, "archive");
@@ -126,9 +167,14 @@ export function InboxPage() {
     <div className={clsx(ui.page, "space-y-4")}>
       <PageHead title="Email">
         {data?.connected && (
-          <button type="button" className={clsx(ui.quiet, "h-9 px-3")} onClick={() => setAsks((n) => n + 1)}>
-            <RefreshCw className="size-4" aria-hidden /> Refresh
-          </button>
+          <span className="flex items-center gap-2">
+            <button type="button" className={clsx(ui.primary, "h-9 px-3")} title="Write a new email (c)" onClick={compose}>
+              <PenLine className="size-4" aria-hidden /> Compose
+            </button>
+            <button type="button" className={clsx(ui.quiet, "h-9 px-3")} onClick={() => setAsks((n) => n + 1)}>
+              <RefreshCw className="size-4" aria-hidden /> Refresh
+            </button>
+          </span>
         )}
       </PageHead>
       {said && GMAIL_SAYS[said] && (
@@ -190,6 +236,24 @@ export function InboxPage() {
               setAsks((n) => n + 1);
             }}
           />
+          {sentFrom && !composing && (
+            <p className="rounded-md bg-positive-soft px-4 py-2.5 text-sm text-positive" role="status">
+              Sent from {sentFrom}. It&apos;s in your Gmail&apos;s Sent.
+            </p>
+          )}
+          {composing && (
+            <ComposeEmail
+              boxes={changeable}
+              readOnly={readOnly}
+              defaultBox={picked && changeable.includes(picked) ? picked : changeable[0]}
+              onReconnect={() => void connect(true)}
+              onClose={() => setComposing(false)}
+              onSent={(from) => {
+                setComposing(false);
+                setSentFrom(from);
+              }}
+            />
+          )}
           {readOnly.length > 0 && (
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-sun px-4 py-2.5 text-sm text-sun-ink" role="status">
               <span>
@@ -311,6 +375,172 @@ export function InboxPage() {
   );
 }
 
+/**
+ * A new email, written here and sent through the person's own Gmail (8 Nov 2026, Martin), so it comes from their address
+ * and Gmail keeps it in their Sent. From (when more than one mailbox can send), To, Cc, a subject and the words, which
+ * can be spoken. Ctrl or ⌘ with Enter sends; nothing goes until Send is pressed.
+ */
+function ComposeEmail({
+  boxes,
+  readOnly,
+  defaultBox,
+  onReconnect,
+  onClose,
+  onSent,
+}: {
+  boxes: string[];
+  readOnly: string[];
+  defaultBox?: string;
+  onReconnect: () => void;
+  onClose: () => void;
+  onSent: (from: string) => void;
+}) {
+  const [box, setBox] = useState(defaultBox ?? "");
+  const [to, setTo] = useState("");
+  const [cc, setCc] = useState("");
+  const [showCc, setShowCc] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [heard, setHeard] = useState("");
+  const [sending, setSending] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const toBox = useRef<HTMLInputElement>(null);
+  useEffect(() => toBox.current?.focus(), []);
+  const written = Boolean(to.trim() || subject.trim() || body.trim());
+  const send = async () => {
+    if (sending || !box) return;
+    setSending(true);
+    setProblem(null);
+    const res = await sendNewEmail({ box, to, cc, subject, body });
+    setSending(false);
+    if (res.ok) onSent(res.from);
+    else setProblem(res.message);
+  };
+  const close = () => {
+    if (written && !window.confirm("Discard this email? It hasn't been sent.")) return;
+    onClose();
+  };
+  const field = "w-full min-w-0 bg-transparent py-2 text-sm text-ink outline-none placeholder:text-muted";
+  const row = "flex items-center gap-3 border-b border-line";
+  const name = "w-14 shrink-0 text-[13px] text-muted";
+  return (
+    <section
+      className={clsx(ui.card, "overflow-hidden")}
+      aria-label="New email"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          void send();
+        } else if (e.key === "Escape") close();
+      }}
+    >
+      <div className="flex items-center justify-between border-b border-line bg-surface-2 px-4 py-2">
+        <p className="text-sm font-medium text-ink">New email</p>
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Discard"
+          className="inline-flex size-7 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
+      </div>
+      {!boxes.length ? (
+        <p className="px-4 py-4 text-sm text-ink-2">
+          {readOnly.join(", ")} {readOnly.length === 1 ? "was" : "were"} connected read only, so nothing can be sent from here yet.{" "}
+          <button type="button" onClick={onReconnect} className={ui.link}>
+            Connect again
+          </button>{" "}
+          and leave every box ticked on Google&apos;s page.
+        </p>
+      ) : (
+        <div className="px-4">
+          <label className={row}>
+            <span className={name}>From</span>
+            {boxes.length > 1 ? (
+              <select value={box} onChange={(e) => setBox(e.target.value)} className={clsx(field, "cursor-pointer")}>
+                {boxes.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className={clsx(field, "text-ink-2")}>{box}</span>
+            )}
+          </label>
+          <label className={row}>
+            <span className={name}>To</span>
+            <input
+              ref={toBox}
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              type="text"
+              inputMode="email"
+              autoComplete="off"
+              placeholder="name@example.com"
+              className={field}
+            />
+            {!showCc && (
+              <button type="button" onClick={() => setShowCc(true)} className="shrink-0 text-[13px] text-ink-2 hover:text-ink">
+                Cc
+              </button>
+            )}
+          </label>
+          {showCc && (
+            <label className={row}>
+              <span className={name}>Cc</span>
+              <input
+                value={cc}
+                onChange={(e) => setCc(e.target.value)}
+                type="text"
+                inputMode="email"
+                autoComplete="off"
+                className={field}
+              />
+            </label>
+          )}
+          <label className={row}>
+            <span className={name}>Subject</span>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={COMPOSE_LIMITS.subject} className={field} />
+          </label>
+          <div className="relative">
+            <textarea
+              value={heard ? withSpoken(body, heard) : body}
+              onChange={(e) => setBody(e.target.value)}
+              maxLength={COMPOSE_LIMITS.body}
+              aria-label="Your email"
+              placeholder="Write your email"
+              className="block min-h-48 w-full resize-y bg-transparent py-3 pr-11 text-sm leading-relaxed text-ink outline-none placeholder:text-muted"
+            />
+            <div className="absolute bottom-2 right-0">
+              <DictateButton
+                label="Speak your email"
+                onHearing={setHeard}
+                onWords={(w) => setBody((t) => withSpoken(t, w).slice(0, COMPOSE_LIMITS.body))}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      {problem && (
+        <p className="mx-4 mb-2 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning" role="alert">
+          {problem}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-3">
+        <button type="button" onClick={() => void send()} disabled={sending || !boxes.length} className={clsx(ui.primary, "h-9 px-4")}>
+          <Send className="size-4" aria-hidden /> {sending ? "Sending…" : "Send"}
+        </button>
+        <button type="button" onClick={close} className="text-sm text-ink-2 hover:text-ink">
+          Discard
+        </button>
+        <span className="ml-auto text-xs text-muted">Sent through your Gmail, so it&apos;s in your Sent. Ctrl+Enter sends.</span>
+      </div>
+    </section>
+  );
+}
+
 /** The mailboxes this person has connected: each picks the inbox down to it, or goes; and room to add another. */
 function Mailboxes({
   boxes,
@@ -414,6 +644,8 @@ function EmailView({
   const [email, setEmail] = useState<OpenedEmail | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  // What the microphone hears of the note while it is still being said.
+  const [heard, setHeard] = useState("");
   const [told, setTold] = useState<string[]>([]);
   const [sol, setSol] = useState<{ mode: "summary" | "reply"; text: string | null } | null>(null);
   const tell = useRef(onChanged);
@@ -602,19 +834,29 @@ function EmailView({
                   </li>
                 ))}
               </ul>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
-                maxLength={NOTE_MAX}
-                placeholder="A note, @someone to share it. Enter sends."
-                className={clsx(ui.input, "mt-3 min-h-16 py-2")}
-              />
+              <div className="relative mt-3">
+                <textarea
+                  value={heard ? withSpoken(note, heard) : note}
+                  onChange={(e) => setNote(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void send();
+                    }
+                  }}
+                  maxLength={NOTE_MAX}
+                  placeholder="A note, @someone to share it. Enter sends."
+                  className={clsx(ui.input, "min-h-16 py-2 pr-11")}
+                />
+                {/* Speak the note: the browser's own recognition, as in Sol's box and team chat. */}
+                <div className="absolute bottom-1.5 right-1.5">
+                  <DictateButton
+                    label="Speak a note"
+                    onHearing={setHeard}
+                    onWords={(w) => setNote((t) => withSpoken(t, w).slice(0, NOTE_MAX))}
+                  />
+                </div>
+              </div>
               {told.length > 0 && <p className="mt-1 text-xs text-positive">Shared with {told.map(handle).join(", ")}.</p>}
               {email.shared.length > 0 && <p className="mt-1 text-xs text-muted">Shared with {email.shared.map(handle).join(", ")}.</p>}
             </section>

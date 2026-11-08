@@ -17,6 +17,8 @@ import {
   headerOf,
   labelChange,
   mergeInboxes,
+  rawEmail,
+  type ComposedEmail,
   type EmailAction,
   type MailPart,
 } from "@/lib/domain/design/inbox";
@@ -289,6 +291,19 @@ export async function changeEmail(member: Who, box: string, id: string, action: 
     throw new GmailOff(`Gmail (${address}) isn't connected.`);
   }
   await gmail(member, address, `messages/${encodeURIComponent(id)}/modify`, labelChange(action));
+}
+
+/**
+ * Sends a new email from one of the member's own mailboxes (8 Nov 2026, Martin: write an email from the inbox), so it
+ * comes from their address and Gmail keeps it in their Sent. gmail.modify allows sending; a read-only one is refused.
+ */
+export async function sendFromGmail(member: Who, box: string, mail: ComposedEmail): Promise<void> {
+  const address = box.toLowerCase();
+  if (!(await changeableAddresses(member)).includes(address)) {
+    if ((await gmailAddresses(member)).includes(address)) throw new ReadOnlyMailbox(`Connect ${address} again to send from it here.`);
+    throw new GmailOff(`Gmail (${address}) isn't connected.`);
+  }
+  await gmail(member, address, "messages/send", { raw: rawEmail(address, mail) });
 }
 
 /** The unread count of every mailbox the member has connected together, as Gmail keeps each. */
