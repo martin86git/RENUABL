@@ -369,7 +369,7 @@ function Shell({
               <span className="studio-mark-full mt-[1.45rem]">
                 <Wordmark className="text-[17px]" />
               </span>
-              <RenuablMark className="studio-mark-short mt-[1.05rem]" />
+              <RenuablMark className="studio-mark-short mt-[1.25rem]" />
             </Link>
           </div>
           <div className="mt-4 flex min-w-0 items-center justify-center">

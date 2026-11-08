@@ -283,6 +283,10 @@ html.sol-resizing .team-pop {
 .studio-mark-short {
   display: none;
 }
+/* A block, so its top margin lines the wordmark up with the sections pill (as an inline span the margin was ignored). */
+.studio-mark-full {
+  display: block;
+}
 @media (max-width: 1535px) {
   .studio-mark-full {
     display: none;
