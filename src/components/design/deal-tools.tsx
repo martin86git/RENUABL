@@ -126,20 +126,23 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
         maxLength={MAX_SUBJECT}
         placeholder="Subject"
       />
-      <EmailFormatBar className="mt-2" area={area} text={body} setText={setBody} files={files} />
-      <textarea
-        ref={area}
-        aria-label="Email"
-        className={clsx(ui.input, "mt-1 min-h-40 py-2 leading-relaxed")}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        onKeyDown={(e) => listKey(e, setBody)}
-        onPaste={files.onPaste}
-        onDragOver={files.onDragOver}
-        onDrop={files.onDrop}
-        maxLength={MAX_BODY}
-        placeholder={`Write to ${customer.firstName || "the customer"}…`}
-      />
+      {/* The words with their tools along the box's foot (8 Nov 2026, Martin: under the words, as in Gmail). */}
+      <div className="mt-2 rounded-md border border-line bg-surface focus-within:border-forest">
+        <textarea
+          ref={area}
+          aria-label="Email"
+          className="block min-h-40 w-full resize-y rounded-t-md bg-transparent px-3 py-2 text-sm leading-relaxed text-ink outline-none placeholder:text-muted"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => listKey(e, setBody)}
+          onPaste={files.onPaste}
+          onDragOver={files.onDragOver}
+          onDrop={files.onDrop}
+          maxLength={MAX_BODY}
+          placeholder={`Write to ${customer.firstName || "the customer"}…`}
+        />
+        <EmailFormatBar className="border-t border-line px-1.5 py-1" area={area} text={body} setText={setBody} files={files} />
+      </div>
       <EmailFileChips files={files} />
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
         <p className={clsx("text-xs", note ? (note.ok ? "text-positive" : "text-danger") : "text-muted")} role="status">

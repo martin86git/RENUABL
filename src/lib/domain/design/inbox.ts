@@ -271,6 +271,39 @@ export function cleanComposeHelp(raw: unknown): { subject: string; body: string 
   return body ? { subject, body } : null;
 }
 
+/**
+ * Sol's summary of an email for the team, in its three parts (8 Nov 2026, Martin: it read as one block of text; the
+ * takeaway and anything to do should stand out): the takeaway in one sentence, what the sender asks for, and the one
+ * next step. Asking or the next step is empty when there is none.
+ */
+export interface EmailSummary {
+  short: string;
+  asking: string;
+  next: string;
+}
+
+/** What Sol is told to return for a summary: each part short, plain, and empty rather than padded. */
+export const SUMMARY_INSTRUCTIONS = [
+  "Sum it up for the team, never for the customer, in three parts:",
+  "short: the one thing to take away, in one sentence.",
+  "asking: what the sender wants from us, in one sentence, or empty when they want nothing.",
+  "next: the one thing to do next, starting with a verb (Reply, Call, Check…), or empty when nothing needs doing.",
+  "Plain words. Never invent a figure, date or promise that isn't in the email.",
+].join("\n");
+
+const NOTHING = /^(n\/?a|none|nothing( (needed|required|to do))?|no( further)? action( (needed|required))?)\.?$/i;
+
+/** Sol's summary, tidied: each part one short paragraph, and "No action needed"-style padding read as empty. */
+export function cleanEmailSummary(raw: unknown): EmailSummary | null {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const part = (k: string) => {
+    const v = typeof r[k] === "string" ? (r[k] as string).replace(/\s+/g, " ").trim().slice(0, 600) : "";
+    return NOTHING.test(v) ? "" : v;
+  };
+  const summary = { short: part("short"), asking: part("asking"), next: part("next") };
+  return summary.short ? summary : null;
+}
+
 /** The labels an action adds and takes off (archiving takes it out of the inbox, as Gmail's own Archive does). */
 export function labelChange(action: EmailAction): { addLabelIds: string[]; removeLabelIds: string[] } {
   if (action === "unread") return { addLabelIds: ["UNREAD"], removeLabelIds: [] };

@@ -4,7 +4,9 @@ import clsx from "clsx";
 import {
   Archive,
   ArrowLeft,
+  ArrowRight,
   Bot,
+  Check,
   Copy,
   ExternalLink,
   Link2,
@@ -32,6 +34,7 @@ import {
   withLink,
   type ComposeHelp,
   type EmailSize,
+  type EmailSummary,
   INBOX_FILTERS,
   NOTE_MAX,
   afterAction,
@@ -932,6 +935,40 @@ function ConnectCard({ ready, broken, onConnect }: { ready: boolean; broken?: st
   );
 }
 
+/**
+ * Sol's summary set out to take in at a glance (8 Nov 2026, Martin: it read as one block): the takeaway first and plain,
+ * what they're asking under it, and the next step in a box of its own, or a quiet line when nothing needs doing.
+ */
+function SummaryParts({ summary }: { summary: EmailSummary }) {
+  const label = "text-[10px] font-medium uppercase tracking-[0.14em] text-muted";
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className={label}>In short</p>
+        <p className="mt-0.5 text-[15px] font-medium leading-snug text-ink">{summary.short}</p>
+      </div>
+      {summary.asking && (
+        <div>
+          <p className={label}>They&apos;re asking</p>
+          <p className="mt-0.5 text-sm leading-snug text-ink-2">{summary.asking}</p>
+        </div>
+      )}
+      {summary.next ? (
+        <div className="rounded-md bg-sun px-3 py-2 ring-1 ring-sun-line/30">
+          <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-[0.14em] text-sun-ink">
+            <ArrowRight className="size-3" aria-hidden /> Next step
+          </p>
+          <p className="mt-0.5 text-sm font-medium leading-snug text-ink">{summary.next}</p>
+        </div>
+      ) : (
+        <p className="flex items-center gap-1.5 text-[13px] text-muted">
+          <Check className="size-3.5" aria-hidden /> Nothing to do
+        </p>
+      )}
+    </div>
+  );
+}
+
 function EmailView({
   id,
   owner,
@@ -956,7 +993,7 @@ function EmailView({
   // What the microphone hears of the note while it is still being said.
   const [heard, setHeard] = useState("");
   const [told, setTold] = useState<string[]>([]);
-  const [sol, setSol] = useState<{ mode: "summary" | "reply"; text: string | null } | null>(null);
+  const [sol, setSol] = useState<{ mode: "summary" | "reply"; text: string | null; summary?: EmailSummary } | null>(null);
   const tell = useRef(onChanged);
   useEffect(() => {
     let gone = false;
@@ -1015,7 +1052,8 @@ function EmailView({
     if (!email) return;
     setSol({ mode, text: null });
     const res = await solOnEmail(id, email.owner, mode);
-    setSol({ mode, text: res.ok ? res.text : res.message });
+    if (!res.ok) return setSol({ mode, text: res.message });
+    setSol({ mode, text: res.text ?? "", summary: res.summary });
   };
   return (
     <div className={clsx(ui.page, "space-y-4")}>
@@ -1183,7 +1221,11 @@ function EmailView({
               </div>
               {sol && (
                 <div className="mt-3 rounded-md bg-surface-2 p-3">
-                  <p className="whitespace-pre-line text-sm text-ink">{sol.text ?? "Sol is reading it…"}</p>
+                  {sol.summary ? (
+                    <SummaryParts summary={sol.summary} />
+                  ) : (
+                    <p className="whitespace-pre-line text-sm text-ink">{sol.text ?? "Sol is reading it…"}</p>
+                  )}
                   {sol.text && sol.mode === "reply" && (
                     <button
                       type="button"

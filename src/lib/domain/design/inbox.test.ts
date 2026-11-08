@@ -7,6 +7,8 @@ import {
   canReadMail,
   cleanCompose,
   cleanComposeHelp,
+  cleanEmailSummary,
+  SUMMARY_INSTRUCTIONS,
   cleanLinkUrl,
   composeHelpPrompt,
   composeHtml,
@@ -242,6 +244,25 @@ describe("writing a new email", () => {
       body: "Hi Sam",
     });
     expect(cleanComposeHelp({ subject: "x", body: "" })).toBeNull();
+  });
+});
+
+describe("Sol's summary of an email", () => {
+  it("keeps the three parts apart and reads padding as nothing to do", () => {
+    expect(cleanEmailSummary({ short: " Neon's usage\nreport: $6.57 so far. ", asking: "Nothing.", next: "No action needed." })).toEqual({
+      short: "Neon's usage report: $6.57 so far.",
+      asking: "",
+      next: "",
+    });
+    expect(
+      cleanEmailSummary({ short: "Sam wants a battery quote.", asking: "A price for a battery", next: "Reply with the proposal" }),
+    ).toEqual({
+      short: "Sam wants a battery quote.",
+      asking: "A price for a battery",
+      next: "Reply with the proposal",
+    });
+    expect(cleanEmailSummary({ short: "", next: "Call" })).toBeNull();
+    expect(SUMMARY_INSTRUCTIONS).toContain("never for the customer");
   });
 });
 

@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Deals",
+    words: "A deal's Email tab has its lists, symbols, pictures and files along the bottom of the message box.",
+  },
+  {
+    day: "2026-11-08",
+    area: "Email",
+    words: "Sol's summary of an email reads at a glance: the takeaway first, then the next step in a box of its own.",
+  },
+  {
+    day: "2026-11-08",
     area: "Everywhere",
     words: "A calculator by the search: sums, and a bill or a day's use turned into a rough solar and battery size at once.",
   },

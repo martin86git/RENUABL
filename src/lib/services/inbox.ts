@@ -2,7 +2,7 @@
  * Each member's own Gmail inbox, as the screens reach it (/api/design/inbox): read, marked read, unread or archived in
  * Gmail itself, its notes, and Sol on an email.
  */
-import type { ComposeHelp, EmailAction, EmailSize, InboxEmail } from "@/lib/domain/design/inbox";
+import type { ComposeHelp, EmailAction, EmailSize, EmailSummary, InboxEmail } from "@/lib/domain/design/inbox";
 import type { OpenedEmail, SharedEmail } from "@/lib/server/design-inbox-repo";
 import { ask } from "./crm";
 
@@ -36,8 +36,9 @@ export const openInboxEmail = (id: string, owner?: string, box?: string) =>
 export const emailFileHref = (id: string, n: number, box?: string) => `${INBOX}?id=${encodeURIComponent(id)}&file=${n}${boxQuery(box)}`;
 export const noteOnEmail = (id: string, owner: string, text: string) =>
   ask<{ told: string[]; email: OpenedEmail }>(INBOX, { method: "POST", body: { do: "note", id, owner, text } });
+/** Sol on an email: a summary for the team in its three parts, or a reply drafted to check and send. Nothing is sent. */
 export const solOnEmail = (id: string, owner: string, mode: "summary" | "reply") =>
-  ask<{ text: string }>(INBOX, { method: "POST", body: { do: "sol", id, owner, mode } });
+  ask<{ text?: string; summary?: EmailSummary }>(INBOX, { method: "POST", body: { do: "sol", id, owner, mode } });
 /** Marks an email read or unread, or archives it, in Gmail itself; tells the shell's unread count. */
 export async function changeInboxEmail(id: string, box: string | undefined, action: EmailAction) {
   const res = await ask<object>(INBOX, { method: "POST", body: { do: action, id, box } });

@@ -2,6 +2,8 @@ import {
   COMPOSE_LIMITS,
   cleanCompose,
   cleanComposeHelp,
+  cleanEmailSummary,
+  SUMMARY_INSTRUCTIONS,
   cleanEmailNote,
   composeHelpPrompt,
   isEmailAction,
@@ -120,6 +122,13 @@ export async function GET(request: Request) {
     }
   });
 }
+
+const SUMMARY_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["short", "asking", "next"],
+  properties: { short: { type: "string" }, asking: { type: "string" }, next: { type: "string" } },
+} as const;
 
 const COMPOSE_SCHEMA = {
   type: "object",
@@ -274,22 +283,26 @@ export async function POST(request: Request) {
           `You are Sol, the assistant at ${member.businessName}, a solar business in Australia. An email came in from ${email.from.name} <${email.from.email}>${email.deal ? `, a customer (${email.deal.customer})` : ""}.`,
           reply
             ? "Draft a short, friendly reply in Australian English from the business, signed off with no name. Answer what they asked only from what the email says; never invent a figure, price, date, product or promise; where something needs checking, say it will be confirmed."
-            : "Sum it up for the team, never for the customer, as three short parts: 'In short:', 'They're asking:', 'Next step:'. Plain words, no more than five lines.",
+            : SUMMARY_INSTRUCTIONS,
           "",
           `Subject: ${email.subject}`,
           words,
         ].join("\n");
         // A reply a customer reads is drafted by the deeper model; a summary for the team is quick (sol-routing.ts).
+        // A summary comes back in its three parts, so the screen can set out the takeaway and the next step.
         const out = await withSolCredit(
           member.businessId,
           "inbox",
           member.email,
-          (ai) => readWithClaude<{ text: string }>([], SOL_SCHEMA, prompt, apiKey, ai),
+          (ai) => readWithClaude<Record<string, string>>([], reply ? SOL_SCHEMA : SUMMARY_SCHEMA, prompt, apiKey, ai),
           inboxTier(reply),
           reply ? "reply drafted" : "summary",
         );
         if (out === "out") return json({ ok: false, message: SOL_OUT_SHORT }, 402);
-        return json({ ok: true, text: String(out.text ?? "").slice(0, 4_000) });
+        if (reply) return json({ ok: true, text: String(out.text ?? "").slice(0, 4_000) });
+        const summary = cleanEmailSummary(out);
+        if (!summary) return json({ ok: false, message: "Sol couldn't sum that one up. Try again in a moment." }, 502);
+        return json({ ok: true, summary });
       }
       return json({ ok: false, message: "That couldn't be read." }, 400);
     } catch (e) {
