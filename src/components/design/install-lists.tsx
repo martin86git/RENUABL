@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BatteryCharging, Check, Plug, Sun } from "lucide-react";
+import { BatteryCharging, CalendarDays, Check, List as ListIcon, Plug, Sun } from "lucide-react";
 import clsx from "clsx";
+import { Segmented } from "./segmented";
 import { INSTALLED_STAGES, PROGRESS, PROGRESS_LABELS, type ProgressKey } from "@/lib/domain/design/crm";
 import {
   AFTER_INSTALL_STEPS,
@@ -443,20 +444,15 @@ export type InstallView = "calendar" | "list";
 /** The switch between the two, kept in the address so a reload or a link keeps it. */
 export function InstallViewSwitch({ view, onView }: { view: InstallView; onView: (v: InstallView) => void }) {
   return (
-    <div className="flex rounded-md border border-line p-0.5" role="radiogroup" aria-label="Show installations as">
-      {(["calendar", "list"] as const).map((v) => (
-        <button
-          key={v}
-          type="button"
-          role="radio"
-          aria-checked={view === v}
-          onClick={() => onView(v)}
-          className={clsx("h-8 rounded px-3 text-sm capitalize", view === v ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink")}
-        >
-          {v}
-        </button>
-      ))}
-    </div>
+    <Segmented
+      label="Show installations as"
+      value={view}
+      onChange={onView}
+      options={[
+        { value: "calendar", label: "Calendar", icon: CalendarDays },
+        { value: "list", label: "List", icon: ListIcon },
+      ]}
+    />
   );
 }
 

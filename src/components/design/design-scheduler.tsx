@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Bell, ChevronLeft, ChevronRight } from "lucide-react";
+import { Bell, CalendarCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import { CAPACITY_WEEKS, capacityWeeks, type CapacityWeek } from "@/lib/domain/design/approvals";
 import { calendarDays, holidayOn, isWeekend, type CalendarView } from "@/lib/domain/design/schedule";
@@ -12,8 +12,10 @@ import { loadPrefs, loadSchedule, type BookedJob } from "@/lib/services/after-sa
 import { PATHS, PageHead, ui } from "./design-shell";
 import { EventCard } from "./event-card";
 import { JobCardDialog } from "./job-card";
+import { Segmented } from "./segmented";
 
-const ARROW = "inline-flex size-9 items-center justify-center rounded-md border border-line bg-surface text-ink hover:border-forest";
+const ARROW =
+  "inline-flex size-9 items-center justify-center rounded-full border border-line bg-surface text-ink hover:border-ink-2 hover:bg-surface-2";
 const TONE = { ready: "border-positive bg-positive-soft", partly: "border-sun-line bg-sun", not: "border-line bg-surface-2" } as const;
 
 /**
@@ -77,42 +79,46 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
 
   return (
     <div className={ui.page}>
-      <PageHead title="Installations">
-        {switcher}
-        <div className="flex items-center gap-1">
-          <button type="button" className={ARROW} onClick={() => setDate(cal.prev)} aria-label="Earlier">
+      <PageHead title="Installations">{switcher}</PageHead>
+      {/* Where you are in time on the left (the arrows either side of the month, Today once you've moved away); how
+          much of it to show on the right. Kept apart from the Calendar | List switch above (8 Nov 2026, Martin). */}
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button type="button" className={ARROW} onClick={() => setDate(cal.prev)} aria-label={`Earlier ${view}`}>
             <ChevronLeft className="size-4" />
           </button>
-          <button type="button" className={clsx(ui.quiet, "h-9")} onClick={() => setDate(today)}>
-            Today
-          </button>
-          <button type="button" className={ARROW} onClick={() => setDate(cal.next)} aria-label="Later">
+          <p className="min-w-[10.5rem] text-center text-[19px] tracking-tight text-ink" aria-live="polite">
+            {cal.title}
+          </p>
+          <button type="button" className={ARROW} onClick={() => setDate(cal.next)} aria-label={`Later ${view}`}>
             <ChevronRight className="size-4" />
           </button>
-        </div>
-        <div className="flex rounded-md border border-line p-0.5" role="radiogroup" aria-label="View">
-          {(["month", "week"] as const).map((v) => (
+          {!cal.days.includes(today) && (
             <button
-              key={v}
               type="button"
-              role="radio"
-              aria-checked={view === v}
-              onClick={() => setView(v)}
-              className={clsx(
-                "h-8 rounded px-3 text-sm capitalize",
-                view === v ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
-              )}
+              onClick={() => setDate(today)}
+              className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-sun-ink ring-1 ring-sun-line hover:bg-sun"
             >
-              {v}
+              <CalendarCheck className="size-3.5" aria-hidden />
+              Back to today
             </button>
-          ))}
+          )}
         </div>
-      </PageHead>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[19px] tracking-tight text-ink">{cal.title}</p>
-        <p className="text-sm text-ink-2">
-          {jobs ? `${inView} ${inView === 1 ? "installation" : "installations"} in view, ${ready} ready to go` : "Loading…"}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-[13px] text-muted">
+            {jobs ? `${inView} ${inView === 1 ? "installation" : "installations"} in view, ${ready} ready to go` : "Loading…"}
+          </p>
+          <Segmented
+            label="Show a month or a week"
+            size="sm"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: "month", label: "Month" },
+              { value: "week", label: "Week" },
+            ]}
+          />
+        </div>
       </div>
       {reminders && (
         <p className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-surface-2 px-4 py-2.5 text-sm text-ink-2">
