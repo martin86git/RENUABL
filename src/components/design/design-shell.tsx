@@ -384,7 +384,6 @@ function Shell({
               >
                 <Search className="size-4 text-ink-2" aria-hidden />
                 <span className="studio-search-words">Search</span>
-                <kbd className="studio-search-words rounded-md bg-surface-2 px-1.5 py-0.5 font-sans text-[11px] text-muted">Ctrl K</kbd>
               </button>
             )}
           </div>

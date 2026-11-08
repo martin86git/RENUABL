@@ -133,7 +133,13 @@ export function PageSearch(props: { open: boolean; onClose: () => void; customer
             aria-label="Find a customer or deal by phone number, name, email or address, or ask Sol"
             className="h-14 min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-muted"
           />
-          <kbd className="hidden rounded border border-line px-1.5 text-xs text-muted sm:inline">Esc</kbd>
+          <span
+            className="hidden shrink-0 items-center gap-1.5 text-xs text-muted sm:flex"
+            title="Ctrl K (⌘K on a Mac) opens this from anywhere"
+          >
+            <kbd className="rounded border border-line px-1.5">Ctrl K</kbd> to open
+            <kbd className="ml-1 rounded border border-line px-1.5">Esc</kbd> to close
+          </span>
         </label>
         <ul className="staff-scroll max-h-[60dvh] overflow-y-auto p-2" role="listbox" aria-label="Found">
           {hits.length === 0 && (
