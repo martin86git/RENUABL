@@ -42,6 +42,7 @@ import { TeamChatButton } from "./team-chat";
 import { DayWeather, NotificationsMenu, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
 import { SectionFold } from "./section-fold";
+import { QuickCalc } from "./quick-calc";
 
 export { MarketplaceMark };
 
@@ -381,6 +382,7 @@ function Shell({
                 // them to be worth folding (a retailer's); an installer's or inspector's few stay as they are.
                 const foldable = sections.filter((s, i) => i > 0 && s.id !== "marketplace");
                 if (foldable.length < 3) return null;
+                const folded = foldable.filter((s) => s.id !== "crm");
                 const link = (sec: (typeof sections)[number]) => {
                   const lit = sec.id === current.id;
                   const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);
@@ -434,11 +436,14 @@ function Shell({
                         <FileText className="size-5" aria-hidden />
                       </Link>
                     )}
+                    {/* The CRM stays in view (8 Nov 2026, Martin: the deals and customers are where the day starts); the
+                        engine behind it (procurement, installation, service) stays folded. */}
+                    {foldable.filter((s) => s.id === "crm").map(link)}
                     <SectionFold
-                      inside={foldable.some((s) => s.id === current.id)}
-                      waiting={foldable.reduce((n, s) => n + s.pages.reduce((m, p) => m + count(p.id), 0), 0)}
+                      inside={folded.some((s) => s.id === current.id)}
+                      waiting={folded.reduce((n, s) => n + s.pages.reduce((m, p) => m + count(p.id), 0), 0)}
                     >
-                      {foldable.map(link)}
+                      {folded.map(link)}
                     </SectionFold>
                   </>
                 );
@@ -505,6 +510,7 @@ function Shell({
                 </div>
               );
             })()}
+            {designsRoofs(kind) && <QuickCalc />}
             {retail && (
               <button
                 type="button"

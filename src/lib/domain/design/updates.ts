@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Everywhere",
+    words: "A calculator by the search: sums, and a bill or a day's use turned into a rough solar and battery size at once.",
+  },
+  {
+    day: "2026-11-08",
+    area: "Everywhere",
+    words: "CRM sits in the menu again; procurement, installation and service stay folded behind the layers icon.",
+  },
+  {
+    day: "2026-11-08",
     area: "Sol",
     words: "New chat at the top of Sol's panel starts afresh in one press; the last conversation is kept in Past conversations.",
   },

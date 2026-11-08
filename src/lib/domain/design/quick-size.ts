@@ -1,0 +1,171 @@
+/**
+ * The calculator in the top bar (8 Nov 2026, Martin: on the phone and asked a question, asking Sol is a wait and a
+ * long answer; this answers at once): a bill or a day's use in, a rough system out, and plain sums. Rules of thumb
+ * only, from the same assumptions the homeowner plan uses (`ASSUMPTIONS` in recommendation.ts: Melbourne's average
+ * sunshine, 40% used as it's made, the battery sized for a winter evening, 90% of it usable). Never a design.
+ */
+import { ASSUMPTIONS } from "../recommendation";
+import { SPEND_ASSUMPTIONS } from "../spend-estimate";
+
+export type BillPeriod = "month" | "two-months" | "quarter";
+
+export const BILL_PERIODS: { id: BillPeriod; label: string; days: number }[] = [
+  { id: "month", label: "Month", days: 30.4 },
+  { id: "two-months", label: "2 months", days: 60.8 },
+  { id: "quarter", label: "Quarter", days: 91.3 },
+];
+
+/** What the calculator starts with: the usual rate and supply charge, editable. */
+export const QUICK_DEFAULTS = {
+  rateCents: Math.round(SPEND_ASSUMPTIONS.usageRate * 100),
+  supplyPerDay: SPEND_ASSUMPTIONS.supplyPerDay,
+  panelWatts: ASSUMPTIONS.panelWatts,
+};
+
+/** Inverter sizes a rough answer rounds up to, in kW. */
+export const INVERTER_STEPS = [3, 5, 6, 8, 10, 15] as const;
+/** The most panels a system is given here, so a huge bill doesn't come back as a commercial roof. */
+export const MAX_QUICK_KW = 20;
+
+export interface QuickInput {
+  /** Use a day in kWh, when known; else worked out from the bill. */
+  kwhPerDay?: number | null;
+  bill?: number | null;
+  period?: BillPeriod;
+  rateCents?: number;
+  supplyPerDay?: number;
+  panelWatts?: number;
+}
+
+export interface QuickSize {
+  kwhPerDay: number;
+  /** True when the day's use was worked out from a bill. */
+  fromBill: boolean;
+  yearKwh: number;
+  solar: { kw: number; panels: number; inverterKw: number };
+  /** Solar sized so a winter day's spare fills the battery for the evening. */
+  withBattery: { kw: number; panels: number; inverterKw: number; batteryKwh: number; eveningKwh: number };
+  /** Hit the ceiling: worth a proper look. */
+  capped: boolean;
+}
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/** The day's use from a bill: what was spent less the supply charge, at the rate. Null when it can't be read. */
+export function dailyFromBill(bill: number, period: BillPeriod, rateCents: number, supplyPerDay: number): number | null {
+  const days = BILL_PERIODS.find((p) => p.id === period)?.days;
+  if (!days || !(bill > 0) || !(rateCents > 0)) return null;
+  const usage = bill / days - Math.max(0, supplyPerDay);
+  return usage > 0 ? usage / (rateCents / 100) : null;
+}
+
+const panelsFor = (kw: number, watts: number) => Math.ceil((kw * 1000) / watts - 1e-9);
+const inverterFor = (kw: number, ratio: number) => INVERTER_STEPS.find((s) => s * ratio >= kw - 1e-9) ?? INVERTER_STEPS.at(-1)!;
+
+/** A rough system from a bill or a day's use; null until there is something to work from. */
+export function quickSize(input: QuickInput): QuickSize | null {
+  const watts = input.panelWatts && input.panelWatts > 100 ? input.panelWatts : QUICK_DEFAULTS.panelWatts;
+  let daily = input.kwhPerDay && input.kwhPerDay > 0 ? input.kwhPerDay : null;
+  const fromBill = daily === null;
+  if (daily === null && input.bill)
+    daily = dailyFromBill(
+      input.bill,
+      input.period ?? "quarter",
+      input.rateCents ?? QUICK_DEFAULTS.rateCents,
+      input.supplyPerDay ?? QUICK_DEFAULTS.supplyPerDay,
+    );
+  if (daily === null || !(daily > 0)) return null;
+
+  const sun = ASSUMPTIONS.dailyYieldKwhPerKw;
+  // Solar only: the least that makes a year's use at average sunshine, never under the smallest system.
+  const soloKw = Math.max(ASSUMPTIONS.minSystemKw, daily / sun);
+  // With a battery: the evening's use (after dark), filled from a winter day's spare.
+  const evening = daily * ASSUMPTIONS.eveningShare;
+  const winterSpare = sun * ASSUMPTIONS.winterSunShare * (1 - ASSUMPTIONS.baseSelfConsumption);
+  const batteryKw = Math.max(soloKw, evening / winterSpare);
+  const capped = soloKw > MAX_QUICK_KW || batteryKw > MAX_QUICK_KW;
+  const solarPanels = panelsFor(Math.min(soloKw, MAX_QUICK_KW), watts);
+  const batteryPanels = panelsFor(Math.min(batteryKw, MAX_QUICK_KW), watts);
+  const kwOf = (panels: number) => round1((panels * watts) / 1000);
+  return {
+    kwhPerDay: round1(daily),
+    fromBill,
+    yearKwh: Math.round(daily * 365),
+    solar: { kw: kwOf(solarPanels), panels: solarPanels, inverterKw: inverterFor(kwOf(solarPanels), 1.33) },
+    withBattery: {
+      kw: kwOf(batteryPanels),
+      panels: batteryPanels,
+      inverterKw: inverterFor(kwOf(batteryPanels), 1.5),
+      batteryKwh: Math.ceil(evening / ASSUMPTIONS.batteryUsableShare),
+      eveningKwh: round1(evening),
+    },
+    capped,
+  };
+}
+
+/**
+ * A sum typed in the calculator ("450*4/365", "(1200-300)*0.9", "15%" of nothing is 0.15): numbers, + - * / %,
+ * brackets and spaces only. Read by hand, never `eval`. Null when it isn't a whole sum or divides by nothing.
+ */
+export function sumOf(text: string): number | null {
+  const src = text.replace(/,/g, "").replace(/\s+/g, "").replace(/[×x]/g, "*").replace(/÷/g, "/");
+  if (!src || src.length > 200 || !/^[\d.+\-*/%()]+$/.test(src)) return null;
+  let at = 0;
+  const peek = () => src[at];
+  const number = (): number | null => {
+    const m = /^\d*\.?\d+|^\d+\.?/.exec(src.slice(at));
+    if (!m) return null;
+    at += m[0].length;
+    let n = Number(m[0]);
+    if (peek() === "%") {
+      at++;
+      n /= 100;
+    }
+    return Number.isFinite(n) ? n : null;
+  };
+  const factor = (): number | null => {
+    if (peek() === "-") {
+      at++;
+      const f = factor();
+      return f === null ? null : -f;
+    }
+    if (peek() === "+") {
+      at++;
+      return factor();
+    }
+    if (peek() === "(") {
+      at++;
+      const e = expr();
+      if (e === null || peek() !== ")") return null;
+      at++;
+      return e;
+    }
+    return number();
+  };
+  const term = (): number | null => {
+    let left = factor();
+    while (left !== null && (peek() === "*" || peek() === "/")) {
+      const op = src[at++];
+      const right = factor();
+      if (right === null) return null;
+      if (op === "/" && right === 0) return null;
+      left = op === "*" ? left * right : left / right;
+    }
+    return left;
+  };
+  function expr(): number | null {
+    let left = term();
+    while (left !== null && (peek() === "+" || peek() === "-")) {
+      const op = src[at++];
+      const right = term();
+      if (right === null) return null;
+      left = op === "+" ? left + right : left - right;
+    }
+    return left;
+  }
+  const value = expr();
+  return value !== null && at === src.length && Number.isFinite(value) ? value : null;
+}
+
+/** A sum's answer as people read it: up to 4 decimal places, grouped thousands. */
+export const sumWords = (n: number) => n.toLocaleString("en-AU", { maximumFractionDigits: 4 });
