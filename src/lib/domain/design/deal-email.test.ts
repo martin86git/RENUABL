@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { DEAL_EMAIL_TEMPLATES, MAX_CC, cleanCc, cleanDealEmail, dealEmail, emailRecord, fillTemplate, senderName } from "./deal-email";
+import {
+  DEAL_EMAIL_TEMPLATES,
+  MAX_CC,
+  cleanCc,
+  cleanDealEmail,
+  dealEmail,
+  emailRecord,
+  fillTemplate,
+  readEmailRecord,
+  senderName,
+} from "./deal-email";
 
 const ctx = {
   firstName: "Jordan",
@@ -72,5 +82,33 @@ describe("emailing a customer from their deal", () => {
     expect(e.html).toContain("<p>Hi &lt;b&gt;Jo&lt;/b&gt;</p>");
     expect(e.html).toContain("Line one<br>Line two");
     expect(e.text).toContain("Reply to this email to reach Sunny Co.");
+  });
+});
+
+describe("reading back an email from the deal's record", () => {
+  it("splits what emailRecord wrote into its parts", () => {
+    const text = emailRecord("cliff@x.example", "Your proposal", "Hi Cliff,\n\nHere it is.", ["roof.png", "quote.pdf"], ["kim@y.example"]);
+    expect(readEmailRecord(text)).toEqual({
+      to: "cliff@x.example",
+      cc: ["kim@y.example"],
+      subject: "Your proposal",
+      files: ["roof.png", "quote.pdf"],
+      body: "Hi Cliff,\n\nHere it is.",
+    });
+    expect(readEmailRecord(emailRecord("a@x.example", "Subject: with a colon", "Words"))).toMatchObject({
+      to: "a@x.example",
+      subject: "Subject: with a colon",
+      body: "Words",
+    });
+  });
+
+  it("keeps an email logged by hand readable", () => {
+    expect(readEmailRecord("Called and emailed the quote\nThey'll reply Monday")).toEqual({
+      to: "",
+      cc: [],
+      subject: "Called and emailed the quote",
+      files: [],
+      body: "They'll reply Monday",
+    });
   });
 });

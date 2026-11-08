@@ -72,6 +72,7 @@ import { NOT_TRACKED, openedWords } from "@/lib/domain/design/email-opens";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { systemSummary } from "@/lib/domain/design/system-summary";
 import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
+import { DealEmails } from "./deal-emails";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
 type Written = "note" | "call" | "email";
@@ -695,7 +696,17 @@ export function DealPage({ id }: { id: string }) {
           </section>
         ) : tab === "email" ? (
           <div className="mt-5">
-            <DealEmail job={job} customer={customer} business={business} onSent={(a) => a && setActivity((all) => [a, ...all])} />
+            <DealEmail
+              job={job}
+              customer={customer}
+              business={business}
+              onSent={(a) => {
+                if (a) setActivity((all) => [a, ...all]);
+                // The new email's tracking, so it reads "Not opened yet" at once.
+                void loadOpens(job.id).then((r) => r.ok && setOpens({ times: r.opens, counts: r.counts ?? {} }));
+              }}
+            />
+            <DealEmails activity={activity.filter((a) => !a.jobId || a.jobId === job.id)} opens={opens} />
           </div>
         ) : tab === "chat" ? (
           <div className="mt-5">

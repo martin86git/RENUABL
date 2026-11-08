@@ -145,4 +145,35 @@ export function dealEmail(input: { business: string; subject: string; body: stri
 
 /** How the email is written on the deal's record, with what went with it before the words (so a long email can't cut it off). */
 export const emailRecord = (to: string, subject: string, body: string, files: readonly string[] = [], cc: readonly string[] = []) =>
-  `Email to ${to}${cc.length ? ` (Cc ${cc.join(", ")})` : ""}: ${subject}${files.length ? `\nAttached (kept in the deal's Attachments): ${files.join(", ")}` : ""}\n\n${body}`;
+  `Email to ${to}${cc.length ? ` (Cc ${cc.join(", ")})` : ""}: ${subject}${files.length ? `\n${ATTACHED_LINE}${files.join(", ")}` : ""}\n\n${body}`;
+
+const ATTACHED_LINE = "Attached (kept in the deal's Attachments): ";
+
+/** An email as the deal's record wrote it, split back into its parts for the deal's list of emails. */
+export interface SentEmail {
+  to: string;
+  cc: string[];
+  subject: string;
+  /** Files that went with it (kept in the deal's Attachments). */
+  files: string[];
+  body: string;
+}
+
+/**
+ * The parts of an email line on a deal's record (8 Nov 2026, Martin: the Email tab lists every email sent from the
+ * deal): `emailRecord`'s "Email to … (Cc …): subject", the files line, then the words. Anything not in that shape (an
+ * older or hand-logged email) keeps its first line as the subject and the rest as the words.
+ */
+export function readEmailRecord(text: string): SentEmail {
+  const [head = "", ...rest] = text.replace(/\r/g, "").split("\n");
+  const m = head.match(/^(?:Group )?[Ee]mail to (\S+?)(?: \(Cc ([^)]*)\))?: (.*)$/);
+  let lines = rest;
+  let files: string[] = [];
+  if (lines[0]?.startsWith(ATTACHED_LINE)) {
+    files = lines[0].slice(ATTACHED_LINE.length).split(", ").filter(Boolean);
+    lines = lines.slice(1);
+  }
+  const body = lines.join("\n").trim();
+  if (!m) return { to: "", cc: [], subject: head.trim(), files, body };
+  return { to: m[1], cc: m[2] ? m[2].split(", ").filter(Boolean) : [], subject: m[3].trim(), files, body };
+}

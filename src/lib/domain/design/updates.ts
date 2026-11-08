@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Deals",
+    words:
+      "Every email sent from a deal is listed under its Email box, with whether the customer opened it. Your team opening it never counts.",
+  },
+  {
+    day: "2026-11-08",
     area: "Everywhere",
     words: "Search sits beside the RENUABL wordmark, and the calculator is on the bar down the right, under team chat.",
   },

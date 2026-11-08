@@ -10,6 +10,7 @@ import {
   openedWords,
   ourCopyNote,
   splitOurCopies,
+  tracksOpensTo,
   withOpen,
   withPixel,
 } from "./email-opens";
@@ -85,5 +86,13 @@ describe("mailMark", () => {
     expect(mailMarkWords(sentToday, "Australia/Melbourne", now)).toBe("Email sent today · opened today at 2:15 pm");
     const older = { sent: 3, lastSent: "2026-11-02T22:00:00Z", opened: false, lastOpened: null };
     expect(mailMarkWords(older, "Australia/Melbourne", now)).toBe("3 emails sent, the latest on Tue, 3 Nov · not opened yet");
+  });
+});
+
+describe("emails to the business's own people", () => {
+  it("aren't tracked, so a member opening one never counts", () => {
+    const ours = ["sam@example-solar.com.au", "hello@example-solar.com.au"];
+    expect(tracksOpensTo("Sam@Example-Solar.com.au", ours)).toBe(false);
+    expect(tracksOpensTo("customer@gmail.com", ours)).toBe(true);
   });
 });

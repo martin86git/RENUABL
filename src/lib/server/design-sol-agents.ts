@@ -23,7 +23,7 @@ import {
 import type { DealViewer } from "@/lib/domain/design/account";
 import type { JobStage } from "@/lib/domain/design/crm";
 import { dealEmail, emailRecord } from "@/lib/domain/design/deal-email";
-import { openPixel, withPixel } from "@/lib/domain/design/email-opens";
+import { openPixel, tracksOpensTo, withPixel } from "@/lib/domain/design/email-opens";
 import type { PreparedItem } from "@/lib/domain/design/prepared";
 import { siteUrl } from "@/lib/domain/sms";
 import { query } from "./db";
@@ -31,6 +31,7 @@ import { markFollowUp } from "./design-after-sale-repo";
 import { addActivity, listJobs } from "./design-crm-repo";
 import { readyFor, type Pending } from "./design-prepared";
 import { loadBrand } from "./design-proposal-repo";
+import { listMembers } from "./design-repo";
 import { newOpenToken, recordSent } from "./design-pulse-repo";
 import { emailProvider, sendEmail } from "./email";
 
@@ -205,7 +206,10 @@ export async function sendOutboxItem(
     const brand = await loadBrand(business.id, business.name);
     const name = brand.name || business.name;
     const site = siteUrl();
-    const token = site ? newOpenToken() : null;
+    // Never tracked when it goes to one of the business's own people: their opening it isn't the customer's.
+    const members = site ? await listMembers(business.id).catch(() => []) : [];
+    const ours = [...members.map((m) => m.email), brand.email, ...brand.notify].filter(Boolean);
+    const token = site && tracksOpensTo(item.to, ours) ? newOpenToken() : null;
     const email = dealEmail({ business: name, subject: item.subject, body: item.body });
     const reply = replyTo ?? (await replyAddress(business.id, brand.email));
     await sendEmail({

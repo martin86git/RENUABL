@@ -54,6 +54,8 @@ describe.skipIf(!url)("deal pulses, email opens and attachments (database)", () 
     await pulse.recordOpen(token, new Date("2026-11-02T00:00:20Z"));
     await pulse.recordOpen(token, new Date("2026-11-02T00:05:00Z"));
     await pulse.recordOpen("f".repeat(32));
+    // Loaded by someone signed in to the business that sent it: not the customer, not counted. Another business's is.
+    await pulse.recordOpen(token, new Date("2026-11-02T00:09:00Z"), a);
     expect(await pulse.opensForJob(a, jobId, all)).toEqual({ act_1: ["2026-11-02T00:00:00.000Z", "2026-11-02T00:05:00.000Z"] });
     expect(await pulse.openCountsForJob(a, jobId)).toEqual({ act_1: 2 });
     expect(await pulse.opensForJob(a, jobId, samOnly)).toBeNull();

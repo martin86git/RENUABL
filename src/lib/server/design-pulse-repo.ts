@@ -34,8 +34,12 @@ export async function recordSent(businessId: string, token: string, jobId: strin
  * goes on past the times kept (`OPENS_EACH`). An email sent before the count was kept starts from the times it has.
  * Unknown tokens change nothing.
  */
-export async function recordOpen(token: string, now = new Date()): Promise<void> {
-  const rows = await query<{ opens: unknown }>(`select opens from design_email_opens where token = $1`, [token]);
+export async function recordOpen(token: string, now = new Date(), notBusiness?: string): Promise<void> {
+  // Loaded by someone signed in to the business that sent it: one of its own people, never the customer (8 Nov 2026).
+  const rows = await query<{ opens: unknown }>(
+    `select opens from design_email_opens where token = $1 and ($2::text is null or business_id <> $2)`,
+    [token, notBusiness ?? null],
+  );
   if (!rows[0]) return;
   const next = withOpen(cleanOpens(rows[0].opens), now);
   if (next)

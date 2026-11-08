@@ -80,6 +80,12 @@ export function splitOurCopies(cc: readonly string[], ours: readonly string[]): 
   return { cc: kept, ours: split };
 }
 
+/**
+ * Whether an email to this address is tracked at all (8 Nov 2026, Martin: opens by the business's own people never
+ * count). One sent to one of the business's own addresses (a member trying it on themselves) goes without the pixel.
+ */
+export const tracksOpensTo = (to: string, ours: readonly string[]) => !ours.some((a) => a.trim().toLowerCase() === to.trim().toLowerCase());
+
 /** The line over the business's own copy of a tracked email, so it is plain why it came apart from the customer's. */
 export const ourCopyNote = (to: string) =>
   `Your copy of the email to ${to}, sent apart from theirs so your opening it isn't counted as the customer's.`;

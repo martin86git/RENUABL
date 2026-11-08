@@ -4,7 +4,7 @@ import { addActivity, jobById } from "@/lib/server/design-crm-repo";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
 import { emailProvider, sendEmail } from "@/lib/server/email";
 import { allow } from "@/lib/server/rate-limit";
-import { openPixel, ourCopyNote, splitOurCopies, withPixel } from "@/lib/domain/design/email-opens";
+import { openPixel, ourCopyNote, splitOurCopies, tracksOpensTo, withPixel } from "@/lib/domain/design/email-opens";
 import { siteUrl } from "@/lib/domain/sms";
 import { addDealFiles, newOpenToken, recordSent } from "@/lib/server/design-pulse-repo";
 import { emailParts, formFiles } from "@/lib/server/email-parts";
@@ -77,14 +77,16 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     const business = brand.name || who.member.businessName;
     // A pixel of its own, so the deal can say when the customer opened it (only when the site's address is known).
     const site = siteUrl();
-    const token = site ? newOpenToken() : null;
+    // The business's own addresses: an email to one of them isn't tracked (8 Nov 2026, Martin: a member opening it must
+    // never count), and on Cc they get a copy of their own, below.
+    const ours = site ? await ownAddresses(who.member.businessId, brand) : [];
+    const token = site && tracksOpensTo(clean.to, ours) ? newOpenToken() : null;
     const parts = await emailParts(files);
     const email = dealEmail({ business, subject: clean.subject, body: clean.body, pictures: parts.picturesHtml, attached: parts.textLine });
     const attachments = parts.attachments.length ? { attachments: parts.attachments } : {};
     // On a tracked email the business's own people on Cc get a copy of their own without the pixel, so only the
     // customer's opens are counted (splitOurCopies); anyone else on Cc stays on the customer's copy.
-    const ours = token && clean.cc.length ? await ownAddresses(who.member.businessId, brand) : [];
-    const split = splitOurCopies(clean.cc, ours);
+    const split = splitOurCopies(clean.cc, token ? ours : []);
     await sendEmail({
       to: clean.to,
       ...email,
