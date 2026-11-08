@@ -31,6 +31,10 @@ export type DesignCommand =
   | { do: "rotate"; degrees: number }
   /** Panels moved so many metres east and south (negative: west and north). */
   | { do: "move"; east: number; south: number }
+  /** The panels (the picked ones, else all) laid again in so many rows, the same panels, where they stood. */
+  | { do: "rows"; rows: number }
+  /** The same number of panels laid again on the roof by the rules, to fit it (8 Nov 2026, Martin). */
+  | { do: "relay" }
   | { do: "undo" }
   | { do: "redo" }
   /**
@@ -117,6 +121,18 @@ export function parseCommand(raw: string): DesignCommand | null {
   if (/\?\s*$/.test(t) || /^(what|how|why|would|could|should|is|does|can|will|which)\b/.test(t)) return null;
   if (/\bdesign it for me\b|\bthree designs\b/.test(t)) return { do: "designForMe" };
   if (/\bstring (it|them|the panels|everything|automatically)\b|\bauto[- ]?string\b/.test(t)) return { do: "stringAuto" };
+  const WORD_NUMBERS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+  const rowsAsked = t.match(/\b(\d{1,2}|one|two|three|four|five|six)\s+(?:single\s+|even\s+|long\s+)?rows?\b/);
+  if (rowsAsked && /\b(lay|put|arrange|set|make|in|into|as)\b/.test(t)) {
+    const rows = WORD_NUMBERS[rowsAsked[1]] ?? Number(rowsAsked[1]);
+    if (rows >= 1 && rows <= 20) return { do: "rows", rows };
+  }
+  if (
+    /\bre-?lay\b|\btidy\b|\blay (?:them|the panels|it)\b.*\b(?:again|properly|neatly|better|out)\b|\bso (?:that )?they fit\b|\bfit (?:them|the panels|it) (?:on|to|onto) the roof\b/.test(
+      t,
+    )
+  )
+    return { do: "relay" };
   const kw = t.match(/(\d+(?:\.\d+)?)\s*kw\b/);
   // A whole system: the kW asked for in a part of its own, not inside a product's name ("the Sungrow 8 kW inverter").
   const kwOnItsOwn = partsOf(t).some((p) => /\d\s*kw\b/.test(p) && !/\b(inverters?|batter(y|ies))\b/.test(p));
@@ -230,6 +246,8 @@ export const DESIGN_COMMAND_SCHEMA = {
         "orient",
         "rotate",
         "move",
+        "rows",
+        "relay",
         "choose",
         "undo",
         "redo",
@@ -256,6 +274,7 @@ export const DESIGN_COMMAND_SCHEMA = {
     landscape: { type: ["boolean", "null"] as ("boolean" | "null")[], description: "For orient: true for landscape, false for portrait." },
     east: { type: ["number", "null"] as ("number" | "null")[], description: "For move: metres east (negative west)." },
     south: { type: ["number", "null"] as ("number" | "null")[], description: "For move: metres south (negative north)." },
+    rows: { type: ["number", "null"] as ("number" | "null")[], description: "For rows: how many rows." },
     question: { type: ["string", "null"] as ("string" | "null")[], description: "For choose: the question, short." },
     options: {
       type: ["array", "null"] as ("array" | "null")[],
@@ -287,6 +306,7 @@ export const DESIGN_COMMAND_SCHEMA = {
     "landscape",
     "east",
     "south",
+    "rows",
     "question",
     "options",
     "phase",
@@ -352,6 +372,12 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
         ? { do: "move", east: Math.round(east * 100) / 100, south: Math.round(south * 100) / 100 }
         : { do: "answer", words };
     }
+    case "rows": {
+      const rows = n(read.rows);
+      return rows !== null && rows >= 1 && rows <= 20 ? { do: "rows", rows: Math.round(rows) } : { do: "answer", words };
+    }
+    case "relay":
+      return { do: "relay" };
     case "undo":
     case "redo":
       return { do: read.do };
@@ -386,6 +412,7 @@ export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roo
 - battery / inverter / panel: choose that product; query holds its maker and model words as named in the lists above. For a battery with no product named ("add a battery", "the storage it needs"), query is "": the designer picks the inverter maker's battery and stacks it to the home.
 - noBattery, stringAuto (string the panels by rule), designForMe (make the three designs), flat (the roof is flat), pitch (the roof's pitch in degrees), phase, storeys, undo, redo.
 - The panels themselves, the picked ones or else all of them: tilt (their tilt in degrees, on frames or the roof), orient (landscape true or false: portrait), rotate (turn them by degrees round their middle, + clockwise), move (east and south in metres, negative for west and north).
+- rows: lay the panels (the picked ones, else all) in that many rows, the same panels where they stood. relay: lay the same number of panels again on the roof by the rules, to fit it ("lay them so they fit the roof", "tidy them up").
 - To place panels somewhere, targetKw with a facing lays them on the faces looking that way. To string them, stringAuto.
 - explainString: show the check for a string, by its letter; put the reason in words too, from the string checks above.
 - choose: when the request could fairly mean different things (which face, how many kW, portrait or landscape, which battery), don't guess: ask a short question with two or three options, each a label, a line on what it means and the request to carry out if chosen, written as the person would say it ("fit 10 kW on the north face"). Only when it is truly unclear.

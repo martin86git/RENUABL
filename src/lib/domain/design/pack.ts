@@ -348,6 +348,51 @@ export function laidAs<T extends Pick<LoosePanel, "angle" | "across">>(panel: T,
   return { ...rest, angle: (((facing - (landscape ? 90 : 0)) % 360) + 360) % 360, ...(landscape ? { across: true } : {}) } as T;
 }
 
+/** How many panels go in each of `rows` rows, gutter first: as even as can be, any extra in the rows nearest the gutter. */
+export function rowCounts(n: number, rows: number): number[] {
+  const r = Math.max(1, Math.min(Math.round(rows), n));
+  const each = Math.floor(n / r);
+  return Array.from({ length: r }, (_, i) => each + (i < n % r ? 1 : 0));
+}
+
+/**
+ * Panels laid again in so many rows (8 Nov 2026, Martin: Sol should lay panels in rows), each group facing one way on
+ * its own: the same panels (ids, portrait or landscape, tilt, the way they look), rows as even as can be with any extra
+ * nearest the gutter, each row centred on where the group was, the whole block centred where it stood.
+ */
+export function inRows(panels: LoosePanel[], size: PanelSize, rows: number): LoosePanel[] {
+  const out = new Map<string, LoosePanel>();
+  const groups = new Map<number, LoosePanel[]>();
+  for (const p of panels) {
+    const facing = Math.round(panelFacing(p)) % 360;
+    groups.set(facing, [...(groups.get(facing) ?? []), p]);
+  }
+  for (const [facing, group] of groups) {
+    const down = downOf(facing);
+    const side = sideOf(facing);
+    // Kept in the order they stand: gutter first, then across.
+    const order = [...group].sort((a, b) => dot(b, down) - dot(a, down) || dot(a, side) - dot(b, side));
+    const plan = planSize(order[0], size);
+    const along = order[0].across ? plan.w : plan.h;
+    const across = order[0].across ? plan.h : plan.w;
+    const mu = order.reduce((t, p) => t + dot(p, side), 0) / order.length;
+    const mv = order.reduce((t, p) => t + dot(p, down), 0) / order.length;
+    const counts = rowCounts(order.length, rows);
+    // The block's rows, from the gutter (furthest down) up, centred on where the group stood.
+    const depth = counts.length * along + (counts.length - 1) * size.gap;
+    let at = 0;
+    counts.forEach((count, r) => {
+      const v = mv + depth / 2 - along / 2 - r * (along + size.gap);
+      for (let j = 0; j < count; j++) {
+        const p = order[at++];
+        const u = mu + (j - (count - 1) / 2) * (across + size.gap);
+        out.set(p.id, { ...p, x: cm(u * side.x + v * down.x), y: cm(u * side.y + v * down.y) });
+      }
+    });
+  }
+  return panels.map((p) => out.get(p.id) ?? p);
+}
+
 export function reorient(panels: LoosePanel[], size: PanelSize, landscape: boolean): LoosePanel[] {
   const out = new Map<string, LoosePanel>();
   const groups = new Map<number, LoosePanel[]>();

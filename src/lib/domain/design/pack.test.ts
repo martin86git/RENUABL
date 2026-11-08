@@ -7,6 +7,8 @@ import {
   packArea,
   packAreas,
   packFaces,
+  inRows,
+  rowCounts,
   reorient,
   tracedArea,
   type Area,
@@ -232,5 +234,21 @@ describe("a panel laid portrait or on its side, for Add a panel", () => {
     expect(back.across).toBeUndefined();
     expect(back.angle).toBe(30);
     expect(laidAs(upright, false)).toBe(upright);
+  });
+});
+
+describe("panels laid in rows", () => {
+  it("shares them out evenly, any extra by the gutter, the same panels where they stood", () => {
+    expect(rowCounts(14, 2)).toEqual([7, 7]);
+    expect(rowCounts(9, 2)).toEqual([5, 4]);
+    expect(rowCounts(3, 5)).toEqual([1, 1, 1]);
+    const column: LoosePanel[] = Array.from({ length: 6 }, (_, i) => ({ id: `p${i}`, x: 0, y: i * 2, angle: 0 }));
+    const laid = inRows(column, PANEL, 2);
+    expect(laid.map((p) => p.id)).toEqual(column.map((p) => p.id));
+    const rowsAt = new Set(laid.map((p) => p.y.toFixed(1)));
+    expect(rowsAt.size).toBe(2);
+    const mid = (ps: LoosePanel[], k: "x" | "y") => ps.reduce((t, p) => t + p[k], 0) / ps.length;
+    expect(mid(laid, "x")).toBeCloseTo(mid(column, "x"), 1);
+    expect(mid(laid, "y")).toBeCloseTo(mid(column, "y"), 1);
   });
 });

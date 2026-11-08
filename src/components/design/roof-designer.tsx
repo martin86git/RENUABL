@@ -6,7 +6,7 @@ import { loadTerrain } from "@/lib/services/terrain";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
 import { loadNearmapOutline } from "@/lib/services/nearmap";
 import { OLD_FACE_CORNERS, mendCutOutline, outlineNote } from "@/lib/domain/design/nearmap";
-import { MOUNT_STANDOFF, clearanceFor, laidAs, packFaces, reorient } from "@/lib/domain/design/pack";
+import { MOUNT_STANDOFF, clearanceFor, inRows, laidAs, packFaces, reorient } from "@/lib/domain/design/pack";
 import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
 import { NO_BILL_KW, SELF_DESIGN_AIMS, SELF_DESIGN_LABELS, selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
@@ -3858,6 +3858,22 @@ export function RoofDesigner(props: {
         if (!on.length) return "There are no panels to turn yet.";
         turn(command.degrees, on);
         return `${panelPicks.length ? "The picked" : "All"} panels turned ${command.degrees > 0 ? "+" : ""}${command.degrees}°.`;
+      }
+      case "rows": {
+        const on = panelPicks.length ? panelPicks : everyPanel();
+        if (!on.length) return "There are no panels to lay in rows yet.";
+        const next = byHand(on);
+        const laid = new Map(inRows(next.loose.filter((p) => next.ids.includes(p.id)), size, command.rows).map((p) => [p.id, p]));
+        setFaces(next.faces);
+        setStrings(next.strings);
+        setLoose(next.loose.map((p) => laid.get(p.id) ?? p));
+        setPicks(next.ids.map((id): Pick => ({ kind: "loose", id })));
+        changed();
+        return `${on.length} panels in ${Math.min(command.rows, on.length)} ${command.rows === 1 ? "row" : "rows"}, where they stood. Drag them into place if they need it, and check the strings.`;
+      }
+      case "relay": {
+        if (!summary.panels) return "There are no panels to lay again yet.";
+        return (await fillTo(summary.kw)).words;
       }
       case "move": {
         const on = panelPicks.length ? panelPicks : everyPanel();

@@ -140,3 +140,14 @@ describe("a battery asked for beside the system's size", () => {
     expect(parseCommand("fit 10 kW")).toEqual({ do: "targetKw", kw: 10 });
   });
 });
+
+describe("Sol laying panels in rows, or again", () => {
+  it("reads rows and laying again", () => {
+    expect(parseCommand("lay the panels in 2 rows")).toEqual({ do: "rows", rows: 2 });
+    expect(parseCommand("put them into three single rows")).toEqual({ do: "rows", rows: 3 });
+    expect(parseCommand("lay the panels so they fit on the roof")).toEqual({ do: "relay" });
+    expect(parseCommand("tidy them up")).toEqual({ do: "relay" });
+    expect(commandFrom({ do: "rows", rows: 4, words: "" })).toEqual({ do: "rows", rows: 4 });
+    expect(commandFrom({ do: "relay", words: "" })).toEqual({ do: "relay" });
+  });
+});
