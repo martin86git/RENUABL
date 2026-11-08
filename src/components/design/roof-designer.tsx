@@ -5,7 +5,7 @@ import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib
 import { loadTerrain } from "@/lib/services/terrain";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
 import { loadNearmapOutline } from "@/lib/services/nearmap";
-import { outlineNote } from "@/lib/domain/design/nearmap";
+import { OLD_FACE_CORNERS, mendCutOutline, outlineNote } from "@/lib/domain/design/nearmap";
 import { MOUNT_STANDOFF, clearanceFor, laidAs, packFaces, reorient } from "@/lib/domain/design/pack";
 import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
@@ -3307,6 +3307,32 @@ export function RoofDesigner(props: {
     };
     return { face: { ...made, angle: angleOfLongestEdge(made) }, captured: got.captured };
   };
+  // A face saved from Nearmap's outline while faces kept only 16 corners closed straight across the roof (8 Nov 2026,
+  // 2 Hanwell Court): mended from the outline kept with the capture (no new Nearmap call), on each design as it opens.
+  const keptOutline = useRef<Promise<Point[] | null> | null>(null);
+  useEffect(() => {
+    if (!props.nearmapPicture || !faces.some((f) => f.points.length === OLD_FACE_CORNERS)) return;
+    keptOutline.current ??= loadNearmapOutline(spot.lat, spot.lng).then((got) => (got.ok ? got.points : null));
+    let gone = false;
+    void keptOutline.current.then((outline) => {
+      if (gone || !outline) return;
+      let mended = false;
+      setFaces((list) =>
+        list.map((f) => {
+          const points = mendCutOutline(f.points, outline);
+          if (!points) return f;
+          mended = true;
+          return { ...f, points };
+        }),
+      );
+      if (mended) changed();
+    });
+    return () => {
+      gone = true;
+    };
+    // Looked at once each design opens; the faces themselves are read when the outline arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, props.nearmapPicture]);
   /** The outline put on the picture for a person to check: picked, the pitch asked for when it isn't set. */
   const putOutlineDown = (face: Face) => {
     setFaces((list) => [...list, face]);

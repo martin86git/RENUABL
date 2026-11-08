@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  OLD_FACE_CORNERS,
   OUTLINE_MAX_POINTS,
   capturedWords,
   homeOutline,
+  mendCutOutline,
   offersOf,
   outlineArea,
   recentCaptures,
@@ -25,6 +27,16 @@ describe("an outline kept as a face", () => {
       faces: [{ id: "f", points, angle: 0, landscape: false, setback: 0, facing: "N", off: [] }],
     });
     expect(kept?.faces[0].points).toHaveLength(22);
+  });
+  it("gives back the corners of a face saved cut to 16, and leaves any other face alone", () => {
+    const outline = Array.from({ length: 22 }, (_, i) => ({ x: i, y: i % 3 }));
+    expect(mendCutOutline(outline.slice(0, OLD_FACE_CORNERS), outline)).toEqual(outline);
+    // Traced by hand, or changed since: not mended.
+    const moved = outline.slice(0, OLD_FACE_CORNERS).map((p, i) => (i === 3 ? { x: 9, y: 9 } : p));
+    expect(mendCutOutline(moved, outline)).toBeNull();
+    expect(mendCutOutline(outline.slice(0, 15), outline)).toBeNull();
+    expect(mendCutOutline(outline.slice(0, OLD_FACE_CORNERS), outline.slice(0, OLD_FACE_CORNERS))).toBeNull();
+    expect(mendCutOutline(outline.slice(0, OLD_FACE_CORNERS), null)).toBeNull();
   });
 });
 

@@ -120,6 +120,20 @@ export function simplifyOutline(points: readonly Point[], tolerance = OUTLINE_TO
   }
 }
 
+/** How many corners a saved face kept before 8 Nov 2026: Nearmap's outlines were cut to it and closed across the roof. */
+export const OLD_FACE_CORNERS = 16;
+
+/**
+ * A face saved from Nearmap's outline before faces kept every corner (8 Nov 2026, 2 Hanwell Court): its points are the
+ * outline's first `OLD_FACE_CORNERS` exactly, so the outline's whole set of corners is given back. Any other face,
+ * one traced by hand or changed since, is left as it is (null).
+ */
+export function mendCutOutline(points: readonly Point[], outline: readonly Point[] | null): Point[] | null {
+  if (!outline || outline.length <= OLD_FACE_CORNERS || points.length !== OLD_FACE_CORNERS) return null;
+  const same = points.every((p, i) => Math.abs(p.x - outline[i].x) < 0.01 && Math.abs(p.y - outline[i].y) < 0.01);
+  return same ? outline.map((p) => ({ ...p })) : null;
+}
+
 /** The area inside an outline, in square metres. */
 export function outlineArea(points: readonly Point[]): number {
   let twice = 0;
