@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { Bell, Check, PencilRuler, RotateCcw, SendHorizonal } from "lucide-react";
 import {
@@ -39,6 +39,11 @@ export function DealTeamChat(props: {
   fill?: boolean;
   initial?: DealLine[];
   onChanged?: () => void;
+  /** The pad as a glance (8 Nov 2026, Martin): pressing it or typing in its box opens the larger chat, with what was typed. */
+  onOpen?: (typed: string) => void;
+  /** Words to start the box with, and the box focused, for the larger chat opened from the pad. */
+  startText?: string;
+  autoFocus?: boolean;
 }) {
   const { jobId, pad, fill } = props;
   const [following, setFollowing] = useState<boolean | null>(null);
@@ -170,6 +175,13 @@ export function DealTeamChat(props: {
             {pad ? "Nothing said here yet." : "Nothing said about this deal yet. Leave the team a note, or ask Sol."}
           </li>
         )}
+        {pad && props.onOpen && shown.length > 0 && (
+          <li className="sr-only">
+            <button type="button" onClick={() => props.onOpen?.("")}>
+              Open the chat on this deal
+            </button>
+          </li>
+        )}
         {shown.map((l) =>
           l.kind === "ask" && l.ask ? (
             <AskCard key={l.id} line={l} jobId={jobId} pad={pad} onSettle={settle} />
@@ -189,7 +201,18 @@ export function DealTeamChat(props: {
           {problem}
         </p>
       )}
-      <Composer pad={pad} people={people} onNeedPeople={() => !view && void load()} onSend={send} />
+      {pad && props.onOpen ? (
+        <OpenBox onOpen={props.onOpen} />
+      ) : (
+        <Composer
+          pad={pad}
+          people={people}
+          onNeedPeople={() => !view && void load()}
+          onSend={send}
+          startText={props.startText}
+          autoFocus={props.autoFocus}
+        />
+      )}
     </div>
   );
 }
@@ -297,12 +320,46 @@ function AskCard(props: { line: DealLine; jobId: string; pad?: boolean; onSettle
   );
 }
 
+/** The pad's box when the pad is a glance: a press or the first key opens the deal's chat with it. */
+function OpenBox({ onOpen }: { onOpen: (typed: string) => void }) {
+  return (
+    <div className="flex items-center gap-1.5 rounded-2xl bg-surface px-2.5 py-1.5 ring-1 ring-line focus-within:ring-2 focus-within:ring-sun-line">
+      <input
+        aria-label="Write to the team on this deal"
+        placeholder="Note to the team, or @Sol…"
+        value=""
+        onFocus={() => onOpen("")}
+        onChange={(e) => onOpen(e.target.value)}
+        className="min-h-[28px] flex-1 bg-transparent py-1 text-[13px] text-ink placeholder:text-muted focus:outline-none"
+      />
+      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-muted" aria-hidden>
+        <SendHorizonal className="size-4" />
+      </span>
+    </div>
+  );
+}
+
 /** The box: Enter sends, Shift+Enter a new line; "@" offers the business's people and Sol. */
-function Composer(props: { pad?: boolean; people: Person[]; onNeedPeople: () => void; onSend: (text: string) => Promise<boolean> }) {
-  const [text, setText] = useState("");
+function Composer(props: {
+  pad?: boolean;
+  people: Person[];
+  onNeedPeople: () => void;
+  onSend: (text: string) => Promise<boolean>;
+  startText?: string;
+  autoFocus?: boolean;
+}) {
+  const [text, setText] = useState(props.startText ?? "");
   const [busy, setBusy] = useState(false);
   const [caret, setCaret] = useState(0);
   const box = useRef<HTMLTextAreaElement>(null);
+  const { autoFocus } = props;
+  useLayoutEffect(() => {
+    if (!autoFocus) return;
+    // Focused as it appears, so keys typed straight after opening land in it; the caret after any words carried in.
+    const end = box.current?.value.length ?? 0;
+    box.current?.focus();
+    box.current?.setSelectionRange(end, end);
+  }, [autoFocus]);
   const tag = typingMention(text, caret);
   const offered = tag
     ? [SOL_PERSON, ...props.people]

@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Today",
+    words: "Type in a deal's team chat on Today and it opens larger over the page, headed by the deal, its address and roof.",
+  },
+  {
+    day: "2026-11-08",
+    area: "Today",
+    words: "The box at the foot of Your deals is gone: ask Sol in a deal's chat or from his round. Show me my day sits by the greeting.",
+  },
+  {
+    day: "2026-11-08",
     area: "Email",
     words:
       "New emails take pictures and files (paste a screenshot in), links and a text size. Polish tidies the words; Sol writes it for you.",

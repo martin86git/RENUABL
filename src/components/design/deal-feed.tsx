@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import clsx from "clsx";
 import {
   ArrowRight,
@@ -222,6 +223,8 @@ function DealCard(props: {
   const need = needsYou(d, now);
   const move = nextMove(d, now);
   const [reviewing, setReviewing] = useState(false);
+  // The deal's chat opened over the page from its glance (null: closed), with what was typed in the glance's box.
+  const [chat, setChat] = useState<string | null>(null);
   // The note-taker for this deal, started from Call (8 Nov 2026, Martin: the call is made on the phone while it listens).
   const notetaker = useRef<NotetakerHandle>(null);
   const call = () => {
@@ -352,7 +355,16 @@ function DealCard(props: {
             All
           </Link>
         </p>
-        <DealTeamChat jobId={d.jobId} pad initial={d.team?.lines ?? []} onChanged={props.onChanged} />
+        <div
+          className="flex min-w-0 flex-1 cursor-pointer flex-col"
+          onClick={(e) => {
+            // Anywhere on the glance but its buttons and box opens the deal's chat.
+            if (!(e.target as HTMLElement).closest("button, a, input, textarea")) setChat("");
+          }}
+        >
+          <DealTeamChat jobId={d.jobId} pad initial={d.team?.lines ?? []} onChanged={props.onChanged} onOpen={(typed) => setChat(typed)} />
+        </div>
+        {chat !== null && <DealChatSheet deal={d} startText={chat} onClose={() => setChat(null)} onChanged={props.onChanged} />}
       </aside>
     </div>
   );
@@ -735,13 +747,69 @@ function sampleRoof(d: FeedDeal): AerialRoofSpec {
   };
 }
 
-function RoofThumb({ deal: d }: { deal: FeedDeal }) {
-  const frame = "relative h-[84px] w-[112px] shrink-0 overflow-hidden rounded-xl bg-surface-2 ring-1 ring-line sm:h-[96px] sm:w-[128px]";
+/**
+ * The deal's team chat, larger, over the page (8 Nov 2026, Martin: the pad beside a card is a glance at the latest; typing
+ * in it brings this up). Headed by the deal, its address and a small roof, so coming back to it after a minute it is
+ * plain which deal the chat is about.
+ */
+function DealChatSheet(props: { deal: FeedDeal; startText: string; onClose: () => void; onChanged: () => void }) {
+  const { deal: d, onClose } = props;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [onClose]);
+  return createPortal(
+    <div
+      className="theme-studio fixed inset-0 z-[70] flex items-end justify-center"
+      role="dialog"
+      aria-modal
+      aria-label={`Team chat on ${d.customer}'s deal`}
+    >
+      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-ink/25 backdrop-blur-[2px]" />
+      <div className="deal-sheet-in relative flex h-[min(82dvh,48rem)] w-full max-w-3xl flex-col rounded-t-[28px] bg-canvas shadow-[0_-12px_48px_rgba(20,22,26,0.22)] ring-1 ring-line sm:mb-4 sm:rounded-[28px]">
+        <header className="flex items-center gap-3 border-b border-line px-5 py-4">
+          <RoofThumb deal={d} small />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[16px] font-semibold text-ink">{d.customer}</p>
+            <p className="truncate text-[13px] text-ink-2">{d.address || d.suburb || "No address yet"}</p>
+            <p className="truncate text-[12px] text-muted">
+              {d.title || "Solar"} · {STAGE_LABELS[d.stage]}
+            </p>
+          </div>
+          <Link
+            href={`${PATHS.deals}/${d.jobId}?tab=team`}
+            className="hidden h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:bg-surface-2 sm:inline-flex"
+          >
+            <Handshake className="size-4" aria-hidden /> Deal
+          </Link>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="grid size-9 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+          >
+            <X className="size-4" />
+          </button>
+        </header>
+        <div className="min-h-0 flex-1 px-5 pb-5 pt-4">
+          <DealTeamChat jobId={d.jobId} fill startText={props.startText} autoFocus onChanged={props.onChanged} />
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function RoofThumb({ deal: d, small }: { deal: FeedDeal; small?: boolean }) {
+  const frame = small
+    ? "relative h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 ring-1 ring-line"
+    : "relative h-[84px] w-[112px] shrink-0 overflow-hidden rounded-xl bg-surface-2 ring-1 ring-line sm:h-[96px] sm:w-[128px]";
   if (d.sample)
     return (
       <div className={frame}>
         <AerialRoof spec={sampleRoof(d)} className="absolute inset-0 h-full w-full" />
-        {d.kw ? <DesignedTag /> : null}
+        {d.kw && !small ? <DesignedTag /> : null}
       </div>
     );
   if (d.place)
@@ -754,12 +822,12 @@ function RoofThumb({ deal: d }: { deal: FeedDeal }) {
           loading="lazy"
           className="absolute inset-0 h-full w-full scale-150 object-cover"
         />
-        {d.projectId && <DesignedTag />}
+        {d.projectId && !small && <DesignedTag />}
       </div>
     );
   return (
     <div className={`${frame} flex items-center justify-center text-center text-[11px] leading-tight text-muted`}>
-      No address on the map yet
+      {small ? "" : "No address on the map yet"}
     </div>
   );
 }

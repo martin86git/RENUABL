@@ -105,6 +105,7 @@ export async function dealFeed(
       jobId: j.id,
       customer: j.customerName,
       suburb: suburbOfAddress(j.address),
+      address: j.address,
       title: j.title,
       stage: j.stage,
       value: j.value,

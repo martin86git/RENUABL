@@ -318,10 +318,19 @@ export function TodayPad(props: {
         )}
         {!welcoming && onFeed && (
           <div className="pb-6">
-            <p className="mx-auto mb-4 w-full max-w-3xl text-[22px] font-light tracking-[-0.01em] text-ink">
-              {greeting()}
-              {props.name ? `, ${props.name}` : ""}.
-            </p>
+            <div className="mx-auto mb-4 flex w-full max-w-3xl flex-wrap items-center justify-between gap-3">
+              <p className="text-[22px] font-light tracking-[-0.01em] text-ink">
+                {greeting()}
+                {props.name ? `, ${props.name}` : ""}.
+              </p>
+              <button
+                type="button"
+                onClick={showDay}
+                className="inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
+              >
+                <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Show me my day
+              </button>
+            </div>
             <DealFeed me={props.email} />
           </div>
         )}
@@ -424,7 +433,9 @@ export function TodayPad(props: {
 
       {touring && <Spotlight steps={WELCOME_TOUR} onEnd={() => setTouring(false)} />}
 
-      {(talking || tab !== "today" || onFeed) && (
+      {/* Not on the deal feed (8 Nov 2026, Martin: a third place to ask Sol confused more than it helped; each deal has
+          its own chat and Sol's round is in the nav). */}
+      {(tab !== "today" || (talking && !onFeed)) && (
         <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-60% to-transparent pb-5 pt-10 print:hidden">
           <div className="mx-auto max-w-3xl">
             {tab === "today" && !welcoming && (!onFeed || talking) && (

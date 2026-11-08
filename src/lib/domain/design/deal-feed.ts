@@ -25,6 +25,8 @@ export interface FeedDeal {
   jobId: string;
   customer: string;
   suburb: string;
+  /** The deal's address as kept on it, for the heading of its chat. */
+  address?: string;
   title: string;
   stage: JobStage;
   value: number | null;
@@ -48,7 +50,16 @@ export interface FeedDeal {
    * What Sol has lined up on it, when anything: the outbox item, its words, when it goes and where it stands
    * (counting down while its agent is on; waiting for a press while it is off; held).
    */
-  sol: { id?: string; subject: string; body?: string; to?: string; firesAt: string; readyAt?: string; held: boolean; state?: OutboxState } | null;
+  sol: {
+    id?: string;
+    subject: string;
+    body?: string;
+    to?: string;
+    firesAt: string;
+    readyAt?: string;
+    held: boolean;
+    state?: OutboxState;
+  } | null;
   canCall: boolean;
   canEmail: boolean;
   /** The customer's phone as kept on their record, for the member to ring themselves. */
@@ -141,7 +152,8 @@ export interface NextMove {
  */
 export function nextMove(d: FeedDeal, now = new Date()): NextMove | null {
   const name = first(d.customer);
-  if (d.events[0]?.kind === "message") return { kind: "reply", label: `Reply to ${name}`, why: `${name} asked something and is waiting on a reply.` };
+  if (d.events[0]?.kind === "message")
+    return { kind: "reply", label: `Reply to ${name}`, why: `${name} asked something and is waiting on a reply.` };
   if (d.sol) {
     const state = d.sol.state ?? (d.sol.held ? "held" : "counting");
     const what = d.sol.subject ? `: "${d.sol.subject}"` : "";

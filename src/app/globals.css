@@ -680,3 +680,23 @@ body:has(.theme-installer) {
   /* A thin gold line under "sun" (scales with the headline). */
   box-shadow: inset 0 -0.11em 0 var(--sun-line);
 }
+
+/* A deal's chat rising over Today's feed (deal-feed.tsx): up from the foot, quickly. */
+@keyframes deal-sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.deal-sheet-in {
+  animation: deal-sheet-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .deal-sheet-in {
+    animation: none;
+  }
+}
