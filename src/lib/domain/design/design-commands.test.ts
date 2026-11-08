@@ -67,3 +67,22 @@ describe("the rest", () => {
     expect(commandFrom({ do: "hack" }).do).toBe("answer");
   });
 });
+
+describe("Sol changing the panels themselves", () => {
+  it("reads portrait or landscape, turning, moving and tilting", () => {
+    expect(parseCommand("make them landscape")).toEqual({ do: "orient", landscape: true });
+    expect(parseCommand("lay the panels portrait")).toEqual({ do: "orient", landscape: false });
+    expect(parseCommand("rotate the panels 5 degrees")).toEqual({ do: "rotate", degrees: 5 });
+    expect(parseCommand("turn them 10° anticlockwise")).toEqual({ do: "rotate", degrees: -10 });
+    expect(parseCommand("move the panels 50 cm north")).toEqual({ do: "move", east: 0, south: -0.5 });
+    expect(parseCommand("move them 1.5 m right")).toEqual({ do: "move", east: 1.5, south: 0 });
+    expect(parseCommand("tilt them to 10")).toEqual({ do: "tilt", degrees: 10 });
+  });
+  it("checks Sol's reading of them", () => {
+    expect(commandFrom({ do: "orient", landscape: true, words: "" })).toEqual({ do: "orient", landscape: true });
+    expect(commandFrom({ do: "orient", landscape: null, words: "Which way?" })).toEqual({ do: "answer", words: "Which way?" });
+    expect(commandFrom({ do: "move", east: 0.25, south: null, words: "" })).toEqual({ do: "move", east: 0.25, south: 0 });
+    expect(commandFrom({ do: "move", east: 900, south: 0, words: "Too far." }).do).toBe("answer");
+    expect(commandFrom({ do: "rotate", degrees: 15, words: "" })).toEqual({ do: "rotate", degrees: 15 });
+  });
+});

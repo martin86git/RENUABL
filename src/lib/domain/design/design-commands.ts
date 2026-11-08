@@ -25,6 +25,12 @@ export type DesignCommand =
   | { do: "phase"; phase: "single" | "three" }
   | { do: "storeys"; storeys: "single" | "double" }
   | { do: "tilt"; degrees: number }
+  /** Panels laid portrait or landscape (the picked ones, else all), rows kept (8 Nov 2026, Martin). */
+  | { do: "orient"; landscape: boolean }
+  /** Panels turned by so many degrees round their middle (the picked ones, else all). */
+  | { do: "rotate"; degrees: number }
+  /** Panels moved so many metres east and south (negative: west and north). */
+  | { do: "move"; east: number; south: number }
   | { do: "undo" }
   | { do: "redo" }
   | { do: "answer"; words: string };
@@ -100,6 +106,23 @@ export function parseCommand(raw: string): DesignCommand | null {
     return { do: "inverter", query: queryOf(text, /\binverters?\b/gi) };
   if (/\bpanels?\b/.test(t) && /\b(swap|switch|change|use|choose|pick)\b/.test(t) && !kw)
     return { do: "panel", query: queryOf(text, /\bpanels?\b/gi) };
+  if (/\blandscape\b/.test(t) && !/\bportrait\b/.test(t)) return { do: "orient", landscape: true };
+  if (/\bportrait\b/.test(t) && !/\blandscape\b/.test(t)) return { do: "orient", landscape: false };
+  const turned = t.match(/\b(?:turn|rotate)\b\D*?(-?\d{1,3})\s*(?:°|deg(?:rees?)?\b)/);
+  if (turned && !/\bpitch\b|\btilt\b/.test(t)) {
+    const degrees = Number(turned[1]) * (/\b(anti|counter)[- ]?clockwise\b|\bleft\b/.test(t) ? -1 : 1);
+    if (degrees && Math.abs(degrees) <= 180) return { do: "rotate", degrees };
+  }
+  const moved = t.match(/\bmove\b.*?(\d+(?:\.\d+)?)\s*(cm|m)\b.*?\b(north|south|east|west|up|down|left|right)\b/);
+  if (moved) {
+    const m = Number(moved[1]) / (moved[2] === "cm" ? 100 : 1);
+    if (m > 0 && m <= 50) {
+      const way = moved[3];
+      const east = way === "east" || way === "right" ? m : way === "west" || way === "left" ? -m : 0;
+      const south = way === "south" || way === "down" ? m : way === "north" || way === "up" ? -m : 0;
+      return { do: "move", east, south };
+    }
+  }
   if (/\bflat roof\b|\bit'?s flat\b/.test(t)) return { do: "flat" };
   const pitch = t.match(/\bpitch\b\D*(\d{1,2})/);
   if (pitch) return { do: "pitch", degrees: Number(pitch[1]) };
@@ -157,6 +180,11 @@ export const DESIGN_COMMAND_SCHEMA = {
         "phase",
         "storeys",
         "tilt",
+        "orient",
+        "rotate",
+        "move",
+        "undo",
+        "redo",
         "answer",
       ],
     },
@@ -176,11 +204,29 @@ export const DESIGN_COMMAND_SCHEMA = {
     },
     letter: { type: ["string", "null"] as ("string" | "null")[] },
     degrees: { type: ["number", "null"] as ("number" | "null")[] },
+    landscape: { type: ["boolean", "null"] as ("boolean" | "null")[], description: "For orient: true for landscape, false for portrait." },
+    east: { type: ["number", "null"] as ("number" | "null")[], description: "For move: metres east (negative west)." },
+    south: { type: ["number", "null"] as ("number" | "null")[], description: "For move: metres south (negative north)." },
     phase: { type: ["string", "null"] as ("string" | "null")[], enum: ["single", "three", null] },
     storeys: { type: ["string", "null"] as ("string" | "null")[], enum: ["single", "double", null] },
     words: { type: "string", description: "What to say to the person: the answer to a question, or the change in a sentence. Short." },
   },
-  required: ["do", "kw", "facing", "query", "inverter", "battery", "letter", "degrees", "phase", "storeys", "words"],
+  required: [
+    "do",
+    "kw",
+    "facing",
+    "query",
+    "inverter",
+    "battery",
+    "letter",
+    "degrees",
+    "landscape",
+    "east",
+    "south",
+    "phase",
+    "storeys",
+    "words",
+  ],
 } as const;
 
 /** Sol's reading, checked: a command the designer can carry out, else his words as an answer. */
@@ -225,6 +271,24 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
       const degrees = n(read.degrees);
       return degrees !== null && degrees >= 0 && degrees <= 60 ? { do: read.do, degrees: Math.round(degrees) } : { do: "answer", words };
     }
+    case "orient":
+      return typeof read.landscape === "boolean" ? { do: "orient", landscape: read.landscape } : { do: "answer", words };
+    case "rotate": {
+      const degrees = n(read.degrees);
+      return degrees !== null && degrees !== 0 && Math.abs(degrees) <= 180
+        ? { do: "rotate", degrees: Math.round(degrees) }
+        : { do: "answer", words };
+    }
+    case "move": {
+      const east = n(read.east) ?? 0;
+      const south = n(read.south) ?? 0;
+      return (east || south) && Math.abs(east) <= 50 && Math.abs(south) <= 50
+        ? { do: "move", east: Math.round(east * 100) / 100, south: Math.round(south * 100) / 100 }
+        : { do: "answer", words };
+    }
+    case "undo":
+    case "redo":
+      return { do: read.do };
     case "phase":
       return read.phase === "single" || read.phase === "three" ? { do: "phase", phase: read.phase } : { do: "answer", words };
     case "storeys":
@@ -240,6 +304,8 @@ export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roo
 - targetKw: fill the roof (or the faces facing a direction) to about that many kW.
 - system: a whole system at once ("load 8 kW of panels, an inverter and a battery"): kw, then inverter and battery, each the product's words from the lists, "" to choose one by rule, or null when it wasn't asked for.
 - battery / inverter / panel: choose that product; query holds its maker and model words as named in the lists above.
-- noBattery, stringAuto (string the panels by rule), designForMe (make the three designs), flat (the roof is flat), pitch (the roof pitch in degrees), tilt (the picked panels' tilt), phase, storeys.
+- noBattery, stringAuto (string the panels by rule), designForMe (make the three designs), flat (the roof is flat), pitch (the roof's pitch in degrees), phase, storeys, undo, redo.
+- The panels themselves, the picked ones or else all of them: tilt (their tilt in degrees, on frames or the roof), orient (landscape true or false: portrait), rotate (turn them by degrees round their middle, + clockwise), move (east and south in metres, negative for west and north).
+- To place panels somewhere, targetKw with a facing lays them on the faces looking that way. To string them, stringAuto.
 - explainString: show the check for a string, by its letter; put the reason in words too, from the string checks above.
 - Always put one short sentence in words. Never invent a figure, product or price that isn't above. Nothing is sent to anyone.`;

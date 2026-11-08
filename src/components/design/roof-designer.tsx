@@ -2049,9 +2049,9 @@ export function RoofDesigner(props: {
   ];
 
   /** Turns the picked panels together, about the middle of the group. */
-  const turn = (degrees: number) => {
-    if (!panelPicks.length) return;
-    const next = byHand(panelPicks);
+  const turn = (degrees: number, on: Pick[] = panelPicks) => {
+    if (!on.length) return;
+    const next = byHand(on);
     const group = next.loose.filter((p) => next.ids.includes(p.id));
     const centre = middle(group);
     const a = (degrees * Math.PI) / 180;
@@ -2079,9 +2079,9 @@ export function RoofDesigner(props: {
    * the same rows and counts, the gutter row's edge kept, each row centred where it was (`reorient`). Strings keep
    * their panels.
    */
-  const turnLandscape = (landscape: boolean) => {
-    if (!panelPicks.length) return;
-    const next = byHand(panelPicks);
+  const turnLandscape = (landscape: boolean, on: Pick[] = panelPicks) => {
+    if (!on.length) return;
+    const next = byHand(on);
     const group = next.loose.filter((p) => next.ids.includes(p.id));
     const turned = new Map(reorient(group, size, landscape).map((p) => [p.id, p]));
     setFaces(next.faces);
@@ -2092,9 +2092,9 @@ export function RoofDesigner(props: {
   };
 
   /** Changes each picked panel where it stands (its tilt). One in a row comes out of the row. */
-  const amend = (change: (panel: LoosePanel) => LoosePanel) => {
-    if (!panelPicks.length) return;
-    const next = byHand(panelPicks);
+  const amend = (change: (panel: LoosePanel) => LoosePanel, on: Pick[] = panelPicks) => {
+    if (!on.length) return;
+    const next = byHand(on);
     setFaces(next.faces);
     setStrings(next.strings);
     setLoose(next.loose.map((p) => (next.ids.includes(p.id) ? change(p) : p)));
@@ -2190,24 +2190,25 @@ export function RoofDesigner(props: {
   // Speed (2 Nov 2026, Martin: "it feels fast"): a key for each tool, the arrows nudge what is picked (5 cm, or 50 cm
   // with Shift), Ctrl+A picks every panel, and ? shows them all.
   const [keysOpen, setKeysOpen] = useState(false);
-  const nudge = (dx: number, dy: number) => {
-    if (!panelPicks.length) return;
-    const next = byHand(panelPicks);
+  const nudge = (dx: number, dy: number, on: Pick[] = panelPicks) => {
+    if (!on.length) return;
+    const next = byHand(on);
     setFaces(next.faces);
     setStrings(next.strings);
     setLoose(next.loose.map((p) => (next.ids.includes(p.id) ? { ...p, x: cm(p.x + dx), y: cm(p.y + dy) } : p)));
     setPicks([...next.ids.map((id): Pick => ({ kind: "loose", id })), ...picks.filter((p) => p.kind === "label")]);
     changed();
   };
-  const pickEveryPanel = () =>
-    setPicks([
-      ...loose.map((p): Pick => ({ kind: "loose", id: p.id })),
-      ...faces.flatMap((fc) =>
-        panelPlaces(fc, size)
-          .filter((pl) => !fc.off.includes(pl.index))
-          .map((pl): Pick => ({ kind: "grid", face: fc.id, index: pl.index })),
-      ),
-    ]);
+  /** Every panel on the design, as picks. */
+  const everyPanel = (): Pick[] => [
+    ...loose.map((p): Pick => ({ kind: "loose", id: p.id })),
+    ...faces.flatMap((fc) =>
+      panelPlaces(fc, size)
+        .filter((pl) => !fc.off.includes(pl.index))
+        .map((pl): Pick => ({ kind: "grid", face: fc.id, index: pl.index })),
+    ),
+  ];
+  const pickEveryPanel = () => setPicks(everyPanel());
   // The keyboard: Delete or Backspace takes out whatever is picked, and Escape picks nothing. Not while typing in a box.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -3788,10 +3789,37 @@ export function RoofDesigner(props: {
       case "storeys":
         setQuote({ ...quoteNow, form: { ...quoteNow.form, storeys: command.storeys } });
         return `${command.storeys === "double" ? "Double" : "Single"} storey.`;
-      case "tilt":
-        if (!pickedPanels.length) return "Pick the panels to tilt first.";
-        amend((p) => ({ ...p, tilt: Math.min(TILT.max, command.degrees) }));
-        return `Tilted ${pickedPanels.length} panels to ${command.degrees}°.`;
+      case "tilt": {
+        const on = panelPicks.length ? panelPicks : everyPanel();
+        if (!on.length) return "There are no panels to tilt yet.";
+        amend((p) => ({ ...p, tilt: Math.min(TILT.max, command.degrees) }), on);
+        return `Tilted ${panelPicks.length ? "the picked" : "all"} ${on.length} panels to ${Math.min(TILT.max, command.degrees)}°.`;
+      }
+      case "orient": {
+        const on = panelPicks.length ? panelPicks : everyPanel();
+        setAddLandscape(command.landscape);
+        if (!on.length) return `New panels go down ${command.landscape ? "landscape" : "portrait"}.`;
+        turnLandscape(command.landscape, on);
+        return `${panelPicks.length ? "The picked" : "All"} ${on.length} panels laid ${command.landscape ? "landscape" : "portrait"}, rows kept. Check the strings.`;
+      }
+      case "rotate": {
+        const on = panelPicks.length ? panelPicks : everyPanel();
+        if (!on.length) return "There are no panels to turn yet.";
+        turn(command.degrees, on);
+        return `${panelPicks.length ? "The picked" : "All"} panels turned ${command.degrees > 0 ? "+" : ""}${command.degrees}°.`;
+      }
+      case "move": {
+        const on = panelPicks.length ? panelPicks : everyPanel();
+        if (!on.length) return "There are no panels to move yet.";
+        nudge(command.east, command.south, on);
+        const way = [
+          command.south ? `${Math.abs(command.south)} m ${command.south > 0 ? "south" : "north"}` : "",
+          command.east ? `${Math.abs(command.east)} m ${command.east > 0 ? "east" : "west"}` : "",
+        ]
+          .filter(Boolean)
+          .join(" and ");
+        return `${panelPicks.length ? "The picked" : "All"} panels moved ${way}.`;
+      }
       case "undo":
         undo();
         return "Undone.";
@@ -3821,10 +3849,17 @@ export function RoofDesigner(props: {
         setCommandReply(j.ok && j.command ? await runCommand(j.command) : (j.message ?? "Sol couldn't read that."));
       }
       setCommandText("");
+      // The box goes once he has acted (8 Nov 2026, Martin): his words stay at the foot of the picture for a while.
+      setCommandOpen(false);
     } finally {
       setCommandBusy(false);
     }
   };
+  useEffect(() => {
+    if (!commandReply || commandOpen) return;
+    const t = window.setTimeout(() => setCommandReply(null), 9000);
+    return () => window.clearTimeout(t);
+  }, [commandReply, commandOpen]);
   // "/" opens the command bar, as on the design home; Escape closes it.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -4920,23 +4955,6 @@ export function RoofDesigner(props: {
                 </div>
               )}
             </section>
-            {/* Too many panels for the inverters: said plainly over the picture. A battery on the design lifts the limit. */}
-            {oversize?.over && (
-              <p
-                className="mx-auto mb-2 flex items-start gap-2.5 rounded-lg border border-sun-line bg-sun px-4 py-2.5 text-sm text-sun-ink"
-                style={{ maxWidth: fit }}
-                role="alert"
-              >
-                <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-                <span>
-                  <strong className="font-semibold">
-                    The panels are {oversize.percent}% of the inverter&apos;s rating: {summary.kw.toFixed(2)} kW of panels on {fittedKw} kW
-                    of inverter.
-                  </strong>{" "}
-                  Without a battery the limit is {oversize.limit}%. Choose a larger inverter, add one, take panels off, or add a battery.
-                </span>
-              </p>
-            )}
             {/* The picture's height as a variable, so the kit lists that open on it scroll inside it, clear of the tools at its foot. */}
             <div
               className="relative mx-auto"
@@ -4947,6 +4965,27 @@ export function RoofDesigner(props: {
                 } as React.CSSProperties
               }
             >
+              {/* Too many panels for the inverters: a pill on the picture, not a line above it, so the picture keeps its size
+                  (8 Nov 2026, Martin); the whole of it when pointed at or focused. A battery on the design lifts the limit. */}
+              {oversize?.over && (
+                <div
+                  tabIndex={0}
+                  role="alert"
+                  className={clsx(
+                    "group absolute z-20 flex max-w-[min(26rem,calc(100%-1.5rem))] items-start gap-2 rounded-2xl border border-sun-line bg-sun/95 px-3 py-2 text-[13px] text-sun-ink shadow-lift backdrop-blur-md outline-none",
+                    props.tight ? "right-3 top-3" : "right-3 top-[7.25rem]",
+                  )}
+                >
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <span>
+                    <strong className="font-semibold">Panels {oversize.percent}% of the inverter</strong>
+                    <span className="hidden group-hover:inline group-focus:inline">
+                      : {summary.kw.toFixed(2)} kW of panels on {fittedKw} kW of inverter. Without a battery the limit is {oversize.limit}%.
+                      Choose a larger inverter, add one, take panels off, or add a battery.
+                    </span>
+                  </span>
+                </div>
+              )}
               {keysOpen && (
                 <div
                   className={clsx(GLASS, "absolute right-3 top-[4.5rem] z-50 w-80 p-3 text-[13px]")}
@@ -5012,6 +5051,29 @@ export function RoofDesigner(props: {
                       {systemWords && ` ${systemWords}`}
                     </p>
                   )}
+                </div>
+              )}
+              {commandReply && !commandOpen && (
+                <div
+                  className={clsx(
+                    GLASS,
+                    "absolute bottom-24 left-1/2 z-40 flex w-[min(34rem,calc(100%-2rem))] -translate-x-1/2 items-start gap-2.5 px-4 py-2.5",
+                  )}
+                  role="status"
+                >
+                  <SolIcon className="mt-0.5 size-4 shrink-0" />
+                  <p className="min-w-0 flex-1 text-sm text-ink">
+                    {commandReply}
+                    {systemWords && ` ${systemWords}`}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCommandReply(null)}
+                    aria-label="Close"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted hover:text-ink"
+                  >
+                    <X className="size-3.5" aria-hidden />
+                  </button>
                 </div>
               )}
               {wheelHint && (
@@ -6431,6 +6493,60 @@ export function RoofDesigner(props: {
                       )}
                     </p>
                   )}
+                  {/* The sheets behind the strings (8 Nov 2026, Martin: a sheet found online should be there to look at, to be sure
+                      it is the right one, Australia's, while designing on its figures). */}
+                  {(() => {
+                    const sheets = [
+                      ...(chosenPanel?.electrical
+                        ? [{ kind: "panel" as const, sku: chosenPanel.sku, name: chosenPanel.name, e: chosenPanel.electrical }]
+                        : []),
+                      ...fittedItems.flatMap((i) =>
+                        i?.electrical ? [{ kind: "inverter" as const, sku: i.sku, name: i.name, e: i.electrical }] : [],
+                      ),
+                    ].filter((s, n, all) => all.findIndex((x) => x.kind === s.kind && x.sku === s.sku) === n);
+                    if (!sheets.length) return null;
+                    return (
+                      <div className="rounded-md bg-surface-2 px-2.5 py-2 text-xs">
+                        <p className="font-semibold text-ink">The figures behind these strings</p>
+                        <ul className="mt-1.5 space-y-1.5">
+                          {sheets.map((s) => (
+                            <li key={`${s.kind}:${s.sku}`}>
+                              <span className="block truncate font-medium text-ink" title={s.name}>
+                                {s.kind === "panel" ? "Panel" : "Inverter"} · {s.name}
+                              </span>
+                              {s.e.unchecked ? (
+                                <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                  <span className="text-sun-ink">Found online, not checked yet</span>
+                                  <a
+                                    href={`/api/design/datasheets/file?kind=${s.kind}&sku=${encodeURIComponent(s.sku)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-semibold text-ink underline underline-offset-2"
+                                  >
+                                    Open the sheet
+                                  </a>
+                                  <a
+                                    href={s.e.unchecked}
+                                    target="_blank"
+                                    rel="noreferrer noopener"
+                                    className="text-ink-2 underline underline-offset-2"
+                                    title={s.e.unchecked}
+                                  >
+                                    Where it came from
+                                  </a>
+                                  <Link href="/design/settings/datasheets" className="text-ink-2 underline underline-offset-2">
+                                    Check and confirm
+                                  </Link>
+                                </span>
+                              ) : (
+                                <span className="mt-0.5 block text-muted">{s.e.basis}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })()}
                   <button
                     className={clsx(button, "!min-h-9 w-full justify-center")}
                     onClick={() => setWiring(newId("s"))}
