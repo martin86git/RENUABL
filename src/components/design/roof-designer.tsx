@@ -70,6 +70,8 @@ import {
   editedLines,
   solarVicBar,
   defaultQuote,
+  sharedHome,
+  withHomeOf,
   lineKey,
   undecidedLines,
   DAY,
@@ -1001,7 +1003,9 @@ export function RoofDesigner(props: {
     }
   };
   // Each design's quote settings and hand changes, in the designs' order.
-  const [quotes, setQuotes] = useState<QuoteFields[]>(props.extras.quotes);
+  // The home (phase, storeys, roof) and the costs decided on each job are the same on every design: brought into line with
+  // the primary as the roof opens, then kept so (`sharedHome`).
+  const [quotes, setQuotes] = useState<QuoteFields[]>(() => sharedHome(props.extras.quotes, props.set.primary));
   // The price after STCs, as the quote builder last worked it out; null when there is nothing to price.
   const [net, setNet] = useState<number | null>(null);
   // Someone who may not see costs has no real costs to price with: the quote's figure is never taken up.
@@ -1277,7 +1281,12 @@ export function RoofDesigner(props: {
     if (op.do === "remove") setThread(null);
   };
   // Opened on a draft from an earlier visit, the work is there but not yet saved.
-  const [saved, setSaved] = useState<"saved" | "saving" | "changed" | { error: string }>(props.draftAt ? "changed" : "saved");
+  // Opened on a draft, or with designs whose home had to be brought into line (`sharedHome`): there is work to save.
+  const [saved, setSaved] = useState<"saved" | "saving" | "changed" | { error: string }>(() =>
+    props.draftAt || JSON.stringify(sharedHome(props.extras.quotes, props.set.primary)) !== JSON.stringify(props.extras.quotes)
+      ? "changed"
+      : "saved",
+  );
   // The draft this designer opened on (when), shown until it is saved or thrown away; and whether the work as it stands is kept as one.
   const [resumed, setResumed] = useState<string | null>(props.draftAt ?? null);
   const [drafted, setDrafted] = useState(Boolean(props.draftAt));
@@ -1504,7 +1513,12 @@ export function RoofDesigner(props: {
   const homePitch = roofPitches[roofInUse];
   const [pitchOpen, setPitchOpen] = useState(false);
   const setQuote = (next: QuoteFields) => {
-    setQuotes(designs.map((_, i) => (i === active ? next : (quotes[i] ?? defaultQuote(props.postcode)))));
+    setQuotes(
+      sharedHome(
+        designs.map((_, i) => (i === active ? next : (quotes[i] ?? defaultQuote(props.postcode)))),
+        active,
+      ),
+    );
     setSaved("changed");
   };
   const addDesign = (copy: boolean) => {
@@ -3375,7 +3389,7 @@ export function RoofDesigner(props: {
       0,
       result.options.findIndex((o) => o.key === "return"),
     );
-    setQuotes(list.map(() => ({ form: quoteNow.form, edits: {} })));
+    setQuotes(list.map(() => withHomeOf(quoteNow, { form: quoteNow.form, edits: {} })));
     setPrimary(lead);
     show(list, lead);
     setSaved("changed");

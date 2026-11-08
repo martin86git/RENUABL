@@ -291,6 +291,36 @@ export function editedLines(lines: readonly CostLine[], edits: Record<string, Li
     });
 }
 
+/** The costs decided on each job (`costSystem`'s `decide`), as group and label. They are about the home, not one design. */
+export const DECIDED_LINES: readonly (readonly [CostGroup, string])[] = [
+  ["Switchboard", "Switchboard upgrade"],
+  ["Switchboard", "RCBO"],
+  ["Battery", "Protective bollard"],
+  ["Battery", "Fireproofing (sheeting)"],
+  ["Battery", "Shade awning"],
+];
+const DECIDED_KEYS = DECIDED_LINES.map(([group, label]) => lineKey({ group, label }));
+
+/**
+ * One quote given the home of another (8 Nov 2026, Martin: phase, storeys and the roof, and the costs decided on each job,
+ * are the home's, set once for every design on the roof; deciding them on one left the others' proposals blocked): the
+ * form, and the decision on each cost decided on each job, taken from `from`; its own hand changes to other lines kept.
+ */
+export function withHomeOf(from: QuoteFields, to: QuoteFields): QuoteFields {
+  const edits = { ...to.edits };
+  for (const key of DECIDED_KEYS) {
+    if (from.edits[key]) edits[key] = from.edits[key];
+    else delete edits[key];
+  }
+  return { form: { ...from.form }, edits };
+}
+
+/** Every design's quote given the home of the one at `from` (the one being worked on). */
+export function sharedHome(quotes: readonly QuoteFields[], from: number): QuoteFields[] {
+  const source = quotes[from] ?? quotes[0];
+  return source ? quotes.map((q, i) => (i === from ? q : withHomeOf(source, q))) : [...quotes];
+}
+
 /** The costs decided on each job that haven't been included or left out yet: nothing is published while there are any. */
 export function undecidedLines(lines: readonly CostLine[], edits: Record<string, LineEdit>): CostLine[] {
   return lines.filter((l) => l.confirm && !edits[lineKey(l)]?.on && !edits[lineKey(l)]?.removed);

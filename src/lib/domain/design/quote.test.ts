@@ -21,6 +21,8 @@ import {
   costSystem,
   defaultBill,
   defaultQuote,
+  DECIDED_LINES,
+  sharedHome,
   designFinance,
   editedLines,
   lineKey,
@@ -362,6 +364,21 @@ describe("costs decided on each job", () => {
       "Shade awning",
     ]);
     expect(solar.cost).toBe(Math.round(solar.lines.filter((l) => !l.confirm).reduce((n, l) => n + l.amount, 0)));
+  });
+  it("knows every cost decided on each job by name, and shares the home and those decisions across a roof's designs", () => {
+    const withBattery = costSystem({ ...system, battery: { sku: "B", name: "Battery", kwh: 8, qty: 1 } }, form, withList);
+    expect(withBattery.lines.filter((l) => l.confirm).map((l) => [l.group, l.label])).toEqual(DECIDED_LINES.map((d) => [...d]));
+    const board = lineKey({ group: "Switchboard", label: "Switchboard upgrade" });
+    const rails = "Racking|Rails (# lengths for # panels)";
+    const worked = { form: { ...form, phase: "three" as const, storeys: "double" as const }, edits: { [board]: { on: true } } };
+    const other = { form, edits: { [rails]: { amount: 5 }, [lineKey({ group: "Switchboard", label: "RCBO" })]: { removed: true } } };
+    const [a, b] = sharedHome([worked, other], 0);
+    expect(a).toBe(worked);
+    expect(b.form).toMatchObject({ phase: "three", storeys: "double" });
+    expect(b.edits[board]).toEqual({ on: true });
+    // A decision not made on the design worked on is undone on the others; their own hand changes stay.
+    expect(b.edits[lineKey({ group: "Switchboard", label: "RCBO" })]).toBeUndefined();
+    expect(b.edits[rails]).toEqual({ amount: 5 });
   });
   it("includes one switched on, leaves one left out, and names it as a possible variation", () => {
     const c = costSystem(system, form, withList);
