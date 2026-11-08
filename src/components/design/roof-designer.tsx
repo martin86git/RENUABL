@@ -1122,7 +1122,10 @@ export function RoofDesigner(props: {
     open(new URLSearchParams(window.location.search).get("side"), false);
     const hear = (e: MessageEvent) => {
       if (e.origin !== window.location.origin || e.source !== window.parent) return;
-      open((e.data as { renuablDesign?: { side?: unknown } } | null)?.renuablDesign?.side, true);
+      const asked = (e.data as { renuablDesign?: { side?: unknown; save?: unknown } } | null)?.renuablDesign;
+      // The window round it asks for a save before it shows the proposal (design-drawer.tsx, `saveThen`).
+      if (asked?.save === true) window.dispatchEvent(new Event("renuabl:design-save"));
+      open(asked?.side, true);
     };
     window.addEventListener("message", hear);
     return () => window.removeEventListener("message", hear);
@@ -2905,8 +2908,13 @@ export function RoofDesigner(props: {
       e.preventDefault();
       void saveNow.current();
     };
+    const asked = () => void saveNow.current();
     window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+    window.addEventListener("renuabl:design-save", asked);
+    return () => {
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("renuabl:design-save", asked);
+    };
   }, []);
   const save = async () => {
     setSaved("saving");

@@ -161,6 +161,26 @@ export function DesignDrawer(props: {
     if (tool.kind === "design") frameEl.current?.contentWindow?.postMessage({ renuablDesign: { side: "quote" } }, window.location.origin);
     else if (onSwitch && tool.job) onSwitch(`${designHref(tool.job)}&side=quote`);
   };
+  // To the proposal from a design not saved yet (8 Nov 2026, Martin: a "lose your changes?" box appeared): the proposal
+  // reads the saved design, so the designer is asked to save first, and the proposal opens once it has. If no word comes
+  // back in a few seconds (the save failed), it goes on as before and the page asks.
+  const saveThen = (href: string) => {
+    if (!onSwitch) return;
+    const win = frameEl.current?.contentWindow;
+    if (tool.kind !== "design" || !unsaved || !win) return onSwitch(href);
+    let timer = 0;
+    const finish = () => {
+      window.removeEventListener("message", hear);
+      window.clearTimeout(timer);
+      onSwitch(href);
+    };
+    const hear = (e: MessageEvent) => {
+      if (e.origin === window.location.origin && (e.data as { renuablDesign?: News } | null)?.renuablDesign?.saved) finish();
+    };
+    window.addEventListener("message", hear);
+    timer = window.setTimeout(finish, 6000);
+    win.postMessage({ renuablDesign: { save: true } }, window.location.origin);
+  };
   return (
     <>
       <div
@@ -243,7 +263,7 @@ export function DesignDrawer(props: {
           </button>
           <button
             type="button"
-            onClick={() => tool.kind !== "proposal" && onSwitch(proposalHref(tool.job!))}
+            onClick={() => tool.kind !== "proposal" && saveThen(proposalHref(tool.job!))}
             aria-pressed={tool.kind === "proposal"}
             aria-label="Proposal"
             title="Proposal"
