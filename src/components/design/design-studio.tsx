@@ -36,7 +36,7 @@ import { useChatWaiting } from "./chat-panel";
 import { sendReply, unreadChanged } from "@/lib/services/chat";
 import { DesignKeptNote, DesignRoofList, useDesignAccount } from "./design-account";
 import { DesignToolHome } from "./design-tool-home";
-import { goUnderneath, inDrawer, openDesigner } from "./design-drawer";
+import { goUnderneath, inDrawer, openDesigner, useInDrawer } from "./design-drawer";
 import { DealNotes, ProposalSide, PutOnDeal } from "./designer-side";
 import { PictureMenu } from "./picture-menu";
 import { loadImagery, nearmapPictureHref, type RoofImagery } from "@/lib/services/nearmap";
@@ -85,6 +85,8 @@ async function loadWithDraft(roof: DesignRoof, workspace: Workspace): Promise<Ro
 
 export function DesignStudio() {
   // Null until this device's last roof has been looked up, so the address box doesn't flash before a saved roof.
+  // Inside the designer pop-up: the bar is trimmed and the picture sized to the window.
+  const popped = useInDrawer();
   const [ready, setReady] = useState(false);
   const [roof, setRoof] = useState<DesignRoof | null>(null);
   // The work the designer opens on: a draft kept from an earlier visit when there is one still drawn over the saved roof
@@ -393,11 +395,15 @@ export function DesignStudio() {
           sitesOnly={signedIn && cleanKind(account?.signedIn ? account.business?.kind : undefined) !== "retailer"}
           savedLabel={kept}
           onUnsaved={noteUnsaved}
+          tight={popped}
           bar={
             <>
-              <Link href="/design" aria-label="RENUABL" className="studio-own-mark">
-                <Wordmark className="text-[17px]" />
-              </Link>
+              {/* In the pop-up the frame around it says where you are: no wordmark, every bit of width for the work. */}
+              {!popped && (
+                <Link href="/design" aria-label="RENUABL" className="studio-own-mark">
+                  <Wordmark className="text-[17px]" />
+                </Link>
+              )}
               <Link
                 href="/design/roof"
                 onClick={(e) => {
@@ -433,7 +439,7 @@ export function DesignStudio() {
                 </button>
               )}
               {/* Another roof, without leaving the designer. */}
-              <div className="w-72 min-w-44 max-w-full shrink xl:w-80 2xl:w-96">
+              <div className={popped ? "w-48 min-w-36 shrink" : "w-72 min-w-44 max-w-full shrink xl:w-80 2xl:w-96"}>
                 <AddressEntry compact placeholder="Search another address" onPick={pick} />
               </div>
             </>
