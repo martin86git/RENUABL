@@ -140,16 +140,17 @@ export function DesignToolHome({ onPick, onOpen }: { onPick: (address: Address) 
       )}
 
       {rest.length > 0 && (
-        <section aria-labelledby="queue">
-          <div className="flex items-baseline justify-between">
+        <section aria-labelledby="queue" className="mx-auto max-w-3xl">
+          <div className="flex items-baseline justify-between gap-3">
             <h2 id="queue" className={head}>
               Waiting for a design · {rest.length}
             </h2>
+            <p className="text-xs text-muted">Hottest first</p>
           </div>
-          <ul className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-3 space-y-4">
             {rest.map((w) => (
               <li key={w.id}>
-                <QueueCard deal={w} pulse={pulses[w.id]} onPlaced={() => setAsks((n) => n + 1)} />
+                <FeedPost deal={w} pulse={pulses[w.id]} onPlaced={() => setAsks((n) => n + 1)} />
               </li>
             ))}
           </ul>
@@ -462,8 +463,23 @@ function AllDesigned({ deals = true }: { deals?: boolean }) {
   );
 }
 
-/** A waiting deal as a roof card; one not on the map yet takes its address right here. */
-function QueueCard({ deal, pulse, onPlaced }: { deal: Waiting; pulse?: DealPulse; onPlaced: () => void }) {
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("") || "?";
+
+/** "2 days ago", "Today": when the deal came in, as a feed says it. */
+const cameIn = (days: number) => (days === 0 ? "Today" : days === 1 ? "Yesterday" : `${days} days ago`);
+
+/**
+ * A waiting deal as a post in a feed (8 Nov 2026, Martin: waiting on a design should feel more like a feed): who and
+ * when across the top, what they want and the latest sign from them, the roof wide, and one button. A deal not on the
+ * map yet takes its address in the post, in a slim line rather than an empty picture.
+ */
+function FeedPost({ deal, pulse, onPlaced }: { deal: Waiting; pulse?: DealPulse; onPlaced: () => void }) {
   const [note, setNote] = useState<string | null>(null);
   const place = async (a: Address) => {
     if (typeof a.lat !== "number" || typeof a.lng !== "number") return setNote("Pick the street address from the list.");
@@ -471,51 +487,66 @@ function QueueCard({ deal, pulse, onPlaced }: { deal: Waiting; pulse?: DealPulse
     if (!res.ok) return setNote(res.message);
     onPlaced();
   };
-  const words = (
-    <span className="block px-4 py-3">
-      <span className="flex items-start justify-between gap-2">
-        <span className="min-w-0">
-          <span className="block truncate text-[15px] font-semibold text-ink">{deal.customerName}</span>
-          <span className="block truncate text-xs text-muted">
-            {deal.title} · {deal.address || "No address yet"}
-          </span>
+  const hot = pulse?.heat.heat === "hot";
+  const sign = pulse?.heat.reasons[0]?.text;
+  const onMap = deal.placed && deal.lat !== null && deal.lng !== null;
+  return (
+    <article className="group overflow-hidden rounded-2xl bg-surface ring-1 ring-line transition hover:shadow-lift">
+      <header className="flex items-start gap-3 px-5 pt-4">
+        <span
+          className={clsx(
+            "flex size-10 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold",
+            hot ? "bg-sun-line text-white" : "bg-primary text-white",
+          )}
+          aria-hidden
+        >
+          {initials(deal.customerName)}
         </span>
-        <span className={clsx("shrink-0 text-[11px] tabular-nums", deal.late ? "font-medium text-danger" : "text-muted")}>
-          {waitedWords(deal.days)}
-        </span>
-      </span>
-      <span className="mt-2 block">
-        <Pulse pulse={pulse} />
-      </span>
-    </span>
-  );
-  if (deal.placed && deal.lat !== null && deal.lng !== null)
-    return (
-      <Link
-        href={designHref(deal.id)}
-        className="group block overflow-hidden rounded-2xl bg-surface ring-1 ring-line transition hover:shadow-lift hover:ring-ink/30"
-      >
-        <span className="block overflow-hidden">
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-baseline gap-x-2 text-[15px] text-ink">
+            <span className="font-semibold">{deal.customerName}</span>
+            <span className="text-muted">wants {deal.title ? deal.title.toLowerCase() : "a design"}</span>
+          </p>
+          <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted">
+            <span className={clsx("tabular-nums", deal.late && "font-medium text-danger")}>{cameIn(deal.days)}</span>
+            <span aria-hidden>·</span>
+            <MapPin className="size-3 shrink-0" aria-hidden />
+            <span className="truncate">{deal.address || "No address yet"}</span>
+          </p>
+        </div>
+      </header>
+      <p className="px-5 pt-3 text-[14px] leading-snug text-ink-2">{sign ?? "No word from them yet."}</p>
+      {onMap ? (
+        <Link href={designHref(deal.id)} className="mt-3 block overflow-hidden" aria-label={`Design ${deal.customerName}'s roof`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={roofPicture({ lat: deal.lat, lng: deal.lng })}
+            src={roofPicture({ lat: deal.lat!, lng: deal.lng! })}
             alt=""
             loading="lazy"
-            className="aspect-[16/9] w-full bg-surface-2 object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06] motion-reduce:transition-none"
+            className="aspect-[2/1] w-full bg-surface-2 object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03] motion-reduce:transition-none"
           />
-        </span>
-        {words}
-      </Link>
-    );
-  return (
-    <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
-      <div className="flex aspect-[16/9] flex-col justify-center gap-2 bg-surface-2 px-4">
-        <p className="text-xs font-medium text-ink-2">Place it on the map to design it</p>
-        <AddressEntry compact placeholder={deal.address || "Street address"} onPick={(a) => void place(a)} />
-        {note && <p className="text-xs text-danger">{note}</p>}
-      </div>
-      {words}
-    </div>
+        </Link>
+      ) : (
+        <div className="mx-5 mt-3 rounded-xl bg-surface-2 p-3">
+          <p className="mb-2 text-xs font-medium text-ink-2">Place it on the map to design it</p>
+          <AddressEntry compact placeholder={deal.address || "Street address"} onPick={(a) => void place(a)} />
+          {note && <p className="mt-1.5 text-xs text-danger">{note}</p>}
+        </div>
+      )}
+      <footer className="flex items-center justify-between gap-3 px-5 py-3">
+        <Pulse pulse={pulse} />
+        {onMap ? (
+          <Link
+            href={designHref(deal.id)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line px-4 text-[13px] font-semibold text-white transition hover:gap-2.5 hover:brightness-105 motion-reduce:transition-none"
+          >
+            <PenTool className="size-4" aria-hidden /> Design it <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        ) : (
+          <span className="text-xs text-muted">Then design it here</span>
+        )}
+      </footer>
+    </article>
   );
 }
 
