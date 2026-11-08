@@ -18,7 +18,8 @@ const box =
  * instant, not a wait for Sol and a long reply): plain sums, and a bill or a day's use turned into a rough system at
  * once (`quickSize`). Nothing is sent anywhere; it is worked out in the page.
  */
-export function QuickCalc() {
+export function QuickCalc({ place = "top" }: { place?: "top" | "rail" }) {
+  const rail = place === "rail";
   const [open, setOpen] = useState(false);
   const [sum, setSum] = useState("");
   const [from, setFrom] = useState<"bill" | "kwh">("bill");
@@ -59,17 +60,27 @@ export function QuickCalc() {
         aria-label="Calculator"
         title="Calculator: sums, and a system from a bill"
         className={clsx(
-          "flex size-9 items-center justify-center rounded-full ring-1 transition-colors",
-          open ? "bg-ink text-sun-line ring-ink" : "bg-surface text-ink-2 ring-line hover:text-ink",
+          "flex items-center justify-center rounded-full transition-colors",
+          // On the rail, a round like its others; in the top bar, ringed like the bar's.
+          rail ? "size-10" : "size-9 ring-1",
+          open
+            ? "bg-ink text-sun-line ring-ink"
+            : rail
+              ? "text-ink-2 hover:bg-canvas hover:text-ink"
+              : "bg-surface text-ink-2 ring-line hover:text-ink",
         )}
       >
-        <Calculator className="size-4" aria-hidden />
+        <Calculator className={rail ? "size-[18px]" : "size-4"} aria-hidden />
       </button>
       {open && (
         <div
           role="dialog"
           aria-label="Calculator"
-          className="absolute right-0 top-11 z-[60] w-[22rem] max-w-[calc(100vw-2rem)] rounded-2xl bg-canvas p-4 shadow-[0_16px_48px_rgba(20,22,26,0.22)] ring-1 ring-line"
+          className={clsx(
+            // From the rail it opens to its left, beside the round; from the top bar, under it.
+            rail ? "absolute right-full top-0 mr-3" : "absolute right-0 top-11",
+            "z-[60] w-[22rem] max-w-[calc(100vw-2rem)] rounded-2xl bg-canvas p-4 shadow-[0_16px_48px_rgba(20,22,26,0.22)] ring-1 ring-line",
+          )}
         >
           <div className="flex items-center justify-between">
             <p className="text-[13px] font-semibold text-ink">Calculator</p>
@@ -124,7 +135,13 @@ export function QuickCalc() {
                   <label className="relative flex-1">
                     <span className="sr-only">The bill in dollars</span>
                     <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px] text-muted">$</span>
-                    <input value={bill} onChange={(e) => setBill(e.target.value)} inputMode="decimal" placeholder="600" className={clsx(box, "pl-6")} />
+                    <input
+                      value={bill}
+                      onChange={(e) => setBill(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="600"
+                      className={clsx(box, "pl-6")}
+                    />
                   </label>
                   <div role="radiogroup" aria-label="Billed every" className="flex rounded-lg bg-surface-2 p-0.5 text-[12px] font-medium">
                     {BILL_PERIODS.map((p) => (
@@ -164,7 +181,13 @@ export function QuickCalc() {
             ) : (
               <label className="mt-2 block">
                 <span className="sr-only">Use a day in kWh</span>
-                <input value={kwh} onChange={(e) => setKwh(e.target.value)} inputMode="decimal" placeholder="18 kWh a day" className={box} />
+                <input
+                  value={kwh}
+                  onChange={(e) => setKwh(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="18 kWh a day"
+                  className={box}
+                />
               </label>
             )}
 
@@ -194,12 +217,15 @@ export function QuickCalc() {
                 </div>
                 {size.capped && <p className="text-[12px] text-sun-ink">That&apos;s a large home: worth a proper look in the designer.</p>}
                 <p className="text-[11px] leading-snug text-muted">
-                  A rule of thumb on Melbourne&apos;s average sunshine, 40% used as it&apos;s made, the battery 90% usable. The design firms it up.
+                  A rule of thumb on Melbourne&apos;s average sunshine, 40% used as it&apos;s made, the battery 90% usable. The design firms
+                  it up.
                 </p>
               </div>
             ) : (
               <p className="mt-3 text-[12.5px] text-muted">
-                {from === "bill" ? "Type the bill and it works out the system as you go." : "Type a day's use and it works out the system as you go."}
+                {from === "bill"
+                  ? "Type the bill and it works out the system as you go."
+                  : "Type a day's use and it works out the system as you go."}
               </p>
             )}
           </div>

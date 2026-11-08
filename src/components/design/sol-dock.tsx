@@ -259,7 +259,7 @@ export function SolNavButton({ phone = false }: { phone?: boolean }) {
  * (3 Nov 2026, Martin: the focus point), then notifications and email (moved from the top bar), then the sales at a
  * glance. Sol left it for his round in the nav (1 Nov 2026). Wide screens only.
  */
-export function SolRail({ team, tools }: { team?: React.ReactNode; tools?: React.ReactNode }) {
+export function SolRail({ team, calc, tools }: { team?: React.ReactNode; calc?: React.ReactNode; tools?: React.ReactNode }) {
   const path = usePathname() ?? "";
   const round = (on: boolean) =>
     clsx(
@@ -277,6 +277,8 @@ export function SolRail({ team, tools }: { team?: React.ReactNode; tools?: React
       className="sol-rail fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 flex-col items-center gap-1.5 rounded-full bg-surface p-1.5 shadow-[0_8px_30px_rgba(20,22,26,0.10)] ring-1 ring-line print:hidden lg:flex"
     >
       {team && <span className="team-bulb">{team}</span>}
+      {/* The calculator under team chat (8 Nov 2026, Martin): an answer on the phone has to be instant. */}
+      {calc && <span className="mt-1">{calc}</span>}
       {tools && (
         <>
           <span className="my-1 h-px w-6 bg-line" aria-hidden />

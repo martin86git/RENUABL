@@ -372,6 +372,21 @@ function Shell({
               </span>
               <RenuablMark className="studio-mark-short mt-[1.25rem]" />
             </Link>
+            {/* Search sits by the wordmark (8 Nov 2026, Martin: lost on the right among the icons): where people look
+                for it, and the left had room for the word. */}
+            {retail && (
+              <button
+                type="button"
+                onClick={() => setSearching(true)}
+                aria-label="Search, or ask Sol"
+                title="Search, or ask Sol (Ctrl K)"
+                className="studio-search mt-[1.25rem] flex h-9 shrink-0 items-center gap-2 rounded-full bg-surface pl-3 pr-2 text-[13px] text-muted ring-1 ring-line transition-colors hover:text-ink"
+              >
+                <Search className="size-4 text-ink-2" aria-hidden />
+                <span className="studio-search-words">Search</span>
+                <kbd className="studio-search-words rounded-md bg-surface-2 px-1.5 py-0.5 font-sans text-[11px] text-muted">Ctrl K</kbd>
+              </button>
+            )}
           </div>
           <div className="mt-4 flex min-w-0 items-center justify-center">
             <nav aria-label="Sections" className="studio-sections flex items-center gap-0.5 rounded-full bg-surface-2 p-1">
@@ -510,18 +525,9 @@ function Shell({
                 </div>
               );
             })()}
-            {designsRoofs(kind) && <QuickCalc />}
-            {retail && (
-              <button
-                type="button"
-                onClick={() => setSearching(true)}
-                aria-label="Search, or ask Sol"
-                title="Search, or ask Sol (Ctrl K)"
-                className="studio-search flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line hover:text-ink"
-              >
-                <Search className="size-4" aria-hidden />
-              </button>
-            )}
+            {/* The calculator lives on the rail (8 Nov 2026, Martin); here only where there is no rail: the design tool, and
+                an installer's login. */}
+            {designsRoofs(kind) && (!retail || tool) && <QuickCalc />}
             <div
               data-tour="icons"
               className="flex shrink-0 items-center gap-0.5 rounded-full bg-surface p-1 shadow-[0_8px_30px_rgba(11,11,12,0.08)] ring-1 ring-line"
@@ -776,6 +782,7 @@ function Shell({
       {retail && !tool && (
         <SolRail
           team={<TeamChatButton me={account.email} />}
+          calc={designsRoofs(kind) ? <QuickCalc place="rail" /> : undefined}
           tools={
             <>
               <NotificationsMenu

@@ -315,6 +315,17 @@ html.sol-resizing .team-pop {
     display: none !important;
   }
 }
+/* Search by the wordmark (8 Nov 2026): its word and Ctrl K go when the wordmark does, leaving the magnifier. */
+@media (max-width: 1535px) {
+  .studio-search-words {
+    display: none;
+  }
+}
+@media (max-width: 1919px) {
+  html.sol-docked .studio-search-words {
+    display: none;
+  }
+}
 @media (min-width: 1024px) and (max-width: 1365px) {
   .studio-sections > a {
     padding-inline: 0.6rem;
