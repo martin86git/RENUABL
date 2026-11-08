@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Designer",
+    words: "The designer opens as a window in the middle of the page, from a deal, Today or anywhere else, and closes back to where you were.",
+  },
+  {
+    day: "2026-11-08",
     area: "Design tool",
     words: "Save (or Ctrl+S) and Make primary are in the bar. The side panel tucks away: hover the tab on the right.",
   },

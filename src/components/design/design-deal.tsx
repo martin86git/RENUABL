@@ -48,7 +48,7 @@ import { DealService } from "./design-service";
 import { AddressField } from "./design-customers";
 import { useDesignAccount } from "./design-account";
 import { DealEmail, SectionFieldLine } from "./deal-tools";
-import { DesignInline } from "./design-drawer";
+import { DesignDrawer } from "./design-drawer";
 import { DealBanner } from "./deal-banner";
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
@@ -61,9 +61,9 @@ import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
 type Written = "note" | "call" | "email";
-type Tab = "design" | "overview" | "activities" | "team" | "email" | "chat" | "sol" | "files" | "service" | "details";
+type Tab = "overview" | "activities" | "team" | "email" | "chat" | "sol" | "files" | "service" | "details";
 /** The deal's tabs under its banner, in order; Service sits apart after them. */
-const DEAL_TABS: [Exclude<Tab, "service" | "design">, string][] = [
+const DEAL_TABS: [Exclude<Tab, "service">, string][] = [
   ["overview", "Overview"],
   ["activities", "Activity"],
   ["team", "Team"],
@@ -241,29 +241,27 @@ export function DealPage({ id }: { id: string }) {
   const asked = useSearchParams().get("tab");
   const params = useSearchParams();
   const [tab, setTab] = useState<Tab>(
-    params.get("design") === "1"
-      ? "design"
-      : asked === "chat"
-        ? "chat"
-        : asked === "email"
-          ? "email"
-          : asked === "sol"
-            ? "sol"
-            : asked === "service"
-              ? "service"
-              : asked === "team"
-                ? "team"
-                : asked === "details"
-                  ? "details"
-                  : asked === "activities"
-                    ? "activities"
-                    : "overview",
+    asked === "chat"
+      ? "chat"
+      : asked === "email"
+        ? "email"
+        : asked === "sol"
+          ? "sol"
+          : asked === "service"
+            ? "service"
+            : asked === "team"
+              ? "team"
+              : asked === "details"
+                ? "details"
+                : asked === "activities"
+                  ? "activities"
+                  : "overview",
   );
-  // The design is a tab of the deal (?design=1 opens on it), loaded the first time it is opened and kept from then on, so
-  // going to another tab and back never loses the work.
-  const [designLoaded, setDesignLoaded] = useState(false);
-  // A link to this deal's own design anywhere on the page (the proposal's "Open the design") turns to the tab rather
-  // than sliding the drawer over it: heard first, on the window, so the shell's drawer leaves it alone.
+  // The designer as a centred pop-up over the deal (8 Nov 2026, Martin: in the same space, the page's grey either side, so
+  // it reads as quick); ?design=1 opens it. Kept loaded once opened, so closing never loses the work.
+  const [drawer, setDrawer] = useState(params.get("design") === "1");
+  // A link to this deal's own design anywhere on the page (the proposal's "Open the design") opens this pop-up rather than
+  // the shell's: heard first, on the window, so the shell leaves it alone.
   useEffect(() => {
     const click = (e: MouseEvent) => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -272,15 +270,11 @@ export function DealPage({ id }: { id: string }) {
       const u = new URL(link.href);
       if (u.origin !== window.location.origin || u.pathname !== PATHS.designer || u.searchParams.get("job") !== id) return;
       e.preventDefault();
-      setTab("design");
+      setDrawer(true);
     };
     window.addEventListener("click", click, true);
     return () => window.removeEventListener("click", click, true);
   }, [id]);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (tab === "design") setDesignLoaded(true);
-  }, [tab]);
   // The installation's job card, over the page (wave 7).
   const [card, setCard] = useState(false);
   // The note-taker, started from the banner's phone round or Overview's button; kept on the page whatever the tab.
@@ -396,9 +390,9 @@ export function DealPage({ id }: { id: string }) {
       : null,
   );
   useEffect(() => {
-    setFrameInFront(tab === "design");
+    setFrameInFront(drawer);
     return () => setFrameInFront(false);
-  }, [tab]);
+  }, [drawer]);
 
   if (problem)
     return (
@@ -458,7 +452,28 @@ export function DealPage({ id }: { id: string }) {
   };
 
   return (
-    <div className={clsx("mx-auto w-full space-y-4 px-5 py-6", tab === "design" ? "max-w-[110rem]" : "max-w-[64rem]")}>
+    <div className="mx-auto w-full max-w-[64rem] space-y-4 px-5 py-6">
+      {job.lat !== null && (
+        <DesignDrawer
+          src={`${PATHS.designer}?job=${encodeURIComponent(job.id)}`}
+          open={drawer}
+          onOpen={() => setDrawer(true)}
+          onFold={() => setDrawer(false)}
+          onSaved={() => {
+            void load();
+            setDesignVersion((v) => v + 1);
+          }}
+          onGo={(href) => {
+            // This deal: the tab asked for (the customer's name in the designer comes back to Overview).
+            if (href.startsWith(`${PATHS.deals}/${job.id}`)) {
+              const want = new URL(href, window.location.origin).searchParams.get("tab");
+              return setTab(want && (DEAL_TABS.some(([k]) => k === want) || want === "service") ? (want as Tab) : "overview");
+            }
+            router.push(href);
+          }}
+          back="Back to the deal"
+        />
+      )}
       <div className="flex items-center justify-between gap-3">
         <Link href={PATHS.pipelines} className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink">
           <ChevronLeft className="size-4 text-muted" aria-hidden /> Deals
@@ -480,25 +495,23 @@ export function DealPage({ id }: { id: string }) {
       </div>
 
       {/* The deal as a picture (8 Nov 2026, Martin): the roof across the top with who it's for laid over it. */}
-      {tab !== "design" && (
-        <DealBanner
-          job={job}
-          designVersion={designVersion}
-          customer={customer}
-          pulse={pulse && hasPulse(job.stage) ? pulse : null}
-          onDesign={job.lat !== null ? () => setTab("design") : null}
-          onEmail={() => setTab("email")}
-          onCall={() => {
-            // A browser that cannot listen just dials.
-            if (!notetaker.current?.start() && customer.phone) window.location.href = `tel:${customer.phone.replace(/s/g, "")}`;
-          }}
-          onSol={() => setTab("sol")}
-          onPlace={() => {
-            setTab("details");
-            setMoving(true);
-          }}
-        />
-      )}
+      <DealBanner
+        job={job}
+        designVersion={designVersion}
+        customer={customer}
+        pulse={pulse && hasPulse(job.stage) ? pulse : null}
+        onDesign={job.lat !== null ? () => setDrawer(true) : null}
+        onEmail={() => setTab("email")}
+        onCall={() => {
+          // A browser that cannot listen just dials.
+          if (!notetaker.current?.start() && customer.phone) window.location.href = `tel:${customer.phone.replace(/\s/g, "")}`;
+        }}
+        onSol={() => setTab("sol")}
+        onPlace={() => {
+          setTab("details");
+          setMoving(true);
+        }}
+      />
 
       <CallNotetaker
         handle={notetaker}
@@ -511,21 +524,18 @@ export function DealPage({ id }: { id: string }) {
       <div className="min-w-0">
         {/* Under the picture, the ways of looking at the deal; its fields are behind Details. */}
         <div className="flex items-center gap-2">
-          {/* The design first, as the design tool is everywhere: its orange round. Without a place on the map, it asks for one. */}
+          {/* The design first, as the design tool is everywhere: its orange round opens it over the deal. Without a place on
+              the map, it asks for one. */}
           <button
-            role="tab"
-            aria-selected={tab === "design"}
+            type="button"
             aria-label="Design"
             title={job.lat !== null ? "Design" : "Give the deal an address to design it"}
             onClick={() => {
-              if (job.lat !== null) return setTab("design");
+              if (job.lat !== null) return setDrawer(true);
               setTab("details");
               setMoving(true);
             }}
-            className={clsx(
-              "flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition",
-              tab === "design" ? "ring-4 ring-sun-line/25" : "shadow-[0_6px_18px_rgba(255,90,31,0.3)] hover:brightness-105",
-            )}
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition hover:brightness-105"
           >
             <PenTool className="size-[18px]" aria-hidden />
           </button>
@@ -566,29 +576,7 @@ export function DealPage({ id }: { id: string }) {
           </button>
         </div>
 
-        {/* The design in place: loaded once asked for, then kept (hidden on other tabs) so nothing is lost. */}
-        {designLoaded && job.lat !== null && (
-          <div className={clsx("mt-4 overflow-hidden rounded-[22px] ring-1 ring-line", tab !== "design" && "hidden")}>
-            <DesignInline
-              src={`${PATHS.designer}?job=${encodeURIComponent(job.id)}`}
-              className="h-[calc(100dvh-8.5rem)] min-h-[40rem] bg-canvas"
-              onFold={() => setTab("overview")}
-              onGo={(href) => {
-                // This deal: the tab asked for (the customer's name in the designer comes back to Overview).
-                if (href.startsWith(`${PATHS.deals}/${job.id}`)) {
-                  const want = new URL(href, window.location.origin).searchParams.get("tab");
-                  return setTab(want && (DEAL_TABS.some(([k]) => k === want) || want === "service") ? (want as Tab) : "overview");
-                }
-                router.push(href);
-              }}
-              onSaved={() => {
-                void load();
-                setDesignVersion((v) => v + 1);
-              }}
-            />
-          </div>
-        )}
-        {tab === "design" ? null : tab === "team" ? (
+        {tab === "team" ? (
           <section className={clsx(ui.card, "mt-5 p-5")}>
             <h2 className="text-[15px] font-medium text-ink">Team chat on this deal</h2>
             <div className="mt-3">

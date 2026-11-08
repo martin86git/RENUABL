@@ -62,8 +62,9 @@ function plainLink(e: MouseEvent): HTMLAnchorElement | null {
 }
 
 /**
- * The drawer itself: it covers the page but for a strip on the left, slides out of sight when folded and back with its
- * tab, and stays as it was while folded (kept loaded once opened, so folding never loses the work).
+ * The designer over the page: a centred window with the page's grey either side (8 Nov 2026, Martin: in the same space, so
+ * it reads as quick; it was a drawer from the right), the whole screen on a phone. Kept loaded once opened, so closing
+ * never loses the work, with a way back at the foot of the page while it holds work not saved.
  */
 export function DesignDrawer(props: {
   src: string;
@@ -131,38 +132,36 @@ export function DesignDrawer(props: {
   return (
     <>
       <div
-        className={clsx("fixed inset-0 z-[59] bg-ink/25 transition-opacity", open ? "opacity-100" : "pointer-events-none opacity-0")}
+        className={clsx(
+          "fixed inset-0 z-[59] bg-ink/30 backdrop-blur-[2px] transition-opacity duration-200",
+          open ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
         onClick={onFold}
         aria-hidden
       />
+      {/* A centred window, about as wide as it is tall, with the page's grey either side (8 Nov 2026, Martin: in the same
+          space, so it reads as quick); the whole screen on a phone. It opens with a short zoom from a touch smaller. */}
       <section
+        role="dialog"
+        aria-modal={open}
         aria-label="Design"
         aria-hidden={!open}
         className={clsx(
-          "fixed inset-y-0 left-12 right-0 z-[60] flex flex-col bg-canvas shadow-[-12px_0_40px_rgba(0,0,0,0.18)] transition-transform duration-300 sm:left-16",
-          open ? "translate-x-0" : "translate-x-full",
+          "fixed inset-0 z-[60] m-auto flex flex-col overflow-hidden bg-canvas transition duration-200 ease-out motion-reduce:transition-none",
+          "sm:h-[min(92dvh,62rem)] sm:w-[min(calc(100vw-3rem),calc(min(92dvh,62rem)*1.3))] sm:rounded-[28px] sm:shadow-[0_30px_80px_rgba(11,11,12,0.28)] sm:ring-1 sm:ring-line",
+          open ? "scale-100 opacity-100" : "pointer-events-none scale-[0.97] opacity-0",
         )}
       >
-        {/* The tab on the drawer's edge: folds it away, and when folded stays at the window's edge to bring it back. */}
-        <button
-          type="button"
-          onClick={open ? onFold : onOpen}
-          className="absolute right-full top-1/2 flex -translate-y-1/2 flex-col items-center gap-2 rounded-l-lg border border-r-0 border-line bg-surface px-1.5 py-3 text-[12px] font-medium text-ink shadow-[-4px_0_12px_rgba(0,0,0,0.08)] hover:bg-surface-2"
-          aria-label={open ? "Fold the design away" : "Bring the design back"}
-        >
-          <PenTool className="size-4" aria-hidden />
-          <span className="[writing-mode:vertical-rl]">{open ? back : "Design"}</span>
-          {unsaved && <span className="size-2 rounded-full bg-sun-line" title="Not saved yet" />}
-        </button>
         <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4">
-          <p className="text-sm font-medium text-ink">
-            Design {unsaved && <span className="ml-2 text-xs font-normal text-sun-ink">Not saved yet</span>}
+          <p className="flex items-center gap-2 text-sm font-medium text-ink">
+            <PenTool className="size-4 text-sun-line" aria-hidden /> Design
+            {unsaved && <span className="text-xs font-normal text-sun-ink">Not saved yet</span>}
           </p>
           <div className="flex items-center gap-1">
             <a href={src} target="_blank" rel="noreferrer" className={clsx(ui.quiet, "h-8 text-xs")}>
               <ExternalLink className="size-3.5" aria-hidden /> Own tab
             </a>
-            <button type="button" onClick={onFold} className={clsx(ui.quiet, "h-8 text-xs")} aria-label="Fold the design away">
+            <button type="button" onClick={onFold} className={clsx(ui.quiet, "h-8 text-xs")} aria-label={back}>
               <X className="size-4" aria-hidden />
             </button>
           </div>
@@ -170,52 +169,19 @@ export function DesignDrawer(props: {
         {/* A new address in the frame is a new designer: keyed so it loads afresh. */}
         <iframe key={frame} src={frame} title="Design tool" className="min-h-0 w-full flex-1 border-0" />
       </section>
+      {/* Closed with work not saved: a way back to it, at the foot of the page. */}
+      {!open && unsaved && (
+        <button
+          type="button"
+          onClick={onOpen}
+          className="fixed bottom-5 left-1/2 z-[58] inline-flex h-10 -translate-x-1/2 items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-ink shadow-lift"
+        >
+          <PenTool className="size-4 text-sun-line" aria-hidden /> Back to the design
+          <span className="text-xs text-white/70">· not saved yet</span>
+        </button>
+      )}
     </>
   );
-}
-
-/**
- * The designer in place on a page (8 Nov 2026, Martin: on a deal, the design is a tab and the roof emerges in the deal's
- * own view rather than sliding over it). The same frame the drawer holds, told the same news: saved, a way back (`fold`),
- * or somewhere else asked for (`go`); work not saved holds the page.
- */
-export function DesignInline(props: {
-  src: string;
-  onFold: () => void;
-  onGo: (href: string) => void;
-  onSaved?: () => void;
-  className?: string;
-}) {
-  const { src, onFold, onGo, onSaved, className } = props;
-  const [unsaved, setUnsaved] = useState(false);
-  const heard = useRef({ onFold, onGo, onSaved });
-  useEffect(() => {
-    heard.current = { onFold, onGo, onSaved };
-  }, [onFold, onGo, onSaved]);
-  useEffect(() => {
-    const hear = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return;
-      const news = (e.data as { renuablDesign?: News } | null)?.renuablDesign;
-      if (!news) return;
-      if (news.fold) heard.current.onFold();
-      if (typeof news.go === "string" && news.go.startsWith("/")) heard.current.onGo(news.go);
-      if (typeof news.unsaved === "boolean") setUnsaved(news.unsaved);
-      if (news.saved) {
-        setUnsaved(false);
-        heard.current.onSaved?.();
-      }
-    };
-    window.addEventListener("message", hear);
-    return () => window.removeEventListener("message", hear);
-  }, []);
-  useEffect(() => {
-    if (!unsaved) return;
-    const stay = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", stay);
-    return () => window.removeEventListener("beforeunload", stay);
-  }, [unsaved]);
-  const frame = `${src}${src.includes("?") ? "&" : "?"}embed=1`;
-  return <iframe key={frame} src={frame} title="Design tool" className={clsx("w-full border-0", className)} />;
 }
 
 /**
