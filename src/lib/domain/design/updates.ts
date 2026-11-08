@@ -22,7 +22,7 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-08",
     area: "Deals",
     words:
-      "A deal opens on its roof: the design across the top with the customer over it, and the tabs underneath. Its fields are under Details.",
+      "A deal opens on its roof: the design across the top with the customer over it, and the tabs underneath. Its fields are under Details. Its call button opens the note-taker while you ring from your phone.",
   },
   {
     day: "2026-11-08",

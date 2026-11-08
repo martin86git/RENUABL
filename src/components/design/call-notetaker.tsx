@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { Check, Loader2, Mic, NotebookPen, Square, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { MIN_WORDS, wordsIn, type CallNotes, type HeardLine } from "@/lib/domain/design/call-notes";
 import { MAX_REMIND_DAYS, type DetailChange } from "@/lib/domain/design/prepared";
@@ -20,7 +20,28 @@ const stamp = () => new Date().toLocaleTimeString("en-AU", { hour: "numeric", mi
  * A dark bar at the foot shows what is heard, with Add a note (what is said until Note done is marked as a note), a
  * box to type one, and End and write up: Claude distils it, the member checks the notes and adds them to the deal.
  */
-export function CallNotetaker({ jobId, onAdded }: { jobId: string; customerId: string; onAdded?: () => void }) {
+/** Starts the note-taker from elsewhere on the page: the deal's call button (8 Nov 2026, Martin). */
+export interface NotetakerHandle {
+  /** Starts it; false when this browser cannot listen. */
+  start: () => boolean;
+}
+
+export function CallNotetaker({
+  jobId,
+  onAdded,
+  handle,
+  phone = "",
+  button = true,
+}: {
+  jobId: string;
+  customerId: string;
+  onAdded?: () => void;
+  handle?: Ref<NotetakerHandle>;
+  /** The customer's number, shown in the bar to ring on the phone. */
+  phone?: string;
+  /** Without its own button: started only through `handle`. */
+  button?: boolean;
+}) {
   const supported = useSpeechSupported();
   const [on, setOn] = useState(false);
   const [lines, setLines] = useState<HeardLine[]>([]);
@@ -104,6 +125,13 @@ export function CallNotetaker({ jobId, onAdded }: { jobId: string; customerId: s
     stopListening();
     setOn(false);
   };
+  useImperativeHandle(handle, () => ({
+    start: () => {
+      if (!supported) return false;
+      if (!on) start();
+      return true;
+    },
+  }));
   const addTyped = () => {
     if (!typed.trim()) return;
     setLines((all) => [...all, { at: stamp(), text: typed.trim(), note: true, ...(noting === "design" ? { design: true } : {}) }]);
@@ -147,19 +175,21 @@ export function CallNotetaker({ jobId, onAdded }: { jobId: string; customerId: s
   const words = wordsIn(lines);
   return (
     <>
-      <button
-        type="button"
-        onClick={on ? close : start}
-        disabled={!supported}
-        title={
-          supported
-            ? "Listen to your side of a call on your phone, and write it up"
-            : "This browser can't turn speech into words: use Chrome or Edge"
-        }
-        className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line bg-surface px-3 text-sm font-medium text-ink hover:border-forest disabled:bg-surface-2 disabled:text-muted"
-      >
-        <NotebookPen className="size-4" aria-hidden /> {on ? "Note-taker on" : "Note-taker"}
-      </button>
+      {button && (
+        <button
+          type="button"
+          onClick={on ? close : start}
+          disabled={!supported}
+          title={
+            supported
+              ? "Listen to your side of a call on your phone, and write it up"
+              : "This browser can't turn speech into words: use Chrome or Edge"
+          }
+          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line bg-surface px-3 text-sm font-medium text-ink hover:border-forest disabled:bg-surface-2 disabled:text-muted"
+        >
+          <NotebookPen className="size-4" aria-hidden /> {on ? "Note-taker on" : "Note-taker"}
+        </button>
+      )}
       {on &&
         typeof document !== "undefined" &&
         createPortal(
@@ -182,6 +212,11 @@ export function CallNotetaker({ jobId, onAdded }: { jobId: string; customerId: s
                       ? "Check the notes, then add them to the deal"
                       : "Added to the deal"}
               </p>
+              {phone && state === "listening" && (
+                <a href={`tel:${phone.replace(/s/g, "")}`} className="hidden text-sm text-white/80 sm:inline">
+                  Ring <span className="font-medium tabular-nums text-white">{phone}</span> on your phone, held to your ear
+                </a>
+              )}
               <button
                 type="button"
                 onClick={close}

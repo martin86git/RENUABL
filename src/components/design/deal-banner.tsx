@@ -58,17 +58,23 @@ export function bannerView(viewBox: string | null): string {
 export function DealBanner({
   job,
   customer,
+  designVersion = 0,
   pulse,
   onDesign,
   onEmail,
+  onCall,
   onSol,
   onPlace,
 }: {
   job: Job;
   customer: Customer;
+  /** Changes whenever the design is saved: the banner then draws it again. */
+  designVersion?: number;
   pulse: DealPulse | null;
   onDesign: (() => void) | null;
   onEmail: () => void;
+  /** On a computer, the call is made on the phone with the note-taker listening (8 Nov 2026, Martin). */
+  onCall: () => void;
   onSol: () => void;
   onPlace: () => void;
 }) {
@@ -83,7 +89,7 @@ export function DealBanner({
     return () => {
       gone = true;
     };
-  }, [job.id, job.projectId]);
+  }, [job.id, job.projectId, designVersion]);
 
   const picture = placed
     ? `/api/design/roof?lat=${job.lat!.toFixed(6)}&lng=${job.lng!.toFixed(6)}&size=${ROOF_IMAGE.width}x${ROOF_IMAGE.height}`
@@ -168,20 +174,17 @@ export function DealBanner({
             >
               <Mail className="size-[18px]" aria-hidden />
             </Round>
-            {phone ? (
-              <a
-                href={`tel:${phone}`}
-                aria-label={`Call ${customer.phone}`}
-                title={`Call ${customer.phone}`}
-                className="flex size-11 items-center justify-center rounded-full bg-white/90 text-ink shadow-sm hover:bg-white"
-              >
-                <Phone className="size-[18px]" aria-hidden />
-              </a>
-            ) : (
-              <Round label="No phone on file" off>
-                <Phone className="size-[18px]" aria-hidden />
-              </Round>
-            )}
+            <Round
+              label={phone ? `Call ${customer.phone} with the note-taker listening` : "No phone on file"}
+              off={!phone}
+              onClick={() => {
+                // A phone dials; a computer opens the note-taker, and the call is made on the phone beside it.
+                if (window.matchMedia("(pointer: coarse)").matches) window.location.href = `tel:${phone}`;
+                else onCall();
+              }}
+            >
+              <Phone className="size-[18px]" aria-hidden />
+            </Round>
             <Round label="Ask Sol about this deal" onClick={onSol} dark>
               <SolBadge className="size-5" />
             </Round>

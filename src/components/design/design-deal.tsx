@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ClipboardList, Search, Trash2, Wrench } from "lucide-react";
+import { ChevronDown, ChevronLeft, NotebookPen, ClipboardList, Search, Trash2, Wrench } from "lucide-react";
 import { JobCardDialog } from "./job-card";
-import { CallNotetaker } from "./call-notetaker";
+import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { ListOnMarketplace } from "./marketplace";
 import { suburbAlone } from "@/lib/domain/design/marketplace";
 import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
@@ -260,6 +260,10 @@ export function DealPage({ id }: { id: string }) {
   const [drawer, setDrawer] = useState(useSearchParams().get("design") === "1");
   // The installation's job card, over the page (wave 7).
   const [card, setCard] = useState(false);
+  // The note-taker, started from the banner's phone round or Overview's button; kept on the page whatever the tab.
+  const notetaker = useRef<NotetakerHandle>(null);
+  // Bumped each time the designer saves, so the banner draws the design as it now is.
+  const [designVersion, setDesignVersion] = useState(0);
   const [account] = useDesignAccount();
   // Which of the deal's tabs of fields is showing, and the signed proposal's figures for Financials.
   const [section, setSection] = useState("system");
@@ -438,7 +442,10 @@ export function DealPage({ id }: { id: string }) {
           open={drawer}
           onOpen={() => setDrawer(true)}
           onFold={() => setDrawer(false)}
-          onSaved={() => void load()}
+          onSaved={() => {
+            void load();
+            setDesignVersion((v) => v + 1);
+          }}
           // This deal is already underneath; anywhere else goes there.
           onGo={(href) => !href.startsWith(`${PATHS.deals}/${job.id}`) && router.push(href)}
           back="Back to the deal"
@@ -467,10 +474,15 @@ export function DealPage({ id }: { id: string }) {
       {/* The deal as a picture (8 Nov 2026, Martin): the roof across the top with who it's for laid over it. */}
       <DealBanner
         job={job}
+        designVersion={designVersion}
         customer={customer}
         pulse={pulse && hasPulse(job.stage) ? pulse : null}
         onDesign={job.lat !== null ? () => setDrawer(true) : null}
         onEmail={() => setTab("email")}
+        onCall={() => {
+          // A browser that cannot listen just dials.
+          if (!notetaker.current?.start() && customer.phone) window.location.href = `tel:${customer.phone.replace(/s/g, "")}`;
+        }}
         onSol={() => setTab("sol")}
         onPlace={() => {
           setTab("details");
@@ -478,6 +490,14 @@ export function DealPage({ id }: { id: string }) {
         }}
       />
 
+      <CallNotetaker
+        handle={notetaker}
+        button={false}
+        jobId={job.id}
+        customerId={customer.id}
+        phone={customer.phone}
+        onAdded={() => void load()}
+      />
       <div className="min-w-0">
         {/* Under the picture, the ways of looking at the deal; its fields are behind Details. */}
         <div className="flex items-center gap-2">
@@ -752,7 +772,9 @@ export function DealPage({ id }: { id: string }) {
         ) : tab === "overview" ? (
           <div className="mt-5 space-y-5">
             <div className="flex flex-wrap gap-2">
-              <CallNotetaker jobId={job.id} customerId={customer.id} onAdded={() => void load()} />
+              <button type="button" onClick={() => notetaker.current?.start()} className={ui.quiet}>
+                <NotebookPen className="size-4" aria-hidden /> Note-taker
+              </button>
               {job.projectId && (
                 <Link href={`${PATHS.deals}/${job.id}/materials`} className={ui.quiet}>
                   <ClipboardList className="size-4" aria-hidden /> Materials order
