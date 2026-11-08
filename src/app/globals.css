@@ -223,21 +223,27 @@ html.sol-resizing .team-pop {
   transition: none;
 }
 /* Team chat on the rail: a larger round standing out of it, the rail's focus point (3 Nov 2026, Martin). */
+/* A touch larger, with a dash of the signal orange (8 Nov 2026, Martin: team chat should stand out as a feature). */
 .team-bulb > button {
-  width: 3.25rem;
-  height: 3.25rem;
-  margin: -0.625rem -0.5rem 0.125rem;
+  width: 3.75rem;
+  height: 3.75rem;
+  margin: -0.875rem -0.75rem 0.125rem;
 }
 .team-bulb > button:not([aria-pressed="true"]) {
-  background: var(--surface);
-  color: var(--ink);
+  background: radial-gradient(circle at 30% 25%, var(--surface) 55%, var(--sun));
+  color: var(--sun-line);
   box-shadow:
-    0 6px 18px rgb(20 22 26 / 0.14),
-    0 0 0 1px var(--line);
+    0 8px 22px rgb(255 90 31 / 0.22),
+    0 0 0 1.5px rgb(255 90 31 / 0.45);
+}
+.team-bulb > button:not([aria-pressed="true"]):hover {
+  box-shadow:
+    0 10px 26px rgb(255 90 31 / 0.3),
+    0 0 0 2px var(--sun-line);
 }
 .team-bulb > button svg {
-  width: 22px;
-  height: 22px;
+  width: 25px;
+  height: 25px;
 }
 /* The Marketplace's words beside its round only where the top bar has room for them: the round alone otherwise. */
 .studio-market-words {
