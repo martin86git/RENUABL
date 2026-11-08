@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { FileText, PenTool, X } from "lucide-react";
+import { FileText, PenTool, ReceiptText, X } from "lucide-react";
 import clsx from "clsx";
 
 /**
@@ -105,6 +105,7 @@ export function DesignDrawer(props: {
   const tool = toolOf(src);
   const [loaded, setLoaded] = useState(false);
   const [unsaved, setUnsaved] = useState(false);
+  const frameEl = useRef<HTMLIFrameElement>(null);
   const heard = useRef({ onSaved, onFold, onGo });
   useEffect(() => {
     heard.current = { onSaved, onFold, onGo };
@@ -154,6 +155,12 @@ export function DesignDrawer(props: {
 
   if (!loaded) return null;
   const frame = embedded(src);
+  // The quote, in one press from beside the window (8 Nov 2026, Martin: a proposal that can't be sent for a quote line
+  // should be one click from the quote): the designer open is told to bring its quote out; else the designer opens on it.
+  const openQuote = () => {
+    if (tool.kind === "design") frameEl.current?.contentWindow?.postMessage({ renuablDesign: { side: "quote" } }, window.location.origin);
+    else if (onSwitch && tool.job) onSwitch(`${designHref(tool.job)}&side=quote`);
+  };
   return (
     <>
       <div
@@ -173,7 +180,7 @@ export function DesignDrawer(props: {
         aria-hidden={!open}
         className={clsx(
           "fixed inset-0 z-[60] m-auto flex flex-col overflow-hidden bg-canvas transition duration-200 ease-out motion-reduce:transition-none",
-          "sm:h-[min(92dvh,62rem)] sm:w-[min(calc(100vw-3rem),calc(min(92dvh,62rem)*1.3))] sm:rounded-[28px] sm:shadow-[0_30px_80px_rgba(11,11,12,0.28)] sm:ring-1 sm:ring-line",
+          "sm:h-[min(92dvh,62rem)] sm:w-[min(calc(100vw-3rem),calc(min(92dvh,62rem)*1.62))] sm:rounded-[28px] sm:shadow-[0_30px_80px_rgba(11,11,12,0.28)] sm:ring-1 sm:ring-line",
           open ? "scale-100 opacity-100" : "pointer-events-none scale-[0.97] opacity-0",
         )}
       >
@@ -192,6 +199,7 @@ export function DesignDrawer(props: {
         </div>
         {/* A new address in the frame is a new designer: keyed so it loads afresh. */}
         <iframe
+          ref={frameEl}
           key={frame}
           src={frame}
           title={tool.kind === "proposal" ? "Proposal" : "Design tool"}
@@ -204,7 +212,7 @@ export function DesignDrawer(props: {
         <nav
           aria-label="This deal's tools"
           className="fixed top-1/2 z-[61] hidden -translate-y-1/2 flex-col gap-3 xl:flex"
-          style={{ left: "calc((100vw - min(calc(100vw - 3rem), calc(min(92dvh, 62rem) * 1.3))) / 2 - 4rem)" }}
+          style={{ left: "calc((100vw - min(calc(100vw - 3rem), calc(min(92dvh, 62rem) * 1.62))) / 2 - 4rem)" }}
         >
           <button
             type="button"
@@ -231,6 +239,15 @@ export function DesignDrawer(props: {
             )}
           >
             <FileText className="size-5" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={openQuote}
+            aria-label="Quote"
+            title="Quote: the lines, their costs and what is still to decide"
+            className="flex size-12 items-center justify-center rounded-full bg-surface text-ink shadow-[0_6px_18px_rgba(11,11,12,0.18)] ring-1 ring-line transition hover:text-sun-line"
+          >
+            <ReceiptText className="size-5" aria-hidden />
           </button>
         </nav>
       )}

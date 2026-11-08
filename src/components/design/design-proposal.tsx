@@ -299,8 +299,11 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                   <li key={p}>{p}</li>
                 ))}
               </ul>
-              <Link href={`${PATHS.designer}?job=${jobId}`} className="mt-2 inline-block font-medium underline underline-offset-4">
-                Open the design
+              <Link
+                href={`${PATHS.designer}?job=${jobId}&side=quote`}
+                className="mt-2 inline-block font-medium underline underline-offset-4"
+              >
+                Open the quote
               </Link>
             </div>
           )}

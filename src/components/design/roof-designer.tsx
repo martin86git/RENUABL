@@ -47,6 +47,9 @@ import {
   Trash2,
   X,
   ChevronDown,
+  Ellipsis,
+  Move,
+  Settings2,
   ChevronLeft,
   ChevronRight,
   Undo2,
@@ -277,6 +280,8 @@ const SHORTCUTS: [keys: string, does: string][] = [
   ["?", "These shortcuts"],
 ];
 
+import { ToolFan } from "./tool-fan";
+
 const GLASS = "rounded-2xl border border-line bg-surface/90 shadow-lift backdrop-blur-md";
 
 /** A panel's outline before it is placed, with the edge it shares with the panel it clicks against. */
@@ -306,6 +311,60 @@ const DIAL_STEPS: [step: number, at: number][] = [
 ];
 
 /** What was read of a face's slope from Google's data, with the way to read it again. */
+/**
+ * The designer's bar; in the pop-up (8 Nov 2026, Martin: "so many it's overwhelming") its controls fold into one round that
+ * brings them out down the left on hover or a press, with a dot while the work isn't saved and the customer's count.
+ */
+function BarRow(props: { tight?: boolean; hold: boolean; unsaved: boolean; waiting: number; children: React.ReactNode }) {
+  if (!props.tight) return <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-2.5 lg:flex-nowrap">{props.children}</div>;
+  return (
+    <ToolFan
+      label="Save, publish, the designs and the checks"
+      direction="down"
+      hold={props.hold}
+      main={({ open }) => (
+        <span
+          className={clsx(
+            "relative flex size-11 items-center justify-center rounded-full shadow-lift ring-1 transition",
+            open ? "bg-ink text-canvas ring-ink" : "bg-surface text-ink ring-line hover:bg-canvas",
+          )}
+        >
+          <Settings2 className="size-5" aria-hidden />
+          {props.unsaved && (
+            <span className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-sun-line ring-2 ring-surface" aria-label="not saved" />
+          )}
+          {props.waiting > 0 && (
+            <span className="absolute -bottom-1 -right-1 min-w-5 rounded-full bg-sun-line px-1 text-center text-[10px] font-semibold leading-5 text-white ring-2 ring-surface">
+              {props.waiting}
+            </span>
+          )}
+        </span>
+      )}
+    >
+      {props.children}
+    </ToolFan>
+  );
+}
+
+/** A round on a fan's leg. */
+function Leg(props: { label: string; on?: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      title={props.label}
+      aria-label={props.label}
+      aria-pressed={props.on}
+      className={clsx(
+        "flex size-11 items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
+        props.on ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface/95 text-ink hover:bg-surface",
+      )}
+    >
+      {props.children}
+    </button>
+  );
+}
+
 function SlopeNote(props: { slope: AspectReading | "busy" | "none" | undefined; onRead: () => void }) {
   const { slope } = props;
   if (slope === "busy") return <p className="text-sm text-muted">Reading this face&apos;s slope from Google&apos;s height data…</p>;
@@ -1039,6 +1098,20 @@ export function RoofDesigner(props: {
       // Nothing to do: it still opens and closes for this visit.
     }
   };
+  useEffect(() => {
+    const open = (v: unknown) => {
+      if (v !== "quote" && v !== "designer" && v !== "proposal") return;
+      setSide(v);
+      setPeek(true);
+    };
+    open(new URLSearchParams(window.location.search).get("side"));
+    const hear = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || e.source !== window.parent) return;
+      open((e.data as { renuablDesign?: { side?: unknown } } | null)?.renuablDesign?.side);
+    };
+    window.addEventListener("message", hear);
+    return () => window.removeEventListener("message", hear);
+  }, []);
   // "Design it for me": working, or the three designs it made and what to know about them.
   const [mine, setMine] = useState<"idle" | "busy" | SelfDesignResult>("idle");
   // Whether "Design it for me" is saying what it will do, before it does it.
@@ -1058,19 +1131,11 @@ export function RoofDesigner(props: {
   const [view, setView] = useState(OPENED);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
   const [picks, setPicks] = useState<Pick[]>([]);
-  // Drawing mode: the photo put away and the roof drawn plainly in its place. Kept on the device.
-  const [drawn, setDrawn] = useState(false);
+  // Drawing mode (the photo put away and the roof drawn plainly) has no button now; the code stays for later.
+  const [drawn] = useState(false);
   // The roof's faces from Google's roof model, for the drawing: null until asked for, "none" when there is no data.
   const [modelFaces, setModelFaces] = useState<DrawnFace[] | "none" | null>(null);
-  useEffect(() => {
-    try {
-      // What was chosen last time is only known once the page is in the browser.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (window.localStorage.getItem("renuabl.design.drawn") === "1") setDrawn(true);
-    } catch {
-      // The photo, then.
-    }
-  }, []);
+  // The drawing view has no button now (8 Nov 2026, Martin: no use to him); it stays off, whatever a device kept.
   useEffect(() => {
     // The first time the drawing is asked for on a roof, Google's roof model is fetched once (the server keeps it).
     if (!drawn || modelFaces !== null) return;
@@ -1144,15 +1209,6 @@ export function RoofDesigner(props: {
       gone = true;
     };
   }, [drawn, measured, measuredUrl]);
-  const toggleDrawn = () => {
-    const next = !drawn;
-    setDrawn(next);
-    try {
-      window.localStorage.setItem("renuabl.design.drawn", next ? "1" : "0");
-    } catch {
-      // It still holds for this visit.
-    }
-  };
   // The heights of everything around the roof (Google's): asked for the first time the shade analysis is wanted.
   const [terrain, setTerrain] = useState<Terrain | "none" | null>(null);
   const [shadeOn, setShadeOn] = useState(false);
@@ -3779,7 +3835,12 @@ export function RoofDesigner(props: {
           props.tight ? "absolute left-0 top-0 w-11" : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
         )}
       >
-        <div className={clsx("flex items-center", props.tight ? "flex-col gap-2" : "flex-wrap gap-x-5 gap-y-2 py-2.5 lg:flex-nowrap")}>
+        <BarRow
+          tight={props.tight}
+          hold={readyOpen || menu === "designs" || liveOpen || sending || noDealOpen}
+          unsaved={saved !== "saved" && saved !== "saving"}
+          waiting={props.waiting ?? 0}
+        >
           {props.bar}
           <dl
             className={clsx(
@@ -4292,7 +4353,7 @@ export function RoofDesigner(props: {
               )}
             </div>
           )}
-        </div>
+        </BarRow>
       </header>
 
       <div className={clsx("relative", props.tight ? "pl-14 pr-11" : "mt-5")}>
@@ -7058,79 +7119,72 @@ export function RoofDesigner(props: {
               )}
               {/* The second pad, in the top right corner, the mirror of the first: stringing the panels in its circle, with
                   tracing a roof face (to its left) and the guide line (beneath it) as its half-rounds. */}
-              <div
-                className="absolute right-3 top-3 z-20 size-[6.25rem]"
-                role="toolbar"
-                aria-label="String panels, trace a roof face, guide line"
-              >
-                <button
-                  onClick={() => pickTool("trace")}
-                  title="Trace a roof face"
-                  aria-label="Trace a roof face"
-                  aria-pressed={tool === "trace"}
-                  className={clsx(
-                    "absolute right-[2.375rem] top-[0.5625rem] flex h-[2.625rem] w-[3.75rem] items-center justify-start rounded-l-full border border-line pl-2.5 shadow-lift backdrop-blur-md",
-                    tool === "trace" ? "bg-primary text-primary-ink" : "bg-surface/90 text-ink hover:bg-surface",
+              {/* Top right (8 Nov 2026, Martin: one round, its tools folded under it): stringing, with tracing a roof face and
+                  the guide line coming out beneath on hover. The round shows whichever of the three is in use. */}
+              <div className="absolute right-3 top-3 z-20">
+                <ToolFan
+                  label="String panels (trace a roof face and the guide line beneath)"
+                  direction="down"
+                  onMain={() => pickTool("string")}
+                  main={() => (
+                    <span
+                      className={clsx(
+                        "flex size-[3.75rem] items-center justify-center rounded-full border shadow-lift",
+                        tool === "string" || tool === "trace" || tool === "rule"
+                          ? "border-primary bg-primary text-primary-ink"
+                          : "border-line bg-surface text-ink hover:bg-canvas",
+                      )}
+                    >
+                      {tool === "trace" ? (
+                        <PenTool className="size-6" aria-hidden />
+                      ) : tool === "rule" ? (
+                        <Ruler className="size-6" aria-hidden />
+                      ) : (
+                        <Cable className="size-6" aria-hidden />
+                      )}
+                    </span>
                   )}
                 >
-                  <PenTool className="size-5" aria-hidden />
-                </button>
-                <button
-                  onClick={() => pickTool("rule")}
-                  title="Guide line"
-                  aria-label="Guide line"
-                  aria-pressed={tool === "rule"}
-                  className={clsx(
-                    "absolute right-[0.5625rem] top-[2.375rem] flex h-[3.75rem] w-[2.625rem] items-end justify-center rounded-b-full border border-line pb-2.5 shadow-lift backdrop-blur-md",
-                    tool === "rule" ? "bg-primary text-primary-ink" : "bg-surface/90 text-ink hover:bg-surface",
-                  )}
-                >
-                  <Ruler className="size-5" aria-hidden />
-                </button>
-                <button
-                  onClick={() => pickTool("string")}
-                  title="String panels"
-                  aria-label="String panels"
-                  aria-pressed={tool === "string"}
-                  className={clsx(
-                    "absolute right-0 top-0 flex size-[3.75rem] items-center justify-center rounded-full border shadow-lift",
-                    tool === "string" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
-                  )}
-                >
-                  <Cable className="size-6" aria-hidden />
-                </button>
+                  <Leg label="String panels" on={tool === "string"} onClick={() => pickTool("string")}>
+                    <Cable className="size-5" aria-hidden />
+                  </Leg>
+                  <Leg label="Trace a roof face" on={tool === "trace"} onClick={() => pickTool("trace")}>
+                    <PenTool className="size-5" aria-hidden />
+                  </Leg>
+                  <Leg label="Guide line" on={tool === "rule"} onClick={() => pickTool("rule")}>
+                    <Ruler className="size-5" aria-hidden />
+                  </Leg>
+                </ToolFan>
               </div>
               {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its
                   circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}
-              <div className="absolute bottom-8 left-3 z-10 size-[6.25rem]" role="toolbar" aria-label="Move the picture, zoom in, zoom out">
-                <button
-                  onClick={() => zoom(1 / 1.4)}
-                  title="Zoom in"
-                  aria-label="Zoom in"
-                  className="absolute bottom-[0.5625rem] left-[2.375rem] flex h-[2.625rem] w-[3.75rem] items-center justify-end rounded-r-full border border-line bg-surface/90 pr-2.5 text-ink shadow-lift backdrop-blur-md hover:bg-surface"
-                >
-                  <ZoomIn className="size-5" aria-hidden />
-                </button>
-                <button
-                  onClick={() => zoom(1.4)}
-                  title="Zoom out"
-                  aria-label="Zoom out"
-                  className="absolute bottom-[2.375rem] left-[0.5625rem] flex h-[3.75rem] w-[2.625rem] items-start justify-center rounded-t-full border border-line bg-surface/90 pt-2.5 text-ink shadow-lift backdrop-blur-md hover:bg-surface"
-                >
-                  <ZoomOut className="size-5" aria-hidden />
-                </button>
-                <button
-                  onClick={() => pickTool("pan")}
-                  title="Move the picture"
-                  aria-label="Move the picture"
-                  aria-pressed={tool === "pan"}
-                  className={clsx(
-                    "absolute bottom-0 left-0 flex size-[3.75rem] items-center justify-center rounded-full border shadow-lift",
-                    tool === "pan" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
+              <div className="absolute bottom-8 left-3 z-10">
+                <ToolFan
+                  label="Getting about: zoom in, zoom out, move the picture"
+                  direction="right"
+                  main={({ open }) => (
+                    <span
+                      className={clsx(
+                        "flex size-[3.25rem] items-center justify-center rounded-full border shadow-lift",
+                        tool === "pan" || open
+                          ? "border-primary bg-primary text-primary-ink"
+                          : "border-line bg-surface text-ink hover:bg-canvas",
+                      )}
+                    >
+                      {tool === "pan" ? <Hand className="size-6" aria-hidden /> : <Move className="size-6" aria-hidden />}
+                    </span>
                   )}
                 >
-                  <Hand className="size-6" aria-hidden />
-                </button>
+                  <Leg label="Zoom in" onClick={() => zoom(1 / 1.4)}>
+                    <ZoomIn className="size-5" aria-hidden />
+                  </Leg>
+                  <Leg label="Zoom out" onClick={() => zoom(1.4)}>
+                    <ZoomOut className="size-5" aria-hidden />
+                  </Leg>
+                  <Leg label="Move the picture" on={tool === "pan"} onClick={() => pickTool(tool === "pan" ? "select" : "pan")}>
+                    <Hand className="size-5" aria-hidden />
+                  </Leg>
+                </ToolFan>
               </div>
               {drawn && faces.length === 0 && modelFaces !== null && !Array.isArray(modelFaces) && (
                 <p className="absolute left-1/2 top-[6.25rem] z-10 w-[22rem] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-lg border border-line bg-surface/95 px-3 py-2 text-center text-[13px] text-ink-2 shadow-lift">
@@ -7148,51 +7202,43 @@ export function RoofDesigner(props: {
                   aria-label="Design tools"
                 >
                   {/* Either side of the comment round the same width, so it sits dead centre whatever stands beside it. */}
-                  <div className="flex w-[10.75rem] items-center justify-end gap-1">
-                    <button
-                      onClick={undo}
-                      title="Undo (Ctrl+Z)"
-                      aria-label="Undo (Ctrl+Z)"
-                      className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-canvas"
-                    >
-                      <Undo2 className="size-5" aria-hidden />
-                    </button>
-                    <button
-                      onClick={redo}
-                      title="Redo (Ctrl+Shift+Z)"
-                      aria-label="Redo (Ctrl+Shift+Z)"
-                      className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-canvas"
-                    >
-                      <Redo2 className="size-5" aria-hidden />
-                    </button>
-                    <button
-                      onClick={() => setView(WHOLE)}
-                      title="Show the whole picture"
-                      aria-label="Show the whole picture"
-                      className="flex size-9 items-center justify-center rounded-xl text-ink hover:bg-canvas"
-                    >
-                      <Maximize className="size-5" aria-hidden />
-                    </button>
-                    {(() => {
-                      const { icon: Icon, name } = TOOLS.find((x) => x.tool === "label")!;
-                      return (
-                        <button
-                          onClick={() => pickTool("label")}
-                          title={name}
-                          aria-label={name}
-                          aria-pressed={tool === "label"}
+                  {/* Undo, redo, the whole picture and the label, folded into one round (8 Nov 2026, Martin). */}
+                  <div className="flex w-[5.5rem] items-center justify-end gap-1">
+                    <ToolFan
+                      label="Undo, redo, the whole picture and a label"
+                      direction="up"
+                      main={({ open }) => (
+                        <span
                           className={clsx(
                             "flex size-9 items-center justify-center rounded-xl",
-                            tool === "label" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
+                            open || tool === "label" ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
                           )}
                         >
-                          <Icon className="size-5" aria-hidden />
-                        </button>
-                      );
-                    })()}
+                          <Ellipsis className="size-5" aria-hidden />
+                        </span>
+                      )}
+                    >
+                      <Leg label="Undo (Ctrl+Z)" onClick={undo}>
+                        <Undo2 className="size-5" aria-hidden />
+                      </Leg>
+                      <Leg label="Redo (Ctrl+Shift+Z)" onClick={redo}>
+                        <Redo2 className="size-5" aria-hidden />
+                      </Leg>
+                      <Leg label="Show the whole picture" onClick={() => setView(WHOLE)}>
+                        <Maximize className="size-5" aria-hidden />
+                      </Leg>
+                      {(() => {
+                        const { icon: Icon, name } = TOOLS.find((x) => x.tool === "label")!;
+                        return (
+                          <Leg label={name} on={tool === "label"} onClick={() => pickTool(tool === "label" ? "select" : "label")}>
+                            <Icon className="size-5" aria-hidden />
+                          </Leg>
+                        );
+                      })()}
+                    </ToolFan>
                   </div>
                   <button
-                    onClick={() => pickTool("comment")}
+                    onClick={() => pickTool(tool === "comment" ? "select" : "comment")}
                     title="Comment"
                     aria-label="Comment"
                     aria-pressed={tool === "comment"}
@@ -7203,19 +7249,7 @@ export function RoofDesigner(props: {
                   >
                     <MessageCircle className="size-7" aria-hidden />
                   </button>
-                  <div className="flex w-[10.75rem] items-center justify-start gap-1">
-                    <button
-                      onClick={toggleDrawn}
-                      title={drawn ? "Show the photo of the roof" : "Show the roof as a drawing"}
-                      aria-label="Show the roof as a drawing"
-                      aria-pressed={drawn}
-                      className={clsx(
-                        "flex size-9 items-center justify-center rounded-xl",
-                        drawn ? "bg-primary text-primary-ink" : "text-ink hover:bg-canvas",
-                      )}
-                    >
-                      <Layers className="size-5" aria-hidden />
-                    </button>
+                  <div className="flex w-[5.5rem] items-center justify-start gap-1">
                     <button
                       onClick={toggleShade}
                       title={shadeOn ? "Put the shade analysis away" : "Shade analysis: how open each panel is to the sun"}
