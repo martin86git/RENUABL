@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { checkInverter, checkPanel, codeKey, datasheetFigures, formFromReading, sheetBasis, withDatasheets } from "./datasheets";
+import {
+  checkInverter,
+  checkPanel,
+  codeKey,
+  datasheetFigures,
+  formFromReading,
+  isAustralianSheet,
+  sheetBasis,
+  sheetCandidates,
+  withDatasheets,
+} from "./datasheets";
 import { checkString } from "./electrical";
 
 const panel = { voc: "36.42", vmp: "31.11", isc: "15.86", imp: "15.27", vocPercent: "-0.24", iscPercent: "0.046", pmaxPercent: "-0.26" };
@@ -107,5 +117,22 @@ describe("datasheetFigures, for Sol", () => {
   it("says when nothing matches or nothing was asked", () => {
     expect(datasheetFigures([sheet], "nothing-like-it")).toMatch(/No datasheet figures match/);
     expect(datasheetFigures([sheet], "  ")).toMatch(/Say which product/);
+  });
+});
+
+describe("the Australian sheet first", () => {
+  const eu = "https://jinkosolar.eu/wp-content/uploads/2025/09/JKM460-485N-48QL6-DB-F2-EU.pdf";
+  const au = "https://www.jinkosolar.com.au/uploads/JKM450-475N-48QL6-DB-F2C2-OC.pdf";
+  const plain = "https://example.com/files/JKM475N-48QL6-DB.pdf";
+
+  it("knows an Australian sheet from its link", () => {
+    expect(isAustralianSheet(au)).toBe(true);
+    expect(isAustralianSheet("https://maker.com/datasheets/au/inverter.pdf")).toBe(true);
+    expect(isAustralianSheet(eu)).toBe(false);
+    expect(isAustralianSheet(plain)).toBe(false);
+  });
+
+  it("tries the Australian sheet before a European one, and a plain one before the European", () => {
+    expect(sheetCandidates(eu, [eu, plain, au], "JKM475N-48QL6-DB")).toEqual([au, plain, eu]);
   });
 });

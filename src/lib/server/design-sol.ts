@@ -64,6 +64,8 @@ export async function sharedViewer(businessId: string): Promise<DealViewer> {
 interface ToolGuard {
   viewer: DealViewer;
   readCustomerText: boolean;
+  /** The files the member put on this message (for a datasheet to keep). */
+  files: readonly SolFile[];
 }
 import { casesForJob, casesToResolve } from "./design-service-repo";
 import { addSolTurns, newSolId, solState, withSol } from "./design-sol-repo";
@@ -77,7 +79,9 @@ import { dealTeamContext, solPostsOnDeal } from "./design-deal-team-repo";
 import { listSheets } from "./design-datasheets-repo";
 import { listStandards } from "./design-standards-repo";
 import { libraryForSol } from "@/lib/domain/design/standards";
-import { datasheetFigures } from "@/lib/domain/design/datasheets";
+import { codeKey, datasheetFigures, figuresLine, isAustralianSheet } from "@/lib/domain/design/datasheets";
+import { replaceDatasheet, replaceDatasheetFromFile } from "./datasheet-finder";
+import { SHEET_TYPES, type SheetType } from "./datasheet-reader";
 import { sourcesLine } from "@/lib/domain/design/maker-docs";
 import {
   BLOCKED_SITES,
@@ -233,6 +237,25 @@ const TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
   },
   {
+    name: "update_datasheet",
+    description:
+      "Find, read and keep the right datasheet for a panel or inverter, in place of the figures kept for it now (Settings, Product datasheets). Use it when they ask you to fix, swap, replace or update a product's datasheet, or say the one on file is wrong: do it, don't tell them to. product_code as on their price list or datasheets. url: a datasheet PDF you saw in this answer (the maker's own, the Australian version where there is one), tried first; leave it out and the web is searched (Australian sheets first). It takes a minute. The new figures are in use at once but marked to check: say so, and that they confirm them against the sheet in Settings, Product datasheets.",
+    input_schema: {
+      type: "object",
+      properties: {
+        product_code: { type: "string" },
+        kind: { type: "string", enum: ["panel", "inverter"], description: "Only needed when the product has no datasheet kept yet." },
+        url: { type: "string" },
+        attached_file: {
+          type: "string",
+          description:
+            "The name of a datasheet PDF or photo the person attached to this message: it is read and kept instead of searching.",
+        },
+      },
+      required: ["product_code"],
+    },
+  },
+  {
     name: "show_chart",
     description:
       "Draw a chart under your answer from figures the facts or a tool gave you (never figures you guessed). kind: 'funnel' for steps people go through, 'bars' for things side by side, 'columns' for one figure over time, oldest first. One series.",
@@ -338,6 +361,8 @@ interface Turn {
   recalled: KnowledgeEntry[];
   /** What was kept in memory with this answer. */
   remembered: { id: string; question: string }[];
+  /** Datasheets swapped in this answer (at most two). */
+  sheetsChanged: number;
 }
 
 const s = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -493,6 +518,61 @@ async function runTool(
   }
   if (name === "standards_on_file") return libraryForSol(await listStandards(businessId));
   if (name === "datasheet_lookup") return datasheetFigures(await listSheets(businessId), s(input.query));
+  if (name === "update_datasheet") {
+    if (!can(member.role, "prices", member.permissions))
+      return "This person can't change datasheets (it needs the permission to change prices and settings): say so.";
+    // A lasting change: never from a turn that has read a customer's own words (as preferences).
+    if (guard.readCustomerText) return "Not changed: this answer read a customer's own words. Ask them to ask again in their own words.";
+    if (shown.sheetsChanged >= 2) return "That's enough datasheets for one answer: do the rest when they ask again.";
+    const code = s(input.product_code).slice(0, 80);
+    if (!code) return "Say which product code.";
+    const [sheets, lists] = await Promise.all([listSheets(businessId), loadLists(businessId)]);
+    const key = codeKey(code);
+    const kept = sheets.find((x) => codeKey(x.sku) === key);
+    const listed = lists.flatMap((l) => l.items).find((i) => codeKey(i.sku) === key);
+    const kind = kept?.kind ?? (input.kind === "panel" || input.kind === "inverter" ? input.kind : null);
+    if (!kind) return "Is it a panel or an inverter? Call again with kind.";
+    const sku = kept?.sku ?? listed?.sku ?? code;
+    const attached = s(input.attached_file);
+    if (attached) {
+      const f = guard.files.find((x) => x.name === attached) ?? (guard.files.length === 1 ? guard.files[0] : undefined);
+      if (!f || !(SHEET_TYPES as readonly string[]).includes(f.type)) return "There's no PDF or photo of that name on this message.";
+      shown.sheetsChanged++;
+      const kept2 = await replaceDatasheetFromFile(
+        businessId,
+        { kind, sku, name: listed?.name ?? kept?.model ?? sku },
+        { name: f.name, type: f.type as SheetType, bytes: Buffer.from(f.data, "base64") },
+      );
+      if (!kept2.ok) return `Nothing changed: ${kept2.why}`;
+      return [
+        `Done: ${sku} now uses ${kept2.sheet.model}, read from ${f.name}.`,
+        `Figures: ${figuresLine(kind, kept2.sheet.figures)}.`,
+        kept ? `It replaced ${kept.model} (${kept.fileName}).` : "There was no sheet before.",
+        "Marked to check: in use now, every string on it is to check until they confirm the figures in Settings, Product datasheets.",
+      ].join("\n");
+    }
+    const given = s(input.url);
+    // Only a link this answer really saw: an address can't be made up or slipped in.
+    const seen = [...shown.pages, ...shown.seen].some((p) => p.url === given);
+    shown.sheetsChanged++;
+    const done = await replaceDatasheet(businessId, { kind, sku, name: listed?.name ?? kept?.model ?? sku }, given && seen ? given : null);
+    if (!done.ok) {
+      if (done.why === "off") return "Datasheets can't be read here (no Claude key on the site). Nothing changed.";
+      return [
+        "Nothing changed: no sheet for this exact model could be read and kept.",
+        done.tried.length ? "What was tried:" : "No datasheet PDF for this exact model turned up in a search.",
+        ...done.tried.map((x) => `- ${x.url}: ${x.why}`),
+        "Say plainly what happened (a broken link on the maker's site is theirs to fix, not the person's). If they have the PDF, it can go on this message with the paperclip, or be uploaded in Settings, Product datasheets.",
+      ].join("\n");
+    }
+    if (done.sheet.url) shown.pages.push({ url: done.sheet.url, title: done.sheet.fileName });
+    return [
+      `Done: ${sku} now uses ${done.sheet.model}, from ${done.sheet.url}${done.sheet.url && isAustralianSheet(done.sheet.url) ? " (the Australian sheet)" : " (not marked Australian: say so)"}.`,
+      `Figures: ${figuresLine(kind, done.sheet.figures)}.`,
+      kept ? `It replaced ${kept.model} (${kept.fileName}).` : "There was no sheet before.",
+      "Marked to check: in use now, every string on it is to check until they confirm the figures in Settings, Product datasheets.",
+    ].join("\n");
+  }
   if (name === "show_chart") {
     const c = cleanChart(input);
     if (!c) return "That chart couldn't be drawn: it needs a title and rows of numbers.";
@@ -585,7 +665,7 @@ export async function askSol(
   if (!credit) return asItWas(SOL_OUT);
   const viewer = said.shared ? await sharedViewer(businessId) : viewerOf(member);
   const costs = !said.shared && can(member.role, "costs", member.permissions);
-  const guard: ToolGuard = { viewer, readCustomerText: false };
+  const guard: ToolGuard = { viewer, readCustomerText: false, files: said.files };
   const [state, jobs, customers, serviceOpen] = await Promise.all([
     solState(businessId, email),
     listJobs(businessId, viewer),
@@ -634,7 +714,17 @@ export async function askSol(
 
   // A search and a manual read can take a while.
   const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 1 });
-  const shown: Turn = { charts: [], diagrams: [], designs: [], drafts: [], pages: [], seen: [], recalled: [], remembered: [] };
+  const shown: Turn = {
+    charts: [],
+    diagrams: [],
+    designs: [],
+    drafts: [],
+    pages: [],
+    seen: [],
+    recalled: [],
+    remembered: [],
+    sheetsChanged: 0,
+  };
   let answer = "";
   /** The answer given just before he only kept it in memory: his next words add to it rather than replace it. */
   let keptAfter = "";

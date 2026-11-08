@@ -92,6 +92,44 @@ export async function saveFoundSheet(
   return rows.length > 0;
 }
 
+/**
+ * Puts a sheet found online in place of what is kept for the product, at a member's word (8 Nov 2026, Martin: Sol swaps
+ * a wrong sheet for him). Marked unchecked again with its address, so every string on it is to check until a person
+ * confirms it.
+ */
+export async function replaceWithFoundSheet(
+  businessId: string,
+  sheet: {
+    kind: SheetKind;
+    sku: string;
+    model: string;
+    fileName: string;
+    figures: PanelElectrical | InverterElectrical;
+    url: string | null;
+  },
+  file: { bytes: Buffer; type: string } | null,
+): Promise<void> {
+  await query(
+    `insert into design_datasheets (business_id, kind, sku, model, figures, file_name, checked_by, found_url, unchecked, file_bytes, file_type)
+     values ($1,$2,$3,$4,$5,$6,$10,$7,true,$8,$9)
+     on conflict (business_id, kind, sku) do update set model = excluded.model, figures = excluded.figures,
+       file_name = excluded.file_name, checked_by = excluded.checked_by, checked_at = now(), found_url = excluded.found_url,
+       unchecked = true, file_bytes = excluded.file_bytes, file_type = excluded.file_type`,
+    [
+      businessId,
+      sheet.kind,
+      sheet.sku,
+      sheet.model,
+      JSON.stringify(sheet.figures),
+      sheet.fileName,
+      sheet.url,
+      file?.bytes ?? null,
+      file?.type ?? null,
+      "found online by Sol",
+    ],
+  );
+}
+
 /** A person confirms figures found online against the sheet: from then on they are checked. */
 export async function confirmSheet(businessId: string, kind: SheetKind, sku: string, by: string): Promise<boolean> {
   const rows = await query(

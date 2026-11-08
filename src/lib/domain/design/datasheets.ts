@@ -313,17 +313,42 @@ export function foundFigures(
  * product code first, the one Claude chose ahead of its equals; Claude's own answer last when it never appeared.
  */
 export const MAX_SHEET_TRIES = 5;
+/**
+ * Australia's version of a sheet first (8 Nov 2026, Martin: the sheet found for a Jinko panel was the EU one): a link on
+ * an Australian site or marked AU/Australia scores up, one marked for Europe, the US or another market down. Only a
+ * leaning between links the search showed: the reader still checks the model is the one asked for.
+ */
+export function sheetRegionScore(url: string): number {
+  let host = "";
+  let path = "";
+  try {
+    const u = new URL(url);
+    host = u.hostname.toLowerCase();
+    path = u.pathname.toLowerCase();
+  } catch {
+    return 0;
+  }
+  const marked = (words: string) => new RegExp(`(^|[^a-z])(${words})([^a-z]|$)`).test(path);
+  if (host.endsWith(".au") || marked("au|aus|australia")) return 20;
+  if (/\.(eu|de|uk|us|cn|in)$/.test(host) || marked("eu|europe|us|usa|uk|de|latam|mea|india|cn")) return -20;
+  return 0;
+}
+
+/** Whether the sheet's link says it is Australia's version. */
+export const isAustralianSheet = (url: string) => sheetRegionScore(url) > 0;
+
 export function sheetCandidates(answer: string | null, seen: readonly string[], sku: string): string[] {
   const parts = sku
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((p) => p.length >= 2);
   const unique = [...new Set(seen.filter((u) => /^https:\/\//i.test(u)))];
+  const isPdf = (u: string) => /\.pdf($|[?#])/i.test(u);
   const score = (u: string) => {
     const l = u.toLowerCase();
-    return (/\.pdf($|[?#])/.test(l) ? 100 : 0) + parts.filter((p) => l.includes(p)).length * 10 + (u === answer ? 5 : 0);
+    return (isPdf(u) ? 100 : 0) + parts.filter((p) => l.includes(p)).length * 10 + (u === answer ? 5 : 0) + sheetRegionScore(u);
   };
-  const ranked = unique.filter((u) => score(u) >= 100 || u === answer).sort((a, b) => score(b) - score(a));
+  const ranked = unique.filter((u) => isPdf(u) || u === answer).sort((a, b) => score(b) - score(a));
   if (answer && /^https:\/\//i.test(answer) && !ranked.includes(answer)) ranked.push(answer);
   return ranked.slice(0, MAX_SHEET_TRIES);
 }
