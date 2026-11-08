@@ -122,6 +122,10 @@ export const PLANNER_FILTERS = [
 ] as const;
 export type PlannerFilter = (typeof PLANNER_FILTERS)[number]["id"];
 
+/** Whether a case in this state is on show under the filter. */
+export const inFilter = (state: ServiceState, filter: PlannerFilter) =>
+  filter === "all" ? true : filter === "resolved" ? state === "resolved" : state !== "resolved";
+
 /**
  * The planner's order: open cases first, longest waiting first; then in hand, longest waiting first; then resolved,
  * the most recently resolved first.
@@ -132,7 +136,7 @@ export function plannerOrder<T extends Pick<ServiceCase, "state" | "raisedAt" | 
 ): T[] {
   const rank: Record<ServiceState, number> = { open: 0, "in-hand": 1, resolved: 2 };
   return cases
-    .filter((c) => (filter === "all" ? true : filter === "resolved" ? c.state === "resolved" : c.state !== "resolved"))
+    .filter((c) => inFilter(c.state, filter))
     .sort((a, b) => {
       if (a.state !== b.state) return rank[a.state] - rank[b.state];
       if (a.state === "resolved") return (b.resolvedAt ?? "").localeCompare(a.resolvedAt ?? "");

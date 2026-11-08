@@ -12,6 +12,7 @@ import {
   SERVICE_STATE_LABEL,
   matchesSearch,
   nextStates,
+  inFilter,
   plannerOrder,
   serviceFocusWords,
   waitingDays,
@@ -184,11 +185,22 @@ export function ServicePlanner() {
     setBriefs((b) => ({ ...b, [id]: res.ok ? { words: res.words, timeline: res.timeline, brief: res.brief } : { problem: res.message } }));
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
   }, []);
+  const focus = cases?.find((c) => c.id === picked) ?? null;
+  /** Leaving a case (8 Nov 2026, Martin): the conversation about it goes, back to the greeting. */
+  const leaveCase = () => {
+    setPicked(null);
+    setTurns([]);
+  };
   const replace = (next: ServiceCase) => {
     setCases((all) => (all ?? []).map((c) => (c.id === next.id ? { ...c, ...next } : c)));
+    // Resolved while only the cases to resolve are on show: it leaves the list, and the chat about it goes with it.
+    if (next.id === picked && !inFilter(next.state, filter)) return leaveCase();
     void loadBrief(next.id);
   };
-  const focus = cases?.find((c) => c.id === picked) ?? null;
+  const chooseFilter = (f: PlannerFilter) => {
+    setFilter(f);
+    if (focus && !inFilter(focus.state, f)) leaveCase();
+  };
   const talking = turns.length > 0;
 
   const follow = useCallback(() => {
@@ -225,7 +237,7 @@ export function ServicePlanner() {
 
   /** Turns the conversation to a case: Sol opens on it, read once a visit and again whenever it changes. */
   const pick = (c: ServiceLine) => {
-    if (picked === c.id) return setPicked(null);
+    if (picked === c.id) return leaveCase();
     setPicked(c.id);
     setTurns((t) => [...t, { id: ++turnNo.current, kind: "focus", caseId: c.id, customer: c.customer, title: c.title }]);
     if (!isBrief(briefs[c.id])) void loadBrief(c.id);
@@ -369,7 +381,7 @@ export function ServicePlanner() {
                 {focus && (
                   <p className="mb-2 flex items-center gap-2 text-xs text-muted">
                     Sol is looking at {focus.customer}&apos;s case
-                    <button type="button" className="underline underline-offset-4 hover:text-ink" onClick={() => setPicked(null)}>
+                    <button type="button" className="underline underline-offset-4 hover:text-ink" onClick={leaveCase}>
                       Look at them all
                     </button>
                   </p>
@@ -397,7 +409,7 @@ export function ServicePlanner() {
               <button
                 key={f.id}
                 aria-pressed={filter === f.id}
-                onClick={() => setFilter(f.id)}
+                onClick={() => chooseFilter(f.id)}
                 className={clsx(
                   "h-7 flex-1 rounded px-2 text-xs font-medium",
                   filter === f.id ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-2 hover:text-ink",

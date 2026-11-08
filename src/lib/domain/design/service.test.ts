@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyUpdate,
   caseInWords,
+  inFilter,
   matchesSearch,
   openCaseFor,
   plannerOrder,
@@ -142,5 +143,14 @@ describe("finding the deal for a new case", () => {
   });
   it("offers the latest installs before anything is typed", () => {
     expect(serviceDealMatches(deals, "").map((d) => d.id)).toEqual(["5", "2"]);
+  });
+});
+
+describe("which cases each filter shows", () => {
+  it("keeps open and in-hand cases under To resolve, resolved ones under Resolved, and all under All", () => {
+    expect(inFilter("open", "to-resolve")).toBe(true);
+    expect(inFilter("resolved", "to-resolve")).toBe(false);
+    expect(inFilter("in-hand", "resolved")).toBe(false);
+    expect(inFilter("resolved", "all")).toBe(true);
   });
 });
