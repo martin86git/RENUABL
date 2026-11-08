@@ -6,6 +6,8 @@
  * history of who did what and when. Every change is written on the deal's
  * record; nothing is sent to the customer. Pure, tested.
  */
+import { INSTALLED_STAGES, WON_STAGES, type JobStage } from "./crm";
+import { matches } from "./find";
 
 export const SERVICE_STATES = ["open", "in-hand", "resolved"] as const;
 export type ServiceState = (typeof SERVICE_STATES)[number];
@@ -195,4 +197,31 @@ export function serviceFocusWords(c: ServiceFocus, all: readonly ServiceCase[]):
     ...(earlier.length ? [`Earlier cases on this deal (${earlier.length}):`, ...earlier.map(caseInWords)] : []),
     `For the deal's record, system and what was installed (serials), use deal_details with deal id ${c.jobId}.`,
   ].join("\n");
+}
+
+/** A deal as the new-case card searches it. */
+export interface ServiceDealPick {
+  id: string;
+  customerName: string;
+  title: string;
+  address: string;
+  stage: JobStage;
+  installDate: string | null;
+}
+
+/** The most deals the new-case card lists at once. */
+export const MAX_DEAL_PICKS = 6;
+
+/**
+ * The deals the new-case card offers as someone types a customer's name, the deal or the address (8 Nov 2026, Martin):
+ * every word found somewhere in them; installed jobs first (what service is usually for), then sold ones, then the
+ * rest, the latest install day first; lost deals left out. Typed nothing, the latest installs.
+ */
+export function serviceDealMatches<T extends ServiceDealPick>(deals: readonly T[], typed: string, max = MAX_DEAL_PICKS): T[] {
+  const rank = (d: ServiceDealPick) => (INSTALLED_STAGES.includes(d.stage) ? 0 : WON_STAGES.includes(d.stage) ? 1 : 2);
+  const live = deals.filter((d) => d.stage !== "lost");
+  const found = typed.trim()
+    ? live.filter((d) => matches({ words: [d.customerName, d.title, d.address] }, typed))
+    : live.filter((d) => rank(d) === 0);
+  return [...found].sort((a, b) => rank(a) - rank(b) || (b.installDate ?? "").localeCompare(a.installDate ?? "")).slice(0, max);
 }

@@ -391,7 +391,7 @@ function Shell({
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
                         "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
-                        lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                        lit ? "bg-surface font-medium text-sun-line shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
                       )}
                     >
                       {sec.label}
@@ -476,7 +476,7 @@ function Shell({
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
                         "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
-                        lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                        lit ? "bg-surface font-medium text-sun-line shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
                       )}
                     >
                       {sec.label}

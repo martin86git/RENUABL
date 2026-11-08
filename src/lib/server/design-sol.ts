@@ -15,6 +15,7 @@ import { asBuiltInWords } from "@/lib/domain/design/as-built";
 import { caseInWords } from "@/lib/domain/design/service";
 import { asBuiltOf, jobCard } from "./design-job-card-repo";
 import { pageAllowed } from "@/lib/domain/design/business-kind";
+import { START_SERVICE_CASE_NOTE, cleanNewCase, historyFor, type NewCaseAsk, type SolRoom } from "@/lib/domain/design/sol-rooms";
 import { placesForSol, solGoTo, type SolGoTo } from "@/lib/domain/design/sol-goto";
 import {
   DRAFTS_PER_TURN,
@@ -345,9 +346,25 @@ ${placesForSol()}`,
   },
 };
 
+/** In the Service room only: a card for the member to start a case (sol-rooms.ts). */
+const START_SERVICE_CASE_TOOL: Anthropic.Tool = {
+  name: "start_service_case",
+  description:
+    "When they want to start, raise, log or flag a new service case, put the new-case card under your answer: it finds the deal as they type and takes what needs putting right, and the case is flagged when they press its button. Pass whatever they've already said: the customer, deal or address to search for, and the issue. Never ask which customer in your words instead: the card asks.",
+  input_schema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "A customer's name, a deal or an address they mentioned, or empty." },
+      issue: { type: "string", description: "What needs putting right, in their words, or empty." },
+    },
+  },
+};
+
 interface Turn {
   /** A page he opened for them (one an answer). */
   goTo?: SolGoTo;
+  /** The card to start a service case (Service room only). */
+  newCase?: NewCaseAsk;
   charts: SolChart[];
   diagrams: SolDiagram[];
   designs: SolDesignShown[];
@@ -399,6 +416,10 @@ async function runTool(
     );
     shown.remembered.push({ id: kept.id, question: kept.question });
     return `Kept in memory as ${kept.id}.`;
+  }
+  if (name === "start_service_case") {
+    shown.newCase = cleanNewCase(input) ?? { query: "", issue: "" };
+    return START_SERVICE_CASE_NOTE;
   }
   if (name === "open_page") {
     const g = solGoTo(input);
@@ -635,6 +656,8 @@ export async function askSol(
     shown?: string;
     /** Try another answer: when the question was first asked, and the answer they didn't take (`retrySol`). */
     retry?: { questionAt: string; answer: string };
+    /** Asked from a screen with its own conversation: only that room's turns are his history (sol-rooms.ts). */
+    room?: SolRoom;
   },
   apiKey: string | null,
   use: SolUse = "chat",
@@ -644,12 +667,13 @@ export async function askSol(
   const text = (said.text || "Here's what I've attached.") + (named.length ? `\n(Attached: ${named.join(", ")})` : "");
   const asked = new Date().toISOString();
   const shortLine = cleanShown(said.shown);
-  const you: SolTurn = { role: "you", text, at: asked, ...(shortLine ? { shown: shortLine } : {}) };
+  const inRoom = said.room ? { room: said.room } : {};
+  const you: SolTurn = { role: "you", text, at: asked, ...(shortLine ? { shown: shortLine } : {}), ...inRoom };
   // Asked again with no answer to come: the old answer stays, and only why is said under it.
   const asItWas = (why: string) =>
     said.retry
-      ? addSolTurns(businessId, email, [{ role: "sol", text: why, at: new Date().toISOString() }])
-      : addSolTurns(businessId, email, [you, { role: "sol", text: why, at: new Date().toISOString() }]);
+      ? addSolTurns(businessId, email, [{ role: "sol", text: why, at: new Date().toISOString(), ...inRoom }])
+      : addSolTurns(businessId, email, [you, { role: "sol", text: why, at: new Date().toISOString(), ...inRoom }]);
   if (!apiKey) return asItWas("I can't answer just now: Claude isn't set up on this site yet (ANTHROPIC_API_KEY).");
   // Quick (Sonnet) unless the question needs more (sol-routing.ts). The credits are taken before Claude is asked
   // and given back when no answer comes. A deep answer with too few credits left is answered quickly instead.
@@ -688,6 +712,7 @@ export async function askSol(
     ...(costs ? [PRICE_TOOL] : []),
     // Opening a page is for their own conversation, never a channel everyone reads.
     ...(said.shared ? [] : [OPEN_PAGE_TOOL]),
+    ...(said.room === "service" ? [START_SERVICE_CASE_TOOL] : []),
     ...WEB_TOOLS,
   ];
   // A quick answer may hand itself up before it starts; a deep one has nothing to hand up to.
@@ -697,7 +722,8 @@ export async function askSol(
   const asking = said.page ? `${pageContextBlock(said.page)}\n\n${text}` : text;
   const messages: Anthropic.MessageParam[] = [
     // Asked again: the conversation as it was before that question, so the answer not taken isn't in it twice.
-    ...(said.shared ? [] : said.retry ? dropExchange(state.turns, said.retry.questionAt) : state.turns)
+    // Asked from a screen with its own conversation, only that room's turns (sol-rooms.ts).
+    ...(said.shared ? [] : said.retry ? dropExchange(state.turns, said.retry.questionAt) : historyFor(state.turns, said.room))
       .slice(-HISTORY_SENT)
       .map((t) => ({ role: t.role === "you" ? ("user" as const) : ("assistant" as const), content: t.text || "(drawn)" })),
     { role: "user", content: blocks.length ? [...blocks, { type: "text" as const, text: asking }] : asking },
@@ -849,6 +875,8 @@ export async function askSol(
     ...(shown.remembered.length ? { remembered: shown.remembered } : {}),
     ...(answer ? { credits, ...(tier === "deep" ? { deep: true } : {}) } : {}),
     ...(shown.goTo ? { goTo: shown.goTo } : {}),
+    ...(shown.newCase ? { newCase: shown.newCase } : {}),
+    ...inRoom,
   };
   // Asked again: the new answer takes the old one's place, only once there is one (a failure leaves the old answer).
   if (said.retry && failed) return asItWas(sol.text);

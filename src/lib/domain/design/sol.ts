@@ -18,6 +18,7 @@ import { SOL_REGULATIONS } from "./standards";
 import { SOL_ORACLE, cleanSources, type SolSource } from "./sol-knowledge";
 import { SOL_ON_SCREEN, cleanPageContext, type PageContext } from "./page-context";
 import { cleanGoTo, type SolGoTo } from "./sol-goto";
+import { cleanNewCase, cleanRoom, type NewCaseAsk, type SolRoom } from "./sol-rooms";
 
 export const SOL_NAME = "Sol";
 /** Turns kept in a member's conversation, and how many of the latest are sent with a question. */
@@ -76,6 +77,10 @@ export interface SolTurn {
   shown?: string;
   /** A page Sol opened for them (sol-goto.ts): the chat goes there as the answer comes in. */
   goTo?: SolGoTo;
+  /** The screen it was asked from, whose own conversation it belongs to (sol-rooms.ts). */
+  room?: SolRoom;
+  /** The card he raised to start a service case (sol-rooms.ts). */
+  newCase?: NewCaseAsk;
 }
 
 /** The longest short line shown for a question. */
@@ -215,6 +220,8 @@ export function cleanTurns(raw: unknown): SolTurn[] {
       const sources = cleanSources(t.sources);
       const shown = role === "you" ? cleanShown(t.shown) : "";
       const goTo = role === "sol" ? cleanGoTo(t.goTo) : null;
+      const room = cleanRoom(t.room);
+      const newCase = role === "sol" ? cleanNewCase(t.newCase) : undefined;
       const remembered = (Array.isArray(t.remembered) ? t.remembered : [])
         .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object")
         .map((x) => ({ id: str(x.id, 40), question: str(x.question, 300) }))
@@ -236,6 +243,8 @@ export function cleanTurns(raw: unknown): SolTurn[] {
         ...(typeof t.credits === "number" && Number.isInteger(t.credits) && t.credits > 0 && t.credits < 100 ? { credits: t.credits } : {}),
         ...(shown ? { shown } : {}),
         ...(goTo ? { goTo } : {}),
+        ...(room ? { room } : {}),
+        ...(newCase ? { newCase } : {}),
       };
     })
     .filter((t): t is SolTurn => t !== null);
@@ -390,7 +399,9 @@ export interface SolFile {
 }
 
 /** A message from the browser: its words (to `MAX_SAID`) and up to three files, or null when there is nothing. */
-export function cleanSolInput(raw: unknown): { text: string; files: SolFile[]; page?: PageContext; deep?: boolean; shown?: string } | null {
+export function cleanSolInput(
+  raw: unknown,
+): { text: string; files: SolFile[]; page?: PageContext; deep?: boolean; shown?: string; room?: SolRoom } | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   const text = typeof r.text === "string" ? r.text.trim().slice(0, MAX_SAID) : "";
@@ -409,7 +420,16 @@ export function cleanSolInput(raw: unknown): { text: string; files: SolFile[]; p
   const page = cleanPageContext(r.page);
   // The short line the chat shows for a long instruction sent for them (cleaned and capped).
   const shown = cleanShown(r.shown);
-  return { text, files, ...(page ? { page } : {}), ...(r.deep === true ? { deep: true } : {}), ...(shown ? { shown } : {}) };
+  // The screen asked from, when it keeps its own conversation (sol-rooms.ts).
+  const room = cleanRoom(r.room);
+  return {
+    text,
+    files,
+    ...(page ? { page } : {}),
+    ...(r.deep === true ? { deep: true } : {}),
+    ...(shown ? { shown } : {}),
+    ...(room ? { room } : {}),
+  };
 }
 
 /** "#" in the box finds a deal, as in Primero: the "#" and what follows it, up to the caret, or null. */

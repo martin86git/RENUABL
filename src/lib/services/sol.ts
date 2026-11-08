@@ -6,6 +6,7 @@ import type { SolFile, SolState, WhenChoice } from "@/lib/domain/design/sol";
 import type { SolPast, SolPastLine } from "@/lib/domain/design/sol-history";
 import type { KnowledgeEntry } from "@/lib/domain/design/sol-knowledge";
 import type { PageContext } from "@/lib/domain/design/page-context";
+import type { SolRoom } from "@/lib/domain/design/sol-rooms";
 import { ask } from "./crm";
 
 export const loadSol = () => ask<{ state: SolState }>("/api/design/sol");
@@ -14,10 +15,19 @@ const post = (body: Record<string, unknown>) => ask<{ state: SolState }>("/api/d
 
 /**
  * A question, with what their screen shows when asked from the side panel (page-context.ts). `shown` is the short line
- * the chat shows for it when `text` is a long instruction sent for the member.
+ * the chat shows for it when `text` is a long instruction sent for the member. `room` keeps it to a screen's own
+ * conversation (sol-rooms.ts).
  */
-export const askSol = (text: string, files: SolFile[], page?: PageContext | null, deep = false, shown?: string) =>
-  post({ do: "chat", text, files, ...(page ? { page } : {}), ...(deep ? { deep: true } : {}), ...(shown ? { shown } : {}) });
+export const askSol = (text: string, files: SolFile[], page?: PageContext | null, deep = false, shown?: string, room?: SolRoom) =>
+  post({
+    do: "chat",
+    text,
+    files,
+    ...(page ? { page } : {}),
+    ...(deep ? { deep: true } : {}),
+    ...(shown ? { shown } : {}),
+    ...(room ? { room } : {}),
+  });
 /** Try another answer: his last answer replaced by a new one to the same question, a different way. */
 export const retrySol = (page?: PageContext | null) => post({ do: "retry", ...(page ? { page } : {}) });
 export const solSeen = () => post({ do: "seen" });

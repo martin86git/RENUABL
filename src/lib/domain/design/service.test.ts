@@ -6,10 +6,12 @@ import {
   openCaseFor,
   plannerOrder,
   recordLine,
+  serviceDealMatches,
   serviceFocusWords,
   toResolve,
   waitingDays,
   type ServiceCase,
+  type ServiceDealPick,
 } from "./service";
 
 const base: ServiceCase = {
@@ -115,5 +117,30 @@ describe("what Sol is told about a case", () => {
     expect(words).toContain("Panel clip loose");
     expect(words).not.toContain("another deal");
     expect(words).toContain("deal_details with deal id job_a");
+  });
+});
+
+describe("finding the deal for a new case", () => {
+  const deal = (id: string, customerName: string, stage: ServiceDealPick["stage"], installDate: string | null = null) => ({
+    id,
+    customerName,
+    title: "Solar",
+    address: `${id} Sample Street, Doncaster East VIC 3109`,
+    stage,
+    installDate,
+  });
+  const deals = [
+    deal("1", "Chloe Fraser", "lead"),
+    deal("2", "Chloe Fraser", "installed", "2026-09-01"),
+    deal("3", "Max Turner", "won"),
+    deal("4", "Chloe Lost", "lost"),
+    deal("5", "Ana Chloe", "grid", "2026-10-01"),
+  ];
+  it("finds every word typed, installed jobs first and the latest install first, never a lost deal", () => {
+    expect(serviceDealMatches(deals, "chloe").map((d) => d.id)).toEqual(["5", "2", "1"]);
+    expect(serviceDealMatches(deals, "sample street turner").map((d) => d.id)).toEqual(["3"]);
+  });
+  it("offers the latest installs before anything is typed", () => {
+    expect(serviceDealMatches(deals, "").map((d) => d.id)).toEqual(["5", "2"]);
   });
 });

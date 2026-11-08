@@ -30,6 +30,8 @@ import { SolDesignView } from "./sol-design-view";
 import { SolThinking } from "./sol-thinking";
 import type { SolFile } from "@/lib/domain/design/sol";
 import { SolBox, SolSays, Typed } from "./today-pad";
+import type { NewCaseAsk } from "@/lib/domain/design/sol-rooms";
+import { NewCaseButton, NewCaseCard } from "./service-new-case";
 
 const PILL: Record<ServiceState, string> = {
   open: "bg-danger/10 text-danger",
@@ -116,10 +118,16 @@ function History({ c }: { c: ServiceCase }) {
   );
 }
 
-/** One turn of the Service conversation: Sol turned to a case, or a question and his answer. */
+/** One turn of the Service conversation: Sol turned to a case, a new case started with the +, or a question and his answer. */
 type Turn =
   | { id: number; kind: "focus"; caseId: string; customer: string; title: string }
-  | { id: number; kind: "ask"; q: string; a: { text: string; more: boolean; designs?: SolDesignShown[] } | null };
+  | { id: number; kind: "new" }
+  | {
+      id: number;
+      kind: "ask";
+      q: string;
+      a: { text: string; more: boolean; designs?: SolDesignShown[]; newCase?: NewCaseAsk } | null;
+    };
 
 /** The cases waiting, in a line each: what Sol is told on the Service screen while no case is picked. */
 function pipelineWords(cases: readonly ServiceLine[]): string {
@@ -197,9 +205,10 @@ export function ServicePlanner() {
     setTurns((t) => [...t, { id, kind: "ask", q, a: null }]);
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
     const page = { path: PATHS.service, title: "Service", about: on ? serviceFocusWords(on, cases) : pipelineWords(cases), screen: "" };
-    const r = await askSol(q, files, page);
+    // The Service screen's own conversation: Sol is given only what was said here (sol-rooms.ts).
+    const r = await askSol(q, files, page, false, undefined, "service");
     setAsking(false);
-    let a: { text: string; more: boolean; designs?: SolDesignShown[] };
+    let a: { text: string; more: boolean; designs?: SolDesignShown[]; newCase?: NewCaseAsk };
     if (!r.ok) a = { text: r.message, more: false };
     else {
       window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
@@ -208,6 +217,7 @@ export function ServicePlanner() {
         text: last?.text ?? "Done.",
         more: Boolean(last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.reminder),
         ...(last?.designs?.length ? { designs: last.designs } : {}),
+        ...(last?.newCase ? { newCase: last.newCase } : {}),
       };
     }
     setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a } : t)));
@@ -221,6 +231,32 @@ export function ServicePlanner() {
     if (!isBrief(briefs[c.id])) void loadBrief(c.id);
     else window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
   };
+
+  /** The + on the cases: the new-case card in the chat, without asking Sol. */
+  const startNew = () => {
+    setTurns((t) => [...t, { id: ++turnNo.current, kind: "new" }]);
+    window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
+  };
+  /** A case just flagged from a card: the list read again, and the conversation turned to it. */
+  const flagged = async (c: ServiceCase) => {
+    const res = await listService();
+    if (!res.ok) return;
+    setCases(res.cases);
+    setFilter("to-resolve");
+    const line = res.cases.find((x) => x.id === c.id);
+    if (line) pick(line);
+  };
+  /** The deal already has a case open: that case. */
+  const openCaseOn = async (jobId: string) => {
+    const res = await listService();
+    if (!res.ok) return;
+    setCases(res.cases);
+    const line = res.cases.find((x) => x.jobId === jobId && x.state !== "resolved");
+    if (line && line.id !== picked) pick(line);
+  };
+  const newCard = (ask?: NewCaseAsk) => (
+    <NewCaseCard query={ask?.query} issue={ask?.issue} onFlagged={(c) => void flagged(c)} onOpenCase={(j) => void openCaseOn(j)} />
+  );
 
   const box = (
     <SolBox
@@ -259,7 +295,14 @@ export function ServicePlanner() {
             <p className="mt-3 max-w-md text-[15px] text-ink-2">
               Pick a case and I&apos;ll bring you up to speed on it, or ask me about any of them.
             </p>
-            <div className="mt-8 w-full">{box}</div>
+            <button
+              type="button"
+              onClick={startNew}
+              className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
+            >
+              <Wrench className="size-3.5 text-sun-line" aria-hidden /> New service case
+            </button>
+            <div className="mt-6 w-full">{box}</div>
           </div>
         ) : (
           <>
@@ -278,6 +321,11 @@ export function ServicePlanner() {
                       <CaseInChat state={briefs[t.caseId]} customer={t.customer} />
                     </SolSays>
                   </div>
+                ) : t.kind === "new" ? (
+                  <SolSays key={t.id}>
+                    <p className="mb-3 text-[15px] text-ink">Which deal is it for, and what needs putting right?</p>
+                    {newCard()}
+                  </SolSays>
                 ) : (
                   <div key={t.id} className="space-y-4">
                     <div className="flex justify-end">
@@ -291,6 +339,7 @@ export function ServicePlanner() {
                       ) : (
                         <div className="text-[15px] leading-relaxed text-ink">
                           <Typed text={t.a.text} onDone={follow} />
+                          {t.a.newCase && <div className="mt-3">{newCard(t.a.newCase)}</div>}
                           {t.a.designs?.length ? (
                             <div className="mt-3 max-w-2xl space-y-3">
                               {t.a.designs.map((d) => (
@@ -335,8 +384,10 @@ export function ServicePlanner() {
       {/* The cases. */}
       <aside className="order-1 min-w-0 lg:order-2" aria-label="Service cases">
         <div className="lg:sticky lg:top-4 lg:flex lg:max-h-[calc(100dvh-9rem)] lg:flex-col">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-            <h2 className="text-[15px] font-semibold text-ink">Service cases</h2>
+          <div className="flex flex-wrap items-center justify-between gap-x-2">
+            <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
+              Service cases <NewCaseButton onClick={startNew} />
+            </h2>
             <p className="text-xs tabular-nums text-muted">
               {cases ? `${count("open")} open · ${count("in-hand")} in hand · ${count("resolved")} resolved` : "–"}
             </p>

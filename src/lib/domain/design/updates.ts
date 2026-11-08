@@ -15,6 +15,17 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Service",
+    words:
+      "Start a new service case with the + by the cases, or ask Sol: a card finds the deal as you type. Sol on Service keeps to its own chat.",
+  },
+  {
+    day: "2026-11-08",
+    area: "Everywhere",
+    words: "The section you're in is now marked in orange in the menu at the top.",
+  },
+  {
+    day: "2026-11-08",
     area: "Sol",
     words: "Sol's questions can be answered where they are: Yes or No in one press, or Reply to answer one from earlier in the chat.",
   },
