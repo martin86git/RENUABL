@@ -86,3 +86,22 @@ describe("Sol changing the panels themselves", () => {
     expect(commandFrom({ do: "rotate", degrees: 15, words: "" })).toEqual({ do: "rotate", degrees: 15 });
   });
 });
+
+describe("Sol asking with options", () => {
+  it("keeps two or three options with a request each, and answers in words otherwise", () => {
+    const options = [
+      { label: "North face", detail: "All on the sunniest face.", request: "fit 10 kW on the north face" },
+      { label: "Split", detail: "North and west.", request: "fit 10 kW" },
+      { label: "Bare", detail: "", request: "" },
+    ];
+    expect(commandFrom({ do: "choose", question: "Where should the 10 kW go?", options, words: "" })).toEqual({
+      do: "choose",
+      question: "Where should the 10 kW go?",
+      options: options.slice(0, 2),
+    });
+    expect(commandFrom({ do: "choose", question: "Which?", options: [options[0]], words: "Say which." })).toEqual({
+      do: "answer",
+      words: "Say which.",
+    });
+  });
+});

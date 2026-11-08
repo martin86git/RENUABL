@@ -33,7 +33,20 @@ export type DesignCommand =
   | { do: "move"; east: number; south: number }
   | { do: "undo" }
   | { do: "redo" }
+  /**
+   * A question with options (8 Nov 2026, Martin: Sol should present options): when a request could mean different
+   * things, up to `MAX_CHOICES`, each a label, a line saying what it means, and the request carried out when chosen.
+   */
+  | { do: "choose"; question: string; options: Choice[] }
   | { do: "answer"; words: string };
+
+export interface Choice {
+  label: string;
+  detail: string;
+  /** What to do when chosen, in the person's own words ("fit 10 kW on the north face"). */
+  request: string;
+}
+export const MAX_CHOICES = 3;
 
 const FACINGS: [RegExp, Facing][] = [
   [/\bnorth/i, "N"],
@@ -183,6 +196,7 @@ export const DESIGN_COMMAND_SCHEMA = {
         "orient",
         "rotate",
         "move",
+        "choose",
         "undo",
         "redo",
         "answer",
@@ -207,6 +221,21 @@ export const DESIGN_COMMAND_SCHEMA = {
     landscape: { type: ["boolean", "null"] as ("boolean" | "null")[], description: "For orient: true for landscape, false for portrait." },
     east: { type: ["number", "null"] as ("number" | "null")[], description: "For move: metres east (negative west)." },
     south: { type: ["number", "null"] as ("number" | "null")[], description: "For move: metres south (negative north)." },
+    question: { type: ["string", "null"] as ("string" | "null")[], description: "For choose: the question, short." },
+    options: {
+      type: ["array", "null"] as ("array" | "null")[],
+      description: "For choose: two or three options.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          label: { type: "string", description: "A few words." },
+          detail: { type: "string", description: "One line on what it means." },
+          request: { type: "string", description: "The request to carry out if chosen, as the person would say it." },
+        },
+        required: ["label", "detail", "request"],
+      },
+    },
     phase: { type: ["string", "null"] as ("string" | "null")[], enum: ["single", "three", null] },
     storeys: { type: ["string", "null"] as ("string" | "null")[], enum: ["single", "double", null] },
     words: { type: "string", description: "What to say to the person: the answer to a question, or the change in a sentence. Short." },
@@ -223,6 +252,8 @@ export const DESIGN_COMMAND_SCHEMA = {
     "landscape",
     "east",
     "south",
+    "question",
+    "options",
     "phase",
     "storeys",
     "words",
@@ -289,6 +320,19 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
     case "undo":
     case "redo":
       return { do: read.do };
+    case "choose": {
+      const question = s(read.question) || words.slice(0, 160);
+      const options = (Array.isArray(read.options) ? read.options : [])
+        .map((o) => (o && typeof o === "object" ? (o as Record<string, unknown>) : {}))
+        .map((o) => ({
+          label: typeof o.label === "string" ? o.label.slice(0, 60).trim() : "",
+          detail: typeof o.detail === "string" ? o.detail.slice(0, 140).trim() : "",
+          request: typeof o.request === "string" ? o.request.slice(0, 200).trim() : "",
+        }))
+        .filter((o) => o.label && o.request)
+        .slice(0, MAX_CHOICES);
+      return question && options.length >= 2 ? { do: "choose", question, options } : { do: "answer", words };
+    }
     case "phase":
       return read.phase === "single" || read.phase === "three" ? { do: "phase", phase: read.phase } : { do: "answer", words };
     case "storeys":
@@ -308,4 +352,5 @@ export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roo
 - The panels themselves, the picked ones or else all of them: tilt (their tilt in degrees, on frames or the roof), orient (landscape true or false: portrait), rotate (turn them by degrees round their middle, + clockwise), move (east and south in metres, negative for west and north).
 - To place panels somewhere, targetKw with a facing lays them on the faces looking that way. To string them, stringAuto.
 - explainString: show the check for a string, by its letter; put the reason in words too, from the string checks above.
+- choose: when the request could fairly mean different things (which face, how many kW, portrait or landscape, which battery), don't guess: ask a short question with two or three options, each a label, a line on what it means and the request to carry out if chosen, written as the person would say it ("fit 10 kW on the north face"). Only when it is truly unclear.
 - Always put one short sentence in words. Never invent a figure, product or price that isn't above. Nothing is sent to anyone.`;

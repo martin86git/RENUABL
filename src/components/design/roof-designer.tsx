@@ -106,7 +106,14 @@ import { billFieldsFromPhoto, billWith, usageFromAmount, type BillPhotoRead } fr
 import { CaptureButtons } from "@/components/ui/capture";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
 import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
-import { faces as facesWay, parseCommand, pickByQuery, type DesignCommand, type Facing as Way } from "@/lib/domain/design/design-commands";
+import {
+  faces as facesWay,
+  parseCommand,
+  pickByQuery,
+  type Choice,
+  type DesignCommand,
+  type Facing as Way,
+} from "@/lib/domain/design/design-commands";
 import { DictateButton } from "./dictate";
 import { usePageAbout } from "@/lib/services/page-context";
 import { MAX_PROPOSAL_OPTIONS } from "@/lib/domain/design/proposal";
@@ -3539,6 +3546,9 @@ export function RoofDesigner(props: {
   const [commandText, setCommandText] = useState("");
   const [commandBusy, setCommandBusy] = useState(false);
   const [commandReply, setCommandReply] = useState<string | null>(null);
+  // Sol's question with options, when a request could mean different things; the request of the one chosen is run.
+  const [choices, setChoices] = useState<{ question: string; options: Choice[] } | null>(null);
+  const [otherText, setOtherText] = useState("");
   const commandBox = useRef<HTMLInputElement>(null);
   const letterOf = (i: number) => String.fromCharCode(65 + i);
   const designInWords = () =>
@@ -3826,6 +3836,10 @@ export function RoofDesigner(props: {
       case "redo":
         redo();
         return "Redone.";
+      case "choose":
+        setChoices({ question: command.question, options: command.options });
+        setOtherText("");
+        return "";
       case "answer":
         return command.words;
     }
@@ -3835,10 +3849,11 @@ export function RoofDesigner(props: {
     if (!text || commandBusy) return;
     setCommandBusy(true);
     setCommandReply(null);
+    setChoices(null);
     setSystemWords("");
     try {
       const quick = parseCommand(text);
-      if (quick) setCommandReply(await runCommand(quick));
+      if (quick) setCommandReply((await runCommand(quick)) || null);
       else {
         const res = await fetch("/api/design/command", {
           method: "POST",
@@ -3846,7 +3861,7 @@ export function RoofDesigner(props: {
           body: JSON.stringify({ text, design: designInWords() }),
         });
         const j = (await res.json().catch(() => ({}))) as { ok?: boolean; command?: DesignCommand; message?: string };
-        setCommandReply(j.ok && j.command ? await runCommand(j.command) : (j.message ?? "Sol couldn't read that."));
+        setCommandReply((j.ok && j.command ? await runCommand(j.command) : (j.message ?? "Sol couldn't read that.")) || null);
       }
       setCommandText("");
       // The box goes once he has acted (8 Nov 2026, Martin): his words stay at the foot of the picture for a while.
@@ -3855,6 +3870,20 @@ export function RoofDesigner(props: {
       setCommandBusy(false);
     }
   };
+  useEffect(() => {
+    if (!choices) return;
+    const key = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea")) return;
+      const n = Number(e.key);
+      if (n >= 1 && n <= choices.options.length) {
+        e.preventDefault();
+        void sendCommand(choices.options[n - 1].request);
+      } else if (e.key === "Escape") setChoices(null);
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  });
   useEffect(() => {
     if (!commandReply || commandOpen) return;
     const t = window.setTimeout(() => setCommandReply(null), 9000);
@@ -5051,6 +5080,71 @@ export function RoofDesigner(props: {
                       {systemWords && ` ${systemWords}`}
                     </p>
                   )}
+                </div>
+              )}
+              {choices && !commandOpen && (
+                <div
+                  className="absolute left-1/2 top-[4.5rem] z-50 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 overflow-hidden rounded-2xl bg-surface shadow-[0_18px_50px_rgba(11,11,12,0.25)] ring-1 ring-line"
+                  role="dialog"
+                  aria-label={choices.question}
+                >
+                  <div className="flex items-start gap-3 px-5 pb-3 pt-4">
+                    <SolIcon className="mt-0.5 size-5 shrink-0" />
+                    <p className="min-w-0 flex-1 text-[15px] font-semibold text-ink">{choices.question}</p>
+                    <button
+                      type="button"
+                      onClick={() => setChoices(null)}
+                      aria-label="Close"
+                      className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+                    >
+                      <X className="size-4" aria-hidden />
+                    </button>
+                  </div>
+                  <ul className="border-t border-line">
+                    {choices.options.map((o, i) => (
+                      <li key={i} className="border-b border-line">
+                        <button
+                          type="button"
+                          onClick={() => void sendCommand(o.request)}
+                          disabled={commandBusy}
+                          className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-surface-2 disabled:opacity-60"
+                        >
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-semibold tabular-nums text-ink-2">
+                            {i + 1}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[15px] font-semibold text-ink">{o.label}</span>
+                            {o.detail && <span className="block text-sm text-muted">{o.detail}</span>}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (otherText.trim()) void sendCommand(otherText);
+                    }}
+                    className="flex items-center gap-3 bg-surface-2 px-5 py-2.5"
+                  >
+                    <PenTool className="size-4 shrink-0 text-sun-line" aria-hidden />
+                    <input
+                      value={otherText}
+                      onChange={(e) => setOtherText(e.target.value)}
+                      placeholder="Something else"
+                      aria-label="Something else"
+                      className="h-9 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
+                    />
+                    {otherText.trim() ? (
+                      <button type="submit" className="text-sm font-semibold text-ink hover:text-sun-ink">
+                        Go
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => setChoices(null)} className="text-sm font-medium text-ink-2 hover:text-ink">
+                        Skip
+                      </button>
+                    )}
+                  </form>
                 </div>
               )}
               {commandReply && !commandOpen && (
