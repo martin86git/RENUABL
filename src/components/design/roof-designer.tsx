@@ -109,6 +109,7 @@ import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/desi
 import {
   faces as facesWay,
   parseCommand,
+  allByQuery,
   pickByQuery,
   type Choice,
   type DesignCommand,
@@ -3686,11 +3687,10 @@ export function RoofDesigner(props: {
     }
     if (wantsBattery) {
       let pick: { battery: CatalogueBattery; qty: number } | null = null;
-      if (ask.battery) {
-        const named = pickByQuery(props.batteries, ask.battery);
-        pick = named ? { battery: named, qty: 1 } : null;
-        if (!named) words.push(`no battery on your lists matches “${ask.battery}”`);
-      } else {
+      // A maker or model named narrows the choice; either way it is stacked to what the home needs.
+      const pool = ask.battery ? allByQuery(props.batteries, ask.battery) : props.batteries;
+      if (!pool.length) words.push(`no battery on your lists matches “${ask.battery}”`);
+      else {
         const onDesign = inverter
           ? [{ name: inverter.item.name, ...(inverter.item.hybrid !== undefined ? { hybrid: inverter.item.hybrid } : {}) }]
           : fitted.map((x, n) => ({
@@ -3698,7 +3698,7 @@ export function RoofDesigner(props: {
               ...(fittedItems[n]?.hybrid !== undefined ? { hybrid: fittedItems[n]?.hybrid } : {}),
             }));
         const idea = suggestBatteries({
-          batteries: props.batteries,
+          batteries: pool,
           inverters: onDesign,
           monthlyKwh: year,
           dailyKwh: finance?.dailyKwh ?? null,
@@ -3742,10 +3742,44 @@ export function RoofDesigner(props: {
         return done.words.replace(" Strings cleared: string them again.", "");
       }
       case "battery": {
-        const to = pickByQuery(props.batteries, command.query);
-        if (!to) return `No battery on your lists matches “${command.query}”.`;
-        chooseBattery(to);
-        return `Battery: ${to.name}.`;
+        // No product named: the inverter's own maker by rule; a maker or model named: that one. Either way stacked to
+        // what the home needs (`suggestBatteries`), not one module (8 Nov 2026, Martin: a Sigenergy controller on the
+        // design, "add the storage it needs").
+        const pool = command.query ? allByQuery(props.batteries, command.query) : props.batteries;
+        if (!pool.length)
+          return command.query ? `No battery on your lists matches “${command.query}”.` : "There are no batteries on your price lists.";
+        const idea =
+          summary.panels > 0
+            ? suggestBatteries({
+                batteries: pool,
+                inverters: fitted.map((f, n) => ({
+                  name: f.name,
+                  ...(fittedItems[n]?.hybrid !== undefined ? { hybrid: fittedItems[n]?.hybrid } : {}),
+                })),
+                monthlyKwh: year,
+                dailyKwh: finance?.dailyKwh ?? null,
+                selfUseShare: props.workspace.settings.bill.selfUseShare,
+                eveningShare: DAY.eveningShare,
+              })
+            : null;
+        const pick = idea?.suggestions[0];
+        if (!pick) {
+          const to = pickByQuery(pool, command.query) ?? pool[0];
+          chooseBattery(to);
+          return `Battery: ${to.name}.${summary.panels ? "" : " Lay the panels and I can size it to the home."}`;
+        }
+        setBattery({
+          sku: pick.battery.sku,
+          name: pick.battery.name,
+          kwh: pick.battery.kwh,
+          qty: pick.qty,
+          ...(battery?.backup ? { backup: true } : {}),
+          x: battery?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
+          y: battery?.y ?? cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
+        });
+        changed();
+        const total = Math.round(pick.battery.kwh * pick.qty * 10) / 10;
+        return `Battery: ${pick.qty > 1 ? `${pick.qty} × ` : ""}${pick.battery.name}, ${total} kWh. ${idea?.note ?? ""}`.trim();
       }
       case "noBattery":
         setBattery(undefined);

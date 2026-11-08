@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commandFrom, faces, parseCommand, pickByQuery } from "./design-commands";
+import { allByQuery, batteryWords, commandFrom, faces, parseCommand, pickByQuery } from "./design-commands";
 
 describe("reading a designer command at once", () => {
   it("reads a size, with a direction", () => {
@@ -103,5 +103,32 @@ describe("Sol asking with options", () => {
       do: "answer",
       words: "Say which.",
     });
+  });
+});
+
+describe("adding a battery with none named", () => {
+  it("reads storage as a battery and leaves no product words", () => {
+    expect(parseCommand("add a battery")).toEqual({ do: "battery", query: "" });
+    expect(parseCommand("add the required amount of storage")).toEqual({ do: "battery", query: "" });
+    expect(parseCommand("add the recommended storage for this home")).toEqual({ do: "battery", query: "" });
+  });
+
+  it("keeps a maker named", () => {
+    expect(parseCommand("add a Sigenergy battery")).toEqual({ do: "battery", query: "Sigenergy" });
+    expect(batteryWords("use sig energy storage")).toBe("sig energy");
+  });
+
+  it("still takes a battery off", () => {
+    expect(parseCommand("remove the storage")).toEqual({ do: "noBattery" });
+  });
+
+  it("finds every product of a maker", () => {
+    const list = [
+      { name: "Sigenergy SigenStor 8 kWh module", sku: "SIG-BAT8" },
+      { name: "Sigenergy SigenStor 5 kWh module", sku: "SIG-BAT5" },
+      { name: "BYD HVS 10.2", sku: "BYD-10" },
+    ];
+    expect(allByQuery(list, "sig energy").map((b) => b.sku)).toEqual(["SIG-BAT8", "SIG-BAT5"]);
+    expect(allByQuery(list, "")).toEqual([]);
   });
 });

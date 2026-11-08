@@ -63,6 +63,32 @@ const queryOf = (text: string, kind: RegExp) =>
     .replace(/\s+/g, " ")
     .trim();
 
+/** The words naming a battery in a request, with what only says how much or which kind taken out ("" for one by rule). */
+export function batteryWords(text: string): string {
+  return queryOf(text, /\b(batter(y|ies)|storage)\b/gi)
+    .replace(
+      /\b(required|needed|needs?|amount|of|some|enough|right|good|suitable|matching|recommended|correct|proper|sized?|its|home|this|that|me|us|by|option|from|kwh|how|much|an?|the|it)\b/gi,
+      " ",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Every product the words name as well as any other does: all of a maker's batteries for "Sigenergy". */
+export function allByQuery<T extends { name: string; sku: string }>(list: readonly T[], query: string): T[] {
+  const words = query
+    .toLowerCase()
+    .split(/[^a-z0-9.]+/)
+    .filter((w) => w.length > 1);
+  if (!words.length) return [];
+  const scored = list.map((item) => ({
+    item,
+    score: words.filter((w) => `${item.name} ${item.sku}`.toLowerCase().includes(w)).length,
+  }));
+  const best = Math.max(0, ...scored.map((s) => s.score));
+  return best ? scored.filter((s) => s.score === best).map((s) => s.item) : [];
+}
+
 /** The parts of a request joined by "+", commas, "and", "with" or "plus". */
 const partsOf = (text: string) => text.split(/\+|,|\band\b|\bwith\b|\bplus\b|&/i).map((s) => s.trim());
 
@@ -112,9 +138,10 @@ export function parseCommand(raw: string): DesignCommand | null {
     const facing = FACINGS.find(([re]) => re.test(t))?.[1];
     return { do: "targetKw", kw: Number(kw[1]), ...(facing ? { facing } : {}) };
   }
-  if (/\b(no|remove|take (off|out)|drop|without)\b.*\bbattery\b/.test(t)) return { do: "noBattery" };
-  if (/\bbattery\b/.test(t) && /\b(swap|switch|change|use|put|add|choose|pick)\b/.test(t))
-    return { do: "battery", query: queryOf(text, /\bbatter(y|ies)\b/gi) };
+  if (/\b(no|remove|take (off|out)|drop|without)\b.*\b(battery|storage)\b/.test(t)) return { do: "noBattery" };
+  // "Add a battery", "add the storage it needs": no product named is one chosen by rule (the inverter's maker, sized to the home).
+  if (/\b(battery|storage)\b/.test(t) && /\b(swap|switch|change|use|put|add|choose|pick|give|fit)\b/.test(t))
+    return { do: "battery", query: batteryWords(text) };
   if (/\binverter\b/.test(t) && /\b(swap|switch|change|use|put|choose|pick)\b/.test(t))
     return { do: "inverter", query: queryOf(text, /\binverters?\b/gi) };
   if (/\bpanels?\b/.test(t) && /\b(swap|switch|change|use|choose|pick)\b/.test(t) && !kw)
@@ -206,7 +233,8 @@ export const DESIGN_COMMAND_SCHEMA = {
     facing: { type: ["string", "null"] as ("string" | "null")[], enum: ["N", "E", "S", "W", null] },
     query: {
       type: ["string", "null"] as ("string" | "null")[],
-      description: "The product's maker and model words, for battery, inverter or panel.",
+      description:
+        "The product's maker and model words, for battery, inverter or panel; for battery, \"\" to choose one by rule (the inverter's maker, sized to the home).",
     },
     inverter: {
       type: ["string", "null"] as ("string" | "null")[],
@@ -347,7 +375,7 @@ export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roo
 
 - targetKw: fill the roof (or the faces facing a direction) to about that many kW.
 - system: a whole system at once ("load 8 kW of panels, an inverter and a battery"): kw, then inverter and battery, each the product's words from the lists, "" to choose one by rule, or null when it wasn't asked for.
-- battery / inverter / panel: choose that product; query holds its maker and model words as named in the lists above.
+- battery / inverter / panel: choose that product; query holds its maker and model words as named in the lists above. For a battery with no product named ("add a battery", "the storage it needs"), query is "": the designer picks the inverter maker's battery and stacks it to the home.
 - noBattery, stringAuto (string the panels by rule), designForMe (make the three designs), flat (the roof is flat), pitch (the roof's pitch in degrees), phase, storeys, undo, redo.
 - The panels themselves, the picked ones or else all of them: tilt (their tilt in degrees, on frames or the roof), orient (landscape true or false: portrait), rotate (turn them by degrees round their middle, + clockwise), move (east and south in metres, negative for west and north).
 - To place panels somewhere, targetKw with a facing lays them on the faces looking that way. To string them, stringAuto.
