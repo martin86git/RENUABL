@@ -11,7 +11,8 @@ import type { NextItem } from "./next-up";
 import { VIC_PUBLIC_HOLIDAYS } from "../scheduling";
 
 export const TODAY_TABS = [
-  { id: "today", label: "Today" },
+  // 8 Nov 2026, Martin: "Today" twice (the top menu and this tab); the tab is the deal feed, so Your deals.
+  { id: "today", label: "Your deals" },
   // 5 Nov 2026, Martin: the member's own email beside their day.
   { id: "inbox", label: "Inbox" },
   { id: "calendar", label: "Calendar" },

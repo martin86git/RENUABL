@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Today",
+    words: "The first tab on Today is now Your deals, and the RENUABL logo lines up with the menu beside it.",
+  },
+  {
+    day: "2026-11-08",
     area: "Sol",
     words: "Ask Sol to fix a product's datasheet and he finds, reads and swaps it himself, Australian sheet first, marked to check.",
   },
