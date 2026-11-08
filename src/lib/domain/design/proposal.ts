@@ -49,6 +49,7 @@ import {
   variationsOf,
   lineKey,
   repriced,
+  sharedHome,
   solarVicFor,
   solarVicNote,
   stcValue,
@@ -565,7 +566,16 @@ export type Built = { ok: true; view: ProposalView; internal: ProposalInternal }
  * Nothing here is taken from a browser. It answers with what stops it being
  * sent, when something does: a customer is never sent a price with a hole in it.
  */
-export function buildProposal(input: ProposalInputs): Built {
+export function buildProposal(given: ProposalInputs): Built {
+  // Every design priced with the primary's home (phase, storeys, roof) and its costs decided on each job (8 Nov 2026,
+  // Martin: decided once; a design saved before that rule still held its own answers, undecided, and stopped the proposal).
+  const input: ProposalInputs = {
+    ...given,
+    project: {
+      ...given.project,
+      extras: { ...given.project.extras, quotes: sharedHome(given.project.extras.quotes, given.project.set.primary) },
+    },
+  };
   const { project, brand } = input;
   const index = project.set.primary;
   const design = project.set.designs[index];

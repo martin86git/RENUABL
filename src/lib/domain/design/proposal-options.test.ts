@@ -174,4 +174,15 @@ describe("costs decided on each job on a proposal", () => {
     const built = buildProposal(base);
     expect(built.ok && built.view.variations).toEqual(["Switchboard upgrade", "RCBO switches"]);
   });
+  it("takes the primary's decisions for every design offered, so one saved undecided doesn't stop it", () => {
+    const two = twoGoals();
+    const [solarQuote, primaryQuote] = two.project.extras.quotes;
+    // The solar design saved before decisions were shared: nothing decided on it.
+    const bare = Object.fromEntries(Object.entries(solarQuote.edits).filter(([k]) => !k.startsWith("Switchboard|")));
+    const built = buildProposal({
+      ...two,
+      project: { ...two.project, extras: { ...two.project.extras, quotes: [{ ...solarQuote, edits: bare }, primaryQuote] } },
+    });
+    expect(built.ok).toBe(true);
+  });
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import clsx from "clsx";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Workspace } from "@/lib/domain/design/pricing";
@@ -41,6 +43,8 @@ const label = "text-[10px] font-medium uppercase tracking-[0.14em] text-muted";
 export function DesignQuote(props: {
   /** Which of the roof's designs this is: "Design 2". */
   design: string;
+  /** Flicking between the roof's designs from the quote (8 Nov 2026, Martin): the one before, and the next. */
+  onDesign?: (step: -1 | 1) => void;
   spec: SystemSpec;
   workspace: Workspace;
   rates: RebateRates;
@@ -458,7 +462,30 @@ export function DesignQuote(props: {
     return (
       <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder">
         <div className="flex items-baseline justify-between gap-2">
-          <p className={label}>Quote builder · {props.design}</p>
+          <p className={clsx(label, "flex items-center gap-1")}>
+            Quote builder ·
+            {props.onDesign && (
+              <button
+                type="button"
+                onClick={() => props.onDesign?.(-1)}
+                aria-label="The design before"
+                className="flex size-6 items-center justify-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-ink"
+              >
+                <ChevronLeft className="size-4" aria-hidden />
+              </button>
+            )}
+            <span>{props.design}</span>
+            {props.onDesign && (
+              <button
+                type="button"
+                onClick={() => props.onDesign?.(1)}
+                aria-label="The next design"
+                className="flex size-6 items-center justify-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-ink"
+              >
+                <ChevronRight className="size-4" aria-hidden />
+              </button>
+            )}
+          </p>
           <span className="flex items-baseline gap-3">
             {props.onCompact && (
               <button
@@ -557,7 +584,30 @@ export function DesignQuote(props: {
   return (
     <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder">
       <div className="flex items-baseline justify-between gap-2">
-        <p className={label}>Quote builder · {props.design}</p>
+        <p className={clsx(label, "flex items-center gap-1")}>
+          Quote builder ·
+          {props.onDesign && (
+            <button
+              type="button"
+              onClick={() => props.onDesign?.(-1)}
+              aria-label="The design before"
+              className="flex size-6 items-center justify-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-ink"
+            >
+              <ChevronLeft className="size-4" aria-hidden />
+            </button>
+          )}
+          <span>{props.design}</span>
+          {props.onDesign && (
+            <button
+              type="button"
+              onClick={() => props.onDesign?.(1)}
+              aria-label="The next design"
+              className="flex size-6 items-center justify-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-ink"
+            >
+              <ChevronRight className="size-4" aria-hidden />
+            </button>
+          )}
+        </p>
         <span className="flex items-baseline gap-3">
           {props.onCompact && (
             <button

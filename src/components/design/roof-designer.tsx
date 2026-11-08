@@ -7951,7 +7951,8 @@ export function RoofDesigner(props: {
             </div>
             <div className={clsx(shown !== "quote" && "hidden")}>
               <DesignQuote
-                design={`Design ${active + 1}${active === primary ? " (primary)" : ""}`}
+                design={`Design ${active + 1} of ${designs.length}${active === primary ? " (primary)" : ""}`}
+                onDesign={designs.length > 1 ? (step) => show(everyDesign(), (active + step + designs.length) % designs.length) : undefined}
                 spec={spec}
                 workspace={props.workspace}
                 rates={props.rates}
