@@ -126,25 +126,9 @@ export function DealFeed({ me }: { me: string }) {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-[13px] text-ink-2">
-          {data ? (
-            <>
-              <span className="font-semibold text-ink">{needs}</span> need{needs === 1 ? "s" : ""} you ·{" "}
-              <span className="font-semibold text-ink">{open.length}</span> being sold
-              {openValue > 0 && (
-                <>
-                  {" "}
-                  · <span className="font-semibold text-ink">${Math.round(openValue / 1000).toLocaleString("en-AU")}k</span> in play
-                </>
-              )}
-            </>
-          ) : (
-            "Looking over your deals…"
-          )}
-        </p>
-        <div className="flex items-center gap-2">
-          {/* A new deal from Today (8 Nov 2026, Martin: how do I add new leads?): the same short form as on Deals. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* A new deal from Today (8 Nov 2026, Martin: how do I add new leads?), at the start of the row: the same short form as on Deals. */}
           <button
             type="button"
             onClick={() => setAdding(true)}
@@ -152,6 +136,24 @@ export function DealFeed({ me }: { me: string }) {
           >
             <Plus className="size-4" aria-hidden /> New deal
           </button>
+          <p className="text-[13px] text-ink-2">
+            {data ? (
+              <>
+                <span className="font-semibold text-ink">{needs}</span> need{needs === 1 ? "s" : ""} you ·{" "}
+                <span className="font-semibold text-ink">{open.length}</span> being sold
+                {openValue > 0 && (
+                  <>
+                    {" "}
+                    · <span className="font-semibold text-ink">${Math.round(openValue / 1000).toLocaleString("en-AU")}k</span> in play
+                  </>
+                )}
+              </>
+            ) : (
+              "Looking over your deals…"
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
           <div role="tablist" aria-label="What to show" className="inline-flex rounded-full bg-surface p-1 ring-1 ring-line">
             {FEED_VIEWS.map((v) => (
               <button

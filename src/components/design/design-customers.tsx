@@ -797,14 +797,15 @@ export function CustomerPage({ id }: { id: string }) {
 }
 
 /**
- * A new deal, from the Deals page: who it is for first (someone already a customer, found by name, phone, email or
- * address, or someone new, added on the spot), then what it is and where. It opens the deal once made.
+ * A new deal, from the Deals page and Today: who it is for first, then what it is and where. It opens the deal once
+ * made. It starts on someone new (8 Nov 2026, Martin: a new deal is almost always a new person; one for an existing
+ * customer is selling to them again), with the way to find an existing customer under it.
  */
 export function NewDeal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [customers, setCustomers] = useState<CustomerLine[] | null>(null);
   const [find, setFind] = useState("");
-  const [who, setWho] = useState<Customer | "new" | null>(null);
+  const [who, setWho] = useState<Customer | "new" | null>("new");
   const [draft, setDraft] = useState<CustomerInput>(BLANK);
   const [deal, setDeal] = useState<{ title: string; address: string; lat: number | null; lng: number | null; own: boolean }>({
     title: "Solar",
@@ -882,15 +883,6 @@ export function NewDeal({ onClose }: { onClose: () => void }) {
             />
           </label>
           <ul className="mt-2 max-w-md divide-y divide-line rounded-md border border-line">
-            {matches.map((c) => (
-              <li key={c.id}>
-                <button type="button" onClick={() => pick(c)} className="block w-full px-3 py-2 text-left hover:bg-surface-2">
-                  <span className="block text-sm font-medium text-ink">{c.name}</span>
-                  <span className="block truncate text-xs text-muted">{c.address || c.email || c.phone || "No details yet"}</span>
-                </button>
-              </li>
-            ))}
-            {customers && !matches.length && <li className="px-3 py-2 text-sm text-ink-2">Nobody matches that.</li>}
             <li>
               <button
                 type="button"
@@ -900,6 +892,15 @@ export function NewDeal({ onClose }: { onClose: () => void }) {
                 <UserPlus className="size-4" aria-hidden /> Someone new
               </button>
             </li>
+            {matches.map((c) => (
+              <li key={c.id}>
+                <button type="button" onClick={() => pick(c)} className="block w-full px-3 py-2 text-left hover:bg-surface-2">
+                  <span className="block text-sm font-medium text-ink">{c.name}</span>
+                  <span className="block truncate text-xs text-muted">{c.address || c.email || c.phone || "No details yet"}</span>
+                </button>
+              </li>
+            ))}
+            {customers && !matches.length && <li className="px-3 py-2 text-sm text-ink-2">Nobody matches that.</li>}
           </ul>
         </div>
       )}
@@ -915,7 +916,7 @@ export function NewDeal({ onClose }: { onClose: () => void }) {
         <div className="mt-2">
           <CustomerFields value={draft} onChange={setDraft} />
           <button type="button" onClick={() => setWho(null)} className="mt-2 text-xs font-medium text-ink-2 underline underline-offset-4">
-            Choose an existing customer instead
+            Selling again to an existing customer? Find them
           </button>
         </div>
       )}
