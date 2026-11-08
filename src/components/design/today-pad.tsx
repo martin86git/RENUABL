@@ -243,7 +243,11 @@ export function TodayPad(props: {
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => setTab(t.id)}
+                  onClick={() => {
+                    setTab(t.id);
+                    // "Your deals" always brings the feed back, even from Sol's conversation (8 Nov 2026, Martin).
+                    if (t.id === "today" && !welcoming) setOnFeed(true);
+                  }}
                   aria-pressed={on}
                   className={clsx(
                     "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] transition",
