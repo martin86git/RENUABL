@@ -1,17 +1,46 @@
 import type { Metadata, Viewport } from "next";
-import { Caveat, Inter, JetBrains_Mono, Source_Serif_4 } from "next/font/google";
+import localFont from "next/font/local";
 import { publicSiteUrl, searchIndexing } from "@/lib/domain/site";
 import { AdTags } from "@/components/ad-tags";
 import { googleAdsConfig } from "@/lib/domain/google-ads";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
-// Brand type: Inter for UI, a light serif for editorial lines, a handwritten script for accents.
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
-const serif = Source_Serif_4({ variable: "--font-serif", subsets: ["latin"], weight: ["300", "400"] });
-const script = Caveat({ variable: "--font-script", subsets: ["latin"], weight: ["400", "500"] });
+// Brand type: Inter for UI, a light serif for editorial lines, a handwritten script for accents. The fonts are kept in
+// the site (./fonts, Latin, from Google Fonts under the SIL Open Font Licence), not fetched from Google at build time:
+// on 8 Nov 2026 Google's replies started breaking the build ("next/font/google queries have exactly one entry").
+const inter = localFont({
+  variable: "--font-inter",
+  src: [{ path: "./fonts/inter-latin.woff2", weight: "100 900", style: "normal" }],
+  display: "swap",
+});
+const serif = localFont({
+  variable: "--font-serif",
+  src: [
+    { path: "./fonts/source-serif-4-300-latin.woff2", weight: "300", style: "normal" },
+    { path: "./fonts/source-serif-4-400-latin.woff2", weight: "400", style: "normal" },
+  ],
+  display: "swap",
+});
+const script = localFont({
+  variable: "--font-script",
+  src: [
+    { path: "./fonts/caveat-400-latin.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/caveat-500-latin.woff2", weight: "500", style: "normal" },
+  ],
+  display: "swap",
+});
 // Figures in the roof designer (.theme-studio). Not preloaded: only that product uses it.
-const mono = JetBrains_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400", "500", "600"], preload: false });
+const mono = localFont({
+  variable: "--font-mono",
+  src: [
+    { path: "./fonts/jetbrains-mono-400-latin.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/jetbrains-mono-500-latin.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/jetbrains-mono-600-latin.woff2", weight: "600", style: "normal" },
+  ],
+  display: "swap",
+  preload: false,
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(publicSiteUrl()),
