@@ -175,6 +175,50 @@ export function DesignDrawer(props: {
 }
 
 /**
+ * The designer in place on a page (8 Nov 2026, Martin: on a deal, the design is a tab and the roof emerges in the deal's
+ * own view rather than sliding over it). The same frame the drawer holds, told the same news: saved, a way back (`fold`),
+ * or somewhere else asked for (`go`); work not saved holds the page.
+ */
+export function DesignInline(props: {
+  src: string;
+  onFold: () => void;
+  onGo: (href: string) => void;
+  onSaved?: () => void;
+  className?: string;
+}) {
+  const { src, onFold, onGo, onSaved, className } = props;
+  const [unsaved, setUnsaved] = useState(false);
+  const heard = useRef({ onFold, onGo, onSaved });
+  useEffect(() => {
+    heard.current = { onFold, onGo, onSaved };
+  }, [onFold, onGo, onSaved]);
+  useEffect(() => {
+    const hear = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      const news = (e.data as { renuablDesign?: News } | null)?.renuablDesign;
+      if (!news) return;
+      if (news.fold) heard.current.onFold();
+      if (typeof news.go === "string" && news.go.startsWith("/")) heard.current.onGo(news.go);
+      if (typeof news.unsaved === "boolean") setUnsaved(news.unsaved);
+      if (news.saved) {
+        setUnsaved(false);
+        heard.current.onSaved?.();
+      }
+    };
+    window.addEventListener("message", hear);
+    return () => window.removeEventListener("message", hear);
+  }, []);
+  useEffect(() => {
+    if (!unsaved) return;
+    const stay = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", stay);
+    return () => window.removeEventListener("beforeunload", stay);
+  }, [unsaved]);
+  const frame = `${src}${src.includes("?") ? "&" : "?"}embed=1`;
+  return <iframe key={frame} src={frame} title="Design tool" className={clsx("w-full border-0", className)} />;
+}
+
+/**
  * The frame's drawer (in `DesignShell`): any link to the designer, and `openDesigner`, slide it over the page. On the
  * design tool's own page its home link goes on as a page, so the home stays where it is.
  */
