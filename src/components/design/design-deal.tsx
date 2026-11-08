@@ -500,6 +500,7 @@ export function DealPage({ id }: { id: string }) {
         designVersion={designVersion}
         customer={customer}
         pulse={pulse && hasPulse(job.stage) ? pulse : null}
+        compact={tab !== "overview"}
         onDesign={job.lat !== null ? () => setDrawer(true) : null}
         onEmail={() => setTab("email")}
         onCall={() => {
