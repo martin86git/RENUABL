@@ -32,7 +32,7 @@ export type DesignCommand =
   /** Panels moved so many metres east and south (negative: west and north). */
   | { do: "move"; east: number; south: number }
   /** The panels (the picked ones, else all) laid again in so many rows, the same panels, where they stood. */
-  | { do: "rows"; rows: number }
+  | { do: "rows"; rows: number; landscape?: boolean }
   /** The same number of panels laid again on the roof by the rules, to fit it (8 Nov 2026, Martin). */
   | { do: "relay" }
   | { do: "undo" }
@@ -122,10 +122,12 @@ export function parseCommand(raw: string): DesignCommand | null {
   if (/\bdesign it for me\b|\bthree designs\b/.test(t)) return { do: "designForMe" };
   if (/\bstring (it|them|the panels|everything|automatically)\b|\bauto[- ]?string\b/.test(t)) return { do: "stringAuto" };
   const WORD_NUMBERS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
-  const rowsAsked = t.match(/\b(\d{1,2}|one|two|three|four|five|six)\s+(?:single\s+|even\s+|long\s+)?rows?\b/);
+  const rowsAsked = t.match(/\b(\d{1,2}|one|two|three|four|five|six)\s+(?:[a-z-]+\s+)?rows?\b/);
   if (rowsAsked && /\b(lay|put|arrange|set|make|in|into|as)\b/.test(t)) {
     const rows = WORD_NUMBERS[rowsAsked[1]] ?? Number(rowsAsked[1]);
-    if (rows >= 1 && rows <= 20) return { do: "rows", rows };
+    // Portrait or landscape said with it goes with it ("2 symmetric rows in portrait", 8 Nov 2026).
+    const way = /\blandscape\b/.test(t) ? true : /\bportrait\b/.test(t) ? false : undefined;
+    if (rows >= 1 && rows <= 20) return { do: "rows", rows, ...(way !== undefined ? { landscape: way } : {}) };
   }
   if (
     /\bre-?lay\b|\btidy\b|\blay (?:them|the panels|it)\b.*\b(?:again|properly|neatly|better|out)\b|\bso (?:that )?they fit\b|\bfit (?:them|the panels|it) (?:on|to|onto) the roof\b/.test(
@@ -374,7 +376,9 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
     }
     case "rows": {
       const rows = n(read.rows);
-      return rows !== null && rows >= 1 && rows <= 20 ? { do: "rows", rows: Math.round(rows) } : { do: "answer", words };
+      return rows !== null && rows >= 1 && rows <= 20
+        ? { do: "rows", rows: Math.round(rows), ...(typeof read.landscape === "boolean" ? { landscape: read.landscape } : {}) }
+        : { do: "answer", words };
     }
     case "relay":
       return { do: "relay" };
@@ -412,7 +416,7 @@ export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roo
 - battery / inverter / panel: choose that product; query holds its maker and model words as named in the lists above. For a battery with no product named ("add a battery", "the storage it needs"), query is "": the designer picks the inverter maker's battery and stacks it to the home.
 - noBattery, stringAuto (string the panels by rule), designForMe (make the three designs), flat (the roof is flat), pitch (the roof's pitch in degrees), phase, storeys, undo, redo.
 - The panels themselves, the picked ones or else all of them: tilt (their tilt in degrees, on frames or the roof), orient (landscape true or false: portrait), rotate (turn them by degrees round their middle, + clockwise), move (east and south in metres, negative for west and north).
-- rows: lay the panels (the picked ones, else all) in that many rows, the same panels where they stood. relay: lay the same number of panels again on the roof by the rules, to fit it ("lay them so they fit the roof", "tidy them up").
+- rows: lay the panels (the picked ones, else all) in that many rows, the same panels where they stood; with landscape true or false when portrait or landscape is asked for too. relay: lay the same number of panels again on the roof by the rules, to fit it ("lay them so they fit the roof", "tidy them up").
 - To place panels somewhere, targetKw with a facing lays them on the faces looking that way. To string them, stringAuto.
 - explainString: show the check for a string, by its letter; put the reason in words too, from the string checks above.
 - choose: when the request could fairly mean different things (which face, how many kW, portrait or landscape, which battery), don't guess: ask a short question with two or three options, each a label, a line on what it means and the request to carry out if chosen, written as the person would say it ("fit 10 kW on the north face"). Only when it is truly unclear.

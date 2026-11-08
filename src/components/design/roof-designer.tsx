@@ -3863,13 +3863,17 @@ export function RoofDesigner(props: {
         const on = panelPicks.length ? panelPicks : everyPanel();
         if (!on.length) return "There are no panels to lay in rows yet.";
         const next = byHand(on);
-        const laid = new Map(inRows(next.loose.filter((p) => next.ids.includes(p.id)), size, command.rows).map((p) => [p.id, p]));
+        const group = next.loose
+          .filter((p) => next.ids.includes(p.id))
+          .map((p) => (command.landscape === undefined ? p : laidAs(p, command.landscape)));
+        const laid = new Map(inRows(group, size, command.rows).map((p) => [p.id, p]));
+        if (command.landscape !== undefined) setAddLandscape(command.landscape);
         setFaces(next.faces);
         setStrings(next.strings);
         setLoose(next.loose.map((p) => laid.get(p.id) ?? p));
         setPicks(next.ids.map((id): Pick => ({ kind: "loose", id })));
         changed();
-        return `${on.length} panels in ${Math.min(command.rows, on.length)} ${command.rows === 1 ? "row" : "rows"}, where they stood. Drag them into place if they need it, and check the strings.`;
+        return `${on.length} panels in ${Math.min(command.rows, on.length)} ${command.rows === 1 ? "row" : "rows"}${command.landscape === undefined ? "" : command.landscape ? ", landscape" : ", portrait"}, where they stood. Drag them into place if they need it, and check the strings.`;
       }
       case "relay": {
         if (!summary.panels) return "There are no panels to lay again yet.";

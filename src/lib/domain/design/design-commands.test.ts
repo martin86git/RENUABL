@@ -145,6 +145,8 @@ describe("Sol laying panels in rows, or again", () => {
   it("reads rows and laying again", () => {
     expect(parseCommand("lay the panels in 2 rows")).toEqual({ do: "rows", rows: 2 });
     expect(parseCommand("put them into three single rows")).toEqual({ do: "rows", rows: 3 });
+    expect(parseCommand("2 symmetric rows in portrait")).toEqual({ do: "rows", rows: 2, landscape: false });
+    expect(parseCommand("lay them in two even rows, landscape")).toEqual({ do: "rows", rows: 2, landscape: true });
     expect(parseCommand("lay the panels so they fit on the roof")).toEqual({ do: "relay" });
     expect(parseCommand("tidy them up")).toEqual({ do: "relay" });
     expect(commandFrom({ do: "rows", rows: 4, words: "" })).toEqual({ do: "rows", rows: 4 });
