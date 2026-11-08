@@ -15,6 +15,7 @@ import {
   withSetting,
   withSupplierList,
   type SettingField,
+  type SupplierList,
   type Workspace,
 } from "@/lib/domain/design/pricing";
 import { loadWorkspace, saveWorkspace, savedLabel } from "@/lib/services/design-store";
@@ -122,30 +123,51 @@ export function DesignSettings({ part }: { part: PricePart }) {
     return saveWorkspace(next).then(async (problem) => setStatus(problem ?? (await savedLabel())));
   };
 
-  const send = async (chosen: File) => {
-    if (!workspace) return;
-    setUpload({ busy: true });
+  /** Reads one file into a list, or says why it couldn't. */
+  const readOne = async (chosen: File): Promise<{ list: SupplierList } | { problem: string }> => {
     try {
       const body = new FormData();
       body.set("file", chosen);
       const res = await fetch("/api/design/price-list", { method: "POST", body });
       const json = (await res.json()) as { ok: boolean; name?: string; rows?: string[][]; message?: string };
-      if (!json.ok || !json.rows) return setUpload({ error: true, message: json.message ?? "That file couldn't be read." });
+      if (!json.ok || !json.rows) return { problem: `${chosen.name}: ${json.message ?? "that file couldn't be read."}` };
       const list = readSupplierList(json.name ?? chosen.name, json.rows, new Date().toISOString().slice(0, 10));
       if (!list.items.length)
-        return setUpload({
-          error: true,
-          message: "We couldn't find priced rows in that file. It needs a product code, a description and a price in its first columns.",
-        });
-      void change({ ...workspace, lists: withSupplierList(workspace.lists, list) });
-      setUpload({
-        message: `Read ${list.items.length.toLocaleString("en-AU")} priced rows from ${list.name}: ${list.panels.length} panels, ${list.inverters.length} inverters, ${list.batteries.length} batteries.`,
-      });
+        return {
+          problem: `${chosen.name}: no priced rows found. It needs a product code, a description and a price in its first columns.`,
+        };
+      return { list };
     } catch {
-      setUpload({ error: true, message: "We couldn't reach the server. Try again in a moment." });
-    } finally {
-      if (file.current) file.current.value = "";
+      return { problem: `${chosen.name}: we couldn't reach the server. Try again in a moment.` };
     }
+  };
+
+  /** One or several files, read in turn and added beside the lists already kept. */
+  const send = async (chosen: File[]) => {
+    if (!workspace || !chosen.length) return;
+    setUpload({ busy: true });
+    let lists = workspace.lists;
+    const read: string[] = [];
+    const problems: string[] = [];
+    for (const one of chosen) {
+      const got = await readOne(one);
+      if ("problem" in got) {
+        problems.push(got.problem);
+        continue;
+      }
+      const { list } = got;
+      const replaced = lists.some((l) => l.name === list.name);
+      const before = lists.map((l) => l.name);
+      lists = withSupplierList(lists, list);
+      const dropped = before.filter((n) => n !== list.name && !lists.some((l) => l.name === n));
+      read.push(
+        `${replaced ? "Replaced" : "Added"} ${list.name}: ${list.items.length.toLocaleString("en-AU")} priced rows, ${list.panels.length} panels, ${list.inverters.length} inverters, ${list.batteries.length} batteries.` +
+          (dropped.length ? ` ${dropped.join(", ")} was taken off to stay within ${MAX_SUPPLIER_LISTS} lists.` : ""),
+      );
+    }
+    if (lists !== workspace.lists) void change({ ...workspace, lists });
+    setUpload({ error: !read.length, message: [...read, ...problems].join(" ") });
+    if (file.current) file.current.value = "";
   };
 
   return (
@@ -174,29 +196,33 @@ export function DesignSettings({ part }: { part: PricePart }) {
                 Supplier price lists
               </h2>
               <p className="mt-1 text-sm text-ink-2">
-                Upload your wholesaler&apos;s price list as Excel (.xlsx) or CSV, with the product code, description and price in the first
-                columns. Its panels, inverters and batteries appear in the designer, and every priced row can be looked up by its code. Up
-                to {MAX_SUPPLIER_LISTS} lists; where two price the same code, the newest wins. Uploading a file of the same name replaces
-                it.
+                Upload each wholesaler&apos;s price list as Excel (.xlsx) or CSV, with the product code, description and price in the first
+                columns. Keep up to {MAX_SUPPLIER_LISTS} lists side by side, one for each wholesaler: their panels, inverters and batteries
+                all appear in the designer, and every priced row can be looked up by its code. Where two lists price the same code, the
+                newest wins. Uploading a file of the same name replaces that list.
               </p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <input
                   ref={file}
                   type="file"
                   accept=".xlsx,.csv"
+                  multiple
                   className="sr-only"
                   id="price-list"
-                  onChange={(e) => {
-                    const chosen = e.target.files?.[0];
-                    if (chosen) void send(chosen);
-                  }}
+                  onChange={(e) => void send([...(e.target.files ?? [])])}
                 />
                 <label
                   htmlFor="price-list"
                   className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-ink hover:bg-forest"
                 >
-                  <Upload className="size-4" aria-hidden /> {upload.busy ? "Reading…" : "Upload a price list"}
+                  <Upload className="size-4" aria-hidden />{" "}
+                  {upload.busy ? "Reading…" : workspace.lists.length ? "Add another price list" : "Upload price lists"}
                 </label>
+                {workspace.lists.length > 0 && (
+                  <span className="text-xs tabular-nums text-muted">
+                    {workspace.lists.length} of {MAX_SUPPLIER_LISTS} lists
+                  </span>
+                )}
                 {upload.message && (
                   <p className={upload.error ? "text-sm text-danger" : "text-sm text-positive"} role="status">
                     {upload.message}
