@@ -52,6 +52,7 @@ import { goWhereAsked, openSolPage } from "./sol-chat";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { InboxPage } from "./inbox";
+import { CallLogPage } from "./call-log";
 import { DealFeed } from "./deal-feed";
 import { NewLook, Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
@@ -65,7 +66,13 @@ import { AttachButton, AttachedFiles, solFilesOf, useSolAttach } from "./sol-att
 import { DictateButton, withSpoken } from "./dictate";
 import { SolThinking } from "./sol-thinking";
 
-const TAB_ICONS: Record<TodayTab, typeof Sun> = { today: Sun, inbox: Mail, calendar: CalendarDays, pipeline: KanbanSquare };
+const TAB_ICONS: Record<TodayTab, typeof Sun> = {
+  today: SolIcon,
+  calls: Phone,
+  inbox: Mail,
+  calendar: CalendarDays,
+  pipeline: KanbanSquare,
+};
 /** Items under To action before "N more". */
 const SHOWN = 5;
 /** How long Sol waits for his drafts, and for Before you call, before telling the day without them. */
@@ -145,7 +152,7 @@ export function TodayPad(props: {
   const [tab, setTab] = useState<TodayTab | "day">("today");
   const [welcoming, setWelcoming] = useState(Boolean(props.welcome));
   // After the first visit Today opens on the deal feed (deal-feed.ts, 6 Nov 2026, Martin): Sol's typed greeting is for
-  // the first time only. Asking Sol, or Show me my day, turns to the conversation; "Your deals" comes back.
+  // the first time only. Asking Sol, or Show me my day, turns to the conversation; "Deals" comes back.
   const [onFeed, setOnFeed] = useState(!props.welcome);
   // The welcome's tour, run once the greeting is back on the page so every place it lights is there.
   const [touring, setTouring] = useState(false);
@@ -245,7 +252,7 @@ export function TodayPad(props: {
                   type="button"
                   onClick={() => {
                     setTab(t.id);
-                    // "Your deals" always brings the feed back, even from Sol's conversation (8 Nov 2026, Martin).
+                    // "Deals" always brings the feed back, even from Sol's conversation (8 Nov 2026, Martin).
                     if (t.id === "today" && !welcoming) setOnFeed(true);
                   }}
                   aria-pressed={on}
@@ -424,6 +431,7 @@ export function TodayPad(props: {
 
       {tab !== "today" && (
         <div className="mt-8 flex-1">
+          {tab === "calls" && <CallLogPage />}
           {tab === "inbox" && <InboxPage />}
           {tab === "calendar" && <CalendarView jobs={props.jobs} today={props.today} />}
           {tab === "pipeline" && <PipelineView jobs={props.jobs} today={props.today} />}
@@ -444,7 +452,7 @@ export function TodayPad(props: {
                 onClick={() => setOnFeed(!onFeed)}
                 className="mb-2.5 mr-2 inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
               >
-                {onFeed ? "Back to the conversation" : "Your deals"}
+                {onFeed ? "Back to the conversation" : "Deals"}
               </button>
             )}
             {!dayTold && (

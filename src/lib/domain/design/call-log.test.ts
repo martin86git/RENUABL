@@ -1,0 +1,54 @@
+import { describe, expect, it } from "vitest";
+import { callDay, callerName, callsOf, comingWords, loggedWords, outcomeTone, outcomeWords, type CallLogEntry } from "./call-log";
+
+const entry = (o: Partial<CallLogEntry>): CallLogEntry => ({
+  id: "a",
+  jobId: "j",
+  customer: "Alex Example",
+  deal: "Solar",
+  at: "2026-11-08T01:00:00Z",
+  who: "sol",
+  by: "Sol",
+  outcome: "talked",
+  words: "",
+  transcript: null,
+  ...o,
+});
+
+describe("call log", () => {
+  it("filters by who rang and puts the newest first", () => {
+    const all = [
+      entry({ id: "1", at: "2026-11-07T01:00:00Z" }),
+      entry({ id: "2", who: "team", by: "sam@x.example", outcome: null, at: "2026-11-08T02:00:00Z" }),
+      entry({ id: "3", at: "2026-11-08T03:00:00Z" }),
+    ];
+    expect(callsOf(all, "all").map((e) => e.id)).toEqual(["3", "2", "1"]);
+    expect(callsOf(all, "sol").map((e) => e.id)).toEqual(["3", "1"]);
+    expect(callsOf(all, "team").map((e) => e.id)).toEqual(["2"]);
+  });
+
+  it("names the caller and the outcome", () => {
+    expect(callerName(entry({ by: "Revo" }))).toBe("Revo");
+    expect(callerName(entry({ who: "team", by: "sam@x.example" }))).toBe("sam");
+    expect(outcomeWords(entry({ outcome: "voicemail" }))).toBe("Left a voicemail");
+    expect(outcomeWords(entry({ outcome: null }))).toBe("Call logged");
+    expect(outcomeTone("booked")).toBe("good");
+    expect(outcomeTone("callback")).toBe("needs");
+    expect(outcomeTone("no-answer")).toBe("plain");
+  });
+
+  it("keeps logged words short and says what is lined up", () => {
+    expect(loggedWords("a  b\n c")).toBe("a b c");
+    expect(loggedWords("x".repeat(500), 10)).toHaveLength(10);
+    expect(comingWords({ status: "calling", attempts: 1, mode: "lead" })).toBe("Ringing now");
+    expect(comingWords({ status: "waiting", attempts: 0, mode: "proposal" })).toBe("They asked for a call · next calling window");
+    expect(comingWords({ status: "waiting", attempts: 2, mode: "lead" })).toContain("2 tries");
+  });
+
+  it("groups by the market's day", () => {
+    const now = new Date("2026-11-08T05:00:00Z"); // 4pm Sunday in Melbourne
+    expect(callDay("2026-11-08T00:30:00Z", now)).toBe("Today");
+    expect(callDay("2026-11-07T03:00:00Z", now)).toBe("Yesterday");
+    expect(callDay("2026-11-05T03:00:00Z", now)).toMatch(/Thu/);
+  });
+});
