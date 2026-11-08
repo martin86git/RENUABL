@@ -12,6 +12,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   ClipboardCheck,
+  FileText,
   LayoutDashboard,
   Menu,
   MessageCircle,
@@ -415,6 +416,22 @@ function Shell({
                         )}
                       >
                         <PenTool className="size-5" aria-hidden />
+                      </Link>
+                    )}
+                    {/* The proposal, the other tool (8 Nov 2026, Martin): its round beside the designer's, opening the
+                        proposals; a deal's own proposal opens over the page like the designer. */}
+                    {retail && (
+                      <Link
+                        href={PATHS.proposalsSent}
+                        aria-label="Proposals"
+                        title="Proposals"
+                        aria-current={path.startsWith(PATHS.proposalsSent) ? "page" : undefined}
+                        className={clsx(
+                          "-my-2 mr-1.5 flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_4px_14px_rgba(11,11,12,0.12)] ring-1 ring-line transition hover:text-ink",
+                          path.startsWith(PATHS.proposalsSent) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface-2",
+                        )}
+                      >
+                        <FileText className="size-5" aria-hidden />
                       </Link>
                     )}
                     <SectionFold

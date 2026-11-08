@@ -292,6 +292,16 @@ function DealCard(props: {
             <PenTool className="size-4" aria-hidden />
             <span className="hidden sm:inline">{d.projectId ? "Design" : "Design it"}</span>
           </Link>
+          {/* The proposal, the deal's other tool: what the customer sees, over the page like the designer. */}
+          <Link
+            href={`${PATHS.deals}/${encodeURIComponent(d.jobId)}/proposal`}
+            aria-label={`${first}'s proposal`}
+            title="Proposal"
+            className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2"
+          >
+            <FileText className="size-4 text-sun-line" aria-hidden />
+            <span className="hidden sm:inline">Proposal</span>
+          </Link>
           <Link
             href={`${PATHS.deals}/${d.jobId}`}
             className="ml-auto inline-flex h-9 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"

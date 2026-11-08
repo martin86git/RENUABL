@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { PenTool, X } from "lucide-react";
+import { FileText, PenTool, X } from "lucide-react";
 import clsx from "clsx";
 
 /**
@@ -31,6 +31,29 @@ const isDesigner = (href: string) => {
     return false;
   }
 };
+
+/** A deal's proposal screen: the second tool the pop-up holds (8 Nov 2026, Martin: the proposal is a tool like the designer). */
+const PROPOSAL = /^\/design\/deals\/([^/]+)\/proposal$/;
+const isProposal = (href: string) => {
+  try {
+    const u = new URL(href, window.location.origin);
+    return u.origin === window.location.origin && PROPOSAL.test(u.pathname);
+  } catch {
+    return false;
+  }
+};
+/** Either tool the pop-up opens. */
+export const isPopupTool = (href: string) => isDesigner(href) || isProposal(href);
+
+/** Which tool an address is, and the deal it is for when it names one. */
+export function toolOf(href: string): { kind: "design" | "proposal"; job: string | null } {
+  const u = new URL(href, "http://x");
+  const m = PROPOSAL.exec(u.pathname);
+  return m ? { kind: "proposal", job: decodeURIComponent(m[1]) } : { kind: "design", job: u.searchParams.get("job") };
+}
+/** The two tools' addresses for a deal. */
+export const designHref = (job: string) => `${DESIGNER}?job=${encodeURIComponent(job)}`;
+export const proposalHref = (job: string) => `/design/deals/${encodeURIComponent(job)}/proposal`;
 
 /**
  * Opens a designer address: inside the drawer it stays there (the shell is bare in a frame); elsewhere the drawer slides
@@ -75,8 +98,11 @@ export function DesignDrawer(props: {
   onGo?: (href: string) => void;
   /** The tab's words while the drawer is out ("Back to the deal"). */
   back?: string;
+  /** For a deal: the other tool asked for (Design or Proposal), from the rounds beside the window. */
+  onSwitch?: (href: string) => void;
 }) {
-  const { src, open, onOpen, onFold, onSaved, onGo, back = "Back" } = props;
+  const { src, open, onOpen, onFold, onSaved, onGo, back = "Back", onSwitch } = props;
+  const tool = toolOf(src);
   const [loaded, setLoaded] = useState(false);
   const [unsaved, setUnsaved] = useState(false);
   const heard = useRef({ onSaved, onFold, onGo });
@@ -143,7 +169,7 @@ export function DesignDrawer(props: {
       <section
         role="dialog"
         aria-modal={open}
-        aria-label="Design"
+        aria-label={tool.kind === "proposal" ? "Proposal" : "Design"}
         aria-hidden={!open}
         className={clsx(
           "fixed inset-0 z-[60] m-auto flex flex-col overflow-hidden bg-canvas transition duration-200 ease-out motion-reduce:transition-none",
@@ -165,8 +191,49 @@ export function DesignDrawer(props: {
           </button>
         </div>
         {/* A new address in the frame is a new designer: keyed so it loads afresh. */}
-        <iframe key={frame} src={frame} title="Design tool" className="min-h-0 w-full flex-1 border-0" />
+        <iframe
+          key={frame}
+          src={frame}
+          title={tool.kind === "proposal" ? "Proposal" : "Design tool"}
+          className="min-h-0 w-full flex-1 border-0"
+        />
       </section>
+      {/* For a deal, its two tools as rounds in the grey just left of the window (wide screens): the designer's orange
+          round and the proposal's, the one open ringed. */}
+      {open && onSwitch && tool.job && (
+        <nav
+          aria-label="This deal's tools"
+          className="fixed top-1/2 z-[61] hidden -translate-y-1/2 flex-col gap-3 xl:flex"
+          style={{ left: "calc((100vw - min(calc(100vw - 3rem), calc(min(92dvh, 62rem) * 1.3))) / 2 - 4rem)" }}
+        >
+          <button
+            type="button"
+            onClick={() => tool.kind !== "design" && onSwitch(designHref(tool.job!))}
+            aria-pressed={tool.kind === "design"}
+            aria-label="Design"
+            title="Design"
+            className={clsx(
+              "flex size-12 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.35)] transition hover:brightness-105",
+              tool.kind === "design" && "ring-4 ring-white/70",
+            )}
+          >
+            <PenTool className="size-5" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => tool.kind !== "proposal" && onSwitch(proposalHref(tool.job!))}
+            aria-pressed={tool.kind === "proposal"}
+            aria-label="Proposal"
+            title="Proposal"
+            className={clsx(
+              "flex size-12 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_6px_18px_rgba(11,11,12,0.18)] ring-1 ring-line transition hover:text-ink",
+              tool.kind === "proposal" && "ring-4 ring-white/70",
+            )}
+          >
+            <FileText className="size-5" aria-hidden />
+          </button>
+        </nav>
+      )}
       {/* Closed with work not saved: a way back to it, at the foot of the page. */}
       {!open && unsaved && (
         <button
@@ -206,7 +273,7 @@ export function ShellDesignDrawer() {
       const next = u.pathname + u.search;
       const was = shown.current;
       if (was && was !== next) {
-        if (unsaved.current && !window.confirm("The design open has changes that aren't saved. Open this one and lose them?"))
+        if (unsaved.current && !window.confirm("The design open has changes that aren't saved. Open this and lose them?"))
           return setOpen(true);
         unsaved.current = false;
       }
@@ -221,7 +288,7 @@ export function ShellDesignDrawer() {
     };
     const click = (e: MouseEvent) => {
       const a = plainLink(e);
-      if (!a || !isDesigner(a.href)) return;
+      if (!a || !isPopupTool(a.href)) return;
       // The design home's own page keeps its home link as a page.
       const u = new URL(a.href);
       if (window.location.pathname === DESIGNER && !u.search) return;
@@ -243,7 +310,7 @@ export function ShellDesignDrawer() {
     setOpen(false);
   }, [path]);
   if (!src) return null;
-  const job = new URL(src, "http://x").searchParams.get("job");
+  const job = toolOf(src).job;
   return (
     <DesignDrawer
       src={src}
@@ -255,6 +322,7 @@ export function ShellDesignDrawer() {
       // What the page underneath shows of the design (a deal's system, the design home's lists) is read again.
       onSaved={() => router.refresh()}
       back={job ? "Back" : "Close"}
+      onSwitch={(href) => window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { href, heard: false } }))}
     />
   );
 }
@@ -270,7 +338,7 @@ export function DrawerFrameLinks() {
       const a = plainLink(e);
       if (!a) return;
       const u = new URL(a.href);
-      if (u.origin !== window.location.origin || u.pathname === DESIGNER) return;
+      if (u.origin !== window.location.origin || isPopupTool(u.href)) return;
       e.preventDefault();
       tell({ go: u.pathname + u.search + u.hash });
     };

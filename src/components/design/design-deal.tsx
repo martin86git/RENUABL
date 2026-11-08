@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, NotebookPen, ClipboardList, PenTool, Search, Trash2, Wrench } from "lucide-react";
+import { ChevronDown, ChevronLeft, NotebookPen, ClipboardList, FileText, PenTool, Search, Trash2, Wrench } from "lucide-react";
 import { JobCardDialog } from "./job-card";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { ListOnMarketplace } from "./marketplace";
@@ -48,7 +48,7 @@ import { DealService } from "./design-service";
 import { AddressField } from "./design-customers";
 import { useDesignAccount } from "./design-account";
 import { DealEmail, SectionFieldLine } from "./deal-tools";
-import { DesignDrawer } from "./design-drawer";
+import { DesignDrawer, designHref, proposalHref, toolOf } from "./design-drawer";
 import { DealBanner } from "./deal-banner";
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
@@ -259,7 +259,13 @@ export function DealPage({ id }: { id: string }) {
   );
   // The designer as a centred pop-up over the deal (8 Nov 2026, Martin: in the same space, the page's grey either side, so
   // it reads as quick); ?design=1 opens it. Kept loaded once opened, so closing never loses the work.
-  const [drawer, setDrawer] = useState(params.get("design") === "1");
+  const [drawer, setDrawer] = useState(params.get("design") === "1" || params.get("proposal") === "1");
+  // Which of the deal's two tools the pop-up holds (8 Nov 2026, Martin: the proposal is a tool like the designer).
+  const [tool, setTool] = useState<"design" | "proposal">(params.get("proposal") === "1" ? "proposal" : "design");
+  const openTool = (t: "design" | "proposal") => {
+    setTool(t);
+    setDrawer(true);
+  };
   // A link to this deal's own design anywhere on the page (the proposal's "Open the design") opens this pop-up rather than
   // the shell's: heard first, on the window, so the shell leaves it alone.
   useEffect(() => {
@@ -268,8 +274,12 @@ export function DealPage({ id }: { id: string }) {
       const link = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!link || (link.target && link.target !== "_self")) return;
       const u = new URL(link.href);
-      if (u.origin !== window.location.origin || u.pathname !== PATHS.designer || u.searchParams.get("job") !== id) return;
+      if (u.origin !== window.location.origin) return;
+      const asked = toolOf(u.pathname + u.search);
+      const mine = (asked.kind === "design" && u.pathname === PATHS.designer) || asked.kind === "proposal";
+      if (!mine || asked.job !== id) return;
       e.preventDefault();
+      setTool(asked.kind);
       setDrawer(true);
     };
     window.addEventListener("click", click, true);
@@ -453,9 +463,10 @@ export function DealPage({ id }: { id: string }) {
 
   return (
     <div className="mx-auto w-full max-w-[64rem] space-y-4 px-5 py-6">
-      {job.lat !== null && (
+      {(job.lat !== null || tool === "proposal") && (
         <DesignDrawer
-          src={`${PATHS.designer}?job=${encodeURIComponent(job.id)}`}
+          src={tool === "proposal" ? proposalHref(job.id) : designHref(job.id)}
+          onSwitch={(href) => openTool(toolOf(href).kind)}
           open={drawer}
           onOpen={() => setDrawer(true)}
           onFold={() => setDrawer(false)}
@@ -501,7 +512,7 @@ export function DealPage({ id }: { id: string }) {
         customer={customer}
         pulse={pulse && hasPulse(job.stage) ? pulse : null}
         compact={tab !== "overview"}
-        onDesign={job.lat !== null ? () => setDrawer(true) : null}
+        onDesign={job.lat !== null ? () => openTool("design") : null}
         onEmail={() => setTab("email")}
         onCall={() => {
           // A browser that cannot listen just dials.
@@ -532,13 +543,23 @@ export function DealPage({ id }: { id: string }) {
             aria-label="Design"
             title={job.lat !== null ? "Design" : "Give the deal an address to design it"}
             onClick={() => {
-              if (job.lat !== null) return setDrawer(true);
+              if (job.lat !== null) return openTool("design");
               setTab("details");
               setMoving(true);
             }}
             className="flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition hover:brightness-105"
           >
             <PenTool className="size-[18px]" aria-hidden />
+          </button>
+          {/* The proposal, the deal's other tool: what the customer sees, opened over the deal like the designer. */}
+          <button
+            type="button"
+            aria-label="Proposal"
+            title="Proposal"
+            onClick={() => openTool("proposal")}
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_6px_18px_rgba(11,11,12,0.12)] ring-1 ring-line transition hover:text-ink"
+          >
+            <FileText className="size-[18px]" aria-hidden />
           </button>
           <div
             className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto rounded-full bg-surface p-1 ring-1 ring-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
