@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Mail, Phone, Search, Wrench } from "lucide-react";
+import { Check, Mail, Phone, Plus, Search, Wrench } from "lucide-react";
 import clsx from "clsx";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import {
@@ -297,22 +297,18 @@ export function ServicePlanner() {
               <SolStars className="absolute -right-3 -top-3 size-6" />
             </span>
             <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Service</p>
-            <h1 className="mt-2 text-[clamp(28px,3.6vw,42px)] font-light leading-[1.05] tracking-[-0.025em] text-ink">
-              {cases === null
-                ? "Looking at your service cases…"
-                : count("open") + count("in-hand") === 0
-                  ? "Nothing to put right."
-                  : `${count("open") + count("in-hand")} to put right.`}
-            </h1>
             <p className="mt-3 max-w-md text-[15px] text-ink-2">
               Pick a case and I&apos;ll bring you up to speed on it, or ask me about any of them.
             </p>
             <button
               type="button"
               onClick={startNew}
-              className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
+              className="mt-6 inline-flex h-12 items-center gap-2.5 rounded-full bg-primary pl-2 pr-5 text-[15px] font-medium text-primary-ink shadow-[0_6px_20px_rgb(20_22_26_/_0.18)] transition hover:shadow-[0_6px_24px_rgb(255_90_31_/_0.35)]"
             >
-              <Wrench className="size-3.5 text-sun-line" aria-hidden /> New service case
+              <span className="inline-flex size-8 items-center justify-center rounded-full bg-sun-line text-white">
+                <Plus className="size-5" strokeWidth={2.5} aria-hidden />
+              </span>
+              New service case
             </button>
             <div className="mt-6 w-full">{box}</div>
           </div>
