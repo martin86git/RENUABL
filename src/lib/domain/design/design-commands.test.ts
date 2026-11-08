@@ -149,6 +149,14 @@ describe("Sol laying panels in rows, or again", () => {
     expect(parseCommand("lay them in two even rows, landscape")).toEqual({ do: "rows", rows: 2, landscape: true });
     expect(parseCommand("lay the panels so they fit on the roof")).toEqual({ do: "relay" });
     expect(parseCommand("tidy them up")).toEqual({ do: "relay" });
+    expect(parseCommand("10kW of pv in two rows")).toEqual({ do: "rows", rows: 2, kw: 10 });
+    expect(parseCommand("lay 8 kW on the north face in 2 rows, portrait")).toEqual({
+      do: "rows",
+      rows: 2,
+      landscape: false,
+      kw: 8,
+      facing: "N",
+    });
     expect(parseCommand("delete the panels")).toEqual({ do: "removePanels" });
     expect(parseCommand("clear all the solar off")).toEqual({ do: "removePanels" });
     expect(parseCommand("remove the battery")).toEqual({ do: "noBattery" });

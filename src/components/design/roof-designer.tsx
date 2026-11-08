@@ -3727,6 +3727,16 @@ export function RoofDesigner(props: {
     // Only when a whole system has just had its panels laid.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [systemTick]);
+  // Rows asked for with a size: once the panels for that size are down, they are put in the rows (and turned, if asked).
+  const rowsNext = useRef<{ rows: number; landscape?: boolean } | null>(null);
+  useEffect(() => {
+    const want = rowsNext.current;
+    if (!want || !loose.length) return;
+    rowsNext.current = null;
+    const group = loose.map((p) => (want.landscape === undefined ? p : laidAs(p, want.landscape)));
+    setLoose(inRows(group, size, want.rows));
+    if (want.landscape !== undefined) setAddLandscape(want.landscape);
+  }, [loose, size]);
   const runCommand = async (command: DesignCommand): Promise<string> => {
     switch (command.do) {
       case "targetKw":
@@ -3860,8 +3870,19 @@ export function RoofDesigner(props: {
         return `${panelPicks.length ? "The picked" : "All"} panels turned ${command.degrees > 0 ? "+" : ""}${command.degrees}°.`;
       }
       case "rows": {
+        // A size asked for too ("10 kW in two rows"): that size laid first by the rules, then, once they are down, put in
+        // the rows (`rowsNext`, below).
+        if (command.kw) {
+          rowsNext.current = { rows: command.rows, landscape: command.landscape };
+          const done = await fillTo(command.kw, command.facing);
+          if (!done.laid) {
+            rowsNext.current = null;
+            return done.words;
+          }
+          return `${done.laid} panels, ${((done.laid * (panelOf(design).watts || 475)) / 1000).toFixed(2)} kW, in ${Math.min(command.rows, done.laid)} rows${command.landscape === undefined ? "" : command.landscape ? ", landscape" : ", portrait"}. Drag them into place if they need it, and string them.`;
+        }
         const on = panelPicks.length ? panelPicks : everyPanel();
-        if (!on.length) return "There are no panels to lay in rows yet.";
+        if (!on.length) return "There are no panels to lay in rows yet: ask for a size too (“10 kW in two rows”).";
         const next = byHand(on);
         const group = next.loose
           .filter((p) => next.ids.includes(p.id))
