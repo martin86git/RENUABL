@@ -2513,6 +2513,12 @@ export function RoofDesigner(props: {
       if (id) press.current = { mode: "turn", id, centre: { x: grip.panel.x, y: grip.panel.y } };
       return;
     }
+    // Just past a panel's edge, the next panel's outline is showing: a press puts it down (a drag pulls out a row).
+    const edge = !hit || hit.empty ? edgeGhostAt(p) : null;
+    if (edge) {
+      press.current = { mode: "array", anchor: edge };
+      return setGhosts([edge]);
+    }
     if (hit?.empty) {
       // An empty place in a row is empty roof: a click there picks the face, as a click beside the panels would.
       setSelected(hit.face);
@@ -2527,12 +2533,6 @@ export function RoofDesigner(props: {
       setPicks(group);
       press.current = { mode: "move", at: p, picks: group, starts: null };
       return;
-    }
-    // Just past a panel's edge, the next panel's outline is showing: a press puts it down (a drag pulls out a row).
-    const edge = edgeGhostAt(p);
-    if (edge) {
-      press.current = { mode: "array", anchor: edge };
-      return setGhosts([edge]);
     }
     const on = [...faces].reverse().find((f) => inside(p, f.points));
     press.current = { mode: "band", at: p, face: on?.id ?? null, add: e.shiftKey, moved: false };
@@ -2578,7 +2578,8 @@ export function RoofDesigner(props: {
           p &&
           ((grip && Math.hypot(p.x - grip.turn.x, p.y - grip.turn.y) < 8 * u * scale) ||
             (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale));
-        const next = p && !under && !on && !handle && !onArrayHint(p) ? edgeGhostAt(p) : null;
+        // Over empty roof, or an empty place in a traced face's rows (8 Nov 2026: inside a face it never showed).
+        const next = p && (!under || under.empty) && !on && !handle && !onArrayHint(p) ? edgeGhostAt(p) : null;
         if (next || ghosts.length) setGhosts(next ? [next] : []);
       }
       return;
@@ -5926,7 +5927,8 @@ export function RoofDesigner(props: {
                   const xs = corners.map((c) => ((ROOF_IMAGE.width / 2 + c.x / scale - view.x) / view.w) * 100);
                   const ys = corners.map((c) => ((ROOF_IMAGE.height / 2 + c.y / scale - view.y) / view.h) * 100);
                   const middle = (Math.min(...xs) + Math.max(...xs)) / 2;
-                  const low = Math.max(...ys) > 78;
+                  // Set back from the panels (8 Nov 2026, Martin: too close to where he was working), under them, or over them when low.
+                  const low = Math.max(...ys) > 70;
                   // The array just laid, and only it, is picked: its tilt sits at the start of the bar.
                   const pickedIds = panelPicks.flatMap((p) => (p.kind === "loose" ? [p.id] : []));
                   const tiltOn =
@@ -5940,7 +5942,9 @@ export function RoofDesigner(props: {
                       className={clsx(GLASS, "absolute z-20 flex items-center gap-0.5 p-0.5")}
                       style={{
                         left: `clamp(0.5rem, calc(${middle}% - ${half}rem), calc(100% - ${half * 2 + 0.5}rem))`,
-                        top: low ? `calc(${Math.min(...ys)}% - 2.6rem)` : `calc(${Math.max(...ys)}% + 0.6rem)`,
+                        top: low
+                          ? `max(0.5rem, calc(${Math.min(...ys)}% - 6.5rem))`
+                          : `min(calc(100% - 3rem), calc(${Math.max(...ys)}% + 4.5rem))`,
                       }}
                       role="toolbar"
                       aria-label="Turn what is picked"
