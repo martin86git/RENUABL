@@ -16,6 +16,7 @@ import {
   Handshake,
   Mail,
   MessageCircle,
+  NotebookPen,
   Phone,
   Snowflake,
   StickyNote,
@@ -309,16 +310,12 @@ function DealCard(props: {
   const [reviewing, setReviewing] = useState(false);
   // The deal's chat opened over the page from its glance (null: closed), with what was typed in the glance's box.
   const [chat, setChat] = useState<string | null>(null);
-  // The note-taker for this deal, started from Call (8 Nov 2026, Martin: the call is made on the phone while it listens).
+  // Call only dials; the note-taker is its own round, opened by hand with its microphone off (8 Nov 2026, Martin: the
+  // phone icon started the note-taker when it shouldn't).
   const notetaker = useRef<NotetakerHandle>(null);
   const call = () => {
     const phone = (d.phone ?? "").replace(/\s+/g, "");
-    // A phone dials; a computer opens the note-taker; a browser that can't listen dials too.
-    if (window.matchMedia("(pointer: coarse)").matches) {
-      if (phone) window.location.href = `tel:${phone}`;
-      return;
-    }
-    if (!notetaker.current?.start() && phone) window.location.href = `tel:${phone}`;
+    if (phone) window.location.href = `tel:${phone}`;
   };
   // The deal and its team chat as two cards side by side (8 Nov 2026, Martin: the chat wider and floating, not inside
   // the deal's post); the chat drops under the deal on a narrow screen.
@@ -395,12 +392,20 @@ function DealCard(props: {
               <Tool
                 quiet={Boolean(move)}
                 label="Call"
-                title={d.phone ? `Call ${d.phone} with the note-taker open` : "No phone on file"}
+                title={d.phone ? `Call ${d.phone}` : "No phone on file"}
                 onClick={d.phone ? call : undefined}
               >
                 <Phone className="size-4" aria-hidden />
               </Tool>
             )}
+            <Tool
+              quiet
+              label="Note-taker"
+              title="Open the note-taker: start it when the call begins"
+              onClick={() => notetaker.current?.start()}
+            >
+              <NotebookPen className="size-4" aria-hidden />
+            </Tool>
             {move?.kind !== "design" && (
               <Tool
                 quiet={Boolean(move)}

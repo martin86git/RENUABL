@@ -592,10 +592,7 @@ export function DealPage({ id }: { id: string }) {
         compact={tab !== "activities"}
         onDesign={job.lat !== null ? () => openTool("design") : null}
         onEmail={() => setTab("email")}
-        onCall={() => {
-          // A browser that cannot listen just dials.
-          if (!notetaker.current?.start() && customer.phone) window.location.href = `tel:${customer.phone.replace(/\s/g, "")}`;
-        }}
+        onNotes={() => notetaker.current?.start()}
         onSol={() => setTab("sol")}
         onPlace={() => {
           setTab("details");

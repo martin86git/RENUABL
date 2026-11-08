@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Mail, MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, NotebookPen, Phone } from "lucide-react";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
 import { STAGE_LABELS, type Customer, type Job } from "@/lib/domain/design/crm";
 import type { JobDrawing } from "@/lib/domain/design/job-card";
@@ -62,7 +62,7 @@ export function DealBanner({
   pulse,
   onDesign,
   onEmail,
-  onCall,
+  onNotes,
   onSol,
   onPlace,
   compact = false,
@@ -74,8 +74,8 @@ export function DealBanner({
   pulse: DealPulse | null;
   onDesign: (() => void) | null;
   onEmail: () => void;
-  /** On a computer, the call is made on the phone with the note-taker listening (8 Nov 2026, Martin). */
-  onCall: () => void;
+  /** Opens the note-taker, its microphone off until started (8 Nov 2026, Martin: Call only dials). */
+  onNotes: () => void;
   onSol: () => void;
   onPlace: () => void;
   /** A slim strip (8 Nov 2026, Martin: on any tab but Overview the tab's own work, an email say, belongs in the first fold). */
@@ -184,15 +184,16 @@ export function DealBanner({
               <Mail className="size-[18px]" aria-hidden />
             </Round>
             <Round
-              label={phone ? `Call ${customer.phone} with the note-taker open` : "No phone on file"}
+              label={phone ? `Call ${customer.phone}` : "No phone on file"}
               off={!phone}
               onClick={() => {
-                // A phone dials; a computer opens the note-taker, and the call is made on the phone beside it.
-                if (window.matchMedia("(pointer: coarse)").matches) window.location.href = `tel:${phone}`;
-                else onCall();
+                if (phone) window.location.href = `tel:${phone}`;
               }}
             >
               <Phone className="size-[18px]" aria-hidden />
+            </Round>
+            <Round label="Note-taker: start it when the call begins" onClick={onNotes}>
+              <NotebookPen className="size-[18px]" aria-hidden />
             </Round>
             <Round label="Ask Sol about this deal" onClick={onSol} dark>
               <SolBadge className="size-5" />
