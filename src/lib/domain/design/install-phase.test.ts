@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { installPhase } from "./deal";
 
 const today = "2026-10-18";
-const done = { customerInvoice: "paid", stcClaim: "claimed", gridConnection: "completed" };
+const done = { customerInvoice: "paid", coes: "received", stcClaim: "claimed", gridConnection: "completed" };
 
 describe("where an installation is", () => {
   it("is upcoming while sold and its day hasn't come, or there's no day yet", () => {

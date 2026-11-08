@@ -2,22 +2,24 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, BatteryCharging, Check, Plug, Sun } from "lucide-react";
+import { BatteryCharging, Check, Plug, Sun } from "lucide-react";
 import clsx from "clsx";
 import { INSTALLED_STAGES, PROGRESS, PROGRESS_LABELS, type ProgressKey } from "@/lib/domain/design/crm";
 import {
+  AFTER_INSTALL_STEPS,
+  AFTER_STEP_WORDS,
+  afterStepDone,
   completedInstalls,
+  daysUntil,
   inTheWorks,
   installOrder,
-  installPhase,
   installRevenueThisMonth,
   installedOn,
   installerBooked,
-  paperworkDone,
+  nextAfterStep,
   power,
   upcomingInstalls,
-  weekOf,
-  type InstallPhase,
+  type AfterInstallStep,
   type JobExtra,
 } from "@/lib/domain/design/deal";
 import { todayInMarket } from "@/lib/domain/market";
@@ -74,56 +76,6 @@ function Banner({
   );
 }
 
-/** This week, Monday to Sunday, each day with the jobs on it. */
-function WeekCalendar({
-  title,
-  jobs,
-  today,
-  dayOf,
-}: {
-  title: string;
-  jobs: JobLine[] | null;
-  today: ISODate;
-  dayOf: (j: JobLine) => ISODate | null;
-}) {
-  return (
-    <section className="mt-6" aria-label={title}>
-      <h2 className="text-[15px] font-medium tracking-tight text-ink">{title}</h2>
-      <ol className={clsx(ui.card, "mt-2.5 grid grid-cols-1 divide-y divide-line sm:grid-cols-7 sm:divide-x sm:divide-y-0")}>
-        {weekOf(today).map((date) => {
-          const on = (jobs ?? []).filter((j) => dayOf(j) === date);
-          const day = new Date(`${date}T00:00:00Z`);
-          return (
-            <li key={date} className={clsx("flex min-h-24 flex-col p-2.5", date === today && "bg-sun")}>
-              <p className="flex items-baseline gap-1.5">
-                <span
-                  className={clsx("text-[10.5px] font-medium uppercase tracking-[0.14em]", date === today ? "text-sun-ink" : "text-muted")}
-                >
-                  {day.toLocaleDateString("en-AU", { weekday: "short", timeZone: "UTC" })}
-                </span>
-                <span className="text-[13px] font-medium tabular-nums text-ink">{day.getUTCDate()}</span>
-              </p>
-              <ul className="mt-1.5 space-y-1">
-                {on.map((j) => (
-                  <li key={j.id}>
-                    <Link
-                      href={`${PATHS.deals}/${j.id}`}
-                      className="block rounded px-1.5 py-1 text-[11.5px] leading-snug ring-1 ring-line hover:ring-ink-2"
-                    >
-                      <span className="block truncate font-medium text-ink">{j.customerName}</span>
-                      <span className="block truncate text-muted">{j.kw ? power(j.kw) : (j.address || "").split(",")[0]}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          );
-        })}
-      </ol>
-    </section>
-  );
-}
-
 /** What a job's system is, as three marks (solar, battery, EV charger, each lit when it has one) and the sizes. */
 function SystemMarks({ job, extra }: { job: JobLine; extra?: JobExtra }) {
   const battery = extra?.batteryKwh ?? 0;
@@ -166,13 +118,46 @@ function JobCell({ job }: { job: JobLine }) {
   );
 }
 
-/** How much of a job's paperwork is done: the customer's invoice paid, the STCs claimed, the grid connected. */
-const paperworkCount = (j: JobLine) =>
-  [j.details?.customerInvoice === "paid", j.details?.stcClaim === "claimed", j.details?.gridConnection === "completed"].filter(Boolean)
-    .length;
-const PAPERWORK_TALLY = "Each install: lit when its paperwork is all done, half-lit when some is";
+/** How many of a job's four steps after the install are done. */
+const stepsDone = (j: JobLine) => AFTER_INSTALL_STEPS.filter((s) => afterStepDone(j, s)).length;
+const STEPS_TALLY = "Each install: lit when all four steps are done, half-lit when some are";
 
-/** Upcoming installs: what is awaiting install, how many need a date, this month's install revenue, this week, and every job. */
+/** When a sold job is due: To book, Today, its day, or its day passed and not marked installed yet. */
+function DueCell({ job, today, onJob }: { job: JobLine; today: ISODate; onJob: ListProps["onJob"] }) {
+  const [busy, setBusy] = useState(false);
+  if (!job.installDate) return <td className={clsx(cell, "text-[12.5px] font-medium text-sun-ink")}>To book</td>;
+  const come = job.installDate <= today;
+  const markInstalled = async () => {
+    setBusy(true);
+    const res = await saveJob(job.id, { stage: "installed" });
+    setBusy(false);
+    if (res.ok) onJob({ ...job, ...res.job });
+  };
+  return (
+    <td className={clsx(cell, "text-[12.5px] tabular-nums")}>
+      <span className={come ? "font-medium text-ink" : "text-ink-2"}>
+        {job.installDate === today ? "Today" : shortDate(job.installDate)}
+      </span>
+      {come && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void markInstalled()}
+          className="ml-2 rounded-full bg-primary px-2.5 py-0.5 text-[11.5px] font-medium text-primary-ink hover:opacity-90 disabled:bg-surface-2 disabled:text-muted"
+          title="Moves it to After install"
+        >
+          {busy ? "Marking…" : "Mark installed"}
+        </button>
+      )}
+    </td>
+  );
+}
+
+/**
+ * The Installations list (8 Nov 2026, Martin: Upcoming and In the works were the calendar as a list): every sold job not
+ * yet marked installed, booked ones soonest first (so one whose day has come leads, with Mark installed), then those
+ * still to book. Marking one installed moves it to After install.
+ */
 export function UpcomingInstallsView({ jobs, today, onJob }: ListProps) {
   const extras = useExtras();
   const u = jobs ? upcomingInstalls(jobs, today) : null;
@@ -184,7 +169,7 @@ export function UpcomingInstallsView({ jobs, today, onJob }: ListProps) {
         items={[
           {
             label: "Awaiting install",
-            value: u ? String(u.total) : "–",
+            value: list ? String(list.length) : "–",
             under: u ? `${dollars(u.value)} · ${power(u.kw)} sold` : "",
             tally: {
               states: list
@@ -202,116 +187,107 @@ export function UpcomingInstallsView({ jobs, today, onJob }: ListProps) {
           },
         ]}
       />
-      <WeekCalendar title="Installs this week" jobs={list} today={today} dayOf={(j) => j.installDate} />
-      <section className="mt-6" aria-label="Awaiting install">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-[15px] font-medium tracking-tight text-ink">Awaiting install</h2>
-          <Link href={PATHS.scheduler} className={clsx(ui.link, "text-[12.5px]")}>
-            Install Scheduler <ArrowRight className="inline size-3.5" aria-hidden />
-          </Link>
-        </div>
-        <div className={clsx(ui.card, "mt-2.5 overflow-x-auto")}>
-          <table className="w-full min-w-[46rem]">
-            <thead>
-              <tr className="border-b border-line">
-                <th className={clsx(head, "pl-4")}>Job</th>
-                <th className={head}>System</th>
-                <th className={head}>Install date</th>
-                <th className={head}>Installer booked</th>
-                <th className={clsx(head, "pr-4")}>Materials ordered</th>
+      <div className={clsx(ui.card, "mt-6 overflow-x-auto")}>
+        <table className="w-full min-w-[46rem]">
+          <thead>
+            <tr className="border-b border-line">
+              <th className={clsx(head, "pl-4")}>Job</th>
+              <th className={head}>System</th>
+              <th className={head}>Install date</th>
+              <th className={head}>Installer booked</th>
+              <th className={clsx(head, "pr-4")}>Materials ordered</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {!list && (
+              <tr>
+                <td colSpan={5} className="p-4 text-[13px] text-muted">
+                  Loading…
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {!list && (
-                <tr>
-                  <td colSpan={5} className="p-4 text-[13px] text-muted">
-                    Loading…
+            )}
+            {list?.length === 0 && (
+              <tr>
+                <td colSpan={5} className="p-4 text-[13px] text-ink-2">
+                  Nothing sold is waiting to be installed.
+                </td>
+              </tr>
+            )}
+            {list?.map((j) => {
+              const extra = extras?.find((e) => e.jobId === j.id);
+              const booked = installerBooked(j);
+              return (
+                <tr key={j.id}>
+                  <JobCell job={j} />
+                  <td className={cell}>
+                    <SystemMarks job={j} extra={extra} />
                   </td>
-                </tr>
-              )}
-              {list?.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="p-4 text-[13px] text-ink-2">
-                    Nothing sold is waiting to be installed.
+                  <DueCell job={j} today={today} onJob={onJob} />
+                  <td className={cell}>
+                    <span className="flex items-center gap-1.5">
+                      {booked && <Check className="size-4 shrink-0 text-positive" aria-label="Booked" />}
+                      <input
+                        defaultValue={j.details?.installer ?? ""}
+                        placeholder="Who's installing"
+                        aria-label={`Installer for ${j.customerName}`}
+                        onBlur={(e) =>
+                          e.target.value.trim() !== (j.details?.installer ?? "") &&
+                          void setDetail(j, "installer", e.target.value.trim(), onJob)
+                        }
+                        className="w-40 rounded border border-transparent bg-transparent px-1.5 py-1 text-[12.5px] text-ink hover:border-line focus:border-forest focus:outline-none"
+                      />
+                    </span>
                   </td>
-                </tr>
-              )}
-              {list?.map((j) => {
-                const extra = extras?.find((e) => e.jobId === j.id);
-                const booked = installerBooked(j);
-                return (
-                  <tr key={j.id}>
-                    <JobCell job={j} />
-                    <td className={cell}>
-                      <SystemMarks job={j} extra={extra} />
-                    </td>
-                    <td className={clsx(cell, "text-[12.5px] tabular-nums", j.installDate ? "text-ink-2" : "font-medium text-sun-ink")}>
-                      {j.installDate ? shortDate(j.installDate) : "To book"}
-                    </td>
-                    <td className={cell}>
-                      <span className="flex items-center gap-1.5">
-                        {booked && <Check className="size-4 shrink-0 text-positive" aria-label="Booked" />}
-                        <input
-                          defaultValue={j.details?.installer ?? ""}
-                          placeholder="Who's installing"
-                          aria-label={`Installer for ${j.customerName}`}
-                          onBlur={(e) =>
-                            e.target.value.trim() !== (j.details?.installer ?? "") &&
-                            void setDetail(j, "installer", e.target.value.trim(), onJob)
-                          }
-                          className="w-40 rounded border border-transparent bg-transparent px-1.5 py-1 text-[12.5px] text-ink hover:border-line focus:border-forest focus:outline-none"
-                        />
+                  <td className={clsx(cell, "pr-4")}>
+                    {extra?.ordered ? (
+                      <span className="inline-flex items-center gap-1 text-[12.5px] text-positive">
+                        <Check className="size-4" aria-hidden /> Ordered
                       </span>
-                    </td>
-                    <td className={clsx(cell, "pr-4")}>
-                      {extra?.ordered ? (
-                        <span className="inline-flex items-center gap-1 text-[12.5px] text-positive">
-                          <Check className="size-4" aria-hidden /> Ordered
-                        </span>
-                      ) : extra ? (
-                        <Link
-                          href={`${PATHS.orders}/${j.id}`}
-                          className="text-[12.5px] font-medium text-sun-ink underline underline-offset-4"
-                        >
-                          To order
-                        </Link>
-                      ) : (
-                        <span className="text-[12.5px] text-muted">No signed proposal</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                    ) : extra ? (
+                      <Link
+                        href={`${PATHS.orders}/${j.id}`}
+                        className="text-[12.5px] font-medium text-sun-ink underline underline-offset-4"
+                      >
+                        To order
+                      </Link>
+                    ) : (
+                      <span className="text-[12.5px] text-muted">No signed proposal</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }
 
-const FIELD_NAMES: Record<ProgressKey, string> = {
-  customerInvoice: "Customer invoice",
-  stcClaim: "STCs",
-  gridConnection: "Grid connection",
+const STEP_FIELD: Record<AfterInstallStep, ProgressKey> = {
+  invoice: "customerInvoice",
+  coes: "coes",
+  stcs: "stcClaim",
+  grid: "gridConnection",
 };
 
-/** One of a completed job's progress choices, as a dropdown in its row. */
-function ProgressSelect({ job, field, onJob }: { job: JobLine; field: ProgressKey; onJob: ListProps["onJob"] }) {
-  const value = job.details?.[field] ?? "";
-  const done = value === "paid" || value === "claimed" || value === "completed";
+/** One of a job's four steps, as a dropdown: green when done, ringed in the signal colour when it's the next one. */
+function StepSelect({ job, step, next, onJob }: { job: JobLine; step: AfterInstallStep; next: boolean; onJob: ListProps["onJob"] }) {
+  const field = STEP_FIELD[step];
+  const value = job.details?.[field] ?? (step === "coes" && afterStepDone(job, "coes") ? "received" : "");
+  const done = afterStepDone(job, step);
   const labels = PROGRESS_LABELS[field] as Record<string, string>;
   return (
     <select
       value={value}
       onChange={(e) => void setDetail(job, field, e.target.value, onJob)}
-      aria-label={`${FIELD_NAMES[field]} for ${job.customerName}`}
+      aria-label={`${AFTER_STEP_WORDS[step].title} for ${job.customerName}`}
       className={clsx(
         "rounded border px-1.5 py-1 text-[12.5px]",
         done
           ? "border-positive/40 bg-positive-soft text-positive"
-          : value
-            ? "border-line bg-surface text-ink"
+          : next
+            ? "border-sun-line bg-surface font-medium text-ink ring-1 ring-sun-line"
             : "border-line bg-surface text-muted",
       )}
     >
@@ -325,142 +301,169 @@ function ProgressSelect({ job, field, onJob }: { job: JobLine; field: ProgressKe
   );
 }
 
+type StepFilter = AfterInstallStep | "open" | "done";
+
 /**
- * Completed installs: this financial year's, the paperwork still open, unpaid invoices, this week, and every job. With a
- * phase, only the jobs in it (`installPhase`): in the works (the day has come, the paperwork isn't done) or completed.
+ * After install (8 Nov 2026, Martin: the one view worth its own page, to make sure every installed job is invoiced, its
+ * CoES followed up, its STCs claimed and its grid connection raised, in that order). The four steps across the top, each
+ * with how many jobs are at it; pressing one shows those jobs. Every row has the four steps as dropdowns, the next one
+ * ringed.
  */
-export function CompletedInstallsView({ jobs, today, onJob, phase }: ListProps & { phase?: Exclude<InstallPhase, "upcoming"> }) {
+export function CompletedInstallsView({ jobs, today, onJob }: ListProps) {
   const extras = useExtras();
+  const [filter, setFilter] = useState<StepFilter>("open");
   const c = jobs ? completedInstalls(jobs, today) : null;
-  const done = jobs
-    ? jobs
-        .filter((j) => (phase ? installPhase(j, today) === phase : INSTALLED_STAGES.includes(j.stage)))
-        .sort((a, b) => (installedOn(b) ?? "").localeCompare(installedOn(a) ?? ""))
+  const installed = jobs
+    ? jobs.filter((j) => INSTALLED_STAGES.includes(j.stage)).sort((a, b) => (installedOn(a) ?? "").localeCompare(installedOn(b) ?? ""))
     : null;
-  const open = done?.filter((j) => !paperworkDone(j)) ?? null;
-  const unpaid = done?.filter((j) => j.details?.customerInvoice !== "paid") ?? null;
-  const works = phase === "in-works";
-  const title = works ? "In the works" : "Completed installs";
+  const atStep = (s: AfterInstallStep) => installed?.filter((j) => nextAfterStep(j) === s) ?? [];
+  const open = installed?.filter((j) => nextAfterStep(j)) ?? null;
+  const done = installed?.filter((j) => !nextAfterStep(j)).reverse() ?? null;
+  const shown = filter === "open" ? open : filter === "done" ? done : installed ? atStep(filter) : null;
+  const tab = (on: boolean) =>
+    clsx(
+      "flex min-w-[8.5rem] flex-1 flex-col rounded-lg px-4 py-3 text-left ring-1 transition",
+      on ? "bg-surface ring-ink" : "bg-surface/60 ring-line hover:ring-ink-2",
+    );
   return (
     <>
-      <Banner
-        items={
-          works
-            ? [
-                {
-                  label: "In the works",
-                  value: done ? String(done.length) : "–",
-                  under: "Installed or due, paperwork still to finish",
-                  tally: { states: done ? done.map((j) => paperworkPanel(paperworkCount(j))) : null, label: PAPERWORK_TALLY },
-                },
-                {
-                  label: "STCs not claimed",
-                  value: done ? String(done.filter((j) => j.details?.stcClaim !== "claimed").length) : "–",
-                  under: "",
-                },
-                {
-                  label: "Invoices not paid",
-                  value: unpaid ? String(unpaid.length) : "–",
-                  under:
-                    unpaid && extras
-                      ? `${dollars(unpaid.reduce((n, j) => n + Math.max(0, (extras.find((e) => e.jobId === j.id)?.youPay ?? j.value ?? 0) - (extras.find((e) => e.jobId === j.id)?.depositReceived ?? 0)), 0))} still to come in`
-                      : "",
-                  signal: true,
-                },
-              ]
-            : [
-                {
-                  label: `Completed installs · ${c?.yearLabel ?? "financial year"}`,
-                  value: c ? String(c.yearCount) : "–",
-                  under: c ? `${dollars(c.yearValue)} · ${power(c.yearKw)} since 1 July` : "",
-                  tally: { states: done ? done.map((j) => paperworkPanel(paperworkCount(j))) : null, label: PAPERWORK_TALLY },
-                },
-                {
-                  label: "Paperwork open",
-                  value: open ? String(open.length) : "–",
-                  under: "Invoice, STCs or grid connection still to finish",
-                },
-                {
-                  label: "Invoices not paid",
-                  value: unpaid ? String(unpaid.length) : "–",
-                  under:
-                    unpaid && extras
-                      ? `${dollars(unpaid.reduce((n, j) => n + Math.max(0, (extras.find((e) => e.jobId === j.id)?.youPay ?? j.value ?? 0) - (extras.find((e) => e.jobId === j.id)?.depositReceived ?? 0)), 0))} still to come in`
-                      : "",
-                  signal: true,
-                },
-              ]
-        }
-      />
-      <WeekCalendar title={works ? "Installing this week" : "Completed this week"} jobs={done} today={today} dayOf={installedOn} />
-      <section className="mt-6" aria-label={title}>
-        <h2 className="text-[15px] font-medium tracking-tight text-ink">{title}</h2>
-        <div className={clsx(ui.card, "mt-2.5 overflow-x-auto")}>
-          <table className="w-full min-w-[50rem]">
-            <thead>
-              <tr className="border-b border-line">
-                <th className={clsx(head, "pl-4")}>Job</th>
-                <th className={head}>System</th>
-                <th className={head}>Installed</th>
-                <th className={head}>Customer invoice</th>
-                <th className={head}>STCs</th>
-                <th className={clsx(head, "pr-4")}>Grid connection</th>
+      <div className="mt-6 flex flex-wrap gap-2" role="tablist" aria-label="Steps after the install">
+        {AFTER_INSTALL_STEPS.map((s, i) => {
+          const n = installed ? atStep(s).length : null;
+          return (
+            <button
+              key={s}
+              type="button"
+              role="tab"
+              aria-selected={filter === s}
+              onClick={() => setFilter(filter === s ? "open" : s)}
+              className={tab(filter === s)}
+            >
+              <span className="text-[11px] tabular-nums text-muted">{i + 1}</span>
+              <span className="text-[13px] font-medium text-ink">{AFTER_STEP_WORDS[s].doing}</span>
+              <span className={clsx("mt-1 text-[22px] font-medium leading-none tabular-nums", n ? "text-sun-line" : "text-muted")}>
+                {n ?? "–"}
+              </span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={filter === "done"}
+          onClick={() => setFilter(filter === "done" ? "open" : "done")}
+          className={tab(filter === "done")}
+        >
+          <span className="text-[11px] text-muted">
+            <Check className="inline size-3" aria-hidden />
+          </span>
+          <span className="text-[13px] font-medium text-ink">All done</span>
+          <span className="mt-1 text-[22px] font-medium leading-none tabular-nums text-positive">{done ? done.length : "–"}</span>
+        </button>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[13px] text-ink-2">
+          {filter === "open"
+            ? "Every installed job with a step still to do, the longest installed first."
+            : filter === "done"
+              ? "Paid, CoES in, STCs claimed and grid connection raised."
+              : `${AFTER_STEP_WORDS[filter].doing}: the jobs where it's the next step.`}
+        </p>
+        {c && installed && (
+          <div className="flex items-center gap-3 text-[12px] text-muted">
+            <span>
+              {c.yearCount} installed {c.yearLabel} · {dollars(c.yearValue)}
+            </span>
+            <Tally states={installed.map((j) => paperworkPanel(stepsDone(j) === 4 ? 3 : Math.min(2, stepsDone(j))))} label={STEPS_TALLY} />
+          </div>
+        )}
+      </div>
+      <div className={clsx(ui.card, "mt-3 overflow-x-auto")}>
+        <table className="w-full min-w-[56rem]">
+          <thead>
+            <tr className="border-b border-line">
+              <th className={clsx(head, "pl-4")}>Job</th>
+              <th className={head}>System</th>
+              <th className={head}>Installed</th>
+              {AFTER_INSTALL_STEPS.map((s, i) => (
+                <th key={s} className={clsx(head, i === 3 && "pr-4")}>
+                  {i + 1}. {AFTER_STEP_WORDS[s].title}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {!shown && (
+              <tr>
+                <td colSpan={7} className="p-4 text-[13px] text-muted">
+                  Loading…
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {!done && (
-                <tr>
-                  <td colSpan={6} className="p-4 text-[13px] text-muted">
-                    Loading…
-                  </td>
-                </tr>
-              )}
-              {done?.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="p-4 text-[13px] text-ink-2">
-                    {works ? "Nothing in the works." : "Nothing installed yet."}
-                  </td>
-                </tr>
-              )}
-              {done?.map((j) => (
+            )}
+            {shown?.length === 0 && (
+              <tr>
+                <td colSpan={7} className="p-4 text-[13px] text-ink-2">
+                  {installed?.length === 0 ? "Nothing installed yet." : filter === "done" ? "None finished yet." : "Nothing waiting here."}
+                </td>
+              </tr>
+            )}
+            {shown?.map((j) => {
+              const next = nextAfterStep(j);
+              const on = installedOn(j);
+              return (
                 <tr key={j.id}>
                   <JobCell job={j} />
                   <td className={cell}>
                     <SystemMarks job={j} extra={extras?.find((e) => e.jobId === j.id)} />
                   </td>
                   <td className={clsx(cell, "text-[12.5px] tabular-nums text-ink-2")}>
-                    {installedOn(j) ? shortDate(installedOn(j)!) : "–"}
+                    {on ? shortDate(on) : "–"}
+                    {on && next && daysUntil(on, today) < 0 && (
+                      <span className="block text-[11px] text-muted">{-daysUntil(on, today)} days ago</span>
+                    )}
                   </td>
-                  <td className={cell}>
-                    <ProgressSelect job={j} field="customerInvoice" onJob={onJob} />
-                  </td>
-                  <td className={cell}>
-                    <ProgressSelect job={j} field="stcClaim" onJob={onJob} />
-                  </td>
-                  <td className={clsx(cell, "pr-4")}>
-                    <ProgressSelect job={j} field="gridConnection" onJob={onJob} />
-                  </td>
+                  {AFTER_INSTALL_STEPS.map((s, i) => (
+                    <td key={s} className={clsx(cell, i === 3 && "pr-4")}>
+                      <StepSelect job={j} step={s} next={next === s} onJob={onJob} />
+                    </td>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }
 
-const PHASE_HEAD: Record<InstallPhase, string> = {
-  upcoming: "Upcoming installations.",
-  "in-works": "Installations in the works.",
-  completed: "Completed installations.",
-};
+/** Calendar or List, the way the Installations page shows its jobs. */
+export type InstallView = "calendar" | "list";
 
-/** An Installations page: the business's jobs in one phase (`installPhase`), as the overview's lists show them. */
-export function InstallationsPhasePage({ phase }: { phase: InstallPhase }) {
+/** The switch between the two, kept in the address so a reload or a link keeps it. */
+export function InstallViewSwitch({ view, onView }: { view: InstallView; onView: (v: InstallView) => void }) {
+  return (
+    <div className="flex rounded-md border border-line p-0.5" role="radiogroup" aria-label="Show installations as">
+      {(["calendar", "list"] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          role="radio"
+          aria-checked={view === v}
+          onClick={() => onView(v)}
+          className={clsx("h-8 rounded px-3 text-sm capitalize", view === v ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink")}
+        >
+          {v}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The business's jobs, loaded once, with a way to put back one that changed. */
+function useJobs() {
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const today = todayInMarket();
   useEffect(() => {
     let gone = false;
     void listJobs().then((res) => {
@@ -473,19 +476,39 @@ export function InstallationsPhasePage({ phase }: { phase: InstallPhase }) {
     };
   }, []);
   const changed = (job: JobLine) => setJobs((all) => (all ?? []).map((j) => (j.id === job.id ? job : j)));
+  return { jobs, problem, changed };
+}
+
+const Problem = ({ text }: { text: string | null }) =>
+  text && (
+    <p className="mt-6 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
+      {text}
+    </p>
+  );
+
+/** The Installations page as a list: every sold job not yet installed. */
+export function InstallListPage({ switcher }: { switcher: React.ReactNode }) {
+  const { jobs, problem, changed } = useJobs();
   return (
     <div className={ui.page}>
-      <PageHead eyebrow="Installations" title={PHASE_HEAD[phase]} />
-      {problem && (
-        <p className="mt-6 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
-          {problem}
-        </p>
-      )}
-      {phase === "upcoming" ? (
-        <UpcomingInstallsView jobs={jobs && jobs.filter((j) => installPhase(j, today) === "upcoming")} today={today} onJob={changed} />
-      ) : (
-        <CompletedInstallsView jobs={jobs} today={today} onJob={changed} phase={phase} />
-      )}
+      <PageHead title="Installations">{switcher}</PageHead>
+      <Problem text={problem} />
+      <UpcomingInstallsView jobs={jobs} today={todayInMarket()} onJob={changed} />
+    </div>
+  );
+}
+
+/** /design/installations/completed: After install. */
+export function AfterInstallPage() {
+  const { jobs, problem, changed } = useJobs();
+  return (
+    <div className={ui.page}>
+      <PageHead title="After install" />
+      <p className="mt-1 text-[13.5px] text-ink-2">
+        Every installed job, taken through four steps in order: invoice, CoES, STCs, grid connection.
+      </p>
+      <Problem text={problem} />
+      <CompletedInstallsView jobs={jobs} today={todayInMarket()} onJob={changed} />
     </div>
   );
 }

@@ -17,13 +17,13 @@ const ARROW = "inline-flex size-9 items-center justify-center rounded-md border 
 const TONE = { ready: "border-positive bg-positive-soft", partly: "border-sun-line bg-sun", not: "border-line bg-surface-2" } as const;
 
 /**
- * /design/procurement/scheduler: the Install Scheduler. Every booked
+ * /design/installations as a calendar (Calendar | List). Every booked
  * installation on a month or a week, each marked with whether it is ready to
  * go (the stock ordered, the deposit in): green when both, amber when one.
  * Dates are set on the deal or in the Installations list. Whether customers
  * are reminded before their day is shown, with the way to switch it on.
  */
-export function SchedulerPage() {
+export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
   const today = todayInMarket();
   const [view, setView] = useState<CalendarView>("month");
   const [date, setDate] = useState(today);
@@ -77,7 +77,8 @@ export function SchedulerPage() {
 
   return (
     <div className={ui.page}>
-      <PageHead eyebrow="Procurement" title="Install Scheduler">
+      <PageHead title="Installations">
+        {switcher}
         <div className="flex items-center gap-1">
           <button type="button" className={ARROW} onClick={() => setDate(cal.prev)} aria-label="Earlier">
             <ChevronLeft className="size-4" />
@@ -240,9 +241,9 @@ export function SchedulerPage() {
           <span className="size-2.5 rounded-sm bg-muted" /> Neither yet
         </span>
         <span>
-          Set a date on the deal, or in{" "}
-          <Link href={PATHS.installations} className={ui.link}>
-            In the works
+          Set a date on the deal, or in the{" "}
+          <Link href={`${PATHS.installations}?view=list`} className={ui.link}>
+            list
           </Link>
           .
         </span>

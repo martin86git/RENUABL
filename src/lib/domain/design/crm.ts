@@ -288,19 +288,22 @@ export type DetailKey = (typeof DETAIL_KEYS)[number];
 
 /**
  * How a sold job is getting on, kept beside its details (and sent with them): who is installing it, and after the
- * install the customer's invoice, the STC claim and the grid connection. Each is set by hand from the Installations
- * lists; the pipeline stages are left as they are.
+ * install the four steps After install takes each job through, in order (8 Nov 2026, Martin): the customer's invoice,
+ * the CoES followed up, the STCs claimed and the grid connection raised. Each is set by hand; the pipeline stages are
+ * left as they are.
  */
 export const PROGRESS = {
   customerInvoice: ["not-issued", "pending", "paid"],
+  coes: ["not-received", "received"],
   stcClaim: ["not-claimed", "claimed"],
   gridConnection: ["pending", "underway", "completed"],
 } as const;
 export type ProgressKey = keyof typeof PROGRESS;
 export const PROGRESS_LABELS: { [K in ProgressKey]: Record<(typeof PROGRESS)[K][number], string> } = {
-  customerInvoice: { "not-issued": "Not issued", pending: "Pending", paid: "Paid" },
+  customerInvoice: { "not-issued": "Not issued", pending: "Sent, not paid", paid: "Paid" },
+  coes: { "not-received": "Not received", received: "Received" },
   stcClaim: { "not-claimed": "Not claimed", claimed: "Claimed" },
-  gridConnection: { pending: "Pending", underway: "Underway", completed: "Completed" },
+  gridConnection: { pending: "Not raised", underway: "Raised", completed: "Connected" },
 };
 /** Who is installing a job, as the business writes it. */
 export const INSTALLER_KEY = "installer";

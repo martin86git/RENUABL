@@ -1,14 +1,6 @@
-import type { Metadata } from "next";
-import { SchedulerPage } from "@/components/design/design-scheduler";
-import { DesignShell } from "@/components/design/design-shell";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Install Scheduler", robots: { index: false, follow: false } };
-
-/** The business's booked installations on a calendar. */
+/** The Install Scheduler is now the Installations page's calendar (8 Nov 2026). */
 export default function Page() {
-  return (
-    <DesignShell needsAccount>
-      <SchedulerPage />
-    </DesignShell>
-  );
+  redirect("/design/installations");
 }

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
           installer: who.member.businessName,
           accepted: action === "accept",
           suburb: done.suburb,
-          link: `${site}/design/procurement/scheduler`,
+          link: `${site}/design/installations`,
         }),
       }).catch((e) => console.error("job answered email failed", e instanceof Error ? e.message : e));
     return Response.json({ ok: true, jobs: await jobsFor(who.member.businessId) });

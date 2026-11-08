@@ -15,6 +15,17 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-08",
+    area: "Installation",
+    words: "The install calendar, Upcoming and In the works are one Installations page, shown as a calendar or a list.",
+  },
+  {
+    day: "2026-11-08",
+    area: "Installation",
+    words:
+      "After install takes each installed job through four steps in order: invoice, follow up the CoES, claim the STCs, raise the grid connection.",
+  },
+  {
+    day: "2026-11-08",
     area: "Deals",
     words: "A deal's system reads at a glance: the home first, then solar, inverter and battery a line each with how many and the size.",
   },

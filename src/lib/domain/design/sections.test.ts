@@ -3,8 +3,9 @@ import { marketplacePagesFor, pageAt, sectionAt, SECTIONS } from "./sections";
 
 describe("the sections across the top", () => {
   it("lights the section and page an address belongs to, the closest match winning", () => {
-    expect(pageAt("/design/installations/underway")?.page.id).toBe("works");
-    expect(pageAt("/design/installations")?.page.id).toBe("upcoming");
+    expect(pageAt("/design/installations/underway")?.page.id).toBe("calendar");
+    expect(pageAt("/design/installations/completed")?.page.id).toBe("completed");
+    expect(pageAt("/design/installations")?.page.id).toBe("calendar");
     expect(pageAt("/design/procurement/scheduler")?.section.id).toBe("installation");
     expect(pageAt("/design/procurement/orders/job_123")?.page.id).toBe("orders");
   });

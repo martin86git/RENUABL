@@ -28,9 +28,10 @@ describe("where a job is on the journey", () => {
     expect(journeyStopOf(job("scheduled", { ...approved, installer: "Sam" }))).toBe("install");
   });
 
-  it("is post-install until the invoice is paid, the STCs claimed and the grid connected, then running", () => {
+  it("is post-install until the invoice is paid, the CoES in, the STCs claimed and the grid connection raised, then running", () => {
     expect(journeyStopOf(job("installed"))).toBe("after");
-    expect(journeyStopOf(job("claimed", { ...done, gridConnection: "underway" }))).toBe("after");
+    expect(journeyStopOf(job("claimed", { ...done, gridConnection: "pending" }))).toBe("after");
+    expect(journeyStopOf(job("installed", done))).toBe("after");
     expect(journeyStopOf(job("grid", done))).toBe("running");
   });
 });

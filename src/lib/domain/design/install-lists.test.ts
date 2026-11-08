@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cleanJobDetails } from "./crm";
-import { installRevenueThisMonth, installedOn, installerBooked, paperworkDone, type JobExtra } from "./deal";
+import { installRevenueThisMonth, installedOn, installerBooked, nextAfterStep, paperworkDone, type JobExtra } from "./deal";
 
 const TODAY = "2026-10-18";
 const job = (id: string, over: Record<string, unknown> = {}) =>
@@ -26,9 +26,25 @@ describe("the Installations lists", () => {
     expect(installerBooked(job("a", { installDate: "2026-10-23" }))).toBe(false);
   });
 
-  it("calls the paperwork done only when all three are", () => {
-    expect(paperworkDone(job("a", { details: { customerInvoice: "paid", stcClaim: "claimed", gridConnection: "completed" } }))).toBe(true);
-    expect(paperworkDone(job("a", { details: { customerInvoice: "paid", stcClaim: "claimed", gridConnection: "underway" } }))).toBe(false);
+  it("takes an installed job through invoice, CoES, STCs and grid connection, in that order", () => {
+    const at = (details: Record<string, string>, stage = "installed") => nextAfterStep(job("a", { stage, details }));
+    expect(at({})).toBe("invoice");
+    expect(at({ customerInvoice: "pending" })).toBe("invoice");
+    expect(at({ customerInvoice: "paid" })).toBe("coes");
+    // A deal moved to CoES received (or past it) has its CoES in.
+    expect(at({ customerInvoice: "paid" }, "coes")).toBe("stcs");
+    expect(at({ customerInvoice: "paid", coes: "received", stcClaim: "claimed" })).toBe("grid");
+    // An earlier step left open is still the next one, whatever is ticked after it.
+    expect(at({ stcClaim: "claimed", gridConnection: "completed" })).toBe("invoice");
+    // Raised is enough: what's left is the network's to do.
+    expect(at({ customerInvoice: "paid", coes: "received", stcClaim: "claimed", gridConnection: "underway" })).toBeNull();
+  });
+
+  it("calls the paperwork done only when all four steps are", () => {
+    const all = { customerInvoice: "paid", coes: "received", stcClaim: "claimed", gridConnection: "completed" };
+    expect(paperworkDone(job("a", { details: all }))).toBe(true);
+    expect(paperworkDone(job("a", { details: { ...all, coes: "not-received" } }))).toBe(false);
+    expect(paperworkDone(job("a", { details: { ...all, gridConnection: "pending" } }))).toBe(false);
   });
 
   it("places a completed install on its install date, else the day it was marked installed", () => {

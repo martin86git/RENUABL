@@ -556,9 +556,33 @@ export function installRevenueThisMonth(
 /** Whether an installer is booked: someone is named on the job and it has an install date. */
 export const installerBooked = (j: Pick<Job, "details" | "installDate">) => Boolean(j.details?.installer && j.installDate);
 
-/** After the install, whether a job's paperwork is all done: the customer's invoice paid, the STCs claimed, the grid connected. */
-export const paperworkDone = (j: Pick<Job, "details">) =>
-  j.details?.customerInvoice === "paid" && j.details?.stcClaim === "claimed" && j.details?.gridConnection === "completed";
+/**
+ * What happens after an install, in order (8 Nov 2026, Martin): invoice the customer, follow up the CoES, claim the
+ * STCs, raise the grid connection. A job's next step is the first not done.
+ */
+export const AFTER_INSTALL_STEPS = ["invoice", "coes", "stcs", "grid"] as const;
+export type AfterInstallStep = (typeof AFTER_INSTALL_STEPS)[number];
+export const AFTER_STEP_WORDS: Record<AfterInstallStep, { title: string; doing: string }> = {
+  invoice: { title: "Invoice", doing: "Invoice the customer" },
+  coes: { title: "CoES", doing: "Follow up the CoES" },
+  stcs: { title: "STCs", doing: "Claim the STCs" },
+  grid: { title: "Grid connection", doing: "Raise the grid connection" },
+};
+type AfterJob = Pick<Job, "details" | "stage">;
+/** Whether one step is done. The CoES also counts once the deal is at CoES received or past it; a raised grid connection counts, since what's left is the network's. */
+export const afterStepDone = (j: AfterJob, step: AfterInstallStep): boolean =>
+  step === "invoice"
+    ? j.details?.customerInvoice === "paid"
+    : step === "coes"
+      ? j.details?.coes === "received" || ["coes", "grid", "claimed"].includes(j.stage)
+      : step === "stcs"
+        ? j.details?.stcClaim === "claimed"
+        : j.details?.gridConnection === "underway" || j.details?.gridConnection === "completed";
+/** A job's next step after the install, or null once all four are done. */
+export const nextAfterStep = (j: AfterJob): AfterInstallStep | null => AFTER_INSTALL_STEPS.find((s) => !afterStepDone(j, s)) ?? null;
+
+/** After the install, whether all four steps are done: paid, CoES in, STCs claimed, grid connection raised. */
+export const paperworkDone = (j: AfterJob) => nextAfterStep(j) === null;
 
 /** The days a job was installed on, for the calendar: its install date, else the day it was marked installed. */
 export const installedOn = (j: Pick<Job, "installDate" | "installedAt">): ISODate | null =>

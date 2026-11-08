@@ -1,14 +1,6 @@
-import type { Metadata } from "next";
-import { DesignShell } from "@/components/design/design-shell";
-import { InstallationsPhasePage } from "@/components/design/install-lists";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "In the works", robots: { index: false, follow: false } };
-
-/** Installations in the works: the day has come, the paperwork isn't done. */
+/** In the works is now the Installations list (8 Nov 2026). */
 export default function InstallationsInTheWorksPage() {
-  return (
-    <DesignShell needsAccount>
-      <InstallationsPhasePage phase="in-works" />
-    </DesignShell>
-  );
+  redirect("/design/installations?view=list");
 }

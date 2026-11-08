@@ -265,7 +265,7 @@ const JOURNEY_PATHS: Record<JourneyStop, string> = {
   approvals: PATHS.installations,
   procure: PATHS.orders,
   install: PATHS.scheduler,
-  after: PATHS.underway,
+  after: PATHS.completed,
   running: PATHS.completed,
   service: PATHS.service,
 };

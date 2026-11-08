@@ -63,10 +63,15 @@ export const SECTIONS: readonly Section[] = [
     id: "installation",
     label: "Installation",
     pages: [
-      { id: "calendar", label: "Install calendar", href: "/design/procurement/scheduler" },
-      { id: "upcoming", label: "Upcoming", href: "/design/installations" },
-      { id: "works", label: "In the works", href: "/design/installations/underway" },
-      { id: "completed", label: "Completed", href: "/design/installations/completed" },
+      // 8 Nov 2026, Martin: the calendar, Upcoming and In the works were one thing seen two ways, so they are one
+      // page with Calendar and List; After install takes each installed job through invoice, CoES, STCs and grid.
+      {
+        id: "calendar",
+        label: "Installations",
+        href: "/design/installations",
+        also: ["/design/procurement/scheduler", "/design/installations/underway"],
+      },
+      { id: "completed", label: "After install", href: "/design/installations/completed" },
       { id: "invoices", label: "Installer invoices", href: "/design/installations/invoices" },
       // The installers and inspectors this retailer works with (connections.ts).
       { id: "connections", label: "Connections", href: "/design/connections" },
@@ -136,7 +141,7 @@ const under = (path: string, href: string) => path === href || path.startsWith(`
 
 /**
  * The page an address is: the one whose address (or one of its others) holds it most closely, so
- * /design/installations/underway is In the works, not Upcoming. The overview itself only on its own address.
+ * /design/installations/completed is After install, not Installations. The overview itself only on its own address.
  */
 export function pageAt(path: string, kind: BusinessKind = "retailer"): { section: Section; page: SectionPage } | null {
   let best: { section: Section; page: SectionPage; length: number } | null = null;

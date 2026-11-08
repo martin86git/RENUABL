@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import { DesignShell } from "@/components/design/design-shell";
-import { InstallationsPhasePage } from "@/components/design/install-lists";
+import { InstallationsPage } from "@/components/design/installations";
 
-export const metadata: Metadata = { title: "Upcoming installations", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Installations", robots: { index: false, follow: false } };
 
-/** Upcoming installations: sold, and the day not come yet (or not booked). */
-export default function DesignInstallationsPage() {
+/** Installations: every sold job not yet installed, as a calendar or a list. */
+export default async function DesignInstallationsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const { view } = await searchParams;
   return (
     <DesignShell needsAccount>
-      <InstallationsPhasePage phase="upcoming" />
+      <InstallationsPage initial={view === "list" ? "list" : "calendar"} />
     </DesignShell>
   );
 }

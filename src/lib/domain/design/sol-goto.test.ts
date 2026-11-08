@@ -6,7 +6,7 @@ describe("Sol opening a page", () => {
     const keys = SOL_PLACES.map((p) => p.key);
     expect(new Set(keys).size).toBe(keys.length);
     expect(SOL_PLACES.find((p) => p.key === "orders")?.path).toBe("/design/procurement/orders");
-    expect(SOL_PLACES.find((p) => p.key === "calendar")?.path).toBe("/design/procurement/scheduler");
+    expect(SOL_PLACES.find((p) => p.key === "calendar")?.path).toBe("/design/installations");
     expect(SOL_PLACES.find((p) => p.key === "settings:price-lists")?.path).toBe("/design/settings/price-lists");
     expect(keys).not.toContain("settings:view-as");
     expect(placesForSol()).toContain("orders: Ordering station");
