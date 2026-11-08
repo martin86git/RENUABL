@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ExternalLink, PenTool, X } from "lucide-react";
+import { PenTool, X } from "lucide-react";
 import clsx from "clsx";
-import { ui } from "./design-shell";
 
 /**
  * The design tool slides over the page as a drawer, never a new screen (5 Nov 2026, Martin: the intention is not to
@@ -152,19 +151,18 @@ export function DesignDrawer(props: {
           open ? "scale-100 opacity-100" : "pointer-events-none scale-[0.97] opacity-0",
         )}
       >
-        <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4">
-          <p className="flex items-center gap-2 text-sm font-medium text-ink">
-            <PenTool className="size-4 text-sun-line" aria-hidden /> Design
-            {unsaved && <span className="text-xs font-normal text-sun-ink">Not saved yet</span>}
-          </p>
-          <div className="flex items-center gap-1">
-            <a href={src} target="_blank" rel="noreferrer" className={clsx(ui.quiet, "h-8 text-xs")}>
-              <ExternalLink className="size-3.5" aria-hidden /> Own tab
-            </a>
-            <button type="button" onClick={onFold} className={clsx(ui.quiet, "h-8 text-xs")} aria-label={back}>
-              <X className="size-4" aria-hidden />
-            </button>
-          </div>
+        {/* No bar of its own (8 Nov 2026, Martin: the map taller and wider): the close round sits in the corner, beside the
+            designer's own slim row, which keeps it clear. */}
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onFold}
+            className="flex size-9 items-center justify-center rounded-full bg-surface text-ink-2 shadow-sm ring-1 ring-line hover:text-ink"
+            aria-label={back}
+            title={unsaved ? `${back} (not saved yet)` : back}
+          >
+            <X className="size-4" aria-hidden />
+          </button>
         </div>
         {/* A new address in the frame is a new designer: keyed so it loads afresh. */}
         <iframe key={frame} src={frame} title="Design tool" className="min-h-0 w-full flex-1 border-0" />

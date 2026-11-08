@@ -3769,15 +3769,26 @@ export function RoofDesigner(props: {
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
           and the address being designed; then which design this is and its quote on the left, and publishing it and
           its proposal on the right. A firmer line under it sets it off from the work below. */}
-      <header className="relative z-40 rounded-lg bg-surface px-4 text-ink shadow-[var(--shadow-soft)] ring-1 ring-line">
+      <header
+        className={clsx(
+          "relative z-40 text-ink",
+          // In the pop-up (8 Nov 2026, Martin: no menu bar, the map taller and wider): one slim row, no card, the window's
+          // close kept clear on the right.
+          props.tight ? "pr-11" : "rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
+        )}
+      >
         <div
-          className={clsx("flex flex-wrap items-center gap-y-2 py-2.5", props.tight ? "gap-x-3 xl:flex-nowrap" : "gap-x-5 lg:flex-nowrap")}
+          className={clsx(
+            "flex flex-wrap items-center gap-y-2",
+            props.tight ? "gap-x-2 py-0.5 xl:flex-nowrap" : "gap-x-5 py-2.5 lg:flex-nowrap",
+          )}
         >
           {props.bar}
+          {props.tight && <span className="flex-1" aria-hidden />}
           <dl
             className={clsx(
-              "flex min-w-0 flex-1 items-center gap-x-6 overflow-hidden border-line lg:border-l lg:pl-5",
-              props.tight ? "basis-24" : "basis-56",
+              "min-w-0 flex-1 basis-56 items-center gap-x-6 overflow-hidden border-line lg:border-l lg:pl-5",
+              props.tight ? "sr-only" : "flex",
             )}
           >
             <div className="min-w-0 flex-1">
@@ -3820,7 +3831,7 @@ export function RoofDesigner(props: {
           {/* Opened on an earlier visit's unsaved work: said once, with the way back to what is saved. */}
           {resumed && saved !== "saved" && (
             <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-ink">
-              Picked up where you left off{keptWhen(resumed) ? ` ${keptWhen(resumed)}` : ""}
+              {props.tight ? "Draft" : `Picked up where you left off${keptWhen(resumed) ? ` ${keptWhen(resumed)}` : ""}`}
               <button
                 type="button"
                 onClick={() => {
@@ -4229,7 +4240,7 @@ export function RoofDesigner(props: {
         </div>
       </header>
 
-      <div className="relative mt-5">
+      <div className={clsx("relative", props.tight ? "mt-2" : "mt-5")}>
         <div className="min-w-0">
           <div>
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what

@@ -3,6 +3,7 @@
 import { withDatasheets, type Datasheets } from "@/lib/domain/design/datasheets";
 import { findDatasheetOnline, loadDatasheets } from "@/lib/services/datasheets";
 import Link from "next/link";
+import { MapPin } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DesignBrief } from "./design-brief";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -87,6 +88,7 @@ export function DesignStudio() {
   // Null until this device's last roof has been looked up, so the address box doesn't flash before a saved roof.
   // Inside the designer pop-up: the bar is trimmed and the picture sized to the window.
   const popped = useInDrawer();
+  const [finding, setFinding] = useState(false);
   const [ready, setReady] = useState(false);
   const [roof, setRoof] = useState<DesignRoof | null>(null);
   // The work the designer opens on: a draft kept from an earlier visit when there is one still drawn over the saved roof
@@ -404,22 +406,24 @@ export function DesignStudio() {
                   <Wordmark className="text-[17px]" />
                 </Link>
               )}
-              <Link
-                href="/design/roof"
-                onClick={(e) => {
-                  if (unsaved.current && !window.confirm("This design has changes that aren't saved. Leave it and lose them?"))
-                    e.preventDefault();
-                  else {
-                    // The home, without a roof: the page's own state is cleared as the address changes.
-                    setRoof(null);
-                    setWork(null);
-                  }
-                }}
-                className="shrink-0 rounded px-2 py-1.5 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
-                title="The design home: deals waiting for a design, and recent designs"
-              >
-                Design home
-              </Link>
+              {!popped && (
+                <Link
+                  href="/design/roof"
+                  onClick={(e) => {
+                    if (unsaved.current && !window.confirm("This design has changes that aren't saved. Leave it and lose them?"))
+                      e.preventDefault();
+                    else {
+                      // The home, without a roof: the page's own state is cleared as the address changes.
+                      setRoof(null);
+                      setWork(null);
+                    }
+                  }}
+                  className="shrink-0 rounded px-2 py-1.5 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
+                  title="The design home: deals waiting for a design, and recent designs"
+                >
+                  Design home
+                </Link>
+              )}
               {onJob && (
                 // The customer's name opens their deal (1 Nov 2026, Martin, as Primero's): inside the design drawer the deal shows on the
                 // page underneath (the drawer folds); on its own it goes to the deal.
@@ -438,10 +442,30 @@ export function DesignStudio() {
                   <span className="shrink-0 text-white/80">· Open deal</span>
                 </button>
               )}
-              {/* Another roof, without leaving the designer. */}
-              <div className={popped ? "w-48 min-w-36 shrink" : "w-72 min-w-44 max-w-full shrink xl:w-80 2xl:w-96"}>
-                <AddressEntry compact placeholder="Search another address" onPick={pick} />
-              </div>
+              {/* Another roof, without leaving the designer; in the pop-up behind a round, for the odd wrong address. */}
+              {popped ? (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setFinding(!finding)}
+                    aria-expanded={finding}
+                    title="The wrong address? Find the right one"
+                    aria-label="Find another address"
+                    className="flex size-9 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line hover:text-ink"
+                  >
+                    <MapPin className="size-4" aria-hidden />
+                  </button>
+                  {finding && (
+                    <div className="absolute left-0 top-11 z-50 w-80 rounded-lg bg-surface p-2 shadow-lift ring-1 ring-line">
+                      <AddressEntry compact placeholder="The right address" onPick={pick} />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="w-72 min-w-44 max-w-full shrink xl:w-80 2xl:w-96">
+                  <AddressEntry compact placeholder="Search another address" onPick={pick} />
+                </div>
+              )}
             </>
           }
         />
