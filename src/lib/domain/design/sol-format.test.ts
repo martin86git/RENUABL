@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LONG_PARAGRAPH, answerFor, brokenUp, isYesNoQuestion, solBlocks, solPlain } from "./sol-format";
+import { LONG_PARAGRAPH, MAX_OPTIONS, answerFor, brokenUp, isYesNoQuestion, solBlocks, solPlain } from "./sol-format";
 import { MORE_DETAIL } from "./sol-charts";
 
 describe("Sol's answers laid out", () => {
@@ -76,5 +76,46 @@ describe("answering Sol's questions", () => {
 
   it("names the question in what goes to Sol", () => {
     expect(answerFor("Want me to do that swap now?", "Yes")).toBe('Answering your question "Want me to do that swap now?": Yes');
+  });
+});
+
+describe("a question with options", () => {
+  const asked = [
+    "Here's how I could run it.",
+    "",
+    "? How should I approach prospects?",
+    "- Consultative: ask questions, understand needs, then position the offer.",
+    "- Direct and persuasive — lead with the value and handle objections.",
+    "- Warm and concise: keep calls brief and focused on the next step.",
+  ].join("\n");
+
+  it("becomes one choice with each option's name and line", () => {
+    const blocks = solBlocks(asked);
+    expect(blocks.map((b) => b.kind)).toEqual(["para", "choose"]);
+    const choice = blocks[1];
+    if (choice.kind !== "choose") throw new Error("not a choice");
+    expect(choice.text).toBe("How should I approach prospects?");
+    expect(choice.options.map((o) => o.label)).toEqual(["Consultative", "Direct and persuasive", "Warm and concise"]);
+    expect(choice.options[1].detail).toBe("lead with the value and handle objections.");
+  });
+
+  it("takes short names with no line, and bold names", () => {
+    const blocks = solBlocks("? Which design?\n- **Fastest payback**\n- Best return");
+    expect(blocks[0]).toEqual({
+      kind: "choose",
+      text: "Which design?",
+      options: [
+        { label: "Fastest payback", detail: "" },
+        { label: "Best return", detail: "" },
+      ],
+    });
+  });
+
+  it("leaves a long list or long sentences as a list to read", () => {
+    const many = ["? Which?", ...Array.from({ length: MAX_OPTIONS + 1 }, (_, i) => `- Option ${i + 1}`)].join("\n");
+    expect(solBlocks(many).map((b) => b.kind)).toEqual(["ask", "list"]);
+    const sentences =
+      "? Anything else?\n- the inverter sits on the north wall beside the meter box today\n- the battery would go in the garage";
+    expect(solBlocks(sentences).map((b) => b.kind)).toEqual(["ask", "list"]);
   });
 });

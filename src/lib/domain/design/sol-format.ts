@@ -16,7 +16,18 @@ export type SolBlock =
   /** A question put to the reader, highlighted so it isn't missed. */
   | { kind: "ask"; text: string }
   /** The routine offer of more detail, kept quiet. */
-  | { kind: "more"; text: string };
+  | { kind: "more"; text: string }
+  /** A question with a few options to pick from, drawn as a card of numbered choices. */
+  | { kind: "choose"; text: string; options: SolOption[] };
+
+/** One option of a choice: a short name and, when given, a line on what it means. */
+export interface SolOption {
+  label: string;
+  detail: string;
+}
+
+/** A choice offers two to this many options; more is a list to read, not a card to press. */
+export const MAX_OPTIONS = 4;
 
 /** A paragraph longer than this is broken at its sentences. */
 export const LONG_PARAGRAPH = 360;
@@ -91,6 +102,37 @@ export function solBlocks(text: string): SolBlock[] {
   }
   endPara();
   endList();
+  return withChoices(out);
+}
+
+/** An option line: "Name: what it means" or "Name — what it means", or a short name alone. */
+function optionOf(item: string): SolOption | null {
+  const m = /^(.{1,48}?)\s*(?::|\s[–—-]\s)\s*(.+)$/.exec(item.replace(/\*\*/g, ""));
+  const label = (m ? m[1] : item.replace(/\*\*/g, "")).trim().replace(/[.:]$/, "");
+  const detail = m ? m[2].trim() : "";
+  if (!label || label.length > 48 || (!m && label.split(/\s+/).length > 6)) return null;
+  return { label, detail };
+}
+
+/**
+ * A question put to the reader followed straight away by two to four short options becomes one choice (8 Nov 2026,
+ * Martin: Sol's questions shown as a card of numbered choices to press, as Claude asks).
+ */
+function withChoices(blocks: SolBlock[]): SolBlock[] {
+  const out: SolBlock[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    const next = blocks[i + 1];
+    if (b.kind === "ask" && next?.kind === "list" && next.items.length >= 2 && next.items.length <= MAX_OPTIONS) {
+      const options = next.items.map(optionOf);
+      if (options.every((o): o is SolOption => o !== null)) {
+        out.push({ kind: "choose", text: b.text, options });
+        i++;
+        continue;
+      }
+    }
+    out.push(b);
+  }
   return out;
 }
 
