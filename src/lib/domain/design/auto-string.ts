@@ -203,6 +203,72 @@ function planGroup(n: number, inputs: Input[], limit: number): Placed[] | null {
   return null;
 }
 
+/** The closest any panel of one set comes to any of another, metres. */
+const gapBetween = (a: AutoPanel[], b: AutoPanel[]) => Math.min(...a.flatMap((p) => b.map((q) => Math.hypot(p.x - q.x, p.y - q.y))));
+
+/**
+ * A group's panels (already in snake order, an array at a time) as clusters a string may be drawn from: each array its
+ * own (8 Nov 2026, Martin: a string that ran from the big array into two small ones meant cable across the roof), with
+ * any too small for a string of its own (`shortest`) joined to the nearest. Each keeps the snake's order.
+ */
+export function arrayClusters(panels: AutoPanel[], shortest: number): AutoPanel[][] {
+  const at = new Map(panels.map((p, i) => [p.key, i]));
+  const order = (list: AutoPanel[]) => [...list].sort((a, b) => (at.get(a.key) ?? 0) - (at.get(b.key) ?? 0));
+  let clusters: AutoPanel[][] = [];
+  for (const p of panels) {
+    const last = clusters[clusters.length - 1];
+    if (last && (last[0].array ?? "") === (p.array ?? "")) last.push(p);
+    else clusters.push([p]);
+  }
+  for (;;) {
+    const small = clusters.findIndex((c) => c.length < shortest);
+    if (small < 0 || clusters.length < 2) return clusters;
+    let near = -1;
+    let gap = Infinity;
+    clusters.forEach((c, i) => {
+      if (i === small) return;
+      const d = gapBetween(clusters[small], c);
+      if (d < gap) [near, gap] = [i, d];
+    });
+    const joined = order([...clusters[small], ...clusters[near]]);
+    clusters = clusters.filter((_, i) => i !== small && i !== near);
+    clusters.push(joined);
+    clusters.sort((a, b) => (at.get(a[0].key) ?? 0) - (at.get(b[0].key) ?? 0));
+  }
+}
+
+/** The clusters with the two closest joined into one: used when the clusters as they are don't fit the inputs. */
+function joinClosest(clusters: AutoPanel[][], panels: AutoPanel[]): AutoPanel[][] {
+  const at = new Map(panels.map((p, i) => [p.key, i]));
+  let best: [number, number] = [0, 1];
+  let gap = Infinity;
+  for (let i = 0; i < clusters.length; i++)
+    for (let j = i + 1; j < clusters.length; j++) {
+      const d = gapBetween(clusters[i], clusters[j]);
+      if (d < gap) [best, gap] = [[i, j], d];
+    }
+  const joined = [...clusters[best[0]], ...clusters[best[1]]].sort((a, b) => (at.get(a.key) ?? 0) - (at.get(b.key) ?? 0));
+  return [...clusters.filter((_, i) => i !== best[0] && i !== best[1]), joined].sort(
+    (a, b) => (at.get(a[0].key) ?? 0) - (at.get(b[0].key) ?? 0),
+  );
+}
+
+/** Every cluster strung whole on its own inputs, or null when they don't all fit (`waiting`: inputs kept for later groups). */
+function planClusters(clusters: AutoPanel[][], open: Input[], waiting: number): { panels: AutoPanel[]; plan: Placed[] }[] | null {
+  const used = new Set<Input>();
+  const out: { panels: AutoPanel[]; plan: Placed[] }[] = [];
+  for (let ci = 0; ci < clusters.length; ci++) {
+    const avail = open.filter((i) => !used.has(i));
+    const limit = avail.length - (clusters.length - 1 - ci) - waiting;
+    if (limit < 1) return null;
+    const plan = planGroup(clusters[ci].length, avail, limit);
+    if (!plan || plan.reduce((sum, p) => sum + p.length * p.count, 0) !== clusters[ci].length) return null;
+    for (const p of plan) used.add(p.input);
+    out.push({ panels: clusters[ci], plan });
+  }
+  return out;
+}
+
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 const VERIFY_NOTE =
@@ -267,6 +333,37 @@ export function autoString(input: {
     }
     // Keep one input back for each group still to come that is big enough for a string of its own.
     const waiting = groups.slice(gi + 1).filter((g) => g.panels.length >= shortest).length;
+    const emit = (panelsIn: AutoPanel[], plan: Placed[]) => {
+      let at = 0;
+      for (const placed of plan) {
+        free.delete(placed.input);
+        const e = input.inverters[placed.input.inverter].electrical as InverterElectrical;
+        for (let k = 0; k < placed.count; k++) {
+          const panels = panelsIn.slice(at, at + placed.length).map((p) => p.key);
+          at += placed.length;
+          strings.push({
+            id: `s${strings.length + 1}`,
+            panels,
+            ...(placed.input.inverter > 0 ? { inverter: placed.input.inverter } : {}),
+            mppt: placed.input.mppt,
+          });
+          checks.push(checkString({ panels: panels.length, panel, inverter: e, mppt: placed.input.mppt, sharing: placed.count }));
+        }
+      }
+      return at;
+    };
+    // Array by array first, so no string runs from one array to another unless an array is too small for one of its
+    // own, or there aren't the inputs for every array apart: then the closest are joined, one pair at a time.
+    let clusters = arrayClusters(group.panels, shortest);
+    let byArray = clusters.length > 1 ? planClusters(clusters, open, waiting) : null;
+    while (!byArray && clusters.length > 2) {
+      clusters = joinClosest(clusters, group.panels);
+      byArray = planClusters(clusters, open, waiting);
+    }
+    if (byArray) {
+      for (const c of byArray) emit(c.panels, c.plan);
+      return;
+    }
     const plan = planGroup(n, open, Math.max(1, open.length - waiting));
     if (!plan) {
       left.push(...group.panels.map((p) => p.key));
@@ -278,22 +375,7 @@ export function autoString(input: {
       );
       return;
     }
-    let at = 0;
-    for (const placed of plan) {
-      free.delete(placed.input);
-      const e = input.inverters[placed.input.inverter].electrical as InverterElectrical;
-      for (let k = 0; k < placed.count; k++) {
-        const panels = group.panels.slice(at, at + placed.length).map((p) => p.key);
-        at += placed.length;
-        strings.push({
-          id: `s${strings.length + 1}`,
-          panels,
-          ...(placed.input.inverter > 0 ? { inverter: placed.input.inverter } : {}),
-          mppt: placed.input.mppt,
-        });
-        checks.push(checkString({ panels: panels.length, panel, inverter: e, mppt: placed.input.mppt, sharing: placed.count }));
-      }
-    }
+    const at = emit(group.panels, plan);
     if (at < n) {
       left.push(...group.panels.slice(at).map((p) => p.key));
       why.push(`${plural(n - at, "panel")}${where}: more than the inputs left can take within their limits`);

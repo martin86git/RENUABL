@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  arrayClusters,
   autoString,
   autoStringDesign,
   designAutoPanels,
@@ -183,6 +184,26 @@ describe("the order along a string", () => {
     // North-facing: the top of the slope is to the south (larger y). Rows at y = 1.8 and y = 0.
     const order = snakeOrder(block("p", 2, 3, 0), 0).map((p) => p.key);
     expect(order).toEqual(["p1-0", "p1-1", "p1-2", "p0-2", "p0-1", "p0-0"]);
+  });
+
+  it("strings each array on its own when the inputs allow, so no cable runs from one array to another", () => {
+    // A big array and two small ones nearby, all looking the same way: before, one snake ran through all three.
+    const big = block("b", 2, 10, 0).map((p) => ({ ...p, array: "big" }));
+    const one = block("s", 3, 3, 0, 22, 20).map((p) => ({ ...p, array: "one" }));
+    const two = block("t", 3, 3, 0, 22, 26).map((p) => ({ ...p, array: "two" }));
+    const r = autoString({ panels: [...big, ...one, ...two], inverters: [SH15T], panel });
+    expect(r.left).toEqual([]);
+    const arrayOf = new Map([...big, ...one, ...two].map((p) => [p.key, p.array]));
+    for (const s of r.strings) expect(new Set(s.panels.map((k) => arrayOf.get(k))).size).toBe(1);
+    expect(lengths(r).sort((a, b) => a - b)).toEqual([9, 9, 20]);
+  });
+
+  it("joins an array too small for a string of its own to the nearest one", () => {
+    const clusters = arrayClusters(
+      [...block("b", 1, 10, 0).map((p) => ({ ...p, array: "big" })), ...block("s", 1, 3, 0, 22, 14).map((p) => ({ ...p, array: "small" }))],
+      8,
+    );
+    expect(clusters.map((c) => c.length)).toEqual([13]);
   });
 
   it("finishes one array before starting the next", () => {
