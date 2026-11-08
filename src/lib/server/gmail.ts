@@ -19,6 +19,7 @@ import {
   mergeInboxes,
   rawEmail,
   type ComposedEmail,
+  type ComposedFile,
   type EmailAction,
   type MailPart,
 } from "@/lib/domain/design/inbox";
@@ -297,13 +298,29 @@ export async function changeEmail(member: Who, box: string, id: string, action: 
  * Sends a new email from one of the member's own mailboxes (8 Nov 2026, Martin: write an email from the inbox), so it
  * comes from their address and Gmail keeps it in their Sent. gmail.modify allows sending; a read-only one is refused.
  */
-export async function sendFromGmail(member: Who, box: string, mail: ComposedEmail): Promise<void> {
+export async function sendFromGmail(
+  member: Who,
+  box: string,
+  mail: ComposedEmail,
+  files: readonly ComposedFile[] = [],
+  picturesHtml = "",
+): Promise<void> {
   const address = box.toLowerCase();
   if (!(await changeableAddresses(member)).includes(address)) {
     if ((await gmailAddresses(member)).includes(address)) throw new ReadOnlyMailbox(`Connect ${address} again to send from it here.`);
     throw new GmailOff(`Gmail (${address}) isn't connected.`);
   }
-  await gmail(member, address, "messages/send", { raw: rawEmail(address, mail) });
+  const token = await accessToken(member, address);
+  if (!token) throw new GmailOff(`Gmail (${address}) isn't connected.`);
+  // Gmail's upload address takes the email as it is (pictures and files included), with no JSON round it.
+  const res = await fetch("https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "message/rfc822" },
+    body: new Uint8Array(rawEmail(address, mail, files, picturesHtml)),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (res.status === 401 || res.status === 403) throw new GmailOff(`Gmail turned the request down for ${address}: connect it again.`);
+  if (!res.ok) throw new Error(`Gmail ${res.status}`);
 }
 
 /** The unread count of every mailbox the member has connected together, as Gmail keeps each. */

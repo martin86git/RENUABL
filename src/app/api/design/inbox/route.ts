@@ -1,4 +1,15 @@
-import { cleanCompose, cleanEmailNote, isEmailAction, isMessageId } from "@/lib/domain/design/inbox";
+import {
+  COMPOSE_LIMITS,
+  cleanCompose,
+  cleanComposeHelp,
+  cleanEmailNote,
+  composeHelpPrompt,
+  isEmailAction,
+  isMessageId,
+  type ComposedFile,
+} from "@/lib/domain/design/inbox";
+import { emailFileName, isPicture, picturesHtml } from "@/lib/domain/design/email-compose";
+import { formFiles } from "@/lib/server/email-parts";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
@@ -110,6 +121,49 @@ export async function GET(request: Request) {
   });
 }
 
+const COMPOSE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["subject", "body"],
+  properties: { subject: { type: "string" }, body: { type: "string" } },
+} as const;
+
+type Member = Extract<Awaited<ReturnType<typeof requireMember>>, { member: unknown }>["member"];
+
+/**
+ * A new email sent through one of the member's own mailboxes: the words, and any pictures (shown inside it under the
+ * words) and files (attached). Never while viewing as someone else; 60 an hour.
+ */
+async function sendNew(request: Request, member: Member, fields: Record<string, unknown>, files: readonly File[]) {
+  if (member.viewedBy) return json({ ok: false, message: "You're viewing as someone else: nothing is sent from their mailbox." }, 403);
+  if (!allow(request, "inbox-send", 60)) return json({ ok: false, message: "That's a lot of emails in an hour. Try again shortly." }, 429);
+  const clean = cleanCompose(fields, files.length > 0);
+  if (!clean.ok) return json({ ok: false, message: clean.message }, 422);
+  const box =
+    typeof fields.box === "string" && fields.box.includes("@")
+      ? fields.box.toLowerCase().slice(0, 254)
+      : (await changeableAddresses(member))[0];
+  if (!box) return json({ ok: false, message: "Connect your Gmail first." }, 409);
+  const parts: ComposedFile[] = [];
+  const ids: string[] = [];
+  let pictures = 0;
+  for (const f of files) {
+    const picture = isPicture(f.type);
+    if (picture) pictures += 1;
+    const contentId = picture ? `picture${pictures}` : undefined;
+    if (contentId) ids.push(contentId);
+    parts.push({ name: emailFileName(f.name, f.type, pictures), type: f.type, bytes: new Uint8Array(await f.arrayBuffer()), contentId });
+  }
+  try {
+    await sendFromGmail(member, box, clean.mail, parts, picturesHtml(ids));
+    return json({ ok: true, from: box });
+  } catch (e) {
+    if (e instanceof GmailOff || e instanceof ReadOnlyMailbox) return json({ ok: false, message: e.message }, 409);
+    console.error("inbox send failed", redactSecrets(e instanceof Error ? e.message : String(e)));
+    return json({ ok: false, message: "Gmail didn't take that email just now. It wasn't sent: try again in a moment." }, 502);
+  }
+}
+
 const SOL_SCHEMA = { type: "object", additionalProperties: false, required: ["text"], properties: { text: { type: "string" } } } as const;
 
 /**
@@ -126,27 +180,62 @@ export async function POST(request: Request) {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const { member } = who;
+    // A new email comes as a form, with its pictures and files (checked again here: the browser is never trusted).
+    if ((request.headers.get("content-type") ?? "").includes("multipart/form-data")) {
+      const form = await request.formData().catch(() => null);
+      if (!form || form.get("do") !== "send") return json({ ok: false, message: "That couldn't be read." }, 400);
+      const got = formFiles(form);
+      if ("problem" in got) return json({ ok: false, message: got.problem }, 422);
+      const field = (k: string) => (typeof form.get(k) === "string" ? (form.get(k) as string) : "");
+      return sendNew(
+        request,
+        member,
+        { box: field("box"), to: field("to"), cc: field("cc"), subject: field("subject"), body: field("body"), size: field("size") },
+        got.files,
+      );
+    }
     // A new email's words can run to COMPOSE_LIMITS.body characters; everything else here is short.
     const read = await readBody(request, 90_000);
     if ("refuse" in read) return read.refuse;
     const b = read.body;
-    if (b.do === "send") {
-      if (member.viewedBy) return json({ ok: false, message: "You're viewing as someone else: nothing is sent from their mailbox." }, 403);
-      if (!allow(request, "inbox-send", 60))
-        return json({ ok: false, message: "That's a lot of emails in an hour. Try again shortly." }, 429);
-      const clean = cleanCompose(b);
-      if (!clean.ok) return json({ ok: false, message: clean.message }, 422);
-      const box =
-        typeof b.box === "string" && b.box.includes("@") ? b.box.toLowerCase().slice(0, 254) : (await changeableAddresses(member))[0];
-      if (!box) return json({ ok: false, message: "Connect your Gmail first." }, 409);
-      try {
-        await sendFromGmail(member, box, clean.mail);
-        return json({ ok: true, from: box });
-      } catch (e) {
-        if (e instanceof GmailOff || e instanceof ReadOnlyMailbox) return json({ ok: false, message: e.message }, 409);
-        console.error("inbox send failed", redactSecrets(e instanceof Error ? e.message : String(e)));
-        return json({ ok: false, message: "Gmail didn't take that email just now. It wasn't sent: try again in a moment." }, 502);
-      }
+    if (b.do === "send") return sendNew(request, member, b, []);
+    if (b.do === "compose-sol") {
+      if (!allow(request, "inbox-sol", 120)) return json({ ok: false, message: "Too many in the last hour. Try again shortly." }, 429);
+      const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);
+      if (!apiKey) return json({ ok: false, message: "Sol isn't set up here." }, 503);
+      const mode = b.mode === "write" ? "write" : "polish";
+      const text = (k: string, max: number) => (typeof b[k] === "string" ? (b[k] as string).slice(0, max) : "");
+      const instructions = text("instructions", COMPOSE_LIMITS.instructions).trim();
+      const body = text("body", COMPOSE_LIMITS.body);
+      if (mode === "write" && !instructions) return json({ ok: false, message: "Tell Sol what the email should say." }, 422);
+      if (mode === "polish" && !body.trim()) return json({ ok: false, message: "Write something first, then Sol can polish it." }, 422);
+      const to = text("to", 1000)
+        .split(/[\s,;]+/)
+        .filter((a) => a.includes("@"))
+        .slice(0, COMPOSE_LIMITS.to);
+      const prompt = composeHelpPrompt(mode, {
+        business: member.businessName,
+        to,
+        subject: text("subject", COMPOSE_LIMITS.subject),
+        body,
+        instructions,
+      });
+      // Writing an email someone will read is the deeper model's; tidying words is quick (sol-routing.ts).
+      const out = await withSolCredit(
+        member.businessId,
+        "inbox",
+        member.email,
+        (ai) => readWithClaude<{ subject: string; body: string }>([], COMPOSE_SCHEMA, prompt, apiKey, ai),
+        inboxTier(mode === "write"),
+        mode === "write" ? "email written" : "email polished",
+      ).catch((e) => {
+        console.error("compose sol failed", redactSecrets(e instanceof Error ? e.message : String(e)));
+        return null;
+      });
+      if (out === "out") return json({ ok: false, message: SOL_OUT_SHORT }, 402);
+      const clean = cleanComposeHelp(out);
+      if (!clean) return json({ ok: false, message: "Sol couldn't write that just now. Try again in a moment." }, 502);
+      return json({ ok: true, ...clean });
     }
     const id = typeof b.id === "string" && isMessageId(b.id) ? b.id : null;
     const owner = typeof b.owner === "string" && b.owner.includes("@") ? b.owner.toLowerCase().slice(0, 254) : member.email.toLowerCase();

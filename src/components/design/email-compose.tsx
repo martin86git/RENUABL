@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type RefObject } from "react";
-import { FileText, ImagePlus, List, ListOrdered, Omega, Paperclip, X } from "lucide-react";
+import { FileText, ImagePlus, List, ListOrdered, Omega, Paperclip, Plus, X } from "lucide-react";
 import clsx from "clsx";
 import {
   EMAIL_SYMBOLS,
@@ -200,12 +200,15 @@ export function EmailFormatBar(props: {
   files: EmailFiles;
   disabled?: boolean;
   className?: string;
+  /** One "+" that takes pictures and files alike, first in the bar, in place of the two buttons (the inbox's Compose). */
+  plus?: boolean;
 }) {
-  const { area, text, setText, files, disabled } = props;
+  const { area, text, setText, files, disabled, plus } = props;
   const [symbols, setSymbols] = useState(false);
   const pop = useRef<HTMLDivElement>(null);
   const pictureInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const anyInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!symbols) return;
@@ -247,6 +250,29 @@ export function EmailFormatBar(props: {
 
   return (
     <div className={clsx("flex flex-wrap items-center gap-0.5", props.className)} role="toolbar" aria-label="Format the email">
+      {plus && (
+        <>
+          <button
+            type="button"
+            className={tool}
+            title="Add pictures or files"
+            aria-label="Add pictures or files"
+            disabled={disabled}
+            onClick={() => anyInput.current?.click()}
+          >
+            <Plus className="size-4" aria-hidden />
+          </button>
+          <input
+            ref={anyInput}
+            type="file"
+            accept={`${PICTURE_ACCEPT},${FILE_ACCEPT}`}
+            multiple
+            hidden
+            onChange={(e) => chosen(e.currentTarget)}
+          />
+          <span className="mx-1 h-5 w-px bg-line" aria-hidden />
+        </>
+      )}
       {/* mousedown kept from the box, so its selection is still there when the button acts. */}
       <button
         type="button"
@@ -304,10 +330,10 @@ export function EmailFormatBar(props: {
           </div>
         )}
       </div>
-      <span className="mx-1 h-5 w-px bg-line" aria-hidden />
+      {!plus && <span className="mx-1 h-5 w-px bg-line" aria-hidden />}
       <button
         type="button"
-        className={tool}
+        className={clsx(tool, plus && "hidden")}
         title="Add a picture"
         aria-label="Add a picture"
         disabled={disabled}
@@ -317,7 +343,7 @@ export function EmailFormatBar(props: {
       </button>
       <button
         type="button"
-        className={tool}
+        className={clsx(tool, plus && "hidden")}
         title="Attach a file"
         aria-label="Attach a file"
         disabled={disabled}

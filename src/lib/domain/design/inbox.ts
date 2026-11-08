@@ -4,12 +4,14 @@
  * customer it came from, machines' emails marked Automated and drawn quieter. An opened email reads as sent, with
  * private notes beside it: only the member and anyone they tag see them, and tagging someone shares that one email
  * with them, never the mailbox. Opening an email marks it read in Gmail, and it can be marked unread again or archived
- * from here, the same in Gmail (5 Nov 2026, Martin); replying stays in Gmail or the deal's Email tab, and nothing is
- * ever sent or deleted. Pure, tested.
+ * from here, the same in Gmail (5 Nov 2026, Martin). A new email is written here and sent through the member's own Gmail
+ * (8 Nov 2026), with pictures, files, links, a text size and Sol's help; replying stays in Gmail or the deal's Email tab,
+ * and nothing is ever deleted. Pure, tested.
  */
 import { todayInMarket } from "../market";
 import { addDaysISO } from "../scheduling";
 import { mondayOf } from "./design-home";
+import { messageBlocks } from "./email-compose";
 
 /**
  * Read, and change labels (5 Nov 2026: read, unread, archive). It can't send, and nothing here deletes. Mailboxes
@@ -32,13 +34,89 @@ export const isEmailAction = (v: unknown): v is EmailAction => EMAIL_ACTIONS.inc
  * Writing a new email from the inbox (8 Nov 2026, Martin): sent through the member's own Gmail, so it comes from their
  * address and sits in their Sent. gmail.modify already allows sending; a mailbox connected read only can't.
  */
-export const COMPOSE_LIMITS = { to: 10, cc: 10, subject: 200, body: 20_000 } as const;
+export const COMPOSE_LIMITS = { to: 10, cc: 10, subject: 200, body: 20_000, instructions: 2_000 } as const;
+
+/** The email's text size (8 Nov 2026, Martin: a way to change it), for the whole email, in pixels in the HTML version. */
+export const EMAIL_SIZES = [
+  { id: "small", label: "Small", px: 13 },
+  { id: "normal", label: "Normal", px: 14 },
+  { id: "large", label: "Large", px: 16 },
+  { id: "huge", label: "Larger", px: 18 },
+] as const;
+export type EmailSize = (typeof EMAIL_SIZES)[number]["id"];
+const sizeOf = (raw: unknown): EmailSize => (EMAIL_SIZES.some((s) => s.id === raw) ? (raw as EmailSize) : "normal");
 
 export interface ComposedEmail {
   to: string[];
   cc: string[];
   subject: string;
+  /** As typed: lists with "• " and "1. ", links as [words](address). */
   body: string;
+  size: EmailSize;
+}
+
+/**
+ * A link's address as typed, made safe to send: "renuabl.com.au" gains https://, an email address becomes mailto:,
+ * and only web and mail links are kept (never javascript: or a file). Null when it isn't one.
+ */
+export function cleanLinkUrl(raw: string): string | null {
+  let url = raw.trim();
+  if (!url || /\s/.test(url) || url.length > 2000) return null;
+  if (ADDRESS.test(url)) url = `mailto:${url}`;
+  else if (!/^[a-z][a-z0-9+.-]*:/i.test(url)) url = `https://${url}`;
+  try {
+    const u = new URL(url);
+    if (u.protocol === "mailto:") return ADDRESS.test(decodeURIComponent(u.pathname)) ? url : null;
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    return u.hostname.includes(".") ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The words with a link put round the selection ([words](address)); with nothing selected, the address is the words. */
+export function withLink(text: string, start: number, end: number, url: string): { text: string; caret: number } {
+  const words = text.slice(start, end).replace(/[[\]]/g, "").trim() || url.replace(/^mailto:/, "");
+  const link = `[${words}](${url})`;
+  return { text: text.slice(0, start) + link + text.slice(end), caret: start + link.length };
+}
+
+const LINK = /\[([^\]\n]{1,300})\]\(([^)\s]{1,2000})\)/g;
+
+/** The plain-text version of the words: each link as "words (address)". */
+export const plainBody = (body: string) =>
+  body.replace(LINK, (_, words: string, url: string) => {
+    const safe = cleanLinkUrl(url);
+    return safe ? `${words} (${safe.replace(/^mailto:/, "")})` : words;
+  });
+
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** One line as HTML: escaped, its [words](address) links made real (only safe addresses), the rest left as words. */
+function lineHtml(line: string): string {
+  let out = "";
+  let at = 0;
+  for (const m of line.matchAll(LINK)) {
+    out += esc(line.slice(at, m.index));
+    const url = cleanLinkUrl(m[2]);
+    out += url ? `<a href="${esc(url)}" style="color:#1a56db">${esc(m[1])}</a>` : esc(m[1]);
+    at = m.index! + m[0].length;
+  }
+  return out + esc(line.slice(at));
+}
+
+/** The words as the email's HTML: paragraphs, real lists and links, at the chosen size, with the pictures under them. */
+export function composeHtml(body: string, size: EmailSize, picturesHtml = ""): string {
+  const px = EMAIL_SIZES.find((s) => s.id === size)?.px ?? 14;
+  const li = (items: string[]) => items.map((i) => `<li style="margin:0 0 4px">${lineHtml(i)}</li>`).join("");
+  const blocks = messageBlocks(body)
+    .map((b) => {
+      if (b.kind === "p") return `<p style="margin:0 0 12px">${b.lines.map(lineHtml).join("<br>")}</p>`;
+      if (b.kind === "ul") return `<ul style="margin:0 0 12px;padding-left:22px">${li(b.items)}</ul>`;
+      return `<ol${b.start !== 1 ? ` start="${b.start}"` : ""} style="margin:0 0 12px;padding-left:24px">${li(b.items)}</ol>`;
+    })
+    .join("\n");
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:${px}px;line-height:1.5;color:#1a1a1a">${blocks}${picturesHtml ? `\n${picturesHtml}` : ""}</div>`;
 }
 
 const ADDRESS = /^[^\s@<>,;"]{1,64}@[^\s@<>,;"]{1,190}\.[a-z]{2,24}$/i;
@@ -58,7 +136,7 @@ function addressesIn(raw: unknown, label: string, max: number): { ok: true; list
 }
 
 /** What the browser sent, as an email to send: someone to send it to, a subject or words, and nothing out of range. */
-export function cleanCompose(raw: unknown): { ok: true; mail: ComposedEmail } | { ok: false; message: string } {
+export function cleanCompose(raw: unknown, hasFiles = false): { ok: true; mail: ComposedEmail } | { ok: false; message: string } {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const to = addressesIn(r.to, "To", COMPOSE_LIMITS.to);
   if (!to.ok) return to;
@@ -75,30 +153,122 @@ export function cleanCompose(raw: unknown): { ok: true; mail: ComposedEmail } | 
     .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "")
     .trimEnd();
   if (body.length > COMPOSE_LIMITS.body) return { ok: false, message: "That email is too long to send from here." };
-  if (!subject && !body.trim()) return { ok: false, message: "Write a subject or a message first." };
-  return { ok: true, mail: { to: to.list, cc: cc.list.filter((a) => !to.list.includes(a)), subject, body } };
+  if (!subject && !body.trim() && !hasFiles) return { ok: false, message: "Write a subject or a message first." };
+  return {
+    ok: true,
+    mail: { to: to.list, cc: cc.list.filter((a) => !to.list.includes(a)), subject, body, size: sizeOf(r.size) },
+  };
 }
 
 /** A header word that may hold any character (RFC 2047), plain when it is already plain ASCII. */
 const headerWord = (text: string) => (/^[\x20-\x7e]*$/.test(text) ? text : `=?UTF-8?B?${Buffer.from(text, "utf8").toString("base64")}?=`);
-
-/** The email as Gmail's send takes it: RFC 2822 text, base64url, plain words in UTF-8. */
-export function rawEmail(from: string, mail: ComposedEmail): string {
-  const body = Buffer.from(mail.body.replace(/\n/g, "\r\n"), "utf8")
+/** A file's name in a header: quotes and line breaks taken out, encoded when it isn't plain ASCII. */
+const fileWord = (name: string) => headerWord(name.replace(/["\\\r\n]/g, "").slice(0, 150) || "file");
+const base64Lines = (bytes: Uint8Array | string) =>
+  Buffer.from(bytes)
     .toString("base64")
     .replace(/.{1,76}/g, "$&\r\n");
-  const lines = [
+
+/** A file going with a new email: a picture shown inside it (by its content id), or an attachment. */
+export interface ComposedFile {
+  name: string;
+  type: string;
+  bytes: Uint8Array;
+  /** Set for a picture shown inside the email under the words. */
+  contentId?: string;
+}
+
+/**
+ * The email as Gmail takes it (RFC 2822, as bytes): the words in plain text and HTML (lists, links, the chosen size),
+ * pictures inside the email under the words and other files attached. Kept plain text alone when there's nothing more.
+ */
+export function rawEmail(from: string, mail: ComposedEmail, files: readonly ComposedFile[] = [], picturesHtml = ""): Buffer {
+  const bound = (n: string) => `renuabl-${n}-${Buffer.from(`${from}${mail.subject}${files.length}`).toString("hex").slice(0, 16)}`;
+  const text = [
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    base64Lines(plainBody(mail.body).replace(/\n/g, "\r\n")),
+  ].join("\r\n");
+  const html = [
+    'Content-Type: text/html; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    base64Lines(composeHtml(mail.body, mail.size, picturesHtml)),
+  ].join("\r\n");
+  const part = (f: ComposedFile) =>
+    [
+      `Content-Type: ${f.type}; name="${fileWord(f.name)}"`,
+      "Content-Transfer-Encoding: base64",
+      f.contentId
+        ? `Content-Disposition: inline; filename="${fileWord(f.name)}"\r\nContent-ID: <${f.contentId}>`
+        : `Content-Disposition: attachment; filename="${fileWord(f.name)}"`,
+      "",
+      base64Lines(f.bytes),
+    ].join("\r\n");
+  const multipart = (kind: string, b: string, parts: string[]) =>
+    [`Content-Type: multipart/${kind}; boundary="${b}"`, "", ...parts.map((p) => `--${b}\r\n${p}`), `--${b}--`, ""].join("\r\n");
+  const pictures = files.filter((f) => f.contentId);
+  const attached = files.filter((f) => !f.contentId);
+  const words = multipart("alternative", bound("alt"), [text, html]);
+  const shown = pictures.length ? multipart("related", bound("rel"), [words, ...pictures.map(part)]) : words;
+  const whole = attached.length ? multipart("mixed", bound("mix"), [shown, ...attached.map(part)]) : shown;
+  const head = [
     `From: ${from}`,
     `To: ${mail.to.join(", ")}`,
     ...(mail.cc.length ? [`Cc: ${mail.cc.join(", ")}`] : []),
     `Subject: ${headerWord(mail.subject)}`,
     "MIME-Version: 1.0",
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-    "",
-    body,
+  ].join("\r\n");
+  return Buffer.from(`${head}\r\n${whole}`, "utf8");
+}
+
+/** What Sol is asked to do with an email being written: tidy the words up, or write it from what the member says. */
+export type ComposeHelp = "polish" | "write";
+
+/**
+ * Sol's instructions for an email being written (8 Nov 2026, Martin: a Polish button, and telling Sol what the email
+ * should say). Polishing keeps their meaning and voice and only tidies; writing follows what they asked. Neither adds a
+ * figure, price, date, product or promise that isn't already in their words or what they asked.
+ */
+export function composeHelpPrompt(
+  mode: ComposeHelp,
+  input: { business: string; to: string[]; subject: string; body: string; instructions: string },
+): string {
+  const draft = [input.subject && `Subject: ${input.subject}`, input.body && `Words so far:\n${input.body}`].filter(Boolean).join("\n\n");
+  const rules = [
+    'Australian English, plain and warm, short paragraphs. Keep lists as lines starting with "• " or "1. ", and links as [words](address).',
+    "Never add a figure, price, saving, date, product, rebate or promise that isn't in the words or the request. Where something must be checked, say it will be confirmed.",
+    "No sign-off name: the sender adds their own. Return the subject and the words.",
   ];
-  return Buffer.from(lines.join("\r\n"), "utf8").toString("base64url");
+  if (mode === "polish")
+    return [
+      `You are Sol, the assistant at ${input.business}, a solar business in Australia. Tidy up this email: fix spelling, grammar and punctuation, make it clearer and easier to read, and keep the writer's meaning, voice and every fact. Don't make it longer than it needs to be. Keep the subject unless it is empty or unclear.`,
+      ...rules,
+      "",
+      draft || "(nothing written yet)",
+    ].join("\n");
+  return [
+    `You are Sol, the assistant at ${input.business}, a solar business in Australia. Write an email as the member asks${input.to.length ? `, to ${input.to.join(", ")}` : ""}. Treat their request as what to say, and use their words so far where they fit.`,
+    ...rules,
+    "",
+    `What they want: ${input.instructions}`,
+    ...(draft ? ["", draft] : []),
+  ].join("\n");
+}
+
+/** Sol's answer, tidied: a subject on one line and the words, each in range. */
+export function cleanComposeHelp(raw: unknown): { subject: string; body: string } | null {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const subject =
+    typeof r.subject === "string"
+      ? r.subject
+          .replace(/[\u0000-\u001f\u007f]+/g, " ")
+          .trim()
+          .slice(0, COMPOSE_LIMITS.subject)
+      : "";
+  const body = typeof r.body === "string" ? r.body.replace(/\r\n?/g, "\n").trim().slice(0, COMPOSE_LIMITS.body) : "";
+  return body ? { subject, body } : null;
 }
 
 /** The labels an action adds and takes off (archiving takes it out of the inbox, as Gmail's own Archive does). */

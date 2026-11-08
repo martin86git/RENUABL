@@ -7,6 +7,7 @@ import {
   Bot,
   Copy,
   ExternalLink,
+  Link2,
   Lock,
   Mail,
   MailOpen,
@@ -15,6 +16,8 @@ import {
   RefreshCw,
   Search,
   Send,
+  Sparkles,
+  Type,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -22,6 +25,11 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   COMPOSE_LIMITS,
+  EMAIL_SIZES,
+  cleanLinkUrl,
+  withLink,
+  type ComposeHelp,
+  type EmailSize,
   INBOX_FILTERS,
   NOTE_MAX,
   afterAction,
@@ -40,12 +48,14 @@ import {
   noteOnEmail,
   openInboxEmail,
   sendNewEmail,
+  solOnNewEmail,
   solOnEmail,
   type InboxAnswer,
   type OpenedEmail,
 } from "@/lib/services/inbox";
 import { useDesignAccount } from "./design-account";
 import { DictateButton, withSpoken } from "./dictate";
+import { EmailFileChips, EmailFormatBar, listKey, useEmailFiles } from "./email-compose";
 import { PATHS, PageHead, ui } from "./design-shell";
 import { SolIcon } from "./sol-icon";
 
@@ -409,7 +419,10 @@ function CheckedWhen({ at }: { at: number }) {
 /**
  * A new email, written here and sent through the person's own Gmail (8 Nov 2026, Martin), so it comes from their address
  * and Gmail keeps it in their Sent. From (when more than one mailbox can send), To, Cc, a subject and the words, which
- * can be spoken. Ctrl or ⌘ with Enter sends; nothing goes until Send is pressed.
+ * can be spoken. Above the words: + for pictures and files (a screenshot can be pasted straight in, or dropped), lists
+ * and symbols, a link round what is picked, the text size, Polish (Sol tidies the words) and Sol's round (say what the
+ * email should say and he writes it). Whatever Sol writes can be put back with Undo. Ctrl or ⌘ with Enter sends;
+ * nothing goes until Send is pressed.
  */
 function ComposeEmail({
   boxes,
@@ -432,17 +445,32 @@ function ComposeEmail({
   const [showCc, setShowCc] = useState(false);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [size, setSize] = useState<EmailSize>("normal");
   const [heard, setHeard] = useState("");
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const files = useEmailFiles();
   const toBox = useRef<HTMLInputElement>(null);
+  const area = useRef<HTMLTextAreaElement>(null);
   useEffect(() => toBox.current?.focus(), []);
-  const written = Boolean(to.trim() || subject.trim() || body.trim());
+  // Sol: what he is doing, what was there before he wrote (for Undo), and his request box.
+  const [solBusy, setSolBusy] = useState<ComposeHelp | null>(null);
+  const [before, setBefore] = useState<{ subject: string; body: string } | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [ask, setAsk] = useState("");
+  const [askHeard, setAskHeard] = useState("");
+  // The link box: the selection it goes round, kept from when it was opened.
+  const [linking, setLinking] = useState<{ start: number; end: number } | null>(null);
+  const [url, setUrl] = useState("");
+  const px = EMAIL_SIZES.find((s) => s.id === size)?.px ?? 14;
+  const written = Boolean(to.trim() || subject.trim() || body.trim() || files.files.length);
+
   const send = async () => {
-    if (sending || !box) return;
+    if (sending || !box || files.busy) return;
+    if (files.problem) return setProblem(files.problem);
     setSending(true);
     setProblem(null);
-    const res = await sendNewEmail({ box, to, cc, subject, body });
+    const res = await sendNewEmail({ box, to, cc, subject, body, size }, files.files);
     setSending(false);
     if (res.ok) onSent(res.from);
     else setProblem(res.message);
@@ -451,9 +479,45 @@ function ComposeEmail({
     if (written && !window.confirm("Discard this email? It hasn't been sent.")) return;
     onClose();
   };
+  const sol = async (mode: ComposeHelp) => {
+    if (solBusy) return;
+    setSolBusy(mode);
+    setProblem(null);
+    const res = await solOnNewEmail({ mode, to, subject, body, instructions: mode === "write" ? ask : undefined });
+    setSolBusy(null);
+    if (!res.ok) return setProblem(res.message);
+    setBefore({ subject, body });
+    if (res.subject && (mode === "write" || !subject.trim())) setSubject(res.subject);
+    setBody(res.body);
+    if (mode === "write") {
+      setAsking(false);
+      setAsk("");
+    }
+  };
+  const openLink = () => {
+    const el = area.current;
+    setLinking(el ? { start: el.selectionStart, end: el.selectionEnd } : { start: body.length, end: body.length });
+    setUrl("");
+  };
+  const addLink = () => {
+    if (!linking) return;
+    const safe = cleanLinkUrl(url);
+    if (!safe) return setProblem("That doesn't look like a web or email address.");
+    const done = withLink(body, linking.start, linking.end, safe);
+    setBody(done.text);
+    setLinking(null);
+    setProblem(null);
+    requestAnimationFrame(() => {
+      area.current?.focus();
+      area.current?.setSelectionRange(done.caret, done.caret);
+    });
+  };
+
   const field = "w-full min-w-0 bg-transparent py-2 text-sm text-ink outline-none placeholder:text-muted";
   const row = "flex items-center gap-3 border-b border-line";
   const name = "w-14 shrink-0 text-[13px] text-muted";
+  const tool =
+    "flex size-8 items-center justify-center rounded-md text-ink-2 hover:bg-surface-2 hover:text-ink disabled:text-muted disabled:hover:bg-transparent";
   return (
     <section
       className={clsx(ui.card, "overflow-hidden")}
@@ -462,7 +526,11 @@ function ComposeEmail({
         if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
           e.preventDefault();
           void send();
-        } else if (e.key === "Escape") close();
+        } else if (e.key === "Escape") {
+          if (linking) setLinking(null);
+          else if (asking) setAsking(false);
+          else close();
+        }
       }}
     >
       <div className="flex items-center justify-between border-b border-line bg-surface-2 px-4 py-2">
@@ -535,14 +603,163 @@ function ComposeEmail({
             <span className={name}>Subject</span>
             <input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={COMPOSE_LIMITS.subject} className={field} />
           </label>
-          <div className="relative">
+
+          {/* The tools for the words: attach, lists and symbols, link, size, then Sol's two on the right. */}
+          <div className="flex flex-wrap items-center gap-0.5 border-b border-line py-1.5">
+            <EmailFormatBar area={area} text={body} setText={setBody} files={files} plus />
+            <div className="relative">
+              <button
+                type="button"
+                className={clsx(tool, linking && "bg-surface-2 text-ink")}
+                title="Make a link of what you've picked"
+                aria-label="Add a link"
+                aria-expanded={Boolean(linking)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => (linking ? setLinking(null) : openLink())}
+              >
+                <Link2 className="size-4" aria-hidden />
+              </button>
+              {linking && (
+                <div
+                  role="dialog"
+                  aria-label="Add a link"
+                  className="absolute left-0 top-full z-30 mt-1 flex w-80 items-center gap-1.5 rounded-lg border border-line bg-surface p-1.5 shadow-lg"
+                >
+                  <input
+                    autoFocus
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addLink();
+                      }
+                    }}
+                    placeholder="Paste or type the address"
+                    aria-label="Link address"
+                    className={clsx(ui.input, "h-8 min-h-8 flex-1 text-[13px]")}
+                  />
+                  <button type="button" onClick={addLink} className={clsx(ui.primary, "h-8 px-3 text-[13px]")}>
+                    Add
+                  </button>
+                </div>
+              )}
+            </div>
+            <label className="ml-1 flex items-center gap-1 rounded-md px-1.5 text-ink-2 hover:bg-surface-2" title="Text size">
+              <Type className="size-4" aria-hidden />
+              <select
+                value={size}
+                onChange={(e) => setSize(e.target.value as EmailSize)}
+                aria-label="Text size"
+                className="h-8 cursor-pointer bg-transparent text-[13px] text-ink-2 outline-none"
+              >
+                {EMAIL_SIZES.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="ml-auto flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => void sol("polish")}
+                disabled={Boolean(solBusy) || !body.trim()}
+                title="Sol tidies up your words: spelling, grammar, clearer"
+                className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-ink-2 ring-1 ring-line hover:text-ink disabled:text-muted"
+              >
+                <Sparkles className="size-3.5" aria-hidden /> {solBusy === "polish" ? "Polishing…" : "Polish"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAsking((v) => !v)}
+                aria-expanded={asking}
+                title="Tell Sol what the email should say"
+                aria-label="Ask Sol to write it"
+                className={clsx(
+                  "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium ring-1",
+                  asking ? "bg-primary text-primary-ink ring-primary" : "text-ink-2 ring-line hover:text-ink",
+                )}
+              >
+                <SolIcon className="size-3.5" aria-hidden /> Sol
+              </button>
+            </span>
+          </div>
+
+          {asking && (
+            <div className="mt-3 rounded-lg bg-sun/60 p-2.5 ring-1 ring-sun-line/25">
+              <div className="flex items-start gap-2">
+                <SolIcon className="mt-2 size-4 shrink-0 text-sun-ink" aria-hidden />
+                <textarea
+                  autoFocus
+                  value={askHeard ? withSpoken(ask, askHeard) : ask}
+                  onChange={(e) => setAsk(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+                      e.preventDefault();
+                      if (ask.trim()) void sol("write");
+                    }
+                  }}
+                  maxLength={COMPOSE_LIMITS.instructions}
+                  rows={2}
+                  placeholder="Tell Sol what the email should say, e.g. thank Sam for the call and say the proposal comes Friday"
+                  aria-label="What Sol should write"
+                  className="min-h-10 flex-1 resize-none bg-transparent py-1.5 text-sm text-ink outline-none placeholder:text-sun-ink/70"
+                />
+                <DictateButton
+                  label="Tell Sol out loud"
+                  onHearing={setAskHeard}
+                  onWords={(w) => setAsk((t) => withSpoken(t, w).slice(0, COMPOSE_LIMITS.instructions))}
+                />
+                <button
+                  type="button"
+                  onClick={() => void sol("write")}
+                  disabled={!ask.trim() || Boolean(solBusy)}
+                  className={clsx(ui.primary, "h-9 shrink-0 px-3 text-[13px]")}
+                >
+                  {solBusy === "write" ? "Writing…" : "Write it"}
+                </button>
+              </div>
+              <p className="mt-1 pl-6 text-[11px] text-sun-ink">
+                Sol writes it in the box below for you to check. Nothing is sent until you press Send.
+              </p>
+            </div>
+          )}
+          {before && !solBusy && (
+            <p className="mt-2 flex items-center gap-2 text-xs text-muted" role="status">
+              Sol wrote this. Check it before you send.
+              <button
+                type="button"
+                className={ui.link}
+                onClick={() => {
+                  setSubject(before.subject);
+                  setBody(before.body);
+                  setBefore(null);
+                }}
+              >
+                Undo
+              </button>
+            </p>
+          )}
+
+          <div className="relative" onDragOver={files.onDragOver} onDrop={files.onDrop}>
             <textarea
+              ref={area}
               value={heard ? withSpoken(body, heard) : body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={(e) => {
+                setBody(e.target.value);
+                if (before) setBefore(null);
+              }}
+              onKeyDown={(e) => listKey(e, setBody)}
+              onPaste={files.onPaste}
               maxLength={COMPOSE_LIMITS.body}
               aria-label="Your email"
-              placeholder="Write your email"
-              className="block min-h-48 w-full resize-y bg-transparent py-3 pr-11 text-sm leading-relaxed text-ink outline-none placeholder:text-muted"
+              placeholder="Write your email. Paste a screenshot straight in."
+              style={{ fontSize: px }}
+              className={clsx(
+                "block min-h-48 w-full resize-y bg-transparent py-3 pr-11 leading-relaxed text-ink outline-none placeholder:text-muted",
+                solBusy && "opacity-60",
+              )}
             />
             <div className="absolute bottom-2 right-0">
               <DictateButton
@@ -552,6 +769,9 @@ function ComposeEmail({
               />
             </div>
           </div>
+          <div className="pb-2">
+            <EmailFileChips files={files} />
+          </div>
         </div>
       )}
       {problem && (
@@ -560,7 +780,12 @@ function ComposeEmail({
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3 border-t border-line px-4 py-3">
-        <button type="button" onClick={() => void send()} disabled={sending || !boxes.length} className={clsx(ui.primary, "h-9 px-4")}>
+        <button
+          type="button"
+          onClick={() => void send()}
+          disabled={sending || !boxes.length || files.busy}
+          className={clsx(ui.primary, "h-9 px-4")}
+        >
           <Send className="size-4" aria-hidden /> {sending ? "Sending…" : "Send"}
         </button>
         <button type="button" onClick={close} className="text-sm text-ink-2 hover:text-ink">

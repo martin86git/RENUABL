@@ -6,6 +6,12 @@ import {
   canChangeMail,
   canReadMail,
   cleanCompose,
+  cleanComposeHelp,
+  cleanLinkUrl,
+  composeHelpPrompt,
+  composeHtml,
+  plainBody,
+  withLink,
   rawEmail,
   isEmailAction,
   labelChange,
@@ -134,34 +140,108 @@ describe("marking read and archiving", () => {
 });
 
 describe("writing a new email", () => {
+  const read = (raw: Buffer) => raw.toString("utf8");
+  /** Every base64 part of the email, decoded, in order. */
+  const parts = (raw: Buffer) =>
+    read(raw)
+      .split(/\r\n\r\n/)
+      .slice(1)
+      .map((chunk) => chunk.split(/\r\n--/)[0].replace(/\r\n/g, ""))
+      .filter((b) => /^[A-Za-z0-9+/=]+$/.test(b) && b.length > 4)
+      .map((b) => Buffer.from(b, "base64").toString("utf8"));
+
   it("checks who it's to, keeps Cc apart and needs something to say", () => {
     expect(
       cleanCompose({ to: "Sam@X.example, sam@x.example; kim@y.example", cc: "kim@y.example lee@z.example", subject: "Hi", body: "" }),
     ).toEqual({
       ok: true,
-      mail: { to: ["sam@x.example", "kim@y.example"], cc: ["lee@z.example"], subject: "Hi", body: "" },
+      mail: { to: ["sam@x.example", "kim@y.example"], cc: ["lee@z.example"], subject: "Hi", body: "", size: "normal" },
     });
     expect(cleanCompose({ to: "", subject: "Hi" })).toMatchObject({ ok: false });
     expect(cleanCompose({ to: "not an address", subject: "Hi" })).toMatchObject({ ok: false });
     expect(cleanCompose({ to: "sam@x.example" })).toMatchObject({ ok: false });
+    // A file alone is something to send.
+    expect(cleanCompose({ to: "sam@x.example" }, true)).toMatchObject({ ok: true });
+    expect(cleanCompose({ to: "sam@x.example", body: "x", size: "huge" })).toMatchObject({ ok: true, mail: { size: "huge" } });
+    expect(cleanCompose({ to: "sam@x.example", body: "x", size: "<script>" })).toMatchObject({ ok: true, mail: { size: "normal" } });
   });
 
   it("never lets a typed subject add a header", () => {
     const c = cleanCompose({ to: "sam@x.example", subject: "Hi\r\nBcc: eve@evil.example", body: "x" });
     expect(c.ok && c.mail.subject).toBe("Hi Bcc: eve@evil.example");
     if (!c.ok) return;
-    const text = Buffer.from(rawEmail("me@x.example", c.mail), "base64url").toString("utf8");
-    expect(text.split("\r\n").filter((l) => /^bcc:/i.test(l))).toEqual([]);
+    expect(
+      read(rawEmail("me@x.example", c.mail))
+        .split("\r\n")
+        .filter((l) => /^bcc:/i.test(l)),
+    ).toEqual([]);
   });
 
-  it("builds the email Gmail sends, any language in the subject and words", () => {
+  it("builds the email Gmail sends: plain text and HTML, any language", () => {
     const c = cleanCompose({ to: "sam@x.example", cc: "kim@y.example", subject: "Café quote", body: "G'day,\nSee you Tuesday ☀" });
     if (!c.ok) throw new Error(c.message);
-    const text = Buffer.from(rawEmail("me@x.example", c.mail), "base64url").toString("utf8");
-    expect(text).toContain("From: me@x.example\r\nTo: sam@x.example\r\nCc: kim@y.example\r\n");
-    expect(text).toContain(`Subject: =?UTF-8?B?${Buffer.from("Café quote").toString("base64")}?=`);
-    const body = text.split("\r\n\r\n")[1].replace(/\r\n/g, "");
-    expect(Buffer.from(body, "base64").toString("utf8")).toBe("G'day,\r\nSee you Tuesday ☀");
+    const raw = rawEmail("me@x.example", c.mail);
+    expect(read(raw)).toContain("From: me@x.example\r\nTo: sam@x.example\r\nCc: kim@y.example\r\n");
+    expect(read(raw)).toContain(`Subject: =?UTF-8?B?${Buffer.from("Café quote").toString("base64")}?=`);
+    expect(read(raw)).toContain("multipart/alternative");
+    const [text, html] = parts(raw);
+    expect(text).toBe("G'day,\r\nSee you Tuesday ☀");
+    expect(html).toContain("G&#39;day".replace("&#39;", "'"));
+    expect(html).toContain("See you Tuesday ☀");
+  });
+
+  it("puts pictures inside the email and attaches the other files", () => {
+    const c = cleanCompose({ to: "sam@x.example", body: "Here's the roof" });
+    if (!c.ok) throw new Error(c.message);
+    const raw = read(
+      rawEmail(
+        "me@x.example",
+        c.mail,
+        [
+          { name: "roof.png", type: "image/png", bytes: new Uint8Array([1, 2, 3]), contentId: "picture1" },
+          { name: 'quote "final".pdf', type: "application/pdf", bytes: new Uint8Array([4, 5]) },
+        ],
+        '<img src="cid:picture1">',
+      ),
+    );
+    expect(raw).toContain("multipart/mixed");
+    expect(raw).toContain("multipart/related");
+    expect(raw).toContain("Content-ID: <picture1>");
+    expect(raw).toContain('Content-Disposition: attachment; filename="quote final.pdf"');
+  });
+
+  it("makes links safe and keeps them in both versions", () => {
+    expect(cleanLinkUrl("renuabl.com.au")).toBe("https://renuabl.com.au/");
+    expect(cleanLinkUrl("sam@x.example")).toBe("mailto:sam@x.example");
+    expect(cleanLinkUrl("javascript:alert(1)")).toBeNull();
+    expect(cleanLinkUrl("not a link")).toBeNull();
+    expect(withLink("See our page", 4, 12, "https://renuabl.com.au/")).toEqual({
+      text: "See [our page](https://renuabl.com.au/)",
+      caret: 39,
+    });
+    expect(withLink("Visit ", 6, 6, "https://renuabl.com.au/").text).toBe("Visit [https://renuabl.com.au/](https://renuabl.com.au/)");
+    const body = "Read [the guide](https://renuabl.com.au/learn) or [this](javascript:void)";
+    expect(plainBody(body)).toBe("Read the guide (https://renuabl.com.au/learn) or this");
+    const html = composeHtml(body, "large");
+    expect(html).toContain('<a href="https://renuabl.com.au/learn" style="color:#1a56db">the guide</a>');
+    expect(html).not.toContain("javascript");
+    expect(html).toContain("font-size:16px");
+    expect(composeHtml("<b>hi</b>\n• one\n• two", "normal")).toContain("&lt;b&gt;hi&lt;/b&gt;</p>\n<ul");
+  });
+
+  it("asks Sol to tidy without adding facts, or to write what was asked", () => {
+    const base = { business: "Sunrise Solar", to: ["sam@x.example"], subject: "", body: "hi sam, quote atached", instructions: "" };
+    const polish = composeHelpPrompt("polish", base);
+    expect(polish).toContain("Tidy up this email");
+    expect(polish).toContain("Never add a figure, price");
+    expect(polish).toContain("quote atached");
+    const write = composeHelpPrompt("write", { ...base, body: "", instructions: "thank them for the call, proposal coming Friday" });
+    expect(write).toContain("What they want: thank them for the call");
+    expect(cleanComposeHelp({ subject: "Thanks\nfor the call", body: "  Hi Sam  " })).toEqual({
+      subject: "Thanks for the call",
+      body: "Hi Sam",
+    });
+    expect(cleanComposeHelp({ subject: "x", body: "" })).toBeNull();
   });
 });
 

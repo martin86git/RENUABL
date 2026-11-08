@@ -2,7 +2,7 @@
  * Each member's own Gmail inbox, as the screens reach it (/api/design/inbox): read, marked read, unread or archived in
  * Gmail itself, its notes, and Sol on an email.
  */
-import type { EmailAction, InboxEmail } from "@/lib/domain/design/inbox";
+import type { ComposeHelp, EmailAction, EmailSize, InboxEmail } from "@/lib/domain/design/inbox";
 import type { OpenedEmail, SharedEmail } from "@/lib/server/design-inbox-repo";
 import { ask } from "./crm";
 
@@ -44,9 +44,23 @@ export async function changeInboxEmail(id: string, box: string | undefined, acti
   if (res.ok) window.dispatchEvent(new Event("renuabl:inbox"));
   return res;
 }
-/** Sends a new email from one of this person's own mailboxes, through Gmail (it lands in their Sent). */
-export const sendNewEmail = (mail: { box?: string; to: string; cc: string; subject: string; body: string }) =>
-  ask<{ from: string }>(INBOX, { method: "POST", body: { do: "send", ...mail } });
+/**
+ * Sends a new email from one of this person's own mailboxes, through Gmail (it lands in their Sent): the words, the text
+ * size, and any pictures (shown inside it) and files (attached), as a form.
+ */
+export function sendNewEmail(
+  mail: { box?: string; to: string; cc: string; subject: string; body: string; size: EmailSize },
+  files: readonly File[] = [],
+) {
+  const form = new FormData();
+  form.set("do", "send");
+  for (const [k, v] of Object.entries(mail)) if (v) form.set(k, v);
+  for (const f of files) form.append("file", f, f.name);
+  return ask<{ from: string }>(INBOX, { method: "POST", body: form });
+}
+/** Sol tidies the words up (polish), or writes the email from what the person asked (write). Nothing is sent. */
+export const solOnNewEmail = (input: { mode: ComposeHelp; to: string; subject: string; body: string; instructions?: string }) =>
+  ask<{ subject: string; body: string }>(INBOX, { method: "POST", body: { do: "compose-sol", ...input } });
 /** Disconnects one mailbox, or every one with none named. */
 export const disconnectGmail = (address?: string) =>
   ask<object>(address ? `${INBOX}?address=${encodeURIComponent(address)}` : INBOX, { method: "DELETE" });
