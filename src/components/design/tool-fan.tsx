@@ -16,11 +16,13 @@ const AWAY = {
   right: "-translate-x-3",
   left: "translate-x-3",
 } as const;
+type Direction = keyof typeof AWAY;
 
 /**
  * A round that holds other rounds (8 Nov 2026, Martin: "like a swiss army knife", the controls round the map were
  * overwhelming). Hovering it, or pressing it, brings its legs out one after another, as a stack opens on the Mac's Dock;
- * the pointer leaving folds them back, unless they were pressed open or something in them is in use (`hold`).
+ * the pointer leaving folds them back, unless they were pressed open or something in them is in use (`hold`). A second
+ * leg (`extra`) can come out of the same round in another direction.
  */
 export function ToolFan({
   main,
@@ -31,11 +33,12 @@ export function ToolFan({
   onMain,
   className,
   legsClassName,
+  extra,
 }: {
   /** The round itself: its look is the caller's. */
   main: (state: { open: boolean }) => React.ReactNode;
   label: string;
-  direction: keyof typeof AWAY;
+  direction: Direction;
   children: React.ReactNode;
   /** Keep it open while something in a leg is open (a box, a menu). */
   hold?: boolean;
@@ -43,6 +46,7 @@ export function ToolFan({
   onMain?: () => void;
   className?: string;
   legsClassName?: string;
+  extra?: { direction: Direction; children: React.ReactNode };
 }) {
   const [hover, setHover] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -66,39 +70,22 @@ export function ToolFan({
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setHover(false), 320);
   };
-  const legs = legsOf(children);
-  const vertical = direction === "down" || direction === "up";
-  return (
-    <div ref={box} className={clsx("relative", className)} onMouseEnter={enter} onMouseLeave={leave}>
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label={label}
-        aria-expanded={open}
-        title={label}
-        onClick={() => {
-          onMain?.();
-          setPinned(onMain ? true : !pinned);
-        }}
-        onKeyDown={(e) => {
-          if (e.key !== "Enter" && e.key !== " ") return;
-          e.preventDefault();
-          onMain?.();
-          setPinned(onMain ? true : !pinned);
-        }}
-      >
-        {main({ open })}
-      </div>
+  const press = () => {
+    onMain?.();
+    setPinned(onMain ? true : !pinned);
+  };
+  const group = (dir: Direction, nodes: React.ReactNode, extraClass?: string) => {
+    const legs = legsOf(nodes);
+    return (
       <div
         className={clsx(
           "absolute z-30 flex items-center gap-1.5",
-          vertical ? "flex-col" : "flex-row",
-          direction === "down" && "left-1/2 top-full -translate-x-1/2 pt-2",
-          direction === "up" && "bottom-full left-1/2 -translate-x-1/2 flex-col-reverse pb-2",
-          direction === "right" && "left-full top-1/2 -translate-y-1/2 pl-2",
-          direction === "left" && "right-full top-1/2 -translate-y-1/2 flex-row-reverse pr-2",
+          dir === "down" && "left-1/2 top-full -translate-x-1/2 flex-col pt-2",
+          dir === "up" && "bottom-full left-1/2 -translate-x-1/2 flex-col-reverse pb-2",
+          dir === "right" && "left-full top-1/2 -translate-y-1/2 flex-row pl-2",
+          dir === "left" && "right-full top-1/2 -translate-y-1/2 flex-row-reverse pr-2",
           !open && "pointer-events-none",
-          legsClassName,
+          extraClass,
         )}
       >
         {legs.map((leg, i) => (
@@ -107,13 +94,34 @@ export function ToolFan({
             style={{ transitionDelay: `${open ? i * 28 : (legs.length - 1 - i) * 14}ms` }}
             className={clsx(
               "transition duration-200 ease-out motion-reduce:transition-none",
-              open ? "translate-x-0 translate-y-0 scale-100 opacity-100" : clsx("scale-90 opacity-0", AWAY[direction]),
+              open ? "translate-x-0 translate-y-0 scale-100 opacity-100" : clsx("scale-90 opacity-0", AWAY[dir]),
             )}
           >
             {leg}
           </div>
         ))}
       </div>
+    );
+  };
+  return (
+    <div ref={box} className={clsx("relative", className)} onMouseEnter={enter} onMouseLeave={leave}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={label}
+        aria-expanded={open}
+        title={label}
+        onClick={press}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          press();
+        }}
+      >
+        {main({ open })}
+      </div>
+      {group(direction, children, legsClassName)}
+      {extra && group(extra.direction, extra.children)}
     </div>
   );
 }

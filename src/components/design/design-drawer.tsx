@@ -229,6 +229,15 @@ export function DesignDrawer(props: {
           </button>
           <button
             type="button"
+            onClick={openQuote}
+            aria-label="Quote"
+            title="Quote: the lines, their costs and what is still to decide"
+            className="flex size-12 items-center justify-center rounded-full bg-surface text-ink shadow-[0_6px_18px_rgba(11,11,12,0.18)] ring-1 ring-line transition hover:text-sun-line"
+          >
+            <ReceiptText className="size-5" aria-hidden />
+          </button>
+          <button
+            type="button"
             onClick={() => tool.kind !== "proposal" && onSwitch(proposalHref(tool.job!))}
             aria-pressed={tool.kind === "proposal"}
             aria-label="Proposal"
@@ -239,15 +248,6 @@ export function DesignDrawer(props: {
             )}
           >
             <FileText className="size-5" aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={openQuote}
-            aria-label="Quote"
-            title="Quote: the lines, their costs and what is still to decide"
-            className="flex size-12 items-center justify-center rounded-full bg-surface text-ink shadow-[0_6px_18px_rgba(11,11,12,0.18)] ring-1 ring-line transition hover:text-sun-line"
-          >
-            <ReceiptText className="size-5" aria-hidden />
           </button>
         </nav>
       )}

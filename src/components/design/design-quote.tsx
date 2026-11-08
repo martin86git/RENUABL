@@ -54,6 +54,8 @@ export function DesignQuote(props: {
    * price, with a way back to every line. The quote is worked out the same either way.
    */
   compact?: boolean;
+  /** Laid out across a wide space: the groups side by side, the totals beside them. */
+  wide?: boolean;
   onCompact?: (compact: boolean) => void;
   /** The home's roof, storeys and phase are shown elsewhere (the design tool's Designer view), so not here. */
   homeless?: boolean;
@@ -262,164 +264,166 @@ export function DesignQuote(props: {
               published until each is decided.
             </p>
           )}
-          {COST_GROUPS.map((group) => {
-            // A cost decided on each job stays in the list when left out, so it can be included again.
-            const rows = all.filter((l) => l.group === group && (l.confirm || !edits[lineKey(l)]?.removed));
-            if (!rows.length) return null;
-            return (
-              <table key={group} className="mt-4 w-full table-fixed text-sm first:mt-0">
-                <thead>
-                  <tr className="border-b-2 border-forest text-xs font-semibold uppercase tracking-[0.12em] text-forest">
-                    <th className="pb-1 text-left">{group}</th>
-                    <th className="w-10 pb-1 text-right">Qty</th>
-                    <th className="w-[5.5rem] pb-1 text-right">Cost</th>
-                    <th className="w-6 pb-1" aria-label="Take out" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((l, i) => {
-                    const typed = edits[lineKey(l)]?.amount;
-                    const typedQty = edits[lineKey(l)]?.qty;
-                    // The line as it stands with any hand changes: a quantity typed over it prices it again.
-                    const shown = editedLines([l], edits)[0] ?? l;
-                    const unset = l.missing && typed === undefined;
-                    const on = Boolean(edits[lineKey(l)]?.on);
-                    const out = Boolean(edits[lineKey(l)]?.removed);
-                    return (
-                      <tr
-                        key={`${l.label}${i}`}
-                        className={
-                          l.confirm && !on && !out
-                            ? "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
-                            : l.confirm && out
-                              ? "group border-b border-line align-top text-muted last:border-0"
-                              : unset
-                                ? // A line with no cost asks to be dealt with: priced, or knowingly left at nothing.
-                                  "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
-                                : "group border-b border-line align-top last:border-0"
-                        }
-                      >
-                        <td className={unset || (l.confirm && !on && !out) ? "py-1.5 pl-2.5 pr-2" : "py-1.5 pr-2"}>
-                          {l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label}
-                          {l.confirm && (
-                            <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
-                              {on ? (
-                                <>
-                                  <span className="font-medium text-positive">Included</span>
-                                  <button
-                                    className="underline underline-offset-2 hover:text-ink"
-                                    onClick={() => edit(l, { removed: true })}
-                                  >
-                                    leave it out
-                                  </button>
-                                </>
-                              ) : out ? (
-                                <>
-                                  <span>Left out: the proposal says it may apply</span>
-                                  <button className="underline underline-offset-2 hover:text-ink" onClick={() => edit(l, { on: true })}>
-                                    include it
-                                  </button>
-                                </>
+          <div className={props.wide ? "grid items-start gap-x-8 gap-y-5 xl:grid-cols-2 2xl:grid-cols-3 [&>table]:mt-0" : ""}>
+            {COST_GROUPS.map((group) => {
+              // A cost decided on each job stays in the list when left out, so it can be included again.
+              const rows = all.filter((l) => l.group === group && (l.confirm || !edits[lineKey(l)]?.removed));
+              if (!rows.length) return null;
+              return (
+                <table key={group} className="mt-4 w-full table-fixed text-sm first:mt-0">
+                  <thead>
+                    <tr className="border-b-2 border-forest text-xs font-semibold uppercase tracking-[0.12em] text-forest">
+                      <th className="pb-1 text-left">{group}</th>
+                      <th className="w-10 pb-1 text-right">Qty</th>
+                      <th className="w-[5.5rem] pb-1 text-right">Cost</th>
+                      <th className="w-6 pb-1" aria-label="Take out" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((l, i) => {
+                      const typed = edits[lineKey(l)]?.amount;
+                      const typedQty = edits[lineKey(l)]?.qty;
+                      // The line as it stands with any hand changes: a quantity typed over it prices it again.
+                      const shown = editedLines([l], edits)[0] ?? l;
+                      const unset = l.missing && typed === undefined;
+                      const on = Boolean(edits[lineKey(l)]?.on);
+                      const out = Boolean(edits[lineKey(l)]?.removed);
+                      return (
+                        <tr
+                          key={`${l.label}${i}`}
+                          className={
+                            l.confirm && !on && !out
+                              ? "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
+                              : l.confirm && out
+                                ? "group border-b border-line align-top text-muted last:border-0"
+                                : unset
+                                  ? // A line with no cost asks to be dealt with: priced, or knowingly left at nothing.
+                                    "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
+                                  : "group border-b border-line align-top last:border-0"
+                          }
+                        >
+                          <td className={unset || (l.confirm && !on && !out) ? "py-1.5 pl-2.5 pr-2" : "py-1.5 pr-2"}>
+                            {l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label}
+                            {l.confirm && (
+                              <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
+                                {on ? (
+                                  <>
+                                    <span className="font-medium text-positive">Included</span>
+                                    <button
+                                      className="underline underline-offset-2 hover:text-ink"
+                                      onClick={() => edit(l, { removed: true })}
+                                    >
+                                      leave it out
+                                    </button>
+                                  </>
+                                ) : out ? (
+                                  <>
+                                    <span>Left out: the proposal says it may apply</span>
+                                    <button className="underline underline-offset-2 hover:text-ink" onClick={() => edit(l, { on: true })}>
+                                      include it
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="text-sun-ink">Decided on each job:</span>
+                                    <button
+                                      className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-ink"
+                                      onClick={() => edit(l, { on: true })}
+                                    >
+                                      Include
+                                    </button>
+                                    <button
+                                      className="rounded-full px-2 py-0.5 font-semibold text-ink ring-1 ring-line hover:ring-ink-2"
+                                      onClick={() => edit(l, { removed: true })}
+                                    >
+                                      Leave out
+                                    </button>
+                                  </>
+                                )}
+                              </span>
+                            )}
+                            {l.sku && <span className="block text-xs text-muted">{l.sku}</span>}
+                            {unset && (
+                              <span className="mt-0.5 block text-xs text-sun-ink">
+                                <strong className="font-semibold">No cost on file.</strong> Type one, or{" "}
+                                <button className="font-semibold underline underline-offset-2" onClick={() => edit(l, { amount: 0 })}>
+                                  leave it at $0
+                                </button>
+                              </span>
+                            )}
+                            {(typed !== undefined || typedQty !== undefined) &&
+                              (l.missing && typed === 0 && typedQty === undefined ? (
+                                <button className="block text-xs text-muted underline underline-offset-2" onClick={() => edit(l, null)}>
+                                  Left at $0 (no cost on file): undo
+                                </button>
                               ) : (
-                                <>
-                                  <span className="text-sun-ink">Decided on each job:</span>
-                                  <button
-                                    className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-ink"
-                                    onClick={() => edit(l, { on: true })}
-                                  >
-                                    Include
-                                  </button>
-                                  <button
-                                    className="rounded-full px-2 py-0.5 font-semibold text-ink ring-1 ring-line hover:ring-ink-2"
-                                    onClick={() => edit(l, { removed: true })}
-                                  >
-                                    Leave out
-                                  </button>
-                                </>
-                              )}
-                            </span>
-                          )}
-                          {l.sku && <span className="block text-xs text-muted">{l.sku}</span>}
-                          {unset && (
-                            <span className="mt-0.5 block text-xs text-sun-ink">
-                              <strong className="font-semibold">No cost on file.</strong> Type one, or{" "}
-                              <button className="font-semibold underline underline-offset-2" onClick={() => edit(l, { amount: 0 })}>
-                                leave it at $0
-                              </button>
-                            </span>
-                          )}
-                          {(typed !== undefined || typedQty !== undefined) &&
-                            (l.missing && typed === 0 && typedQty === undefined ? (
-                              <button className="block text-xs text-muted underline underline-offset-2" onClick={() => edit(l, null)}>
-                                Left at $0 (no cost on file): undo
-                              </button>
+                                <button className="block text-xs text-sun-ink underline underline-offset-2" onClick={() => edit(l, null)}>
+                                  Changed by hand: back to {typedQty !== undefined ? `${l.qty} at ` : ""}
+                                  {l.missing ? "no cost" : money(l.amount)}
+                                </button>
+                              ))}
+                          </td>
+                          <td className="py-1 text-right tabular-nums text-ink-2">
+                            {l.qty === undefined ? (
+                              ""
                             ) : (
-                              <button className="block text-xs text-sun-ink underline underline-offset-2" onClick={() => edit(l, null)}>
-                                Changed by hand: back to {typedQty !== undefined ? `${l.qty} at ` : ""}
-                                {l.missing ? "no cost" : money(l.amount)}
-                              </button>
-                            ))}
-                        </td>
-                        <td className="py-1 text-right tabular-nums text-ink-2">
-                          {l.qty === undefined ? (
-                            ""
-                          ) : (
-                            <input
-                              type="number"
-                              min="0"
-                              max={MAX_LINE_QTY}
-                              step="1"
-                              value={typedQty ?? l.qty}
-                              onChange={(e) =>
-                                edit(l, { qty: Math.max(0, Math.min(MAX_LINE_QTY, Math.round(Number(e.target.value) || 0))) })
-                              }
-                              aria-label={`How many: ${l.label}`}
-                              style={{ width: `${String(typedQty ?? l.qty).length + 1.6}ch` }}
-                              className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
-                                typedQty !== undefined ? "border-sun-line font-semibold text-ink" : "border-transparent hover:border-line"
-                              }`}
-                            />
-                          )}
-                        </td>
-                        <td className="py-1 pl-1 text-right">
-                          <span className="inline-flex items-center justify-end gap-px">
-                            <span className="text-muted">$</span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={Math.round(typed ?? shown.amount)}
-                              onChange={(e) => edit(l, { amount: Math.max(0, Number(e.target.value) || 0) })}
-                              aria-label={`Cost of ${l.label}`}
-                              style={{ width: `${String(Math.round(typed ?? shown.amount)).length + 1.6}ch` }}
-                              className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
-                                typed !== undefined
-                                  ? "border-sun-line font-semibold"
-                                  : unset
-                                    ? "border-warning"
-                                    : "border-transparent hover:border-line"
-                              }`}
-                            />
-                          </span>
-                        </td>
-                        <td className="py-1.5 text-right">
-                          <button
-                            hidden={Boolean(l.confirm)}
-                            className="text-base leading-none text-muted hover:text-danger"
-                            onClick={() => edit(l, { removed: true })}
-                            aria-label={`Take out ${l.label}`}
-                            title="Take this line out"
-                          >
-                            ×
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            );
-          })}
+                              <input
+                                type="number"
+                                min="0"
+                                max={MAX_LINE_QTY}
+                                step="1"
+                                value={typedQty ?? l.qty}
+                                onChange={(e) =>
+                                  edit(l, { qty: Math.max(0, Math.min(MAX_LINE_QTY, Math.round(Number(e.target.value) || 0))) })
+                                }
+                                aria-label={`How many: ${l.label}`}
+                                style={{ width: `${String(typedQty ?? l.qty).length + 1.6}ch` }}
+                                className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
+                                  typedQty !== undefined ? "border-sun-line font-semibold text-ink" : "border-transparent hover:border-line"
+                                }`}
+                              />
+                            )}
+                          </td>
+                          <td className="py-1 pl-1 text-right">
+                            <span className="inline-flex items-center justify-end gap-px">
+                              <span className="text-muted">$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={Math.round(typed ?? shown.amount)}
+                                onChange={(e) => edit(l, { amount: Math.max(0, Number(e.target.value) || 0) })}
+                                aria-label={`Cost of ${l.label}`}
+                                style={{ width: `${String(Math.round(typed ?? shown.amount)).length + 1.6}ch` }}
+                                className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
+                                  typed !== undefined
+                                    ? "border-sun-line font-semibold"
+                                    : unset
+                                      ? "border-warning"
+                                      : "border-transparent hover:border-line"
+                                }`}
+                              />
+                            </span>
+                          </td>
+                          <td className="py-1.5 text-right">
+                            <button
+                              hidden={Boolean(l.confirm)}
+                              className="text-base leading-none text-muted hover:text-danger"
+                              onClick={() => edit(l, { removed: true })}
+                              aria-label={`Take out ${l.label}`}
+                              title="Take this line out"
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              );
+            })}
+          </div>
           {changed > 0 && (
             <p className="mt-3 rounded-md bg-sun p-2.5 text-xs text-sun-ink">
               {changed} {changed === 1 ? "line has" : "lines have"} been changed by hand
