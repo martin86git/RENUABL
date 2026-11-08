@@ -280,7 +280,7 @@ const SHORTCUTS: [keys: string, does: string][] = [
   ["?", "These shortcuts"],
 ];
 
-import { ToolFan } from "./tool-fan";
+import { KnifeMenu, ToolFan } from "./tool-fan";
 
 const GLASS = "rounded-2xl border border-line bg-surface/90 shadow-lift backdrop-blur-md";
 
@@ -326,11 +326,10 @@ function BarRow(props: {
 }) {
   if (!props.tight) return <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-2.5 lg:flex-nowrap">{props.children}</div>;
   return (
-    <ToolFan
+    <KnifeMenu
       label="Save, publish, the designs and the checks; stringing, tracing, the guide line, undo and redo"
-      direction="down"
       hold={props.hold}
-      extra={props.tools ? { direction: "right", children: props.tools } : undefined}
+      sections={[{ title: "This design", children: props.children }, ...(props.tools ? [{ title: "Draw", children: props.tools }] : [])]}
       main={({ open }) => (
         <span
           className={clsx(
@@ -349,9 +348,7 @@ function BarRow(props: {
           )}
         </span>
       )}
-    >
-      {props.children}
-    </ToolFan>
+    />
   );
 }
 
@@ -1325,7 +1322,7 @@ export function RoofDesigner(props: {
     | { mode: "msb"; dx: number; dy: number }
     | { mode: "charger"; dx: number; dy: number }
     | { mode: "inverter"; n: number; dx: number; dy: number }
-    | { mode: "erase" }
+    | { mode: "erase"; faceGone?: boolean }
     | { mode: "spin"; centre: Point; from: number; starts: Record<string, LoosePanel> }
     | null
   >(null);
@@ -2126,6 +2123,16 @@ export function RoofDesigner(props: {
   };
   const removePicked = () => removePicks(picks);
   /** The eraser: whatever is under the point goes. A panel or a label first; failing that, a guide line close by. */
+  /** A traced roof face taken away, with its row panels and their places on strings (8 Nov 2026, Martin: no way to untrace). */
+  const removeFace = (id: string) => {
+    setFaces((all) => all.filter((f) => f.id !== id));
+    setStrings((all) =>
+      all.map((s) => ({ ...s, panels: s.panels.filter((k) => !k.startsWith(`g:${id}:`)) })).filter((s) => s.panels.length),
+    );
+    setSelected(null);
+    setPicks([]);
+    changed();
+  };
   const eraseAt = (p: Point) => {
     if (msbAt(p)) {
       setMsb(null);
@@ -2145,7 +2152,12 @@ export function RoofDesigner(props: {
     });
     if (line) {
       setRules(rules.filter((g) => g !== line));
-      changed();
+      return changed();
+    }
+    const on = [...faces].reverse().find((f) => inside(p, f.points));
+    if (on && press.current?.mode === "erase" && !press.current.faceGone) {
+      press.current.faceGone = true;
+      removeFace(on.id);
     }
   };
 
@@ -2231,6 +2243,9 @@ export function RoofDesigner(props: {
       } else if ((e.key === "Delete" || e.key === "Backspace") && picks.length) {
         e.preventDefault();
         removePicked();
+      } else if ((e.key === "Delete" || e.key === "Backspace") && selected && faces.some((f) => f.id === selected)) {
+        e.preventDefault();
+        removeFace(selected);
       } else if (e.key === "Escape") {
         setKeysOpen(false);
         setPicks([]);
@@ -3912,6 +3927,7 @@ export function RoofDesigner(props: {
             type="button"
             onClick={() => void save()}
             disabled={saved === "saved" || saved === "saving"}
+            data-leg={saved === "saved" ? "Saved" : "Save (Ctrl+S)"}
             title="Save this roof's designs (Ctrl+S). Publishing is separate."
             className={clsx(
               "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full text-xs font-semibold ring-1",
@@ -3970,6 +3986,7 @@ export function RoofDesigner(props: {
             <button
               type="button"
               onClick={() => setReadyOpen(!readyOpen)}
+              data-leg={light.ready ? "Ready to install" : `${light.fix} to fix${light.check ? `, ${light.check} to check` : ""}`}
               aria-expanded={readyOpen}
               className={clsx(
                 "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-xs font-semibold ring-1",
@@ -6373,6 +6390,14 @@ export function RoofDesigner(props: {
                     <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Rows</p>
                     <p className="mt-1 text-[1.75rem] font-semibold leading-none tabular-nums text-ink">{face.angle}°</p>
                     <p className="mt-2 text-xs leading-snug text-ink-2">Turn the rows on this roof face</p>
+                    <button
+                      type="button"
+                      onClick={() => removeFace(face.id)}
+                      title="Take this traced roof face away (Delete), with the panels in its rows"
+                      className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-danger ring-1 ring-danger/30 hover:bg-danger/10"
+                    >
+                      <Trash2 className="size-3.5" aria-hidden /> Delete this face
+                    </button>
                   </Dial>
                 )
               )}
@@ -7659,20 +7684,7 @@ export function RoofDesigner(props: {
                   <button className={button} onClick={() => update(face.id, { off: [] })} disabled={!face.off.length}>
                     Put every row panel back
                   </button>
-                  <button
-                    className={clsx(button, "text-danger")}
-                    onClick={() => {
-                      setFaces(faces.filter((f) => f.id !== face.id));
-                      setStrings(
-                        strings
-                          .map((s) => ({ ...s, panels: s.panels.filter((k) => !k.startsWith(`g:${face.id}:`)) }))
-                          .filter((s) => s.panels.length),
-                      );
-                      changed();
-                      setSelected(null);
-                      setPicks([]);
-                    }}
-                  >
+                  <button className={clsx(button, "text-danger")} onClick={() => removeFace(face.id)}>
                     Delete this face
                   </button>
                 </div>
