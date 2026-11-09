@@ -4261,11 +4261,11 @@ export function RoofDesigner(props: {
     const t = window.setTimeout(() => setCommandReply(null), 9000);
     return () => window.clearTimeout(t);
   }, [commandReply, commandOpen]);
-  // "/" opens the command bar, as on the design home; Escape closes it.
   // In the pop-up the box stays under Sol's reply: the cursor goes back into it, ready for the next thing.
   useEffect(() => {
     if (props.tight && commandReply) commandBox.current?.focus();
   }, [props.tight, commandReply]);
+  // "/" opens the command bar, as on the design home; Escape closes it.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -5508,6 +5508,7 @@ export function RoofDesigner(props: {
                       <input
                         ref={commandBox}
                         value={commandText}
+                        onFocus={() => setCommandOpen(true)}
                         onChange={(e) => setCommandText(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Escape") {
@@ -5522,7 +5523,6 @@ export function RoofDesigner(props: {
                       <button
                         type="button"
                         onClick={() => setCalcOpen((o) => !o)}
-                        onFocus={() => setCommandOpen(true)}
                         aria-label="Size a system: the calculator"
                         title="Size a system: PV kW, a battery or backup"
                         aria-pressed={calcOpen}
