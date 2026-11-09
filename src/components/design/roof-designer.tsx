@@ -120,6 +120,7 @@ import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, ty
 import { openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
 import { SolThinking } from "./sol-thinking";
+import { panelWords, productWords } from "@/lib/domain/design/kit-words";
 import { CaptureButtons } from "@/components/ui/capture";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
 import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
@@ -4501,6 +4502,51 @@ export function RoofDesigner(props: {
         props.tight ? "right-0 top-full mt-2" : "left-0 top-full mt-2",
       )}
     >
+      {props.tight && !props.sitesOnly && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-line pb-3">
+          {props.noDeal ? (
+            <button
+              type="button"
+              onClick={() => {
+                openMenu(false);
+                if (saved === "changed") void save();
+                setNoDealOpen(true);
+              }}
+              className="inline-flex h-10 items-center gap-2 rounded-md bg-surface-2 px-4 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+            >
+              <Send className="size-4" aria-hidden /> Publish · put it on a deal first
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => void publish()}
+                disabled={saved === "saving" || publishing}
+                className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-semibold text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+              >
+                <Send className="size-4" aria-hidden /> {publishing ? "Publishing…" : "Publish design"}
+              </button>
+              {props.onNote && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    openMenu(false);
+                    setSending(true);
+                  }}
+                  className="text-sm font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
+                >
+                  With a note to {props.customerName ?? "the customer"}
+                </button>
+              )}
+            </>
+          )}
+          {sent && !sending && (
+            <p className={clsx("w-full text-xs", sent.ok ? "text-positive" : "text-warning")} role="status">
+              {sent.message}
+            </p>
+          )}
+        </div>
+      )}
       <ul className="space-y-1.5">
         {everyDesign().map((d, i) => {
           const sum = designSummary(d);
@@ -4610,164 +4656,165 @@ export function RoofDesigner(props: {
         The starred design is the primary: the one this roof opens on. Offer up to {MAX_PROPOSAL_OPTIONS - 1} more to the customer as
         options on the next proposal published, and mark the one you recommend.
       </p>
-      {props.tight && !props.sitesOnly && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-          {props.noDeal ? (
-            <button
-              type="button"
-              onClick={() => {
-                openMenu(false);
-                if (saved === "changed") void save();
-                setNoDealOpen(true);
-              }}
-              className="inline-flex h-10 items-center gap-2 rounded-md bg-surface-2 px-4 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink"
-            >
-              <Send className="size-4" aria-hidden /> Publish · put it on a deal first
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => void publish()}
-                disabled={saved === "saving" || publishing}
-                className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-sm font-semibold text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
-              >
-                <Send className="size-4" aria-hidden /> {publishing ? "Publishing…" : "Publish design"}
-              </button>
-              {props.onNote && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    openMenu(false);
-                    setSending(true);
-                  }}
-                  className="text-sm font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
-                >
-                  With a note to {props.customerName ?? "the customer"}
-                </button>
-              )}
-            </>
-          )}
-          {sent && !sending && (
-            <p className={clsx("w-full text-xs", sent.ok ? "text-positive" : "text-warning")} role="status">
-              {sent.message}
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 
   // Publish design (8 Nov 2026, Martin: in the pop-up, the picture's top right corner): the same control in either place.
-  const publishControl = props.sitesOnly ? null : (
-    <div className="relative" data-popup>
-      {props.noDeal ? (
-        // No deal, no customer to send a proposal to: Publish says so, and opens the way to put the design on a deal.
-        <button
-          type="button"
-          onClick={() => {
-            if (!noDealOpen && saved === "changed") void save();
-            setNoDealOpen(!noDealOpen);
-          }}
-          aria-expanded={noDealOpen}
-          title="Publish: put it on a deal first"
-          className={clsx(
-            "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap bg-surface-2 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink",
-            "h-10 rounded-md px-4",
-          )}
-        >
-          <Send className="size-4" aria-hidden /> <span>Publish · put it on a deal first</span>
-        </button>
-      ) : (
-        <button
-          onClick={() => (props.onNote ? setSending(!sending) : void publish())}
-          aria-expanded={props.onNote ? sending : undefined}
-          disabled={saved === "saving" || publishing}
-          title="Publish design: saves it and brings the customer's proposal up to date"
-          className={clsx(
-            "inline-flex items-center justify-center gap-2 bg-primary text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted",
-            "h-10 rounded-md px-5",
-          )}
-        >
-          <Send className="size-4" aria-hidden /> <span>{publishing ? "Publishing…" : "Publish design"}</span>
-        </button>
-      )}
-      {noDealOpen && props.noDeal && (
-        <div
-          className={clsx(
-            "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
-            "right-0 top-12",
-          )}
-        >
-          <button
-            type="button"
-            onClick={() => setNoDealOpen(false)}
-            aria-label="Close"
-            className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
-          >
-            <X className="size-4" aria-hidden />
-          </button>
-          {props.noDeal}
-        </div>
-      )}
-      {sending && props.onNote && (
-        <div
-          className={clsx(
-            "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
-            "right-0 top-12",
-          )}
-        >
-          <button
-            type="button"
-            onClick={() => setSending(false)}
-            aria-label="Close"
-            className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
-          >
-            <X className="size-4" aria-hidden />
-          </button>
-          <p className="pr-8 text-sm font-medium text-ink">Send the proposal{props.customerName ? ` to ${props.customerName}` : ""}</p>
-          <p className="mt-0.5 text-xs text-muted">
-            Your note goes in their chat on the proposal, and by email when replies are emailed. It is kept on the deal.
-          </p>
-          <textarea
-            autoFocus
-            value={note}
-            maxLength={2000}
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void publish(note);
-            }}
-            placeholder="Hi, here's your design with the battery we spoke about. Any questions, just reply on the proposal."
-            className="mt-3 block min-h-24 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-forest"
-          />
-          {sent && (
-            <p
-              className={clsx(
-                "mt-2 rounded-md px-2.5 py-2 text-xs",
-                sent.ok ? "bg-positive-soft text-positive" : "bg-warning-soft text-warning",
-              )}
-              role="status"
-            >
-              {sent.message}
-            </p>
-          )}
-          <div className="mt-3 flex justify-end gap-2">
-            <button type="button" className={button} onClick={() => void publish()} disabled={publishing}>
-              Publish only
-            </button>
+  const publishControl =
+    props.sitesOnly && !props.tight ? null : (
+      <div className="relative" data-popup data-menu-host>
+        {props.tight ? (
+          // In the pop-up the corner is the roof's designs (10 Nov 2026, Martin: there was no plain way to start a second
+          // design): the one open, the others either side, and the menu of them all with New design and Publish.
+          <div className="flex h-10 items-center rounded-md bg-primary text-primary-ink shadow-lift">
+            {designs.length > 1 && (
+              <button
+                type="button"
+                onClick={() => show(everyDesign(), (active - 1 + designs.length) % designs.length)}
+                aria-label="The design before"
+                className="flex h-10 w-8 items-center justify-center rounded-l-md text-primary-ink/70 hover:bg-white/10 hover:text-primary-ink"
+              >
+                <ChevronLeft className="size-4" aria-hidden />
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => void publish(note)}
-              disabled={publishing || !note.trim()}
-              className="inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+              onClick={() => openMenu(menu === "designs" ? false : "designs")}
+              aria-expanded={menu === "designs"}
+              aria-haspopup="true"
+              title="Every design on this roof: a new one, a copy, and Publish"
+              className={clsx(
+                "flex h-10 items-center gap-2 text-sm font-medium tabular-nums hover:bg-white/10",
+                designs.length > 1 ? "px-2" : "rounded-md px-4",
+              )}
             >
-              <Send className="size-4" aria-hidden /> {publishing ? "Sending…" : "Publish and send"}
+              <Layers className="size-4" aria-hidden />
+              <span>
+                Design {active + 1}
+                {designs.length > 1 ? ` of ${designs.length}` : ""}
+              </span>
+              {designs.length > 1 && active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-label="primary" />}
+              <ChevronDown className="size-4 opacity-70" aria-hidden />
             </button>
+            {designs.length > 1 && (
+              <button
+                type="button"
+                onClick={() => show(everyDesign(), (active + 1) % designs.length)}
+                aria-label="The next design"
+                className="flex h-10 w-8 items-center justify-center rounded-r-md text-primary-ink/70 hover:bg-white/10 hover:text-primary-ink"
+              >
+                <ChevronRight className="size-4" aria-hidden />
+              </button>
+            )}
           </div>
-        </div>
-      )}
-    </div>
-  );
+        ) : props.noDeal ? (
+          // No deal, no customer to send a proposal to: Publish says so, and opens the way to put the design on a deal.
+          <button
+            type="button"
+            onClick={() => {
+              if (!noDealOpen && saved === "changed") void save();
+              setNoDealOpen(!noDealOpen);
+            }}
+            aria-expanded={noDealOpen}
+            title="Publish: put it on a deal first"
+            className={clsx(
+              "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap bg-surface-2 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink",
+              "h-10 rounded-md px-4",
+            )}
+          >
+            <Send className="size-4" aria-hidden /> <span>Publish · put it on a deal first</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => (props.onNote ? setSending(!sending) : void publish())}
+            aria-expanded={props.onNote ? sending : undefined}
+            disabled={saved === "saving" || publishing}
+            title="Publish design: saves it and brings the customer's proposal up to date"
+            className={clsx(
+              "inline-flex items-center justify-center gap-2 bg-primary text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted",
+              "h-10 rounded-md px-5",
+            )}
+          >
+            <Send className="size-4" aria-hidden /> <span>{publishing ? "Publishing…" : "Publish design"}</span>
+          </button>
+        )}
+        {noDealOpen && props.noDeal && (
+          <div
+            className={clsx(
+              "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
+              "right-0 top-12",
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => setNoDealOpen(false)}
+              aria-label="Close"
+              className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+            {props.noDeal}
+          </div>
+        )}
+        {props.tight && menu === "designs" && designsMenu}
+        {sending && props.onNote && (
+          <div
+            className={clsx(
+              "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
+              "right-0 top-12",
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => setSending(false)}
+              aria-label="Close"
+              className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+            <p className="pr-8 text-sm font-medium text-ink">Send the proposal{props.customerName ? ` to ${props.customerName}` : ""}</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Your note goes in their chat on the proposal, and by email when replies are emailed. It is kept on the deal.
+            </p>
+            <textarea
+              autoFocus
+              value={note}
+              maxLength={2000}
+              onChange={(e) => setNote(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void publish(note);
+              }}
+              placeholder="Hi, here's your design with the battery we spoke about. Any questions, just reply on the proposal."
+              className="mt-3 block min-h-24 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-forest"
+            />
+            {sent && (
+              <p
+                className={clsx(
+                  "mt-2 rounded-md px-2.5 py-2 text-xs",
+                  sent.ok ? "bg-positive-soft text-positive" : "bg-warning-soft text-warning",
+                )}
+                role="status"
+              >
+                {sent.message}
+              </p>
+            )}
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" className={button} onClick={() => void publish()} disabled={publishing}>
+                Publish only
+              </button>
+              <button
+                type="button"
+                onClick={() => void publish(note)}
+                disabled={publishing || !note.trim()}
+                className="inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+              >
+                <Send className="size-4" aria-hidden /> {publishing ? "Sending…" : "Publish and send"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
 
   // Boxes from the knife's rows open in its card, in place of the rows (8 Nov 2026, Martin: they lay over the other column).
   const readyBox = (
@@ -5502,42 +5549,6 @@ export function RoofDesigner(props: {
                   </div>
                 )}
               </div>
-              {/* Flicking through the roof's designs, at the end of the figures (8 Nov 2026, Martin: it was in the way on the map). */}
-              {designs.length > 1 && (
-                <div
-                  className="relative flex shrink-0 items-center gap-0.5 rounded-r-lg border-l border-white/15 px-1.5 text-white"
-                  role="group"
-                  aria-label="Designs on this roof"
-                  data-menu-host
-                >
-                  {menu === "designs" && props.tight && designsMenu}
-                  <button
-                    type="button"
-                    onClick={() => show(everyDesign(), (active - 1 + designs.length) % designs.length)}
-                    aria-label="The design before"
-                    className="flex size-7 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
-                  >
-                    <ChevronLeft className="size-4" aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openMenu(menu === "designs" ? false : "designs")}
-                    title="Every design on this roof"
-                    className="flex h-7 items-center gap-1 whitespace-nowrap rounded-full px-2 text-xs font-semibold tabular-nums text-white hover:bg-white/10"
-                  >
-                    Design {active + 1} of {designs.length}
-                    {active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-label="primary" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => show(everyDesign(), (active + 1) % designs.length)}
-                    aria-label="The next design"
-                    className="flex size-7 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
-                  >
-                    <ChevronRight className="size-4" aria-hidden />
-                  </button>
-                </div>
-              )}
             </section>
             {/* The picture's height as a variable, so the kit lists that open on it scroll inside it, clear of the tools at its foot. */}
             <div
@@ -7631,515 +7642,587 @@ export function RoofDesigner(props: {
                   beneath, centred under the three. (Which design is open is in the bar at the top of the page, and
                   the customer's bill in the figures above the picture.) */}
               <div
-                className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center"
+                className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 flex-col items-center"
                 role="group"
                 aria-label="System"
                 data-menu-host
               >
-                <div className="order-3">
-                  <button
-                    onClick={() => openMenu(menu === "panels" ? false : "panels")}
-                    aria-expanded={menu === "panels"}
-                    aria-haspopup="true"
-                    title={`Panels: ${summary.panels} × ${panel?.name ?? chosenPanel?.name ?? "panel"}`}
-                    aria-label="The panel this design is drawn with"
-                    className={clsx(
-                      "relative z-10 flex size-[3.75rem] flex-col items-center justify-center rounded-full border shadow-lift tabular-nums",
-                      menu === "panels" ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface text-ink hover:bg-canvas",
-                    )}
-                  >
-                    {/* A solar panel, leaning as it does on a roof: frame, cells, and a stand. */}
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="size-7"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinejoin="round"
-                      aria-hidden
+                <div className="flex items-center">
+                  <div className="order-3">
+                    <button
+                      onClick={() => openMenu(menu === "panels" ? false : "panels")}
+                      aria-expanded={menu === "panels"}
+                      aria-haspopup="true"
+                      title={`Panels: ${summary.panels} × ${panel?.name ?? chosenPanel?.name ?? "panel"}`}
+                      aria-label="The panel this design is drawn with"
+                      className={clsx(
+                        "relative z-10 flex size-[3.75rem] flex-col items-center justify-center rounded-full border shadow-lift tabular-nums",
+                        menu === "panels"
+                          ? "border-primary bg-primary text-primary-ink"
+                          : "border-line bg-surface text-ink hover:bg-canvas",
+                      )}
                     >
-                      <path d="M5.2 4h13.6l2.7 12H2.5z" />
-                      <path d="M3.9 10h16.2M9.4 4 8 16M14.6 4 16 16" strokeWidth="1.2" />
-                      <path d="M12 16v4M8.5 20h7" strokeLinecap="round" />
-                    </svg>
-                    <span className="mt-0.5 text-[11px] font-medium leading-none">{summary.panels}</span>
-                  </button>
-                  {menu === "panels" && (
-                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2">
-                      <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
-                      {[
-                        ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
-                        ...favourites.sorted("panels", props.catalogue).map((p) => ({ ...p, gone: false })),
-                      ].map((p) => (
-                        <div key={p.sku} className="group flex items-start gap-1">
-                          <button
-                            onClick={() => {
-                              if (!p.gone) choosePanel(p.sku);
-                              openMenu(false);
-                            }}
-                            className={clsx(
-                              "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
-                              p.sku === chosen && "bg-canvas",
-                            )}
-                          >
-                            <Check className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")} aria-hidden />
-                            <span className="min-w-0">
-                              <span className="block text-sm font-semibold">{p.name}</span>
-                              <ModelNo sku={p.sku} />
-                              <span className="block text-xs tabular-nums text-muted">
-                                {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
-                                {p.gone ? " · no longer in our range" : ""}
-                              </span>
-                            </span>
-                          </button>
-                          {!p.gone && (
-                            <FavouriteStar
-                              on={favourites.is("panels", p.sku)}
-                              onToggle={() => favourites.toggle("panels", p.sku)}
-                              name={p.name}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {/* The EV charger (5 Nov 2026), beside the inverter as the switchboard is beside the battery: its list is the
-                    chargers on the business's own price lists; chosen, its mark goes on the picture to be dragged to its wall. */}
-                <div className="order-1 mr-1.5">
-                  <button
-                    onClick={() => openMenu(menu === "chargers" ? false : "chargers")}
-                    aria-expanded={menu === "chargers"}
-                    aria-haspopup="true"
-                    title={charger ? `EV charger: ${charger.name}` : "EV charger: add one"}
-                    aria-label="The EV charger on this design"
-                    className={clsx(
-                      "flex size-[2.625rem] items-center justify-center rounded-full border border-line shadow-lift backdrop-blur-md",
-                      menu === "chargers"
-                        ? "bg-primary text-primary-ink"
-                        : charger
-                          ? "bg-surface/90 text-ink hover:bg-surface"
-                          : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
-                    )}
-                  >
-                    <PlugZap className="size-5" aria-hidden />
-                  </button>
-                  {menu === "chargers" && (
-                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift">
-                      <p className={clsx(label, "px-2 py-1")}>On this design</p>
-                      {charger ? (
-                        <div className="rounded-md bg-canvas px-2 py-2">
-                          <div className="flex items-start gap-2">
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-semibold">{charger.name}</span>
-                              <ModelNo sku={charger.sku} />
-                              <span className="block text-xs tabular-nums text-muted">{charger.kw} kW</span>
-                            </span>
-                            <button
-                              className="text-sm font-medium text-danger hover:underline"
-                              onClick={() => {
-                                setCharger(undefined);
-                                changed();
-                              }}
-                            >
-                              Take it off
-                            </button>
-                          </div>
-                          <p className="mt-1.5 text-xs text-muted">
-                            It is on the picture: drag it to the wall it will be mounted on. The quote adds it and its installation.
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="px-2 pb-1 text-sm text-muted">None on this design.</p>
-                      )}
-                      {(props.chargers ?? []).length === 0 ? (
-                        <p className="mt-2 px-2 text-sm text-ink-2">
-                          No EV chargers on your price lists yet. Upload a list with them in Settings, under price lists, and they show
-                          here.
-                        </p>
-                      ) : (
-                        <>
-                          <p className={clsx(label, "mt-2 px-2 py-1")}>
-                            {charger ? "Change it" : "Chargers to choose from"} · {(props.chargers ?? []).length} on your lists
-                          </p>
-                          <input
-                            value={seek}
-                            onChange={(e) => setSeek(e.target.value)}
-                            placeholder="Search EV chargers"
-                            className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                          />
-                          <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
-                            {favourites
-                              .sorted("chargers", props.chargers ?? [])
-                              .filter((c) =>
-                                seek
-                                  .toLowerCase()
-                                  .split(/\s+/)
-                                  .every((word) => `${c.name} ${c.sku}`.toLowerCase().includes(word)),
-                              )
-                              .map((c) => (
-                                <div key={c.sku} className="group flex items-start gap-1">
-                                  <button
-                                    onClick={() => chooseCharger(c)}
-                                    className={clsx(
-                                      "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
-                                      c.sku === charger?.sku && "bg-canvas",
-                                    )}
-                                  >
-                                    <Check
-                                      className={clsx("mt-0.5 size-4 shrink-0", c.sku === charger?.sku ? "text-ink" : "invisible")}
-                                      aria-hidden
-                                    />
-                                    <span className="min-w-0">
-                                      <span className="block text-sm font-semibold">{c.name}</span>
-                                      <ModelNo sku={c.sku} />
-                                      <span className="block text-xs tabular-nums text-muted">{c.kw} kW</span>
-                                    </span>
-                                  </button>
-                                  <FavouriteStar
-                                    on={favourites.is("chargers", c.sku)}
-                                    onToggle={() => favourites.toggle("chargers", c.sku)}
-                                    name={c.name}
-                                  />
-                                </div>
-                              ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="order-2 -mr-6">
-                  <button
-                    onClick={() => openMenu(menu === "inverters" ? false : "inverters")}
-                    aria-expanded={menu === "inverters"}
-                    aria-haspopup="true"
-                    title={fitted.length ? `Inverter: ${fitted.map((i) => i.name).join(" + ")}` : "Inverter: choose one"}
-                    aria-label="The inverters this design is drawn for"
-                    className={clsx(
-                      "flex h-[2.625rem] w-[4rem] items-center justify-start rounded-l-full border border-line pl-2.5 shadow-lift backdrop-blur-md",
-                      menu === "inverters"
-                        ? "bg-primary text-primary-ink"
-                        : fitted.length
-                          ? "bg-surface/90 text-ink hover:bg-surface"
-                          : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
-                    )}
-                  >
-                    <Zap className="size-5" aria-hidden />
-                  </button>
-                  {menu === "inverters" && (
-                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
-                      <p className={clsx(label, "px-2 py-1")}>On this design</p>
-                      {fitted.length === 0 && (
-                        <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
-                      )}
-                      <ul className="space-y-0.5">
-                        {fitted.map((spec, n) => (
-                          <li key={n} className="flex items-center gap-2 rounded-md bg-canvas px-2 py-1.5">
-                            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-ink">
-                              {n + 1}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-semibold">{spec.name}</span>
-                              <ModelNo sku={spec.sku} />
-                              <span className="block text-xs tabular-nums text-muted">
-                                {spec.kw} kW ·{" "}
-                                {fittedItems[n]
-                                  ? fittedItems[n]?.electrical
-                                    ? `${inputsOf(n)} inputs · strings can be checked`
-                                    : "limits not on file"
-                                  : "no longer in our range"}
-                              </span>
-                            </span>
-                            <button
-                              onClick={() => removeInverter(n)}
-                              className="px-1 text-lg leading-none text-muted hover:text-danger"
-                              aria-label={`Take inverter ${n + 1} off the design`}
-                              title="Take it off the design"
-                            >
-                              ×
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        onClick={() => setSuggesting(!suggesting)}
-                        aria-expanded={suggesting}
-                        className={clsx(button, "mt-2 w-full justify-center", suggesting && "!border-forest")}
+                      {/* A solar panel, leaning as it does on a roof: frame, cells, and a stand. */}
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="size-7"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinejoin="round"
+                        aria-hidden
                       >
-                        <Sparkles className="mr-1.5 size-4 text-sun-ink" aria-hidden /> Suggest one for these panels
-                      </button>
-                      {suggesting && (
-                        <div className="mt-1 space-y-1 rounded-md border border-sun-line bg-sun p-2">
-                          {summary.panels === 0 && (
-                            <p className="px-1 text-sm text-ink-2">Put panels on the roof first: the suggestion is sized to them.</p>
-                          )}
-                          {summary.panels > 0 && suggestions.length === 0 && (
-                            <p className="px-1 text-sm text-ink-2">
-                              Nothing in our range suits {summary.kw.toFixed(2)} kW of panels by the usual sizing. Pick one from the list
-                              below.
-                            </p>
-                          )}
-                          {suggestions.map((sug) => (
-                            <div key={sug.inverter.sku + sug.kind} className="rounded-lg bg-surface p-2">
-                              <p className={label}>{sug.kind}</p>
-                              <p className="mt-0.5 text-sm font-semibold">
-                                {sug.count > 1 ? `${sug.count} × ` : ""}
-                                {sug.inverter.name}
-                              </p>
-                              <ModelNo sku={sug.inverter.sku} />
-                              <p className="mt-0.5 text-xs text-ink-2">{sug.why}</p>
-                              <button
-                                className="mt-1.5 text-sm font-semibold underline underline-offset-4"
-                                onClick={() => takeSuggestion(sug)}
-                              >
-                                Use {sug.count > 1 ? "these" : "this one"}
-                              </button>
-                            </div>
-                          ))}
-                          {suggestions.length > 0 && (
-                            <p className="px-1 text-[11px] text-muted">
-                              One for each kind in our range: choose by the home&apos;s supply and whether a battery is wanted. Sized by
-                              rule from the panels, not a design check.
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      <p className={clsx(label, "mt-2 px-2 py-1")}>
-                        {fitted.length >= MAX_INVERTERS
-                          ? `That is the most a design takes (${MAX_INVERTERS})`
-                          : fitted.length
-                            ? "Add another"
-                            : "Add one"}
-                      </p>
-                      {fitted.length < MAX_INVERTERS && (
-                        <>
-                          <input
-                            autoFocus
-                            value={seek}
-                            onChange={(e) => setSeek(e.target.value)}
-                            placeholder="Search inverters"
-                            className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                          />
-                          <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
-                            {favourites
-                              .sorted("inverters", props.inverters)
-                              .filter((i) =>
-                                seek
-                                  .toLowerCase()
-                                  .split(/\s+/)
-                                  .every((word) => `${i.name} ${i.sku}`.toLowerCase().includes(word)),
-                              )
-                              .map((i) => (
-                                <div key={i.sku} className="group flex items-start gap-1">
-                                  <button
-                                    onClick={() => addInverter(i)}
-                                    className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas"
-                                  >
-                                    <Plus className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
-                                    <span className="min-w-0">
-                                      <span className="block text-sm font-semibold">{i.name}</span>
-                                      <ModelNo sku={i.sku} />
-                                      <span className="block text-xs tabular-nums text-muted">
-                                        {i.kw} kW ·{" "}
-                                        {i.electrical
-                                          ? `${i.electrical.mppts.length} inputs, up to ${i.electrical.maxVoltage} V · strings can be checked`
-                                          : "limits not on file: strings can't be checked"}
-                                      </span>
-                                    </span>
-                                  </button>
-                                  <FavouriteStar
-                                    on={favourites.is("inverters", i.sku)}
-                                    onToggle={() => favourites.toggle("inverters", i.sku)}
-                                    name={i.name}
-                                  />
-                                </div>
-                              ))}
+                        <path d="M5.2 4h13.6l2.7 12H2.5z" />
+                        <path d="M3.9 10h16.2M9.4 4 8 16M14.6 4 16 16" strokeWidth="1.2" />
+                        <path d="M12 16v4M8.5 20h7" strokeLinecap="round" />
+                      </svg>
+                      <span className="mt-0.5 text-[11px] font-medium leading-none">{summary.panels}</span>
+                    </button>
+                    {menu === "panels" && (
+                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2">
+                        <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
+                        {[
+                          ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
+                          ...favourites.sorted("panels", props.catalogue).map((p) => ({ ...p, gone: false })),
+                        ].map((p) => (
+                          <div key={p.sku} className="group flex items-start gap-1">
+                            <button
+                              onClick={() => {
+                                if (!p.gone) choosePanel(p.sku);
+                                openMenu(false);
+                              }}
+                              className={clsx(
+                                "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
+                                p.sku === chosen && "bg-canvas",
+                              )}
+                            >
+                              <Check className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")} aria-hidden />
+                              <span className="min-w-0">
+                                <span className="block text-sm font-semibold">{p.name}</span>
+                                <ModelNo sku={p.sku} />
+                                <span className="block text-xs tabular-nums text-muted">
+                                  {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
+                                  {p.gone ? " · no longer in our range" : ""}
+                                </span>
+                              </span>
+                            </button>
+                            {!p.gone && (
+                              <FavouriteStar
+                                on={favourites.is("panels", p.sku)}
+                                onToggle={() => favourites.toggle("panels", p.sku)}
+                                name={p.name}
+                              />
+                            )}
                           </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-                {/* The main switchboard (MSB), beside the battery (Martin): pressed, its mark goes on the picture to be dragged
-                    to where the board is; pressed again (or erased), it comes off. */}
-                <div className="order-5 ml-1.5">
-                  <button
-                    onClick={toggleMsb}
-                    title={
-                      msb
-                        ? "Main switchboard: drag its mark on the picture. Press again to take it off."
-                        : "Main switchboard: mark where it is"
-                    }
-                    aria-label={msb ? "Take the main switchboard off" : "Mark the main switchboard"}
-                    aria-pressed={msb !== null}
-                    className={clsx(
-                      "flex size-[2.625rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
-                      msb
-                        ? "border-line bg-surface/90 text-ink hover:bg-surface"
-                        : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
+                        ))}
+                      </div>
                     )}
-                  >
-                    <SwitchboardGlyph />
-                  </button>
-                </div>
-                <div className="order-4 -ml-6">
-                  <button
-                    onClick={() => openMenu(menu === "batteries" ? false : "batteries")}
-                    aria-expanded={menu === "batteries"}
-                    aria-haspopup="true"
-                    title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Battery: add one"}
-                    aria-label="The battery on this design"
-                    className={clsx(
-                      "flex h-[2.625rem] w-[4rem] items-center justify-end rounded-r-full border border-line pr-2.5 shadow-lift backdrop-blur-md",
-                      menu === "batteries"
-                        ? "bg-primary text-primary-ink"
-                        : battery
-                          ? "bg-surface/90 text-ink hover:bg-surface"
-                          : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
-                    )}
-                  >
-                    <BatteryCharging className="size-6" aria-hidden />
-                  </button>
-                  {menu === "batteries" && (
-                    <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
-                      <p className={clsx(label, "px-2 py-1")}>On this design</p>
-                      {battery ? (
-                        <div className="rounded-md bg-canvas px-2 py-2">
-                          <p className="truncate text-sm font-semibold">{battery.name}</p>
-                          <ModelNo sku={battery.sku} />
-                          <div className="mt-1.5 flex items-center gap-2 text-sm">
-                            <button
-                              className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface font-semibold disabled:bg-surface-2 disabled:text-muted"
-                              disabled={battery.qty <= 1}
-                              onClick={() => {
-                                setBattery({ ...battery, qty: battery.qty - 1 });
-                                changed();
-                              }}
-                              aria-label="One fewer"
-                            >
-                              −
-                            </button>
-                            <span className="min-w-28 text-center tabular-nums">
-                              {battery.qty} × {battery.kwh} kWh = <strong>{batteryKwh} kWh</strong>
-                            </span>
-                            <button
-                              className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface font-semibold disabled:bg-surface-2 disabled:text-muted"
-                              disabled={battery.qty >= MAX_BATTERY_QTY}
-                              onClick={() => {
-                                setBattery({ ...battery, qty: battery.qty + 1 });
-                                changed();
-                              }}
-                              aria-label="One more"
-                            >
-                              +
-                            </button>
-                            <button
-                              className="ml-auto text-sm font-medium text-danger hover:underline"
-                              onClick={() => {
-                                setBattery(undefined);
-                                changed();
-                              }}
-                            >
-                              Take it off
-                            </button>
-                          </div>
-                          <label className="mt-2 flex items-start gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              className="mt-0.5 size-4"
-                              checked={Boolean(battery.backup)}
-                              onChange={(e) => {
-                                setBattery({ ...battery, backup: e.target.checked || undefined });
-                                changed();
-                              }}
-                            />
-                            <span>
-                              Blackout backup: wire chosen circuits to it, one module held back for outages. Adds the backup circuits to the
-                              quote; the held module isn&apos;t counted in the savings.
-                            </span>
-                          </label>
-                          <p className="mt-1.5 text-xs text-muted">It is on the picture: drag it to the wall it will stand against.</p>
-                        </div>
-                      ) : (
-                        <p className="px-2 pb-1 text-sm text-muted">None: this design is solar only. Choose one below.</p>
+                  </div>
+                  {/* The EV charger (5 Nov 2026), beside the inverter as the switchboard is beside the battery: its list is the
+                    chargers on the business's own price lists; chosen, its mark goes on the picture to be dragged to its wall. */}
+                  <div className="order-1 mr-1.5">
+                    <button
+                      onClick={() => openMenu(menu === "chargers" ? false : "chargers")}
+                      aria-expanded={menu === "chargers"}
+                      aria-haspopup="true"
+                      title={charger ? `EV charger: ${charger.name}` : "EV charger: add one"}
+                      aria-label="The EV charger on this design"
+                      className={clsx(
+                        "flex size-[2.625rem] items-center justify-center rounded-full border border-line shadow-lift backdrop-blur-md",
+                        menu === "chargers"
+                          ? "bg-primary text-primary-ink"
+                          : charger
+                            ? "bg-surface/90 text-ink hover:bg-surface"
+                            : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                       )}
-                      {batteryIdea && batteryIdea.size > 0 && (
-                        <div className="mt-2 space-y-1 rounded-md border border-sun-line bg-sun p-2">
-                          <p className="flex items-center gap-1.5 px-1 text-sm font-semibold text-sun-ink">
-                            <Sparkles className="size-4" aria-hidden /> Recommended for this home: about {batteryIdea.size} kWh
-                          </p>
-                          <p className="px-1 text-xs text-ink-2">{batteryIdea.note}</p>
-                          {batteryIdea.suggestions.slice(0, 3).map((sug) => (
-                            <div key={sug.battery.sku} className="rounded-lg bg-surface p-2">
-                              <p className="text-sm font-semibold">
-                                {sug.qty > 1 ? `${sug.qty} × ` : ""}
-                                {sug.battery.name}
-                              </p>
-                              <ModelNo sku={sug.battery.sku} />
-                              <p className="mt-0.5 text-xs text-ink-2">{sug.why}</p>
+                    >
+                      <PlugZap className="size-5" aria-hidden />
+                    </button>
+                    {menu === "chargers" && (
+                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift">
+                        <p className={clsx(label, "px-2 py-1")}>On this design</p>
+                        {charger ? (
+                          <div className="rounded-md bg-canvas px-2 py-2">
+                            <div className="flex items-start gap-2">
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-semibold">{charger.name}</span>
+                                <ModelNo sku={charger.sku} />
+                                <span className="block text-xs tabular-nums text-muted">{charger.kw} kW</span>
+                              </span>
                               <button
-                                className="mt-1 text-sm font-semibold underline underline-offset-4"
+                                className="text-sm font-medium text-danger hover:underline"
                                 onClick={() => {
-                                  chooseBattery(sug.battery);
-                                  setBattery((b) => (b ? { ...b, qty: sug.qty } : b));
+                                  setCharger(undefined);
+                                  changed();
                                 }}
                               >
-                                Use this
+                                Take it off
                               </button>
                             </div>
-                          ))}
-                          {!finance && <p className="px-1 text-[11px] text-muted">Add the customer&apos;s bill for a closer size.</p>}
-                        </div>
-                      )}
-                      <p className={clsx(label, "mt-2 px-2 py-1")}>
-                        {battery ? "Change it" : "Batteries to choose from"} · {props.batteries.length} to choose from
-                      </p>
-                      <input
-                        value={seek}
-                        onChange={(e) => setSeek(e.target.value)}
-                        placeholder="Search batteries"
-                        className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                      />
-                      <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
-                        {favourites
-                          .sorted("batteries", props.batteries)
-                          .filter((b) =>
-                            seek
-                              .toLowerCase()
-                              .split(/\s+/)
-                              .every((word) => `${b.name} ${b.sku}`.toLowerCase().includes(word)),
-                          )
-                          .map((b) => (
-                            <div key={b.sku} className="group flex items-start gap-1">
-                              <button
-                                onClick={() => chooseBattery(b)}
-                                className={clsx(
-                                  "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
-                                  b.sku === battery?.sku && "bg-canvas",
-                                )}
-                              >
-                                <Check
-                                  className={clsx("mt-0.5 size-4 shrink-0", b.sku === battery?.sku ? "text-ink" : "invisible")}
-                                  aria-hidden
-                                />
-                                <span className="min-w-0">
-                                  <span className="block text-sm font-semibold">{b.name}</span>
-                                  <ModelNo sku={b.sku} />
-                                  <span className="block text-xs tabular-nums text-muted">{b.kwh} kWh each</span>
-                                </span>
-                              </button>
-                              <FavouriteStar
-                                on={favourites.is("batteries", b.sku)}
-                                onToggle={() => favourites.toggle("batteries", b.sku)}
-                                name={b.name}
-                              />
+                            <p className="mt-1.5 text-xs text-muted">
+                              It is on the picture: drag it to the wall it will be mounted on. The quote adds it and its installation.
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="px-2 pb-1 text-sm text-muted">None on this design.</p>
+                        )}
+                        {(props.chargers ?? []).length === 0 ? (
+                          <p className="mt-2 px-2 text-sm text-ink-2">
+                            No EV chargers on your price lists yet. Upload a list with them in Settings, under price lists, and they show
+                            here.
+                          </p>
+                        ) : (
+                          <>
+                            <p className={clsx(label, "mt-2 px-2 py-1")}>
+                              {charger ? "Change it" : "Chargers to choose from"} · {(props.chargers ?? []).length} on your lists
+                            </p>
+                            <input
+                              value={seek}
+                              onChange={(e) => setSeek(e.target.value)}
+                              placeholder="Search EV chargers"
+                              className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                            />
+                            <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                              {favourites
+                                .sorted("chargers", props.chargers ?? [])
+                                .filter((c) =>
+                                  seek
+                                    .toLowerCase()
+                                    .split(/\s+/)
+                                    .every((word) => `${c.name} ${c.sku}`.toLowerCase().includes(word)),
+                                )
+                                .map((c) => (
+                                  <div key={c.sku} className="group flex items-start gap-1">
+                                    <button
+                                      onClick={() => chooseCharger(c)}
+                                      className={clsx(
+                                        "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
+                                        c.sku === charger?.sku && "bg-canvas",
+                                      )}
+                                    >
+                                      <Check
+                                        className={clsx("mt-0.5 size-4 shrink-0", c.sku === charger?.sku ? "text-ink" : "invisible")}
+                                        aria-hidden
+                                      />
+                                      <span className="min-w-0">
+                                        <span className="block text-sm font-semibold">{c.name}</span>
+                                        <ModelNo sku={c.sku} />
+                                        <span className="block text-xs tabular-nums text-muted">{c.kw} kW</span>
+                                      </span>
+                                    </button>
+                                    <FavouriteStar
+                                      on={favourites.is("chargers", c.sku)}
+                                      onToggle={() => favourites.toggle("chargers", c.sku)}
+                                      name={c.name}
+                                    />
+                                  </div>
+                                ))}
                             </div>
-                          ))}
+                          </>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <div className="order-2 -mr-6">
+                    <button
+                      onClick={() => openMenu(menu === "inverters" ? false : "inverters")}
+                      aria-expanded={menu === "inverters"}
+                      aria-haspopup="true"
+                      title={fitted.length ? `Inverter: ${fitted.map((i) => i.name).join(" + ")}` : "Inverter: choose one"}
+                      aria-label="The inverters this design is drawn for"
+                      className={clsx(
+                        "flex h-[2.625rem] w-[4rem] items-center justify-start rounded-l-full border border-line pl-2.5 shadow-lift backdrop-blur-md",
+                        menu === "inverters"
+                          ? "bg-primary text-primary-ink"
+                          : fitted.length
+                            ? "bg-surface/90 text-ink hover:bg-surface"
+                            : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
+                      )}
+                    >
+                      <Zap className="size-5" aria-hidden />
+                    </button>
+                    {menu === "inverters" && (
+                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                        <p className={clsx(label, "px-2 py-1")}>On this design</p>
+                        {fitted.length === 0 && (
+                          <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
+                        )}
+                        <ul className="space-y-0.5">
+                          {fitted.map((spec, n) => (
+                            <li key={n} className="flex items-center gap-2 rounded-md bg-canvas px-2 py-1.5">
+                              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-ink">
+                                {n + 1}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-semibold">{spec.name}</span>
+                                <ModelNo sku={spec.sku} />
+                                <span className="block text-xs tabular-nums text-muted">
+                                  {spec.kw} kW ·{" "}
+                                  {fittedItems[n]
+                                    ? fittedItems[n]?.electrical
+                                      ? `${inputsOf(n)} inputs · strings can be checked`
+                                      : "limits not on file"
+                                    : "no longer in our range"}
+                                </span>
+                              </span>
+                              <button
+                                onClick={() => removeInverter(n)}
+                                className="px-1 text-lg leading-none text-muted hover:text-danger"
+                                aria-label={`Take inverter ${n + 1} off the design`}
+                                title="Take it off the design"
+                              >
+                                ×
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          onClick={() => setSuggesting(!suggesting)}
+                          aria-expanded={suggesting}
+                          className={clsx(button, "mt-2 w-full justify-center", suggesting && "!border-forest")}
+                        >
+                          <Sparkles className="mr-1.5 size-4 text-sun-ink" aria-hidden /> Suggest one for these panels
+                        </button>
+                        {suggesting && (
+                          <div className="mt-1 space-y-1 rounded-md border border-sun-line bg-sun p-2">
+                            {summary.panels === 0 && (
+                              <p className="px-1 text-sm text-ink-2">Put panels on the roof first: the suggestion is sized to them.</p>
+                            )}
+                            {summary.panels > 0 && suggestions.length === 0 && (
+                              <p className="px-1 text-sm text-ink-2">
+                                Nothing in our range suits {summary.kw.toFixed(2)} kW of panels by the usual sizing. Pick one from the list
+                                below.
+                              </p>
+                            )}
+                            {suggestions.map((sug) => (
+                              <div key={sug.inverter.sku + sug.kind} className="rounded-lg bg-surface p-2">
+                                <p className={label}>{sug.kind}</p>
+                                <p className="mt-0.5 text-sm font-semibold">
+                                  {sug.count > 1 ? `${sug.count} × ` : ""}
+                                  {sug.inverter.name}
+                                </p>
+                                <ModelNo sku={sug.inverter.sku} />
+                                <p className="mt-0.5 text-xs text-ink-2">{sug.why}</p>
+                                <button
+                                  className="mt-1.5 text-sm font-semibold underline underline-offset-4"
+                                  onClick={() => takeSuggestion(sug)}
+                                >
+                                  Use {sug.count > 1 ? "these" : "this one"}
+                                </button>
+                              </div>
+                            ))}
+                            {suggestions.length > 0 && (
+                              <p className="px-1 text-[11px] text-muted">
+                                One for each kind in our range: choose by the home&apos;s supply and whether a battery is wanted. Sized by
+                                rule from the panels, not a design check.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        <p className={clsx(label, "mt-2 px-2 py-1")}>
+                          {fitted.length >= MAX_INVERTERS
+                            ? `That is the most a design takes (${MAX_INVERTERS})`
+                            : fitted.length
+                              ? "Add another"
+                              : "Add one"}
+                        </p>
+                        {fitted.length < MAX_INVERTERS && (
+                          <>
+                            <input
+                              autoFocus
+                              value={seek}
+                              onChange={(e) => setSeek(e.target.value)}
+                              placeholder="Search inverters"
+                              className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                            />
+                            <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                              {favourites
+                                .sorted("inverters", props.inverters)
+                                .filter((i) =>
+                                  seek
+                                    .toLowerCase()
+                                    .split(/\s+/)
+                                    .every((word) => `${i.name} ${i.sku}`.toLowerCase().includes(word)),
+                                )
+                                .map((i) => (
+                                  <div key={i.sku} className="group flex items-start gap-1">
+                                    <button
+                                      onClick={() => addInverter(i)}
+                                      className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas"
+                                    >
+                                      <Plus className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
+                                      <span className="min-w-0">
+                                        <span className="block text-sm font-semibold">{i.name}</span>
+                                        <ModelNo sku={i.sku} />
+                                        <span className="block text-xs tabular-nums text-muted">
+                                          {i.kw} kW ·{" "}
+                                          {i.electrical
+                                            ? `${i.electrical.mppts.length} inputs, up to ${i.electrical.maxVoltage} V · strings can be checked`
+                                            : "limits not on file: strings can't be checked"}
+                                        </span>
+                                      </span>
+                                    </button>
+                                    <FavouriteStar
+                                      on={favourites.is("inverters", i.sku)}
+                                      onToggle={() => favourites.toggle("inverters", i.sku)}
+                                      name={i.name}
+                                    />
+                                  </div>
+                                ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {/* The main switchboard (MSB), beside the battery (Martin): pressed, its mark goes on the picture to be dragged
+                    to where the board is; pressed again (or erased), it comes off. */}
+                  <div className="order-5 ml-1.5">
+                    <button
+                      onClick={toggleMsb}
+                      title={
+                        msb
+                          ? "Main switchboard: drag its mark on the picture. Press again to take it off."
+                          : "Main switchboard: mark where it is"
+                      }
+                      aria-label={msb ? "Take the main switchboard off" : "Mark the main switchboard"}
+                      aria-pressed={msb !== null}
+                      className={clsx(
+                        "flex size-[2.625rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
+                        msb
+                          ? "border-line bg-surface/90 text-ink hover:bg-surface"
+                          : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
+                      )}
+                    >
+                      <SwitchboardGlyph />
+                    </button>
+                  </div>
+                  <div className="order-4 -ml-6">
+                    <button
+                      onClick={() => openMenu(menu === "batteries" ? false : "batteries")}
+                      aria-expanded={menu === "batteries"}
+                      aria-haspopup="true"
+                      title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Battery: add one"}
+                      aria-label="The battery on this design"
+                      className={clsx(
+                        "flex h-[2.625rem] w-[4rem] items-center justify-end rounded-r-full border border-line pr-2.5 shadow-lift backdrop-blur-md",
+                        menu === "batteries"
+                          ? "bg-primary text-primary-ink"
+                          : battery
+                            ? "bg-surface/90 text-ink hover:bg-surface"
+                            : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
+                      )}
+                    >
+                      <BatteryCharging className="size-6" aria-hidden />
+                    </button>
+                    {menu === "batteries" && (
+                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                        <p className={clsx(label, "px-2 py-1")}>On this design</p>
+                        {battery ? (
+                          <div className="rounded-md bg-canvas px-2 py-2">
+                            <p className="truncate text-sm font-semibold">{battery.name}</p>
+                            <ModelNo sku={battery.sku} />
+                            <div className="mt-1.5 flex items-center gap-2 text-sm">
+                              <button
+                                className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface font-semibold disabled:bg-surface-2 disabled:text-muted"
+                                disabled={battery.qty <= 1}
+                                onClick={() => {
+                                  setBattery({ ...battery, qty: battery.qty - 1 });
+                                  changed();
+                                }}
+                                aria-label="One fewer"
+                              >
+                                −
+                              </button>
+                              <span className="min-w-28 text-center tabular-nums">
+                                {battery.qty} × {battery.kwh} kWh = <strong>{batteryKwh} kWh</strong>
+                              </span>
+                              <button
+                                className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface font-semibold disabled:bg-surface-2 disabled:text-muted"
+                                disabled={battery.qty >= MAX_BATTERY_QTY}
+                                onClick={() => {
+                                  setBattery({ ...battery, qty: battery.qty + 1 });
+                                  changed();
+                                }}
+                                aria-label="One more"
+                              >
+                                +
+                              </button>
+                              <button
+                                className="ml-auto text-sm font-medium text-danger hover:underline"
+                                onClick={() => {
+                                  setBattery(undefined);
+                                  changed();
+                                }}
+                              >
+                                Take it off
+                              </button>
+                            </div>
+                            <label className="mt-2 flex items-start gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                className="mt-0.5 size-4"
+                                checked={Boolean(battery.backup)}
+                                onChange={(e) => {
+                                  setBattery({ ...battery, backup: e.target.checked || undefined });
+                                  changed();
+                                }}
+                              />
+                              <span>
+                                Blackout backup: wire chosen circuits to it, one module held back for outages. Adds the backup circuits to
+                                the quote; the held module isn&apos;t counted in the savings.
+                              </span>
+                            </label>
+                            <p className="mt-1.5 text-xs text-muted">It is on the picture: drag it to the wall it will stand against.</p>
+                          </div>
+                        ) : (
+                          <p className="px-2 pb-1 text-sm text-muted">None: this design is solar only. Choose one below.</p>
+                        )}
+                        {batteryIdea && batteryIdea.size > 0 && (
+                          <div className="mt-2 space-y-1 rounded-md border border-sun-line bg-sun p-2">
+                            <p className="flex items-center gap-1.5 px-1 text-sm font-semibold text-sun-ink">
+                              <Sparkles className="size-4" aria-hidden /> Recommended for this home: about {batteryIdea.size} kWh
+                            </p>
+                            <p className="px-1 text-xs text-ink-2">{batteryIdea.note}</p>
+                            {batteryIdea.suggestions.slice(0, 3).map((sug) => (
+                              <div key={sug.battery.sku} className="rounded-lg bg-surface p-2">
+                                <p className="text-sm font-semibold">
+                                  {sug.qty > 1 ? `${sug.qty} × ` : ""}
+                                  {sug.battery.name}
+                                </p>
+                                <ModelNo sku={sug.battery.sku} />
+                                <p className="mt-0.5 text-xs text-ink-2">{sug.why}</p>
+                                <button
+                                  className="mt-1 text-sm font-semibold underline underline-offset-4"
+                                  onClick={() => {
+                                    chooseBattery(sug.battery);
+                                    setBattery((b) => (b ? { ...b, qty: sug.qty } : b));
+                                  }}
+                                >
+                                  Use this
+                                </button>
+                              </div>
+                            ))}
+                            {!finance && <p className="px-1 text-[11px] text-muted">Add the customer&apos;s bill for a closer size.</p>}
+                          </div>
+                        )}
+                        <p className={clsx(label, "mt-2 px-2 py-1")}>
+                          {battery ? "Change it" : "Batteries to choose from"} · {props.batteries.length} to choose from
+                        </p>
+                        <input
+                          value={seek}
+                          onChange={(e) => setSeek(e.target.value)}
+                          placeholder="Search batteries"
+                          className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                        />
+                        <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                          {favourites
+                            .sorted("batteries", props.batteries)
+                            .filter((b) =>
+                              seek
+                                .toLowerCase()
+                                .split(/\s+/)
+                                .every((word) => `${b.name} ${b.sku}`.toLowerCase().includes(word)),
+                            )
+                            .map((b) => (
+                              <div key={b.sku} className="group flex items-start gap-1">
+                                <button
+                                  onClick={() => chooseBattery(b)}
+                                  className={clsx(
+                                    "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
+                                    b.sku === battery?.sku && "bg-canvas",
+                                  )}
+                                >
+                                  <Check
+                                    className={clsx("mt-0.5 size-4 shrink-0", b.sku === battery?.sku ? "text-ink" : "invisible")}
+                                    aria-hidden
+                                  />
+                                  <span className="min-w-0">
+                                    <span className="block text-sm font-semibold">{b.name}</span>
+                                    <ModelNo sku={b.sku} />
+                                    <span className="block text-xs tabular-nums text-muted">{b.kwh} kWh each</span>
+                                  </span>
+                                </button>
+                                <FavouriteStar
+                                  on={favourites.is("batteries", b.sku)}
+                                  onToggle={() => favourites.toggle("batteries", b.sku)}
+                                  name={b.name}
+                                />
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
+                {/* What is on the design, by make and model, under the rounds (10 Nov 2026, Martin: the kit was plain only
+                    from its marks on the picture, which are easy to miss); each name opens its choices. */}
+                {(summary.panels > 0 || fitted.length > 0 || battery || charger) && (
+                  <div className="mt-2 flex max-w-[min(46rem,calc(100vw-6rem))] flex-wrap items-center justify-center gap-x-1 rounded-full bg-surface/90 px-2 py-0.5 text-[11.5px] text-ink shadow-lift ring-1 ring-line backdrop-blur-md">
+                    {[
+                      {
+                        key: "panels" as const,
+                        words: panelWords(summary.panels, panel?.name ?? chosenPanel?.name, panelOf(design).watts),
+                        title: `Panels: ${panel?.name ?? chosenPanel?.name ?? "panel"}`,
+                        none: false,
+                      },
+                      {
+                        key: "inverters" as const,
+                        words: fitted.length
+                          ? fitted
+                              .reduce<{ spec: InverterSpec; n: number }[]>((all, spec) => {
+                                const same = all.find((x) => x.spec.sku === spec.sku);
+                                if (same) same.n += 1;
+                                else all.push({ spec, n: 1 });
+                                return all;
+                              }, [])
+                              .map(({ spec, n }) => `${n > 1 ? `${n} × ` : ""}${productWords(spec.name, spec.sku)}`)
+                              .join(" + ")
+                          : "No inverter",
+                        title: fitted.length ? `Inverter: ${fitted.map((x) => x.name).join(" + ")}` : "Choose an inverter",
+                        none: !fitted.length,
+                      },
+                      {
+                        key: "batteries" as const,
+                        words: battery
+                          ? `${battery.qty > 1 ? `${battery.qty} × ` : ""}${productWords(battery.name, battery.sku)} · ${batteryKwh} kWh`
+                          : "No battery",
+                        title: battery ? `Battery: ${battery.qty} × ${battery.name}` : "Add a battery",
+                        none: !battery,
+                      },
+                      ...(charger
+                        ? [
+                            {
+                              key: "chargers" as const,
+                              words: productWords(charger.name, charger.sku),
+                              title: `EV charger: ${charger.name}`,
+                              none: false,
+                            },
+                          ]
+                        : []),
+                    ].map((item, n) => (
+                      <span key={item.key} className="flex items-center gap-x-1">
+                        {n > 0 && (
+                          <span className="text-muted" aria-hidden>
+                            ·
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => openMenu(menu === item.key ? false : item.key)}
+                          title={item.title}
+                          className={clsx(
+                            "whitespace-nowrap rounded-full px-1.5 py-0.5 hover:bg-canvas",
+                            item.none ? "text-muted" : "font-medium",
+                            menu === item.key && "bg-canvas",
+                          )}
+                        >
+                          {item.words}
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               {/* The pad, in the top left corner: the select arrow in a circle of its own, since it is the tool every other
                   is left for, with two smaller half-rounds growing out of it for the two things done most with it:

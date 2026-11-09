@@ -14,6 +14,11 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-10",
+    area: "Designer",
+    words: "The corner button now opens your designs: start a new one, copy one or publish. Under the kit, the make and model on the design.",
+  },
+  {
     day: "2026-11-09",
     area: "Designer",
     words: "When the sunnier roof is full, panels go on the south side too. Faces look wrong? Ask Sol to read the roof again.",
