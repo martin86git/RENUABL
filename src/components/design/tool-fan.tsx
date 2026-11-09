@@ -107,6 +107,7 @@ export function KnifeMenu({
   return (
     <div
       ref={box}
+      data-popup
       className="relative"
       onMouseEnter={() => {
         if (timer.current) window.clearTimeout(timer.current);
@@ -254,7 +255,7 @@ export function ToolFan({
     );
   };
   return (
-    <div ref={box} className={clsx("relative", className)} onMouseEnter={enter} onMouseLeave={leave}>
+    <div ref={box} className={clsx("relative", className)} onMouseEnter={enter} onMouseLeave={leave} data-popup>
       <div
         role="button"
         tabIndex={0}

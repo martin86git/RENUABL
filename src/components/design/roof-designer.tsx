@@ -3748,6 +3748,40 @@ export function RoofDesigner(props: {
     // Only when a whole system has just had its panels laid.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [systemTick]);
+  // Every box over the designer closes on a press anywhere outside it (8 Nov 2026, Martin), as well as by its cross.
+  // A box and the button that opens it carry `data-popup`; the strings box also stays while stringing on the roof.
+  const anyBox =
+    commandOpen ||
+    choices !== null ||
+    sending ||
+    noDealOpen ||
+    readyOpen ||
+    liveOpen ||
+    keysOpen ||
+    mineIntro ||
+    arraysOpen ||
+    tool === "string";
+  useEffect(() => {
+    if (!anyBox) return;
+    const away = (e: PointerEvent) => {
+      const at = e.target as Element | null;
+      if (!at || at.closest("[data-popup]")) return;
+      const onRoof = Boolean(svg.current?.contains(at));
+      setCommandOpen(false);
+      setChoices(null);
+      setSending(false);
+      setNoDealOpen(false);
+      setReadyOpen(false);
+      setLiveOpen(false);
+      setKeysOpen(false);
+      setMineIntro(false);
+      setArraysOpen(false);
+      // Stringing goes on while the roof is pressed (a press off the panels there puts it down already).
+      if (tool === "string" && !onRoof) pickTool("select");
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
+  });
   // Rows asked for with a size: once the panels for that size are down, they are put in the rows (and turned, if asked).
   const rowsNext = useRef<{ rows: number; landscape?: boolean } | null>(null);
   useEffect(() => {
@@ -4251,7 +4285,7 @@ export function RoofDesigner(props: {
 
   // Publish design (8 Nov 2026, Martin: in the pop-up, the picture's top right corner): the same control in either place.
   const publishControl = props.sitesOnly ? null : (
-    <div className="relative">
+    <div className="relative" data-popup>
       {props.noDeal ? (
         // No deal, no customer to send a proposal to: Publish says so, and opens the way to put the design on a deal.
         <button
@@ -4290,6 +4324,14 @@ export function RoofDesigner(props: {
             "right-0 top-12",
           )}
         >
+          <button
+            type="button"
+            onClick={() => setNoDealOpen(false)}
+            aria-label="Close"
+            className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
           {props.noDeal}
         </div>
       )}
@@ -4300,7 +4342,15 @@ export function RoofDesigner(props: {
             "right-0 top-12",
           )}
         >
-          <p className="text-sm font-medium text-ink">Send the proposal{props.customerName ? ` to ${props.customerName}` : ""}</p>
+          <button
+            type="button"
+            onClick={() => setSending(false)}
+            aria-label="Close"
+            className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+          <p className="pr-8 text-sm font-medium text-ink">Send the proposal{props.customerName ? ` to ${props.customerName}` : ""}</p>
           <p className="mt-0.5 text-xs text-muted">
             Your note goes in their chat on the proposal, and by email when replies are emailed. It is kept on the deal.
           </p>
@@ -4354,6 +4404,16 @@ export function RoofDesigner(props: {
         props.tight ? "rounded-none bg-transparent p-1 shadow-none ring-0" : "right-0 top-full mt-2",
       )}
     >
+      {!props.tight && (
+        <button
+          type="button"
+          onClick={() => setReadyOpen(false)}
+          aria-label="Close"
+          className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
+      )}
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Ready to install</p>
       <ul className="mt-2 space-y-1.5">
         {ready.map((item) => (
@@ -4601,7 +4661,7 @@ export function RoofDesigner(props: {
             </button>
           )}
           {/* Ready to install: green only when the design would pass; pressed, every check with what to fix. */}
-          <div className="relative" data-menu-host>
+          <div className="relative" data-menu-host data-popup>
             <button
               type="button"
               onClick={() => setReadyOpen(!readyOpen)}
@@ -4681,7 +4741,7 @@ export function RoofDesigner(props: {
           </div>
           {!props.tight && <span className="hidden flex-1 lg:block" aria-hidden />}
           {/* Share live: the customer watches the design on their phone during the call, and says which they'd like. */}
-          <div className="relative">
+          <div className="relative" data-popup>
             <button
               type="button"
               onClick={() => (liveOpen ? setLiveOpen(false) : void shareLive())}
@@ -5140,6 +5200,7 @@ export function RoofDesigner(props: {
                   className={clsx(GLASS, "absolute right-3 top-[4.5rem] z-50 w-80 p-3 text-[13px]")}
                   role="dialog"
                   aria-label="Keyboard shortcuts"
+                  data-popup
                 >
                   <div className="flex items-center justify-between">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Keyboard shortcuts</p>
@@ -5166,6 +5227,7 @@ export function RoofDesigner(props: {
                       ? "bottom-[5.75rem] flex flex-col-reverse gap-2 transition duration-200 ease-out starting:translate-y-3 starting:opacity-0 motion-reduce:transition-none [&>p]:mt-0"
                       : "top-[4.5rem]",
                   )}
+                  data-popup
                 >
                   <form
                     onSubmit={(e) => {
@@ -5201,6 +5263,17 @@ export function RoofDesigner(props: {
                     >
                       {commandBusy ? "…" : "Go"}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCommandOpen(false);
+                        setCommandReply(null);
+                      }}
+                      aria-label="Close"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+                    >
+                      <X className="size-4" aria-hidden />
+                    </button>
                   </form>
                   {commandReply && (
                     <p className={clsx(GLASS, "mt-2 px-4 py-2.5 text-sm text-ink")} role="status">
@@ -5218,6 +5291,7 @@ export function RoofDesigner(props: {
                   )}
                   role="dialog"
                   aria-label={choices.question}
+                  data-popup
                 >
                   <div className="flex items-start gap-3 px-5 pb-3 pt-4">
                     <SolIcon className="mt-0.5 size-5 shrink-0" />
@@ -6579,6 +6653,7 @@ export function RoofDesigner(props: {
                   className="absolute right-3 top-[6.75rem] z-10 max-h-[calc(100%-13rem)] w-72 space-y-2 overflow-y-auto rounded-lg border border-line bg-surface p-3 shadow-lift"
                   role="group"
                   aria-label="Strings"
+                  data-popup
                 >
                   <div className="flex items-start gap-2">
                     <p className={clsx(label, "flex-1")}>
@@ -7515,6 +7590,7 @@ export function RoofDesigner(props: {
                 </button>
                 {/* The arrays: a round under the eraser that lists them, and writes each one's size on the picture. */}
                 <button
+                  data-popup
                   onClick={() => {
                     setArraysOpen(!arraysOpen);
                     setShadeOn(false);
@@ -7609,6 +7685,7 @@ export function RoofDesigner(props: {
                   className="absolute left-[4.25rem] top-[7rem] z-20 max-h-[calc(100%-13rem)] w-[28rem] max-w-[calc(100%-6.5rem)] overflow-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
                   role="region"
                   aria-label="Arrays"
+                  data-popup
                 >
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
@@ -7758,6 +7835,7 @@ export function RoofDesigner(props: {
                       requestAnimationFrame(() => commandBox.current?.focus());
                     }}
                     aria-expanded={commandOpen}
+                    data-popup
                     title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
                     className="pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110"
                   >
@@ -7845,6 +7923,7 @@ export function RoofDesigner(props: {
                       {/* Design it for me (Martin: part of the dock): three designs for three outcomes, said first, made on "Make the three designs". */}
                       <button
                         onClick={() => setMineIntro(!mineIntro)}
+                        data-popup
                         aria-expanded={mineIntro}
                         disabled={mine === "busy" || costsHidden}
                         title={
@@ -7970,7 +8049,20 @@ export function RoofDesigner(props: {
                     </div>
                   )}
                   {mineIntro && (
-                    <div className={clsx(GLASS, "w-80 space-y-2 p-3 text-[13px] text-ink-2")} role="dialog" aria-label="Design it for me">
+                    <div
+                      className={clsx(GLASS, "relative w-80 space-y-2 p-3 text-[13px] text-ink-2")}
+                      role="dialog"
+                      aria-label="Design it for me"
+                      data-popup
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setMineIntro(false)}
+                        aria-label="Close"
+                        className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+                      >
+                        <X className="size-4" aria-hidden />
+                      </button>
                       <p className="font-semibold text-ink">Design it for me</p>
                       <p>Three designs for this home, each priced from your price lists and set against the customer&apos;s bill:</p>
                       <ul className="space-y-1.5">

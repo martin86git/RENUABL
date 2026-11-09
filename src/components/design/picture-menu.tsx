@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { Check, ImageIcon, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { capturedWords, offersOf } from "@/lib/domain/design/nearmap";
 import { chooseImagery, fetchNearmap, loadImagery, type NearmapSurvey, type RoofImagery } from "@/lib/services/nearmap";
 
@@ -24,6 +24,16 @@ export function PictureMenu({
   onChange: (next: RoofImagery) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // A press anywhere outside the box closes it (8 Nov 2026, Martin), as its cross does.
+  const menuBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (menuBox.current && !menuBox.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
+  }, [open]);
   const [surveys, setSurveys] = useState<NearmapSurvey[] | null | undefined>(undefined);
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -57,7 +67,7 @@ export function PictureMenu({
   const row = "flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-left text-xs hover:bg-surface-2";
 
   return (
-    <div className="relative">
+    <div className="relative" ref={menuBox}>
       {/* Which picture is under the design, and the button that calls on Nearmap where Google's isn't good enough. */}
       <div className="flex items-center gap-1 rounded-full bg-surface/90 p-1 shadow-lift ring-1 ring-line backdrop-blur-md">
         <button
