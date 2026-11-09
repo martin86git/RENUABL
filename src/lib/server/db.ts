@@ -826,6 +826,16 @@ create table if not exists nearmap_heights (
   terrain bytea,
   fetched_at timestamptz not null default now()
 );
+-- What the designer found on a roof's picture before designing (domain/design/roof-check.ts): existing panels, vents and the
+-- like, once a picture ("google" or a Nearmap capture's survey), kept for the business.
+create table if not exists design_roof_checks (
+  business_id text not null references businesses(id) on delete cascade,
+  spot text not null,
+  picture text not null,
+  check_json jsonb not null,
+  checked_at timestamptz not null default now(),
+  primary key (business_id, spot, picture)
+);
 create table if not exists design_nearmap_use (
   business_id text not null references businesses(id) on delete cascade,
   spot text not null,

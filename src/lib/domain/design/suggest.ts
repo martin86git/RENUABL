@@ -20,7 +20,7 @@
 import type { RoofModel } from "../roof-layout";
 import { metresPerPixel, type LoosePanel, type PanelSize } from "./roof-design";
 import { FACE_EDGE, hull } from "./drawing";
-import { packAreas, type Area } from "./pack";
+import { avoiding, packAreas, type Area } from "./pack";
 
 /** The most panels a suggestion lays out. */
 export const MAX_SUGGESTED = 60;
@@ -248,8 +248,11 @@ export function suggestPanels(
   newId: () => string,
   /** Where Google's model sits on the picture, in metres east and south: from lining it up with today's photo. */
   offset: Pt = { x: 0, y: 0 },
+  /** Places to keep clear (existing panels, vents: `roof-check.ts`), outlines in metres. */
+  avoid?: readonly Pt[][],
 ): LoosePanel[] {
-  return packAreas(areasFor(model, centre, offset), Math.min(MAX_SUGGESTED, count), size, newId, MAX_SUGGESTED);
+  const areas = areasFor(model, centre, offset).map((a) => avoiding(a, avoid));
+  return packAreas(areas, Math.min(MAX_SUGGESTED, count), size, newId, MAX_SUGGESTED);
 }
 
 /**

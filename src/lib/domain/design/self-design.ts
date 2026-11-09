@@ -131,6 +131,8 @@ export interface SelfDesignInput {
   model: RoofModel | null;
   /** Where Google's model sits on the picture, metres east and south, once lined up with today's photo. */
   modelOffset?: { x: number; y: number };
+  /** Places on the roof to keep clear (existing panels, vents, skylights: `roof-check.ts`), outlines in metres. */
+  avoid?: { x: number; y: number }[][];
   /** The panel the design is drawn with (undefined: the costing's). */
   panel?: PanelSpec;
   panelElectrical?: PanelElectrical;
@@ -169,13 +171,18 @@ interface Source {
  * The traced faces, laid by the installer's rules (`packFaces`: rows from the gutter up, portrait and
  * landscape mixed to fit the most, clear of every edge, the fewest arrays), as panels placed by hand on the faces.
  */
-function tracedSource(faces: Face[], panel: PanelSpec | undefined, newId: (prefix: string) => string): Source | null {
+function tracedSource(
+  faces: Face[],
+  panel: PanelSpec | undefined,
+  newId: (prefix: string) => string,
+  avoid?: { x: number; y: number }[][],
+): Source | null {
   const size = panelOf({ panel });
   const made = new Map<number, Layout>();
   const lay = (n: number): Layout => {
     const kept = made.get(n);
     if (kept) return kept;
-    const packed = packFaces(faces, size, n, () => newId("p"));
+    const packed = packFaces(faces, size, n, () => newId("p"), avoid);
     const laid: Layout = { faces: packed.faces, loose: packed.loose, ...(panel ? { panel } : {}) };
     made.set(n, laid);
     return laid;
@@ -190,7 +197,7 @@ function modelSource(input: SelfDesignInput): Source | null {
   const { model } = input;
   if (!model?.slots.length) return null;
   const size = panelOf({ panel: input.panel });
-  const lay = (n: number) => suggestPanels(model, input.centre, n, size, () => input.newId("p"), input.modelOffset);
+  const lay = (n: number) => suggestPanels(model, input.centre, n, size, () => input.newId("p"), input.modelOffset, input.avoid);
   // As many as fit in rows, which is fewer than Google's spots: our panels are laid afresh, wholly on the roof.
   const most = lay(MAX_SUGGESTED).length;
   if (!most) return null;
@@ -362,7 +369,7 @@ function dailyUse(bill: NonNullable<SelfDesignInput["bill"]>): number | null {
 const countFor = (kw: number, watts: number, most: number) => Math.max(1, Math.min(most, Math.round((kw * 1000) / watts)));
 
 export function selfDesign(input: SelfDesignInput): SelfDesignResult {
-  const source = (input.faces.length ? tracedSource(input.faces, input.panel, input.newId) : null) ?? modelSource(input);
+  const source = (input.faces.length ? tracedSource(input.faces, input.panel, input.newId, input.avoid) : null) ?? modelSource(input);
   if (!source)
     return {
       options: [],

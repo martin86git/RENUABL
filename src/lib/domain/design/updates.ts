@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-09",
     area: "Designer",
+    words: "Design it for me looks for panels, vents and skylights already on the roof first, keeps clear of them and marks them.",
+  },
+  {
+    day: "2026-11-09",
+    area: "Designer",
     words: "On a Nearmap picture, traced roof faces and the shade analysis use Nearmap's newer heights, and say when they were measured.",
   },
   {

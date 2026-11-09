@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport } from "@/lib/domain/design/shade";
 import { loadTerrain, type Heights } from "@/lib/services/terrain";
+import { loadRoofCheck } from "@/lib/services/roof-check";
+import { HAS_SOLAR_NOTE, hasSolar, keepOuts, keptClearWords, thingLabel, type RoofCheck } from "@/lib/domain/design/roof-check";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
 import { loadNearmapOutline } from "@/lib/services/nearmap";
 import { OLD_FACE_CORNERS, mendCutOutline, outlineNote } from "@/lib/domain/design/nearmap";
@@ -3424,9 +3426,29 @@ export function RoofDesigner(props: {
    * independence (`self-design.ts`), from the traced faces (else Google's roof model), the customer's bill and the
    * business's prices. They replace the roof's designs (asked first), each with its goal, the best return the primary.
    */
+  /**
+   * What is already on the roof in the picture in use (existing panels, vents, skylights: `roof-check.ts`), asked once
+   * a roof and picture before anything is laid by rule, so nothing goes over them (9 Nov 2026, Martin: Design it for me
+   * laid panels over a home's existing ones). Null when it can't be had: then it designs as before.
+   */
+  const [roofCheckNow, setRoofCheckNow] = useState<RoofCheck | null>(null);
+  const checkRoof = async (): Promise<RoofCheck | null> => {
+    const picture = props.nearmapPicture ? `nearmap ${props.nearmapCaptured ?? ""}` : "google";
+    const check = await Promise.race([
+      loadRoofCheck(spot.lat, spot.lng, picture),
+      new Promise<null>((done) => window.setTimeout(() => done(null), 45_000)),
+    ]);
+    setRoofCheckNow(check);
+    return check;
+  };
+  /** What was kept clear of, said with a design laid by rule. */
+  const checkNotes = (check: RoofCheck | null) =>
+    check ? [...(hasSolar(check.things) ? [HAS_SOLAR_NOTE] : []), ...[keptClearWords(check.things)].filter((w): w is string => !!w)] : [];
   const designForMe = async (auto = false) => {
     setMineIntro(false);
     setMine("busy");
+    const check = await checkRoof();
+    const avoid = check?.things.length ? keepOuts(check.things) : undefined;
     let model: RoofModel | null = null;
     let modelOffsetM: { x: number; y: number } | undefined;
     let fromFaces = faces;
@@ -3457,6 +3479,7 @@ export function RoofDesigner(props: {
       faces: fromFaces,
       model,
       ...(modelOffsetM ? { modelOffset: modelOffsetM } : {}),
+      ...(avoid ? { avoid } : {}),
       panel:
         panel ??
         (chosenPanel
@@ -3480,7 +3503,11 @@ export function RoofDesigner(props: {
     });
     if (auto && !result.options.length) return setMine("idle");
     // Made by itself as the roof opened: said so on the card, to be checked against the photo.
-    setMine(auto ? { ...result, notes: [AUTO_DESIGNED, ...result.notes] } : { ...result, notes: [...notes, ...result.notes] });
+    setMine(
+      auto
+        ? { ...result, notes: [AUTO_DESIGNED, ...checkNotes(check), ...result.notes] }
+        : { ...result, notes: [...notes, ...checkNotes(check), ...result.notes] },
+    );
     setMineOpen(true);
     if (!result.options.length) return;
     const list = result.options.map((o) => o.design);
@@ -3665,18 +3692,21 @@ export function RoofDesigner(props: {
   const fillTo = async (kw: number, facing?: Way): Promise<{ words: string; laid: number }> => {
     const watts = panelOf(design).watts || 475;
     const n = Math.max(1, Math.ceil((kw * 1000) / watts));
+    const check = await checkRoof();
+    const avoid = check?.things.length ? keepOuts(check.things) : undefined;
+    const clear = check ? keptClearWords(check.things) : null;
     if (faces.length) {
       const chosen = facing ? faces.filter((fc) => facesWay(facing, faceFacing(fc))) : faces;
       if (!chosen.length)
         return { words: `No traced roof face looks ${{ N: "north", E: "east", S: "south", W: "west" }[facing!]}.`, laid: 0 };
-      const packed = packFaces(chosen, size, n, () => newId("p"));
+      const packed = packFaces(chosen, size, n, () => newId("p"), avoid);
       const ids = new Set(chosen.map((fc) => fc.id));
       setFaces(faces.map((fc) => (ids.has(fc.id) ? (packed.faces.find((x) => x.id === fc.id) ?? fc) : fc)));
       setLoose(packed.loose);
       setStrings([]);
       changed();
       return {
-        words: `${packed.loose.length} panels, ${((packed.loose.length * watts) / 1000).toFixed(2)} kW${packed.loose.length < n ? `: only that many fit` : ""}. Strings cleared: string them again.`,
+        words: `${packed.loose.length} panels, ${((packed.loose.length * watts) / 1000).toFixed(2)} kW${packed.loose.length < n ? `: only that many fit` : ""}. Strings cleared: string them again.${clear ? ` ${clear}` : ""}`,
         laid: packed.loose.length,
       };
     }
@@ -3688,7 +3718,7 @@ export function RoofDesigner(props: {
       if (!outline || "note" in outline) return { words: [found.note, outline?.note].filter(Boolean).join(" "), laid: 0 };
       putOutlineDown(outline.face);
       if (homePitch !== 0) return { words: outlineNote(false, outline.captured), laid: 0 };
-      const packed = packFaces([outline.face], size, n, () => newId("p"));
+      const packed = packFaces([outline.face], size, n, () => newId("p"), avoid);
       setFaces((list) => list.map((fc) => (fc.id === outline.face.id ? (packed.faces[0] ?? fc) : fc)));
       setLoose(packed.loose);
       setStrings([]);
@@ -3697,14 +3727,14 @@ export function RoofDesigner(props: {
         laid: packed.loose.length,
       };
     }
-    let laid = suggestPanels(found.model, spot, n, size, () => newId("p"), found.offset);
+    let laid = suggestPanels(found.model, spot, n, size, () => newId("p"), found.offset, avoid);
     if (facing) laid = laid.filter((p) => facesWay(facing, panelFacing(p)));
     if (!laid.length) return { words: "Nothing fits that way round on Google's roof data: trace the roof faces and ask again.", laid: 0 };
     setLoose(laid);
     setStrings([]);
     changed();
     return {
-      words: `${laid.length} panels, ${((laid.length * watts) / 1000).toFixed(2)} kW from Google's roof data${laid.length < n ? ": only that many fit" : ""}. Check it against the photo.`,
+      words: `${laid.length} panels, ${((laid.length * watts) / 1000).toFixed(2)} kW from Google's roof data${laid.length < n ? ": only that many fit" : ""}. Check it against the photo.${clear ? ` ${clear}` : ""}`,
       laid: laid.length,
     };
   };
@@ -6072,6 +6102,24 @@ export function RoofDesigner(props: {
                         </g>
                       );
                     })()}
+                  {/* What was found on the roof and kept clear of: a dashed box each, named, never picked or moved. */}
+                  {roofCheckNow?.things.map((t, i) => {
+                    const pts = t.box.map(px);
+                    const [lx, ly] = pts[0];
+                    return (
+                      <g key={`found-${i}`} className="pointer-events-none">
+                        <polygon
+                          points={pts.map(([x, y]) => `${x},${y}`).join(" ")}
+                          className="fill-warning/10 stroke-warning"
+                          strokeWidth={1.2 * u}
+                          strokeDasharray={`${4 * u} ${3 * u}`}
+                        />
+                        <text x={lx + 2 * u} y={ly - 2.5 * u} className="fill-warning" fontSize={7 * u} fontWeight={600}>
+                          {thingLabel(t)}
+                        </text>
+                      </g>
+                    );
+                  })}
                   {/* Labels: a pin and its name. */}
                   {labels.map((l) => {
                     const [lx, ly] = px(l);

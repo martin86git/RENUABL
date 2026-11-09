@@ -79,6 +79,25 @@ export interface Area {
   clearance?: number;
   /** The gap under its panels, panel underside to roof surface, metres (`MOUNT_STANDOFF` when not said). */
   standoff?: number;
+  /** Places on it to keep clear (existing panels, vents, skylights: `roof-check.ts`), outlines in metres. */
+  avoid?: Point[][];
+}
+
+const avoidKept = new WeakMap<Area, Map<string, Area>>();
+/**
+ * The area with places to keep clear (9 Nov 2026, Martin: Design it for me laid panels over a home's existing ones):
+ * no panel is laid over or within its clearance of one. Kept with the area, so the rows found on it are kept too.
+ */
+export function avoiding(area: Area, avoid: readonly Point[][] | undefined): Area {
+  if (!avoid?.length) return area;
+  const key = JSON.stringify(avoid);
+  const byKey = avoidKept.get(area) ?? new Map<string, Area>();
+  avoidKept.set(area, byKey);
+  const kept = byKey.get(key);
+  if (kept) return kept;
+  const made: Area = { ...area, avoid: [...avoid], covers: (p) => area.covers(p) && !avoid.some((q) => inside(p, q)) };
+  byKey.set(key, made);
+  return made;
 }
 
 /**
@@ -110,6 +129,7 @@ export function packArea(area: Area, n: number, size: PanelSize, newId: () => st
   const edge = Math.max(clearanceFor(area.standoff), area.clearance ?? 0) + 0.01;
   const tilt = Math.max(0, Math.min(TILT.max, Math.round(area.pitch)));
   const facing = Math.round(area.facing) % 360;
+  const avoidUV = (area.avoid ?? []).map((q) => q.map((p) => ({ u: dot(p, side), v: dot(p, down) })));
 
   /** Whether a panel centred at (u, v), `across` wide and `along` down the slope, is wholly on the face with the clearance round it. */
   const fits = (u: number, v: number, across: number, along: number) => {
@@ -117,6 +137,8 @@ export function packArea(area: Area, n: number, size: PanelSize, newId: () => st
     const hv = along / 2 + edge;
     for (const a of [-1, -0.5, 0, 0.5, 1])
       for (const b of [-1, -0.5, 0, 0.5, 1]) if (!area.covers(at(u + a * hu, v + b * hv))) return false;
+    // A place to keep clear smaller than the gaps between those points (a vent) still stops it: any corner within.
+    for (const q of avoidUV) if (q.some((c) => Math.abs(c.u - u) <= hu && Math.abs(c.v - v) <= hv)) return false;
     return true;
   };
   const STEP = 0.1;
@@ -317,9 +339,16 @@ export function tracedArea(face: Face, size: PanelSize = PANEL): Area {
  * Up to `n` panels on traced faces, as panels placed by hand (`packAreas`), and the faces with every place in
  * their own grid switched off, so the faces stay as the roof's outline and the panels are the ones laid here.
  */
-export function packFaces(faces: Face[], size: PanelSize, n: number, newId: () => string): { faces: Face[]; loose: LoosePanel[] } {
+export function packFaces(
+  faces: Face[],
+  size: PanelSize,
+  n: number,
+  newId: () => string,
+  /** Places to keep clear (`avoiding`). */
+  avoid?: readonly Point[][],
+): { faces: Face[]; loose: LoosePanel[] } {
   const loose = packAreas(
-    faces.map((f) => tracedArea(f, size)),
+    faces.map((f) => avoiding(tracedArea(f, size), avoid)),
     n,
     size,
     newId,

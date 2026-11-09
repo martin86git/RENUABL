@@ -5,7 +5,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { OBSTRUCTION_TYPES, cleanObstructions, type ObstructionCheck } from "@/lib/domain/obstructions";
 import { plainText } from "@/lib/domain/emails";
-import { readWithClaude } from "./claude-reader";
+import { readWithClaude, type ReadOptions } from "./claude-reader";
 
 const SCHEMA = {
   type: "object",
@@ -43,11 +43,12 @@ export async function checkObstructions(
   image: { data: ArrayBuffer; mediaType: "image/jpeg" | "image/png" },
   roofBox: [number, number, number, number],
   apiKey: string,
+  options: ReadOptions = {},
 ): Promise<ObstructionCheck> {
   const files: Anthropic.Beta.BetaContentBlockParam[] = [
     { type: "image", source: { type: "base64", media_type: image.mediaType, data: Buffer.from(image.data).toString("base64") } },
   ];
-  const raw = await readWithClaude<unknown>(files, SCHEMA, prompt(roofBox), apiKey);
+  const raw = await readWithClaude<unknown>(files, SCHEMA, prompt(roofBox), apiKey, options);
   return {
     items: cleanObstructions(raw),
     summary: plainText((raw as { summary?: unknown }).summary, 200),
