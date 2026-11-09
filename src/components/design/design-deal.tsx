@@ -10,6 +10,8 @@ import {
   ClipboardList,
   FileText,
   HardHat,
+  NotebookPen,
+  Phone,
   MessagesSquare,
   Paperclip,
   PenTool,
@@ -17,7 +19,7 @@ import {
   Trash2,
   Wrench,
 } from "lucide-react";
-import { SolIcon } from "./sol-icon";
+import { SolBadge } from "./sol-icon";
 import { JobCardDialog } from "./job-card";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { ListOnMarketplace } from "./marketplace";
@@ -80,14 +82,14 @@ type Written = "note" | "call" | "email";
 type Tab = "activities" | "team" | "email" | "chat" | "sol" | "files" | "service" | "details";
 /**
  * The deal's tabs under its banner, in order; Service sits apart after them. Activity is the deal at a glance and its
- * record (8 Nov 2026, Martin: Overview folded into it); the team's chat, Sol and the files are their icons.
+ * record (8 Nov 2026, Martin: Overview folded into it); the team's chat and the files are their icons. Call sits beside
+ * Email, and Sol is his own lit round after the row (10 Nov 2026, Martin: off the banner).
  */
 const DEAL_TABS: { key: Exclude<Tab, "service">; label: string; icon?: (p: { className?: string }) => React.ReactNode }[] = [
   { key: "activities", label: "Activity" },
   { key: "team", label: "Team chat", icon: ({ className }) => <MessagesSquare className={className} aria-hidden /> },
   { key: "email", label: "Email" },
   { key: "chat", label: "Chat" },
-  { key: "sol", label: "Sol", icon: ({ className }) => <SolIcon className={className} aria-hidden /> },
   { key: "files", label: "Files", icon: ({ className }) => <Paperclip className={className} aria-hidden /> },
   { key: "details", label: "Details" },
 ];
@@ -591,9 +593,6 @@ export function DealPage({ id }: { id: string }) {
         pulse={pulse && hasPulse(job.stage) ? pulse : null}
         compact={tab !== "activities"}
         onDesign={job.lat !== null ? () => openTool("design") : null}
-        onEmail={() => setTab("email")}
-        onNotes={() => notetaker.current?.start()}
-        onSol={() => setTab("sol")}
         onPlace={() => {
           setTab("details");
           setMoving(true);
@@ -640,7 +639,7 @@ export function DealPage({ id }: { id: string }) {
             className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto rounded-full bg-surface p-1 ring-1 ring-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             role="tablist"
           >
-            {DEAL_TABS.map(({ key, label, icon: Icon }) => (
+            {DEAL_TABS.map(({ key, label, icon: Icon }) => [
               <button
                 key={key}
                 role="tab"
@@ -655,8 +654,11 @@ export function DealPage({ id }: { id: string }) {
                 )}
               >
                 {Icon ? <Icon className="size-[18px]" /> : label}
-              </button>
-            ))}
+              </button>,
+              key === "email" && (
+                <CallMenu key="call" phone={customer.phone} name={customer.firstName} onNotes={() => notetaker.current?.start()} />
+              ),
+            ])}
             {/* The job card opens over the page, so it sits at the end of the row rather than being a tab of its own. */}
             <button
               type="button"
@@ -669,6 +671,20 @@ export function DealPage({ id }: { id: string }) {
             </button>
           </div>
           {card && <JobCardDialog jobId={job.id} onClose={() => setCard(false)} />}
+          {/* Sol, his own lit round (10 Nov 2026, Martin: off the banner and into the row): his conversation on this deal. */}
+          <button
+            role="tab"
+            aria-selected={tab === "sol"}
+            aria-label="Sol on this deal"
+            title="Sol on this deal"
+            onClick={() => setTab("sol")}
+            className={clsx(
+              "flex size-11 shrink-0 items-center justify-center rounded-full bg-primary shadow-[0_6px_18px_rgba(11,11,12,0.18)] transition hover:bg-forest",
+              tab === "sol" && "ring-2 ring-sun-line/60 ring-offset-2 ring-offset-canvas",
+            )}
+          >
+            <SolBadge className="size-5" />
+          </button>
           {/* Service sits apart at the end, in its own colour: putting something right after the sale. */}
           <button
             role="tab"
@@ -1091,6 +1107,85 @@ export function DealPage({ id }: { id: string }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Call, beside Email (10 Nov 2026, Martin: you either email or call, and the note-taker is part of calling): one round
+ * offering to ring the customer, or to ring them with the note-taker open. The menu is drawn fixed under the round, so
+ * the row's scrolling doesn't cut it off.
+ */
+function CallMenu({ phone, name, onNotes }: { phone: string; name: string; onNotes: () => void }) {
+  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const dial = phone.replace(/s/g, "");
+  useEffect(() => {
+    if (!at) return;
+    const away = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setAt(null);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setAt(null);
+    const gone = () => setAt(null);
+    document.addEventListener("pointerdown", away);
+    window.addEventListener("keydown", key);
+    window.addEventListener("scroll", gone, true);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("scroll", gone, true);
+    };
+  }, [at]);
+  const row = "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-surface-2";
+  return (
+    <div ref={box} className="contents">
+      <button
+        type="button"
+        aria-label={phone ? `Call ${name || "them"}` : "No phone on file"}
+        title={phone ? `Call ${name || "them"}` : "No phone on file"}
+        aria-expanded={Boolean(at)}
+        disabled={!phone}
+        onClick={(e) => {
+          if (at) return setAt(null);
+          const r = e.currentTarget.getBoundingClientRect();
+          setAt({ top: r.bottom + 8, left: r.left });
+        }}
+        className={clsx(
+          "flex h-9 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
+          at ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+          !phone && "text-muted hover:text-muted",
+        )}
+      >
+        <Phone className="size-[18px]" aria-hidden />
+      </button>
+      {at && (
+        <div
+          role="menu"
+          style={{ top: at.top, left: at.left }}
+          className="fixed z-50 w-64 rounded-xl bg-surface p-1.5 shadow-lift ring-1 ring-line"
+        >
+          <a role="menuitem" href={`tel:${dial}`} onClick={() => setAt(null)} className={row}>
+            <Phone className="size-4 text-ink-2" aria-hidden />
+            <span>
+              Call {name || "them"}
+              <span className="block text-xs tabular-nums text-muted">{phone}</span>
+            </span>
+          </a>
+          <button
+            role="menuitem"
+            type="button"
+            onClick={() => {
+              setAt(null);
+              onNotes();
+            }}
+            className={row}
+          >
+            <NotebookPen className="size-4 text-ink-2" aria-hidden />
+            <span>
+              Call with the note-taker
+              <span className="block text-xs text-muted">Ring on your phone, notes typed up here</span>
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

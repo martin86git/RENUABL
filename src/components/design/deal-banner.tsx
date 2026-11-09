@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Mail, MapPin, NotebookPen, Phone } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
 import { STAGE_LABELS, type Customer, type Job } from "@/lib/domain/design/crm";
 import type { JobDrawing } from "@/lib/domain/design/job-card";
@@ -10,7 +10,6 @@ import type { DealPulse } from "@/lib/domain/design/deal-heat";
 import { loadJobCard } from "@/lib/services/job-card";
 import { dollars } from "@/lib/services/crm";
 import { DealPulseBadges } from "./deal-pulse";
-import { SolBadge } from "./sol-icon";
 
 /** The banner's shape, wide and low: width over height. */
 const BANNER_ASPECT = 3.2;
@@ -53,7 +52,8 @@ export function bannerView(viewBox: string | null): string {
 /**
  * The top of a deal (8 Nov 2026, Martin: the deal as a picture, not a database record): the roof from above across the
  * column, with the design drawn on it when there is one, and over its foot the customer, where, the stage, the price,
- * the deal's clock and heat, and the ways to reach them. Pressing the picture opens the designer over the page.
+ * the deal's clock and heat. Pressing the picture opens the designer over the page. Email, Call (with the note-taker)
+ * and Sol are in the row of tabs under it (10 Nov 2026, Martin), not on the picture.
  */
 export function DealBanner({
   job,
@@ -61,9 +61,6 @@ export function DealBanner({
   designVersion = 0,
   pulse,
   onDesign,
-  onEmail,
-  onNotes,
-  onSol,
   onPlace,
   compact = false,
 }: {
@@ -73,10 +70,6 @@ export function DealBanner({
   designVersion?: number;
   pulse: DealPulse | null;
   onDesign: (() => void) | null;
-  onEmail: () => void;
-  /** Opens the note-taker, its microphone off until started (8 Nov 2026, Martin: Call only dials). */
-  onNotes: () => void;
-  onSol: () => void;
   onPlace: () => void;
   /** A slim strip (8 Nov 2026, Martin: on any tab but Overview the tab's own work, an email say, belongs in the first fold). */
   compact?: boolean;
@@ -97,7 +90,6 @@ export function DealBanner({
   const picture = placed
     ? `/api/design/roof?lat=${job.lat!.toFixed(6)}&lng=${job.lng!.toFixed(6)}&size=${ROOF_IMAGE.width}x${ROOF_IMAGE.height}`
     : null;
-  const phone = customer.phone.replace(/\s/g, "");
   const where = job.address || customer.address;
 
   return (
@@ -175,30 +167,6 @@ export function DealBanner({
               )}
             </div>
           </div>
-          <div className="pointer-events-auto flex items-center gap-2">
-            <Round
-              label={customer.email ? `Email ${customer.firstName || "them"}` : "No email on file"}
-              onClick={onEmail}
-              off={!customer.email}
-            >
-              <Mail className="size-[18px]" aria-hidden />
-            </Round>
-            <Round
-              label={phone ? `Call ${customer.phone}` : "No phone on file"}
-              off={!phone}
-              onClick={() => {
-                if (phone) window.location.href = `tel:${phone}`;
-              }}
-            >
-              <Phone className="size-[18px]" aria-hidden />
-            </Round>
-            <Round label="Note-taker: start it when the call begins" onClick={onNotes}>
-              <NotebookPen className="size-[18px]" aria-hidden />
-            </Round>
-            <Round label="Ask Sol about this deal" onClick={onSol} dark>
-              <SolBadge className="size-5" />
-            </Round>
-          </div>
         </div>
       </div>
     </section>
@@ -210,35 +178,5 @@ function Chip({ children }: { children: React.ReactNode }) {
     <span className="inline-flex h-7 items-center rounded-full bg-white/15 px-3 text-[13px] tabular-nums text-white ring-1 ring-white/20 backdrop-blur">
       {children}
     </span>
-  );
-}
-
-function Round({
-  label,
-  onClick,
-  off = false,
-  dark = false,
-  children,
-}: {
-  label: string;
-  onClick?: () => void;
-  off?: boolean;
-  dark?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={off}
-      aria-label={label}
-      title={label}
-      className={clsx(
-        "flex size-11 items-center justify-center rounded-full shadow-sm",
-        off ? "bg-white/30 text-white/60" : dark ? "bg-primary text-white hover:bg-forest" : "bg-white/90 text-ink hover:bg-white",
-      )}
-    >
-      {children}
-    </button>
   );
 }
