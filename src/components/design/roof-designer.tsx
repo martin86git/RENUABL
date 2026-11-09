@@ -5295,7 +5295,7 @@ export function RoofDesigner(props: {
                         e.preventDefault();
                         void sendCommand(commandText);
                       }}
-                      className="flex items-center gap-2 rounded-full bg-white/10 p-1.5 pl-3 ring-1 ring-white/10 focus-within:ring-sun-line/70"
+                      className="flex items-center gap-2 rounded-full bg-primary p-1.5 pl-3 ring-1 ring-white/15 focus-within:ring-sun-line/70"
                     >
                       <input
                         ref={commandBox}
@@ -5321,7 +5321,7 @@ export function RoofDesigner(props: {
                       <button
                         type="submit"
                         disabled={commandBusy || !commandText.trim()}
-                        className="h-9 rounded-full bg-sun-line px-4 text-sm font-medium text-white disabled:bg-white/10 disabled:text-white/40"
+                        className="h-9 rounded-full bg-sun-line px-4 text-sm font-medium text-white disabled:bg-transparent disabled:text-white/40"
                       >
                         {commandBusy ? "…" : "Go"}
                       </button>
