@@ -134,6 +134,8 @@ export interface SelfDesignInput {
   modelOffset?: { x: number; y: number };
   /** Places on the roof to keep clear (existing panels, vents, skylights: `roof-check.ts`), outlines in metres. */
   avoid?: { x: number; y: number }[][];
+  /** On traced faces, share the panels across two faces looking different ways when one would hold them all (`splitPartner`). */
+  split?: boolean;
   /** The panel the design is drawn with (undefined: the costing's). */
   panel?: PanelSpec;
   panelElectrical?: PanelElectrical;
@@ -177,13 +179,14 @@ function tracedSource(
   panel: PanelSpec | undefined,
   newId: (prefix: string) => string,
   avoid?: { x: number; y: number }[][],
+  split = false,
 ): Source | null {
   const size = panelOf({ panel });
   const made = new Map<number, Layout>();
   const lay = (n: number): Layout => {
     const kept = made.get(n);
     if (kept) return kept;
-    const packed = packFaces(faces, size, n, () => newId("p"), avoid);
+    const packed = packFaces(faces, size, n, () => newId("p"), avoid, split);
     const laid: Layout = { faces: packed.faces, loose: packed.loose, ...(panel ? { panel } : {}) };
     made.set(n, laid);
     return laid;
@@ -303,9 +306,7 @@ function build(input: SelfDesignInput, source: Source, n: number, way: BatteryWa
     kw: inverter.inverter.kw,
   }));
   // On the home's south wall (`kitOnHome`): the roof's faces, else the panels laid.
-  const home = layout.faces.length
-    ? layout.faces.flatMap((f) => f.points)
-    : (layout.loose ?? []).map((p) => ({ x: p.x, y: p.y }));
+  const home = layout.faces.length ? layout.faces.flatMap((f) => f.points) : (layout.loose ?? []).map((p) => ({ x: p.x, y: p.y }));
   const kit = kitOnHome(home, inverters.length);
   if (kit) kit.inverters.forEach((at, i) => Object.assign(inverters[i], at));
   const year = monthlyProduction(layout, input.yieldPerKwDay);
@@ -398,7 +399,8 @@ function dailyUse(bill: NonNullable<SelfDesignInput["bill"]>): number | null {
 const countFor = (kw: number, watts: number, most: number) => Math.max(1, Math.min(most, Math.round((kw * 1000) / watts)));
 
 export function selfDesign(input: SelfDesignInput): SelfDesignResult {
-  const source = (input.faces.length ? tracedSource(input.faces, input.panel, input.newId, input.avoid) : null) ?? modelSource(input);
+  const source =
+    (input.faces.length ? tracedSource(input.faces, input.panel, input.newId, input.avoid, input.split) : null) ?? modelSource(input);
   if (!source)
     return {
       options: [],

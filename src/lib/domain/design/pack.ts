@@ -315,9 +315,19 @@ export function packArea(area: Area, n: number, size: PanelSize, newId: () => st
  * 18 panels), none under `MIN_ARRAY_PANELS`, leaving room for a second proper array rather than a remainder too
  * small to lay. Faces too steep, or under `SUNNY_ENOUGH` of the best face's sun, are left alone.
  */
-export function packAreas(areas: Area[], n: number, size: PanelSize, newId: () => string, most = 60): LoosePanel[] {
+export function packAreas(
+  areas: Area[],
+  n: number,
+  size: PanelSize,
+  newId: () => string,
+  most = 60,
+  /** Split across two faces looking different ways, when one would hold it all (`splitPartner`). */
+  opts: { split?: boolean } = {},
+): LoosePanel[] {
   const want = Math.min(most, Math.max(0, Math.round(n)));
   if (!want) return [];
+  const pair = opts.split ? splitPair(areas, want, size, most) : null;
+  if (pair) return [...packArea(pair.whole, pair.onWhole, size, newId), ...packArea(pair.partner, pair.onPartner, size, newId)];
   const usable = areas
     .filter((a) => a.pitch <= STEEPEST)
     .flatMap((a) => regionsOf(a, size))
@@ -377,6 +387,52 @@ export function packAreas(areas: Area[], n: number, size: PanelSize, newId: () =
     }
   }
   return out;
+}
+
+/** Two faces at least this far apart in the way they look count as different ways (east and west, not two parts of one). */
+const SPLIT_APART = 45;
+
+/**
+ * When the whole system fits on one face, the other face it could be shared with (10 Nov 2026, Martin: "sol placed all
+ * panels on the west, he should ask me if I want to split some panels over to the east"): the sunniest face looking
+ * another way, within `ONE_ARRAY_SUN` of the best, with room for an array, and how many go on each (about half, as
+ * many on the second as it holds). Null when one face can't hold it all, or there's no such second face.
+ */
+function splitPair(areas: Area[], want: number, size: PanelSize, most: number) {
+  const usable = areas.filter((a) => a.pitch <= STEEPEST).flatMap((a) => regionsOf(a, size));
+  if (!usable.length || want < MIN_ARRAY_PANELS * 2) return null;
+  const counted = new Map<Area, number>();
+  let tried = 0;
+  const room = (a: Area) => {
+    if (!counted.has(a)) counted.set(a, packArea(a, most, size, () => `s${tried++}`).length);
+    return counted.get(a)!;
+  };
+  const roomy = usable.filter((a) => room(a) >= MIN_ARRAY_PANELS).sort((a, b) => b.sun - a.sun);
+  if (!roomy.length) return null;
+  const top = roomy[0].sun;
+  const whole = roomy.filter((a) => a.sun >= top * ONE_ARRAY_SUN && room(a) >= want)[0];
+  if (!whole) return null;
+  const apart = (a: Area) => {
+    const d = Math.abs(((((a.facing - whole.facing) % 360) + 540) % 360) - 180);
+    return d >= SPLIT_APART;
+  };
+  const partner = roomy.find((a) => a !== whole && a.sun >= top * ONE_ARRAY_SUN && apart(a));
+  if (!partner) return null;
+  const onPartner = Math.min(room(partner), Math.floor(want / 2));
+  const onWhole = want - onPartner;
+  if (onPartner < MIN_ARRAY_PANELS || onWhole < MIN_ARRAY_PANELS) return null;
+  return { whole, partner, onWhole, onPartner };
+}
+
+/** The way (degrees, clockwise from north) the second face of a split would look, or null when there's none to offer. */
+export function splitPartner(faces: Face[], size: PanelSize, n: number, avoid?: readonly Point[][]): number | null {
+  const pair = splitPair(
+    faces.map((f) => avoiding(tracedArea(f, size), avoid)),
+    Math.max(0, Math.round(n)),
+    size,
+    60,
+  );
+  return pair ? pair.partner.facing : null;
 }
 
 /** The grid the clear parts of a face are found on, metres. */
@@ -535,12 +591,16 @@ export function packFaces(
   newId: () => string,
   /** Places to keep clear (`avoiding`). */
   avoid?: readonly Point[][],
+  /** Shared across two faces looking different ways, when one would hold it all. */
+  split = false,
 ): { faces: Face[]; loose: LoosePanel[] } {
   const loose = packAreas(
     faces.map((f) => avoiding(tracedArea(f, size), avoid)),
     n,
     size,
     newId,
+    60,
+    { split },
   );
   return { faces: faces.map((f) => ({ ...f, off: panelPlaces(f, size).map((p) => p.index) })), loose };
 }

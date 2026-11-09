@@ -139,6 +139,17 @@ describe("arrays across a roof's faces", () => {
     expect(new Set(panels.map((p) => p.angle)).size).toBe(1);
   });
 
+  it("shares one face's system with a face looking another way when asked, about half each", () => {
+    const west = face(270, 100, rect(-14, -8, -6, 8));
+    const east = face(90, 98, rect(6, -8, 14, 8));
+    const panels = packAreas([west, east], 12, PANEL, id, 60, { split: true });
+    const on = (way: number) => panels.filter((p) => panelFacing(p) === way).length;
+    expect(panels.length).toBe(12);
+    expect(on(270)).toBe(6);
+    expect(on(90)).toBe(6);
+    expect(new Set(packAreas([west, east], 12, PANEL, id).map(panelFacing)).size).toBe(1);
+  });
+
   it("splits into at most two arrays, none of fewer than four, and leaves weak or steep faces alone", () => {
     const north = face(0, 100, rect(-4, -3, 4, 3));
     const east = face(90, 90, rect(20, -8, 26, 8));

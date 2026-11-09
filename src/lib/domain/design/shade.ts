@@ -256,3 +256,16 @@ export function accessColour(access: number): string {
   }
   return `rgb(${stops[2][1].join(",")})`;
 }
+
+/** Panels with less than this share of the year's sun are tinted as they are laid, with no button pressed. */
+export const SHADE_HINT_BELOW = 0.92;
+
+/**
+ * How strongly a panel is tinted as it is laid (10 Nov 2026, Martin: shaded panels should show as they go down, not
+ * only once the shade view is opened): nothing for a panel open to the sun, more the more shaded, never so much the
+ * panel can't be seen. A number from 0 to 1 for the tint's opacity, or null for none.
+ */
+export function shadeHint(access: number | null | undefined): number | null {
+  if (access === null || access === undefined || !Number.isFinite(access) || access >= SHADE_HINT_BELOW) return null;
+  return Math.round(Math.min(0.6, 0.15 + (SHADE_HINT_BELOW - access) * 1.5) * 100) / 100;
+}

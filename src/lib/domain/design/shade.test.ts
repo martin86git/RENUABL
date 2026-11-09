@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  SHADE_HINT_BELOW,
   TERRAIN_CELL,
+  shadeHint,
   accessColour,
   heightAt,
   packTerrain,
@@ -133,5 +135,18 @@ describe("the colour of a panel's access", () => {
     expect(accessColour(0.8)).toBe("rgb(245,158,11)");
     expect(accessColour(0.2)).toBe("rgb(239,68,68)");
     expect(accessColour(0.9)).not.toBe(accessColour(1));
+  });
+});
+
+describe("the tint a shaded panel is laid with", () => {
+  it("is none for a panel open to the sun, and stronger the more shaded, within limits", () => {
+    expect(shadeHint(1)).toBeNull();
+    expect(shadeHint(SHADE_HINT_BELOW)).toBeNull();
+    expect(shadeHint(null)).toBeNull();
+    const light = shadeHint(0.88)!;
+    const heavy = shadeHint(0.5)!;
+    expect(light).toBeGreaterThan(0);
+    expect(heavy).toBeGreaterThan(light);
+    expect(shadeHint(0)).toBeLessThanOrEqual(0.6);
   });
 });

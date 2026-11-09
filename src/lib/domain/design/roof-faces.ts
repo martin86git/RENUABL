@@ -246,6 +246,11 @@ export function facesFromHeights(
   /** The address, metres from the picture's middle: the faces kept are its roof's. */
   home: Point = { x: 0, y: 0 },
   most = 12,
+  /**
+   * Places inside the outline that aren't the home's roof (a pergola, a clear roof over a side path: the roof check's
+   * structures, 10 Nov 2026), left out before the faces are read, so they make no face and no face reaches into them.
+   */
+  skip: readonly Point[][] = [],
 ): FoundFace[] {
   if (outline.length < 3) return [];
   const { cols, rows, cell } = t;
@@ -264,7 +269,7 @@ export function facesFromHeights(
   for (let r = r0; r <= r1; r++)
     for (let c = c0; c <= c1; c++) {
       const p = { x: xOf(c), y: yOf(r) };
-      if (!inside(p, outline)) continue;
+      if (!inside(p, outline) || skip.some((box) => inside(p, box))) continue;
       const i = r * cols + c;
       if (!Number.isFinite(t.heights[i])) continue;
       onRoof.add(i);

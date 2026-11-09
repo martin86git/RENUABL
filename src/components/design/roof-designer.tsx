@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { accessColour, shadeReport, type ShadeReport } from "@/lib/domain/design/shade";
+import { accessColour, shadeHint, shadeReport, type ShadeReport } from "@/lib/domain/design/shade";
 import { loadTerrain, type Heights } from "@/lib/services/terrain";
 import { loadRoofCheck } from "@/lib/services/roof-check";
+import { useDesignTips } from "./design-tips";
 import {
   HAS_SOLAR_NOTE,
   REPLACING_NOTE,
@@ -19,7 +20,7 @@ import {
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
 import { loadNearmapOutline } from "@/lib/services/nearmap";
 import { OLD_FACE_CORNERS, mendCutOutline, outlineNote } from "@/lib/domain/design/nearmap";
-import { MOUNT_STANDOFF, clearanceFor, inRows, laidAs, packFaces, reorient } from "@/lib/domain/design/pack";
+import { MOUNT_STANDOFF, clearanceFor, inRows, laidAs, packFaces, reorient, splitPartner } from "@/lib/domain/design/pack";
 import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
 import { facesFoundNote, facesFromHeights } from "@/lib/domain/design/roof-faces";
@@ -1349,8 +1350,11 @@ export function RoofDesigner(props: {
   const [shadeOn, setShadeOn] = useState(false);
   // The shade on the design as it stands: each panel's access to the sun by its key, and the design's as a whole.
   const [shade, setShade] = useState<{ report: ShadeReport; keys: string[] } | null>(null);
+  // The heights are read once there are panels on the roof, so shaded panels show as they are laid (10 Nov 2026,
+  // Martin), not only once the shade view is opened.
+  const anyPanels = loose.length > 0 || faces.length > 0;
   useEffect(() => {
-    if (!shadeOn || terrain !== null) return;
+    if (!(shadeOn || anyPanels) || terrain !== null) return;
     let gone = false;
     void loadTerrain(spot.lat, spot.lng, { nearmap: props.nearmapPicture }).then((found) => !gone && setTerrain(found ?? "none"));
     return () => {
@@ -1358,7 +1362,7 @@ export function RoofDesigner(props: {
     };
     // The roof's place never changes for the life of this designer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shadeOn, terrain]);
+  }, [shadeOn, anyPanels, terrain]);
   const toggleShade = () => {
     setShadeOn(!shadeOn);
     setArraysOpen(false);
@@ -2115,6 +2119,7 @@ export function RoofDesigner(props: {
     setTool("select");
     setPitchDue((due) => [...due, id]);
     void readSlope(id, points, false);
+    if (props.nearmapPicture) tips.nudge("face-traced");
   };
 
   /**
@@ -2941,6 +2946,7 @@ export function RoofDesigner(props: {
     setSettled((n) => n + 1);
     if (held?.mode === "spin") return setSpinAt(0);
     if (held?.mode === "wire") {
+      if (held.dragged) tips.nudge("strung-by-hand");
       // A plain click on a panel that was already on the string takes it off.
       if (held.had && !held.dragged)
         setStrings(
@@ -2963,9 +2969,11 @@ export function RoofDesigner(props: {
         // Add a panel stays on, to go on adding (3 Nov 2026, Martin: "I still want to be able to add panels"); the
         // array just laid stays picked, with its tilt offered, and the arrow over a panel still picks and moves it.
         if (placed.length > 1) setTiltPop(placed.map((g) => g.id));
+        else tips.nudge("one-panel-added");
       }
       return setGhosts([]);
     }
+    if (held?.mode === "move" && held.starts && Object.keys(held.starts).length === 1) tips.nudge("one-panel-moved");
     if (held?.mode === "move" && held.starts && !e.altKey) {
       // Panels moved by hand settle square against the nearest roof edge or guide line, unless they joined other panels.
       const starts = held.starts;
@@ -3151,7 +3159,8 @@ export function RoofDesigner(props: {
   const label = "text-[10px] font-medium uppercase tracking-[0.18em] text-muted";
   const stringOf = (key: string) => strings.findIndex((s) => s.panels.includes(key));
   /** Every panel on the design as it stands on the roof: where, its tilt and the way it faces. For the shade analysis. */
-  const standingPanels = shadeOn
+  // Every panel standing, for the shade (worked out whether or not the shade view is open, so shaded panels show as laid).
+  const standingPanels = anyPanels
     ? [
         ...loose.map((panel) => ({
           key: keyOf({ kind: "loose", id: panel.id }),
@@ -3176,7 +3185,9 @@ export function RoofDesigner(props: {
     : [];
   // The shade is worked out again a moment after the panels stop changing, not on every movement of a drag.
   const shadeKey =
-    shadeOn && terrain && terrain !== "none" ? standingPanels.map((p) => `${p.key}:${p.x},${p.y},${p.tilt},${p.facing}`).join("|") : null;
+    terrain && terrain !== "none" && standingPanels.length
+      ? standingPanels.map((p) => `${p.key}:${p.x},${p.y},${p.tilt},${p.facing}`).join("|")
+      : null;
   useEffect(() => {
     if (shadeKey === null || !terrain || terrain === "none") return;
     const timer = window.setTimeout(
@@ -3188,6 +3199,8 @@ export function RoofDesigner(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shadeKey, terrain]);
   const shadeNow = shadeOn && shadeKey !== null ? shade : null;
+  // With the shade view closed, the shaded panels only, tinted more the more shaded (`shadeHint`), no figures.
+  const shadeHints = !shadeOn && shadeKey !== null ? shade : null;
   /**
    * The design's arrays, largest first, for the list that the arrays button opens: groups of panels that touch, or as
    * good as (`ARRAY_GAP`, the same rule the quote counts arrays by), each with the way most of its panels face, their
@@ -3520,7 +3533,16 @@ export function RoofDesigner(props: {
     const [outline, heights, check] = await Promise.all([nearmapFace(), loadTerrain(spot.lat, spot.lng, { nearmap: true }), checkRoof()]);
     if ("note" in outline || !heights || heights.from !== "nearmap") return null;
     // Faces over a pergola, a clear roof or the house next door aren't the home's roof (10 Nov 2026, Martin).
-    const found = roofFacesOnly(facesFromHeights(outline.face.points, heights), check?.notRoof);
+    const found = roofFacesOnly(
+      facesFromHeights(
+        outline.face.points,
+        heights,
+        undefined,
+        undefined,
+        check?.notRoof?.map((x) => x.box),
+      ),
+      check?.notRoof,
+    );
     if (!found.length) return null;
     const made: Face[] = found.map((f) => ({
       id: newId("f"),
@@ -3592,6 +3614,15 @@ export function RoofDesigner(props: {
   };
   /** The last thing laid by rule, so changing the existing panels' answer lays it again. */
   const lastLay = useRef<{ kind: "fill"; kw: number; facing?: Way } | { kind: "mine"; goal: DesignGoal } | null>(null);
+  /**
+   * Shared across two faces (10 Nov 2026, Martin: "sol placed all panels on the west, he should ask me if I want to
+   * split some panels over to the east"): when one face holds the whole system and another nearly as sunny looks
+   * another way, Sol offers the split (`splitOffer`, the second face's way in words); on yes, Design it for me lays
+   * about half on each, for this visit.
+   */
+  const splitRef = useRef(false);
+  const [splitOffer, setSplitOffer] = useState<string | null>(null);
+  const [splitting, setSplitting] = useState(false);
   const designForMe = async (auto = false, goal: DesignGoal = "return") => {
     setMineIntro(false);
     setMine("busy");
@@ -3631,6 +3662,7 @@ export function RoofDesigner(props: {
     const result = selfDesign({
       centre: spot,
       faces: fromFaces,
+      split: splitRef.current,
       model,
       ...(modelOffsetM ? { modelOffset: modelOffsetM } : {}),
       ...(avoid ? { avoid } : {}),
@@ -3673,6 +3705,13 @@ export function RoofDesigner(props: {
     setPrimary(lead);
     show(list, lead);
     setSaved("changed");
+    // Everything on one face, and another as sunny looking another way: Sol offers to split it.
+    const way = fromFaces.length ? splitPartner(fromFaces, size, list[lead].loose?.length ?? 0, avoid) : null;
+    setSplitOffer(
+      splitRef.current || way === null
+        ? null
+        : (["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"][Math.round(way / 45) % 8] ?? null),
+    );
     madeFor.current = { bill: billKey, designs: designsKey(list) };
     setBillMoved(false);
   };
@@ -3818,6 +3857,18 @@ export function RoofDesigner(props: {
   /** The design (by index) Sol has been asked to delete, waiting for the person's Yes (9 Nov 2026, Martin). */
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const commandBox = useRef<HTMLInputElement>(null);
+  // "Did you know?" (10 Nov 2026, Martin: pointers for new users, a lightbulb to switch them off): each tip answers
+  // what was just done, and its "Show me" does it.
+  const tips = useDesignTips({
+    busy: () => press.current !== null,
+    onAct: (act) => {
+      if (act === "pick-all") {
+        pickTool("select");
+        pickEveryPanel();
+      } else if (act === "design-for-me") void designForMe(false);
+      else stringForMe();
+    },
+  });
   /**
    * In the pop-up, Sol's panel put away (10 Nov 2026, Martin: it blocked the map and couldn't be closed, and pressing
    * Sol again started from scratch). Closing it only hides it: his last answer, the question and anything he offered
@@ -4151,6 +4202,27 @@ export function RoofDesigner(props: {
     setSystemWords("");
     try {
       setCommandReply(await readRoofAgain());
+    } finally {
+      setCommandBusy(false);
+      setAsked(null);
+    }
+  };
+  /** The split chip's answer: the panels shared across two faces, or back on one, laid again by Design it for me. */
+  const answerSplit = async (on: boolean) => {
+    if (commandBusy) return;
+    const word = splitOffer;
+    splitRef.current = on;
+    setSplitting(on);
+    setCommandBusy(true);
+    setAsked(on ? `Split some to the ${word ?? "other"} face.` : "Keep them on one face.");
+    setCommandReply(null);
+    setSystemWords("");
+    try {
+      const last = lastLay.current;
+      await designForMe(false, last?.kind === "mine" ? last.goal : "return");
+      setCommandReply(
+        on ? `Shared across two faces: about half on the ${word ?? "other"} face.` : "Back on one face, the sunniest that holds them all.",
+      );
     } finally {
       setCommandBusy(false);
       setAsked(null);
@@ -5551,6 +5623,7 @@ export function RoofDesigner(props: {
                           step="10"
                           value={bill.amount}
                           onChange={(e) => setBill(billWith(bill, { amount: e.target.value }))}
+                          onBlur={() => Number(bill.amount) > 0 && tips.nudge("bill-typed")}
                           placeholder="e.g. 350"
                           className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest"
                         />
@@ -5736,6 +5809,16 @@ export function RoofDesigner(props: {
                             className="mt-2 rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
                           >
                             {replacing ? "Keep clear of the existing panels" : "The existing panels are being replaced: use their roof"}
+                          </button>
+                        )}
+                        {(splitting || splitOffer) && (
+                          <button
+                            type="button"
+                            disabled={commandBusy}
+                            onClick={() => void answerSplit(!splitting)}
+                            className="mr-1.5 mt-2 rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+                          >
+                            {splitting ? "Keep them on one face" : `Split some to the ${splitOffer}?`}
                           </button>
                         )}
                         {props.nearmapPicture && faces.length > 0 && (
@@ -6742,6 +6825,25 @@ export function RoofDesigner(props: {
                         )}
                       </g>
                     ))}
+                  {/* Shaded panels as they are laid, with the shade view closed: a tint, stronger the more shaded. */}
+                  {shadeHints &&
+                    standingPanels.map((p) => {
+                      const at = shadeHints.keys.indexOf(p.key);
+                      const access = at < 0 ? null : shadeHints.report.panels[at]?.access;
+                      const tint = shadeHint(access);
+                      if (tint === null || access === null || access === undefined) return null;
+                      return (
+                        <polygon
+                          key={`hint-${p.key}`}
+                          points={path(p.corners)}
+                          fill={accessColour(access)}
+                          fillOpacity={tint}
+                          pointerEvents="none"
+                        >
+                          <title>{`About ${Math.round(access * 100)}% of the year's sun reaches it`}</title>
+                        </polygon>
+                      );
+                    })}
                   {/* Shade analysis: each panel tinted by how open it is to the sun over a year, with the figure on it. */}
                   {shadeNow &&
                     standingPanels.map((p) => {
@@ -8580,6 +8682,7 @@ export function RoofDesigner(props: {
                   </ToolFan>
                 </div>
               )}
+              {tips.corner}
               {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its
                   circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}
               <div className="absolute bottom-8 left-3 z-10">
@@ -8635,6 +8738,7 @@ export function RoofDesigner(props: {
                       // Open: put away. Away (or never opened): the same panel back, his last answer in it, the box ready.
                       const shown = !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen);
                       if (shown) return putSolAway();
+                      tips.nudge("sol-pressed");
                       setAwayFrom(null);
                       setCommandOpen(true);
                       requestAnimationFrame(() => commandBox.current?.focus());
