@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { packArea, type Area } from "./pack";
 import { PANEL, inside } from "./roof-design";
-import { boxOnRoof, hasSolar, keepOuts, keptClearWords, roofThings, thingLabel, withoutExisting } from "./roof-check";
+import {
+  avoidFor,
+  boxOnRoof,
+  hasSolar,
+  keepOuts,
+  keptClearWords,
+  notRoofWords,
+  roofFacesOnly,
+  roofThings,
+  thingLabel,
+  withoutExisting,
+  type RoofThing,
+} from "./roof-check";
 import { suggestPanels } from "./suggest";
 
 const lat = -37.936943;
@@ -139,5 +151,29 @@ describe("what is left out", () => {
       lat,
     );
     expect(withoutExisting(things).map((t) => t.type)).toEqual(["vent"]);
+  });
+});
+
+describe("structures that aren't the home's roof", () => {
+  const sq = (x0: number, y0: number, x1: number, y1: number) => [
+    { x: x0, y: y0 },
+    { x: x1, y: y0 },
+    { x: x1, y: y1 },
+    { x: x0, y: y1 },
+  ];
+  const pergola: RoofThing = { type: "other", note: "Pergola with clear roof", box: sq(-6, -12, 6, -7) };
+  it("leaves out a face mostly over a pergola, and keeps the roof's own", () => {
+    const faces = [{ points: sq(-5, -11, 5, -7.5) }, { points: sq(-5, -7, 5, 5) }, { points: sq(-5, -8, 5, -4) }];
+    const kept = roofFacesOnly(faces, [pergola]);
+    expect(kept).toEqual([faces[1], faces[2]]);
+    expect(roofFacesOnly(faces, undefined)).toBe(faces);
+  });
+  it("keeps panels laid by rule off it, with no clearance added", () => {
+    const avoid = avoidFor({ things: [], notRoof: [pergola] });
+    expect(avoid).toEqual([pergola.box]);
+  });
+  it("says what was left off", () => {
+    expect(notRoofWords([pergola])).toBe("Left off what isn't the home's roof: pergola with clear roof.");
+    expect(notRoofWords([])).toBeNull();
   });
 });

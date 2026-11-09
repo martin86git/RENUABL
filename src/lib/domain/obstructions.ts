@@ -29,6 +29,8 @@ export interface Obstruction {
 
 export interface ObstructionCheck {
   items: Obstruction[];
+  /** The designer's check only: structures that aren't the house's own roof (pergolas, clear roofs, the house next door). */
+  structures?: { box: [number, number, number, number]; note?: string }[];
   summary: string;
   checkedAt: string;
 }

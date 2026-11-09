@@ -7,7 +7,7 @@
  * A helper, never a site inspection: what the picture shows on the day it was taken.
  */
 import { OBSTRUCTION_SETBACK_M, type Obstruction, type ObstructionType } from "../obstructions";
-import { ROOF_IMAGE, metresPerPixel, type Point } from "./roof-design";
+import { ROOF_IMAGE, inside, metresPerPixel, type Point } from "./roof-design";
 
 /** One thing found, with the place it covers on the roof (metres east and south of the picture's middle). */
 export interface RoofThing {
@@ -21,6 +21,12 @@ export interface RoofCheck {
   things: RoofThing[];
   /** The checker's one line on the roof. */
   summary: string;
+  /**
+   * What stands in the roof's outline but isn't the home's own solid roof (10 Nov 2026, Martin: at 29 Shearer Drive
+   * a pergola and the clear roof over the side path were traced as roof faces and panels laid on them): pergolas,
+   * verandas, carports, glass or clear roofs, shade sails, sheds, a neighbour's house that touches this one.
+   */
+  notRoof?: RoofThing[];
   /** The picture it was found on: "google", or a Nearmap capture's survey. */
   picture: string;
   checkedAt: string;
@@ -83,6 +89,50 @@ export function keepOuts(things: readonly RoofThing[], clearance = OBSTRUCTION_S
       { x: x0, y: y1 },
     ];
   });
+}
+
+/** The structures that aren't the home's roof, from the check's boxes on the whole picture (0–1000), in metres. */
+export function notRoofThings(items: readonly { box: [number, number, number, number]; note?: string }[], lat: number): RoofThing[] {
+  return items.map((o) => ({ type: "other", ...(o.note ? { note: o.note } : {}), box: boxOnRoof(o.box, lat) }));
+}
+
+/** Everything panels laid by rule keep off: each thing with its clearance, and each structure that isn't roof. */
+export function avoidFor(check: Pick<RoofCheck, "things" | "notRoof">): Point[][] {
+  return [...keepOuts(check.things), ...(check.notRoof ?? []).map((t) => t.box)];
+}
+
+/** The share of an outline (by a grid of points over it) that falls in any of the boxes. */
+function shareIn(points: Point[], boxes: Point[][]): number {
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  let on = 0;
+  let all = 0;
+  for (let x = Math.min(...xs); x <= Math.max(...xs); x += 0.25)
+    for (let y = Math.min(...ys); y <= Math.max(...ys); y += 0.25) {
+      if (!inside({ x, y }, points)) continue;
+      all++;
+      if (boxes.some((b) => inside({ x, y }, b))) on++;
+    }
+  return all ? on / all : 0;
+}
+
+/** A face read from the heights is left out when at least this share of it is over a structure that isn't roof. */
+export const NOT_ROOF_SHARE = 0.5;
+
+/** The faces that are the home's roof: those mostly over a pergola, a clear roof or the house next door left out. */
+export function roofFacesOnly<T extends { points: Point[] }>(faces: T[], notRoof: readonly RoofThing[] | undefined): T[] {
+  if (!notRoof?.length) return faces;
+  const boxes = notRoof.map((t) => t.box);
+  return faces.filter((f) => shareIn(f.points, boxes) < NOT_ROOF_SHARE);
+}
+
+/** What was left out as not the home's roof, in a sentence, or null. */
+export function notRoofWords(notRoof: readonly RoofThing[] | undefined): string | null {
+  const notes = [...new Set((notRoof ?? []).map((t) => (t.note ?? "").trim().toLowerCase()).filter(Boolean))].slice(0, 3);
+  if (!notRoof?.length) return null;
+  return notes.length
+    ? `Left off what isn't the home's roof: ${notes.join("; ")}.`
+    : "Left off what isn't the home's roof, as the picture shows it.";
 }
 
 /** Whether the home has panels on it already: then it is likely a battery or an expansion, not a new system. */

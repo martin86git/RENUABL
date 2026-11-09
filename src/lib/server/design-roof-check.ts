@@ -5,7 +5,7 @@
  * Business id first, from the signed-in member.
  */
 import sharp from "sharp";
-import { HOME_BOX, roofThings, type RoofCheck } from "@/lib/domain/design/roof-check";
+import { HOME_BOX, notRoofThings, roofThings, type RoofCheck } from "@/lib/domain/design/roof-check";
 import { query } from "./db";
 import { keptPicture, roofImagery, spotOf } from "./design-nearmap-repo";
 import { checkObstructions } from "./obstruction-check";
@@ -14,7 +14,7 @@ import { satelliteImage } from "./roof-view";
 /** The model that looks, by default: quick enough for a roof as it opens, and sharp enough on a roof photo. */
 const ROOF_CHECK_MODEL = "claude-sonnet-5-5";
 /** The instructions the check was made with: older checks are made again. */
-const CHECK_VERSION = 2;
+const CHECK_VERSION = 3;
 
 /** The roof's check for the picture in use: kept, else made now. Null when there is no picture or no key to ask with. */
 export async function roofCheck(businessId: string, place: { lat: number; lng: number }): Promise<RoofCheck | null> {
@@ -25,7 +25,8 @@ export async function roofCheck(businessId: string, place: { lat: number; lng: n
     `select check_json from design_roof_checks where business_id = $1 and spot = $2 and picture = $3`,
     [businessId, spot, picture],
   );
-  // A check made with older instructions is made again once (v2: fixtures on the roof only, 9 Nov 2026).
+  // A check made with older instructions is made again once (v2: fixtures on the roof only, 9 Nov 2026; v3: structures
+  // that aren't the home's roof, 10 Nov 2026).
   if (kept[0] && kept[0].check_json.v === CHECK_VERSION) return kept[0].check_json;
   if (!apiKey) return null;
   let image: { data: ArrayBuffer; mediaType: "image/jpeg" | "image/png" } | null = null;
@@ -43,7 +44,13 @@ export async function roofCheck(businessId: string, place: { lat: number; lng: n
   const found = await checkObstructions({ data: new Uint8Array(small).buffer, mediaType: "image/jpeg" }, HOME_BOX, apiKey, {
     model: process.env.ROOF_CHECK_MODEL?.trim() || ROOF_CHECK_MODEL,
   });
-  const check: RoofCheck = { things: roofThings(found.items, place.lat), summary: found.summary, picture, checkedAt: found.checkedAt };
+  const check: RoofCheck = {
+    things: roofThings(found.items, place.lat),
+    notRoof: notRoofThings(found.structures ?? [], place.lat),
+    summary: found.summary,
+    picture,
+    checkedAt: found.checkedAt,
+  };
   await query(
     `insert into design_roof_checks (business_id, spot, picture, check_json) values ($1, $2, $3, $4)
      on conflict (business_id, spot, picture) do update set check_json = excluded.check_json, checked_at = now()`,

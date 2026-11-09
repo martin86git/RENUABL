@@ -51,6 +51,10 @@ export const ROOF_FACES = {
   snap: 0.7,
   /** Outlines simplified to within this, metres. */
   simplify: 0.45,
+  /** A face smaller than this, square metres... */
+  enclosedMax: 12,
+  /** ...with at least this share of its edge against one other face, is part of that face (existing panels read as a slope of their own). */
+  enclosedShare: 0.7,
 } as const;
 
 /** One face found: its outline (metres east and south of the picture's middle), slope and size from above. */
@@ -501,6 +505,30 @@ export function facesFromHeights(
   }
   for (const set of final.values()) set.clear();
   for (const [i, g] of label) final.get(g)!.add(i);
+
+  // A small face set inside another is part of it (10 Nov 2026, Martin: at 29 Shearer Drive the existing panels on the
+  // west face, lying a few degrees flatter than the tiles, were read as a face of their own inside it).
+  for (const [g, set] of [...final].sort((p, q) => p[1].size - q[1].size)) {
+    if (!set.size || set.size * cellArea >= ROOF_FACES.enclosedMax) continue;
+    const round = new Map<number, number>();
+    let edge = 0;
+    for (const i of set)
+      for (const j of [i - 1, i + 1, i - cols, i + cols]) {
+        if (set.has(j)) continue;
+        edge++;
+        const h = label.get(j);
+        if (h !== undefined) round.set(h, (round.get(h) ?? 0) + 1);
+      }
+    let into = -1;
+    let most = 0;
+    for (const [h, n] of round) if (n > most) [into, most] = [h, n];
+    if (into < 0 || most / edge < ROOF_FACES.enclosedShare) continue;
+    for (const i of set) {
+      label.set(i, into);
+      final.get(into)!.add(i);
+    }
+    set.clear();
+  }
 
   // Which faces meet (their cells touch), for straightening the seams between them.
   const ownerOf = new Map<number, number>();

@@ -7,9 +7,11 @@ import { loadRoofCheck } from "@/lib/services/roof-check";
 import {
   HAS_SOLAR_NOTE,
   REPLACING_NOTE,
+  avoidFor,
   hasSolar,
-  keepOuts,
   keptClearWords,
+  notRoofWords,
+  roofFacesOnly,
   thingLabel,
   withoutExisting,
   type RoofCheck,
@@ -3489,9 +3491,10 @@ export function RoofDesigner(props: {
     !faces.length || (Boolean(props.nearmapPicture) && faces.length === 1 && faces[0].points.length >= OUTLINE_FACE_CORNERS);
   const nearmapRoofFaces = async (): Promise<{ faces: Face[]; words: string } | null> => {
     if (!props.nearmapPicture) return null;
-    const [outline, heights] = await Promise.all([nearmapFace(), loadTerrain(spot.lat, spot.lng, { nearmap: true })]);
+    const [outline, heights, check] = await Promise.all([nearmapFace(), loadTerrain(spot.lat, spot.lng, { nearmap: true }), checkRoof()]);
     if ("note" in outline || !heights || heights.from !== "nearmap") return null;
-    const found = facesFromHeights(outline.face.points, heights);
+    // Faces over a pergola, a clear roof or the house next door aren't the home's roof (10 Nov 2026, Martin).
+    const found = roofFacesOnly(facesFromHeights(outline.face.points, heights), check?.notRoof);
     if (!found.length) return null;
     const made: Face[] = found.map((f) => ({
       id: newId("f"),
@@ -3557,7 +3560,7 @@ export function RoofDesigner(props: {
     return check
       ? [
           ...(found && hasSolar(found.things) ? [replacingRef.current ? REPLACING_NOTE : HAS_SOLAR_NOTE] : []),
-          ...[keptClearWords(check.things)].filter((w): w is string => !!w),
+          ...[keptClearWords(check.things), notRoofWords(check.notRoof)].filter((w): w is string => !!w),
         ]
       : [];
   };
@@ -3569,7 +3572,7 @@ export function RoofDesigner(props: {
     if (!auto) lastLay.current = { kind: "mine", goal };
     const found = await checkRoof();
     const check = inUse(found);
-    const avoid = check?.things.length ? keepOuts(check.things) : undefined;
+    const avoid = check && avoidFor(check).length ? avoidFor(check) : undefined;
     let model: RoofModel | null = null;
     let modelOffsetM: { x: number; y: number } | undefined;
     let fromFaces = faces;
@@ -3885,10 +3888,11 @@ export function RoofDesigner(props: {
     lastLay.current = { kind: "fill", kw, ...(facing ? { facing } : {}) };
     const seen = await checkRoof();
     const check = inUse(seen);
-    const avoid = check?.things.length ? keepOuts(check.things) : undefined;
+    const avoid = check && avoidFor(check).length ? avoidFor(check) : undefined;
     const clear = [
       seen && hasSolar(seen.things) && replacingRef.current ? REPLACING_NOTE : null,
       check ? keptClearWords(check.things) : null,
+      check ? notRoofWords(check.notRoof) : null,
     ]
       .filter(Boolean)
       .join(" ");
