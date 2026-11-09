@@ -816,6 +816,16 @@ create table if not exists design_nearmap (
   fetched_at timestamptz not null default now(),
   primary key (business_id, spot, survey)
 );
+-- Nearmap's heights for a roof (server/nearmap.ts nearmapHeights), stitched once on the designer's picture: RENUABL's own
+-- key's data, so kept by place for every business (terrain null: none measured there when last asked).
+create table if not exists nearmap_heights (
+  spot text primary key,
+  survey text,
+  captured text,
+  layer text,
+  terrain bytea,
+  fetched_at timestamptz not null default now()
+);
 create table if not exists design_nearmap_use (
   business_id text not null references businesses(id) on delete cascade,
   spot text not null,

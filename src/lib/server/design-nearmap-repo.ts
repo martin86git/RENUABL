@@ -5,7 +5,7 @@
 import { query } from "./db";
 import { homeOutline } from "@/lib/domain/design/nearmap";
 import type { Point } from "@/lib/domain/design/roof-design";
-import { nearmapPicture, nearmapRoofOutlines, nearmapSurveys } from "./nearmap";
+import { nearmapHeights, nearmapPicture, nearmapRoofOutlines, nearmapSurveys } from "./nearmap";
 
 /** A roof's place, to six decimals, as its key. */
 export const spotOf = (lat: number, lng: number) => `${lat.toFixed(6)},${lng.toFixed(6)}`;
@@ -124,4 +124,37 @@ export async function nearmapOutline(
     JSON.stringify(points ?? []),
   ]);
   return { points, captured: row.captured };
+}
+
+/** Asking again for a roof Nearmap had no heights for, after this many days (a new capture may have come). */
+const HEIGHTS_RETRY_DAYS = 30;
+
+/**
+ * Nearmap's heights for the roof (packed `Terrain`), while the roof's picture is a Nearmap capture: the person chose
+ * Nearmap, so its heights are used for the slope of each face and the shade too. Asked of Nearmap once a place (about
+ * a dozen tiles) and kept. "google" while Google's picture is in use; null when Nearmap has measured nothing there or
+ * couldn't be reached.
+ */
+export async function roofHeights(
+  businessId: string,
+  place: { lat: number; lng: number },
+): Promise<{ terrain: Buffer; captured: string | null; layer: string | null } | null | "google"> {
+  const imagery = await roofImagery(businessId, place.lat, place.lng);
+  if (imagery.use === "google") return "google";
+  const spot = spotOf(place.lat, place.lng);
+  const kept = await query<{ terrain: Buffer | null; captured: string | null; layer: string | null; stale: boolean }>(
+    `select terrain, captured, layer, fetched_at < now() - make_interval(days => $2) as stale from nearmap_heights where spot = $1`,
+    [spot, HEIGHTS_RETRY_DAYS],
+  );
+  const row = kept[0];
+  if (row?.terrain) return { terrain: row.terrain, captured: row.captured, layer: row.layer };
+  if (row && !row.stale) return null;
+  const got = await nearmapHeights(place.lat, place.lng);
+  await query(
+    `insert into nearmap_heights (spot, survey, captured, layer, terrain) values ($1, $2, $3, $4, $5)
+     on conflict (spot) do update set survey = excluded.survey, captured = excluded.captured, layer = excluded.layer,
+       terrain = excluded.terrain, fetched_at = now()`,
+    [spot, got?.survey ?? null, got?.captured ?? null, got?.layer ?? null, got?.terrain ?? null],
+  );
+  return got ? { terrain: got.terrain, captured: got.captured, layer: got.layer } : null;
 }

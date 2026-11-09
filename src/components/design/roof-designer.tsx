@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { accessColour, shadeReport, type ShadeReport, type Terrain } from "@/lib/domain/design/shade";
-import { loadTerrain } from "@/lib/services/terrain";
+import { accessColour, shadeReport, type ShadeReport } from "@/lib/domain/design/shade";
+import { loadTerrain, type Heights } from "@/lib/services/terrain";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
 import { loadNearmapOutline } from "@/lib/services/nearmap";
 import { OLD_FACE_CORNERS, mendCutOutline, outlineNote } from "@/lib/domain/design/nearmap";
@@ -413,29 +413,37 @@ function Leg(props: { label: string; on?: boolean; onClick: () => void; children
   );
 }
 
-function SlopeNote(props: { slope: AspectReading | "busy" | "none" | undefined; onRead: () => void }) {
+function SlopeNote(props: {
+  slope: AspectReading | "busy" | "none" | undefined;
+  onRead: () => void;
+  /** Whose heights are read: Nearmap's (with the capture's day in words) while its picture is in use, else Google's. */
+  nearmap?: string | null;
+}) {
   const { slope } = props;
-  if (slope === "busy") return <p className="text-sm text-muted">Reading this face&apos;s slope from Google&apos;s height data…</p>;
+  const whose = props.nearmap ? "Nearmap's" : "Google's";
+  const heightsWords = props.nearmap ? `Nearmap's height data (${props.nearmap})` : "Google's height data";
+  if (slope === "busy") return <p className="text-sm text-muted">Reading this face&apos;s slope from {heightsWords}…</p>;
   const again = (
     <button className="tap-area font-medium text-ink underline underline-offset-2" onClick={props.onRead}>
-      {slope ? "Read it again" : "Read the slope from Google's data"}
+      {slope ? "Read it again" : `Read the slope from ${whose} data`}
     </button>
   );
   if (!slope) return <p className="text-sm text-ink-2">{again}</p>;
   if (slope === "none")
     return (
       <p className="text-sm text-ink-2">
-        Google&apos;s data couldn&apos;t tell which way this face slopes. Set the direction and pitch below. {again}
+        {whose} data couldn&apos;t tell which way this face slopes. Set the direction and pitch below. {again}
       </p>
     );
   const { aspect, disagrees } = slope;
   return (
     <p className="text-sm text-ink-2">
       {aspect.flat
-        ? `Read as flat (about ${Math.round(aspect.pitch)}°) from Google's ${aspect.from === "heights" ? "height data" : "roof model"}.`
-        : `Slope read from Google's ${aspect.from === "heights" ? "height data" : "roof model"}: down towards ${compass(aspect.azimuth)} at about ${Math.round(aspect.pitch)}°.`}{" "}
+        ? `Read as flat (about ${Math.round(aspect.pitch)}°) from ${aspect.from === "heights" ? heightsWords : "Google's roof model"}.`
+        : `Slope read from ${aspect.from === "heights" ? heightsWords : "Google's roof model"}: down towards ${compass(aspect.azimuth)} at about ${Math.round(aspect.pitch)}°.`}{" "}
       {disagrees && <strong className="font-semibold text-ink">Google&apos;s roof model points another way. </strong>}
-      Google&apos;s data can be older than the roof: check it against the photo. {again}
+      {aspect.from === "heights" && props.nearmap ? "Measured when that picture was taken" : "Google's data can be older than the roof"}:
+      check it against the photo. {again}
     </p>
   );
 }
@@ -1267,15 +1275,27 @@ export function RoofDesigner(props: {
       gone = true;
     };
   }, [drawn, measured, measuredUrl]);
-  // The heights of everything around the roof (Google's): asked for the first time the shade analysis is wanted.
-  const [terrain, setTerrain] = useState<Terrain | "none" | null>(null);
+  // The heights of everything around the roof: asked for the first time the shade analysis is wanted.
+  // Nearmap's heights go with Nearmap's picture (9 Nov 2026, Martin): kept by which were asked for, so switching the
+  // picture asks for the other's.
+  const heightsFrom = props.nearmapPicture ? "nearmap" : "google";
+  const [terrainBy, setTerrainBy] = useState<{ asked: string; t: Heights | "none" } | null>(null);
+  const terrain = terrainBy?.asked === heightsFrom ? terrainBy.t : null;
+  const setTerrain = (t: Heights | "none") => setTerrainBy({ asked: heightsFrom, t });
+  /** The capture's day in words when the heights in use are Nearmap's. */
+  const nearmapHeights =
+    terrain && terrain !== "none" && terrain.from === "nearmap"
+      ? terrain.captured
+        ? new Date(`${terrain.captured}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })
+        : "Nearmap"
+      : null;
   const [shadeOn, setShadeOn] = useState(false);
   // The shade on the design as it stands: each panel's access to the sun by its key, and the design's as a whole.
   const [shade, setShade] = useState<{ report: ShadeReport; keys: string[] } | null>(null);
   useEffect(() => {
     if (!shadeOn || terrain !== null) return;
     let gone = false;
-    void loadTerrain(spot.lat, spot.lng).then((found) => !gone && setTerrain(found ?? "none"));
+    void loadTerrain(spot.lat, spot.lng, { nearmap: props.nearmapPicture }).then((found) => !gone && setTerrain(found ?? "none"));
     return () => {
       gone = true;
     };
@@ -2015,15 +2035,19 @@ export function RoofDesigner(props: {
   };
 
   /**
-   * Which way a face slopes and how steeply, read from Google's heights (else its roof model), and the face's rows
+   * Which way a face slopes and how steeply, read from the heights (Nearmap's while its picture is in use, else
+   * Google's; else Google's roof model), and the face's rows
    * laid to it: along the gutter, looking down the slope, at the roof's pitch (`face-aspect.ts`). A face just
    * traced takes it only while nobody has turned its rows, picked a direction or set a pitch in the meantime;
    * asked for again (`again`), it always does.
    */
   const readSlope = async (id: string, points: Point[], again: boolean) => {
     setSlopes((s) => ({ ...s, [id]: "busy" }));
-    const [heights, model] = await Promise.all([loadTerrain(spot.lat, spot.lng), loadRoofModel(spot.lat, spot.lng)]);
-    if (heights) setTerrain((t) => (t && t !== "none" ? t : heights));
+    const [heights, model] = await Promise.all([
+      loadTerrain(spot.lat, spot.lng, { nearmap: props.nearmapPicture }),
+      loadRoofModel(spot.lat, spot.lng),
+    ]);
+    if (heights && !(terrain && terrain !== "none")) setTerrain(heights);
     const read = readAspect({ points, terrain: heights, model, centre: spot });
     setSlopes((s) => ({ ...s, [id]: read ?? "none" }));
     if (!read) return;
@@ -7772,9 +7796,10 @@ export function RoofDesigner(props: {
                     </>
                   )}
                   <p className="mt-3 border-t border-line pt-2 text-[11px] leading-snug text-muted">
-                    Worked out from Google&apos;s height data for this address: where the sun is each half hour through the year, and what
-                    stands in its way. That data can be older than the roof and the trees. It is a guide for design, not a shade assessment
-                    on site, and the quote&apos;s output figures don&apos;t take it off.
+                    Worked out from {nearmapHeights ? `Nearmap's height data (${nearmapHeights})` : "Google's height data"} for this
+                    address: where the sun is each half hour through the year, and what stands in its way. That data can be older than the
+                    roof and the trees. It is a guide for design, not a shade assessment on site, and the quote&apos;s output figures
+                    don&apos;t take it off.
                   </p>
                 </div>
               )}
@@ -8280,7 +8305,7 @@ export function RoofDesigner(props: {
                 <p className={label}>
                   This face · {summary.faces.find((f) => f.id === face.id)?.panels ?? 0} panels · {faceArea(face).toFixed(0)} m² from above
                 </p>
-                <SlopeNote slope={slopes[face.id]} onRead={() => void readSlope(face.id, face.points, true)} />
+                <SlopeNote slope={slopes[face.id]} nearmap={nearmapHeights} onRead={() => void readSlope(face.id, face.points, true)} />
                 <label className="block text-sm">
                   <span className="flex justify-between">
                     Rows run at <span className="tabular-nums">{face.angle}°</span>

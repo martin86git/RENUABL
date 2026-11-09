@@ -14,7 +14,9 @@
  */
 import sharp from "sharp";
 import type { LngLatRing } from "@/lib/domain/design/nearmap";
+import { dsmSource, terrainFromTiles, tileValues, tilesFor, type DsmTile } from "@/lib/domain/design/nearmap-dsm";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
+import { packTerrain } from "@/lib/domain/design/shade";
 
 const nearmapKey = () => process.env.NEARMAP_API_KEY?.trim() || null;
 
@@ -176,4 +178,47 @@ export async function nearmapRoofOutlines(lat: number, lng: number, captured?: s
   } catch {
     return null;
   }
+}
+
+/**
+ * Nearmap's heights round a point on the designer's picture (domain/design/nearmap-dsm.ts): the newest capture with
+ * the detailed DSM (zoom 20, about 12 tiles), else the standard one (zoom 18), stitched and set on the shade
+ * analysis's grid. Packed for the browser (`packTerrain`) with the capture it came from. Null when not set up, nothing
+ * measured there, or not reached.
+ */
+export async function nearmapHeights(
+  lat: number,
+  lng: number,
+): Promise<{ terrain: Buffer; survey: string; captured: string; layer: string } | null> {
+  const key = nearmapKey();
+  if (!key) return null;
+  const surveys = await nearmapSurveys(lat, lng);
+  const source = surveys ? dsmSource(surveys) : null;
+  if (!source) return null;
+  const { survey, layer } = source;
+  const tiles = await Promise.all(
+    tilesFor(lat, lng, layer.zoom).map(({ x, y }) =>
+      fetch(
+        `https://api.nearmap.com/tiles/v3/surveys/${encodeURIComponent(survey.id)}/${layer.type}/${layer.zoom}/${x}/${y}.png?apikey=${encodeURIComponent(key)}`,
+        { signal: AbortSignal.timeout(10_000), cache: "no-store" },
+      )
+        .then(async (r) => {
+          if (!r.ok) return null;
+          const { data, info } = await sharp(Buffer.from(await r.arrayBuffer()))
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+          if (info.width !== info.height || info.channels < 3) return null;
+          return { x, y, size: info.width, values: tileValues(data, info.channels, info.width) } satisfies DsmTile;
+        })
+        .catch(() => null),
+    ),
+  );
+  const terrain = terrainFromTiles(
+    lat,
+    lng,
+    layer.zoom,
+    tiles.filter((t): t is DsmTile => t !== null),
+  );
+  if (!terrain) return null;
+  return { terrain: Buffer.from(packTerrain(terrain)), survey: survey.id, captured: survey.captured, layer: layer.type };
 }
