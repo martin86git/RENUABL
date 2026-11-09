@@ -272,3 +272,77 @@ export async function nearmapMeshPart(path: string): Promise<Response | null> {
   }).catch(() => null);
   return res && res.ok ? res : null;
 }
+
+/** The four angled views Nearmap photographs, as its Tile API names them, and which way each looks (degrees from north). */
+export const OBLIQUE_VIEWS = { North: 0, East: 90, South: 180, West: 270 } as const;
+export type ObliqueView = keyof typeof OBLIQUE_VIEWS;
+/** An angled view's side, before its height is foreshortened (pixels at zoom 21: about 47 m in Melbourne). */
+const OBLIQUE_SIDE = 800;
+
+/**
+ * Nearmap's angled photo of the home from one side (9 Nov 2026, Martin: "why wouldn't you use Nearmap's angled
+ * photos?"): its Panorama tiles round the point, each turned north-up and laid as the vertical ones are (the same tile
+ * numbers cover the same ground: Nearmap's sample code), the square then turned so the camera's way is up, and its
+ * height foreshortened to 3/4 (192 of 256, Nearmap's own display ratio for 45° photos). The newest capture with that
+ * view. A JPEG of 800 × 600 and the capture's day, or null when there is no such photo or Nearmap isn't reached.
+ */
+export async function nearmapOblique(lat: number, lng: number, view: ObliqueView): Promise<{ jpeg: Buffer; captured: string } | null> {
+  const key = nearmapKey();
+  if (!key) return null;
+  const surveys = await nearmapSurveys(lat, lng);
+  const survey = surveys?.find((s) => s.resources.includes(`tiles:${view}`));
+  if (!survey) return null;
+  const heading = OBLIQUE_VIEWS[view];
+  const c = worldPixel(lat, lng);
+  const left = Math.round(c.x - OBLIQUE_SIDE / 2);
+  const top = Math.round(c.y - OBLIQUE_SIDE / 2);
+  const jobs: Promise<{ input: Buffer; left: number; top: number } | null>[] = [];
+  for (let ty = Math.floor(top / TILE); ty <= Math.floor((top + OBLIQUE_SIDE - 1) / TILE); ty++)
+    for (let tx = Math.floor(left / TILE); tx <= Math.floor((left + OBLIQUE_SIDE - 1) / TILE); tx++)
+      jobs.push(
+        fetch(
+          `https://api.nearmap.com/tiles/v3/surveys/${encodeURIComponent(survey.id)}/${view}/${ZOOM}/${tx}/${ty}.jpg?apikey=${encodeURIComponent(key)}`,
+          { signal: AbortSignal.timeout(10_000), cache: "no-store" },
+        )
+          .then(async (r) => {
+            if (!r.ok) return null;
+            // Each tile comes looking its own way: turned north-up to lie with its neighbours.
+            const input = await sharp(Buffer.from(await r.arrayBuffer()))
+              .resize(TILE, TILE, { fit: "fill" })
+              .rotate(heading)
+              .toBuffer();
+            return { input, left: tx * TILE - left, top: ty * TILE - top };
+          })
+          .catch(() => null),
+      );
+  const tiles = (await Promise.all(jobs)).filter((t): t is NonNullable<typeof t> => t !== null);
+  if (tiles.length < jobs.length / 2) return null;
+  const pieces = await Promise.all(
+    tiles.map(async (t) => {
+      const x0 = Math.max(0, -t.left);
+      const y0 = Math.max(0, -t.top);
+      const w = Math.min(TILE, OBLIQUE_SIDE - t.left) - x0;
+      const h = Math.min(TILE, OBLIQUE_SIDE - t.top) - y0;
+      if (w <= 0 || h <= 0) return null;
+      return {
+        input: await sharp(t.input).extract({ left: x0, top: y0, width: w, height: h }).toBuffer(),
+        left: Math.max(0, t.left),
+        top: Math.max(0, t.top),
+      };
+    }),
+  );
+  const northUp = await sharp({ create: { width: OBLIQUE_SIDE, height: OBLIQUE_SIDE, channels: 3, background: "#1b1d21" } })
+    .composite(pieces.filter((p): p is NonNullable<typeof p> => p !== null))
+    .png()
+    .toBuffer();
+  // Turned back so the camera's way is up, as the photo was taken; then the 45° foreshortening.
+  const jpeg = await sharp(
+    await sharp(northUp)
+      .rotate((360 - heading) % 360)
+      .toBuffer(),
+  )
+    .resize(OBLIQUE_SIDE, Math.round((OBLIQUE_SIDE * 3) / 4), { fit: "fill" })
+    .jpeg({ quality: 86 })
+    .toBuffer();
+  return { jpeg, captured: survey.captured };
+}

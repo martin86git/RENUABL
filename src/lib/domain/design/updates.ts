@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-09",
     area: "Designer",
+    words: "A Sides button beside Google and Nearmap shows the house in Nearmap's angled photos, from the north, east, south and west.",
+  },
+  {
+    day: "2026-11-09",
+    area: "Designer",
     words: "Panels fill more of an awkwardly shaped roof face, and a roof outline left from an earlier try is read into its faces again.",
   },
   {
@@ -31,7 +36,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-09",
     area: "Designer",
-    words: "A 3D button beside Google and Nearmap shows the roof in Nearmap's 3D model, to turn round and zoom.",
+    words: "Nearmap's angled photos replace the 3D view, which wasn't sharp enough to be of use.",
   },
   {
     day: "2026-11-09",
