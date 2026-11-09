@@ -28,7 +28,17 @@ function nameOf(el: HTMLElement | null): string {
 }
 
 /** One row of the knife: the control, and beside it what it is (pressing the words presses the control). */
-function KnifeRow({ children, delay, open }: { children: React.ReactNode; delay: number; open: boolean }) {
+function KnifeRow({
+  children,
+  delay,
+  open,
+  rank,
+}: {
+  children: React.ReactNode;
+  delay: number;
+  open: boolean;
+  rank?: (name: string) => number;
+}) {
   const row = useRef<HTMLDivElement>(null);
   const [name, setName] = useState("");
   useEffect(() => {
@@ -39,7 +49,7 @@ function KnifeRow({ children, delay, open }: { children: React.ReactNode; delay:
   return (
     <div
       ref={row}
-      style={{ transitionDelay: `${open ? delay : 0}ms` }}
+      style={{ transitionDelay: `${open ? delay : 0}ms`, order: rank && name ? rank(name) : undefined }}
       className={clsx(
         "flex items-center gap-2.5 rounded-xl py-0.5 pl-0.5 pr-2 transition duration-200 ease-out hover:bg-surface-2 motion-reduce:transition-none",
         open ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0",
@@ -68,11 +78,17 @@ export function KnifeMenu({
   label,
   sections,
   hold = false,
+  panel,
+  rank,
 }: {
   main: (state: { open: boolean }) => React.ReactNode;
   label: string;
   sections: { title: string; children: React.ReactNode }[];
   hold?: boolean;
+  /** Something opened from a row: shown in the card in place of the rows, with the way back. */
+  panel?: { title: string; body: React.ReactNode; back: () => void };
+  /** Where a row goes in its column, by its name. */
+  rank?: (name: string) => number;
 }) {
   const [hover, setHover] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -122,12 +138,25 @@ export function KnifeMenu({
           open ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0",
         )}
       >
+        {panel && (
+          <div className="w-[26rem] max-w-[80vw] p-1">
+            <button
+              type="button"
+              onClick={panel.back}
+              className="mb-1 inline-flex h-8 items-center gap-1 rounded-full px-2 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
+            >
+              <span aria-hidden>‹</span> Back
+            </button>
+            <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">{panel.title}</p>
+            {panel.body}
+          </div>
+        )}
         {sections.map((section, s) => (
-          <div key={section.title} className={clsx("w-56", s > 0 && "border-l border-line pl-1")}>
+          <div key={section.title} className={clsx("w-56", s > 0 && "border-l border-line pl-1", panel && "hidden")}>
             <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">{section.title}</p>
-            <div className="space-y-0.5">
+            <div className="flex flex-col gap-0.5">
               {legsOf(section.children).map((leg, i) => (
-                <KnifeRow key={i} open={open} delay={n++ * 18}>
+                <KnifeRow key={i} open={open} delay={n++ * 18} rank={rank}>
                   {leg}
                 </KnifeRow>
               ))}

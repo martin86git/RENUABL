@@ -327,6 +327,7 @@ const DIAL_STEPS: [step: number, at: number][] = [
  */
 function BarRow(props: {
   tight?: boolean;
+  panel?: { title: string; body: React.ReactNode; back: () => void };
   hold: boolean;
   unsaved: boolean;
   waiting: number;
@@ -342,6 +343,8 @@ function BarRow(props: {
       <KnifeMenu
         label="Save, publish, the designs and the checks; stringing, tracing, the guide line, undo and redo"
         hold={props.hold}
+        panel={props.panel}
+        rank={knifeRank}
         sections={[{ title: "This design", children: props.children }, ...(props.tools ? [{ title: "Draw", children: props.tools }] : [])]}
         main={({ open }) => (
           <span
@@ -369,6 +372,24 @@ function BarRow(props: {
       )}
     </div>
   );
+}
+
+/**
+ * The knife's rows in the order a designer reaches for them (8 Nov 2026, Martin): the customer, then saving, the checks,
+ * the designs and the primary, a draft to throw away, sharing live and the chat, and finding another address last.
+ */
+function knifeRank(name: string): number {
+  const order: [RegExp, number][] = [
+    [/^save|^saved/i, 2],
+    [/to fix|ready to install/i, 3],
+    [/^designs?\b/i, 4],
+    [/primary/i, 5],
+    [/discard|draft/i, 6],
+    [/live/i, 7],
+    [/chat/i, 8],
+    [/another address/i, 9],
+  ];
+  return order.find(([re]) => re.test(name))?.[1] ?? 1;
 }
 
 /** A round on a fan's leg. */
@@ -4323,6 +4344,104 @@ export function RoofDesigner(props: {
     </div>
   );
 
+  // Boxes from the knife's rows open in its card, in place of the rows (8 Nov 2026, Martin: they lay over the other column).
+  const readyBox = (
+    <div
+      className={clsx(
+        props.tight
+          ? "w-[24rem] max-w-full"
+          : "absolute z-50 w-[24rem] max-w-[85vw] rounded-lg bg-surface p-3 shadow-lift ring-1 ring-line",
+        props.tight ? "rounded-none bg-transparent p-1 shadow-none ring-0" : "right-0 top-full mt-2",
+      )}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Ready to install</p>
+      <ul className="mt-2 space-y-1.5">
+        {ready.map((item) => (
+          <li key={item.id} className="flex items-start gap-2 text-[13px]">
+            <span
+              className={clsx(
+                "mt-1 size-2 shrink-0 rounded-full",
+                item.state === "pass" ? "bg-positive" : item.state === "fix" ? "bg-danger" : "bg-sun-line",
+              )}
+              aria-label={item.state === "pass" ? "Passes" : item.state === "fix" ? "To fix" : "To check"}
+            />
+            <span className="min-w-0 flex-1">
+              <span className="font-medium text-ink">{item.label}</span>{" "}
+              <span className={item.state === "pass" ? "text-muted" : "text-ink-2"}>{item.words}</span>
+            </span>
+            {item.goTo && item.state !== "pass" && (
+              <button
+                type="button"
+                onClick={() => goTo(item.goTo)}
+                className="shrink-0 text-xs font-semibold text-ink underline underline-offset-2"
+              >
+                Fix
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2.5 text-[11px] leading-snug text-muted">
+        A guide, not a site inspection: the installer&apos;s own design check and the network&apos;s approval still apply.
+      </p>
+    </div>
+  );
+  const liveBox = (
+    <div
+      className={clsx(
+        props.tight
+          ? "w-[24rem] max-w-full"
+          : "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
+        props.tight ? "rounded-none bg-transparent p-1 shadow-none ring-0" : "right-0 top-12",
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-ink">Design it live with the customer</p>
+        <button type="button" onClick={() => setLiveOpen(false)} aria-label="Close" className="text-muted hover:text-ink">
+          <X className="size-4" aria-hidden />
+        </button>
+      </div>
+      <p className="mt-0.5 text-xs text-muted">
+        Send them this link during the call. They see every design on this roof as you draw it, with the price after STCs and the saving,
+        can switch between them, and tell you which they&apos;d like. Nothing else of yours is shown. It closes after a few hours, or when
+        you end it.
+      </p>
+      {live ? (
+        <>
+          <div className="mt-3 flex gap-2">
+            <input
+              readOnly
+              value={liveLink(live.token)}
+              onFocus={(e) => e.currentTarget.select()}
+              className="min-w-0 flex-1 rounded-md bg-surface-2 px-2.5 py-2 text-xs text-ink ring-1 ring-line"
+              aria-label="The customer's live link"
+            />
+            <button
+              type="button"
+              onClick={() => void copyLive()}
+              className="rounded-md bg-primary px-3 text-xs font-medium text-primary-ink hover:bg-forest"
+            >
+              {liveCopied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p className="mt-3 inline-flex items-center gap-2 text-sm text-ink">
+            <span className={clsx("size-2 rounded-full", live.seenAt ? "bg-positive" : "bg-line")} aria-hidden />
+            {liveWords}
+          </p>
+          {costsHidden && <p className="mt-1 text-xs text-muted">Prices aren&apos;t shown: you don&apos;t see costs on this account.</p>}
+          <div className="mt-3 flex justify-end">
+            <button type="button" onClick={() => void stopLive()} className="text-xs text-ink-2 underline-offset-2 hover:underline">
+              End the live link
+            </button>
+          </div>
+        </>
+      ) : (
+        <p className="mt-3 text-sm text-ink-2">{liveProblem ?? "Opening a link…"}</p>
+      )}
+      {live && liveProblem && <p className="mt-2 text-xs text-danger">{liveProblem}</p>}
+    </div>
+  );
+
   return (
     <div className={clsx(props.tight && "relative")}>
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
@@ -4352,9 +4471,6 @@ export function RoofDesigner(props: {
           tools={
             props.tight ? (
               <>
-                <Leg label="Comment (C)" on={tool === "comment"} onClick={() => pickTool(tool === "comment" ? "select" : "comment")}>
-                  <MessageCircle className="size-5" aria-hidden />
-                </Leg>
                 {!costsHidden && (
                   <Leg label="Design it for me" on={mineIntro || mine === "busy"} onClick={() => setMineIntro(!mineIntro)}>
                     <WandSparkles className={clsx("size-5", mine === "busy" && "animate-pulse")} aria-hidden />
@@ -4366,6 +4482,12 @@ export function RoofDesigner(props: {
                 <Leg label="Guide line (G)" on={tool === "rule"} onClick={() => pickTool(tool === "rule" ? "select" : "rule")}>
                   <Ruler className="size-5" aria-hidden />
                 </Leg>
+                <Leg label="Comment (C)" on={tool === "comment"} onClick={() => pickTool(tool === "comment" ? "select" : "comment")}>
+                  <MessageCircle className="size-5" aria-hidden />
+                </Leg>
+                <Leg label="Add a label (L)" on={tool === "label"} onClick={() => pickTool(tool === "label" ? "select" : "label")}>
+                  <Tag className="size-5" aria-hidden />
+                </Leg>
                 <Leg label="Undo (Ctrl+Z)" onClick={undo}>
                   <Undo2 className="size-5" aria-hidden />
                 </Leg>
@@ -4375,32 +4497,38 @@ export function RoofDesigner(props: {
                 <Leg label="Whole picture" onClick={() => setView(WHOLE)}>
                   <Maximize className="size-5" aria-hidden />
                 </Leg>
-                <Leg label="Add a label (L)" on={tool === "label"} onClick={() => pickTool(tool === "label" ? "select" : "label")}>
-                  <Tag className="size-5" aria-hidden />
-                </Leg>
               </>
             ) : undefined
           }
           tight={props.tight}
           hold={readyOpen || (menu === "designs" && !props.tight) || liveOpen || ((sending || noDealOpen) && !props.tight)}
+          panel={
+            props.tight && readyOpen
+              ? { title: "Ready to install", body: readyBox, back: () => setReadyOpen(false) }
+              : props.tight && liveOpen
+                ? { title: "Share live", body: liveBox, back: () => setLiveOpen(false) }
+                : undefined
+          }
           unsaved={saved !== "saved" && saved !== "saving"}
           waiting={props.waiting ?? 0}
         >
           {props.bar}
-          <dl
-            className={clsx(
-              "min-w-0 flex-1 basis-56 items-center gap-x-6 overflow-hidden border-line lg:border-l lg:pl-5",
-              props.tight ? "sr-only" : "flex",
-            )}
-          >
-            <div className="min-w-0 flex-1">
-              <dt className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">Address</dt>
-              <dd className="truncate text-sm">
-                <h1>{props.address}</h1>
-              </dd>
-            </div>
-          </dl>
-          <span className={clsx("whitespace-nowrap text-xs text-muted", props.tight && "sr-only")} role="status">
+          {!props.tight && (
+            <dl
+              className={clsx(
+                "min-w-0 flex-1 basis-56 items-center gap-x-6 overflow-hidden border-line lg:border-l lg:pl-5",
+                props.tight ? "sr-only" : "flex",
+              )}
+            >
+              <div className="min-w-0 flex-1">
+                <dt className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted">Address</dt>
+                <dd className="truncate text-sm">
+                  <h1>{props.address}</h1>
+                </dd>
+              </div>
+            </dl>
+          )}
+          <span className={clsx("whitespace-nowrap text-xs text-muted", props.tight && "hidden")} role="status">
             {saved === "saved"
               ? (props.savedLabel ?? "Saved")
               : saved === "saving"
@@ -4504,45 +4632,7 @@ export function RoofDesigner(props: {
                 </>
               )}
             </button>
-            {readyOpen && (
-              <div
-                className={clsx(
-                  "absolute z-50 w-[24rem] max-w-[85vw] rounded-lg bg-surface p-3 shadow-lift ring-1 ring-line",
-                  props.tight ? "left-full top-0 ml-2" : "right-0 top-full mt-2",
-                )}
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Ready to install</p>
-                <ul className="mt-2 space-y-1.5">
-                  {ready.map((item) => (
-                    <li key={item.id} className="flex items-start gap-2 text-[13px]">
-                      <span
-                        className={clsx(
-                          "mt-1 size-2 shrink-0 rounded-full",
-                          item.state === "pass" ? "bg-positive" : item.state === "fix" ? "bg-danger" : "bg-sun-line",
-                        )}
-                        aria-label={item.state === "pass" ? "Passes" : item.state === "fix" ? "To fix" : "To check"}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="font-medium text-ink">{item.label}</span>{" "}
-                        <span className={item.state === "pass" ? "text-muted" : "text-ink-2"}>{item.words}</span>
-                      </span>
-                      {item.goTo && item.state !== "pass" && (
-                        <button
-                          type="button"
-                          onClick={() => goTo(item.goTo)}
-                          className="shrink-0 text-xs font-semibold text-ink underline underline-offset-2"
-                        >
-                          Fix
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-2.5 text-[11px] leading-snug text-muted">
-                  A guide, not a site inspection: the installer&apos;s own design check and the network&apos;s approval still apply.
-                </p>
-              </div>
-            )}
+            {readyOpen && !props.tight && readyBox}
           </div>
           {/* The open design as the primary in one press (8 Nov 2026, Martin): the one priced on the deal and sent first. */}
           {designs.length > 1 && (
@@ -4607,65 +4697,7 @@ export function RoofDesigner(props: {
               <Radio className={clsx("size-4", live && "animate-pulse text-sun-line")} aria-hidden />
               {live ? (liveChoice !== null ? "Chosen" : "Live") : null}
             </button>
-            {liveOpen && (
-              <div
-                className={clsx(
-                  "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
-                  props.tight ? "left-full top-0 ml-2" : "right-0 top-12",
-                )}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-medium text-ink">Design it live with the customer</p>
-                  <button type="button" onClick={() => setLiveOpen(false)} aria-label="Close" className="text-muted hover:text-ink">
-                    <X className="size-4" aria-hidden />
-                  </button>
-                </div>
-                <p className="mt-0.5 text-xs text-muted">
-                  Send them this link during the call. They see every design on this roof as you draw it, with the price after STCs and the
-                  saving, can switch between them, and tell you which they&apos;d like. Nothing else of yours is shown. It closes after a
-                  few hours, or when you end it.
-                </p>
-                {live ? (
-                  <>
-                    <div className="mt-3 flex gap-2">
-                      <input
-                        readOnly
-                        value={liveLink(live.token)}
-                        onFocus={(e) => e.currentTarget.select()}
-                        className="min-w-0 flex-1 rounded-md bg-surface-2 px-2.5 py-2 text-xs text-ink ring-1 ring-line"
-                        aria-label="The customer's live link"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void copyLive()}
-                        className="rounded-md bg-primary px-3 text-xs font-medium text-primary-ink hover:bg-forest"
-                      >
-                        {liveCopied ? "Copied" : "Copy"}
-                      </button>
-                    </div>
-                    <p className="mt-3 inline-flex items-center gap-2 text-sm text-ink">
-                      <span className={clsx("size-2 rounded-full", live.seenAt ? "bg-positive" : "bg-line")} aria-hidden />
-                      {liveWords}
-                    </p>
-                    {costsHidden && (
-                      <p className="mt-1 text-xs text-muted">Prices aren&apos;t shown: you don&apos;t see costs on this account.</p>
-                    )}
-                    <div className="mt-3 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => void stopLive()}
-                        className="text-xs text-ink-2 underline-offset-2 hover:underline"
-                      >
-                        End the live link
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <p className="mt-3 text-sm text-ink-2">{liveProblem ?? "Opening a link…"}</p>
-                )}
-                {live && liveProblem && <p className="mt-2 text-xs text-danger">{liveProblem}</p>}
-              </div>
-            )}
+            {liveOpen && !props.tight && liveBox}
           </div>
           {/* The customer's chat (as Primero's): a round that lights orange with a count while they wait, opening the Proposal view. */}
           {props.jobId && (
