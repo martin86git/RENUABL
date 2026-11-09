@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dailyFromBill, quickSize, sumOf, sumWords } from "./quick-size";
+import { BACKUP_MODULE_KWH, dailyFromBill, openingAdvice, quickSize, sizeFromKw, sumOf, sumWords } from "./quick-size";
 
 describe("the quick sizing calculator", () => {
   it("reads a day's use from a bill, less the supply charge", () => {
@@ -59,5 +59,41 @@ describe("sums in the calculator", () => {
 
   it("writes an answer to read", () => {
     expect(sumWords(1234567.891234)).toBe("1,234,567.8912");
+  });
+});
+
+describe("sizeFromKw", () => {
+  it("takes the solar's kW to panels and an inverter", () => {
+    const s = sizeFromKw({ kw: 6.6, battery: "none", phase: "single" })!;
+    expect(s.panels).toBe(14);
+    expect(s.hybrid).toBe(false);
+    expect(s.batteryKwh).toBeNull();
+    expect(s.notes.some((n) => n.includes("single phase"))).toBe(true);
+  });
+  it("sizes the battery to what a winter day's spare fills, and adds a module for backup", () => {
+    const plain = sizeFromKw({ kw: 10, battery: "solar", phase: "three" })!;
+    expect(plain.hybrid).toBe(true);
+    expect(plain.batteryKwh).toBe(Math.max(5, Math.ceil(plain.winterSpareKwh / 0.9)));
+    const backup = sizeFromKw({ kw: 10, battery: "backup", phase: "three" })!;
+    expect(backup.batteryKwh).toBe(plain.batteryKwh! + BACKUP_MODULE_KWH);
+    expect(backup.backupKwh).toBe(BACKUP_MODULE_KWH);
+  });
+  it("keeps the battery to the evenings when the use is known", () => {
+    const s = sizeFromKw({ kw: 15, battery: "solar", phase: "three", kwhPerDay: 10 })!;
+    expect(s.batteryKwh).toBe(Math.ceil(6 / 0.9));
+    expect(s.yearShare).toBe(100);
+  });
+  it("is nothing without a size", () => expect(sizeFromKw({ kw: 0, battery: "none", phase: "single" })).toBeNull());
+});
+
+describe("openingAdvice", () => {
+  it("leads with a battery when the evenings are worth storing", () => {
+    const a = openingAdvice(quickSize({ kwhPerDay: 20 })!);
+    expect(a.lead).toBe("battery");
+    expect(a.headline).toContain("battery");
+    expect(a.why).toHaveLength(3);
+  });
+  it("leads with solar alone for small evenings", () => {
+    expect(openingAdvice(quickSize({ kwhPerDay: 6 })!).lead).toBe("solar");
   });
 });

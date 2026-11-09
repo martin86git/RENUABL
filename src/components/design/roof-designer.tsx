@@ -59,6 +59,7 @@ import {
   ZoomIn,
   ZoomOut,
   type LucideIcon,
+  Calculator,
 } from "lucide-react";
 import { DESIGN_TEMPERATURES, HOT_CELL, checkString, type StringCheck } from "@/lib/domain/design/electrical";
 import type { CatalogueBattery, CatalogueCharger, CatalogueInverter, CataloguePanel } from "@/lib/domain/design/catalogue";
@@ -105,7 +106,9 @@ import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
-import { billFieldsFromPhoto, billWith, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
+import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
+import { openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
+import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
 import { CaptureButtons } from "@/components/ui/capture";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
 import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
@@ -169,6 +172,7 @@ import {
   type PanelSpec,
   type PanelString,
   type Point,
+  type DesignGoal,
   type RoofDesign,
 } from "@/lib/domain/design/roof-design";
 
@@ -1027,8 +1031,9 @@ export function RoofDesigner(props: {
   };
   const solLooked = useRef(false);
   const billTouched = useRef(false);
-  const askSol = async () => {
-    if (!props.jobId) return;
+  /** Sol looks through the deal's file for what the home uses; answers with what he found (null when nothing). */
+  const askSol = async (): Promise<{ fields: typeof bill; notes: string[] } | null> => {
+    if (!props.jobId) return null;
     solLooked.current = true;
     billTouched.current = false;
     setUsageRead({ busy: true, notes: [] });
@@ -1049,10 +1054,12 @@ export function RoofDesigner(props: {
           busy: false,
           notes: kept ? ["You changed the box while Sol looked, so yours are kept.", ...(j.notes ?? [])] : (j.notes ?? []),
         });
+        return { fields: j.fields, notes: j.notes ?? [] };
       } else setUsageRead({ busy: false, notes: [], error: j.message ?? "Sol couldn't find it." });
     } catch {
       setUsageRead({ busy: false, notes: [], error: "We couldn't reach the server." });
     }
+    return null;
   };
   // Each design's quote settings and hand changes, in the designs' order.
   // The home (phase, storeys, roof) and the costs decided on each job are the same on every design: brought into line with
@@ -3446,7 +3453,7 @@ export function RoofDesigner(props: {
   /** What was kept clear of, said with a design laid by rule. */
   const checkNotes = (check: RoofCheck | null) =>
     check ? [...(hasSolar(check.things) ? [HAS_SOLAR_NOTE] : []), ...[keptClearWords(check.things)].filter((w): w is string => !!w)] : [];
-  const designForMe = async (auto = false) => {
+  const designForMe = async (auto = false, goal: DesignGoal = "return") => {
     setMineIntro(false);
     setMine("busy");
     const check = await checkRoof();
@@ -3515,7 +3522,7 @@ export function RoofDesigner(props: {
     const list = result.options.map((o) => o.design);
     const lead = Math.max(
       0,
-      result.options.findIndex((o) => o.key === "return"),
+      result.options.findIndex((o) => o.key === goal),
     );
     setQuotes(list.map(() => withHomeOf(quoteNow, { form: quoteNow.form, edits: {} })));
     setPrimary(lead);
@@ -3557,20 +3564,55 @@ export function RoofDesigner(props: {
     // Only when the bill changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [billKey]);
-  // The roof designs itself as it opens (1 Nov 2026, Martin: land on a finished first design, not a blank roof): once,
-  // only when nothing has been drawn on any of the roof's designs, and only for someone who sees costs (it prices them).
+  /**
+   * Sol speaks first as a blank roof opens (9 Nov 2026, Martin: "Sol should immediately be proactive and ask what you
+   * want to achieve, or tell you he's read the customer's consumption from the notes and recommends solar + battery,
+   * the size and why"; it replaced the roof designing itself unasked, 1 Nov 2026). With the home's use in the bill box,
+   * or found in the deal's file, he recommends a system and says why (`openingAdvice`); without it he asks what it
+   * should achieve. Nothing is laid until a press. Once, only when nothing is drawn on any of the roof's designs, and
+   * only for someone who sees costs (the designs are priced).
+   */
   const autoDesigned = useRef(false);
+  const [opening, setOpening] = useState<Opening | null>(null);
+  const [calcOpen, setCalcOpen] = useState(false);
+  const firstName = props.customerName?.trim().split(/s+/)[0];
+  const adviceFrom = (fields: typeof bill, found: string[]): Opening | null => {
+    const daily = dailyFromBillFields(fields);
+    const size = daily ? quickSize({ kwhPerDay: daily }) : null;
+    return size ? { kind: "advice", advice: openingAdvice(size), found, ...(firstName ? { customer: firstName } : {}) } : null;
+  };
   useEffect(() => {
     if (autoDesigned.current || costsHidden) return;
     if (!props.set.designs.every((d) => !d.faces.length && !(d.loose ?? []).length)) return;
     const t = window.setTimeout(() => {
       autoDesigned.current = true;
-      void designForMe(true);
+      const who = firstName ? { customer: firstName } : {};
+      const known = adviceFrom(bill, []);
+      if (known) return setOpening(known);
+      if (!props.jobId) return setOpening({ kind: "ask", ...who });
+      setOpening({ kind: "looking", ...who });
+      void askSol().then((got) => {
+        const advice = got ? adviceFrom(got.fields, got.notes) : null;
+        setOpening((now) =>
+          now?.kind !== "looking"
+            ? now
+            : (advice ?? {
+                kind: "ask",
+                ...who,
+                note: "I couldn't find what the home uses in the notes: add the bill for a recommendation.",
+              }),
+        );
+      });
     }, 400);
     return () => window.clearTimeout(t);
     // Once, as the roof opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /** A press on Sol's opening: the three designs made, the one asked for in front. */
+  const designForGoal = (goal: DesignGoal) => {
+    setOpening(null);
+    void designForMe(false, goal);
+  };
   const suggestions = suggesting
     ? suggestInverters({
         arrayKw: summary.kw,
@@ -3745,7 +3787,8 @@ export function RoofDesigner(props: {
   // A whole system asked for at once ("load 8 kW of panels, an inverter and a battery", 3 Nov 2026, Martin): the panels go
   // down first, then on the next render, with the design's kW and output known, the inverter and the battery are chosen:
   // by name when named, else by the same rules as "Suggest one" and "Recommended for this home".
-  const systemAsk = useRef<{ inverter?: string; battery?: string } | null>(null);
+  // From the calculator, the battery's size wanted (kWh, stacked to it) and whether a module is held for blackouts.
+  const systemAsk = useRef<{ inverter?: string; battery?: string; batteryKwh?: number; backup?: boolean } | null>(null);
   const [systemTick, setSystemTick] = useState(0);
   // What the inverter and battery step chose, said after the panels' line (it lands after the reply is set).
   const [systemWords, setSystemWords] = useState("");
@@ -3806,6 +3849,9 @@ export function RoofDesigner(props: {
           eveningShare: DAY.eveningShare,
         }).suggestions[0];
         pick = idea ? { battery: idea.battery, qty: idea.qty } : null;
+        // A size asked for (the calculator): the same battery, stacked to it.
+        if (pick && ask.batteryKwh && pick.battery.kwh > 0)
+          pick = { ...pick, qty: Math.max(1, Math.round(ask.batteryKwh / pick.battery.kwh)) };
         if (!idea) words.push("no battery on your lists suits this home");
       }
       if (pick) {
@@ -3814,12 +3860,14 @@ export function RoofDesigner(props: {
           name: pick.battery.name,
           kwh: pick.battery.kwh,
           qty: pick.qty,
+          ...(ask.backup ? { backup: true } : {}),
           x: battery?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
           y: battery?.y ?? cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
         });
         words.push(
           `${pick.qty > 1 ? `${pick.qty} × ` : ""}${pick.battery.name} (${Math.round(pick.battery.kwh * pick.qty * 10) / 10} kWh)`,
         );
+        if (ask.backup) words.push("one module held for blackouts");
       }
     }
     changed();
@@ -3839,6 +3887,9 @@ export function RoofDesigner(props: {
     keysOpen ||
     mineIntro ||
     arraysOpen ||
+    // Sol's opening while he isn't still looking, and his calculator.
+    (opening !== null && opening.kind !== "looking") ||
+    calcOpen ||
     tool === "string";
   useEffect(() => {
     if (!anyBox) return;
@@ -3855,6 +3906,8 @@ export function RoofDesigner(props: {
       setKeysOpen(false);
       setMineIntro(false);
       setArraysOpen(false);
+      if (opening?.kind !== "looking") setOpening(null);
+      setCalcOpen(false);
       // Stringing goes on while the roof is pressed (a press off the panels there puts it down already).
       if (tool === "string" && !onRoof) pickTool("select");
     };
@@ -4066,6 +4119,32 @@ export function RoofDesigner(props: {
         return "";
       case "answer":
         return command.words;
+    }
+  };
+  /**
+   * The calculator's Design this: that much solar laid on the roof, then the inverter and a battery of about the size
+   * worked out (with the module held for blackouts), as Ask Sol's "load 8 kW PV + a battery" does.
+   */
+  const designFromCalc = async (size: KwSize, choice: BatteryChoice, phase: "single" | "three") => {
+    setCalcOpen(false);
+    setOpening(null);
+    setCommandBusy(true);
+    try {
+      if (phase !== quoteNow.form.phase) await runCommand({ do: "phase", phase });
+      if (choice === "none" && battery) await runCommand({ do: "noBattery" });
+      const done = await fillTo(size.kw);
+      if (done.laid) {
+        systemAsk.current = {
+          inverter: "",
+          ...(choice !== "none"
+            ? { battery: "", ...(size.batteryKwh ? { batteryKwh: size.batteryKwh } : {}), backup: choice === "backup" }
+            : {}),
+        };
+        setSystemTick((n) => n + 1);
+      }
+      setCommandReply(done.words.replace(" Strings cleared: string them again.", ""));
+    } finally {
+      setCommandBusy(false);
     }
   };
   const sendCommand = async (raw: string) => {
@@ -5331,11 +5410,30 @@ export function RoofDesigner(props: {
               )}
               {/* In the pop-up the box and Sol's answer are one black panel growing out of the Ask Sol pill (9 Nov 2026,
                   Martin: it should physically connect to Sol below, and stay black): its foot runs behind the pill. */}
-              {props.tight && (commandOpen || commandReply) && (
+              {props.tight && (commandOpen || commandReply || opening || calcOpen) && (
                 <div
                   className="absolute bottom-[3.5rem] left-1/2 z-50 flex w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2 rounded-[28px] bg-primary px-2.5 pb-[2.6rem] pt-2.5 text-white shadow-[0_18px_50px_rgba(11,11,12,0.4)] ring-1 ring-white/10 transition duration-200 ease-out starting:translate-y-3 starting:opacity-0 motion-reduce:transition-none"
                   data-popup
                 >
+                  {calcOpen ? (
+                    <SolCalculator
+                      kwhPerDay={dailyFromBillFields(bill)}
+                      phase={quoteNow.form.phase === "three" ? "three" : "single"}
+                      {...(summary.kw > 0 ? { startKw: Math.round(summary.kw * 10) / 10 } : {})}
+                      onDesign={(size, choice, phase) => void designFromCalc(size, choice, phase)}
+                      onClose={() => setCalcOpen(false)}
+                    />
+                  ) : (
+                    opening && (
+                      <SolOpening
+                        opening={opening}
+                        onLead={(lead) => designForGoal(lead === "battery" ? "return" : "payback")}
+                        onGoal={designForGoal}
+                        onCalc={() => setCalcOpen(true)}
+                        onClose={() => setOpening(null)}
+                      />
+                    )
+                  )}
                   {commandReply && (
                     <div className="flex items-start gap-2.5 px-2.5 pt-1.5" role="status">
                       <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
@@ -5377,6 +5475,19 @@ export function RoofDesigner(props: {
                         aria-label="Tell Sol what to change in the design, or ask him about it"
                         className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-white outline-none placeholder:text-white/45"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setCalcOpen((o) => !o)}
+                        aria-label="Size a system: the calculator"
+                        title="Size a system: PV kW, a battery or backup"
+                        aria-pressed={calcOpen}
+                        className={clsx(
+                          "flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-white/10 hover:text-white",
+                          calcOpen ? "text-sun-line" : "text-white/70",
+                        )}
+                      >
+                        <Calculator className="size-4" aria-hidden />
+                      </button>
                       <span className="inline-flex [&_button:hover]:bg-white/10 [&_button:hover]:text-white [&_button]:text-white/70">
                         <DictateButton
                           onWords={(words) => void sendCommand(words)}
@@ -5406,6 +5517,30 @@ export function RoofDesigner(props: {
                   )}
                 </div>
               )}
+              {!props.tight && (opening || calcOpen) && (
+                <div
+                  className="absolute left-1/2 top-[4.5rem] z-50 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 rounded-[28px] bg-primary px-2.5 pb-3 pt-2.5 text-white shadow-[0_18px_50px_rgba(11,11,12,0.4)] ring-1 ring-white/10"
+                  data-popup
+                >
+                  {calcOpen ? (
+                    <SolCalculator
+                      kwhPerDay={dailyFromBillFields(bill)}
+                      phase={quoteNow.form.phase === "three" ? "three" : "single"}
+                      {...(summary.kw > 0 ? { startKw: Math.round(summary.kw * 10) / 10 } : {})}
+                      onDesign={(size, choice, phase) => void designFromCalc(size, choice, phase)}
+                      onClose={() => setCalcOpen(false)}
+                    />
+                  ) : (
+                    opening && (
+                      <SolOpening
+                        opening={opening}
+                        onLead={(lead) => designForGoal(lead === "battery" ? "return" : "payback")}
+                        onGoal={designForGoal}
+                        onCalc={() => setCalcOpen(true)}
+                        onClose={() => setOpening(null)}
+                      />
+                    )
+                  )}
               {commandOpen && !props.tight && (
                 <div
                   className={clsx(
@@ -8072,7 +8207,7 @@ export function RoofDesigner(props: {
                 className={clsx(
                   "pointer-events-none absolute inset-x-2 bottom-7 flex items-end gap-2",
                   // Over Sol's black panel while it is out, so the pill stands at its foot as one piece.
-                  props.tight && (commandOpen || commandReply) ? "z-[55]" : "z-10",
+                  props.tight && (commandOpen || commandReply || opening || calcOpen) ? "z-[55]" : "z-10",
                 )}
               >
                 {/* In the pop-up the foot of the picture is Sol alone (8 Nov 2026, Martin): ask him to change the design. */}

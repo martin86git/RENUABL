@@ -45,6 +45,13 @@ export function usageFromAmount(bill: BillFields): number | null {
   return use > 0 ? Math.round(use) : null;
 }
 
+/** What the home uses a day in kWh, from the bill box (its kWh, else its dollars at the rate), or null. */
+export function dailyFromBillFields(bill: BillFields): number | null {
+  const span = BILL_INTERVALS[bill.interval];
+  const kwh = num(bill.usage) || usageFromAmount(bill) || 0;
+  return kwh && span ? Math.round((kwh / span) * 10) / 10 : null;
+}
+
 /** What Sol found about the home's use in the customer's file (notes, emails, calls, the chat). */
 export interface FileUsageRead {
   found: boolean;

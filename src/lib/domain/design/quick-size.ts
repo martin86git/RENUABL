@@ -169,3 +169,129 @@ export function sumOf(text: string): number | null {
 
 /** A sum's answer as people read it: up to 4 decimal places, grouped thousands. */
 export const sumWords = (n: number) => n.toLocaleString("en-AU", { maximumFractionDigits: 4 });
+
+/**
+ * A system from its size (9 Nov 2026, Martin: "a calculator that would emerge out of Sol, with input fields: PV kW,
+ * battery yes / no, size the battery or allow for backup, whatever fields are needed to design a system"). The solar's
+ * kW in; the panels, inverter and battery it takes out, by the same rules of thumb. Never a design.
+ */
+export type BatteryChoice = "none" | "solar" | "backup";
+
+export const BATTERY_CHOICES: { id: BatteryChoice; label: string; detail: string }[] = [
+  { id: "none", label: "No battery", detail: "Solar only" },
+  { id: "solar", label: "Battery", detail: "Sized to what the solar can fill" },
+  { id: "backup", label: "With backup", detail: "One module more held for blackouts" },
+];
+
+/** One battery module held back for blackouts (the 8 kWh modules most stackable batteries come in; VERIFY per battery). */
+export const BACKUP_MODULE_KWH = 8;
+/** The most solar a single-phase home exports without the network's approval or export limiting (VERIFY per network). */
+export const SINGLE_PHASE_KW = 5;
+
+export interface KwInput {
+  kw: number;
+  battery: BatteryChoice;
+  phase: "single" | "three";
+  /** The home's use a day, when known: the battery is then never larger than its evenings. */
+  kwhPerDay?: number | null;
+  panelWatts?: number;
+}
+
+export interface KwSize {
+  kw: number;
+  panels: number;
+  inverterKw: number;
+  hybrid: boolean;
+  /** What the solar makes on an average day and in a year, kWh. */
+  dayKwh: number;
+  yearKwh: number;
+  /** What a winter day's spare could put into a battery, kWh. */
+  winterSpareKwh: number;
+  /** The battery to fit, kWh (nominal), with the part of it held for blackouts; null without one. */
+  batteryKwh: number | null;
+  backupKwh: number | null;
+  /** The share of a year's use the solar makes, when the use is known (never over 100). */
+  yearShare: number | null;
+  /** Things to know: export limits, a battery capped by the evenings. */
+  notes: string[];
+}
+
+export function sizeFromKw(input: KwInput): KwSize | null {
+  if (!(input.kw > 0)) return null;
+  const watts = input.panelWatts && input.panelWatts > 100 ? input.panelWatts : QUICK_DEFAULTS.panelWatts;
+  const panels = panelsFor(Math.min(input.kw, MAX_QUICK_KW), watts);
+  const kw = round1((panels * watts) / 1000);
+  const hybrid = input.battery !== "none";
+  const sun = ASSUMPTIONS.dailyYieldKwhPerKw;
+  const dayKwh = round1(kw * sun);
+  const winterSpareKwh = round1(kw * sun * ASSUMPTIONS.winterSunShare * (1 - ASSUMPTIONS.baseSelfConsumption));
+  const notes: string[] = [];
+  let batteryKwh: number | null = null;
+  let backupKwh: number | null = null;
+  if (hybrid) {
+    const evening = input.kwhPerDay && input.kwhPerDay > 0 ? input.kwhPerDay * ASSUMPTIONS.eveningShare : null;
+    const fill = evening !== null ? Math.min(winterSpareKwh, evening) : winterSpareKwh;
+    if (evening !== null && evening < winterSpareKwh)
+      notes.push(`Kept to their evenings (about ${round1(evening)} kWh after dark): more wouldn't be used.`);
+    batteryKwh = Math.max(5, Math.ceil(fill / ASSUMPTIONS.batteryUsableShare));
+    if (input.battery === "backup") {
+      backupKwh = BACKUP_MODULE_KWH;
+      batteryKwh += BACKUP_MODULE_KWH;
+    }
+  }
+  if (input.kw > MAX_QUICK_KW) notes.push(`Kept to ${MAX_QUICK_KW} kW here: worth a proper look in the designer.`);
+  if (input.phase === "single" && kw > SINGLE_PHASE_KW)
+    notes.push(`Over ${SINGLE_PHASE_KW} kW on single phase: the network's pre-approval or export limiting is likely needed.`);
+  const use = input.kwhPerDay && input.kwhPerDay > 0 ? input.kwhPerDay * 365 : null;
+  return {
+    kw,
+    panels,
+    inverterKw: inverterFor(kw, hybrid ? 1.5 : 1.33),
+    hybrid,
+    dayKwh,
+    yearKwh: Math.round(dayKwh * 365),
+    winterSpareKwh,
+    batteryKwh,
+    backupKwh,
+    yearShare: use ? Math.min(100, Math.round((dayKwh * 365 * 100) / use)) : null,
+    notes,
+  };
+}
+
+/** Below this many kWh after dark a battery is slow to pay its way, so Sol leads with solar alone. */
+export const EVENING_WORTH_STORING = 5;
+
+/**
+ * What Sol says as the designer opens on a home whose use he knows (9 Nov 2026, Martin: "tell you that it's read from
+ * the notes the customer's consumption and therefore recommends solar + battery and the size and why"): the system he'd
+ * lead with and the reasons, from `quickSize`. Plain words; every figure a rule of thumb.
+ */
+export interface OpeningAdvice {
+  lead: "battery" | "solar";
+  headline: string;
+  why: string[];
+}
+
+export function openingAdvice(size: QuickSize): OpeningAdvice {
+  const evening = size.withBattery.eveningKwh;
+  const day = `They use about ${size.kwhPerDay} kWh a day (${size.yearKwh.toLocaleString("en-AU")} kWh a year).`;
+  if (evening >= EVENING_WORTH_STORING)
+    return {
+      lead: "battery",
+      headline: `I'd go solar and a battery: about ${size.withBattery.kw} kW with a ${size.withBattery.batteryKwh} kWh battery.`,
+      why: [
+        day,
+        `About ${evening} kWh of that is after dark, which solar alone can't cover: the battery holds it.`,
+        `${size.withBattery.kw} kW leaves enough spare on a winter day to fill it; solar alone would be ${size.solar.kw} kW.`,
+      ],
+    };
+  return {
+    lead: "solar",
+    headline: `I'd start with solar alone: about ${size.solar.kw} kW.`,
+    why: [
+      day,
+      `Their evenings are small (about ${evening} kWh after dark), so a battery would be slow to pay its way.`,
+      `${size.solar.kw} kW makes about a year's use at Melbourne's average sunshine.`,
+    ],
+  };
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { billFieldsFromFile, billFieldsFromPhoto, billWith, nearestInterval, usageFromAmount } from "./design-bill";
+import { billFieldsFromFile, billFieldsFromPhoto, billWith, dailyFromBillFields, nearestInterval, usageFromAmount } from "./design-bill";
 import type { BillFields } from "./quote";
 
 const box: BillFields = { interval: "quarterly", amount: "", supplyPerDay: "1.00", rate: "0.30", feedIn: "0.05" };
@@ -72,5 +72,14 @@ describe("a bill photo into the bill box", () => {
     const r = billFieldsFromPhoto({ periodDays: 91, dailyUsageKwh: 10, usageRate: null, feedInRate: null, exportedDailyKwh: 6 }, box);
     expect(r.fields.rate).toBe(box.rate);
     expect(r.notes.join(" ")).toContain("solar on the roof");
+  });
+});
+
+describe("the day's use from the bill box", () => {
+  const base: BillFields = { interval: "quarterly", amount: "", supplyPerDay: "1", rate: "0.3", feedIn: "" };
+  it("reads the kWh, else the dollars at the rate", () => {
+    expect(dailyFromBillFields({ ...base, usage: "1825" })).toBe(20);
+    expect(dailyFromBillFields({ ...base, amount: String(Math.round(1825 * 0.3 + 365 / 4)) })).toBeCloseTo(20, 0);
+    expect(dailyFromBillFields(base)).toBeNull();
   });
 });
