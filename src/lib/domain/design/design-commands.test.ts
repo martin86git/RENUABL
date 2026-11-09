@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { PRICED_PER_KIND, allByQuery, batteryWords, pricesInWords, commandFrom, faces, parseCommand, pickByQuery } from "./design-commands";
+import {
+  PRICED_PER_KIND,
+  allByQuery,
+  batteryWords,
+  confirmWord,
+  deleteQuestion,
+  designNumberIn,
+  pricesInWords,
+  commandFrom,
+  faces,
+  parseCommand,
+  pickByQuery,
+} from "./design-commands";
 
 describe("reading a designer command at once", () => {
   it("reads a size, with a direction", () => {
@@ -213,5 +225,32 @@ describe("the design's prices for Sol", () => {
     const words = pricesInWords({ ...base, inverters: many });
     expect(words).toContain(`Inv ${PRICED_PER_KIND - 1} `);
     expect(words).not.toContain(`Inv ${PRICED_PER_KIND} `);
+  });
+});
+
+describe("deleting a design, asked first", () => {
+  it("reads which design is to go", () => {
+    expect(parseCommand("delete design 2")).toEqual({ do: "deleteDesign", which: 2 });
+    expect(parseCommand("get rid of the third design")).toEqual({ do: "deleteDesign", which: 3 });
+    expect(parseCommand("delete this design")).toEqual({ do: "deleteDesign" });
+    expect(designNumberIn("remove design #4")).toBe(4);
+  });
+  it("leaves taking panels off as it was", () => {
+    expect(parseCommand("delete the panels")).toEqual({ do: "removePanels" });
+  });
+  it("takes Sol's reading, and his design number only when it is one", () => {
+    expect(commandFrom({ do: "deleteDesign", design: 2, words: "Delete Design 2?" })).toEqual({ do: "deleteDesign", which: 2 });
+    expect(commandFrom({ do: "deleteDesign", design: null, words: "" })).toEqual({ do: "deleteDesign" });
+    expect(commandFrom({ do: "deleteDesign", design: 99, words: "" })).toEqual({ do: "deleteDesign" });
+  });
+  it("asks plainly, naming the design and that it can't be undone", () => {
+    expect(deleteQuestion(2, "Best return")).toBe(
+      "Delete Design 2 (Best return)? Its panels, kit and quote go with it, and it can't be undone.",
+    );
+  });
+  it("hears a Yes or a No, and nothing else as either", () => {
+    for (const y of ["yes", "Yes!", "yep", "confirm", "do it", "yes, delete it", "go ahead"]) expect(confirmWord(y)).toBe("yes");
+    for (const n of ["no", "nope", "cancel", "keep it", "don't"]) expect(confirmWord(n)).toBe("no");
+    for (const x of ["fit 8 kW", "yes but make it landscape", "now delete design 3"]) expect(confirmWord(x)).toBeNull();
   });
 });

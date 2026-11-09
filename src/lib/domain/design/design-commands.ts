@@ -38,6 +38,11 @@ export type DesignCommand =
   | { do: "relay" }
   /** The panels taken off the design (the picked ones, else all). */
   | { do: "removePanels" }
+  /**
+   * A whole design deleted from the roof (9 Nov 2026, Martin), by its number (1 is the first), or the one open when none
+   * is named. Never done straight away: the designer asks first (`deleteQuestion`) and only a Yes deletes it.
+   */
+  | { do: "deleteDesign"; which?: number }
   | { do: "undo" }
   | { do: "redo" }
   /**
@@ -111,6 +116,41 @@ function productAsked(text: string, kind: RegExp, refused?: RegExp): string | un
   return words;
 }
 
+const ORDINALS: Record<string, number> = {
+  first: 1,
+  second: 2,
+  third: 3,
+  fourth: 4,
+  fifth: 5,
+  sixth: 6,
+  seventh: 7,
+  eighth: 8,
+  ninth: 9,
+  tenth: 10,
+};
+
+/** The design a request names by number ("design 2", "the second design"); null for the one open. */
+export function designNumberIn(text: string): number | null {
+  const t = text.toLowerCase();
+  const n = t.match(/\bdesigns?\s*(?:no\.?|number|#)?\s*(\d{1,2})\b/) ?? t.match(/#(\d{1,2})\b/);
+  if (n) return Number(n[1]) || null;
+  const word = t.match(/\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\b/);
+  return word ? ORDINALS[word[1]] : null;
+}
+
+/** What the designer asks before a design is deleted: which one, and that it can't be undone. */
+export function deleteQuestion(number: number, label?: string): string {
+  return `Delete Design ${number}${label ? ` (${label})` : ""}? Its panels, kit and quote go with it, and it can't be undone.`;
+}
+
+/** A Yes or a No typed or said to a question waiting for one; null for anything else. */
+export function confirmWord(raw: string): "yes" | "no" | null {
+  const t = raw.trim().toLowerCase();
+  if (/^(y|yes|yep|yeah|yup|sure|ok|okay|confirm(ed)?|do it|go ahead|delete it|yes,? delete it|please do)\b[.!]*$/.test(t)) return "yes";
+  if (/^(n|no|nope|nah|cancel|stop|keep it|don'?t|do not|leave it)\b/.test(t)) return "no";
+  return null;
+}
+
 /** A command read from common phrasings, or null for Sol to read. */
 export function parseCommand(raw: string): DesignCommand | null {
   const text = raw.trim();
@@ -146,6 +186,11 @@ export function parseCommand(raw: string): DesignCommand | null {
     )
   )
     return { do: "relay" };
+  // A whole design deleted ("delete design 2", "get rid of this design"): asked about before it is done.
+  if (/\b(delete|remove|bin|discard|get rid of|scrap|throw away)\b/.test(t) && /\bdesigns?\b/.test(t) && !/\bpanels?\b/.test(t)) {
+    const which = designNumberIn(t);
+    return { do: "deleteDesign", ...(which ? { which } : {}) };
+  }
   // Taking panels away (8 Nov 2026, Martin: he asked, and Sol only said he had).
   if (
     /\b(delete|remove|clear|erase|take (?:off|away|out)|get rid of)\b/.test(t) &&
@@ -269,6 +314,7 @@ export const DESIGN_COMMAND_SCHEMA = {
         "rows",
         "relay",
         "removePanels",
+        "deleteDesign",
         "choose",
         "undo",
         "redo",
@@ -296,6 +342,10 @@ export const DESIGN_COMMAND_SCHEMA = {
     east: { type: ["number", "null"] as ("number" | "null")[], description: "For move: metres east (negative west)." },
     south: { type: ["number", "null"] as ("number" | "null")[], description: "For move: metres south (negative north)." },
     rows: { type: ["number", "null"] as ("number" | "null")[], description: "For rows: how many rows." },
+    design: {
+      type: ["number", "null"] as ("number" | "null")[],
+      description: "For deleteDesign: the design's number (1 is the first); null for the one open.",
+    },
     question: { type: ["string", "null"] as ("string" | "null")[], description: "For choose: the question, short." },
     options: {
       type: ["array", "null"] as ("array" | "null")[],
@@ -328,6 +378,7 @@ export const DESIGN_COMMAND_SCHEMA = {
     "east",
     "south",
     "rows",
+    "design",
     "question",
     "options",
     "phase",
@@ -408,6 +459,10 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
     case "relay":
     case "removePanels":
       return { do: read.do };
+    case "deleteDesign": {
+      const which = n(read.design);
+      return which !== null && which >= 1 && which <= 20 ? { do: "deleteDesign", which: Math.round(which) } : { do: "deleteDesign" };
+    }
     case "undo":
     case "redo":
       return { do: read.do };
@@ -447,6 +502,7 @@ export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roo
 - explainString: show the check for a string, by its letter; put the reason in words too, from the string checks above.
 - choose: when the request could fairly mean different things (which face, how many kW, portrait or landscape, which battery), don't guess: ask a short question with two or three options, each a label, a line on what it means and the request to carry out if chosen, written as the person would say it ("fit 10 kW on the north face"). Only when it is truly unclear.
 - removePanels: take the panels off (the picked ones, else all), when asked to delete, remove or clear them.
+- deleteDesign: delete a whole design from the roof when asked to, design being its number (1 is the first) or null for the one open. The designer asks the person to confirm before anything is deleted, so put the question in words ("Delete Design 2?"), never that it is done.
 - Never say you have changed something in words alone: only a change done above changes the design. If none of these does what is asked, say plainly that you can't do that yet, with "answer".
 - Always put one short sentence in words. Never invent a figure, product or price that isn't above. Nothing is sent to anyone.
 - For a question, answer from THE DESIGN: its PRICES part holds the price, what the system costs line by line, the saving and the payback, and what each product on the lists costs. Never say you can't see prices when that part is there: work the answer out from it (a cheaper inverter or battery, fewer panels, what a change does to the payback), naming the products and figures you used, two or three sentences at most. When it says prices are hidden for this person, say they can't be shown to them.`;

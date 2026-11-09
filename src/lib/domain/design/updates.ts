@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-09",
     area: "Designer",
+    words: "Ask Sol can delete a design for you. He asks first, and nothing goes until you say yes.",
+  },
+  {
+    day: "2026-11-09",
+    area: "Designer",
     words: "Design it for me looks for panels, vents and skylights already on the roof first, keeps clear of them and marks them.",
   },
   {
