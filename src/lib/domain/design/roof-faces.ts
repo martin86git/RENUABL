@@ -508,7 +508,7 @@ export function facesFromHeights(
 
   // A small face set inside another is part of it (10 Nov 2026, Martin: at 29 Shearer Drive the existing panels on the
   // west face, lying a few degrees flatter than the tiles, were read as a face of their own inside it).
-  for (const [g, set] of [...final].sort((p, q) => p[1].size - q[1].size)) {
+  for (const [, set] of [...final].sort((p, q) => p[1].size - q[1].size)) {
     if (!set.size || set.size * cellArea >= ROOF_FACES.enclosedMax) continue;
     const round = new Map<number, number>();
     let edge = 0;
