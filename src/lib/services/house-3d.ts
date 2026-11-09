@@ -40,23 +40,41 @@ async function tilesKey(recordKey: string): Promise<string> {
 /** Shows the home in 3D in `el`, looking at it from the south-west. Returns a clean-up function. */
 export async function showHouse3d(el: HTMLElement, at: { lat: number; lng: number }, recordKey: string): Promise<() => void> {
   const key = await tilesKey(recordKey);
-  return showTileset(el, at, `https://tile.googleapis.com/v1/3dtiles/root.json?key=${encodeURIComponent(key)}`, true);
+  return showTileset(el, at, `https://tile.googleapis.com/v1/3dtiles/root.json?key=${encodeURIComponent(key)}`, { credits: true });
 }
 
 /**
  * Nearmap's 3D model of a roof in `el` (9 Nov 2026, Martin), read through RENUABL's server so Nearmap's key never
  * reaches the browser (`/api/design/roof/mesh`). The day it was captured, and a clean-up function.
  */
-export async function showNearmapMesh(el: HTMLElement, at: { lat: number; lng: number }): Promise<{ captured: string; close: () => void }> {
+export async function showNearmapMesh(
+  el: HTMLElement,
+  at: { lat: number; lng: number },
+  /** Told while the model's detail is still coming in, and when it is all in. */
+  onLoading?: (loading: boolean) => void,
+): Promise<{ captured: string; close: () => void }> {
   const res = await fetch(`/api/design/roof/mesh?lat=${at.lat}&lng=${at.lng}`, { cache: "no-store" });
   const json = (await res.json().catch(() => ({}))) as { ok?: boolean; root?: string; captured?: string; message?: string };
   if (!json.ok || !json.root) throw new Error(json.message ?? "Nearmap has no 3D model of this roof.");
-  const close = await showTileset(el, at, json.root, false);
+  // Closer in, drawn continuously and with room for its textures (9 Nov 2026, Martin: it looked incomplete).
+  const close = await showTileset(el, at, json.root, { credits: false, near: true, continuous: true, roomy: true, onLoading });
   return { captured: json.captured ?? "", close };
 }
 
 /** A 3D Tiles model in `el`, looking at the point from the south-west, free to turn and zoom. */
-async function showTileset(el: HTMLElement, at: { lat: number; lng: number }, url: string, credits: boolean): Promise<() => void> {
+async function showTileset(
+  el: HTMLElement,
+  at: { lat: number; lng: number },
+  url: string,
+  opts: {
+    credits: boolean;
+    detail?: number;
+    near?: boolean;
+    continuous?: boolean;
+    roomy?: boolean;
+    onLoading?: (loading: boolean) => void;
+  },
+): Promise<() => void> {
   const Cesium = await loadCesium();
   const viewer = new Cesium.Viewer(el, {
     globe: false,
@@ -71,10 +89,28 @@ async function showTileset(el: HTMLElement, at: { lat: number; lng: number }, ur
     fullscreenButton: false,
     infoBox: false,
     selectionIndicator: false,
-    requestRenderMode: true,
+    // Nearmap's model draws continuously while open: its pieces are unpacked only on frames, and drawing on request
+    // left them half unpacked (a grey or starry view, 9 Nov 2026). Google's keeps to drawing on request.
+    requestRenderMode: !opts.continuous,
   });
-  const tileset = await Cesium.Cesium3DTileset.fromUrl(url, { showCreditsOnScreen: credits });
+  const tileset = await Cesium.Cesium3DTileset.fromUrl(url, {
+    showCreditsOnScreen: opts.credits,
+    ...(opts.detail ? { maximumScreenSpaceError: opts.detail } : {}),
+    // Nearmap's pieces carry large photo textures: past the usual memory budget Cesium falls back to its coarse pieces
+    // (a grey view, 9 Nov 2026, at 1.1 GB), so it gets more room before it does.
+    ...(opts.roomy ? { cacheBytes: 1_024 * 1_024 * 1_024, maximumCacheOverflowBytes: 512 * 1_024 * 1_024 } : {}),
+  });
+  if (opts.onLoading) {
+    const told = opts.onLoading;
+    told(true);
+    tileset.loadProgress.addEventListener((pending: number, processing: number) => told(pending + processing > 0));
+    tileset.allTilesLoaded.addEventListener(() => told(false));
+  }
   viewer.scene.primitives.add(tileset);
+  // Drawn again as each piece arrives: the viewer only draws when asked (to spare the battery), and a model streamed in
+  // otherwise stayed on its first, coarse pieces until it was moved (9 Nov 2026).
+  tileset.tileLoad.addEventListener(() => viewer.scene.requestRender());
+  tileset.allTilesLoaded.addEventListener(() => viewer.scene.requestRender());
   const point = Cesium.Cartographic.fromDegrees(at.lng, at.lat);
   // A Melbourne-ish ground height above the ellipsoid until the model gives the real one, seen from far enough back
   // that the house is in view either way.
@@ -88,7 +124,7 @@ async function showTileset(el: HTMLElement, at: { lat: number; lng: number }, ur
     viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
     viewer.scene.requestRender();
   };
-  look(140);
+  look(opts.near ? 110 : 140);
   // The real height, read off the model once its first tiles are in (9 Nov 2026: waiting on the most detailed sample
   // could hang with Nearmap's mesh, leaving the view on its loading line); the view is up meanwhile.
   const settle = () => {
@@ -96,11 +132,19 @@ async function showTileset(el: HTMLElement, at: { lat: number; lng: number }, ur
     const h = viewer.scene.sampleHeight(point);
     if (Number.isFinite(h)) {
       height = h;
-      look(65);
+      look(opts.near ? 45 : 65);
     }
   };
-  tileset.initialTilesLoaded.addEventListener(settle);
-  const late = window.setTimeout(settle, 8000);
+  // Only once the detail is in: the first pieces are coarse ones for the whole city, whose surface can sit tens of metres
+  // off the real roofs, and aiming at that put the camera inside them (a flat grey view, 9 Nov 2026).
+  let settled = false;
+  const settleOnce = () => {
+    if (settled) return;
+    settled = true;
+    settle();
+  };
+  tileset.allTilesLoaded.addEventListener(settleOnce);
+  const late = window.setTimeout(settleOnce, 30000);
   return () => {
     window.clearTimeout(late);
     if (!viewer.isDestroyed()) viewer.destroy();

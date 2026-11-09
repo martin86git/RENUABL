@@ -32,16 +32,27 @@ export function Mesh3dButton({ lat, lng }: { lat: number; lng: number }) {
 
 function Mesh3dWindow({ lat, lng, onClose }: { lat: number; lng: number; onClose: () => void }) {
   const el = useRef<HTMLDivElement>(null);
+  // The model's detail still coming in: said, so a half-loaded view isn't taken for the finished one.
+  const [filling, setFilling] = useState(true);
   const [state, setState] = useState<{ kind: "loading" } | { kind: "ready"; captured: string } | { kind: "failed"; words: string }>({
     kind: "loading",
   });
   useEffect(() => {
     if (!el.current) return;
+    // A container of its own for each viewer: set up twice (React does in development), two viewers sharing one place
+    // left a grey or empty view as the first one's clean-up took the second's with it.
+    const host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0";
+    el.current.appendChild(host);
     let close: (() => void) | undefined;
     let live = true;
-    showNearmapMesh(el.current, { lat, lng })
+    showNearmapMesh(host, { lat, lng }, (loading) => live && setFilling(loading))
       .then((got) => {
-        if (!live) return got.close();
+        if (!live) {
+          got.close();
+          host.remove();
+          return;
+        }
         close = got.close;
         setState({ kind: "ready", captured: got.captured });
       })
@@ -49,6 +60,7 @@ function Mesh3dWindow({ lat, lng, onClose }: { lat: number; lng: number; onClose
     return () => {
       live = false;
       close?.();
+      if (close) host.remove();
     };
   }, [lat, lng]);
   useEffect(() => {
@@ -85,6 +97,11 @@ function Mesh3dWindow({ lat, lng, onClose }: { lat: number; lng: number; onClose
             <span className="flex items-center gap-2">
               <Loader2 className="size-4 animate-spin" aria-hidden /> Loading Nearmap&apos;s 3D model
             </span>
+          </p>
+        )}
+        {state.kind === "ready" && filling && (
+          <p className="pointer-events-none absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/55 px-3 py-1.5 text-xs text-white/90 backdrop-blur">
+            <Loader2 className="size-3.5 animate-spin" aria-hidden /> Loading detail…
           </p>
         )}
         {state.kind === "failed" && (
