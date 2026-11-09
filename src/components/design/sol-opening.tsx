@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import clsx from "clsx";
-import { Calculator, X } from "lucide-react";
+import { Calculator, Moon, Sun, TriangleAlert, X } from "lucide-react";
 import {
   BATTERY_CHOICES,
   QUICK_DEFAULTS,
+  recommendKw,
   sizeFromKw,
   type BatteryChoice,
   type KwSize,
@@ -136,7 +137,7 @@ export function SolOpening({
 }
 
 const field =
-  "w-full rounded-xl bg-white/10 px-3 py-2 text-[15px] tabular-nums text-white ring-1 ring-white/15 placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-sun-line";
+  "h-12 w-full rounded-xl bg-white/10 px-3 text-[15px] tabular-nums text-white ring-1 ring-white/15 placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-sun-line";
 
 /**
  * The calculator that comes out of Sol (9 Nov 2026, Martin: "a calculator that would emerge out of Sol, with input
@@ -158,10 +159,13 @@ export function SolCalculator({
   onDesign: (size: KwSize, battery: BatteryChoice, phase: "single" | "three") => void;
   onClose: () => void;
 }) {
-  const [kw, setKw] = useState(startKw ? String(startKw) : "");
+  // Sol's pick follows the home's use and the battery until a kW is typed over it (10 Nov 2026, Martin).
+  const [typedKw, setTypedKw] = useState<string | null>(startKw ? String(startKw) : null);
   const [battery, setBattery] = useState<BatteryChoice>("solar");
   const [phase, setPhase] = useState(startPhase);
   const [use, setUse] = useState(kwhPerDay ? String(Math.round(kwhPerDay * 10) / 10) : "");
+  const pick = recommendKw(Number(use) || null, battery);
+  const kw = typedKw ?? (pick ? String(pick.kw) : "");
   const size = sizeFromKw({ kw: Number(kw) || 0, battery, phase, kwhPerDay: Number(use) || null });
   return (
     <div className="px-2.5 pt-1.5">
@@ -177,58 +181,52 @@ export function SolCalculator({
           <X className="size-3.5" aria-hidden />
         </button>
       </div>
-      <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_auto]">
-        <label className="block">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-white/50">PV</span>
-          <span className="relative mt-1 block">
-            <input
-              value={kw}
-              onChange={(e) => setKw(e.target.value)}
-              inputMode="decimal"
-              autoFocus
-              placeholder="8"
-              aria-label="Solar in kW"
-              className={clsx(field, "pr-9")}
-            />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-white/50">kW</span>
-          </span>
-        </label>
-        <label className="block">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-white/50">Home uses</span>
-          <span className="relative mt-1 block">
-            <input
-              value={use}
-              onChange={(e) => setUse(e.target.value)}
-              inputMode="decimal"
-              placeholder="optional"
-              aria-label="What the home uses a day, kWh"
-              className={clsx(field, "pr-16")}
-            />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-white/50">kWh/day</span>
-          </span>
-        </label>
-        <div className="col-span-2 sm:col-span-1">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-white/50">Phase</span>
-          <div role="radiogroup" aria-label="Phase" className="mt-1 flex rounded-xl bg-white/10 p-0.5 ring-1 ring-white/15">
-            {(["single", "three"] as const).map((p) => (
-              <button
-                key={p}
-                type="button"
-                role="radio"
-                aria-checked={phase === p}
-                onClick={() => setPhase(p)}
-                className={clsx(
-                  "h-9 flex-1 rounded-[10px] px-3 text-[13px] font-medium",
-                  phase === p ? "bg-white text-ink" : "text-white/70 hover:text-white",
-                )}
-              >
-                {p === "single" ? "Single" : "Three"}
-              </button>
-            ))}
-          </div>
+      {/* The six boxes on one grid of three (10 Nov 2026, Martin: symmetry and clarity). */}
+      <div className="mt-2.5 grid grid-cols-3 gap-2">
+        <Label>PV</Label>
+        <Label>Home uses</Label>
+        <Label>Phase</Label>
+        <span className="relative block">
+          <input
+            value={kw}
+            onChange={(e) => setTypedKw(e.target.value)}
+            onFocus={(e) => e.target.select()}
+            inputMode="decimal"
+            autoFocus
+            placeholder="8"
+            aria-label="Solar in kW"
+            className={clsx(field, "pr-9", typedKw === null && pick && "text-sun-line")}
+          />
+          <Unit>kW</Unit>
+        </span>
+        <span className="relative block">
+          <input
+            value={use}
+            onChange={(e) => setUse(e.target.value)}
+            inputMode="decimal"
+            placeholder="optional"
+            aria-label="What the home uses a day, kWh"
+            className={clsx(field, "pr-16")}
+          />
+          <Unit>kWh/day</Unit>
+        </span>
+        <div role="radiogroup" aria-label="Phase" className="flex h-12 rounded-xl bg-white/10 p-1 ring-1 ring-white/15">
+          {(["single", "three"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              role="radio"
+              aria-checked={phase === p}
+              onClick={() => setPhase(p)}
+              className={clsx(
+                "flex-1 rounded-[9px] text-[13px] font-medium",
+                phase === p ? "bg-white text-ink" : "text-white/70 hover:text-white",
+              )}
+            >
+              {p === "single" ? "Single" : "Three"}
+            </button>
+          ))}
         </div>
-      </div>
-      <div role="radiogroup" aria-label="Battery" className="mt-2 grid grid-cols-3 gap-1.5">
         {BATTERY_CHOICES.map((b) => (
           <button
             key={b.id}
@@ -237,41 +235,76 @@ export function SolCalculator({
             aria-checked={battery === b.id}
             onClick={() => setBattery(b.id)}
             className={clsx(
-              "rounded-xl px-2.5 py-1.5 text-left ring-1 transition-colors",
+              "h-12 rounded-xl px-3 text-left ring-1 transition-colors",
               battery === b.id ? "bg-white/15 ring-sun-line" : "ring-white/15 hover:bg-white/10",
             )}
           >
-            <span className="block text-[13px] font-medium text-white">{b.label}</span>
-            <span className="block text-[11px] leading-snug text-white/55">{b.detail}</span>
+            <span className="block truncate text-[13px] font-medium text-white">{b.label}</span>
+            <span className="block truncate text-[11px] text-white/55">{b.detail}</span>
           </button>
         ))}
       </div>
+      {pick &&
+        (typedKw === null ? (
+          <p className="mt-2.5 flex items-start gap-2 text-[12.5px] leading-snug text-white/75">
+            <SolIcon className="mt-0.5 size-3.5 shrink-0 text-sun-line" />
+            <span>
+              I&apos;d go <span className="font-mono text-sun-line">{pick.kw} kW</span>. {pick.why} Type over it to change it.
+            </span>
+          </p>
+        ) : (
+          Number(typedKw) !== pick.kw && (
+            <p className="mt-2.5 text-[12.5px] text-white/60">
+              Your size.{" "}
+              <button type="button" onClick={() => setTypedKw(null)} className="font-medium text-sun-line hover:underline">
+                Back to Sol&apos;s {pick.kw} kW
+              </button>
+            </p>
+          )
+        ))}
       {size ? (
-        <div className="mt-2.5 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10" aria-live="polite">
+        <div className="mt-2.5 rounded-2xl bg-white p-3 text-ink" aria-live="polite">
+          {/* The result, on its own light card so it reads as the answer. */}
           <div className="grid grid-cols-3 gap-2">
             <Figure label="Panels" big={`${size.panels}`} small={`${size.kw} kW · ${QUICK_DEFAULTS.panelWatts} W`} />
             <Figure label="Inverter" big={`${size.inverterKw} kW`} small={size.hybrid ? "Hybrid" : "String"} />
             <Figure
               label="Battery"
               big={size.batteryKwh ? `${size.batteryKwh} kWh` : "None"}
-              small={size.backupKwh ? `${size.backupKwh} kWh held for blackouts` : size.batteryKwh ? "Filled on a winter day" : "—"}
+              small={size.backupKwh ? `incl. ${size.backupKwh} for blackouts` : size.batteryKwh ? "Usable 90%" : "Solar only"}
               lit={Boolean(size.batteryKwh)}
             />
           </div>
-          <p className="mt-2 text-[12px] text-white/65">
-            Makes about <span className="font-mono text-white">{size.dayKwh}</span> kWh a day,{" "}
-            <span className="font-mono text-white">{size.yearKwh.toLocaleString("en-AU")}</span> a year
-            {size.yearShare !== null ? `: about ${size.yearShare}% of a year's use` : ""}.
-          </p>
-          {size.notes.map((n) => (
-            <p key={n} className="mt-1 text-[12px] text-sun-line">
-              {n}
-            </p>
-          ))}
-          <div className="mt-2.5 flex items-center justify-between gap-3">
-            <p className="text-[11px] leading-snug text-white/45">
-              Rules of thumb on Melbourne&apos;s average sunshine. The design firms it up.
-            </p>
+          <ul className="mt-3 space-y-2 border-t border-line pt-3 text-[12.5px] leading-snug">
+            <Point icon={<Sun className="size-3.5" aria-hidden />}>
+              <span className="font-mono">{size.dayKwh}</span> kWh a day
+              {size.yearShare !== null && (
+                <>
+                  <span className="text-muted"> · </span>
+                  <span className="font-mono">{size.yearShare}%</span> of their use
+                  <Bar share={size.yearShare} />
+                </>
+              )}
+            </Point>
+            {size.batteryKwh !== null && size.eveningKwh !== null && (
+              <Point icon={<Moon className="size-3.5" aria-hidden />}>
+                Covers the <span className="font-mono">{size.eveningKwh}</span> kWh they use after dark
+                {size.toEvenings && <span className="text-muted"> (bigger wouldn&apos;t be used)</span>}
+              </Point>
+            )}
+            {size.exportCheck && (
+              <Point icon={<TriangleAlert className="size-3.5" aria-hidden />} warn>
+                Over 5 kW single phase: network approval or an export limit
+              </Point>
+            )}
+            {size.overMax && (
+              <Point icon={<TriangleAlert className="size-3.5" aria-hidden />} warn>
+                Kept to 20 kW here: design it to see more
+              </Point>
+            )}
+          </ul>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <p className="text-[11px] leading-snug text-muted">Rules of thumb, Melbourne&apos;s average sun.</p>
             <button
               type="button"
               onClick={() => onDesign(size, battery, phase)}
@@ -291,9 +324,41 @@ export function SolCalculator({
 function Figure({ label, big, small, lit }: { label: string; big: string; small: string; lit?: boolean }) {
   return (
     <div>
-      <p className="text-[10.5px] font-medium uppercase tracking-wide text-white/45">{label}</p>
-      <p className={clsx("font-mono text-[19px] font-semibold tabular-nums", lit ? "text-sun-line" : "text-white")}>{big}</p>
-      <p className="text-[11px] leading-snug text-white/55">{small}</p>
+      <p className="text-[10.5px] font-medium uppercase tracking-wide text-muted">{label}</p>
+      <p className={clsx("font-mono text-[20px] font-semibold tabular-nums", lit ? "text-sun-line" : "text-ink")}>{big}</p>
+      <p className="text-[11px] leading-snug text-muted">{small}</p>
     </div>
   );
 }
+
+const Label = ({ children }: { children: string }) => (
+  <span className="text-[11px] font-medium uppercase tracking-wide text-white/50">{children}</span>
+);
+
+const Unit = ({ children }: { children: string }) => (
+  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-white/50">{children}</span>
+);
+
+/** One point of the result: an icon and a few words, amber when it is something to check. */
+function Point({ icon, warn, children }: { icon: React.ReactNode; warn?: boolean; children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2">
+      <span
+        className={clsx(
+          "mt-px flex size-5 shrink-0 items-center justify-center rounded-full",
+          warn ? "bg-sun text-sun-ink" : "bg-surface-2 text-ink-2",
+        )}
+      >
+        {icon}
+      </span>
+      <span className={clsx("min-w-0 flex-1", warn ? "text-sun-ink" : "text-ink")}>{children}</span>
+    </li>
+  );
+}
+
+/** How much of a year's use the solar makes, as a fine line. */
+const Bar = ({ share }: { share: number }) => (
+  <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+    <span className="block h-full rounded-full bg-sun-line" style={{ width: `${Math.min(100, share)}%` }} />
+  </span>
+);

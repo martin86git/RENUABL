@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
     area: "Designer",
+    words: "Sol's calculator puts in the solar size for the home's use, and says why. Type over it to use your own.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Designer",
     words: "The corner button now opens your designs: start a new one, copy one or publish. Under the kit, the make and model on the design.",
   },
   {

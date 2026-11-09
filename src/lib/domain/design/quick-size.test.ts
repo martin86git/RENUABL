@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BACKUP_MODULE_KWH, dailyFromBill, openingAdvice, quickSize, sizeFromKw, sumOf, sumWords } from "./quick-size";
+import { BACKUP_MODULE_KWH, dailyFromBill, openingAdvice, quickSize, recommendKw, sizeFromKw, sumOf, sumWords } from "./quick-size";
 
 describe("the quick sizing calculator", () => {
   it("reads a day's use from a bill, less the supply charge", () => {
@@ -82,6 +82,13 @@ describe("sizeFromKw", () => {
     const s = sizeFromKw({ kw: 15, battery: "solar", phase: "three", kwhPerDay: 10 })!;
     expect(s.batteryKwh).toBe(Math.ceil(6 / 0.9));
     expect(s.yearShare).toBe(100);
+    expect([s.eveningKwh, s.toEvenings]).toEqual([6, true]);
+    expect(s.notes[0]).toBe("Battery sized to the 6 kWh they use after dark: a bigger one wouldn't be used.");
+  });
+  it("flags single phase over the export size, and a size over the calculator's", () => {
+    expect(sizeFromKw({ kw: 6.6, battery: "none", phase: "single" })!.exportCheck).toBe(true);
+    expect(sizeFromKw({ kw: 6.6, battery: "none", phase: "three" })!.exportCheck).toBe(false);
+    expect(sizeFromKw({ kw: 30, battery: "none", phase: "three" })!.overMax).toBe(true);
   });
   it("is nothing without a size", () => expect(sizeFromKw({ kw: 0, battery: "none", phase: "single" })).toBeNull());
 });
@@ -95,5 +102,24 @@ describe("openingAdvice", () => {
   });
   it("leads with solar alone for small evenings", () => {
     expect(openingAdvice(quickSize({ kwhPerDay: 6 })!).lead).toBe("solar");
+  });
+});
+
+describe("recommendKw", () => {
+  it("waits for the home's use", () => {
+    expect(recommendKw(null, "solar")).toBeNull();
+    expect(recommendKw(0, "none")).toBeNull();
+  });
+  it("puts in quickSize's solar, larger with a battery", () => {
+    const size = quickSize({ kwhPerDay: 25 })!;
+    expect(recommendKw(25, "none")!.kw).toBe(size.solar.kw);
+    expect(recommendKw(25, "solar")!.kw).toBe(size.withBattery.kw);
+    expect(recommendKw(25, "backup")!.kw).toBe(size.withBattery.kw);
+    expect(recommendKw(25, "solar")!.kw).toBeGreaterThanOrEqual(recommendKw(25, "none")!.kw);
+  });
+  it("says why, and when the smallest system covers it", () => {
+    expect(recommendKw(25, "solar")!.why).toMatch(/fill the battery/);
+    expect(recommendKw(25, "none")!.why).toMatch(/a year's use/);
+    expect(recommendKw(3, "none")!.why).toMatch(/smallest system/);
   });
 });
