@@ -222,3 +222,53 @@ export async function nearmapHeights(
   if (!terrain) return null;
   return { terrain: Buffer.from(packTerrain(terrain)), survey: survey.id, captured: survey.captured, layer: layer.type };
 }
+
+/** A 3D model's root in Nearmap's mesh store, as Coverage gives it (`rootPath`). Nothing else is ever fetched for 3D. */
+export const MESH_ROOT = /^\/meshes\/v1\/stores\/[\w-]{1,40}\/[\w-]{1,60}\/meshes\/\{[\w-]{1,60}\}\/Mesh\/[\w.-]{1,80}\.json$/;
+
+/**
+ * Nearmap's 3D model of the place (9 Nov 2026, Martin): the newest capture with a textured mesh, as the address of its
+ * 3D Tiles root in Nearmap's mesh store (Cesium 3D Tiles, draco), and the capture's day. Null when not set up, there is
+ * no mesh there, or not reached. The mesh is read through RENUABL's server (`nearmapMeshPart`), never with the key in
+ * the browser.
+ */
+export async function nearmapMesh(lat: number, lng: number): Promise<{ root: string; captured: string } | null> {
+  const key = nearmapKey();
+  if (!key) return null;
+  try {
+    const res = await fetch(
+      `https://api.nearmap.com/coverage/v2/point/${lng.toFixed(6)},${lat.toFixed(6)}?apikey=${encodeURIComponent(key)}&limit=30`,
+      { signal: AbortSignal.timeout(8_000), cache: "no-store" },
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      surveys?: { captureDate?: string; resources?: { "3d"?: { type?: string; properties?: { rootPath?: unknown } }[] } }[];
+    };
+    const found = (json.surveys ?? [])
+      .flatMap((s) =>
+        (s.resources?.["3d"] ?? [])
+          .filter((r) => r.type === "mesh" && typeof r.properties?.rootPath === "string" && MESH_ROOT.test(r.properties.rootPath))
+          .map((r) => ({ root: r.properties!.rootPath as string, captured: (s.captureDate ?? "").slice(0, 10) })),
+      )
+      .sort((a, b) => b.captured.localeCompare(a.captured));
+    return found[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a path is a part of a mesh in Nearmap's store: under `meshes/v1/stores/`, no way out of it. */
+export function meshPartAllowed(path: string): boolean {
+  return /^\/meshes\/v1\/stores\/[\w\-./{}]+$/.test(path) && !path.includes("..") && !path.includes("//") && path.length < 400;
+}
+
+/** One part of a Nearmap mesh (its tileset JSON or a b3dm/glb tile), fetched with RENUABL's key. Null when refused. */
+export async function nearmapMeshPart(path: string): Promise<Response | null> {
+  const key = nearmapKey();
+  if (!key || !meshPartAllowed(path)) return null;
+  const res = await fetch(`https://api.nearmap.com${path}?apikey=${encodeURIComponent(key)}`, {
+    signal: AbortSignal.timeout(20_000),
+    cache: "no-store",
+  }).catch(() => null);
+  return res && res.ok ? res : null;
+}

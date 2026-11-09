@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-09",
+    area: "Designer",
+    words: "A 3D button beside Google and Nearmap shows the roof in Nearmap's 3D model, to turn round and zoom.",
+  },
+  {
+    day: "2026-11-09",
     area: "Deals",
     words: "A new deal asks what they're interested in: Solar, Battery, EV charger, any together, or something else.",
   },
