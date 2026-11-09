@@ -181,12 +181,13 @@ export function DealFeed({ me }: { me: string }) {
           >
             <Plus className="size-4" aria-hidden /> New deal
           </button>
-          <label className="relative inline-flex h-9 items-center rounded-full bg-surface pl-3.5 pr-8 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2">
+          {/* The select fills the whole pill, so a press anywhere on it, the arrow included, opens the list (9 Nov 2026, Martin). */}
+          <label className="relative inline-flex h-9 items-center rounded-full bg-surface text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2">
             <span className="sr-only">Pipeline</span>
             <select
               value={pickedPipeline ? feedPick.pipeline : "all"}
               onChange={(e) => choosePick({ ...feedPick, pipeline: e.target.value })}
-              className="cursor-pointer appearance-none bg-transparent focus:outline-none"
+              className="h-full cursor-pointer appearance-none rounded-full bg-transparent pl-3.5 pr-8 focus:outline-none"
             >
               <option value="all">All deals</option>
               {pipelines.map((p) => (

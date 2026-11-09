@@ -16,6 +16,7 @@ import {
   Mail,
   Phone,
   Play,
+  Plus,
   RefreshCw,
   Search,
   Sun,
@@ -54,6 +55,7 @@ import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { InboxPage } from "./inbox";
 import { CallLogPage } from "./call-log";
 import { DealFeed } from "./deal-feed";
+import { NewDeal } from "./design-customers";
 import { NewLook, Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
@@ -1181,6 +1183,8 @@ function MailBadge({ mark }: { mark: MailMark }) {
 /** The deals being sold as a board, or the numbers. */
 function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
   const [numbers, setNumbers] = useState(false);
+  // A new deal from the pipeline too (9 Nov 2026, Martin), the same short form as on Deals and the feed.
+  const [adding, setAdding] = useState(false);
   // Which deals an email has gone from, and whether the latest was opened (Sol and the team's emails alike).
   const [marks, setMarks] = useState<Record<string, MailMark> | null>(null);
   useEffect(() => {
@@ -1198,7 +1202,14 @@ function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate 
     clsx("rounded-full px-3 py-1 text-[13px] transition", on ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink");
   return (
     <section aria-label="Pipeline" className="rounded-3xl bg-surface p-5 ring-1 ring-line sm:p-6">
-      <div className="flex justify-center">
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="inline-flex h-9 items-center gap-1.5 justify-self-start rounded-full bg-surface px-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2"
+        >
+          <Plus className="size-4" aria-hidden /> New deal
+        </button>
         <div className="inline-flex gap-0.5 rounded-full bg-canvas p-1 ring-1 ring-line" role="tablist" aria-label="Pipeline">
           <button type="button" role="tab" aria-selected={!numbers} onClick={() => setNumbers(false)} className={pill(!numbers)}>
             Board
@@ -1208,6 +1219,7 @@ function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate 
           </button>
         </div>
       </div>
+      {adding && <NewDeal onClose={() => setAdding(false)} />}
       <div className="mt-5">
         {numbers ? (
           <Numbers jobs={jobs} today={today} />
