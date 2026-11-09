@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-09",
+    area: "Design tool",
+    words: "Click an inverter, battery, switchboard or EV charger on the roof to pick it; Remove (or Delete) takes it off.",
+  },
+  {
+    day: "2026-11-09",
     area: "Designer",
     words: "Existing panels being replaced? Say so and their roof is used. Open roof past them is used too, and Sol shows he's working.",
   },

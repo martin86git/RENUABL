@@ -1120,6 +1120,9 @@ export function RoofDesigner(props: {
   const [fanOpen, setFanOpen] = useState(false);
   // The battery or the inverter under the pointer: its details show beside it.
   const [kit, setKit] = useState<"battery" | number | null>(null);
+  // The kit picked on the picture (9 Nov 2026, Martin: delete an inverter or battery straight from the map): an inverter
+  // by its place, the battery, the main switchboard or the EV charger. A small bar over it takes it off.
+  const [kitPick, setKitPick] = useState<"battery" | "msb" | "charger" | number | null>(null);
   const [tool, setTool] = useState<Tool>("select");
   // The tools, opened by a right click where the pointer is (1 Nov 2026, Martin, as Primero's): in % of the picture.
   const [toolMenu, setToolMenu] = useState<{ x: number; y: number } | null>(null);
@@ -1761,6 +1764,17 @@ export function RoofDesigner(props: {
     setSaved("changed");
   };
 
+  /** Takes the picked kit off the design: an inverter (its strings wait to be placed again), the battery, the MSB or the charger. */
+  const removeKit = (which: NonNullable<typeof kitPick>) => {
+    setKitPick(null);
+    setKit(null);
+    if (typeof which === "number") return removeInverter(which);
+    if (which === "battery") setBattery(undefined);
+    else if (which === "msb") setMsb(null);
+    else setCharger(undefined);
+    changed();
+  };
+
   /** Another panel from the catalogue. One of another size lays every face's rows out afresh. */
   const choosePanel = (sku: string) => {
     const to = props.catalogue.find((p) => p.sku === sku);
@@ -2344,6 +2358,9 @@ export function RoofDesigner(props: {
         showSide("quote");
       } else if (!command && e.key.toLowerCase() === "d") {
         showSide("designer");
+      } else if ((e.key === "Delete" || e.key === "Backspace") && kitPick !== null && tool === "select") {
+        e.preventDefault();
+        removeKit(kitPick);
       } else if ((e.key === "Delete" || e.key === "Backspace") && picks.length) {
         e.preventDefault();
         removePicked();
@@ -2352,6 +2369,7 @@ export function RoofDesigner(props: {
         removeFace(selected);
       } else if (e.key === "Escape") {
         setKeysOpen(false);
+        setKitPick(null);
         setPicks([]);
         setTracing([]);
         setThread(null);
@@ -2464,10 +2482,13 @@ export function RoofDesigner(props: {
       setOnPanel(false);
       return setTool("select");
     }
+    // A press anywhere else puts down the kit picked; pressing kit picks it (its bar shows over it) as well as dragging it.
+    setKitPick(null);
     if (tool === "select" && msb && msbAt(p)) {
       // The main switchboard: press it and drag it to the wall it is on.
       svg.current?.setPointerCapture(e.pointerId);
       setPicks([]);
+      setKitPick("msb");
       press.current = { mode: "msb", dx: p.x - msb.x, dy: p.y - msb.y };
       return;
     }
@@ -2475,6 +2496,7 @@ export function RoofDesigner(props: {
       // The EV charger: press it and drag it to the wall it will be mounted on.
       svg.current?.setPointerCapture(e.pointerId);
       setPicks([]);
+      setKitPick("charger");
       press.current = { mode: "charger", dx: p.x - charger.x, dy: p.y - charger.y };
       return;
     }
@@ -2484,6 +2506,7 @@ export function RoofDesigner(props: {
       svg.current?.setPointerCapture(e.pointerId);
       setPicks([]);
       setKit(null);
+      setKitPick(grabbed);
       const at = grabbed === "battery" ? (battery as DesignBattery) : inverterSpot(fitted[grabbed], grabbed, spot.lat);
       press.current =
         grabbed === "battery"
@@ -6885,8 +6908,60 @@ export function RoofDesigner(props: {
                 </>
               )}
 
-              {/* The battery or the inverter under the pointer: what it is, beside it. */}
+              {/* The kit picked: a small bar over it saying what it is, with Remove (Delete does the same). */}
+              {tool === "select" &&
+                kitPick !== null &&
+                (() => {
+                  const inverter = typeof kitPick === "number" ? fitted[kitPick] : undefined;
+                  const at =
+                    kitPick === "battery"
+                      ? battery
+                      : kitPick === "msb"
+                        ? msb
+                        : kitPick === "charger"
+                          ? charger
+                          : inverter
+                            ? inverterSpot(inverter, kitPick as number, spot.lat)
+                            : null;
+                  if (!at) return null;
+                  const left = ((ROOF_IMAGE.width / 2 + at.x / scale - view.x) / view.w) * 100;
+                  const top = ((ROOF_IMAGE.height / 2 + at.y / scale - view.y) / view.h) * 100;
+                  const name =
+                    kitPick === "battery"
+                      ? `Battery · ${batteryKwh} kWh`
+                      : kitPick === "msb"
+                        ? "Main switchboard"
+                        : kitPick === "charger"
+                          ? `EV charger${charger ? ` · ${charger.kw} kW` : ""}`
+                          : `${fitted.length > 1 ? `Inverter ${(kitPick as number) + 1}` : "Inverter"} · ${inverter?.kw} kW`;
+                  return (
+                    <div
+                      className={clsx(GLASS, "absolute z-30 flex -translate-x-1/2 items-center gap-1 py-0.5 pl-3 pr-0.5")}
+                      style={{
+                        left: `clamp(7rem, ${left}%, calc(100% - 7rem))`,
+                        top: top < 22 ? `calc(${top}% + 2.75rem)` : `calc(${top}% - 4.25rem)`,
+                      }}
+                      role="toolbar"
+                      aria-label={`${name}, picked`}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <span className="whitespace-nowrap text-[12.5px] font-medium text-ink">{name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeKit(kitPick)}
+                        className="ml-1 flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium text-danger hover:bg-danger/10"
+                        title="Take it off the design (Delete)"
+                      >
+                        <Trash2 className="size-4" aria-hidden />
+                        Remove
+                      </button>
+                    </div>
+                  );
+                })()}
+
+              {/* The battery or the inverter under the pointer: what it is, beside it. Not over the bar of the one picked. */}
               {kit !== null &&
+                kit !== kitPick &&
                 (() => {
                   const at = kit === "battery" ? battery : fitted[kit] ? inverterSpot(fitted[kit], kit, spot.lat) : null;
                   if (!at) return null;
