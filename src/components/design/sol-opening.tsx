@@ -278,6 +278,9 @@ export function SolCalculator({
           <ul className="mt-3 space-y-2 border-t border-line pt-3 text-[12.5px] leading-snug">
             <Point icon={<Sun className="size-3.5" aria-hidden />}>
               <span className="font-mono">{size.dayKwh}</span> kWh a day
+              {/* The kW the whole panels come to, which can be more than was typed (1 kW is three panels, 1.4 kW). */}
+              <span className="text-muted"> from </span>
+              <span className="font-mono">{size.kw}</span> kW
               {size.yearShare !== null && (
                 <>
                   <span className="text-muted"> · </span>
@@ -286,10 +289,21 @@ export function SolCalculator({
                 </>
               )}
             </Point>
-            {size.batteryKwh !== null && size.eveningKwh !== null && (
+            {size.coveredKwh !== null && size.eveningKwh !== null && (
               <Point icon={<Moon className="size-3.5" aria-hidden />}>
-                Covers the <span className="font-mono">{size.eveningKwh}</span> kWh they use after dark
-                {size.toEvenings && <span className="text-muted"> (bigger wouldn&apos;t be used)</span>}
+                {size.coveredKwh >= size.eveningKwh ? (
+                  <>
+                    Covers the <span className="font-mono">{size.eveningKwh}</span> kWh they use after dark
+                    {size.toEvenings && <span className="text-muted"> (bigger wouldn&apos;t be used)</span>}
+                  </>
+                ) : (
+                  <>
+                    Covers <span className="font-mono">{size.coveredKwh}</span> of the <span className="font-mono">{size.eveningKwh}</span>{" "}
+                    kWh they use after dark
+                    {size.solarShort && <span className="text-muted"> (more solar fills more)</span>}
+                    <Bar share={(size.coveredKwh / size.eveningKwh) * 100} />
+                  </>
+                )}
               </Point>
             )}
             {size.exportCheck && (

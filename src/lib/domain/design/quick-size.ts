@@ -216,6 +216,14 @@ export interface KwSize {
   eveningKwh: number | null;
   /** The battery was kept to the evenings: the solar could fill more than they use after dark. */
   toEvenings: boolean;
+  /**
+   * How much of the evening the battery covers on an average day, kWh (10 Nov 2026, Martin: 1.4 kW "covered" 4.6 kWh
+   * after dark): the least of their evening, what the battery holds (less any held for blackouts) and the day's spare
+   * once the home has used its share. Null without a battery or a known use.
+   */
+  coveredKwh: number | null;
+  /** The solar is what stops the battery covering the evening: more panels would fill more. */
+  solarShort: boolean;
   /** Over the single-phase export size: the network's pre-approval or export limiting is likely needed. */
   exportCheck: boolean;
   /** The kW asked for was over what the calculator goes to. */
@@ -253,6 +261,10 @@ export function sizeFromKw(input: KwInput): KwSize | null {
   if (exportCheck)
     notes.push(`Over ${SINGLE_PHASE_KW} kW on single phase: the network's pre-approval or export limiting is likely needed.`);
   const use = input.kwhPerDay && input.kwhPerDay > 0 ? input.kwhPerDay * 365 : null;
+  const daySpare = dayKwh * (1 - ASSUMPTIONS.baseSelfConsumption);
+  const holds = batteryKwh !== null ? (batteryKwh - (backupKwh ?? 0)) * ASSUMPTIONS.batteryUsableShare : null;
+  const covered = holds !== null && evening !== null ? Math.min(evening, holds, daySpare) : null;
+  const solarShort = covered !== null && evening !== null && covered < evening - 0.05 && daySpare <= holds!;
   return {
     kw,
     panels,
@@ -266,6 +278,8 @@ export function sizeFromKw(input: KwInput): KwSize | null {
     yearShare: use ? Math.min(100, Math.round((dayKwh * 365 * 100) / use)) : null,
     eveningKwh: evening !== null ? round1(evening) : null,
     toEvenings,
+    coveredKwh: covered !== null ? round1(covered) : null,
+    solarShort,
     exportCheck,
     overMax,
     notes,

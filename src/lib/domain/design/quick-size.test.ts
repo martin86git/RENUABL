@@ -123,3 +123,28 @@ describe("recommendKw", () => {
     expect(recommendKw(3, "none")!.why).toMatch(/smallest system/);
   });
 });
+
+describe("how much of the evening the battery covers", () => {
+  it("says so when a small system can't fill the battery (1 kW typed, 7.6 kWh a day)", () => {
+    const s = sizeFromKw({ kw: 1, battery: "solar", phase: "single", kwhPerDay: 7.6 })!;
+    expect(s.kw).toBe(1.4); // three whole 475 W panels
+    expect(s.dayKwh).toBe(5.3);
+    expect(s.eveningKwh).toBe(4.6);
+    expect(s.coveredKwh).toBe(3.2); // 60% of 5.3 spare after the home's own use
+    expect(s.solarShort).toBe(true);
+  });
+  it("covers the whole evening at Sol's size", () => {
+    const pick = recommendKw(7.6, "solar")!;
+    const s = sizeFromKw({ kw: pick.kw, battery: "solar", phase: "single", kwhPerDay: 7.6 })!;
+    expect(s.coveredKwh).toBe(s.eveningKwh);
+    expect(s.solarShort).toBe(false);
+  });
+  it("leaves the blackout module out of what covers the evening", () => {
+    const s = sizeFromKw({ kw: 1, battery: "backup", phase: "single", kwhPerDay: 7.6 })!;
+    expect(s.coveredKwh).toBe(3.2);
+  });
+  it("has nothing to say without a battery or a use", () => {
+    expect(sizeFromKw({ kw: 5, battery: "none", phase: "single", kwhPerDay: 7.6 })!.coveredKwh).toBeNull();
+    expect(sizeFromKw({ kw: 5, battery: "solar", phase: "single" })!.coveredKwh).toBeNull();
+  });
+});
