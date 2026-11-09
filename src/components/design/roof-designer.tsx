@@ -93,7 +93,7 @@ import {
   type LiveStatus,
 } from "@/lib/services/live";
 import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@/lib/domain/design/live";
-import { SolIcon } from "./sol-icon";
+import { SolIcon, SolMark, SolStars } from "./sol-icon";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
@@ -4228,6 +4228,101 @@ export function RoofDesigner(props: {
     </div>
   );
 
+  // Publish design (8 Nov 2026, Martin: in the pop-up, the picture's top right corner): the same control in either place.
+  const publishControl = props.sitesOnly ? null : (
+    <div className="relative">
+      {props.noDeal ? (
+        // No deal, no customer to send a proposal to: Publish says so, and opens the way to put the design on a deal.
+        <button
+          type="button"
+          onClick={() => {
+            if (!noDealOpen && saved === "changed") void save();
+            setNoDealOpen(!noDealOpen);
+          }}
+          aria-expanded={noDealOpen}
+          title="Publish: put it on a deal first"
+          className={clsx(
+            "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap bg-surface-2 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink",
+            "h-10 rounded-md px-4",
+          )}
+        >
+          <Send className="size-4" aria-hidden /> <span>Publish · put it on a deal first</span>
+        </button>
+      ) : (
+        <button
+          onClick={() => (props.onNote ? setSending(!sending) : void publish())}
+          aria-expanded={props.onNote ? sending : undefined}
+          disabled={saved === "saving" || publishing}
+          title="Publish design: saves it and brings the customer's proposal up to date"
+          className={clsx(
+            "inline-flex items-center justify-center gap-2 bg-primary text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted",
+            "h-10 rounded-md px-5",
+          )}
+        >
+          <Send className="size-4" aria-hidden /> <span>{publishing ? "Publishing…" : "Publish design"}</span>
+        </button>
+      )}
+      {noDealOpen && props.noDeal && (
+        <div
+          className={clsx(
+            "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
+            "right-0 top-12",
+          )}
+        >
+          {props.noDeal}
+        </div>
+      )}
+      {sending && props.onNote && (
+        <div
+          className={clsx(
+            "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
+            "right-0 top-12",
+          )}
+        >
+          <p className="text-sm font-medium text-ink">Send the proposal{props.customerName ? ` to ${props.customerName}` : ""}</p>
+          <p className="mt-0.5 text-xs text-muted">
+            Your note goes in their chat on the proposal, and by email when replies are emailed. It is kept on the deal.
+          </p>
+          <textarea
+            autoFocus
+            value={note}
+            maxLength={2000}
+            onChange={(e) => setNote(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void publish(note);
+            }}
+            placeholder="Hi, here's your design with the battery we spoke about. Any questions, just reply on the proposal."
+            className="mt-3 block min-h-24 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-forest"
+          />
+          {sent && (
+            <p
+              className={clsx(
+                "mt-2 rounded-md px-2.5 py-2 text-xs",
+                sent.ok ? "bg-positive-soft text-positive" : "bg-warning-soft text-warning",
+              )}
+              role="status"
+            >
+              {sent.message}
+            </p>
+          )}
+          <div className="mt-3 flex justify-end gap-2">
+            <button type="button" className={button} onClick={() => void publish()} disabled={publishing}>
+              Publish only
+            </button>
+            <button
+              type="button"
+              onClick={() => void publish(note)}
+              disabled={publishing || !note.trim()}
+              className="inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
+            >
+              <Send className="size-4" aria-hidden /> {publishing ? "Sending…" : "Publish and send"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className={clsx(props.tight && "relative")}>
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
@@ -4287,7 +4382,7 @@ export function RoofDesigner(props: {
             ) : undefined
           }
           tight={props.tight}
-          hold={readyOpen || (menu === "designs" && !props.tight) || liveOpen || sending || noDealOpen}
+          hold={readyOpen || (menu === "designs" && !props.tight) || liveOpen || ((sending || noDealOpen) && !props.tight)}
           unsaved={saved !== "saved" && saved !== "saving"}
           waiting={props.waiting ?? 0}
         >
@@ -4592,102 +4687,7 @@ export function RoofDesigner(props: {
               )}
             </button>
           )}
-          {/* Publishing saves the design and makes (or brings up to date) its proposal. From a deal it opens a box for a note to the customer, sent with it. An installer has none to publish. */}
-          {!props.sitesOnly && (
-            <div className="relative">
-              {props.noDeal ? (
-                // No deal, no customer to send a proposal to: Publish says so, and opens the way to put the design on a deal.
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!noDealOpen && saved === "changed") void save();
-                    setNoDealOpen(!noDealOpen);
-                  }}
-                  aria-expanded={noDealOpen}
-                  title="Publish: put it on a deal first"
-                  className={clsx(
-                    "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap bg-surface-2 text-sm font-medium text-ink-2 ring-1 ring-line hover:text-ink",
-                    props.tight ? "size-10 rounded-full" : "h-10 rounded-md px-4",
-                  )}
-                >
-                  <Send className="size-4" aria-hidden />{" "}
-                  <span className={clsx(props.tight && "sr-only")}>Publish · put it on a deal first</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => (props.onNote ? setSending(!sending) : void publish())}
-                  aria-expanded={props.onNote ? sending : undefined}
-                  disabled={saved === "saving" || publishing}
-                  title="Publish design: saves it and brings the customer's proposal up to date"
-                  className={clsx(
-                    "inline-flex items-center justify-center gap-2 bg-primary text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted",
-                    props.tight ? "size-10 rounded-full" : "h-10 rounded-md px-5",
-                  )}
-                >
-                  <Send className="size-4" aria-hidden />{" "}
-                  <span className={clsx(props.tight && "sr-only")}>{publishing ? "Publishing…" : "Publish design"}</span>
-                </button>
-              )}
-              {noDealOpen && props.noDeal && (
-                <div
-                  className={clsx(
-                    "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
-                    props.tight ? "bottom-0 left-full ml-2" : "right-0 top-12",
-                  )}
-                >
-                  {props.noDeal}
-                </div>
-              )}
-              {sending && props.onNote && (
-                <div
-                  className={clsx(
-                    "absolute z-50 w-[min(24rem,calc(100vw-2rem))] rounded-lg bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-line",
-                    props.tight ? "bottom-0 left-full ml-2" : "right-0 top-12",
-                  )}
-                >
-                  <p className="text-sm font-medium text-ink">Send the proposal{props.customerName ? ` to ${props.customerName}` : ""}</p>
-                  <p className="mt-0.5 text-xs text-muted">
-                    Your note goes in their chat on the proposal, and by email when replies are emailed. It is kept on the deal.
-                  </p>
-                  <textarea
-                    autoFocus
-                    value={note}
-                    maxLength={2000}
-                    onChange={(e) => setNote(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void publish(note);
-                    }}
-                    placeholder="Hi, here's your design with the battery we spoke about. Any questions, just reply on the proposal."
-                    className="mt-3 block min-h-24 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-forest"
-                  />
-                  {sent && (
-                    <p
-                      className={clsx(
-                        "mt-2 rounded-md px-2.5 py-2 text-xs",
-                        sent.ok ? "bg-positive-soft text-positive" : "bg-warning-soft text-warning",
-                      )}
-                      role="status"
-                    >
-                      {sent.message}
-                    </p>
-                  )}
-                  <div className="mt-3 flex justify-end gap-2">
-                    <button type="button" className={button} onClick={() => void publish()} disabled={publishing}>
-                      Publish only
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void publish(note)}
-                      disabled={publishing || !note.trim()}
-                      className="inline-flex min-h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-surface-2 disabled:text-muted"
-                    >
-                      <Send className="size-4" aria-hidden /> {publishing ? "Sending…" : "Publish and send"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          {!props.tight && publishControl}
         </BarRow>
       </header>
 
@@ -5090,7 +5090,7 @@ export function RoofDesigner(props: {
                   role="alert"
                   className={clsx(
                     "group absolute z-20 flex max-w-[min(26rem,calc(100%-1.5rem))] items-start gap-2 rounded-2xl border border-sun-line bg-sun/95 px-3 py-2 text-[13px] text-sun-ink shadow-lift backdrop-blur-md outline-none",
-                    props.tight ? "right-3 top-3" : "right-3 top-[7.25rem]",
+                    props.tight ? "right-3 top-16" : "right-3 top-[7.25rem]",
                   )}
                 >
                   <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -5126,7 +5126,15 @@ export function RoofDesigner(props: {
                 </div>
               )}
               {commandOpen && (
-                <div className="absolute left-1/2 top-[4.5rem] z-50 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2">
+                <div
+                  className={clsx(
+                    "absolute left-1/2 z-50 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2",
+                    // In the pop-up it rises from Ask Sol at the foot (8 Nov 2026, Martin), his answer above the box.
+                    props.tight
+                      ? "bottom-[5.75rem] flex flex-col-reverse gap-2 transition duration-200 ease-out starting:translate-y-3 starting:opacity-0 motion-reduce:transition-none [&>p]:mt-0"
+                      : "top-[4.5rem]",
+                  )}
+                >
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -5172,7 +5180,10 @@ export function RoofDesigner(props: {
               )}
               {choices && !commandOpen && (
                 <div
-                  className="absolute left-1/2 top-[4.5rem] z-50 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 overflow-hidden rounded-2xl bg-surface shadow-[0_18px_50px_rgba(11,11,12,0.25)] ring-1 ring-line"
+                  className={clsx(
+                    "absolute left-1/2 z-50 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 overflow-hidden rounded-2xl bg-surface shadow-[0_18px_50px_rgba(11,11,12,0.25)] ring-1 ring-line",
+                    props.tight ? "bottom-[5.75rem]" : "top-[4.5rem]",
+                  )}
                   role="dialog"
                   aria-label={choices.question}
                 >
@@ -6078,7 +6089,18 @@ export function RoofDesigner(props: {
               </div>
 
               {/* Which picture of the roof is under the design: Google's or a Nearmap capture (3 Nov 2026, as Primero's). */}
-              {props.pictureMenu && <div className="pointer-events-auto absolute bottom-3 right-3 z-20">{props.pictureMenu}</div>}
+              {/* In the pop-up, Publish in the top right corner, and the picture's switch level with Ask Sol. */}
+              {props.tight && publishControl && <div className="pointer-events-auto absolute right-3 top-3 z-30">{publishControl}</div>}
+              {props.pictureMenu && (
+                <div
+                  className={clsx(
+                    "pointer-events-auto absolute right-3 z-20",
+                    props.tight ? "bottom-7 flex h-14 items-center" : "bottom-3",
+                  )}
+                >
+                  {props.pictureMenu}
+                </div>
+              )}
 
               {/* The roof's pitch (1 Nov 2026, Martin, as Primero's): until a person has set it for this home, a card asks for it
                   (so a flat roof isn't left at the 22 degree start); then it is a small roof-angle mark on the left edge that opens to change it. */}
@@ -7707,8 +7729,12 @@ export function RoofDesigner(props: {
                     title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
                     className="pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110"
                   >
-                    <span className="flex size-10 items-center justify-center rounded-full bg-white/10">
-                      <SolIcon className="size-6" />
+                    {/* Sol as he is in the menu (8 Nov 2026, Martin: keep Sol consistent): his lit sun in the graphite round, the stars above. */}
+                    <span className="sol-orb relative flex size-11 items-center justify-center rounded-full">
+                      <span className="sol-heartbeat inline-flex">
+                        <SolMark className="size-[35px]" />
+                      </span>
+                      <SolStars className="pointer-events-none absolute -right-3 -top-3.5 size-[22px]" />
                     </span>
                     <span className="text-[15px] font-medium">Ask Sol</span>
                     <kbd className="rounded border border-white/25 px-1.5 text-[11px] text-white/60">/</kbd>
