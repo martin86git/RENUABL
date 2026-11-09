@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allByQuery, batteryWords, commandFrom, faces, parseCommand, pickByQuery } from "./design-commands";
+import { PRICED_PER_KIND, allByQuery, batteryWords, pricesInWords, commandFrom, faces, parseCommand, pickByQuery } from "./design-commands";
 
 describe("reading a designer command at once", () => {
   it("reads a size, with a direction", () => {
@@ -163,5 +163,55 @@ describe("Sol laying panels in rows, or again", () => {
     expect(commandFrom({ do: "removePanels", words: "" })).toEqual({ do: "removePanels" });
     expect(commandFrom({ do: "rows", rows: 4, words: "" })).toEqual({ do: "rows", rows: 4 });
     expect(commandFrom({ do: "relay", words: "" })).toEqual({ do: "relay" });
+  });
+});
+
+describe("the design's prices for Sol", () => {
+  const base = {
+    costsHidden: false,
+    lines: [
+      { label: "Jinko 475 W panel", qty: 55, amount: 6400 },
+      { label: "Sigenergy controller", amount: 3100 },
+      { label: "RCBO", amount: 0 },
+      { label: "Optimisers", amount: 0, missing: true },
+    ],
+    priceIncGst: 30000,
+    afterStcs: 21500,
+    saving: 1885,
+    panels: [{ name: "Jinko 475 W", cost: 116 }],
+    inverters: [
+      { name: "Sigenergy 20 kW", cost: 3100 },
+      { name: "Sungrow 10 kW", cost: 1500 },
+      { name: "Not priced", cost: null },
+    ],
+    batteries: [],
+  };
+
+  it("gives the price, saving, payback and costs", () => {
+    const words = pricesInWords(base);
+    expect(words).toContain("Price after STCs $21,500 inc GST");
+    expect(words).toContain("Payback about 11.4 years");
+    expect(words).toContain("55 × Jinko 475 W panel $6,400");
+    expect(words).toContain("Optimisers no cost on file");
+    expect(words).not.toContain("RCBO");
+    expect(words).toContain("Sungrow 10 kW $1,500");
+    expect(words).not.toContain("Not priced");
+  });
+
+  it("says when there is no bill", () => {
+    expect(pricesInWords({ ...base, saving: null })).toContain("no saving or payback yet");
+  });
+
+  it("gives nothing of the prices to someone who may not see them", () => {
+    const words = pricesInWords({ ...base, costsHidden: true });
+    expect(words).toMatch(/hidden/);
+    expect(words).not.toContain("$");
+  });
+
+  it("keeps each list short", () => {
+    const many = Array.from({ length: PRICED_PER_KIND + 5 }, (_, i) => ({ name: `Inv ${i}`, cost: 1000 + i }));
+    const words = pricesInWords({ ...base, inverters: many });
+    expect(words).toContain(`Inv ${PRICED_PER_KIND - 1} `);
+    expect(words).not.toContain(`Inv ${PRICED_PER_KIND} `);
   });
 });

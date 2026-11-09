@@ -448,4 +448,62 @@ export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roo
 - choose: when the request could fairly mean different things (which face, how many kW, portrait or landscape, which battery), don't guess: ask a short question with two or three options, each a label, a line on what it means and the request to carry out if chosen, written as the person would say it ("fit 10 kW on the north face"). Only when it is truly unclear.
 - removePanels: take the panels off (the picked ones, else all), when asked to delete, remove or clear them.
 - Never say you have changed something in words alone: only a change done above changes the design. If none of these does what is asked, say plainly that you can't do that yet, with "answer".
-- Always put one short sentence in words. Never invent a figure, product or price that isn't above. Nothing is sent to anyone.`;
+- Always put one short sentence in words. Never invent a figure, product or price that isn't above. Nothing is sent to anyone.
+- For a question, answer from THE DESIGN: its PRICES part holds the price, what the system costs line by line, the saving and the payback, and what each product on the lists costs. Never say you can't see prices when that part is there: work the answer out from it (a cheaper inverter or battery, fewer panels, what a change does to the payback), naming the products and figures you used, two or three sentences at most. When it says prices are hidden for this person, say they can't be shown to them.`;
+
+/** A product on the price lists with what it costs, for Sol's answer. */
+export interface PricedProduct {
+  name: string;
+  /** Ex GST; null with no cost on file. */
+  cost: number | null;
+}
+
+/** The most products of a kind put in front of Sol: enough to suggest a cheaper one, short enough to read. */
+export const PRICED_PER_KIND = 25;
+
+const money = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
+
+/**
+ * The design's prices in words for the designer's Ask Sol (9 Nov 2026, Martin: he said he couldn't see pricing, so he
+ * couldn't say how to bring the payback down): the price before and after STCs, the system's costs line by line, the
+ * saving and payback, and what each panel, inverter and battery on the lists costs. Only for someone who sees costs;
+ * otherwise one line saying they are hidden. Pure, tested.
+ */
+export function pricesInWords(p: {
+  costsHidden: boolean;
+  lines: readonly { label: string; amount: number; qty?: number; missing?: boolean }[];
+  /** The quote's price inc GST before STCs, its own figure (hand changes in). */
+  priceIncGst: number | null;
+  /** After STCs, the quote's own. */
+  afterStcs: number | null;
+  /** A year's saving from the bill, null without a bill. */
+  saving: number | null;
+  panels: readonly PricedProduct[];
+  inverters: readonly PricedProduct[];
+  batteries: readonly PricedProduct[];
+}): string {
+  if (p.costsHidden) return "PRICES: hidden for this person (they may not see costs or prices).";
+  const out = ["PRICES (ex GST unless said):"];
+  if (p.priceIncGst !== null) out.push(`Price ${money(p.priceIncGst)} inc GST before STCs.`);
+  if (p.afterStcs !== null) out.push(`Price after STCs ${money(p.afterStcs)} inc GST: what the customer pays.`);
+  if (p.saving !== null && p.saving > 0) {
+    out.push(`Saving about ${money(p.saving)} a year.`);
+    if (p.afterStcs !== null)
+      out.push(`Payback about ${Math.round((p.afterStcs / p.saving) * 10) / 10} years (price after STCs ÷ yearly saving).`);
+  } else out.push("No bill, so no saving or payback yet.");
+  const lines = p.lines.filter((l) => l.amount > 0 || l.missing);
+  if (lines.length)
+    out.push(
+      `Costs: ${lines
+        .map((l) => `${l.qty && l.qty > 1 ? `${l.qty} × ` : ""}${l.label} ${l.missing ? "no cost on file" : money(l.amount)}`)
+        .join("; ")}.`,
+    );
+  const kind = (title: string, list: readonly PricedProduct[]) => {
+    const priced = list.filter((x) => x.cost !== null).slice(0, PRICED_PER_KIND);
+    if (priced.length) out.push(`${title} on the lists, each: ${priced.map((x) => `${x.name} ${money(x.cost as number)}`).join("; ")}.`);
+  };
+  kind("Panels", p.panels);
+  kind("Inverters", p.inverters);
+  kind("Batteries", p.batteries);
+  return out.join("\n");
+}

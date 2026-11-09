@@ -63,6 +63,7 @@ import type { CatalogueBattery, CatalogueCharger, CatalogueInverter, CataloguePa
 import { DRAFT_WAIT_MS, keptWhen } from "@/lib/domain/design/draft";
 import { FavouriteStar, useFavourites } from "./favourite-star";
 import type { Workspace } from "@/lib/domain/design/pricing";
+import { listed } from "@/lib/domain/design/pricing";
 import {
   costSystem,
   MAX_ROOFS,
@@ -110,6 +111,7 @@ import {
   faces as facesWay,
   parseCommand,
   allByQuery,
+  pricesInWords,
   pickByQuery,
   type Choice,
   type DesignCommand,
@@ -3599,6 +3601,25 @@ export function RoofDesigner(props: {
         .map((x) => x.name)
         .join("; ")}`,
     ].join("\n");
+  /** The design with its prices (only for someone who sees costs), for the designer's Ask Sol (9 Nov 2026, Martin). */
+  const designForSol = () => {
+    const costing = costSystem(spec, quoteNow.form, props.workspace);
+    const priced = (list: readonly { name: string; sku: string }[]) =>
+      list.map((x) => ({ name: x.name, cost: listed(props.workspace, x.sku)?.cost ?? null }));
+    return [
+      designInWords(),
+      pricesInWords({
+        costsHidden,
+        lines: costing.lines,
+        priceIncGst: costing.priceIncGst,
+        afterStcs: net,
+        saving: finance?.saving ?? null,
+        panels: priced(props.catalogue),
+        inverters: priced(props.inverters),
+        batteries: priced(props.batteries),
+      }),
+    ].join("\n");
+  };
   // What Sol's side panel sees of this page (page-context.ts): the open design in words, which of the roof's designs it
   // is, the customer, and its price only for someone who may see it.
   usePageAbout(
@@ -4001,7 +4022,7 @@ export function RoofDesigner(props: {
         const res = await fetch("/api/design/command", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text, design: designInWords() }),
+          body: JSON.stringify({ text, design: designForSol() }),
         });
         const j = (await res.json().catch(() => ({}))) as { ok?: boolean; command?: DesignCommand; message?: string };
         setCommandReply((j.ok && j.command ? await runCommand(j.command) : (j.message ?? "Sol couldn't read that.")) || null);
@@ -5218,7 +5239,84 @@ export function RoofDesigner(props: {
                   </dl>
                 </div>
               )}
-              {commandOpen && (
+              {/* In the pop-up the box and Sol's answer are one black panel growing out of the Ask Sol pill (9 Nov 2026,
+                  Martin: it should physically connect to Sol below, and stay black): its foot runs behind the pill. */}
+              {props.tight && (commandOpen || commandReply) && (
+                <div
+                  className="absolute bottom-[3.5rem] left-1/2 z-50 flex w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2 rounded-[28px] bg-primary px-2.5 pb-[2.6rem] pt-2.5 text-white shadow-[0_18px_50px_rgba(11,11,12,0.4)] ring-1 ring-white/10 transition duration-200 ease-out starting:translate-y-3 starting:opacity-0 motion-reduce:transition-none"
+                  data-popup
+                >
+                  {commandReply && (
+                    <div className="flex items-start gap-2.5 px-2.5 pt-1.5" role="status">
+                      <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
+                      <p className="min-w-0 flex-1 text-[14px] leading-relaxed text-white/90">
+                        {commandReply}
+                        {systemWords && ` ${systemWords}`}
+                      </p>
+                      {!commandOpen && (
+                        <button
+                          type="button"
+                          onClick={() => setCommandReply(null)}
+                          aria-label="Close"
+                          className="flex size-6 shrink-0 items-center justify-center rounded-full text-white/60 hover:text-white"
+                        >
+                          <X className="size-3.5" aria-hidden />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {commandOpen && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void sendCommand(commandText);
+                      }}
+                      className="flex items-center gap-2 rounded-full bg-white/10 p-1.5 pl-3 ring-1 ring-white/10 focus-within:ring-sun-line/70"
+                    >
+                      <input
+                        ref={commandBox}
+                        value={commandText}
+                        onChange={(e) => setCommandText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            setCommandOpen(false);
+                            setCommandReply(null);
+                          }
+                        }}
+                        placeholder="Fit 8 kW on the north face · add the storage it needs · how could I bring the payback down?"
+                        aria-label="Tell Sol what to change in the design, or ask him about it"
+                        className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-white outline-none placeholder:text-white/45"
+                      />
+                      <span className="inline-flex [&_button:hover]:bg-white/10 [&_button:hover]:text-white [&_button]:text-white/70">
+                        <DictateButton
+                          onWords={(words) => void sendCommand(words)}
+                          onHearing={(words) => setCommandText(words)}
+                          label="Say it"
+                        />
+                      </span>
+                      <button
+                        type="submit"
+                        disabled={commandBusy || !commandText.trim()}
+                        className="h-9 rounded-full bg-sun-line px-4 text-sm font-medium text-white disabled:bg-white/10 disabled:text-white/40"
+                      >
+                        {commandBusy ? "…" : "Go"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCommandOpen(false);
+                          setCommandReply(null);
+                        }}
+                        aria-label="Close"
+                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white"
+                      >
+                        <X className="size-4" aria-hidden />
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+              {commandOpen && !props.tight && (
                 <div
                   className={clsx(
                     "absolute left-1/2 z-50 w-[min(36rem,calc(100%-2rem))] -translate-x-1/2",
@@ -5352,7 +5450,7 @@ export function RoofDesigner(props: {
                   </form>
                 </div>
               )}
-              {commandReply && !commandOpen && (
+              {commandReply && !commandOpen && !props.tight && (
                 <div
                   className={clsx(
                     GLASS,
@@ -7825,7 +7923,13 @@ export function RoofDesigner(props: {
                   comment bubble is its centre: a round larger than the rest, standing proud of the plate, with undo and
                   redo, the whole picture and the label to its left, and the two ways of looking to its right (the roof
                   as a drawing, and the shade analysis). */}
-              <div className="pointer-events-none absolute inset-x-2 bottom-7 z-10 flex items-end gap-2">
+              <div
+                className={clsx(
+                  "pointer-events-none absolute inset-x-2 bottom-7 flex items-end gap-2",
+                  // Over Sol's black panel while it is out, so the pill stands at its foot as one piece.
+                  props.tight && (commandOpen || commandReply) ? "z-[55]" : "z-10",
+                )}
+              >
                 {/* In the pop-up the foot of the picture is Sol alone (8 Nov 2026, Martin): ask him to change the design. */}
                 {props.tight ? (
                   <button

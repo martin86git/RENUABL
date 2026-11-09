@@ -1,4 +1,5 @@
 import { DESIGN_COMMAND_PROMPT, DESIGN_COMMAND_SCHEMA, commandFrom } from "@/lib/domain/design/design-commands";
+import { looksLikeQuestion } from "@/lib/domain/design/find";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
 import { modelFor } from "@/lib/server/sol-credits";
@@ -36,8 +37,10 @@ export async function POST(request: Request) {
         DESIGN_COMMAND_SCHEMA,
         DESIGN_COMMAND_PROMPT,
         apiKey,
-        // A change to the design or a short answer about it: the quick model (sol-routing.ts).
-        { model: modelFor("quick") },
+        // A change to the design: the quick model. A question about it ("how could I bring the payback down?") wants
+        // judgement over the figures, so the deep one, which answers it the same way each time (9 Nov 2026, Martin:
+        // the quick model's answers to such questions wandered). The command bar takes no credit either way.
+        { model: modelFor(looksLikeQuestion(text) ? "deep" : "quick") },
       );
       return Response.json({ ok: true, command: commandFrom(reading) });
     } catch (e) {
