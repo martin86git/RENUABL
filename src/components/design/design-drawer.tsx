@@ -226,9 +226,10 @@ export function DesignDrawer(props: {
           className="min-h-0 w-full flex-1 border-0"
         />
       </section>
-      {/* For a deal, its two tools as rounds in the grey just left of the window (wide screens): the designer's orange
-          round and the proposal's, the one open ringed. */}
-      {open && onSwitch && tool.job && (
+      {/* Its tools as rounds in the grey just left of the window (wide screens): the designer's orange round, the quote and
+          the proposal's, the one open ringed. A site with no deal has them too (9 Nov 2026, Martin): its Proposal says why
+          there is none yet and how to put it on a deal. */}
+      {open && onSwitch && (tool.job || tool.kind === "design") && (
         <nav
           aria-label="This deal's tools"
           className="fixed top-1/2 z-[61] hidden -translate-y-1/2 flex-col gap-3 xl:flex"
@@ -263,7 +264,13 @@ export function DesignDrawer(props: {
           </button>
           <button
             type="button"
-            onClick={() => tool.kind !== "proposal" && saveThen(proposalHref(tool.job!))}
+            onClick={() =>
+              tool.kind === "proposal"
+                ? undefined
+                : tool.job
+                  ? saveThen(proposalHref(tool.job))
+                  : frameEl.current?.contentWindow?.postMessage({ renuablDesign: { side: "proposal" } }, window.location.origin)
+            }
             aria-pressed={tool.kind === "proposal"}
             aria-label="Proposal"
             title="Proposal"

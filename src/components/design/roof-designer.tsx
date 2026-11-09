@@ -8426,8 +8426,8 @@ export function RoofDesigner(props: {
             right half, so the proposal, its chat and timeline have room (3 Nov 2026, Martin, as Primero's); the picture
             keeps its size underneath. */}
         {/* The handle on the right edge: hovering a view (or pressing it) brings the column out over the picture. */}
-        {/* Not in the pop-up on a deal: the rounds beside the window switch the views there (8 Nov 2026, Martin). */}
-        {!peek && shown && !(props.tight && props.jobId) && (
+        {/* Not in the pop-up: the rounds beside the window switch the views there (8 Nov 2026, Martin), a site's too. */}
+        {!peek && shown && !props.tight && (
           <div
             className="absolute right-0 top-24 z-40 flex flex-col gap-1 rounded-l-2xl bg-surface/95 p-1 shadow-[-6px_6px_24px_rgba(20,22,26,0.16)] ring-1 ring-line backdrop-blur"
             aria-label="Beside the picture"
@@ -8496,7 +8496,7 @@ export function RoofDesigner(props: {
               <div
                 role="tablist"
                 aria-label="Beside the picture"
-                className={clsx("flex-1 rounded-lg border border-line bg-surface-2 p-1", props.tight && props.jobId ? "hidden" : "flex")}
+                className={clsx("flex-1 rounded-lg border border-line bg-surface-2 p-1", props.tight ? "hidden" : "flex")}
               >
                 {SIDE_VIEWS.filter((v) => (v.id !== "quote" || !costsHidden) && (v.id !== "proposal" || !props.sitesOnly)).map((v) => (
                   <button
