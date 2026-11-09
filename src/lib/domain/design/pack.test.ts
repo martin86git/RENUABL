@@ -7,6 +7,8 @@ import {
   packArea,
   packAreas,
   packFaces,
+  regionsOf,
+  avoiding,
   inRows,
   rowCounts,
   reorient,
@@ -250,5 +252,25 @@ describe("panels laid in rows", () => {
     const mid = (ps: LoosePanel[], k: "x" | "y") => ps.reduce((t, p) => t + p[k], 0) / ps.length;
     expect(mid(laid, "x")).toBeCloseTo(mid(column, "x"), 1);
     expect(mid(laid, "y")).toBeCloseTo(mid(column, "y"), 1);
+  });
+});
+
+describe("a face split by places to keep clear", () => {
+  // 12 m wide, 16 m down, its gutter the north edge; existing panels across most of it 5 to 9 m from the gutter, a
+  // narrow strip at the east end the only way past them, and a small clear corner beside the gutter.
+  const outline = rect(0, 0, 12, 16);
+  const existing = [rect(-1, 4, 10, 9), rect(4, -1, 13, 4)];
+  const face = avoiding(northFace(outline), existing);
+
+  it("finds each clear part on its own", () => {
+    expect(regionsOf(face, PANEL).length).toBeGreaterThanOrEqual(2);
+    expect(regionsOf(northFace(outline), PANEL)).toHaveLength(1);
+  });
+
+  it("lays panels on the clear roof past the existing ones, not only by the gutter", () => {
+    const laid = packAreas([face], 20, PANEL, id);
+    expect(laid.length).toBe(20);
+    expect(laid.some((p) => p.y > 9)).toBe(true);
+    for (const p of laid) for (const q of existing) expect(looseCorners(p, PANEL).some((c) => inside(c, q))).toBe(false);
   });
 });

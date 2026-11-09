@@ -43,6 +43,12 @@ export type DesignCommand =
    * is named. Never done straight away: the designer asks first (`deleteQuestion`) and only a Yes deletes it.
    */
   | { do: "deleteDesign"; which?: number }
+  /**
+   * The panels already on the roof are being replaced, so their roof is used (9 Nov 2026, Martin), or kept clear of
+   * again. Panels laid by rule keep clear of them until told otherwise.
+   */
+  | { do: "replaceExisting" }
+  | { do: "keepExisting" }
   | { do: "undo" }
   | { do: "redo" }
   /**
@@ -158,6 +164,17 @@ export function parseCommand(raw: string): DesignCommand | null {
   const t = text.toLowerCase();
   if (/^undo\b/.test(t)) return { do: "undo" };
   if (/^redo\b/.test(t)) return { do: "redo" };
+  // The panels already there: being replaced, so laid over, or kept clear of (9 Nov 2026, Martin).
+  if (/\b(existing|old|current) (panels?|solar|system|arrays?|pv)\b/.test(t)) {
+    if (/\b(keep|avoid|leave|stay|staying|around|clear of)\b/.test(t) && !/\b(replac\w*|remov\w*|ignore|disregard)\b/.test(t))
+      return { do: "keepExisting" };
+    if (
+      /\b(replac\w*|remov\w*|ignore|disregard|coming off|come off|taken off|take off|swap\w*|gone|lay over|use (?:the|that|their) (?:roof|space))\b/.test(
+        t,
+      )
+    )
+      return { do: "replaceExisting" };
+  }
   const why = t.match(/\bstring\s+([a-z])\b/);
   if (why && /\b(why|fail|failing|wrong|check|problem|explain)\b/.test(t)) return { do: "explainString", letter: why[1].toUpperCase() };
   // A question (other than about a string) is Sol's to answer, never read as an order.
@@ -315,6 +332,8 @@ export const DESIGN_COMMAND_SCHEMA = {
         "relay",
         "removePanels",
         "deleteDesign",
+        "replaceExisting",
+        "keepExisting",
         "choose",
         "undo",
         "redo",
@@ -418,6 +437,8 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
     case "panel":
       return s(read.query) ? { do: read.do, query: s(read.query) } : { do: "answer", words };
     case "noBattery":
+    case "replaceExisting":
+    case "keepExisting":
     case "stringAuto":
     case "designForMe":
     case "flat":
@@ -502,6 +523,7 @@ export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roo
 - explainString: show the check for a string, by its letter; put the reason in words too, from the string checks above.
 - choose: when the request could fairly mean different things (which face, how many kW, portrait or landscape, which battery), don't guess: ask a short question with two or three options, each a label, a line on what it means and the request to carry out if chosen, written as the person would say it ("fit 10 kW on the north face"). Only when it is truly unclear.
 - removePanels: take the panels off (the picked ones, else all), when asked to delete, remove or clear them.
+- replaceExisting: the panels already on the roof are being replaced, so new panels may go where they are ("ignore the existing panels", "they're coming off"); keepExisting: keep clear of them again.
 - deleteDesign: delete a whole design from the roof when asked to, design being its number (1 is the first) or null for the one open. The designer asks the person to confirm before anything is deleted, so put the question in words ("Delete Design 2?"), never that it is done.
 - Never say you have changed something in words alone: only a change done above changes the design. If none of these does what is asked, say plainly that you can't do that yet, with "answer".
 - Always put one short sentence in words. Never invent a figure, product or price that isn't above. Nothing is sent to anyone.

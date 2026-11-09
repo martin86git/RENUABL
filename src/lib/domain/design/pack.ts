@@ -284,14 +284,26 @@ export function packArea(area: Area, n: number, size: PanelSize, newId: () => st
 export function packAreas(areas: Area[], n: number, size: PanelSize, newId: () => string, most = 60): LoosePanel[] {
   const want = Math.min(most, Math.max(0, Math.round(n)));
   if (!want) return [];
-  const usable = areas.filter((a) => a.pitch <= STEEPEST).sort((a, b) => b.sun - a.sun);
+  const usable = areas
+    .filter((a) => a.pitch <= STEEPEST)
+    .flatMap((a) => regionsOf(a, size))
+    .sort((a, b) => b.sun - a.sun);
   if (!usable.length) return [];
-  const top = usable[0].sun;
-  const sunny = usable.filter((a) => a.sun >= top * SUNNY_ENOUGH);
   let tried = 0;
-  const room = new Map(sunny.map((a) => [a, packArea(a, most, size, () => `t${tried++}`).length]));
+  // How many panels each face holds, worked out only when asked (laying a face is the slow part).
+  const counted = new Map<Area, number>();
+  const room = {
+    get: (a: Area) => {
+      if (!counted.has(a)) counted.set(a, packArea(a, most, size, () => `t${tried++}`).length);
+      return counted.get(a)!;
+    },
+  };
+  // The best sun among faces with room for an array: a sunny face already full (of existing panels, say) rules nothing out.
+  const top = usable.find((a) => room.get(a) >= MIN_ARRAY_PANELS)?.sun ?? usable[0].sun;
+  // As sunny as each other (the parts of one face), the one that holds the most first.
+  const sunny = usable.filter((a) => a.sun >= top * SUNNY_ENOUGH).sort((a, b) => b.sun - a.sun || room.get(b) - room.get(a));
 
-  const whole = sunny.find((a) => (room.get(a) ?? 0) >= want && a.sun >= top * 0.95);
+  const whole = sunny.find((a) => room.get(a) >= want && a.sun >= top * 0.95);
   if (whole) return packArea(whole, want, size, newId);
 
   const arraysAllowed = want > 18 ? 3 : 2;
@@ -313,6 +325,131 @@ export function packAreas(areas: Area[], n: number, size: PanelSize, newId: () =
     left -= panels.length;
   });
   return out;
+}
+
+/** The grid the clear parts of a face are found on, metres. */
+const REGION_STEP = 0.25;
+const regionsKept = new WeakMap<Area, Map<string, Area[]>>();
+
+/**
+ * The separate clear parts of a face that places to keep clear split up (9 Nov 2026, Martin: at a roof whose existing
+ * panels ran down its middle, only four panels went in a corner and the clear roof to the south was never used: the
+ * rows climb from the gutter in one pyramid, so the first row cut short by the existing panels stopped every row after
+ * it). Each part is where a panel fits, joined to its neighbours, and is packed as an array of its own. A face with
+ * nothing to keep clear, or one part, is itself.
+ */
+export function regionsOf(area: Area, size: PanelSize): Area[] {
+  if (!area.avoid?.length || area.outline.length < 3) return [area];
+  const sizeKey = `${size.long}|${size.short}|${size.gap}`;
+  const byKey = regionsKept.get(area) ?? new Map<string, Area[]>();
+  regionsKept.set(area, byKey);
+  const kept = byKey.get(sizeKey);
+  if (kept) return kept;
+
+  const down = downOf(area.facing);
+  const side = sideOf(area.facing);
+  const at = (u: number, v: number): Point => ({ x: u * side.x + v * down.x, y: u * side.y + v * down.y });
+  const us = area.outline.map((p) => dot(p, side));
+  const vs = area.outline.map((p) => dot(p, down));
+  const [u0, u1, v0, v1] = [Math.min(...us), Math.max(...us), Math.min(...vs), Math.max(...vs)];
+  const edge = Math.max(clearanceFor(area.standoff), area.clearance ?? 0) + 0.01;
+  const cos = Math.cos((Math.max(0, Math.min(TILT.max, area.pitch)) * Math.PI) / 180);
+  const shapes = [
+    { across: size.short, along: size.long * cos },
+    { across: size.long, along: size.short * cos },
+  ];
+  const avoidUV = area.avoid.map((q) => q.map((p) => ({ u: dot(p, side), v: dot(p, down) })));
+  const fitsAt = (u: number, v: number) =>
+    shapes.some(({ across, along }) => {
+      const hu = across / 2 + edge;
+      const hv = along / 2 + edge;
+      for (const a of [-1, -0.5, 0, 0.5, 1])
+        for (const b of [-1, -0.5, 0, 0.5, 1]) if (!area.covers(at(u + a * hu, v + b * hv))) return false;
+      return !avoidUV.some((q) => q.some((c) => Math.abs(c.u - u) <= hu && Math.abs(c.v - v) <= hv));
+    });
+
+  const cols = Math.max(1, Math.ceil((u1 - u0) / REGION_STEP) + 1);
+  const rowsN = Math.max(1, Math.ceil((v1 - v0) / REGION_STEP) + 1);
+  if (cols * rowsN > 200_000) return [area];
+  const free = new Uint8Array(cols * rowsN);
+  for (let j = 0; j < rowsN; j++)
+    for (let i = 0; i < cols; i++) free[j * cols + i] = fitsAt(u0 + i * REGION_STEP, v0 + j * REGION_STEP) ? 1 : 0;
+
+  // Joined places, by a flood from each one not yet reached.
+  const label = new Int32Array(cols * rowsN).fill(-1);
+  const parts: number[][] = [];
+  for (let s = 0; s < free.length; s++) {
+    if (!free[s] || label[s] >= 0) continue;
+    const id = parts.length;
+    const cells: number[] = [];
+    const stack = [s];
+    label[s] = id;
+    while (stack.length) {
+      const c = stack.pop()!;
+      cells.push(c);
+      const i = c % cols;
+      const j = (c - i) / cols;
+      for (const [di, dj] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const ni = i + di;
+        const nj = j + dj;
+        if (ni < 0 || nj < 0 || ni >= cols || nj >= rowsN) continue;
+        const k = nj * cols + ni;
+        if (free[k] && label[k] < 0) {
+          label[k] = id;
+          stack.push(k);
+        }
+      }
+    }
+    parts.push(cells);
+  }
+  if (parts.length <= 1) {
+    byKey.set(sizeKey, [area]);
+    return [area];
+  }
+
+  // Each part covers what a panel centred on any of its places would: its places grown by the largest panel's reach.
+  const reachU = Math.ceil((Math.max(...shapes.map((s) => s.across)) / 2 + edge) / REGION_STEP) + 1;
+  const reachV = Math.ceil((Math.max(...shapes.map((s) => s.along)) / 2 + edge) / REGION_STEP) + 1;
+  const made = parts.map((cells, id): Area => {
+    const mine = new Uint8Array(cols * rowsN);
+    let [lu, hu, lv, hv] = [Infinity, -Infinity, Infinity, -Infinity];
+    for (const c of cells) {
+      const i = c % cols;
+      const j = (c - i) / cols;
+      for (let dj = -reachV; dj <= reachV; dj++)
+        for (let di = -reachU; di <= reachU; di++) {
+          const ni = i + di;
+          const nj = j + dj;
+          if (ni >= 0 && nj >= 0 && ni < cols && nj < rowsN) mine[nj * cols + ni] = 1;
+        }
+      lu = Math.min(lu, i);
+      hu = Math.max(hu, i);
+      lv = Math.min(lv, j);
+      hv = Math.max(hv, j);
+    }
+    const ownCell = (p: Point) => {
+      const i = Math.round((dot(p, side) - u0) / REGION_STEP);
+      const j = Math.round((dot(p, down) - v0) / REGION_STEP);
+      if (i < 0 || j < 0 || i >= cols || j >= rowsN) return false;
+      // Only this part's own places, never another part's (two parts' reach can overlap between them).
+      const k = j * cols + i;
+      return mine[k] === 1 && (label[k] < 0 || label[k] === id);
+    };
+    const [a0, a1] = [u0 + (lu - reachU) * REGION_STEP, u0 + (hu + reachU) * REGION_STEP];
+    const [b0, b1] = [v0 + (lv - reachV) * REGION_STEP, v0 + (hv + reachV) * REGION_STEP];
+    return {
+      ...area,
+      covers: (p) => area.covers(p) && ownCell(p),
+      outline: [at(a0, b0), at(a1, b0), at(a1, b1), at(a0, b1)],
+    };
+  });
+  byKey.set(sizeKey, made);
+  return made;
 }
 
 /** A traced face as an area: on it means inside its outline and off any place switched off; its own distance from the edges, never under the wind rule. */

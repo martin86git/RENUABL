@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-09",
     area: "Designer",
+    words: "Existing panels being replaced? Say so and their roof is used. Open roof past them is used too, and Sol shows he's working.",
+  },
+  {
+    day: "2026-11-09",
+    area: "Designer",
     words: "A 3D button beside Google and Nearmap shows the roof in Nearmap's 3D model, to turn round and zoom.",
   },
   {

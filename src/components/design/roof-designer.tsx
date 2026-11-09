@@ -4,7 +4,16 @@ import Link from "next/link";
 import { accessColour, shadeReport, type ShadeReport } from "@/lib/domain/design/shade";
 import { loadTerrain, type Heights } from "@/lib/services/terrain";
 import { loadRoofCheck } from "@/lib/services/roof-check";
-import { HAS_SOLAR_NOTE, hasSolar, keepOuts, keptClearWords, thingLabel, type RoofCheck } from "@/lib/domain/design/roof-check";
+import {
+  HAS_SOLAR_NOTE,
+  REPLACING_NOTE,
+  hasSolar,
+  keepOuts,
+  keptClearWords,
+  thingLabel,
+  withoutExisting,
+  type RoofCheck,
+} from "@/lib/domain/design/roof-check";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
 import { loadNearmapOutline } from "@/lib/services/nearmap";
 import { OLD_FACE_CORNERS, mendCutOutline, outlineNote } from "@/lib/domain/design/nearmap";
@@ -110,6 +119,7 @@ import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/e
 import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
 import { openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
+import { SolThinking } from "./sol-thinking";
 import { CaptureButtons } from "@/components/ui/capture";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
 import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
@@ -3482,13 +3492,34 @@ export function RoofDesigner(props: {
     setRoofCheckNow(check);
     return check;
   };
+  /**
+   * The panels already on the roof are being replaced (9 Nov 2026, Martin: nothing let him disregard them): then panels
+   * laid by rule may go where they are. Asked by the button beside what Sol says, or in words ("ignore the existing
+   * panels"); for this visit.
+   */
+  const replacingRef = useRef(false);
+  const [replacing, setReplacing] = useState(false);
+  /** What is kept clear of: everything found, less the existing panels while they are being replaced. */
+  const inUse = (check: RoofCheck | null): RoofCheck | null =>
+    check && replacingRef.current ? { ...check, things: withoutExisting(check.things) } : check;
   /** What was kept clear of, said with a design laid by rule. */
-  const checkNotes = (check: RoofCheck | null) =>
-    check ? [...(hasSolar(check.things) ? [HAS_SOLAR_NOTE] : []), ...[keptClearWords(check.things)].filter((w): w is string => !!w)] : [];
+  const checkNotes = (found: RoofCheck | null) => {
+    const check = inUse(found);
+    return check
+      ? [
+          ...(found && hasSolar(found.things) ? [replacingRef.current ? REPLACING_NOTE : HAS_SOLAR_NOTE] : []),
+          ...[keptClearWords(check.things)].filter((w): w is string => !!w),
+        ]
+      : [];
+  };
+  /** The last thing laid by rule, so changing the existing panels' answer lays it again. */
+  const lastLay = useRef<{ kind: "fill"; kw: number; facing?: Way } | { kind: "mine"; goal: DesignGoal } | null>(null);
   const designForMe = async (auto = false, goal: DesignGoal = "return") => {
     setMineIntro(false);
     setMine("busy");
-    const check = await checkRoof();
+    if (!auto) lastLay.current = { kind: "mine", goal };
+    const found = await checkRoof();
+    const check = inUse(found);
     const avoid = check?.things.length ? keepOuts(check.things) : undefined;
     let model: RoofModel | null = null;
     let modelOffsetM: { x: number; y: number } | undefined;
@@ -3550,8 +3581,8 @@ export function RoofDesigner(props: {
     // Made by itself as the roof opened: said so on the card, to be checked against the photo.
     setMine(
       auto
-        ? { ...result, notes: [AUTO_DESIGNED, ...notes, ...checkNotes(check), ...result.notes] }
-        : { ...result, notes: [...notes, ...checkNotes(check), ...result.notes] },
+        ? { ...result, notes: [AUTO_DESIGNED, ...notes, ...checkNotes(found), ...result.notes] }
+        : { ...result, notes: [...notes, ...checkNotes(found), ...result.notes] },
     );
     setMineOpen(true);
     if (!result.options.length) return;
@@ -3700,6 +3731,8 @@ export function RoofDesigner(props: {
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandText, setCommandText] = useState("");
   const [commandBusy, setCommandBusy] = useState(false);
+  // What was just asked, shown with Sol thinking until he answers (9 Nov 2026, Martin: pressing Enter gave no sign he had it).
+  const [asked, setAsked] = useState<string | null>(null);
   const [commandReply, setCommandReply] = useState<string | null>(null);
   // Sol's question with options, when a request could mean different things; the request of the one chosen is run.
   const [choices, setChoices] = useState<{ question: string; options: Choice[] } | null>(null);
@@ -3774,9 +3807,16 @@ export function RoofDesigner(props: {
   const fillTo = async (kw: number, facing?: Way): Promise<{ words: string; laid: number }> => {
     const watts = panelOf(design).watts || 475;
     const n = Math.max(1, Math.ceil((kw * 1000) / watts));
-    const check = await checkRoof();
+    lastLay.current = { kind: "fill", kw, ...(facing ? { facing } : {}) };
+    const seen = await checkRoof();
+    const check = inUse(seen);
     const avoid = check?.things.length ? keepOuts(check.things) : undefined;
-    const clear = check ? keptClearWords(check.things) : null;
+    const clear = [
+      seen && hasSolar(seen.things) && replacingRef.current ? REPLACING_NOTE : null,
+      check ? keptClearWords(check.things) : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
     const fromHeights = !faces.length ? await nearmapRoofFaces() : null;
     const roofFaces = fromHeights?.faces ?? faces;
     if (roofFaces.length) {
@@ -3964,8 +4004,41 @@ export function RoofDesigner(props: {
     setLoose(inRows(group, size, want.rows));
     if (want.landscape !== undefined) setAddLandscape(want.landscape);
   }, [loose, size]);
+  /** The existing panels being replaced (or kept clear of again), and what was last laid by rule laid again for it. */
+  const existingPanels = async (replace: boolean): Promise<string> => {
+    replacingRef.current = replace;
+    setReplacing(replace);
+    const said = replace
+      ? "The existing panels are being replaced: new panels may go where they are."
+      : "Keeping clear of the existing panels again.";
+    const last = lastLay.current;
+    if (!last) return `${said} Lay the panels and I'll use it.`;
+    if (last.kind === "mine") {
+      await designForMe(false, last.goal);
+      return said;
+    }
+    return `${said} ${(await fillTo(last.kw, last.facing)).words}`;
+  };
+  /** The button's answer, shown as Sol's (busy, then what he did). */
+  const answerExisting = async (replace: boolean) => {
+    if (commandBusy) return;
+    setCommandBusy(true);
+    setAsked(replace ? "The existing panels are being replaced." : "Keep clear of the existing panels.");
+    setCommandReply(null);
+    setSystemWords("");
+    try {
+      setCommandReply(await existingPanels(replace));
+    } finally {
+      setCommandBusy(false);
+      setAsked(null);
+    }
+  };
   const runCommand = async (command: DesignCommand): Promise<string> => {
     switch (command.do) {
+      case "replaceExisting":
+        return existingPanels(true);
+      case "keepExisting":
+        return existingPanels(false);
       case "targetKw":
         if (!command.facing && summary.panels > 0 && Math.abs(summary.kw - command.kw) <= Math.max(0.5, command.kw * 0.05))
           return `The panels already make ${summary.kw.toFixed(2)} kW: left as they are.`;
@@ -4219,6 +4292,8 @@ export function RoofDesigner(props: {
       return;
     }
     setCommandBusy(true);
+    setAsked(text);
+    setCommandText("");
     setCommandReply(null);
     setChoices(null);
     setConfirmDelete(null);
@@ -4240,6 +4315,7 @@ export function RoofDesigner(props: {
       setCommandOpen(false);
     } finally {
       setCommandBusy(false);
+      setAsked(null);
     }
   };
   useEffect(() => {
@@ -4256,15 +4332,15 @@ export function RoofDesigner(props: {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   });
+  // In the pop-up the box stays under Sol's reply: the cursor goes back into it, ready for the next thing.
+  useEffect(() => {
+    if (props.tight && commandReply) commandBox.current?.focus();
+  }, [props.tight, commandReply]);
   useEffect(() => {
     if (!commandReply || commandOpen) return;
     const t = window.setTimeout(() => setCommandReply(null), 9000);
     return () => window.clearTimeout(t);
   }, [commandReply, commandOpen]);
-  // In the pop-up the box stays under Sol's reply: the cursor goes back into it, ready for the next thing.
-  useEffect(() => {
-    if (props.tight && commandReply) commandBox.current?.focus();
-  }, [props.tight, commandReply]);
   // "/" opens the command bar, as on the design home; Escape closes it.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -5453,7 +5529,7 @@ export function RoofDesigner(props: {
               )}
               {/* In the pop-up the box and Sol's answer are one black panel growing out of the Ask Sol pill (9 Nov 2026,
                   Martin: it should physically connect to Sol below, and stay black): its foot runs behind the pill. */}
-              {props.tight && (commandOpen || commandReply || opening || calcOpen) && (
+              {props.tight && (commandOpen || commandReply || commandBusy || opening || calcOpen) && (
                 <div
                   className="absolute bottom-[3.5rem] left-1/2 z-50 flex w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2 rounded-[28px] bg-primary px-2.5 pb-[2.6rem] pt-2.5 text-white shadow-[0_18px_50px_rgba(11,11,12,0.4)] ring-1 ring-white/10 transition duration-200 ease-out starting:translate-y-3 starting:opacity-0 motion-reduce:transition-none"
                   data-popup
@@ -5477,13 +5553,33 @@ export function RoofDesigner(props: {
                       />
                     )
                   )}
+                  {commandBusy && asked && (
+                    <div className="flex flex-col gap-2 px-2.5 pt-1.5">
+                      <p className="max-w-[85%] self-end rounded-2xl bg-white/10 px-3 py-1.5 text-[13.5px] text-white/85">{asked}</p>
+                      <div className="[&_.text-muted]:text-white/65">
+                        <SolThinking />
+                      </div>
+                    </div>
+                  )}
                   {commandReply && (
                     <div className="flex items-start gap-2.5 px-2.5 pt-1.5" role="status">
                       <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
-                      <p className="min-w-0 flex-1 text-[14px] leading-relaxed text-white/90">
-                        {commandReply}
-                        {systemWords && ` ${systemWords}`}
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] leading-relaxed text-white/90">
+                          {commandReply}
+                          {systemWords && ` ${systemWords}`}
+                        </p>
+                        {roofCheckNow && hasSolar(roofCheckNow.things) && (
+                          <button
+                            type="button"
+                            disabled={commandBusy}
+                            onClick={() => void answerExisting(!replacing)}
+                            className="mt-2 rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+                          >
+                            {replacing ? "Keep clear of the existing panels" : "The existing panels are being replaced: use their roof"}
+                          </button>
+                        )}
+                      </div>
                       {!commandOpen && (
                         <button
                           type="button"
@@ -5645,11 +5741,29 @@ export function RoofDesigner(props: {
                       <X className="size-4" aria-hidden />
                     </button>
                   </form>
+                  {commandBusy && asked && (
+                    <div className={clsx(GLASS, "mt-2 flex flex-col gap-1.5 px-4 py-2.5")}>
+                      <p className="text-sm text-ink-2">{asked}</p>
+                      <SolThinking />
+                    </div>
+                  )}
                   {commandReply && (
-                    <p className={clsx(GLASS, "mt-2 px-4 py-2.5 text-sm text-ink")} role="status">
-                      {commandReply}
-                      {systemWords && ` ${systemWords}`}
-                    </p>
+                    <div className={clsx(GLASS, "mt-2 px-4 py-2.5 text-sm text-ink")} role="status">
+                      <p>
+                        {commandReply}
+                        {systemWords && ` ${systemWords}`}
+                      </p>
+                      {roofCheckNow && hasSolar(roofCheckNow.things) && (
+                        <button
+                          type="button"
+                          disabled={commandBusy}
+                          onClick={() => void answerExisting(!replacing)}
+                          className="mt-2 rounded-full px-3 py-1 text-[12.5px] font-medium ring-1 ring-line hover:bg-surface-2"
+                        >
+                          {replacing ? "Keep clear of the existing panels" : "The existing panels are being replaced: use their roof"}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -6360,8 +6474,9 @@ export function RoofDesigner(props: {
                   {roofCheckNow?.things.map((t, i) => {
                     const pts = t.box.map(px);
                     const [lx, ly] = pts[0];
+                    const going = replacing && t.type === "existing panels";
                     return (
-                      <g key={`found-${i}`} className="pointer-events-none">
+                      <g key={`found-${i}`} className={clsx("pointer-events-none", going && "opacity-45")}>
                         <polygon
                           points={pts.map(([x, y]) => `${x},${y}`).join(" ")}
                           className="fill-warning/10 stroke-warning"
@@ -6369,7 +6484,7 @@ export function RoofDesigner(props: {
                           strokeDasharray={`${4 * u} ${3 * u}`}
                         />
                         <text x={lx + 2 * u} y={ly - 2.5 * u} className="fill-warning" fontSize={7 * u} fontWeight={600}>
-                          {thingLabel(t)}
+                          {going ? "Being replaced" : thingLabel(t)}
                         </text>
                       </g>
                     );
@@ -8254,7 +8369,7 @@ export function RoofDesigner(props: {
                 className={clsx(
                   "pointer-events-none absolute inset-x-2 bottom-7 flex items-end gap-2",
                   // Over Sol's black panel while it is out, so the pill stands at its foot as one piece.
-                  props.tight && (commandOpen || commandReply || opening || calcOpen) ? "z-[55]" : "z-10",
+                  props.tight && (commandOpen || commandReply || commandBusy || opening || calcOpen) ? "z-[55]" : "z-10",
                 )}
               >
                 {/* In the pop-up the foot of the picture is Sol alone (8 Nov 2026, Martin): ask him to change the design. */}
@@ -8470,6 +8585,15 @@ export function RoofDesigner(props: {
                           {n}
                         </p>
                       ))}
+                      {roofCheckNow && hasSolar(roofCheckNow.things) && (
+                        <button
+                          type="button"
+                          onClick={() => void answerExisting(!replacing)}
+                          className="rounded-full px-3 py-1 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2"
+                        >
+                          {replacing ? "Keep clear of the existing panels" : "The existing panels are being replaced: use their roof"}
+                        </button>
+                      )}
                       <p className="text-muted">
                         Estimates from the bill and the price lists: one price at all times, no price rises. Check every design against the
                         picture before it goes to the customer.{" "}

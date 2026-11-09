@@ -254,3 +254,16 @@ describe("deleting a design, asked first", () => {
     for (const x of ["fit 8 kW", "yes but make it landscape", "now delete design 3"]) expect(confirmWord(x)).toBeNull();
   });
 });
+
+describe("the panels already on the roof", () => {
+  it("reads being replaced, and keeping clear", () => {
+    expect(parseCommand("ignore the existing panels")).toEqual({ do: "replaceExisting" });
+    expect(parseCommand("the existing panels are being replaced")).toEqual({ do: "replaceExisting" });
+    expect(parseCommand("remove the existing panels and use that roof")).toEqual({ do: "replaceExisting" });
+    expect(parseCommand("keep clear of the existing panels")).toEqual({ do: "keepExisting" });
+    expect(parseCommand("remove the panels")).toEqual({ do: "removePanels" });
+  });
+  it("is something Sol may answer with", () => {
+    expect(commandFrom({ do: "replaceExisting", words: "Using their roof." })).toEqual({ do: "replaceExisting" });
+  });
+});

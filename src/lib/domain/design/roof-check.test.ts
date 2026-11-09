@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { packArea, type Area } from "./pack";
 import { PANEL, inside } from "./roof-design";
-import { boxOnRoof, hasSolar, keepOuts, keptClearWords, roofThings, thingLabel } from "./roof-check";
+import { boxOnRoof, hasSolar, keepOuts, keptClearWords, roofThings, thingLabel, withoutExisting } from "./roof-check";
 import { suggestPanels } from "./suggest";
 
 const lat = -37.936943;
@@ -115,5 +115,29 @@ describe("words", () => {
     expect(thingLabel(things[0])).toBe("Existing panels");
     expect(thingLabel({ type: "other", note: "pergola frame at rear of roof", box: [] })).toBe("Pergola frame at");
     expect(thingLabel({ type: "other", box: [] })).toBe("Keep clear");
+  });
+});
+
+describe("what is left out", () => {
+  it("drops a large 'something else' (a pergola, a glass roof), keeps a small one and every fixture", () => {
+    const things = roofThings(
+      [
+        { type: "other", note: "polycarbonate roof", box: [300, 300, 600, 600] },
+        { type: "other", note: "box", box: [300, 300, 310, 310] },
+        { type: "existing panels", box: [100, 100, 400, 400] },
+      ],
+      lat,
+    );
+    expect(things.map((t) => t.type)).toEqual(["other", "existing panels"]);
+  });
+  it("leaves out the existing panels when they are being replaced", () => {
+    const things = roofThings(
+      [
+        { type: "existing panels", box: [100, 100, 200, 200] },
+        { type: "vent", box: [300, 300, 310, 310] },
+      ],
+      lat,
+    );
+    expect(withoutExisting(things).map((t) => t.type)).toEqual(["vent"]);
   });
 });

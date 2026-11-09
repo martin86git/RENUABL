@@ -46,9 +46,23 @@ export function boxOnRoof(box: [number, number, number, number], lat: number): P
   ];
 }
 
-/** What was found, set on the roof. */
+/**
+ * The biggest "something else" kept clear of, square metres: past it, a box is a pergola, a glass roof or a whole
+ * part of the roof read as one thing, not a fixture, and would rule out roof that may be used (9 Nov 2026).
+ */
+export const MAX_OTHER_M2 = 6;
+
+const boxArea = (box: Point[]) => {
+  const xs = box.map((p) => p.x);
+  const ys = box.map((p) => p.y);
+  return (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
+};
+
+/** What was found, set on the roof (a large "something else" left out: `MAX_OTHER_M2`). */
 export function roofThings(items: readonly Obstruction[], lat: number): RoofThing[] {
-  return items.map((o) => ({ type: o.type, ...(o.note ? { note: o.note } : {}), box: boxOnRoof(o.box, lat) }));
+  return items
+    .map((o): RoofThing => ({ type: o.type, ...(o.note ? { note: o.note } : {}), box: boxOnRoof(o.box, lat) }))
+    .filter((t) => t.type !== "other" || boxArea(t.box) <= MAX_OTHER_M2);
 }
 
 /** Each thing's box grown by the clearance kept round it, as the places the packer keeps clear. */
@@ -116,3 +130,9 @@ export function thingLabel(t: RoofThing): string {
   }
   return t.type[0].toUpperCase() + t.type.slice(1);
 }
+
+/** The things to keep clear of with the panels already there left out: they are being replaced (9 Nov 2026, Martin). */
+export const withoutExisting = (things: readonly RoofThing[]) => things.filter((t) => t.type !== "existing panels");
+
+/** What a design laid over the existing panels says. */
+export const REPLACING_NOTE = "Laid over the existing panels, as they're being replaced: check what is coming off on site.";
