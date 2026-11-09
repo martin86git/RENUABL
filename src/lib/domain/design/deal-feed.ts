@@ -1,5 +1,7 @@
 import type { Heat } from "./deal-heat";
 import { countdownWords, type OutboxState } from "./sol-agents";
+import { LAUNCH_MARKET, marketDateTime, todayInMarket } from "../market";
+import { nextWorkingDay } from "./today-pad";
 import { STAGE_LABELS, type JobStage } from "./crm";
 import { askNeedWords, type AskType, type DealLine } from "./deal-team";
 
@@ -70,6 +72,8 @@ export interface FeedDeal {
   place: { lat: number; lng: number } | null;
   /** The deal's team chat (deal-team.ts): the pad's lines, oldest first, and the requests still waiting for a person. */
   team?: { lines: DealLine[]; openAsks: { id: string; type: AskType }[] };
+  /** Done or Later, pressed on the card (FeedMark): it holds until something new happens on the deal. */
+  mark?: FeedMark | null;
 }
 
 export type FeedView = "needs" | "all" | "sol";
@@ -94,6 +98,7 @@ export function lastAt(d: FeedDeal): string {
 
 /** Why this deal needs a person now, in words, or null when Sol and the record have it in hand. */
 export function needsYou(d: FeedDeal, now = new Date()): string | null {
+  if (markHolds(d, now)) return null;
   const latest = d.events[0];
   const name = first(d.customer);
   if (latest?.kind === "message") return `${name} is waiting on a reply`;
@@ -153,6 +158,7 @@ export interface NextMove {
  * By rule from the record, so it is free and instant.
  */
 export function nextMove(d: FeedDeal, now = new Date()): NextMove | null {
+  if (markHolds(d, now)) return null;
   const name = first(d.customer);
   if (d.events[0]?.kind === "message")
     return { kind: "reply", label: `Reply to ${name}`, why: `${name} asked something and is waiting on a reply.` };
@@ -258,4 +264,93 @@ export function batteryOf(details: Record<string, string>): number | null {
   const raw = details.batteryStorage || details.battery || "";
   const m = /(\d+(?:\.\d+)?)\s*kwh/i.exec(raw) ?? /^\s*(\d+(?:\.\d+)?)\s*$/.exec(raw);
   return m ? Number(m[1]) : null;
+}
+
+/**
+ * Done and Later on a card (9 Nov 2026, Martin: nothing on the feed felt finished; docs/plans/needs-you-sign-offs.md).
+ * The deal isn't what is done, the thing it needs from you now is. **Done** takes it out of Needs you (it was handled
+ * somewhere the record can't see: a call from your own phone, a word in the office); **Later** takes it out until a time
+ * or until they reply. Either way it comes back the moment anything new happens on the deal, so clearing a card can
+ * never bury a deal. One mark a deal, shared by the team, written on the deal's record.
+ */
+export type MarkKind = "done" | "later";
+export type LaterChoice = "tomorrow" | "week" | "reply";
+export interface FeedMark {
+  kind: MarkKind;
+  /** When Later runs out (ISO), or null: Done, or Later until they reply. */
+  until: string | null;
+  /** What it needed, in words, as it was cleared. */
+  need: string;
+  by: string;
+  /** ISO time it was pressed. */
+  at: string;
+}
+
+export const LATER_CHOICES: { id: LaterChoice; label: string }[] = [
+  { id: "tomorrow", label: "Tomorrow 9am" },
+  { id: "week", label: "Next week" },
+  { id: "reply", label: "Until they reply" },
+];
+
+/** Whether the deal's mark still holds: nothing has happened on it since, and a Later hasn't run out. */
+export function markHolds(d: Pick<FeedDeal, "mark" | "events" | "createdAt">, now = new Date()): boolean {
+  const m = d.mark;
+  if (!m) return false;
+  if (m.at < lastAt(d as FeedDeal)) return false;
+  return m.until === null || Date.parse(m.until) > now.getTime();
+}
+
+/** When a Later runs out, as an ISO time: 9am on the next working day, 9am next Monday, or never (until they reply). */
+export function laterUntil(choice: LaterChoice, now = new Date()): string | null {
+  if (choice === "reply") return null;
+  const today = todayInMarket(now);
+  if (choice === "tomorrow") return marketDateTime(nextWorkingDay(today), 9);
+  // Next Monday (a week on, when today is Monday), at 9am, passing over a holiday.
+  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
+  const ahead = (8 - weekday) % 7 || 7;
+  const monday = new Date(Date.parse(`${today}T12:00:00Z`) + (ahead - 1) * DAY).toISOString().slice(0, 10);
+  return marketDateTime(nextWorkingDay(monday as typeof today), 9);
+}
+
+/**
+ * Whether a line on the record is one Done or Later wrote. It stays on the record but isn't news on the card: were it, a
+ * Later pressed on "waiting on a reply" would make the reply look sent.
+ */
+export const isMarkLine = (text: string) => /^(Marked done|Put off) on Today[ :.]/.test(text.trim());
+
+/** The line written on the deal's record when Done or Later is pressed. */
+export function markRecordLine(kind: MarkKind, need: string, until: string | null): string {
+  const what = need.trim() ? `: ${need.trim()}` : "";
+  if (kind === "done") return `Marked done on Today${what}.`;
+  if (!until) return `Put off on Today until they reply${what}.`;
+  const when = new Date(until).toLocaleString("en-AU", {
+    timeZone: LAUNCH_MARKET.timeZone,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    hourCycle: "h12",
+  });
+  return `Put off on Today until ${when}${what}.`;
+}
+
+/** What a held mark says on the card: "Done by Sam", "Back Tue 9am", "Back when they reply". */
+export function markWords(m: FeedMark, now = new Date()): string {
+  const who = m.by.split("@")[0] || "someone";
+  if (m.kind === "done") return `Done by ${who}`;
+  if (!m.until) return "Back when they reply";
+  return `Back ${countdownWords(m.until, now)}`;
+}
+
+/** How a day's work reads beside All clear: "7 done today", "Sol sent 4". */
+export interface DayDone {
+  /** Things this member did on deals today: calls, emails, replies, proposals, moves, Done pressed. */
+  mine: number;
+  /** Emails and replies Sol sent today. */
+  sol: number;
+}
+export function allClearWords(done: DayDone | null): string {
+  if (!done) return "All clear.";
+  const parts = [done.mine > 0 ? `${done.mine} done today` : null, done.sol > 0 ? `Sol sent ${done.sol}` : null].filter(Boolean);
+  return parts.length ? `All clear. ${parts.join(". ")}.` : "All clear.";
 }

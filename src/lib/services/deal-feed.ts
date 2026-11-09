@@ -1,5 +1,5 @@
 /** Today's deal feed as the screens reach it (/api/design/feed), and the controls on its cards. */
-import type { FeedDeal } from "@/lib/domain/design/deal-feed";
+import type { DayDone, FeedDeal, FeedMark, LaterChoice } from "@/lib/domain/design/deal-feed";
 import { ask } from "./crm";
 
 export interface FeedAnswer {
@@ -8,6 +8,8 @@ export interface FeedAnswer {
   team: { email: string; name: string }[];
   /** How many example deals a made-up business has; null for a real business. */
   examples: number | null;
+  /** The day's work beside All clear; null when it couldn't be read. */
+  today?: DayDone | null;
 }
 
 export const loadFeed = () => ask<FeedAnswer>("/api/design/feed");
@@ -20,3 +22,6 @@ export const solCalls = (jobId: string) =>
 /** Adds the example deals to a made-up business, or clears them. */
 export const exampleDeals = (what: "add" | "clear") =>
   ask<{ examples: number | null }>("/api/design/examples", { method: "POST", body: { do: what } });
+/** Done or Later on a deal's card, or taken off again. */
+export const markFeedDeal = (jobId: string, act: "done" | "later" | "undo", o: { later?: LaterChoice; need?: string } = {}) =>
+  ask<{ mark: FeedMark | null }>("/api/design/feed", { method: "POST", body: { jobId, do: act, ...o } });

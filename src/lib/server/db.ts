@@ -672,6 +672,19 @@ create table if not exists design_deal_follows (
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
 create index if not exists design_deal_follows_email on design_deal_follows(business_id, email);
+-- Done and Later pressed on a deal's card on Today (domain/design/deal-feed.ts, FeedMark): one a deal, shared by the
+-- team, holding until something new happens on the deal or a Later runs out; gone with the deal.
+create table if not exists design_feed_marks (
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  kind text not null,
+  until timestamptz,
+  need text not null default '',
+  by_email text not null,
+  at timestamptz not null default now(),
+  primary key (business_id, job_id),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
 create table if not exists design_deal_seen (
   business_id text not null references businesses(id) on delete cascade,
   job_id text not null,

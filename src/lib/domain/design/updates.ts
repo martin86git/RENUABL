@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-09",
     area: "Today",
+    words: "A deal that needs you has Done and Later. Needs you counts down as you clear it, and at zero says what you got done today.",
+  },
+  {
+    day: "2026-11-09",
+    area: "Today",
     words: "The pipeline has a New deal button, and the pipeline picker on the feed opens wherever you press it.",
   },
   {

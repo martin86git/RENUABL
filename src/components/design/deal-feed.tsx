@@ -8,6 +8,8 @@ import {
   ArrowRight,
   ArrowUp,
   CalendarPlus,
+  Check,
+  Clock,
   ChevronDown,
   CornerUpLeft,
   Eye,
@@ -22,11 +24,16 @@ import {
   StickyNote,
   PenTool,
   Plus,
+  Undo2,
   X,
 } from "lucide-react";
 import {
   FEED_VIEWS,
+  LATER_CHOICES,
   agoWords,
+  allClearWords,
+  markHolds,
+  markWords,
   caption,
   feedFilter,
   feedOf,
@@ -39,6 +46,8 @@ import {
   type FeedEventKind,
   type FeedPipeline,
   type FeedView,
+  type FeedMark,
+  type LaterChoice,
 } from "@/lib/domain/design/deal-feed";
 import { OPEN_STAGES, STAGE_LABELS } from "@/lib/domain/design/crm";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
@@ -46,7 +55,7 @@ import { emailDeal, listPipelines } from "@/lib/services/crm";
 import { PIPELINES, type Pipeline } from "@/lib/domain/design/deal";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
 import { briefHref } from "@/lib/domain/design/deal-team";
-import { exampleDeals, loadFeed, writeWithSol, type FeedAnswer } from "@/lib/services/deal-feed";
+import { exampleDeals, loadFeed, markFeedDeal, writeWithSol, type FeedAnswer } from "@/lib/services/deal-feed";
 import { DEAL_TEAM_CHANGED } from "@/lib/services/deal-team";
 import { AerialRoof, type AerialRoofSpec, type RoofFinish, type RoofForm } from "./aerial-roof";
 import { PATHS } from "./design-shell";
@@ -91,7 +100,7 @@ export function DealFeed({ me }: { me: string }) {
   const load = useCallback(async () => {
     const r = await loadFeed();
     if (r.ok) {
-      setData({ deals: r.deals, callsOn: r.callsOn, team: r.team, examples: r.examples });
+      setData({ deals: r.deals, callsOn: r.callsOn, team: r.team, examples: r.examples, today: r.today ?? null });
       setProblem(null);
     } else setProblem(r.message);
   }, []);
@@ -160,6 +169,11 @@ export function DealFeed({ me }: { me: string }) {
   const needs = deals.filter((d) => needsYou(d, now)).length;
   const open = deals.filter((d) => OPEN_STAGES.includes(d.stage));
   const openValue = open.reduce((sum, d) => sum + (d.value ?? 0), 0);
+  // Done or Later on a card: the deal's mark put in place at once, then the feed read again (for the day's count).
+  const setMark = (jobId: string, mark: FeedMark | null) => {
+    setData((all) => (all ? { ...all, deals: all.deals.map((x) => (x.jobId === jobId ? { ...x, mark } : x)) } : all));
+    void load();
+  };
   const [filling, setFilling] = useState(false);
   const [adding, setAdding] = useState(false);
   const examples = async (what: "add" | "clear") => {
@@ -280,17 +294,32 @@ export function DealFeed({ me }: { me: string }) {
         </p>
       )}
       <div className="mt-4 space-y-3">
-        {data && shown.length === 0 && (
+        {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
+        {data && shown.length === 0 && view === "needs" && (
+          <div className="flex flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-10 text-center ring-1 ring-line">
+            <span className="grid size-11 place-items-center rounded-full bg-positive-soft text-positive">
+              <Check className="size-5" aria-hidden />
+            </span>
+            <p className="text-[16px] font-medium text-ink">{allClearWords(data.today ?? null)}</p>
+            <p className="text-[13px] text-ink-2">Nothing needs you right now. Sol has the rest in hand.</p>
+          </div>
+        )}
+        {data && shown.length === 0 && view !== "needs" && (
           <p className="rounded-2xl bg-surface px-5 py-8 text-center text-[14px] text-ink-2 ring-1 ring-line">
-            {view === "needs"
-              ? "Nothing needs you right now. Sol has the rest in hand."
-              : view === "sol"
-                ? "Sol has nothing lined up just now."
-                : "No deals being sold yet."}
+            {view === "sol" ? "Sol has nothing lined up just now." : "No deals being sold yet."}
           </p>
         )}
         {shown.map((d) => (
-          <DealCard key={d.jobId} deal={d} now={now} me={me} callsOn={Boolean(data?.callsOn)} team={data?.team ?? []} onChanged={load} />
+          <DealCard
+            key={d.jobId}
+            deal={d}
+            now={now}
+            me={me}
+            callsOn={Boolean(data?.callsOn)}
+            team={data?.team ?? []}
+            onChanged={load}
+            onMark={(mark) => setMark(d.jobId, mark)}
+          />
         ))}
       </div>
     </div>
@@ -304,11 +333,32 @@ function DealCard(props: {
   callsOn: boolean;
   team: { email: string; name: string }[];
   onChanged: () => void;
+  onMark: (mark: FeedMark | null) => void;
 }) {
   const { deal: d, now } = props;
   const need = needsYou(d, now);
   const move = nextMove(d, now);
   const [reviewing, setReviewing] = useState(false);
+  // A card cleared with Done or Later shows a tick for a moment before it leaves Needs you.
+  const [cleared, setCleared] = useState<string | null>(null);
+  const held = markHolds(d, now) ? d.mark! : null;
+  const [marking, setMarking] = useState(false);
+  const mark = async (act: "done" | "later", later?: LaterChoice) => {
+    if (marking) return;
+    setMarking(true);
+    const r = await markFeedDeal(d.jobId, act, { later, need: need ?? move?.label ?? "" });
+    setMarking(false);
+    if (!r.ok) return;
+    setCleared(act === "done" ? "Done" : "Later");
+    window.setTimeout(() => {
+      setCleared(null);
+      props.onMark(r.mark);
+    }, 650);
+  };
+  const undo = async () => {
+    const r = await markFeedDeal(d.jobId, "undo");
+    if (r.ok) props.onMark(null);
+  };
   // The deal's chat opened over the page from its glance (null: closed), with what was typed in the glance's box.
   const [chat, setChat] = useState<string | null>(null);
   // Call only dials; the note-taker is its own round, opened by hand with its microphone off (8 Nov 2026, Martin: the
@@ -322,7 +372,19 @@ function DealCard(props: {
   // the deal's post); the chat drops under the deal on a narrow screen.
   return (
     <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <article className={clsx("flex min-w-0 flex-col rounded-2xl bg-surface p-4 ring-1 sm:p-5", need ? "ring-sun-line/50" : "ring-line")}>
+      <article
+        className={clsx("relative flex min-w-0 flex-col rounded-2xl bg-surface p-4 ring-1 sm:p-5", need ? "ring-sun-line/50" : "ring-line")}
+      >
+        {cleared && (
+          <div className="feed-cleared absolute inset-0 z-10 grid place-items-center rounded-2xl bg-surface/85" role="status">
+            <span className="flex items-center gap-2 text-[15px] font-medium text-ink">
+              <span className="grid size-9 place-items-center rounded-full bg-positive-soft text-positive">
+                <Check className="size-5" aria-hidden />
+              </span>
+              {cleared}
+            </span>
+          </div>
+        )}
         <div className="flex gap-4">
           <RoofThumb deal={d} />
           <div className="min-w-0 flex-1">
@@ -339,8 +401,28 @@ function DealCard(props: {
               {d.clock && OPEN_STAGES.includes(d.stage) ? ` · ${d.clock}` : ""}
             </p>
             {need && (
-              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-sun px-2.5 py-0.5 text-[12px] font-medium text-sun-ink">
-                {need}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <p className="inline-flex items-center gap-1.5 rounded-full bg-sun px-2.5 py-0.5 text-[12px] font-medium text-sun-ink">
+                  {need}
+                </p>
+                <MarkButtons busy={marking} onDone={() => void mark("done")} onLater={(c) => void mark("later", c)} />
+              </div>
+            )}
+            {held && (
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] text-ink-2">
+                {held.kind === "done" ? (
+                  <Check className="size-3.5 text-positive" aria-hidden />
+                ) : (
+                  <Clock className="size-3.5" aria-hidden />
+                )}
+                {markWords(held, now)}
+                <button
+                  type="button"
+                  onClick={() => void undo()}
+                  className="ml-1 inline-flex items-center gap-1 font-medium text-ink hover:underline"
+                >
+                  <Undo2 className="size-3" aria-hidden /> Undo
+                </button>
               </p>
             )}
           </div>
@@ -925,5 +1007,62 @@ function RoofThumb({ deal: d, small }: { deal: FeedDeal; small?: boolean }) {
 function DesignedTag() {
   return (
     <span className="absolute bottom-1 left-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">Designed</span>
+  );
+}
+
+/**
+ * Done and Later beside what a deal needs (9 Nov 2026, Martin; docs/plans/needs-you-sign-offs.md): Done for something
+ * handled where the record can't see it, Later to bring it back tomorrow, next week or when they reply. Either way it
+ * comes back the moment anything new happens on the deal.
+ */
+function MarkButtons(props: { busy: boolean; onDone: () => void; onLater: (c: LaterChoice) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const pill =
+    "inline-flex h-6 items-center gap-1 rounded-full px-2 text-[12px] font-medium text-ink-2 ring-1 ring-line transition hover:bg-surface-2 hover:text-ink disabled:text-muted";
+  return (
+    <div ref={box} className="relative flex items-center gap-1">
+      <button type="button" disabled={props.busy} onClick={props.onDone} className={pill} title="Handled: take it out of Needs you">
+        <Check className="size-3.5" aria-hidden /> Done
+      </button>
+      <button
+        type="button"
+        disabled={props.busy}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className={pill}
+        title="Not now: bring it back later"
+      >
+        <Clock className="size-3.5" aria-hidden /> Later
+      </button>
+      {open && (
+        <div className="absolute left-0 top-7 z-20 w-44 overflow-hidden rounded-xl bg-surface py-1 shadow-[0_10px_30px_rgba(11,11,12,0.12)] ring-1 ring-line">
+          {LATER_CHOICES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                props.onLater(c.id);
+              }}
+              className="block w-full px-3 py-2 text-left text-[13px] text-ink hover:bg-surface-2"
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

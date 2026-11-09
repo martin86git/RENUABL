@@ -13,9 +13,24 @@ import { readDraft, writeAsk, writeSystem, type WriteFacts } from "@/lib/domain/
 import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { USE_TIER } from "@/lib/domain/design/sol-routing";
 import { redactSecrets } from "./bill-reader";
-import { batteryOf, CARD_EVENTS, suburbOfAddress, type FeedDeal, type FeedEvent, type FeedEventKind } from "@/lib/domain/design/deal-feed";
+import {
+  batteryOf,
+  CARD_EVENTS,
+  isMarkLine,
+  laterUntil,
+  markRecordLine,
+  suburbOfAddress,
+  type DayDone,
+  type FeedDeal,
+  type FeedEvent,
+  type FeedEventKind,
+  type FeedMark,
+  type LaterChoice,
+  type MarkKind,
+} from "@/lib/domain/design/deal-feed";
+import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { newId, query, transaction } from "./db";
-import { jobById, listJobs } from "./design-crm-repo";
+import { jobById, listJobs, record } from "./design-crm-repo";
 import { padsFor } from "./design-deal-team-repo";
 import { dealPulses } from "./design-pulse-repo";
 import { outbox } from "./design-sol-agents";
@@ -33,6 +48,8 @@ function eventOfActivity(kind: string, text: string, at: string, by: string): Fe
   if (!k) return null;
   // Sol's notes and requests are written on the record from the deal's team chat, which the card's pad already shows.
   if (k === "note" && by === "sol") return null;
+  // Done and Later write a line on the record; it isn't news on the card (deal-feed.ts, isMarkLine).
+  if (k === "note" && isMarkLine(words)) return null;
   if (k === "proposal" && /opened/i.test(words)) return { kind: "opened", text: words, at, by: handle(by) };
   return { kind: by === "sol" ? (k === "email" ? "sol" : k) : k, text: words, at, by: handle(by) };
 }
@@ -45,7 +62,7 @@ export async function dealFeed(
   const jobs = (await listJobs(businessId, viewer)).filter((j) => OPEN_STAGES.includes(j.stage) || PRE_INSTALL_STAGES.includes(j.stage));
   if (!jobs.length) return [];
   const ids = jobs.map((j) => j.id);
-  const [pulses, box, customers, activity, messages, proposals, pads] = await Promise.all([
+  const [pulses, box, customers, activity, messages, proposals, pads, marks] = await Promise.all([
     dealPulses(businessId, viewer).catch(() => ({}) as Awaited<ReturnType<typeof dealPulses>>),
     outbox(member, viewer, true).catch(() => null),
     query<{ id: string; phone: string; email: string; sample: boolean }>(
@@ -73,6 +90,11 @@ export async function dealFeed(
       [businessId, ids],
     ),
     padsFor(businessId, ids).catch(() => ({}) as Awaited<ReturnType<typeof padsFor>>),
+    query<{ job: string; kind: MarkKind; until: string | null; need: string; by: string; at: string }>(
+      `select job_id as job, kind, ${moment("until")} as until, need, by_email as by, ${moment("at")} as at
+         from design_feed_marks where business_id = $1 and job_id = any($2)`,
+      [businessId, ids],
+    ).catch(() => []),
   ]);
   const byCustomer = new Map(customers.map((c) => [c.id, c]));
   return jobs.map((j): FeedDeal => {
@@ -138,6 +160,7 @@ export async function dealFeed(
       phone: c?.phone || null,
       place: j.lat !== null && j.lng !== null ? { lat: j.lat, lng: j.lng } : null,
       ...(pads[j.id] ? { team: pads[j.id] } : {}),
+      mark: markOf(marks.find((m) => m.job === j.id)),
     };
   });
 }
@@ -329,4 +352,72 @@ export async function addExampleDeals(businessId: string): Promise<number> {
 /** Takes every example deal away (their customers, and with them their deals, record and chat). */
 export async function clearExampleDeals(businessId: string): Promise<void> {
   await query(`delete from design_customers where business_id = $1 and source = $2 and sample = true`, [businessId, EXAMPLE_SOURCE]);
+}
+
+const markOf = (m: { kind: MarkKind; until: string | null; need: string; by: string; at: string } | undefined): FeedMark | null =>
+  m ? { kind: m.kind === "later" ? "later" : "done", until: m.until, need: m.need, by: m.by, at: m.at } : null;
+
+/** Why a Done or Later can't be kept. */
+export type MarkRefusal = "missing";
+
+/**
+ * Done or Later pressed on a deal's card (9 Nov 2026, Martin): kept as the deal's one mark, replacing any before, and
+ * written on its record in the same moment, so the line on the record doesn't count as something new. Only a deal the
+ * member may see.
+ */
+export async function markDeal(
+  member: { businessId: string; email: string },
+  viewer: DealViewer,
+  jobId: string,
+  o: { kind: MarkKind; later?: LaterChoice; need: string },
+): Promise<FeedMark | MarkRefusal> {
+  const found = await jobById(member.businessId, jobId, viewer);
+  if (!found) return "missing";
+  const until = o.kind === "later" ? laterUntil(o.later ?? "tomorrow") : null;
+  const need = o.need.replace(/\s+/g, " ").trim().slice(0, 120);
+  return transaction(async (q) => {
+    await record(q, member.businessId, {
+      customerId: found.job.customerId,
+      jobId,
+      kind: "note",
+      text: markRecordLine(o.kind, need, until),
+      by: member.email,
+    });
+    const rows = await q<{ kind: MarkKind; until: string | null; need: string; by: string; at: string }>(
+      `insert into design_feed_marks (business_id, job_id, kind, until, need, by_email, at) values ($1, $2, $3, $4, $5, $6, now())
+       on conflict (business_id, job_id) do update set kind = excluded.kind, until = excluded.until, need = excluded.need,
+         by_email = excluded.by_email, at = excluded.at
+       returning kind, ${moment("until")} as until, need, by_email as by, ${moment("at")} as at`,
+      [member.businessId, jobId, o.kind, until, need, member.email],
+    );
+    return markOf(rows[0])!;
+  });
+}
+
+/** Undo: the deal's mark taken off, so it is back in Needs you if it needs you. */
+export async function unmarkDeal(member: { businessId: string }, viewer: DealViewer, jobId: string): Promise<boolean> {
+  if (!(await jobById(member.businessId, jobId, viewer))) return false;
+  await query(`delete from design_feed_marks where business_id = $1 and job_id = $2`, [member.businessId, jobId]);
+  return true;
+}
+
+/**
+ * The day's work beside All clear, in the market's day: what this member did on deals (calls, emails, notes, proposal
+ * updates and moves on the record, and replies in a customer's chat) and what Sol sent (emails and chat replies).
+ */
+export async function dayDone(businessId: string, me: string): Promise<DayDone> {
+  const tz = LAUNCH_MARKET.timeZone;
+  const rows = await query<{ mine: string; sol: string }>(
+    `select
+       (select count(*) from design_activity where business_id = $1 and by_email = $2 and job_id is not null
+          and kind in ('call','email','note','proposal','stage') and (at at time zone $3)::date = (now() at time zone $3)::date)
+       + (select count(*) from design_messages where business_id = $1 and by_email = $2 and not from_customer
+          and (at at time zone $3)::date = (now() at time zone $3)::date) as mine,
+       (select count(*) from design_activity where business_id = $1 and by_email = 'sol' and kind = 'email'
+          and (at at time zone $3)::date = (now() at time zone $3)::date)
+       + (select count(*) from design_messages where business_id = $1 and by_email = 'sol' and not from_customer
+          and (at at time zone $3)::date = (now() at time zone $3)::date) as sol`,
+    [businessId, me, tz],
+  );
+  return { mine: Number(rows[0]?.mine ?? 0), sol: Number(rows[0]?.sol ?? 0) };
 }

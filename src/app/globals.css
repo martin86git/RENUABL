@@ -717,3 +717,21 @@ body:has(.theme-installer) {
     animation: none;
   }
 }
+
+/* A card on Today's deal feed cleared with Done or Later: the tick fades in over it before it leaves Needs you. */
+.feed-cleared {
+  animation: feed-cleared 0.25s ease-out both;
+}
+@keyframes feed-cleared {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feed-cleared {
+    animation: none;
+  }
+}
