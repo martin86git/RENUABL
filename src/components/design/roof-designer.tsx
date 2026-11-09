@@ -325,7 +325,7 @@ const SHORTCUTS: [keys: string, does: string][] = [
 
 import { KnifeMenu, ToolFan } from "./tool-fan";
 
-const GLASS = "rounded-2xl border border-line bg-surface/90 shadow-lift backdrop-blur-md";
+const GLASS = "rounded-2xl border border-line bg-surface/75 shadow-lift backdrop-blur-md backdrop-saturate-150";
 /**
  * A kit round lit because its part is on the design (10 Nov 2026, Martin: "light up, like a light, when they exist in a
  * design … it should feel like it's been selected"): the signal orange ring, a soft glow and an orange glyph.
@@ -3824,8 +3824,7 @@ export function RoofDesigner(props: {
    * stay, and pressing Ask Sol brings the same panel back. A new answer brings it back by itself.
    */
   const [awayFrom, setAwayFrom] = useState<readonly unknown[] | null>(null);
-  const solAway =
-    awayFrom !== null && awayFrom[0] === commandReply && awayFrom[1] === commandBusy && awayFrom[2] === opening;
+  const solAway = awayFrom !== null && awayFrom[0] === commandReply && awayFrom[1] === commandBusy && awayFrom[2] === opening;
   const solPanel = useRef<HTMLDivElement>(null);
   const solPill = useRef<HTMLButtonElement>(null);
   const putSolAway = () => {
@@ -5631,9 +5630,10 @@ export function RoofDesigner(props: {
                 )}
               </div>
             </section>
-            {/* The picture's height as a variable, so the kit lists that open on it scroll inside it, clear of the tools at its foot. */}
+            {/* The picture's height as a variable, so the kit lists that open on it scroll inside it, clear of the tools at its foot.
+                Everything floating on it is dark glass (glass-dark, 10 Nov 2026, Martin). */}
             <div
-              className="relative mx-auto"
+              className="glass-dark relative mx-auto"
               style={
                 {
                   maxWidth: fit,

@@ -145,6 +145,36 @@
   color-scheme: light;
 }
 /*
+ * Dark glass for what floats on the roof picture (10 Nov 2026, Martin: the white plates looked like any solar design
+ * tool, rudimentary). The same semantic tokens turned dark, so every control on the picture, its menus and cards follow:
+ * graphite glass, light type, hairlines of white, and the signal orange kept for what is picked. --primary stays the
+ * graphite it is, so dark buttons (Design 1, Ask Sol) keep their look.
+ */
+.theme-studio .glass-dark,
+.glass-dark {
+  --canvas: #2a2c31;
+  --surface: #1c1e22;
+  --surface-2: #2e3137;
+  --ink: #f4f4f5;
+  --ink-2: #cfd1d6;
+  --muted: #989ba3;
+  --line: rgb(255 255 255 / 0.12);
+  --line-strong: rgb(255 255 255 / 0.22);
+  --primary: #3a3d43;
+  --primary-ink: #ffffff;
+  --forest: #5a5e66;
+  --sage: #2e3137;
+  --sun: rgb(255 90 31 / 0.16);
+  --sun-ink: #ffb08a;
+  --positive: #3ddc97;
+  --positive-soft: rgb(61 220 151 / 0.14);
+  --warning: #f5b041;
+  --warning-soft: rgb(245 176 65 / 0.14);
+  --danger: #ff6b5e;
+  --shadow-lift: 0 0 0 1px rgb(0 0 0 / 0.25), 0 14px 34px -12px rgb(0 0 0 / 0.55);
+  color-scheme: dark;
+}
+/*
  * The frame of the signed-in screens (31 Oct 2026, Primero's layout in RENUABL's colours): a near-white page, the soft
  * grey pad every page sits on (white cards on it), and slim rounded scroll bars with no arrows. Inside the pad the
  * canvas token is the pad's own grey, so anything drawn in it (a fade, a chat tail) sits on the right ground.
