@@ -37,7 +37,8 @@ const SCHEMA = {
 const prompt = (roofBox: [number, number, number, number]) =>
   `This is a satellite image (north up) of a house in Australia where solar panels will be installed. The main roof is roughly within [${roofBox.join(", ")}] (left, top, right, bottom on a 0–1000 scale).
 Find everything on that roof that panels must avoid: vents and whirlybirds, skylights, chimneys and flues, aerials, satellite dishes, air conditioner units, solar hot water, existing solar panels, and trees shading or overhanging the roof.
-Give a tight box for each, on the 0–1000 scale of the whole image. Only include what you can actually see; if the roof is clear, return an empty list. Ignore cars, the yard and neighbouring houses.`;
+Only things fixed on the roof's tiles or sheeting count. Never box a pergola, a veranda, a carport, a glass or polycarbonate roof, a shed or any other structure beside or below the main roof, and never box a whole section of roof (a lower roof, a wing, a dormer, a gable or a patch of a different colour is roof, not an obstruction).
+Give a tight box for each, on the 0–1000 scale of the whole image, round the thing itself and no more. Only include what you can actually see; if the roof is clear, return an empty list. Ignore cars, the yard and neighbouring houses.`;
 
 export async function checkObstructions(
   image: { data: ArrayBuffer; mediaType: "image/jpeg" | "image/png" },
