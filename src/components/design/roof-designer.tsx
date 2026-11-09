@@ -498,7 +498,10 @@ function Dial(props: {
     <div
       className={clsx(
         "absolute right-0 top-[56%] z-10 -translate-y-1/2 rounded-l-full border border-r-0 shadow-lift backdrop-blur-md",
-        props.dark ? "border-sun-line bg-primary/95 text-white ring-2 ring-sun-line" : "border-line bg-surface/90",
+        // Glass, so the map shows through (10 Nov 2026, Martin: the grey half circle covered too much of it).
+        props.dark
+          ? "border-sun-line bg-primary/95 text-white ring-2 ring-sun-line"
+          : "border-white/50 bg-white/15 shadow-[inset_0_1px_0_rgb(255_255_255/0.5),0_10px_30px_rgb(11_11_12/0.18)] backdrop-blur-[3px] backdrop-saturate-150",
       )}
       style={{ width: `${R}rem`, height: `${R * 2}rem` }}
       role="group"
@@ -537,7 +540,15 @@ function Dial(props: {
           <Trash2 className="size-[18px]" aria-hidden />
         </button>
       )}
-      <div className="absolute right-3 top-1/2 w-[6rem] -translate-y-1/2 text-right">{props.children}</div>
+      {/* On the glass, the words sit on a small frosted card of their own so they read over any roof. */}
+      <div
+        className={clsx(
+          "absolute right-3 top-1/2 w-[6.75rem] -translate-y-1/2 text-right",
+          !props.dark && "rounded-2xl bg-surface/80 p-2.5 shadow-lift ring-1 ring-white/60 backdrop-blur-md",
+        )}
+      >
+        {props.children}
+      </div>
     </div>
   );
 }
