@@ -87,6 +87,8 @@ export interface Face {
    * switched off and the strings saved with them still mean the same panels.
    */
   plan?: boolean;
+  /** Which of the home's roofs it is on, when there are several (as `LoosePanel.roof`). */
+  roof?: number;
 }
 
 /**
@@ -108,6 +110,24 @@ export interface LoosePanel {
   across?: boolean;
   /** Degrees up from flat. One placed before this existed takes `TILT.roof`. */
   tilt?: number;
+  /** Which of the home's roofs it is on, when there are several (1 is the second; none is the first). */
+  roof?: number;
+}
+
+/** The most roofs a home is designed with (the main one and up to three more: a garage, a patio). */
+export const ROOF_TAGS = 4;
+/** Which roof a panel or face is on: 0 for the home's own. */
+export const roofOf = (item: { roof?: number }) => item.roof ?? 0;
+/** A roof tag kept: a whole number from 1 to `ROOF_TAGS` - 1, else none. */
+const cleanRoofTag = (raw: unknown): { roof?: number } =>
+  Number.isInteger(raw) && (raw as number) >= 1 && (raw as number) < ROOF_TAGS ? { roof: raw as number } : {};
+/** After roof `removed` is taken away: what was on it goes back to the home's own roof, and the ones after move down one. */
+export function roofAfterRemoving<T extends { roof?: number }>(item: T, removed: number): T {
+  const at = roofOf(item);
+  if (at < removed) return item;
+  const { roof: _old, ...rest } = item;
+  const next = at === removed ? 0 : at - 1;
+  return (next ? { ...rest, roof: next } : rest) as T;
 }
 
 /**
@@ -531,6 +551,7 @@ export function freed(face: Face, place: PlacedPanel, id: string): LoosePanel {
     angle: turn360(facing - (face.landscape ? 90 : 0)),
     across: face.landscape,
     tilt: tiltOf(face),
+    ...(face.roof ? { roof: face.roof } : {}),
   };
 }
 
@@ -749,6 +770,7 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
       tilt: Math.round(finite(f.tilt, 0, TILT.max) ?? TILT.roof),
       off: off.sort((a, b) => a - b),
       ...(f.plan === true ? { plan: true } : {}),
+      ...cleanRoofTag(f.roof),
     });
   }
   const loose: LoosePanel[] = [];
@@ -768,6 +790,7 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
       angle: turn360(Math.round(angle)),
       across: p.across === true,
       tilt: Math.round(tilt ?? TILT.roof),
+      ...cleanRoofTag(p.roof),
     };
     if (tilt === null) {
       // Placed before panels had a direction of their own: it looks the way the face under it does (north, off

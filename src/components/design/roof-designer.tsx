@@ -187,6 +187,8 @@ import {
   type Point,
   type DesignGoal,
   type RoofDesign,
+  roofAfterRemoving,
+  roofOf,
 } from "@/lib/domain/design/roof-design";
 
 const GOLD = "var(--sun-line)";
@@ -200,6 +202,12 @@ const KIT_SIZE = 0.6;
 const OWN_ROOF_LIFT = 62;
 /** One colour a string, so they can be told apart on the roof. */
 const STRING_COLOURS = ["#86efac", "#f9a8d4", "#fdba74", "#fde047", "#7dd3fc", "#c4b5fd", "#fca5a5", "#5eead4"];
+/**
+ * Each of the home's roofs in a colour of its own, when there are several (10 Nov 2026, Martin: Roof 1 and Roof 2 on the
+ * left edge didn't say which panels were on which): the mark carries it, and the panels and faces on that roof are
+ * edged in it. Never the signal orange, which is for what is picked.
+ */
+const ROOF_COLOURS = ["#38bdf8", "#c084fc", "#34d399", "#fbbf24"];
 /** Strings are lettered: A, B, C. */
 const letter = (index: number) => String.fromCharCode(65 + (index % 26));
 /** A string check's verdict as a mark and a colour. */
@@ -344,11 +352,11 @@ const middle = (corners: readonly Point[]): Point => ({
 });
 /** Where each of the dial's rounds sits on its arc: degrees from straight left, up (negative) or down. */
 const DIAL_STEPS: [step: number, at: number][] = [
-  [-5, -34],
-  [-1, -17],
+  [-5, -40],
+  [-1, -20],
   [90, 0],
-  [1, 17],
-  [5, 34],
+  [1, 20],
+  [5, 40],
 ];
 
 /** What was read of a face's slope from Google's data, with the way to read it again. */
@@ -508,15 +516,15 @@ function Dial(props: {
         // Glass, so the map shows through (10 Nov 2026, Martin: the grey half circle covered too much of it).
         props.dark
           ? "border-sun-line bg-primary/95 text-white ring-2 ring-sun-line"
-          : "border-white/50 bg-white/15 shadow-[inset_0_1px_0_rgb(255_255_255/0.5),0_10px_30px_rgb(11_11_12/0.18)] backdrop-blur-[3px] backdrop-saturate-150",
+          : "border-white/50 bg-white/10 shadow-[inset_0_1px_0_rgb(255_255_255/0.5),0_10px_30px_rgb(11_11_12/0.18)] backdrop-blur-[1px]",
       )}
       style={{ width: `${R}rem`, height: `${R * 2}rem` }}
       role="group"
       aria-label={props.label}
     >
       <button
-        className={clsx(round, "size-11 text-ink-2 hover:text-ink")}
-        style={at(-50, R - 3)}
+        className={clsx(round, "size-9 text-ink-2 hover:text-ink")}
+        style={at(-60, R - 3)}
         onClick={props.onClose}
         title={props.closeTitle}
         aria-label={props.closeTitle}
@@ -527,7 +535,7 @@ function Dial(props: {
         DIAL_STEPS.map(([step, degrees]) => (
           <button
             key={step}
-            className={clsx(round, "size-11 text-sm font-semibold tabular-nums text-ink")}
+            className={clsx(round, "size-9 text-[12.5px] font-semibold tabular-nums text-ink")}
             style={at(degrees, R - 2.1)}
             onClick={() => props.onTurn?.(step)}
             aria-label={`Turn ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
@@ -538,8 +546,8 @@ function Dial(props: {
         ))}
       {props.onRemove && (
         <button
-          className={clsx(round, "size-11 text-danger")}
-          style={at(50, R - 3)}
+          className={clsx(round, "size-9 text-danger")}
+          style={at(60, R - 3)}
           onClick={props.onRemove}
           title="Take out what is picked (Delete)"
           aria-label="Take out what is picked"
@@ -783,6 +791,9 @@ function RoofPitches(props: {
               <RoofAngle pitch={isFlat ? 0 : p} />
               <span className="text-xs font-semibold tabular-nums leading-none">{isFlat ? "Flat" : `${p}°`}</span>
               {several && <span className="text-[9px] font-medium uppercase tracking-[0.1em] text-muted">Roof {i + 1}</span>}
+              {several && (
+                <span className="mt-0.5 h-1 w-7 rounded-full" style={{ background: ROOF_COLOURS[i % ROOF_COLOURS.length] }} aria-hidden />
+              )}
             </button>
           );
         })}
@@ -1617,6 +1628,10 @@ export function RoofDesigner(props: {
   const [activeRoof, setActiveRoof] = useState(0);
   const roofInUse = Math.min(activeRoof, roofPitches.length - 1);
   const homePitch = roofPitches[roofInUse];
+  // With more than one roof, panels and faces are edged in their roof's colour.
+  const severalRoofs = roofPitches.length > 1;
+  const roofTag = roofInUse ? { roof: roofInUse } : {};
+  const roofEdge = (item: { roof?: number }) => ROOF_COLOURS[roofOf(item) % ROOF_COLOURS.length];
   const [pitchOpen, setPitchOpen] = useState(false);
   const setQuote = (next: QuoteFields) => {
     setQuotes(
@@ -1935,7 +1950,7 @@ export function RoofDesigner(props: {
       const on = [...faces].reverse().find((f) => inside(p, f.points));
       const open: LoosePanel = on
         ? { ...freed(on, { index: 0, corners: [p, p, p, p] }, "ghost"), x: p.x, y: p.y }
-        : { id: "ghost", x: p.x, y: p.y, angle: 0, tilt: homePitch };
+        : { id: "ghost", x: p.x, y: p.y, angle: 0, tilt: homePitch, ...roofTag };
       return addLandscape === null ? open : laidAs(open, addLandscape);
     }
     const a = (base.angle * Math.PI) / 180;
@@ -2081,7 +2096,18 @@ export function RoofDesigner(props: {
     setTracing([]);
     if (points.length < 3) return;
     const id = newId("f");
-    const made: Face = { id, points, angle: 0, landscape: false, setback: 0.3, facing: "N", tilt: homePitch, off: [], plan: true };
+    const made: Face = {
+      id,
+      points,
+      angle: 0,
+      landscape: false,
+      setback: 0.3,
+      facing: "N",
+      tilt: homePitch,
+      off: [],
+      plan: true,
+      ...roofTag,
+    };
     setFaces([...faces, { ...made, angle: angleOfLongestEdge(made) }]);
     changed();
     setSelected(id);
@@ -6122,9 +6148,9 @@ export function RoofDesigner(props: {
                           points={path(f.points)}
                           fill="#ffffff"
                           fillOpacity={on ? 0.08 : 0.03}
-                          stroke={on ? GOLD : "#ffffff"}
-                          strokeOpacity={on ? 1 : 0.55}
-                          strokeWidth={(on ? 1.4 : 1) * u}
+                          stroke={on ? GOLD : severalRoofs ? roofEdge(f) : "#ffffff"}
+                          strokeOpacity={on ? 1 : severalRoofs ? 0.9 : 0.55}
+                          strokeWidth={(on ? 1.4 : severalRoofs ? 1.3 : 1) * u}
                         />
                         {panelPlaces(f, size).map((panel) => {
                           // A place whose panel was taken out or moved away is simply empty roof: nothing is drawn there.
@@ -6138,8 +6164,16 @@ export function RoofDesigner(props: {
                                 points={path(panel.corners)}
                                 fill={wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#0d1219"}
                                 fillOpacity={wired >= 0 ? 0.72 : 0.9}
-                                stroke={lit ? GOLD : wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#93a0b1"}
-                                strokeWidth={(lit ? 0.9 : 0.5) * u}
+                                stroke={
+                                  lit
+                                    ? GOLD
+                                    : wired >= 0
+                                      ? STRING_COLOURS[wired % STRING_COLOURS.length]
+                                      : severalRoofs
+                                        ? roofEdge(f)
+                                        : "#93a0b1"
+                                }
+                                strokeWidth={(lit ? 0.9 : severalRoofs && wired < 0 ? 0.8 : 0.5) * u}
                               />
                               {aspect(
                                 middle(panel.corners),
@@ -6164,8 +6198,16 @@ export function RoofDesigner(props: {
                           points={path(looseCorners(panel, size))}
                           fill={wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#0d1219"}
                           fillOpacity={wired >= 0 ? 0.72 : 0.9}
-                          stroke={lit ? GOLD : wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#93a0b1"}
-                          strokeWidth={(lit ? 0.9 : 0.5) * u}
+                          stroke={
+                            lit
+                              ? GOLD
+                              : wired >= 0
+                                ? STRING_COLOURS[wired % STRING_COLOURS.length]
+                                : severalRoofs
+                                  ? roofEdge(panel)
+                                  : "#93a0b1"
+                          }
+                          strokeWidth={(lit ? 0.9 : severalRoofs && wired < 0 ? 0.8 : 0.5) * u}
                         />
                         {aspect(panel, panelFacing(panel), panel.tilt ?? TILT.roof, wired >= 0 ? "#0b0c0e" : lit ? GOLD : "#93a0b1")}
                       </g>
@@ -6897,7 +6939,11 @@ export function RoofDesigner(props: {
                     setActiveRoof(i);
                     setPitchOpen(false);
                     // Panels picked go to that roof's pitch.
-                    if (panelPicks.length) amend((panel) => ({ ...panel, tilt: roofPitches[i] }));
+                    if (panelPicks.length)
+                      amend((panel) => {
+                        const { roof: _was, ...rest } = panel;
+                        return { ...rest, tilt: roofPitches[i], ...(i ? { roof: i } : {}) };
+                      });
                   }}
                   onPitch={(i, pitch) =>
                     setQuote({
@@ -6915,6 +6961,9 @@ export function RoofDesigner(props: {
                   }}
                   onRemove={(i) => {
                     setQuote({ ...quoteNow, form: { ...quoteNow.form, pitches: roofPitches.slice(1).filter((_, j) => j !== i - 1) } });
+                    // What was on it goes back to roof 1; the roofs after it move down one.
+                    setLoose((list) => list.map((panel) => roofAfterRemoving(panel, i)));
+                    setFaces((list) => list.map((fc) => roofAfterRemoving(fc, i)));
                     setActiveRoof(0);
                     setPitchOpen(false);
                   }}
@@ -7668,7 +7717,15 @@ export function RoofDesigner(props: {
                   <Dial
                     label="Turn the rows"
                     // The rows run the same turned half way round, so their angle stays between a quarter turn either way.
-                    onTurn={(step) => update(face.id, { angle: ((((face.angle + step + 90) % 180) + 180) % 180) - 90, off: [] })}
+                    onTurn={(step) => {
+                      const angle = ((((face.angle + step + 90) % 180) + 180) % 180) - 90;
+                      // A face whose own grid is switched off (its panels laid on it as panels by hand, or by the rules)
+                      // stays empty when its rows turn: switching its grid back on put a second set of panels down
+                      // with every press (10 Nov 2026, Martin: +1 kept adding panels).
+                      const places = panelPlaces(face, size);
+                      const empty = places.length > 0 && face.off.length > places.length / 2;
+                      update(face.id, { angle, off: empty ? panelPlaces({ ...face, angle }, size).map((x) => x.index) : [] });
+                    }}
                     onClose={() => setSelected(null)}
                     closeTitle="Leave this roof face"
                   >
