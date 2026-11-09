@@ -118,9 +118,9 @@ import {
   allByQuery,
   pricesInWords,
   pickByQuery,
-  type Choice,
   confirmWord,
   deleteQuestion,
+  type Choice,
   type DesignCommand,
   type Facing as Way,
 } from "@/lib/domain/design/design-commands";
@@ -3668,6 +3668,8 @@ export function RoofDesigner(props: {
   // Sol's question with options, when a request could mean different things; the request of the one chosen is run.
   const [choices, setChoices] = useState<{ question: string; options: Choice[] } | null>(null);
   const [otherText, setOtherText] = useState("");
+  /** The design (by index) Sol has been asked to delete, waiting for the person's Yes (9 Nov 2026, Martin). */
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const commandBox = useRef<HTMLInputElement>(null);
   const letterOf = (i: number) => String.fromCharCode(65 + i);
   const designInWords = () =>
@@ -3704,8 +3706,6 @@ export function RoofDesigner(props: {
     return [
       designInWords(),
       pricesInWords({
-  /** The design (by index) Sol has been asked to delete, waiting for the person's Yes (9 Nov 2026, Martin). */
-  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
         costsHidden,
         lines: costing.lines,
         priceIncGst: costing.priceIncGst,
@@ -3880,6 +3880,7 @@ export function RoofDesigner(props: {
   const anyBox =
     commandOpen ||
     choices !== null ||
+    confirmDelete !== null ||
     sending ||
     noDealOpen ||
     readyOpen ||
@@ -3899,6 +3900,7 @@ export function RoofDesigner(props: {
       const onRoof = Boolean(svg.current?.contains(at));
       setCommandOpen(false);
       setChoices(null);
+      setConfirmDelete(null);
       setSending(false);
       setNoDealOpen(false);
       setReadyOpen(false);
@@ -3923,7 +3925,6 @@ export function RoofDesigner(props: {
     const group = loose.map((p) => (want.landscape === undefined ? p : laidAs(p, want.landscape)));
     setLoose(inRows(group, size, want.rows));
     if (want.landscape !== undefined) setAddLandscape(want.landscape);
-    confirmDelete !== null ||
   }, [loose, size]);
   const runCommand = async (command: DesignCommand): Promise<string> => {
     switch (command.do) {
@@ -3940,7 +3941,6 @@ export function RoofDesigner(props: {
           : await fillTo(command.kw, command.facing);
         if (!done.laid) return done.words;
         systemAsk.current = {
-      setConfirmDelete(null);
           ...(command.inverter !== undefined ? { inverter: command.inverter } : {}),
           ...(command.battery !== undefined ? { battery: command.battery } : {}),
         };
@@ -4091,6 +4091,15 @@ export function RoofDesigner(props: {
         removePicks(on);
         return `${panelPicks.length ? "The picked" : "All"} ${on.length} panels taken off. Ctrl+Z puts them back.`;
       }
+      case "deleteDesign": {
+        // Asked first, never done straight away: the card below waits for a Yes (9 Nov 2026, Martin).
+        const count = everyDesign().length;
+        const n = command.which ?? active + 1;
+        if (n < 1 || n > count) return `There's no Design ${n}: this roof has ${count === 1 ? "one design" : `${count} designs`}.`;
+        if (count <= 1) return "This is the only design on the roof, so it can't be deleted. I can take its panels off instead.";
+        setConfirmDelete(n - 1);
+        return "";
+      }
       case "relay": {
         if (!summary.panels) return "There are no panels to lay again yet.";
         return (await fillTo(summary.kw)).words;
@@ -4147,23 +4156,36 @@ export function RoofDesigner(props: {
       setCommandBusy(false);
     }
   };
+
+  const deleteConfirmed = () => {
+    const i = confirmDelete;
+    setConfirmDelete(null);
+    if (i === null || i >= everyDesign().length || everyDesign().length <= 1) return;
+    removeDesign(i);
+    setCommandReply(`Design ${i + 1} deleted. Save to keep it that way.`);
+  };
+  const cancelDelete = () => {
+    setConfirmDelete(null);
+    setCommandReply("Nothing deleted: the design is as it was.");
+  };
   const sendCommand = async (raw: string) => {
     const text = raw.trim();
     if (!text || commandBusy) return;
+    // A Yes or a No typed to the delete question answers it.
+    const answer = confirmDelete !== null ? confirmWord(text) : null;
+    if (answer) {
+      if (answer === "yes") deleteConfirmed();
+      else cancelDelete();
+      setCommandText("");
+      setCommandOpen(false);
+      return;
+    }
     setCommandBusy(true);
     setCommandReply(null);
     setChoices(null);
+    setConfirmDelete(null);
     setSystemWords("");
     try {
-      case "deleteDesign": {
-        // Asked first, never done straight away: the card below waits for a Yes (9 Nov 2026, Martin).
-        const count = everyDesign().length;
-        const n = command.which ?? active + 1;
-        if (n < 1 || n > count) return `There's no Design ${n}: this roof has ${count === 1 ? "one design" : `${count} designs`}.`;
-        if (count <= 1) return "This is the only design on the roof, so it can't be deleted. I can take its panels off instead.";
-        setConfirmDelete(n - 1);
-        return "";
-      }
       const quick = parseCommand(text);
       if (quick) setCommandReply((await runCommand(quick)) || null);
       else {
@@ -4194,33 +4216,12 @@ export function RoofDesigner(props: {
       } else if (e.key === "Escape") setChoices(null);
     };
     window.addEventListener("keydown", key);
-  const deleteConfirmed = () => {
-    const i = confirmDelete;
-    setConfirmDelete(null);
-    if (i === null || i >= everyDesign().length || everyDesign().length <= 1) return;
-    removeDesign(i);
-    setCommandReply(`Design ${i + 1} deleted. Save to keep it that way.`);
-  };
-  const cancelDelete = () => {
-    setConfirmDelete(null);
-    setCommandReply("Nothing deleted: the design is as it was.");
-  };
     return () => window.removeEventListener("keydown", key);
   });
   useEffect(() => {
-    // A Yes or a No typed to the delete question answers it.
-    const answer = confirmDelete !== null ? confirmWord(text) : null;
-    if (answer) {
-      if (answer === "yes") deleteConfirmed();
-      else cancelDelete();
-      setCommandText("");
-      setCommandOpen(false);
-      return;
-    }
     if (!commandReply || commandOpen) return;
     const t = window.setTimeout(() => setCommandReply(null), 9000);
     return () => window.clearTimeout(t);
-    setConfirmDelete(null);
   }, [commandReply, commandOpen]);
   // "/" opens the command bar, as on the design home; Escape closes it.
   useEffect(() => {
@@ -5541,6 +5542,8 @@ export function RoofDesigner(props: {
                       />
                     )
                   )}
+                </div>
+              )}
               {commandOpen && !props.tight && (
                 <div
                   className={clsx(
@@ -5675,6 +5678,42 @@ export function RoofDesigner(props: {
                   </form>
                 </div>
               )}
+              {confirmDelete !== null && !commandOpen && (
+                <div
+                  className={clsx(
+                    "absolute left-1/2 z-50 w-[min(30rem,calc(100%-2rem))] -translate-x-1/2 rounded-2xl bg-primary px-5 pb-4 pt-4 text-white shadow-[0_18px_50px_rgba(11,11,12,0.4)] ring-1 ring-white/10",
+                    props.tight ? "bottom-[5.75rem]" : "top-[4.5rem]",
+                  )}
+                  role="alertdialog"
+                  aria-label="Delete this design?"
+                  data-popup
+                >
+                  <div className="flex items-start gap-3">
+                    <SolIcon className="mt-0.5 size-5 shrink-0 text-sun-line" />
+                    <p className="min-w-0 flex-1 text-[15px] leading-relaxed">
+                      {deleteQuestion(confirmDelete + 1, everyDesign()[confirmDelete]?.label)}
+                    </p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelDelete}
+                      autoFocus
+                      className="h-9 rounded-full px-4 text-sm font-medium text-white/80 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+                    >
+                      No, keep it
+                    </button>
+                    <button
+                      type="button"
+                      onClick={deleteConfirmed}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-full bg-danger px-4 text-sm font-semibold text-white hover:brightness-110"
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                      Yes, delete Design {confirmDelete + 1}
+                    </button>
+                  </div>
+                </div>
+              )}
               {commandReply && !commandOpen && !props.tight && (
                 <div
                   className={clsx(
@@ -5713,42 +5752,6 @@ export function RoofDesigner(props: {
                   className={clsx(
                     "block w-full touch-none select-none",
                     tool === "pan" ? "cursor-grab" : tool === "select" || onPanel ? "cursor-default" : "cursor-crosshair",
-              {confirmDelete !== null && !commandOpen && (
-                <div
-                  className={clsx(
-                    "absolute left-1/2 z-50 w-[min(30rem,calc(100%-2rem))] -translate-x-1/2 rounded-2xl bg-primary px-5 pb-4 pt-4 text-white shadow-[0_18px_50px_rgba(11,11,12,0.4)] ring-1 ring-white/10",
-                    props.tight ? "bottom-[5.75rem]" : "top-[4.5rem]",
-                  )}
-                  role="alertdialog"
-                  aria-label="Delete this design?"
-                  data-popup
-                >
-                  <div className="flex items-start gap-3">
-                    <SolIcon className="mt-0.5 size-5 shrink-0 text-sun-line" />
-                    <p className="min-w-0 flex-1 text-[15px] leading-relaxed">
-                      {deleteQuestion(confirmDelete + 1, everyDesign()[confirmDelete]?.label)}
-                    </p>
-                  </div>
-                  <div className="mt-3 flex flex-wrap justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={cancelDelete}
-                      autoFocus
-                      className="h-9 rounded-full px-4 text-sm font-medium text-white/80 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
-                    >
-                      No, keep it
-                    </button>
-                    <button
-                      type="button"
-                      onClick={deleteConfirmed}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-full bg-danger px-4 text-sm font-semibold text-white hover:brightness-110"
-                    >
-                      <Trash2 className="size-4" aria-hidden />
-                      Yes, delete Design {confirmDelete + 1}
-                    </button>
-                  </div>
-                </div>
-              )}
                   )}
                   onContextMenu={(e) => {
                     // A right click opens the tools here, where the pointer is. On a panel not already picked it picks
