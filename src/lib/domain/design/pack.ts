@@ -52,6 +52,10 @@ export function clearanceFor(standoff: number = MOUNT_STANDOFF): number {
 export const MIN_ROW = 2;
 /** The most steps the row search takes on one face before it lays the rest row by row (see `packArea`). */
 export const SEARCH_BUDGET = 4000;
+/** How far up the slope from where a first row fits the gutter row is also tried from, metres (`packArea`). */
+export const GUTTER_SEARCH = 2.5;
+/** The steps the gutter row is tried at further up, metres. */
+export const GUTTER_STEP = 0.2;
 /** Faces steeper than this are walls or gables, never a place for panels. */
 export const STEEPEST = 45;
 /** A face gets at least this share of the sunniest face's sun to be used. */
@@ -233,7 +237,28 @@ export function packArea(area: Area, n: number, size: PanelSize, newId: () => st
   };
   // The gutter edge may be ragged: look a little further up until a first row fits.
   let rows: Row[] = [];
-  for (let lowerEdge = v1; lowerEdge > v0 && !rows.length; lowerEdge -= STEP) rows = plan(lowerEdge, null, 0);
+  let first = v1;
+  for (let lowerEdge = v1; lowerEdge > v0 && !rows.length; lowerEdge -= STEP) {
+    rows = plan(lowerEdge, null, 0);
+    first = lowerEdge;
+  }
+  // A first row that is only a stub (a face read from heights, a hip's corner) would cap every row above it, since none
+  // may be longer (9 Nov 2026, Martin: on a ragged east face the first row held four, so 70 m² held eight panels). Then
+  // the gutter row is also tried further up the slope, every `GUTTER_STEP` for `GUTTER_SEARCH`, and a start is taken only
+  // when it holds more panels in all.
+  const across = Math.min(size.short, size.long) + size.gap;
+  const stub = rows.length > 0 && rows[0].room * 2 <= Math.floor((u1 - u0) / across);
+  if (stub) {
+    let best = score(rows).total;
+    for (let lowerEdge = first - GUTTER_STEP; lowerEdge > v0 && first - lowerEdge <= GUTTER_SEARCH; lowerEdge -= GUTTER_STEP) {
+      const tried = plan(lowerEdge, null, 0);
+      const total = score(tried).total;
+      if (total > best) {
+        best = total;
+        rows = tried;
+      }
+    }
+  }
 
   // Then the panels shared out: the gutter row first and fullest. A top row that would be a lone panel takes one
   // from the row below instead, when that row stays at least as long; otherwise the lone panel is left off.

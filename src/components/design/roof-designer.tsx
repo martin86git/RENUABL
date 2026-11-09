@@ -274,6 +274,8 @@ const SIDE_VIEWS: { id: SideView; label: string; hint: string }[] = [
 ];
 
 /** What the card says when the three designs were made by themselves as the roof opened. */
+/** A face with this many corners or more, alone on the roof, is the home's outline put down whole, not a face traced by hand. */
+const OUTLINE_FACE_CORNERS = 8;
 const AUTO_DESIGNED = "Designed as the roof opened, from Google's roof data and your prices: check each against the photo before sending.";
 
 /** A key for each tool (2 Nov 2026, Martin: speed), as the shortcuts card lists them. */
@@ -3461,6 +3463,13 @@ export function RoofDesigner(props: {
    * direction, put down as traced faces to check and change. Null when the outline or the heights can't be had, or
    * they show no faces: then the designer goes on as before.
    */
+  /**
+   * Whether to read the roof's faces from Nearmap's heights before laying panels: nothing traced, or only the home's
+   * outline put down whole (one face of many corners, 9 Nov 2026, Martin: at 29 Shearer Drive the outline left from an
+   * earlier try was packed as one roof facing north, and nothing fitted). Faces someone traced are left as they are.
+   */
+  const readFacesFromHeights = () =>
+    !faces.length || (Boolean(props.nearmapPicture) && faces.length === 1 && faces[0].points.length >= OUTLINE_FACE_CORNERS);
   const nearmapRoofFaces = async (): Promise<{ faces: Face[]; words: string } | null> => {
     if (!props.nearmapPicture) return null;
     const [outline, heights] = await Promise.all([nearmapFace(), loadTerrain(spot.lat, spot.lng, { nearmap: true })]);
@@ -3548,7 +3557,7 @@ export function RoofDesigner(props: {
     let modelOffsetM: { x: number; y: number } | undefined;
     let fromFaces = faces;
     const notes: string[] = [];
-    const fromHeights = !faces.length ? await nearmapRoofFaces() : null;
+    const fromHeights = readFacesFromHeights() ? await nearmapRoofFaces() : null;
     if (fromHeights) {
       fromFaces = fromHeights.faces;
       notes.push(fromHeights.words);
@@ -3840,7 +3849,7 @@ export function RoofDesigner(props: {
     ]
       .filter(Boolean)
       .join(" ");
-    const fromHeights = !faces.length ? await nearmapRoofFaces() : null;
+    const fromHeights = readFacesFromHeights() ? await nearmapRoofFaces() : null;
     const roofFaces = fromHeights?.faces ?? faces;
     if (roofFaces.length) {
       const chosen = facing ? roofFaces.filter((fc) => facesWay(facing, faceFacing(fc))) : roofFaces;

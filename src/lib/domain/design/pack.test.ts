@@ -274,3 +274,22 @@ describe("a face split by places to keep clear", () => {
     for (const p of laid) for (const q of existing) expect(looseCorners(p, PANEL).some((c) => inside(c, q))).toBe(false);
   });
 });
+
+describe("a ragged gutter edge", () => {
+  it("doesn't let a short first row cap the rows above it", () => {
+    // 10 m along the gutter, 8 m up the slope, with a 3 m tab sticking out past the gutter, room for a short row.
+    const plain = northFace(rect(0, 0, 10, 8));
+    const tabbed = northFace([
+      { x: 0, y: 0 },
+      { x: 4, y: 0 },
+      { x: 4, y: -2.2 },
+      { x: 7, y: -2.2 },
+      { x: 7, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 8 },
+      { x: 0, y: 8 },
+    ]);
+    const full = packArea(plain, 60, PANEL, id).length;
+    expect(packArea(tabbed, 60, PANEL, id).length).toBeGreaterThanOrEqual(full);
+  });
+});
