@@ -4262,6 +4262,10 @@ export function RoofDesigner(props: {
     return () => window.clearTimeout(t);
   }, [commandReply, commandOpen]);
   // "/" opens the command bar, as on the design home; Escape closes it.
+  // In the pop-up the box stays under Sol's reply: the cursor goes back into it, ready for the next thing.
+  useEffect(() => {
+    if (props.tight && commandReply) commandBox.current?.focus();
+  }, [props.tight, commandReply]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -5492,7 +5496,8 @@ export function RoofDesigner(props: {
                       )}
                     </div>
                   )}
-                  {commandOpen && (
+                  {/* The box stays under his reply, so the next thing can be typed straight away (9 Nov 2026, Martin). */}
+                  {(commandOpen || commandReply) && (
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
@@ -5517,6 +5522,7 @@ export function RoofDesigner(props: {
                       <button
                         type="button"
                         onClick={() => setCalcOpen((o) => !o)}
+                        onFocus={() => setCommandOpen(true)}
                         aria-label="Size a system: the calculator"
                         title="Size a system: PV kW, a battery or backup"
                         aria-pressed={calcOpen}
