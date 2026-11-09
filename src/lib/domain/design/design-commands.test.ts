@@ -267,3 +267,11 @@ describe("the panels already on the roof", () => {
     expect(commandFrom({ do: "replaceExisting", words: "Using their roof." })).toEqual({ do: "replaceExisting" });
   });
 });
+
+describe("reading the roof again", () => {
+  it("reads the asking", () => {
+    expect(parseCommand("read the roof again")).toEqual({ do: "readRoof" });
+    expect(parseCommand("retrace the roof faces")).toEqual({ do: "readRoof" });
+    expect(parseCommand("trace a roof face")).toBeNull();
+  });
+});

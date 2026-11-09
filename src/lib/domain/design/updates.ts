@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-09",
     area: "Designer",
+    words: "When the sunnier roof is full, panels go on the south side too. Faces look wrong? Ask Sol to read the roof again.",
+  },
+  {
+    day: "2026-11-09",
+    area: "Designer",
     words: "A Sides button beside Google and Nearmap shows the house in Nearmap's angled photos, from the north, east, south and west.",
   },
   {

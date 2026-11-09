@@ -293,3 +293,15 @@ describe("a ragged gutter edge", () => {
     expect(packArea(tabbed, 60, PANEL, id).length).toBeGreaterThanOrEqual(full);
   });
 });
+
+describe("the less sunny faces, when the sunny ones are full", () => {
+  it("lays the rest on a south face rather than stopping short", () => {
+    const north = northFace(rect(0, 0, 6, 4), { sun: 1 });
+    const south: Area = { ...northFace(rect(0, 10, 10, 18)), facing: 180, sun: 0.7 };
+    const alone = packAreas([north], 30, PANEL, id).length;
+    const both = packAreas([north, south], 30, PANEL, id);
+    expect(both.length).toBeGreaterThan(alone);
+    // A size the north face holds stays on it.
+    expect(packAreas([north, south], alone, PANEL, id).every((p) => p.y < 5)).toBe(true);
+  });
+});

@@ -4051,7 +4051,39 @@ export function RoofDesigner(props: {
     }
     return `${said} ${(await fillTo(last.kw, last.facing)).words}`;
   };
+  /**
+   * The roof's faces read again from Nearmap's heights in place of those on the design (9 Nov 2026, Martin: faces kept
+   * from an older reading at 29 Shearer Drive were wrong, and only an empty roof was ever read), then what was last
+   * laid by rule laid again on them.
+   */
+  const readRoofAgain = async (): Promise<string> => {
+    if (!props.nearmapPicture) return "Only a Nearmap picture has the heights to read the roof from: switch to Nearmap, then ask again.";
+    const read = await nearmapRoofFaces();
+    if (!read) return "Nearmap's heights didn't show this roof's faces: trace them by hand.";
+    const last = lastLay.current;
+    if (last?.kind === "fill") return `${read.words} ${(await fillTo(last.kw, last.facing)).words}`;
+    if (last?.kind === "mine") {
+      await designForMe(false, last.goal);
+      return read.words;
+    }
+    setLoose([]);
+    setStrings([]);
+    return `${read.words} Ask for a size, or Design it for me, to lay panels on them.`;
+  };
   /** The button's answer, shown as Sol's (busy, then what he did). */
+  const answerReadRoof = async () => {
+    if (commandBusy) return;
+    setCommandBusy(true);
+    setAsked("Read the roof again.");
+    setCommandReply(null);
+    setSystemWords("");
+    try {
+      setCommandReply(await readRoofAgain());
+    } finally {
+      setCommandBusy(false);
+      setAsked(null);
+    }
+  };
   const answerExisting = async (replace: boolean) => {
     if (commandBusy) return;
     setCommandBusy(true);
@@ -4067,6 +4099,8 @@ export function RoofDesigner(props: {
   };
   const runCommand = async (command: DesignCommand): Promise<string> => {
     switch (command.do) {
+      case "readRoof":
+        return readRoofAgain();
       case "replaceExisting":
         return existingPanels(true);
       case "keepExisting":
@@ -5609,6 +5643,16 @@ export function RoofDesigner(props: {
                             className="mt-2 rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
                           >
                             {replacing ? "Keep clear of the existing panels" : "The existing panels are being replaced: use their roof"}
+                          </button>
+                        )}
+                        {props.nearmapPicture && faces.length > 0 && (
+                          <button
+                            type="button"
+                            disabled={commandBusy}
+                            onClick={() => void answerReadRoof()}
+                            className="ml-1.5 mt-2 rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+                          >
+                            Faces look wrong? Read the roof again
                           </button>
                         )}
                       </div>

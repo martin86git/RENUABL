@@ -60,6 +60,8 @@ export const GUTTER_STEP = 0.2;
 export const STEEPEST = 45;
 /** A face gets at least this share of the sunniest face's sun to be used. */
 export const SUNNY_ENOUGH = 0.8;
+/** When the sunnier faces can't hold the size asked for, faces down to this share of the best's sun take the rest. */
+export const FILL_SUN = 0.6;
 
 const rad = (d: number) => (d * Math.PI) / 180;
 const cm = (n: number) => Math.round(n * 100) / 100;
@@ -349,6 +351,22 @@ export function packAreas(areas: Area[], n: number, size: PanelSize, newId: () =
     arrays += 1;
     left -= panels.length;
   });
+  // The size asked for doesn't fit on the sunniest faces (9 Nov 2026, Martin: at 29 Shearer Drive the open south end
+  // of the roof was never used): the rest goes on the less sunny ones, down to `FILL_SUN` of the best (a south face in
+  // Melbourne), the largest first, one array more than the rule above allows.
+  if (left > 0) {
+    const extra = usable.filter((a) => a.sun >= top * FILL_SUN && a.sun < top * SUNNY_ENOUGH).sort((a, b) => room.get(b) - room.get(a));
+    for (const a of extra) {
+      if (!left || arrays >= arraysAllowed + 1) break;
+      const take = Math.min(left, room.get(a));
+      if (take < MIN_ARRAY_PANELS) continue;
+      const panels = packArea(a, take, size, newId);
+      if (panels.length < MIN_ARRAY_PANELS) continue;
+      out.push(...panels);
+      arrays += 1;
+      left -= panels.length;
+    }
+  }
   return out;
 }
 

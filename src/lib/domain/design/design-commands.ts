@@ -49,6 +49,8 @@ export type DesignCommand =
    */
   | { do: "replaceExisting" }
   | { do: "keepExisting" }
+  /** The roof's faces read again from Nearmap's heights, in place of those on the design. */
+  | { do: "readRoof" }
   | { do: "undo" }
   | { do: "redo" }
   /**
@@ -175,6 +177,13 @@ export function parseCommand(raw: string): DesignCommand | null {
     )
       return { do: "replaceExisting" };
   }
+  // The roof's faces read again from the heights (9 Nov 2026, Martin: faces kept from an older reading were wrong).
+  if (
+    /\b(re-?read|re-?trace|redo|read|trace|find|work out|detect)\b.*\b(roof|faces?)\b.*\bagain\b|\bre-?(read|trace|detect)\b.*\b(roof|faces?)\b/.test(
+      t,
+    )
+  )
+    return { do: "readRoof" };
   const why = t.match(/\bstring\s+([a-z])\b/);
   if (why && /\b(why|fail|failing|wrong|check|problem|explain)\b/.test(t)) return { do: "explainString", letter: why[1].toUpperCase() };
   // A question (other than about a string) is Sol's to answer, never read as an order.
@@ -334,6 +343,7 @@ export const DESIGN_COMMAND_SCHEMA = {
         "deleteDesign",
         "replaceExisting",
         "keepExisting",
+        "readRoof",
         "choose",
         "undo",
         "redo",
@@ -439,6 +449,7 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
     case "noBattery":
     case "replaceExisting":
     case "keepExisting":
+    case "readRoof":
     case "stringAuto":
     case "designForMe":
     case "flat":
@@ -523,7 +534,7 @@ export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roo
 - explainString: show the check for a string, by its letter; put the reason in words too, from the string checks above.
 - choose: when the request could fairly mean different things (which face, how many kW, portrait or landscape, which battery), don't guess: ask a short question with two or three options, each a label, a line on what it means and the request to carry out if chosen, written as the person would say it ("fit 10 kW on the north face"). Only when it is truly unclear.
 - removePanels: take the panels off (the picked ones, else all), when asked to delete, remove or clear them.
-- replaceExisting: the panels already on the roof are being replaced, so new panels may go where they are ("ignore the existing panels", "they're coming off"); keepExisting: keep clear of them again.
+- replaceExisting: the panels already on the roof are being replaced, so new panels may go where they are ("ignore the existing panels", "they're coming off"); keepExisting: keep clear of them again. readRoof: read the roof's faces again from the picture's heights, when the faces drawn look wrong or the person asks.
 - deleteDesign: delete a whole design from the roof when asked to, design being its number (1 is the first) or null for the one open. The designer asks the person to confirm before anything is deleted, so put the question in words ("Delete Design 2?"), never that it is done.
 - Never say you have changed something in words alone: only a change done above changes the design. If none of these does what is asked, say plainly that you can't do that yet, with "answer".
 - Always put one short sentence in words. Never invent a figure, product or price that isn't above. Nothing is sent to anyone.
