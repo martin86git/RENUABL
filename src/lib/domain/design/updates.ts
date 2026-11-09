@@ -16,7 +16,18 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
     area: "Designer",
-    words: "Design it for me puts the whole system on one roof face when one holds it (an east or west face as well as a north one), and puts the inverter and battery on the home's own south wall. Sol's panel closes with its cross, Escape or a press on the map, and Ask Sol brings it back as you left it.",
+    words: "The kit rounds at the top light up when on the design, showing the inverter's kW and battery's kWh. No parts line under them.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Designer",
+    words: "In the designs menu, New design is orange and each design's label sits in its own card.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Designer",
+    words:
+      "Design it for me puts the whole system on one roof face when one holds it (an east or west face as well as a north one), and puts the inverter and battery on the home's own south wall. Sol's panel closes with its cross, Escape or a press on the map, and Ask Sol brings it back as you left it.",
   },
   {
     day: "2026-11-10",
@@ -26,7 +37,8 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
     area: "Designer",
-    words: "The corner button now opens your designs: start a new one, copy one or publish. Under the kit, the make and model on the design.",
+    words:
+      "The corner button now opens your designs: start a new one, copy one or publish. Under the kit, the make and model on the design.",
   },
   {
     day: "2026-11-09",

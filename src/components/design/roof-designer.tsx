@@ -120,7 +120,6 @@ import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, ty
 import { openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
 import { SolThinking } from "./sol-thinking";
-import { panelWords, productWords } from "@/lib/domain/design/kit-words";
 import { CaptureButtons } from "@/components/ui/capture";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
 import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
@@ -317,6 +316,12 @@ const SHORTCUTS: [keys: string, does: string][] = [
 import { KnifeMenu, ToolFan } from "./tool-fan";
 
 const GLASS = "rounded-2xl border border-line bg-surface/90 shadow-lift backdrop-blur-md";
+/**
+ * A kit round lit because its part is on the design (10 Nov 2026, Martin: "light up, like a light, when they exist in a
+ * design … it should feel like it's been selected"): the signal orange ring, a soft glow and an orange glyph.
+ */
+const KIT_LIT =
+  "border-sun-line bg-surface text-sun-line ring-1 ring-sun-line shadow-[0_0_0_3px_rgb(255_90_31/0.18),0_0_18px_rgb(255_90_31/0.45)] hover:bg-canvas";
 
 /** A panel's outline before it is placed, with the edge it shares with the panel it clicks against. */
 type Ghost = LoosePanel & { join?: [Point, Point] };
@@ -4654,6 +4659,23 @@ export function RoofDesigner(props: {
                   </button>
                 )}
               </div>
+              {/* The open design names itself inside its own card (10 Nov 2026, Martin: the label box outside it read as apart). */}
+              {i === active && (
+                <label className="flex items-center gap-2 border-t border-line px-3 py-1.5">
+                  <span className="shrink-0 text-xs text-muted">Label</span>
+                  <input
+                    value={designLabel}
+                    onChange={(e) => {
+                      setDesignLabel(e.target.value);
+                      changed();
+                    }}
+                    maxLength={40}
+                    placeholder="e.g. All on the north face"
+                    aria-label={`A label for design ${i + 1}`}
+                    className="h-8 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
+                  />
+                </label>
+              )}
               {doomed === i && (
                 <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2 text-sm">
                   <span>Delete design {i + 1}? It can&apos;t be undone.</span>
@@ -4666,21 +4688,12 @@ export function RoofDesigner(props: {
           );
         })}
       </ul>
-      <label className="block text-sm">
-        A label for design {active + 1}
-        <input
-          value={designLabel}
-          onChange={(e) => {
-            setDesignLabel(e.target.value);
-            changed();
-          }}
-          maxLength={40}
-          placeholder="e.g. All on the north face"
-          className="mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-3 outline-none focus:border-forest"
-        />
-      </label>
       <div className="flex flex-wrap gap-2">
-        <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(false)}>
+        <button
+          className="inline-flex min-h-10 items-center rounded-md bg-sun-line px-4 text-sm font-semibold text-white hover:brightness-110 disabled:bg-surface-2 disabled:text-muted"
+          disabled={designs.length >= MAX_DESIGNS}
+          onClick={() => addDesign(false)}
+        >
           <Plus className="mr-1.5 size-4" aria-hidden /> New design
         </button>
         <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(true)}>
@@ -7692,7 +7705,9 @@ export function RoofDesigner(props: {
                         "relative z-10 flex size-[3.75rem] flex-col items-center justify-center rounded-full border shadow-lift tabular-nums",
                         menu === "panels"
                           ? "border-primary bg-primary text-primary-ink"
-                          : "border-line bg-surface text-ink hover:bg-canvas",
+                          : summary.panels > 0
+                            ? KIT_LIT
+                            : "border-line bg-surface text-ink hover:bg-canvas",
                       )}
                     >
                       {/* A solar panel, leaning as it does on a roof: frame, cells, and a stand. */}
@@ -7761,12 +7776,12 @@ export function RoofDesigner(props: {
                       title={charger ? `EV charger: ${charger.name}` : "EV charger: add one"}
                       aria-label="The EV charger on this design"
                       className={clsx(
-                        "flex size-[2.625rem] items-center justify-center rounded-full border border-line shadow-lift backdrop-blur-md",
+                        "flex size-[2.625rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
                         menu === "chargers"
-                          ? "bg-primary text-primary-ink"
+                          ? "border-line bg-primary text-primary-ink"
                           : charger
-                            ? "bg-surface/90 text-ink hover:bg-surface"
-                            : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
+                            ? KIT_LIT
+                            : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                       )}
                     >
                       <PlugZap className="size-5" aria-hidden />
@@ -7856,7 +7871,7 @@ export function RoofDesigner(props: {
                       </div>
                     )}
                   </div>
-                  <div className="order-2 -mr-6">
+                  <div className="order-2 -mr-7">
                     <button
                       onClick={() => openMenu(menu === "inverters" ? false : "inverters")}
                       aria-expanded={menu === "inverters"}
@@ -7864,15 +7879,18 @@ export function RoofDesigner(props: {
                       title={fitted.length ? `Inverter: ${fitted.map((i) => i.name).join(" + ")}` : "Inverter: choose one"}
                       aria-label="The inverters this design is drawn for"
                       className={clsx(
-                        "flex h-[2.625rem] w-[4rem] items-center justify-start rounded-l-full border border-line pl-2.5 shadow-lift backdrop-blur-md",
+                        "flex h-[2.625rem] w-[4.75rem] flex-col items-start justify-center rounded-l-full border pl-3 shadow-lift backdrop-blur-md",
                         menu === "inverters"
-                          ? "bg-primary text-primary-ink"
+                          ? "border-line bg-primary text-primary-ink"
                           : fitted.length
-                            ? "bg-surface/90 text-ink hover:bg-surface"
-                            : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
+                            ? KIT_LIT
+                            : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                       )}
                     >
-                      <Zap className="size-5" aria-hidden />
+                      <Zap className={fitted.length ? "size-4" : "size-5"} aria-hidden />
+                      {fitted.length > 0 && (
+                        <span className="mt-px text-[10px] font-semibold leading-none tabular-nums">{fittedKw} kW</span>
+                      )}
                     </button>
                     {menu === "inverters" && (
                       <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
@@ -8022,15 +8040,13 @@ export function RoofDesigner(props: {
                       aria-pressed={msb !== null}
                       className={clsx(
                         "flex size-[2.625rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
-                        msb
-                          ? "border-line bg-surface/90 text-ink hover:bg-surface"
-                          : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
+                        msb ? KIT_LIT : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                       )}
                     >
                       <SwitchboardGlyph />
                     </button>
                   </div>
-                  <div className="order-4 -ml-6">
+                  <div className="order-4 -ml-7">
                     <button
                       onClick={() => openMenu(menu === "batteries" ? false : "batteries")}
                       aria-expanded={menu === "batteries"}
@@ -8038,15 +8054,16 @@ export function RoofDesigner(props: {
                       title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Battery: add one"}
                       aria-label="The battery on this design"
                       className={clsx(
-                        "flex h-[2.625rem] w-[4rem] items-center justify-end rounded-r-full border border-line pr-2.5 shadow-lift backdrop-blur-md",
+                        "flex h-[2.625rem] w-[4.75rem] flex-col items-end justify-center rounded-r-full border pr-3 shadow-lift backdrop-blur-md",
                         menu === "batteries"
-                          ? "bg-primary text-primary-ink"
+                          ? "border-line bg-primary text-primary-ink"
                           : battery
-                            ? "bg-surface/90 text-ink hover:bg-surface"
-                            : "bg-surface/90 text-muted hover:bg-surface hover:text-ink",
+                            ? KIT_LIT
+                            : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                       )}
                     >
-                      <BatteryCharging className="size-6" aria-hidden />
+                      <BatteryCharging className={battery ? "size-5" : "size-6"} aria-hidden />
+                      {battery && <span className="mt-px text-[10px] font-semibold leading-none tabular-nums">{batteryKwh} kWh</span>}
                     </button>
                     {menu === "batteries" && (
                       <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
@@ -8188,74 +8205,6 @@ export function RoofDesigner(props: {
                     )}
                   </div>
                 </div>
-                {/* What is on the design, by make and model, under the rounds (10 Nov 2026, Martin: the kit was plain only
-                    from its marks on the picture, which are easy to miss); each name opens its choices. */}
-                {(summary.panels > 0 || fitted.length > 0 || battery || charger) && (
-                  <div className="mt-2 flex max-w-[min(46rem,calc(100vw-6rem))] flex-wrap items-center justify-center gap-x-1 rounded-full bg-surface/90 px-2 py-0.5 text-[11.5px] text-ink shadow-lift ring-1 ring-line backdrop-blur-md">
-                    {[
-                      {
-                        key: "panels" as const,
-                        words: panelWords(summary.panels, panel?.name ?? chosenPanel?.name, panelOf(design).watts),
-                        title: `Panels: ${panel?.name ?? chosenPanel?.name ?? "panel"}`,
-                        none: false,
-                      },
-                      {
-                        key: "inverters" as const,
-                        words: fitted.length
-                          ? fitted
-                              .reduce<{ spec: InverterSpec; n: number }[]>((all, spec) => {
-                                const same = all.find((x) => x.spec.sku === spec.sku);
-                                if (same) same.n += 1;
-                                else all.push({ spec, n: 1 });
-                                return all;
-                              }, [])
-                              .map(({ spec, n }) => `${n > 1 ? `${n} × ` : ""}${productWords(spec.name, spec.sku)}`)
-                              .join(" + ")
-                          : "No inverter",
-                        title: fitted.length ? `Inverter: ${fitted.map((x) => x.name).join(" + ")}` : "Choose an inverter",
-                        none: !fitted.length,
-                      },
-                      {
-                        key: "batteries" as const,
-                        words: battery
-                          ? `${battery.qty > 1 ? `${battery.qty} × ` : ""}${productWords(battery.name, battery.sku)} · ${batteryKwh} kWh`
-                          : "No battery",
-                        title: battery ? `Battery: ${battery.qty} × ${battery.name}` : "Add a battery",
-                        none: !battery,
-                      },
-                      ...(charger
-                        ? [
-                            {
-                              key: "chargers" as const,
-                              words: productWords(charger.name, charger.sku),
-                              title: `EV charger: ${charger.name}`,
-                              none: false,
-                            },
-                          ]
-                        : []),
-                    ].map((item, n) => (
-                      <span key={item.key} className="flex items-center gap-x-1">
-                        {n > 0 && (
-                          <span className="text-muted" aria-hidden>
-                            ·
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => openMenu(menu === item.key ? false : item.key)}
-                          title={item.title}
-                          className={clsx(
-                            "whitespace-nowrap rounded-full px-1.5 py-0.5 hover:bg-canvas",
-                            item.none ? "text-muted" : "font-medium",
-                            menu === item.key && "bg-canvas",
-                          )}
-                        >
-                          {item.words}
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
               </div>
               {/* The pad, in the top left corner: the select arrow in a circle of its own, since it is the tool every other
                   is left for, with two smaller half-rounds growing out of it for the two things done most with it:
