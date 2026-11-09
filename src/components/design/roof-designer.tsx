@@ -11,6 +11,7 @@ import { OLD_FACE_CORNERS, mendCutOutline, outlineNote } from "@/lib/domain/desi
 import { MOUNT_STANDOFF, clearanceFor, inRows, laidAs, packFaces, reorient } from "@/lib/domain/design/pack";
 import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
+import { facesFoundNote, facesFromHeights } from "@/lib/domain/design/roof-faces";
 import { NO_BILL_KW, SELF_DESIGN_AIMS, SELF_DESIGN_LABELS, selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
 import { todayInMarket } from "@/lib/domain/market";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
@@ -3421,6 +3422,37 @@ export function RoofDesigner(props: {
     setTool("select");
     if (homePitch !== 0) setPitchDue((due) => [...due, face.id]);
   };
+  /**
+   * On a Nearmap picture, the home's roof faces read from Nearmap's own heights inside its outline (`roof-faces.ts`;
+   * 9 Nov 2026, Martin: not Google's roof model, which can be years older than the roof), each with its slope and
+   * direction, put down as traced faces to check and change. Null when the outline or the heights can't be had, or
+   * they show no faces: then the designer goes on as before.
+   */
+  const nearmapRoofFaces = async (): Promise<{ faces: Face[]; words: string } | null> => {
+    if (!props.nearmapPicture) return null;
+    const [outline, heights] = await Promise.all([nearmapFace(), loadTerrain(spot.lat, spot.lng, { nearmap: true })]);
+    if ("note" in outline || !heights || heights.from !== "nearmap") return null;
+    const found = facesFromHeights(outline.face.points, heights);
+    if (!found.length) return null;
+    const made: Face[] = found.map((f) => ({
+      id: newId("f"),
+      points: f.points,
+      landscape: false,
+      setback: 0.3,
+      off: [],
+      plan: true,
+      ...faceFromAspect({ points: f.points }, f.aspect),
+    }));
+    setFaces(made);
+    changed();
+    setSelected(null);
+    setPicks([]);
+    setTool("select");
+    const day = heights.captured
+      ? new Date(`${heights.captured}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })
+      : null;
+    return { faces: made, words: facesFoundNote(made.length, day) };
+  };
   /** The right click's "Roof outline from Nearmap": the outline down, said in the command bar's reply. */
   const outlineFromNearmap = async () => {
     setToolMenu(null);
@@ -3462,7 +3494,11 @@ export function RoofDesigner(props: {
     let modelOffsetM: { x: number; y: number } | undefined;
     let fromFaces = faces;
     const notes: string[] = [];
-    if (!faces.length) {
+    const fromHeights = !faces.length ? await nearmapRoofFaces() : null;
+    if (fromHeights) {
+      fromFaces = fromHeights.faces;
+      notes.push(fromHeights.words);
+    } else if (!faces.length) {
       const found = await googleModelInPlace();
       // Opened by itself with nothing to design from (Google's roof data missing or older than the photo): it says
       // nothing (3 Nov 2026, Martin: "we don't need the Google pop up"); pressed by a person, it says why.
@@ -3514,7 +3550,7 @@ export function RoofDesigner(props: {
     // Made by itself as the roof opened: said so on the card, to be checked against the photo.
     setMine(
       auto
-        ? { ...result, notes: [AUTO_DESIGNED, ...checkNotes(check), ...result.notes] }
+        ? { ...result, notes: [AUTO_DESIGNED, ...notes, ...checkNotes(check), ...result.notes] }
         : { ...result, notes: [...notes, ...checkNotes(check), ...result.notes] },
     );
     setMineOpen(true);
@@ -3741,18 +3777,20 @@ export function RoofDesigner(props: {
     const check = await checkRoof();
     const avoid = check?.things.length ? keepOuts(check.things) : undefined;
     const clear = check ? keptClearWords(check.things) : null;
-    if (faces.length) {
-      const chosen = facing ? faces.filter((fc) => facesWay(facing, faceFacing(fc))) : faces;
+    const fromHeights = !faces.length ? await nearmapRoofFaces() : null;
+    const roofFaces = fromHeights?.faces ?? faces;
+    if (roofFaces.length) {
+      const chosen = facing ? roofFaces.filter((fc) => facesWay(facing, faceFacing(fc))) : roofFaces;
       if (!chosen.length)
         return { words: `No traced roof face looks ${{ N: "north", E: "east", S: "south", W: "west" }[facing!]}.`, laid: 0 };
       const packed = packFaces(chosen, size, n, () => newId("p"), avoid);
       const ids = new Set(chosen.map((fc) => fc.id));
-      setFaces(faces.map((fc) => (ids.has(fc.id) ? (packed.faces.find((x) => x.id === fc.id) ?? fc) : fc)));
+      setFaces(roofFaces.map((fc) => (ids.has(fc.id) ? (packed.faces.find((x) => x.id === fc.id) ?? fc) : fc)));
       setLoose(packed.loose);
       setStrings([]);
       changed();
       return {
-        words: `${packed.loose.length} panels, ${((packed.loose.length * watts) / 1000).toFixed(2)} kW${packed.loose.length < n ? `: only that many fit` : ""}. Strings cleared: string them again.${clear ? ` ${clear}` : ""}`,
+        words: `${packed.loose.length} panels, ${((packed.loose.length * watts) / 1000).toFixed(2)} kW${packed.loose.length < n ? `: only that many fit` : ""}. Strings cleared: string them again.${fromHeights ? ` ${fromHeights.words}` : ""}${clear ? ` ${clear}` : ""}`,
         laid: packed.loose.length,
       };
     }
