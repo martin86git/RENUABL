@@ -51,6 +51,7 @@ import {
   type InverterSpec,
   type Layout,
   type PanelSpec,
+  type Point,
   type RoofDesign,
   MAX_BATTERY_QTY,
 } from "./roof-design";
@@ -243,7 +244,29 @@ function inverterFor(input: SelfDesignInput, arrayKw: number, battery: boolean):
   return onFile ? { ...pick, inverter: onFile, why: `${pick.why} Its limits are on file, so the strings can be checked.` } : pick;
 }
 
-/** Where a battery stands on the drawing until it is moved: low on the right of the picture. */
+/**
+ * Where the inverters and the battery go on the drawing until they are moved (10 Nov 2026, Martin: they stood on the
+ * house next door, at a fixed place on the picture): side by side on the home's south wall, the shaded side here and
+ * where they are usually fitted, a little inside the roof's edge so the mark sits on the home. The home is the roof's
+ * faces, else the panels laid. Metres from the picture's middle (y down, so south is the largest y).
+ */
+export function kitOnHome(home: Point[], inverters: number): { inverters: Point[]; battery: Point } | null {
+  if (!home.length) return null;
+  const south = Math.max(...home.map((p) => p.y));
+  const wall = home.filter((p) => p.y >= south - KIT.wallBand);
+  const xs = wall.map((p) => p.x);
+  const middle = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const y = r1(south - KIT.inset);
+  const first = middle - (inverters * KIT.apart) / 2;
+  return {
+    inverters: Array.from({ length: inverters }, (_, i) => ({ x: r1(first + i * KIT.apart), y })),
+    battery: { x: r1(first + inverters * KIT.apart), y },
+  };
+}
+/** The kit's marks on the south wall: how far up from the southmost edge counts as that wall, how far inside the roof's edge they sit, and how far apart, metres. */
+export const KIT = { wallBand: 1.5, inset: 0.9, apart: 2.2 } as const;
+
+/** Where a battery stands when there is nothing to tell where the home is: low on the right of the picture. */
 function batterySpot(lat: number) {
   const k = metresPerPixel(lat);
   return { x: r1(ROOF_IMAGE.width * k * 0.36), y: r1(ROOF_IMAGE.height * k * 0.3) };
@@ -279,6 +302,12 @@ function build(input: SelfDesignInput, source: Source, n: number, way: BatteryWa
     name: inverter.inverter.name,
     kw: inverter.inverter.kw,
   }));
+  // On the home's south wall (`kitOnHome`): the roof's faces, else the panels laid.
+  const home = layout.faces.length
+    ? layout.faces.flatMap((f) => f.points)
+    : (layout.loose ?? []).map((p) => ({ x: p.x, y: p.y }));
+  const kit = kitOnHome(home, inverters.length);
+  if (kit) kit.inverters.forEach((at, i) => Object.assign(inverters[i], at));
   const year = monthlyProduction(layout, input.yieldPerKwDay);
   let battery: DesignBattery | undefined;
   if (withBattery) {
@@ -306,7 +335,7 @@ function build(input: SelfDesignInput, source: Source, n: number, way: BatteryWa
       name: product.name,
       kwh: product.kwh,
       qty: Math.min(MAX_BATTERY_QTY, Math.max(1, qty)),
-      ...batterySpot(input.centre.lat),
+      ...(kit?.battery ?? batterySpot(input.centre.lat)),
       ...(way === "blackout" ? { backup: true } : {}),
     };
   }

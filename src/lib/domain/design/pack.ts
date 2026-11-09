@@ -62,6 +62,13 @@ export const STEEPEST = 45;
 export const SUNNY_ENOUGH = 0.8;
 /** When the sunnier faces can't hold the size asked for, faces down to this share of the best's sun take the rest. */
 export const FILL_SUN = 0.6;
+/**
+ * A face this near the best face's sun that holds the whole system takes it as one array (10 Nov 2026, Martin: at 29
+ * Shearer Drive the system was split, a few panels on a small north face and the rest elsewhere, while the east face
+ * that holds it all was never used). An east or west face at a Melbourne pitch is about 85 to 90% of a north one; one
+ * tidy array is worth more than that difference in strings, rail and the look of the roof.
+ */
+export const ONE_ARRAY_SUN = 0.85;
 
 const rad = (d: number) => (d * Math.PI) / 180;
 const cm = (n: number) => Math.round(n * 100) / 100;
@@ -303,8 +310,8 @@ export function packArea(area: Area, n: number, size: PanelSize, newId: () => st
 }
 
 /**
- * Up to `n` panels across a roof's faces, in as few tidy arrays as will hold them: one array when a face nearly
- * as sunny as the best (within 5%) holds them all; else the sunniest faces in turn, at most two arrays (three above
+ * Up to `n` panels across a roof's faces, in as few tidy arrays as will hold them: one array when a face within
+ * `ONE_ARRAY_SUN` of the best holds them all (the sunniest such face, the roomier of two alike); else the sunniest faces in turn, at most two arrays (three above
  * 18 panels), none under `MIN_ARRAY_PANELS`, leaving room for a second proper array rather than a remainder too
  * small to lay. Faces too steep, or under `SUNNY_ENOUGH` of the best face's sun, are left alone.
  */
@@ -330,7 +337,9 @@ export function packAreas(areas: Area[], n: number, size: PanelSize, newId: () =
   // As sunny as each other (the parts of one face), the one that holds the most first.
   const sunny = usable.filter((a) => a.sun >= top * SUNNY_ENOUGH).sort((a, b) => b.sun - a.sun || room.get(b) - room.get(a));
 
-  const whole = sunny.find((a) => room.get(a) >= want && a.sun >= top * 0.95);
+  const whole = usable
+    .filter((a) => a.sun >= top * ONE_ARRAY_SUN && room.get(a) >= want)
+    .sort((a, b) => (Math.abs(a.sun - b.sun) <= top * 0.02 ? room.get(b) - room.get(a) : b.sun - a.sun))[0];
   if (whole) return packArea(whole, want, size, newId);
 
   const arraysAllowed = want > 18 ? 3 : 2;

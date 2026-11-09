@@ -3784,6 +3784,32 @@ export function RoofDesigner(props: {
   /** The design (by index) Sol has been asked to delete, waiting for the person's Yes (9 Nov 2026, Martin). */
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const commandBox = useRef<HTMLInputElement>(null);
+  /**
+   * In the pop-up, Sol's panel put away (10 Nov 2026, Martin: it blocked the map and couldn't be closed, and pressing
+   * Sol again started from scratch). Closing it only hides it: his last answer, the question and anything he offered
+   * stay, and pressing Ask Sol brings the same panel back. A new answer brings it back by itself.
+   */
+  const [awayFrom, setAwayFrom] = useState<readonly unknown[] | null>(null);
+  const solAway =
+    awayFrom !== null && awayFrom[0] === commandReply && awayFrom[1] === commandBusy && awayFrom[2] === opening;
+  const solPanel = useRef<HTMLDivElement>(null);
+  const solPill = useRef<HTMLButtonElement>(null);
+  const putSolAway = () => {
+    setAwayFrom([commandReply, commandBusy, opening]);
+    setCommandOpen(false);
+    setCalcOpen(false);
+  };
+  // A press anywhere outside the panel (on the map, say) puts it away, as its cross does.
+  useEffect(() => {
+    if (!props.tight || solAway) return;
+    const away = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (solPanel.current?.contains(t) || solPill.current?.contains(t)) return;
+      putSolAway();
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
+  });
   const letterOf = (i: number) => String.fromCharCode(65 + i);
   const designInWords = () =>
     [
@@ -4415,16 +4441,17 @@ export function RoofDesigner(props: {
     if (props.tight && commandReply) commandBox.current?.focus();
   }, [props.tight, commandReply]);
   useEffect(() => {
-    if (!commandReply || commandOpen) return;
+    if (!commandReply || commandOpen || props.tight) return;
     const t = window.setTimeout(() => setCommandReply(null), 9000);
     return () => window.clearTimeout(t);
-  }, [commandReply, commandOpen]);
+  }, [commandReply, commandOpen, props.tight]);
   // "/" opens the command bar, as on the design home; Escape closes it.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (e.key !== "/" || e.metaKey || e.ctrlKey || t?.closest("input, textarea, select, [contenteditable]")) return;
       e.preventDefault();
+      setAwayFrom(null);
       setCommandOpen(true);
       requestAnimationFrame(() => commandBox.current?.focus());
     };
@@ -5617,8 +5644,9 @@ export function RoofDesigner(props: {
               )}
               {/* In the pop-up the box and Sol's answer are one black panel growing out of the Ask Sol pill (9 Nov 2026,
                   Martin: it should physically connect to Sol below, and stay black): its foot runs behind the pill. */}
-              {props.tight && (commandOpen || commandReply || commandBusy || opening || calcOpen) && (
+              {props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen) && (
                 <div
+                  ref={solPanel}
                   className="absolute bottom-[3.5rem] left-1/2 z-50 flex w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2 rounded-[28px] bg-primary px-2.5 pb-[2.6rem] pt-2.5 text-white shadow-[0_18px_50px_rgba(11,11,12,0.4)] ring-1 ring-white/10 transition duration-200 ease-out starting:translate-y-3 starting:opacity-0 motion-reduce:transition-none"
                   data-popup
                 >
@@ -5681,7 +5709,7 @@ export function RoofDesigner(props: {
                       {!commandOpen && (
                         <button
                           type="button"
-                          onClick={() => setCommandReply(null)}
+                          onClick={putSolAway}
                           aria-label="Close"
                           className="flex size-6 shrink-0 items-center justify-center rounded-full text-white/60 hover:text-white"
                         >
@@ -5705,10 +5733,7 @@ export function RoofDesigner(props: {
                         onFocus={() => setCommandOpen(true)}
                         onChange={(e) => setCommandText(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === "Escape") {
-                            setCommandOpen(false);
-                            setCommandReply(null);
-                          }
+                          if (e.key === "Escape") putSolAway();
                         }}
                         placeholder="Fit 8 kW on the north face · add the storage it needs · how could I bring the payback down?"
                         aria-label="Tell Sol what to change in the design, or ask him about it"
@@ -5743,10 +5768,7 @@ export function RoofDesigner(props: {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          setCommandOpen(false);
-                          setCommandReply(null);
-                        }}
+                        onClick={putSolAway}
                         aria-label="Close"
                         className="flex size-8 shrink-0 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white"
                       >
@@ -8591,18 +8613,23 @@ export function RoofDesigner(props: {
                 className={clsx(
                   "pointer-events-none absolute inset-x-2 bottom-7 flex items-end gap-2",
                   // Over Sol's black panel while it is out, so the pill stands at its foot as one piece.
-                  props.tight && (commandOpen || commandReply || commandBusy || opening || calcOpen) ? "z-[55]" : "z-10",
+                  props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen) ? "z-[55]" : "z-10",
                 )}
               >
                 {/* In the pop-up the foot of the picture is Sol alone (8 Nov 2026, Martin): ask him to change the design. */}
                 {props.tight ? (
                   <button
+                    ref={solPill}
                     type="button"
                     onClick={() => {
-                      setCommandOpen(!commandOpen);
+                      // Open: put away. Away (or never opened): the same panel back, his last answer in it, the box ready.
+                      const shown = !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen);
+                      if (shown) return putSolAway();
+                      setAwayFrom(null);
+                      setCommandOpen(true);
                       requestAnimationFrame(() => commandBox.current?.focus());
                     }}
-                    aria-expanded={commandOpen}
+                    aria-expanded={!solAway && commandOpen}
                     data-popup
                     title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
                     className="pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110"

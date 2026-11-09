@@ -8,7 +8,7 @@ import { DEFAULT_WORKSPACE, readSupplierList, type Workspace } from "./pricing";
 import { costSystem, defaultQuote } from "./quote";
 import { packFaces } from "./pack";
 import { PANEL, cleanDesign, inside, panelFacing, panelPlaces, type Face } from "./roof-design";
-import { NO_BILL_KW, SELF_DESIGN_LABELS, selfDesign, type SelfDesignInput } from "./self-design";
+import { NO_BILL_KW, kitOnHome, SELF_DESIGN_LABELS, selfDesign, type SelfDesignInput } from "./self-design";
 import { YIELD_PER_KW_DAY, shiftingKwhOf, systemSpecOf } from "./system";
 
 const rows = readXlsxRows(readFileSync("src/lib/domain/__fixtures__/awm-price-list.xlsx"));
@@ -218,5 +218,24 @@ describe("choosing inverters that can be strung", () => {
     const fast = result.options.find((o) => o.key === "payback")!;
     expect(fast.design.inverters?.some((i) => i.sku === "NOFILE3")).toBe(false);
     expect(fast.design.inverters?.every((i) => inverterCatalogue().find((c) => c.sku === i.sku)?.electrical)).toBe(true);
+  });
+});
+
+describe("kitOnHome", () => {
+  it("puts the inverter and battery side by side on the home's south wall, inside its edge", () => {
+    // A house 12 m wide, its south wall at y = 5 (y runs south).
+    const home = [
+      { x: -6, y: -5 },
+      { x: 6, y: -5 },
+      { x: 6, y: 5 },
+      { x: -6, y: 5 },
+    ];
+    const kit = kitOnHome(home, 1)!;
+    expect(kit.inverters).toEqual([{ x: -1.1, y: 4.1 }]);
+    expect(kit.battery).toEqual({ x: 1.1, y: 4.1 });
+    for (const p of [...kit.inverters, kit.battery]) expect(Math.abs(p.x)).toBeLessThan(6);
+  });
+  it("is nothing without a home to stand on", () => {
+    expect(kitOnHome([], 1)).toBeNull();
   });
 });
