@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, PenTool, Plus, Search, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeft, Check, PenTool, Plus, Search, Trash2, UserPlus } from "lucide-react";
+import { INTERESTS, INTEREST_WORDS, interestsOf, toggleInterest } from "@/lib/domain/design/deal-interest";
 import clsx from "clsx";
 import { AddressEntry } from "@/components/consumer/address-entry";
 import { JOB_STAGES, LEAD_SOURCES, STAGE_LABELS, type Activity, type Customer, type Job, type JobStage } from "@/lib/domain/design/crm";
@@ -292,17 +293,8 @@ export function CustomersPage() {
             A deal is the job you are quoting: it goes into your pipeline as a lead, and with an address found on the map its roof can be
             designed straight away.
           </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
-            <label className={ui.label}>
-              What it is
-              <input
-                className={clsx(ui.input, "mt-1.5")}
-                value={deal.title}
-                onChange={(e) => setDeal({ ...deal, title: e.target.value })}
-                maxLength={80}
-                placeholder="Solar, Battery…"
-              />
-            </label>
+          <div className="mt-4 space-y-4">
+            <InterestField value={deal.title} onChange={(title) => setDeal({ ...deal, title })} />
             <div className={ui.label}>
               Where
               <AddressField value={deal.address} placed={deal.lat !== null} onChange={(place) => setDeal({ ...deal, ...place })} />
@@ -669,17 +661,8 @@ export function CustomerPage({ id }: { id: string }) {
             </div>
             {newJob && (
               <div className="mt-4 rounded-md border border-line bg-canvas p-4">
-                <div className="grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
-                  <label className={ui.label}>
-                    What it is
-                    <input
-                      className={clsx(ui.input, "mt-1.5")}
-                      value={newJob.title}
-                      onChange={(e) => setNewJob({ ...newJob, title: e.target.value })}
-                      maxLength={80}
-                      placeholder="Solar, Battery…"
-                    />
-                  </label>
+                <div className="space-y-4">
+                  <InterestField value={newJob.title} onChange={(title) => setNewJob({ ...newJob, title })} />
                   <div className={ui.label}>
                     Where
                     <AddressField
@@ -922,17 +905,8 @@ export function NewDeal({ onClose }: { onClose: () => void }) {
       )}
 
       {who && (
-        <div className="mt-5 grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
-          <label className={ui.label}>
-            What it is
-            <input
-              className={clsx(ui.input, "mt-1.5")}
-              value={deal.title}
-              onChange={(e) => setDeal({ ...deal, title: e.target.value })}
-              maxLength={80}
-              placeholder="Solar, Battery…"
-            />
-          </label>
+        <div className="mt-5 space-y-4">
+          <InterestField value={deal.title} onChange={(title) => setDeal({ ...deal, title })} />
           <div className={ui.label}>
             Where
             <AddressField
@@ -958,5 +932,67 @@ export function NewDeal({ onClose }: { onClose: () => void }) {
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * What the customer is interested in (9 Nov 2026, Martin: "What it is" didn't say what what was): Solar, Battery and EV
+ * charger, any of them together, naming the deal ("Solar and battery"); Something else for a deal named in words.
+ */
+function InterestField({ value, onChange }: { value: string; onChange: (title: string) => void }) {
+  const picked = interestsOf(value);
+  const [other, setOther] = useState(picked === null);
+  const chip = (on: boolean) =>
+    clsx(
+      "inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm ring-1 transition-colors",
+      on ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line hover:text-ink hover:ring-line-strong",
+    );
+  return (
+    <fieldset>
+      <legend className={ui.label}>What are they interested in?</legend>
+      <p className="mt-0.5 text-xs text-muted">Pick any that apply. The deal is named from them.</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {INTERESTS.map((i) => {
+          const on = !other && (picked ?? []).includes(i);
+          return (
+            <button
+              key={i}
+              type="button"
+              aria-pressed={on}
+              className={chip(on)}
+              onClick={() => {
+                setOther(false);
+                onChange(toggleInterest(other ? "" : value, i));
+              }}
+            >
+              {on && <Check className="size-3.5" aria-hidden />}
+              {INTEREST_WORDS[i]}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          aria-pressed={other}
+          className={chip(other)}
+          onClick={() => {
+            setOther(!other);
+            onChange(other ? "Solar" : "");
+          }}
+        >
+          Something else
+        </button>
+      </div>
+      {other && (
+        <input
+          className={clsx(ui.input, "mt-2 max-w-sm")}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          maxLength={80}
+          placeholder="Heat pump hot water, a service visit…"
+          aria-label="What they are interested in"
+          autoFocus
+        />
+      )}
+    </fieldset>
   );
 }
