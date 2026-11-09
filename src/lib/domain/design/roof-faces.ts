@@ -47,6 +47,8 @@ export const ROOF_FACES = {
   reassign: 6,
   /** Passes of tidying each face's edge. */
   tidyPasses: 2,
+  /** A corner this near a seam between two faces, or the roof's outline, is put on it, metres. */
+  snap: 0.7,
   /** Outlines simplified to within this, metres. */
   simplify: 0.45,
 } as const;
@@ -500,6 +502,18 @@ export function facesFromHeights(
   for (const set of final.values()) set.clear();
   for (const [i, g] of label) final.get(g)!.add(i);
 
+  // Which faces meet (their cells touch), for straightening the seams between them.
+  const ownerOf = new Map<number, number>();
+  for (const [g, set] of final) for (const i of set) ownerOf.set(i, g);
+  const meets = new Map<number, Set<number>>();
+  for (const [i, g] of ownerOf)
+    for (const j of [i + 1, i + cols]) {
+      const h = ownerOf.get(j);
+      if (h === undefined || h === g) continue;
+      meets.set(g, (meets.get(g) ?? new Set()).add(h));
+      meets.set(h, (meets.get(h) ?? new Set()).add(g));
+    }
+
   const out: FoundFace[] = [];
   for (const [g, all] of final) {
     // The largest piece only: a stray cell or two on the plane elsewhere isn't this face.
@@ -510,14 +524,62 @@ export function facesFromHeights(
     if (ring.length < 3) continue;
     let points = simplifyRing(ring, ROOF_FACES.simplify);
     for (let tol = ROOF_FACES.simplify * 1.5; points.length > FACE_MAX_POINTS; tol *= 1.5) points = simplifyRing(ring, tol);
+    // Straight edges (9 Nov 2026, Martin: the faces' edges wandered, and the rows laid from them came out staggered):
+    // each corner onto the line where this face's plane meets a neighbour's (the true hip, ridge or valley), or onto the
+    // roof's outline, whichever is near; where two of them are near, onto the point they cross.
+    const plane = planes.get(g)!;
+    const seams = [...(meets.get(g) ?? [])]
+      .map((h) => planes.get(h))
+      .filter((p): p is Fit => Boolean(p))
+      .map((p) => ({ A: plane.a - p.a, B: plane.b - p.b, C: plane.c - p.c }))
+      .filter((l) => Math.hypot(l.A, l.B) > 0.05);
+    points = simplifyRing(
+      points.map((v) => straighten(v, seams, outline)),
+      0.05,
+    );
     if (points.length < 3) continue;
     out.push({
       points: points.map((p) => ({ x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100 })),
-      aspect: aspectOf(planes.get(g)!),
+      aspect: aspectOf(plane),
       areaM2: Math.round(areaM2 * 10) / 10,
     });
   }
   return out.sort((a, b) => b.areaM2 - a.areaM2).slice(0, most);
+}
+
+/** A corner moved onto the nearest of a face's seams (lines A·x + B·y + C = 0) and the outline's edges, when near. */
+function straighten(v: Point, seams: { A: number; B: number; C: number }[], outline: Point[]): Point {
+  type Line = { p: Point; d: Point };
+  const lines: { line: Line; gap: number; foot: Point }[] = [];
+  for (const s of seams) {
+    const n = Math.hypot(s.A, s.B);
+    const gap = (s.A * v.x + s.B * v.y + s.C) / n;
+    const foot = { x: v.x - (gap * s.A) / n, y: v.y - (gap * s.B) / n };
+    lines.push({ line: { p: foot, d: { x: -s.B / n, y: s.A / n } }, gap: Math.abs(gap), foot });
+  }
+  for (let i = 0; i < outline.length; i++) {
+    const a = outline[i];
+    const b = outline[(i + 1) % outline.length];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.3) continue;
+    const k = Math.max(0, Math.min(1, ((v.x - a.x) * dx + (v.y - a.y) * dy) / (len * len)));
+    const foot = { x: a.x + k * dx, y: a.y + k * dy };
+    lines.push({ line: { p: a, d: { x: dx / len, y: dy / len } }, gap: Math.hypot(v.x - foot.x, v.y - foot.y), foot });
+  }
+  const near = lines.filter((l) => l.gap <= ROOF_FACES.snap).sort((x, y) => x.gap - y.gap);
+  if (!near.length) return v;
+  // Two lines near and not alike in direction: the corner where they cross, when that is near too.
+  for (let j = 1; j < near.length; j++) {
+    const [l1, l2] = [near[0].line, near[j].line];
+    const det = l1.d.x * l2.d.y - l1.d.y * l2.d.x;
+    if (Math.abs(det) < 0.25) continue;
+    const s = ((l2.p.x - l1.p.x) * l2.d.y - (l2.p.y - l1.p.y) * l2.d.x) / det;
+    const x = { x: l1.p.x + s * l1.d.x, y: l1.p.y + s * l1.d.y };
+    if (Math.hypot(x.x - v.x, x.y - v.y) <= ROOF_FACES.snap * 1.5) return x;
+  }
+  return near[0].foot;
 }
 
 /** What the designer says when it has put the faces down from the heights. */
