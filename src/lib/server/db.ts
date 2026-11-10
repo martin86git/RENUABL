@@ -625,6 +625,10 @@ create index if not exists industry_news_found on industry_news(found_at desc);
 -- How sure each story is, and Sol's line on why (10 Nov 2026).
 alter table industry_news add column if not exists standing text;
 alter table industry_news add column if not exists standing_note text not null default '';
+-- Its page's preview picture, redrawn small by us (no file kept as it came), and whether it has been looked for.
+alter table industry_news add column if not exists image bytea;
+alter table industry_news add column if not exists image_type text;
+alter table industry_news add column if not exists image_tried boolean not null default false;
 create table if not exists industry_news_runs (
   id text primary key,
   started_at timestamptz not null default now(),

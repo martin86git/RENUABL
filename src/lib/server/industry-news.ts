@@ -6,12 +6,18 @@
  * under a lock. RENUABL pays for it: no Sol credit; its cost is kept on `industry_news_runs`.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import sharp from "sharp";
+import { sniffImage } from "@/lib/domain/design/brand";
+import { safeFetch } from "./safe-fetch";
 import { addUsage, costUsd, noUsage, toMicros, usageOf } from "@/lib/domain/ai-costs";
 import {
   NEWS_DAYS,
   NEWS_SHOWN,
   NEWS_STANDINGS,
   NEWS_TOPICS,
+  PAGE_READ_BYTES,
+  PICTURE_BYTES,
+  pageImageUrl,
   type NewsStanding,
   cleanNewsItems,
   newsDue,
@@ -27,8 +33,9 @@ import { newId, query, transaction } from "./db";
 const MODEL = () => process.env.NEWS_MODEL?.trim() || "claude-sonnet-5-5";
 
 const TOOLS: Anthropic.ToolUnion[] = [
-  { type: "web_search_20260209", name: "web_search", max_uses: 10, blocked_domains: [...BLOCKED_SITES], user_location: SEARCH_FROM },
-  { type: "web_fetch_20260209", name: "web_fetch", max_uses: 4, blocked_domains: [...BLOCKED_SITES], max_content_tokens: 12_000 },
+  // 10 Nov 2026, Martin: more stories, products every day: a few more searches than the first ten.
+  { type: "web_search_20260209", name: "web_search", max_uses: 14, blocked_domains: [...BLOCKED_SITES], user_location: SEARCH_FROM },
+  { type: "web_fetch_20260209", name: "web_fetch", max_uses: 5, blocked_domains: [...BLOCKED_SITES], max_content_tokens: 12_000 },
 ];
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -45,6 +52,7 @@ interface Row {
   brands: unknown;
   standing: string | null;
   standingNote: string;
+  hasImage: boolean;
   foundAt: string;
 }
 
@@ -60,6 +68,7 @@ const itemOf = (r: Row): NewsItem => ({
   brands: Array.isArray(r.brands) ? r.brands.filter((b): b is string => typeof b === "string") : [],
   standing: NEWS_STANDINGS.includes(r.standing as NewsStanding) ? (r.standing as NewsStanding) : null,
   standingNote: r.standingNote ?? "",
+  hasImage: Boolean(r.hasImage),
   foundAt: r.foundAt,
 });
 
@@ -94,7 +103,7 @@ export async function newsFeed(): Promise<NewsFeed> {
   const [rows, last, good] = await Promise.all([
     query<Row>(
       `select id, topic, headline, summary, meaning, url, site, to_char(published_on, 'YYYY-MM-DD') as "publishedOn", brands,
-              standing, standing_note as "standingNote",
+              standing, standing_note as "standingNote", image is not null as "hasImage",
               ${moment("found_at")} as "foundAt"
          from industry_news
         where coalesce(published_on, found_at::date) > now() - make_interval(days => $1)
@@ -129,6 +138,88 @@ async function claimRun(force: boolean): Promise<string | null> {
     await q(`insert into industry_news_runs (id) values ($1)`, [id]);
     return id;
   });
+}
+
+/** How many stories' pictures are looked for at once, and at most in one go. */
+const PICTURES_AT_ONCE = 4;
+const PICTURES_A_GO = 24;
+
+/**
+ * A story's picture: its page's own preview picture (`pageImageUrl`), fetched with every address checked
+ * (`safeFetch`), taken only when its own first bytes say JPEG, PNG or WebP (never SVG), then drawn again small as a
+ * JPEG so nothing but the picture is kept. Null when there is none to be had.
+ */
+async function pictureFor(pageUrl: string): Promise<Buffer | null> {
+  const page = await safeFetch(pageUrl, PAGE_READ_BYTES, "page");
+  if (!page) return null;
+  const imageUrl = pageImageUrl(page.bytes.toString("utf8"), pageUrl);
+  if (!imageUrl) return null;
+  const pic = await safeFetch(imageUrl, PICTURE_BYTES, "picture");
+  if (!pic || !sniffImage(pic.bytes)) return null;
+  try {
+    return await sharp(pic.bytes, { limitInputPixels: 40_000_000, animated: false })
+      .rotate()
+      .resize({ width: 720, height: 405, fit: "cover", position: "attention", withoutEnlargement: false })
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: 78, mozjpeg: true })
+      .toBuffer();
+  } catch {
+    return null;
+  }
+}
+
+/** Whether some recent story hasn't had its picture looked for yet. */
+export async function picturesDue(): Promise<boolean> {
+  const rows = await query(`select 1 from industry_news where not image_tried and found_at > now() - make_interval(days => $1) limit 1`, [
+    NEWS_DAYS * 2,
+  ]);
+  return rows.length > 0;
+}
+
+const filling = globalThis as unknown as { __newsPictures?: Promise<number> };
+
+/**
+ * Looks once for the picture of every recent story not yet looked at (after each reading; new stories first). One look
+ * at a time on a server: a second call while one runs waits for that one.
+ */
+export function fillPictures(): Promise<number> {
+  filling.__newsPictures ??= lookForPictures().finally(() => {
+    filling.__newsPictures = undefined;
+  });
+  return filling.__newsPictures;
+}
+
+async function lookForPictures(): Promise<number> {
+  const todo = await query<{ id: string; url: string }>(
+    `select id, url from industry_news where not image_tried and found_at > now() - make_interval(days => $1)
+      order by found_at desc limit $2`,
+    [NEWS_DAYS * 2, PICTURES_A_GO],
+  );
+  let got = 0;
+  for (let i = 0; i < todo.length; i += PICTURES_AT_ONCE) {
+    await Promise.all(
+      todo.slice(i, i + PICTURES_AT_ONCE).map(async (s) => {
+        const pic = await pictureFor(s.url).catch(() => null);
+        if (pic) got++;
+        await query(`update industry_news set image = $2, image_type = $3, image_tried = true where id = $1`, [
+          s.id,
+          pic,
+          pic ? "image/jpeg" : null,
+        ]);
+      }),
+    );
+  }
+  return got;
+}
+
+/** A story's kept picture, or null. */
+export async function newsPicture(id: string): Promise<{ bytes: Buffer; contentType: string } | null> {
+  const rows = await query<{ image: Buffer | null; type: string | null }>(
+    `select image, image_type as type from industry_news where id = $1`,
+    [id],
+  );
+  const r = rows[0];
+  return r?.image && r.type ? { bytes: r.image, contentType: r.type } : null;
 }
 
 /** Every page a search result or a fetched page carried, with its title, however the web tools nest them. */
@@ -176,7 +267,7 @@ export async function readTheNews(force = false): Promise<number | null> {
     let text = "";
     // The web tools run on Anthropic's side; a long search may pause and is carried on (a few times at most).
     for (let turn = 0; turn < 5; turn++) {
-      const m = await client.messages.create({ model: MODEL(), max_tokens: 8000, tools: TOOLS, messages });
+      const m = await client.messages.create({ model: MODEL(), max_tokens: 12_000, tools: TOOLS, messages });
       usage = addUsage(usage, usageOf(m.model, m.usage));
       seen.push(...pagesIn(m.content));
       text = m.content.map((b) => (b.type === "text" ? b.text : "")).join("\n");
@@ -227,6 +318,7 @@ export async function readTheNews(force = false): Promise<number | null> {
       kept,
       toMicros(costUsd(usage)),
     ]);
+    await fillPictures().catch((e) => console.error("news pictures", e instanceof Error ? e.message : e));
     return kept;
   } catch (e) {
     const why = e instanceof Error ? e.message.slice(0, 300) : "failed";

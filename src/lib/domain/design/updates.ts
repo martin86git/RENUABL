@@ -20,6 +20,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-10",
+    area: "Today",
+    words: "News has more stories each day, new products among them, with a picture on each and a mark for confirmed or rumoured.",
+  },
+  {
+    day: "2026-11-10",
     area: "Designer",
     words: "Photo or Drawn, bottom right of the roof picture: Drawn shows the roof as a drawing, panels as panels and the kit on its wall.",
   },

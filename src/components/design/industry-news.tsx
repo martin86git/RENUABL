@@ -174,50 +174,70 @@ function StandingPill({ standing }: { standing: NewsStanding }) {
 
 function Story({ item }: { item: NewsItem }) {
   return (
-    <li className="rounded-2xl bg-surface px-4 py-3.5 ring-1 ring-line">
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
-        <span className="rounded-full bg-canvas px-2 py-0.5 text-ink-2 ring-1 ring-line">{NEWS_TOPIC_LABELS[item.topic]}</span>
-        {item.standing && <StandingPill standing={item.standing} />}
-        <span>{item.site}</span>
-        {item.publishedOn && <span>· {dayWords(item.publishedOn)}</span>}
-      </p>
-      <a
-        href={item.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="group mt-1.5 flex items-start gap-1 text-[15px] font-medium leading-snug text-ink hover:underline"
-      >
-        <span>{item.headline}</span>
-        <ArrowUpRight className="mt-0.5 size-4 shrink-0 text-muted group-hover:text-ink" aria-hidden />
-      </a>
-      <p className="mt-1 text-[14px] leading-relaxed text-ink-2">{item.summary}</p>
-      {item.standingNote && (
-        <p className="mt-1.5 flex items-start gap-1.5 text-[12.5px] italic text-muted">
-          <SolBadge className="mt-0.5 size-3 shrink-0" />
-          <span>{item.standingNote}</span>
-        </p>
+    <li className="flex flex-col gap-3 rounded-2xl bg-surface px-4 py-3.5 ring-1 ring-line sm:flex-row sm:items-start sm:gap-4">
+      {item.hasImage && (
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          tabIndex={-1}
+          aria-hidden
+          className="block shrink-0 overflow-hidden rounded-xl bg-canvas ring-1 ring-line sm:order-last sm:mt-1 sm:w-48"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- the story page's preview picture, redrawn and kept by us */}
+          <img
+            src={`/api/design/news/${encodeURIComponent(item.id)}/image`}
+            alt=""
+            loading="lazy"
+            className="aspect-[16/9] w-full object-cover"
+          />
+        </a>
       )}
-      {item.mine && (
-        <p className="mt-2.5 flex items-start gap-2 rounded-xl bg-canvas px-3 py-2 text-[13px] text-ink ring-1 ring-sun-line">
-          <PackageSearch className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
-          <span>
-            <span className="font-medium">{onYourListsWords(item.mine)}</span>
-            <span className="text-muted">
-              : {item.mine.examples.join(", ")}
-              {item.mine.count > item.mine.examples.length ? "…" : ""}
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
+          <span className="rounded-full bg-canvas px-2 py-0.5 text-ink-2 ring-1 ring-line">{NEWS_TOPIC_LABELS[item.topic]}</span>
+          {item.standing && <StandingPill standing={item.standing} />}
+          <span>{item.site}</span>
+          {item.publishedOn && <span>· {dayWords(item.publishedOn)}</span>}
+        </p>
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group mt-1.5 flex items-start gap-1 text-[15px] font-medium leading-snug text-ink hover:underline"
+        >
+          <span>{item.headline}</span>
+          <ArrowUpRight className="mt-0.5 size-4 shrink-0 text-muted group-hover:text-ink" aria-hidden />
+        </a>
+        <p className="mt-1 text-[14px] leading-relaxed text-ink-2">{item.summary}</p>
+        {item.standingNote && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-[12.5px] italic text-muted">
+            <SolBadge className="mt-0.5 size-3 shrink-0" />
+            <span>{item.standingNote}</span>
+          </p>
+        )}
+        {item.mine && (
+          <p className="mt-2.5 flex items-start gap-2 rounded-xl bg-canvas px-3 py-2 text-[13px] text-ink ring-1 ring-sun-line">
+            <PackageSearch className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
+            <span>
+              <span className="font-medium">{onYourListsWords(item.mine)}</span>
+              <span className="text-muted">
+                : {item.mine.examples.join(", ")}
+                {item.mine.count > item.mine.examples.length ? "…" : ""}
+              </span>
             </span>
-          </span>
-        </p>
-      )}
-      {item.meaning && (
-        <p className="mt-2.5 flex items-start gap-2 rounded-xl bg-sun px-3 py-2 text-[13px] text-sun-ink">
-          <SolBadge className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            <span className="font-medium">For you: </span>
-            {item.meaning}
-          </span>
-        </p>
-      )}
+          </p>
+        )}
+        {item.meaning && (
+          <p className="mt-2.5 flex items-start gap-2 rounded-xl bg-sun px-3 py-2 text-[13px] text-sun-ink">
+            <SolBadge className="mt-0.5 size-3.5 shrink-0" />
+            <span>
+              <span className="font-medium">For you: </span>
+              {item.meaning}
+            </span>
+          </p>
+        )}
+      </div>
     </li>
   );
 }

@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { onYourLists } from "@/lib/domain/design/industry-news";
 import { answer, requireMember } from "@/lib/server/design-context";
 import { loadLists } from "@/lib/server/design-repo";
-import { newsFeed, newsReadingDue, readTheNews } from "@/lib/server/industry-news";
+import { fillPictures, newsFeed, newsReadingDue, picturesDue, readTheNews } from "@/lib/server/industry-news";
 
 // A morning's reading started from here runs after the answer and can take a few minutes.
 export const maxDuration = 300;
@@ -19,6 +19,8 @@ export async function GET() {
     if ("refuse" in who) return who.refuse;
     const due = await newsReadingDue();
     if (due) after(() => readTheNews().catch((e) => console.error("industry news failed", e instanceof Error ? e.message : e)));
+    // Stories kept before pictures were looked for (or whose look failed to finish) get theirs after the answer.
+    else if (await picturesDue()) after(() => fillPictures().catch(() => undefined));
     const [feed, lists] = await Promise.all([newsFeed(), loadLists(who.member.businessId).catch(() => [])]);
     // The makers a story names, set against this business's own price lists (product names only, never a cost).
     const products = lists.flatMap((l) => [...l.items, ...l.panels, ...l.inverters, ...l.batteries, ...(l.chargers ?? [])]);

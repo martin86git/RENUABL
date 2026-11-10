@@ -45,6 +45,8 @@ export interface NewsItem {
   standingNote: string;
   /** When Sol found it (ISO instant). */
   foundAt: string;
+  /** A picture is kept for it (the page's own preview picture, redrawn by us), served at `/api/design/news/<id>/image`. */
+  hasImage?: boolean;
   /** For the business reading it: its products that name the story's makers (added by the route, never stored). */
   mine?: OnYourLists | null;
 }
@@ -66,16 +68,34 @@ export const NEWS_STANDING_LABELS: Record<NewsStanding, string> = {
 /** Topics whose facts belong to a government body, regulator or network: confirmed only from one of their own pages. */
 export const OFFICIAL_TOPICS: readonly NewsTopic[] = ["rebates", "rules", "networks"];
 
-/** Official sites beyond every .gov.au address: the market operator, standards and accreditation bodies, Victoria's networks. */
+/**
+ * Official sites beyond every .gov.au address: the market operator, standards and accreditation bodies, and every
+ * Australian electricity network (10 Nov 2026: Endeavour Energy's own page read "Not found on an official page").
+ */
 export const OFFICIAL_SITES: readonly string[] = [
   "aemo.com.au",
   "standards.org.au",
   "solaraccreditation.com.au",
+  // Victoria
   "ausnetservices.com.au",
   "citipower.com.au",
   "powercor.com.au",
   "jemena.com.au",
   "unitedenergy.com.au",
+  // New South Wales and the ACT
+  "ausgrid.com.au",
+  "endeavourenergy.com.au",
+  "essentialenergy.com.au",
+  "evoenergy.com.au",
+  // Queensland
+  "energex.com.au",
+  "ergon.com.au",
+  // South Australia, Tasmania, Western Australia, the Northern Territory
+  "sapowernetworks.com.au",
+  "tasnetworks.com.au",
+  "westernpower.com.au",
+  "horizonpower.com.au",
+  "powerwater.com.au",
 ];
 
 /** Comparison and lead sites: never the source of a rebate, rules or network story. */
@@ -120,14 +140,48 @@ export function cleanStanding(
 }
 
 /** What Sol is asked to return for each story, before it is checked. */
-export type NewsDraft = Omit<NewsItem, "id" | "site" | "foundAt">;
+export type NewsDraft = Omit<NewsItem, "id" | "site" | "foundAt" | "hasImage" | "mine">;
+
+/** The most of a story's page read to find its picture, and the largest picture fetched. */
+export const PAGE_READ_BYTES = 600_000;
+export const PICTURE_BYTES = 5_000_000;
+
+const attr = (tag: string, name: string) => tag.match(new RegExp(`\\b${name}\\s*=\\s*(["'])(.*?)\\1`, "i"))?.[2] ?? null;
+
+/**
+ * The preview picture a page names for itself (`og:image`, then `og:image:secure_url`, then `twitter:image`), as an
+ * https address resolved against the page; null when it names none or only a non-https one. Pure: the server fetches
+ * it with every address checked.
+ */
+export function pageImageUrl(html: string, pageUrl: string): string | null {
+  const metas = html.slice(0, PAGE_READ_BYTES).match(/<meta\b[^>]*>/gi) ?? [];
+  const wanted = ["og:image:secure_url", "og:image", "twitter:image", "twitter:image:src"];
+  const found = new Map<string, string>();
+  for (const m of metas) {
+    const key = (attr(m, "property") ?? attr(m, "name") ?? "").toLowerCase();
+    const content = attr(m, "content");
+    if (content && wanted.includes(key) && !found.has(key)) found.set(key, content.replace(/&amp;/g, "&").trim());
+  }
+  for (const key of wanted) {
+    const raw = found.get(key);
+    if (!raw) continue;
+    try {
+      const u = new URL(raw, pageUrl);
+      if (u.protocol === "https:") return u.toString();
+    } catch {
+      /* try the next */
+    }
+  }
+  return null;
+}
 
 /** Stories older than this aren't kept. */
 export const NEWS_DAYS = 14;
 /** The feed shows this many, newest first. */
 export const NEWS_SHOWN = 60;
-/** Most stories kept from one day's reading. */
-export const MAX_PER_RUN = 12;
+/** Most stories kept from one day's reading, and how many Sol is asked to find (10 Nov 2026, Martin: more stories). */
+export const MAX_PER_RUN = 15;
+export const AIM_STORIES = 10;
 /** A day's reading is due again after this many hours (the cron runs each morning; a read of the tab catches up). */
 export const NEWS_REFRESH_HOURS = 20;
 /** How long to wait before trying again after a reading failed. */
@@ -241,6 +295,8 @@ Sources:
 - Never use comparison or lead sites (Finder, Canstar, SolarQuotes and the like), or a retailer's or installer's own sales or pricing page, as the source for a rebate, rule or network change.
 - If you can't find or open the official page, don't drop the story: link a reputable news outlet (ABC, AFR, RenewEconomy, pv magazine and the like) and mark it "reported".
 - Report the news; don't spend your searches on one story. Cover the week's main stories first, then look for official pages for the rebate and rule ones.
+
+Aim for ${AIM_STORIES} stories or more, across the topics, not all rebates. Always search for products: new panels, inverters, batteries and EV chargers launched in Australia or added to the Clean Energy Council's approved lists, and makers' announcements (makers' own news pages, pv magazine Australia and the trade press). Include at least two product stories when there are any that week.
 ${already}
 Rules:
 - Every story must come from a page your search showed or you read. Copy its address exactly. Never make up or guess a link.

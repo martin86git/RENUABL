@@ -11,6 +11,7 @@ import {
   onYourLists,
   onYourListsWords,
   wholeSentences,
+  pageImageUrl,
   cleanStanding,
   isOfficialSite,
   NOT_OFFICIAL_NOTE,
@@ -225,5 +226,44 @@ describe("how sure a story is", () => {
     const p = newsPrompt(today, []);
     expect(p).toMatch(/Never use comparison or lead sites/);
     expect(p).toMatch(/"standing"/);
+  });
+});
+
+describe("every Australian network is official", () => {
+  it("counts Endeavour, Ausgrid and SA Power Networks", () => {
+    expect(isOfficialSite("https://www.endeavourenergy.com.au/news/flexible-exports")).toBe(true);
+    expect(isOfficialSite("https://www.ausgrid.com.au/x")).toBe(true);
+    expect(isOfficialSite("https://www.sapowernetworks.com.au/x")).toBe(true);
+    expect(cleanStanding("networks", "https://www.endeavourenergy.com.au/x", "confirmed", "On Endeavour's own page.").standing).toBe(
+      "confirmed",
+    );
+  });
+});
+
+describe("pageImageUrl", () => {
+  const page = "https://news.example.com/2026/11/story";
+  it("takes the page's own preview picture", () => {
+    const html = `<head><meta property="og:image" content="https://cdn.example.com/a.jpg?w=1200&amp;h=630"></head>`;
+    expect(pageImageUrl(html, page)).toBe("https://cdn.example.com/a.jpg?w=1200&h=630");
+  });
+  it("prefers the secure address, resolves a relative one and reads twitter's", () => {
+    expect(pageImageUrl(`<meta content="/img/b.png" property="og:image">`, page)).toBe("https://news.example.com/img/b.png");
+    expect(
+      pageImageUrl(
+        `<meta property="og:image" content="http://x.example.com/c.jpg"><meta property="og:image:secure_url" content="https://x.example.com/c.jpg">`,
+        page,
+      ),
+    ).toBe("https://x.example.com/c.jpg");
+    expect(pageImageUrl(`<meta name="twitter:image" content="https://t.example.com/d.jpg">`, page)).toBe("https://t.example.com/d.jpg");
+  });
+  it("answers null for none, or only an http picture", () => {
+    expect(pageImageUrl("<p>No picture</p>", page)).toBeNull();
+    expect(pageImageUrl(`<meta property="og:image" content="http://x.example.com/c.jpg">`, "http://x.example.com/p")).toBeNull();
+  });
+});
+
+describe("asking for more stories", () => {
+  it("asks for products every time", () => {
+    expect(newsPrompt(today, [])).toMatch(/Always search for products/);
   });
 });
