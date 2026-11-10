@@ -152,6 +152,8 @@ export function TodayPad(props: {
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TodayTab | "day">("today");
+  // The new deal form under the tabs, opened by the orange + beside them.
+  const [adding, setAdding] = useState(false);
   const [welcoming, setWelcoming] = useState(Boolean(props.welcome));
   // After the first visit Today opens on the deal feed (deal-feed.ts, 6 Nov 2026, Martin): Sol's typed greeting is for
   // the first time only. Asking Sol, or Show me my day, turns to the conversation; "Deals" comes back.
@@ -243,7 +245,18 @@ export function TodayPad(props: {
     <div className="mx-auto flex min-h-[calc(100dvh-13rem)] w-full max-w-6xl flex-col">
       <div className="flex items-center gap-2">
         <span className="hidden w-28 shrink-0 sm:block" aria-hidden />
-        <nav aria-label="Today" className="flex min-w-0 flex-1 justify-center">
+        <nav aria-label="Today" className="flex min-w-0 flex-1 items-center justify-center gap-2">
+          {/* A new deal, wherever you are on Today (10 Nov 2026, Martin: one orange + beside the tabs, not a button on each view). */}
+          <button
+            type="button"
+            onClick={() => setAdding((a) => !a)}
+            aria-expanded={adding}
+            aria-label="New deal"
+            title="New deal"
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white shadow-sm transition hover:brightness-105"
+          >
+            <Plus className={clsx("size-5 transition", adding && "rotate-45")} strokeWidth={2.25} aria-hidden />
+          </button>
           <div className="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-full bg-surface p-1 ring-1 ring-line">
             {TODAY_TABS.map((t) => {
               const Icon = TAB_ICONS[t.id];
@@ -304,6 +317,12 @@ export function TodayPad(props: {
         </button>
       </div>
 
+      {adding && (
+        <div className="mx-auto mt-4 w-full max-w-5xl">
+          <NewDeal onClose={() => setAdding(false)} />
+        </div>
+      )}
+
       {props.problem && (
         <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
           {props.problem}
@@ -327,11 +346,7 @@ export function TodayPad(props: {
         )}
         {!welcoming && onFeed && (
           <div className="pb-6">
-            <div className="mx-auto mb-4 flex w-full max-w-3xl flex-wrap items-center justify-between gap-3">
-              <p className="text-[22px] font-light tracking-[-0.01em] text-ink">
-                {greeting()}
-                {props.name ? `, ${props.name}` : ""}.
-              </p>
+            <div className="mx-auto -mt-3 mb-3 flex w-full max-w-5xl justify-end">
               <button
                 type="button"
                 onClick={showDay}
@@ -1183,8 +1198,6 @@ function MailBadge({ mark }: { mark: MailMark }) {
 /** The deals being sold as a board, or the numbers. */
 function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
   const [numbers, setNumbers] = useState(false);
-  // A new deal from the pipeline too (9 Nov 2026, Martin), the same short form as on Deals and the feed.
-  const [adding, setAdding] = useState(false);
   // Which deals an email has gone from, and whether the latest was opened (Sol and the team's emails alike).
   const [marks, setMarks] = useState<Record<string, MailMark> | null>(null);
   useEffect(() => {
@@ -1202,14 +1215,7 @@ function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate 
     clsx("rounded-full px-3 py-1 text-[13px] transition", on ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink");
   return (
     <section aria-label="Pipeline" className="rounded-3xl bg-surface p-5 ring-1 ring-line sm:p-6">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="inline-flex h-9 items-center gap-1.5 justify-self-start rounded-full bg-surface px-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2"
-        >
-          <Plus className="size-4" aria-hidden /> New deal
-        </button>
+      <div className="flex justify-center">
         <div className="inline-flex gap-0.5 rounded-full bg-canvas p-1 ring-1 ring-line" role="tablist" aria-label="Pipeline">
           <button type="button" role="tab" aria-selected={!numbers} onClick={() => setNumbers(false)} className={pill(!numbers)}>
             Board
@@ -1219,7 +1225,6 @@ function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate 
           </button>
         </div>
       </div>
-      {adding && <NewDeal onClose={() => setAdding(false)} />}
       <div className="mt-5">
         {numbers ? (
           <Numbers jobs={jobs} today={today} />

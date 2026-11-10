@@ -23,7 +23,6 @@ import {
   Snowflake,
   StickyNote,
   PenTool,
-  Plus,
   Undo2,
   X,
 } from "lucide-react";
@@ -60,7 +59,6 @@ import { DEAL_TEAM_CHANGED } from "@/lib/services/deal-team";
 import { AerialRoof, type AerialRoofSpec, type RoofFinish, type RoofForm } from "./aerial-roof";
 import { PATHS } from "./design-shell";
 import { DealTeamChat } from "./deal-team-chat";
-import { NewDeal } from "./design-customers";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { SolIcon } from "./sol-icon";
 
@@ -175,7 +173,6 @@ export function DealFeed({ me }: { me: string }) {
     void load();
   };
   const [filling, setFilling] = useState(false);
-  const [adding, setAdding] = useState(false);
   const examples = async (what: "add" | "clear") => {
     setFilling(true);
     await exampleDeals(what);
@@ -187,53 +184,7 @@ export function DealFeed({ me }: { me: string }) {
     <div className="mx-auto w-full max-w-5xl">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          {/* A new deal from Today (8 Nov 2026, Martin: how do I add new leads?), at the start of the row: the same short form as on Deals. */}
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2"
-          >
-            <Plus className="size-4" aria-hidden /> New deal
-          </button>
-          {/* The select fills the whole pill, so a press anywhere on it, the arrow included, opens the list (9 Nov 2026, Martin). */}
-          <label className="relative inline-flex h-9 items-center rounded-full bg-surface text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2">
-            <span className="sr-only">Pipeline</span>
-            <select
-              value={pickedPipeline ? feedPick.pipeline : "all"}
-              onChange={(e) => choosePick({ ...feedPick, pipeline: e.target.value })}
-              className="h-full cursor-pointer appearance-none rounded-full bg-transparent pl-3.5 pr-8 focus:outline-none"
-            >
-              <option value="all">All deals</option>
-              {pipelines.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 size-3.5 text-muted" aria-hidden />
-          </label>
-          <div role="radiogroup" aria-label="Whose deals" className="inline-flex rounded-full bg-surface p-1 ring-1 ring-line">
-            {(
-              [
-                [false, "Everyone's"],
-                [true, "Mine"],
-              ] as const
-            ).map(([mine, label]) => (
-              <button
-                key={label}
-                type="button"
-                role="radio"
-                aria-checked={feedPick.mine === mine}
-                onClick={() => choosePick({ ...feedPick, mine })}
-                className={clsx(
-                  "rounded-full px-3 py-1 text-[12.5px] font-medium transition",
-                  feedPick.mine === mine ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} />
           <p className="text-[13px] text-ink-2">
             {data ? (
               <>
@@ -272,7 +223,6 @@ export function DealFeed({ me }: { me: string }) {
           </div>
         </div>
       </div>
-      {adding && <NewDeal onClose={() => setAdding(false)} />}
       {data?.examples !== null && data?.examples !== undefined && (
         <p className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] text-ink-2">
           {data.examples > 0
@@ -1061,6 +1011,104 @@ function MarkButtons(props: { busy: boolean; onDone: () => void; onLater: (c: La
               {c.label}
             </button>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Whose deals and which pipeline, in one pill (10 Nov 2026, Martin: fewer buttons): it reads "All deals", "My deals" or
+ * "Sales · mine", and opens a small menu with Everyone's / Mine over the pipelines.
+ */
+function FeedPicker({
+  pick,
+  pipelines,
+  picked,
+  onPick,
+}: {
+  pick: { pipeline: FeedPipeline; mine: boolean };
+  pipelines: readonly Pipeline[];
+  picked: Pipeline | null;
+  onPick: (next: { pipeline: FeedPipeline; mine: boolean }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const label = picked ? (pick.mine ? `${picked.name} · mine` : picked.name) : pick.mine ? "My deals" : "All deals";
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="inline-flex h-9 items-center gap-2 rounded-full bg-surface pl-3.5 pr-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2"
+      >
+        {label}
+        <ChevronDown className={clsx("size-3.5 text-muted transition", open && "rotate-180")} aria-hidden />
+      </button>
+      {open && (
+        <div role="menu" className="absolute left-0 top-11 z-30 w-60 rounded-2xl bg-surface p-2 shadow-lg ring-1 ring-line">
+          <div role="radiogroup" aria-label="Whose deals" className="grid grid-cols-2 gap-0.5 rounded-full bg-canvas p-1 ring-1 ring-line">
+            {(
+              [
+                [false, "Everyone's"],
+                [true, "Mine"],
+              ] as const
+            ).map(([mine, words]) => (
+              <button
+                key={words}
+                type="button"
+                role="radio"
+                aria-checked={pick.mine === mine}
+                onClick={() => onPick({ ...pick, mine })}
+                className={clsx(
+                  "rounded-full py-1 text-[12.5px] font-medium transition",
+                  pick.mine === mine ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+                )}
+              >
+                {words}
+              </button>
+            ))}
+          </div>
+          <p className="px-2.5 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-wide text-muted">Pipeline</p>
+          {[{ id: "all", name: "All deals" }, ...pipelines].map((p) => {
+            const on = (picked?.id ?? "all") === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={on}
+                onClick={() => {
+                  onPick({ ...pick, pipeline: p.id });
+                  setOpen(false);
+                }}
+                className={clsx(
+                  "flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-1.5 text-left text-[13px] transition",
+                  on ? "font-medium text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink",
+                )}
+              >
+                {p.name}
+                {on && <Check className="size-4 text-sun-line" aria-hidden />}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
