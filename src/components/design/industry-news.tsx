@@ -146,11 +146,15 @@ export function NewsPage() {
   ];
 
   return (
-    <div className="mx-auto w-full max-w-3xl pb-10">
+    // Outlined in the Marketplace's blue (10 Nov 2026, Martin): the industry's feed, set apart from the business's own work.
+    <div className="mx-auto w-full max-w-3xl rounded-[28px] bg-market/[0.04] px-4 pb-8 pt-5 ring-2 ring-market sm:px-6">
       <div className="flex items-start gap-3">
         <SolBadge className="mt-0.5 size-6 shrink-0" />
         <div className="min-w-0">
-          <h2 className="text-[17px] font-semibold text-ink">Industry news</h2>
+          <h2 className="flex items-center gap-2 text-[17px] font-semibold text-ink">
+            Industry news
+            <span className="rounded-full bg-market px-2 py-0.5 text-[11px] font-medium text-white">Across RENUABL</span>
+          </h2>
           <p className="mt-0.5 text-[13px] text-muted">
             {data?.reading
               ? "Sol is reading this morning's solar news…"

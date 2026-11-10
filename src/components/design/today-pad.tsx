@@ -276,7 +276,14 @@ export function TodayPad(props: {
                   aria-pressed={on}
                   className={clsx(
                     "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] transition",
-                    on ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+                    // News is the industry's, not the business's own work: it wears the Marketplace's blue (10 Nov 2026, Martin).
+                    t.id === "news"
+                      ? on
+                        ? "bg-market text-white"
+                        : "text-market hover:bg-market/10"
+                      : on
+                        ? "bg-primary text-primary-ink"
+                        : "text-ink-2 hover:text-ink",
                   )}
                 >
                   <Icon className="size-4" aria-hidden />
