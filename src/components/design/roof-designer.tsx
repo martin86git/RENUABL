@@ -1756,7 +1756,9 @@ export function RoofDesigner(props: {
     if (list.length >= MAX_DESIGNS) return;
     const made: RoofDesign = copy
       ? { ...working(), label: undefined }
-      : { ...spot, faces: [], loose: [], ...(panel ? { panel } : {}), ...(fitted.length ? { inverters: fitted } : {}) };
+      : // A new design is clean (10 Nov 2026, Martin: the inverter carried over): no panels, no panel or inverter chosen,
+        // no battery, strings or marks. Only the home itself (its roof, storeys and phase) is shared, as for every design.
+        { ...spot, faces: [], loose: [] };
     // A copy takes its quote's settings and hand changes with it; a new design starts with the same home and no changes.
     setQuotes([...everyQuote(), copy ? quoteNow : { form: quoteNow.form, edits: {} }]);
     show([...list, made], list.length);
