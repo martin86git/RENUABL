@@ -76,6 +76,12 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
     area: "Deals",
+    words:
+      "A deal's banner shows its panels, battery, inverter and charger as icons with their sizes. Details and Activity keep their tabs at the top.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Deals",
     words: "A deal's banner shows the system in figures beside its roof. On wide screens its tools and pages sit down either side.",
   },
   {

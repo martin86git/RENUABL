@@ -96,12 +96,16 @@ export function DealBanner({
     ? `/api/design/roof?lat=${job.lat!.toFixed(6)}&lng=${job.lng!.toFixed(6)}&size=${ROOF_IMAGE.width}x${ROOF_IMAGE.height}`
     : null;
   const where = job.address || customer.address;
-  const battery = figures.find((f) => f.label === "Battery");
 
   return (
     <section className="overflow-hidden rounded-[24px] bg-primary text-white shadow-[0_8px_30px_rgba(11,11,12,0.10)]">
       <div className="grid sm:grid-cols-[minmax(0,1fr)_minmax(0,34%)]">
-        <div className={clsx("flex min-w-0 flex-col justify-between gap-4", compact ? "px-5 py-4 sm:px-6" : "p-5 sm:p-6")}>
+        <div
+          className={clsx(
+            "flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-4",
+            compact ? "px-5 py-4 sm:px-6" : "p-5 sm:p-6",
+          )}
+        >
           <div className="min-w-0">
             <h1 className={clsx("truncate leading-tight tracking-tight", compact ? "text-[21px]" : "text-[26px] sm:text-[28px]")}>
               {customer.name}
@@ -114,7 +118,6 @@ export function DealBanner({
               <Chip>{STAGE_LABELS[job.stage]}</Chip>
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
               {job.installDate && <Chip>Installing {shortDate(job.installDate)}</Chip>}
-              {compact && figures[0] && <Chip>{figures[0].value}</Chip>}
               {pulse && (
                 <span className="[&>*]:mt-0">
                   <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />
@@ -122,30 +125,11 @@ export function DealBanner({
               )}
             </div>
           </div>
-          {!compact &&
-            (figures.length ? (
-              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-t border-white/10 pt-4 sm:grid-cols-4">
-                {figures.map((f) => (
-                  <div key={f.label} className="min-w-0">
-                    <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/55">{f.label}</dt>
-                    <dd className="mt-1 text-[20px] leading-none tabular-nums tracking-tight text-sun-line">{f.value}</dd>
-                    {f.note && (
-                      <dd className="mt-1 truncate text-xs text-white/65" title={f.note}>
-                        {f.note}
-                      </dd>
-                    )}
-                  </div>
-                ))}
-              </dl>
-            ) : (
-              <p className="border-t border-white/10 pt-4 text-sm text-white/65">
-                No system yet. {onDesign ? "Design the roof and its figures show here." : "Give the deal an address to design it."}
-              </p>
-            ))}
+          <Kit figures={figures} compact={compact} />
         </div>
 
         {/* The roof, a third of the banner: the design on it, and the battery on its wall when there is one. */}
-        <div className={clsx("relative bg-black/20", compact ? "min-h-[6.5rem]" : "min-h-[11rem]")}>
+        <div className={clsx("relative bg-black/20", compact ? "min-h-[6.5rem]" : "min-h-[8.5rem]")}>
           {picture ? (
             <svg
               viewBox={bannerView(drawing?.viewBox ?? null, 1.5, 1.25)}
@@ -179,33 +163,92 @@ export function DealBanner({
               aria-label={job.projectId ? "Open the design" : "Design this roof"}
             />
           )}
-          {battery && !compact && <BatteryWall kwh={battery.value} />}
         </div>
       </div>
     </section>
   );
 }
 
-/** A wall with the battery on it, as the house would have it, and its storage: shown over the roof when there is one. */
-function BatteryWall({ kwh }: { kwh: string }) {
+/**
+ * The system as its kit (10 Nov 2026, Martin: a house didn't say at a glance what he needed; the panels and the battery
+ * do): each part the deal knows, as its icon in the signal orange with its size and a few words under it.
+ */
+function Kit({ figures, compact }: { figures: BannerFigure[]; compact: boolean }) {
+  if (!figures.length) return <p className="text-[13px] text-white/60">No system designed yet</p>;
   return (
-    <div className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-2.5 rounded-2xl bg-black/60 py-2 pl-2 pr-3.5 ring-1 ring-white/15 backdrop-blur">
-      <svg viewBox="0 0 34 44" className="h-11 w-[34px]" aria-hidden>
-        {/* The wall: a few courses of render. */}
-        <rect x="0" y="0" width="34" height="44" rx="4" fill="rgb(255 255 255 / 0.10)" />
-        <path d="M0 11h34M0 22h34M0 33h34" stroke="rgb(255 255 255 / 0.10)" strokeWidth="1" />
-        {/* The battery on it, its charge in the signal orange. */}
-        <rect x="9" y="7" width="16" height="30" rx="3" fill="#f4f4f5" />
-        <rect x="12" y="20" width="10" height="14" rx="1.5" fill="var(--sun-line)" />
-        <rect x="12" y="10" width="10" height="2" rx="1" fill="rgb(11 11 12 / 0.25)" />
-      </svg>
-      <div>
-        <p className="text-[15px] leading-none tabular-nums text-white">{kwh}</p>
-        <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">On the wall</p>
-      </div>
-    </div>
+    <dl className={clsx("flex flex-wrap", compact ? "gap-x-5 gap-y-2" : "gap-x-6 gap-y-3")}>
+      {figures.map((f) => {
+        const Icon = KIT_ICONS[f.label] ?? PanelIcon;
+        return (
+          <div key={f.label} className="flex min-w-0 items-center gap-2.5">
+            <span
+              className={clsx(
+                "flex shrink-0 items-center justify-center rounded-full bg-white/10 text-sun-line ring-1 ring-white/15",
+                compact ? "size-8" : "size-10",
+              )}
+              aria-hidden
+            >
+              <Icon className={compact ? "size-[18px]" : "size-[22px]"} />
+            </span>
+            <div className="min-w-0">
+              <dt className="sr-only">{f.label}</dt>
+              <dd className={clsx("tabular-nums leading-tight text-white", compact ? "text-[14px]" : "text-[16px]")}>
+                {f.label === "EV charger" ? "EV charger" : f.value}
+              </dd>
+              {f.note && !compact && <dd className="max-w-[10rem] truncate text-[12px] text-white/60">{f.note}</dd>}
+            </div>
+          </div>
+        );
+      })}
+    </dl>
   );
 }
+
+type IconProps = { className?: string };
+const LINE = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+
+/** The kit's icons, in the brand's line (a 24 box, 2-unit round-capped strokes, as the Marketplace's mark). */
+function PanelIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" {...LINE} className={className}>
+      <path d="M5 4h14l2 12H3z" />
+      <path d="M4 10h16M9.7 4 9 16M14.3 4l.7 12" strokeWidth={1.5} />
+      <path d="M12 16v4M8 20h8" />
+    </svg>
+  );
+}
+function BatteryIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" {...LINE} className={className}>
+      <rect x="6" y="4" width="12" height="17" rx="2.5" />
+      <path d="M10 2h4" />
+      <path d="M9 17h6M9 13.5h6" strokeWidth={2.4} />
+    </svg>
+  );
+}
+function InverterIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" {...LINE} className={className}>
+      <rect x="4" y="3" width="16" height="18" rx="2.5" />
+      <path d="m13 7-3 5h4l-3 5" />
+    </svg>
+  );
+}
+function ChargerIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" {...LINE} className={className}>
+      <path d="M9 3v4M15 3v4" />
+      <path d="M6 7h12v3a6 6 0 0 1-12 0z" />
+      <path d="M12 16v5" />
+    </svg>
+  );
+}
+const KIT_ICONS: Record<string, (p: IconProps) => React.ReactNode> = {
+  Solar: PanelIcon,
+  Battery: BatteryIcon,
+  Inverter: InverterIcon,
+  "EV charger": ChargerIcon,
+};
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
