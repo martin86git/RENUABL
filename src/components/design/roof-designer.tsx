@@ -27,6 +27,7 @@ import { MOUNT_STANDOFF, clearanceFor, inRows, laidAs, packFaces, reorient, spli
 import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
 import { faceAt, facesFoundNote, facesFromHeights } from "@/lib/domain/design/roof-faces";
+import { PITCH_NOT_READ, pitchOfRoof, pitchReadWords, type PitchReading } from "@/lib/domain/design/roof-pitch";
 import { NO_BILL_KW, SELF_DESIGN_AIMS, SELF_DESIGN_LABELS, selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
 import { todayInMarket } from "@/lib/domain/market";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
@@ -774,6 +775,12 @@ function RoofPitches(props: {
   onAdd: () => void;
   onRemove: (index: number) => void;
   onNotFlat: () => void;
+  /** What Nearmap's heights read for the home's roof, said beside the mark until put away. */
+  note?: string | null;
+  onNoteClose?: () => void;
+  /** Reads the home's pitch from Nearmap's heights and sets it: offered on a Nearmap picture. */
+  onRead?: () => void;
+  reading?: boolean;
 }) {
   const { roofs, flat, active, open } = props;
   const pitch = roofs[active] ?? 0;
@@ -843,11 +850,39 @@ function RoofPitches(props: {
           ) : (
             <PitchStepper pitch={pitch} onPitch={(n) => props.onPitch(active, n)} onEnter={() => props.onOpen(false)} />
           )}
+          {active === 0 && props.onRead && (
+            <button
+              onClick={props.onRead}
+              disabled={props.reading}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-full bg-surface py-1.5 text-xs font-semibold text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted"
+              title="Measure the roof's pitch from Nearmap's height survey and set it"
+            >
+              <Ruler className="size-3.5" aria-hidden />
+              {props.reading ? "Reading the heights…" : "Read it from Nearmap"}
+            </button>
+          )}
+          {active === 0 && props.note && <p className="mt-2 text-[11px] leading-snug text-ink-2">{props.note}</p>}
           {active > 0 && (
             <button onClick={() => props.onRemove(active)} className="mt-2 w-full text-xs font-medium text-muted hover:text-danger">
               Remove roof {active + 1}
             </button>
           )}
+        </div>
+      )}
+      {!open && props.note && (
+        <div
+          className="absolute left-full top-1/2 ml-2 flex w-60 -translate-y-1/2 items-start gap-1.5 rounded-2xl bg-surface p-2.5 text-ink shadow-lift ring-1 ring-line"
+          role="status"
+        >
+          <Ruler className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
+          <p className="min-w-0 flex-1 text-[11px] leading-snug text-ink-2">{props.note}</p>
+          <button
+            onClick={props.onNoteClose}
+            className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+            aria-label="Put the note away"
+          >
+            <X className="size-3" aria-hidden />
+          </button>
         </div>
       )}
     </div>
@@ -859,7 +894,14 @@ function RoofPitches(props: {
  * flat roof left at the 22° start). It comes in after a moment, small and to the side, so the roof is seen first. Kept
  * with the design's quote settings, so it asks again only if left unsaved.
  */
-function PitchFirst(props: { pitch: number; flat: boolean; onSet: (pitch: number, roof?: "flat") => void }) {
+function PitchFirst(props: {
+  pitch: number;
+  flat: boolean;
+  onSet: (pitch: number, roof?: "flat") => void;
+  /** What Nearmap's heights suggest, when too little of the roof agreed to set it without asking. */
+  hint?: string | null;
+  reading?: boolean;
+}) {
   const [pitch, setPitch] = useState(props.pitch);
   const [shown, setShown] = useState(false);
   useEffect(() => {
@@ -876,7 +918,9 @@ function PitchFirst(props: { pitch: number; flat: boolean; onSet: (pitch: number
           <RoofAngle pitch={pitch} size={44} />
         </div>
         <PitchStepper pitch={pitch} onPitch={setPitch} onEnter={() => props.onSet(pitch)} />
-        <p className="mt-1.5 text-center text-[11px] leading-snug text-muted">Tap the figure to type it. New panels start at it.</p>
+        <p className="mt-1.5 text-center text-[11px] leading-snug text-muted">
+          {props.hint ?? (props.reading ? "Reading Nearmap's heights for it…" : "Tap the figure to type it. New panels start at it.")}
+        </p>
         {/* The flat roof is a button of its own beside Set (Martin: it was easy to miss as a line of text). */}
         <div className="mt-2.5 flex gap-1.5">
           <button
@@ -1693,6 +1737,11 @@ export function RoofDesigner(props: {
   const roofTag = roofInUse ? { roof: roofInUse } : {};
   const roofEdge = (item: { roof?: number }) => ROOF_COLOURS[roofOf(item) % ROOF_COLOURS.length];
   const [pitchOpen, setPitchOpen] = useState(false);
+  // The pitch read from Nearmap's heights (`readRoofPitch`): what it said, for the roof it was read on.
+  const spotKey = `${spot.lat},${spot.lng}`;
+  const [pitchNote, setPitchNote] = useState<{ words: string; at: string } | null>(null);
+  const [pitchGuess, setPitchGuess] = useState<{ read: PitchReading; words: string; at: string } | null>(null);
+  const [pitchReading, setPitchReading] = useState(false);
   const setQuote = (next: QuoteFields) => {
     setQuotes(
       sharedHome(
@@ -3630,6 +3679,66 @@ export function RoofDesigner(props: {
       : null;
     return { faces: made, words: facesFoundNote(made.length, day) };
   };
+  /**
+   * The roof's pitch read from Nearmap's heights (10 Nov 2026, Martin: measured, not guessed): the home's faces found
+   * in the heights inside its outline, and the pitch most of the roof is at (`roof-pitch.ts`). Nothing is put on the
+   * design by this: it only answers the pitch, or why there is none.
+   */
+  const readRoofPitch = async (): Promise<{ read: PitchReading; words: string } | { note: string }> => {
+    if (!props.nearmapPicture) return { note: "Only a Nearmap picture has the heights to read the pitch from: switch to Nearmap first." };
+    const [outline, heights] = await Promise.all([nearmapFace(), loadTerrain(spot.lat, spot.lng, { nearmap: true })]);
+    if ("note" in outline) return { note: outline.note };
+    if (!heights || heights.from !== "nearmap") return { note: "Nearmap has no height data at this address yet. Set the pitch by hand." };
+    const read = pitchOfRoof(facesFromHeights(outline.face.points, heights).map((f) => ({ pitch: f.aspect.pitch, areaM2: f.areaM2 })));
+    if (!read) return { note: PITCH_NOT_READ };
+    const day = heights.captured
+      ? new Date(`${heights.captured}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })
+      : null;
+    return { read, words: pitchReadWords(read, "Nearmap's heights", day) };
+  };
+  /** The reading put on the home: its pitch, or flat. As it is now, whenever the answer comes back. */
+  const applyPitch = useRef<(read: PitchReading, only: "unset" | "always") => boolean>(() => false);
+  useEffect(() => {
+    applyPitch.current = (read, only) => {
+      if (only === "unset" && quoteNow.form.pitchSet) return false;
+      const roof = read.flat ? "flat" : quoteNow.form.roof === "flat" ? "tile" : quoteNow.form.roof;
+      setQuote({ ...quoteNow, form: { ...quoteNow.form, ...(read.flat ? {} : { pitch: read.pitch }), roof, pitchSet: true } });
+      return true;
+    };
+  });
+  /** Pressed on the pitch's pad: read it now, and set it whatever stood there. */
+  const readPitchNow = async () => {
+    if (pitchReading) return;
+    setPitchReading(true);
+    const got = await readRoofPitch();
+    setPitchReading(false);
+    if ("note" in got) return setPitchNote({ words: got.note, at: spotKey });
+    applyPitch.current(got.read, "always");
+    setPitchNote({ words: got.words, at: spotKey });
+  };
+  // A roof opened on a Nearmap picture with no pitch set yet has it read once (never over one a person set): set when
+  // most of the roof agrees, else offered on the card that asks for it.
+  const pitchTried = useRef("");
+  const pitchUnset = !quoteNow.form.pitchSet;
+  useEffect(() => {
+    if (!props.nearmapPicture || !pitchUnset || pitchTried.current === spotKey) return;
+    pitchTried.current = spotKey;
+    let gone = false;
+    setPitchReading(true);
+    void readRoofPitch().then((got) => {
+      if (gone) return;
+      setPitchReading(false);
+      if ("note" in got) return;
+      if (got.read.sure) {
+        if (applyPitch.current(got.read, "unset")) setPitchNote({ words: got.words, at: spotKey });
+      } else setPitchGuess({ read: got.read, words: got.words, at: spotKey });
+    });
+    return () => {
+      gone = true;
+    };
+    // Asked once a roof: what it reads is the roof's, whichever design is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.nearmapPicture, pitchUnset, spotKey]);
   /** The right click's "Roof outline from Nearmap": the outline down, said in the command bar's reply. */
   const outlineFromNearmap = async () => {
     setToolMenu(null);
@@ -5269,7 +5378,7 @@ export function RoofDesigner(props: {
   );
 
   return (
-    <div className={clsx(props.tight && "relative")}>
+    <div className={clsx(props.tight && "relative p-4")}>
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
           and the address being designed; then which design this is and its quote on the left, and publishing it and
           its proposal on the right. A firmer line under it sets it off from the work below. */}
@@ -5278,7 +5387,7 @@ export function RoofDesigner(props: {
           "z-40 text-ink",
           // In the pop-up (8 Nov 2026, Martin: no menu bar, the map taller and wider; the buttons can run down one side):
           // a rail of rounds down the left, beside the picture, each saying what it is on hover.
-          props.tight ? "absolute left-0 top-0 w-11" : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
+          props.tight ? "absolute left-4 top-4 w-11" : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
         )}
       >
         <BarRow
@@ -7400,12 +7509,18 @@ export function RoofDesigner(props: {
                     setPitchOpen(false);
                   }}
                   onNotFlat={() => setQuote({ ...quoteNow, form: { ...quoteNow.form, roof: "tile", pitchSet: true } })}
+                  note={pitchNote?.at === spotKey ? pitchNote.words : null}
+                  onNoteClose={() => setPitchNote(null)}
+                  onRead={props.nearmapPicture ? () => void readPitchNow() : undefined}
+                  reading={pitchReading}
                 />
               )}
               {!quoteNow.form.pitchSet && (
                 <PitchFirst
-                  key={active}
-                  pitch={quoteNow.form.pitch ?? TILT.roof}
+                  key={`${active}-${pitchGuess?.at === spotKey ? pitchGuess.read.pitch : ""}`}
+                  pitch={pitchGuess?.at === spotKey && !pitchGuess.read.flat ? pitchGuess.read.pitch : (quoteNow.form.pitch ?? TILT.roof)}
+                  hint={pitchGuess?.at === spotKey ? pitchGuess.words : null}
+                  reading={pitchReading}
                   flat={quoteNow.form.roof === "flat"}
                   onSet={(pitch, roof) =>
                     setQuote({ ...quoteNow, form: { ...quoteNow.form, pitch, roof: roof ?? quoteNow.form.roof, pitchSet: true } })

@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
     area: "Designer",
+    words: "On a Nearmap picture the roof's pitch is read from Nearmap's heights: by itself on a new roof, or from the pitch mark.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Designer",
     words: "The day now plays in a low bar along the foot of the roof picture, so the roof and the sun stay in view.",
   },
   {
