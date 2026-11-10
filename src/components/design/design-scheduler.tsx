@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Bell, CalendarCheck, CalendarClock, CalendarX, ChevronLeft, ChevronRight, Plus, StickyNote, Trash2, X } from "lucide-react";
 import clsx from "clsx";
-import { CAPACITY_WEEKS, capacityWeeks, type CapacityWeek } from "@/lib/domain/design/approvals";
 import {
   ENTRY_WORDS,
   entriesOn,
@@ -15,7 +14,6 @@ import {
   type EntryKind,
 } from "@/lib/domain/design/calendar-entries";
 import { calendarDays, holidayOn, isWeekend, type CalendarView } from "@/lib/domain/design/schedule";
-import { addDaysISO } from "@/lib/domain/scheduling";
 import { todayInMarket } from "@/lib/domain/market";
 import type { ISODate } from "@/lib/domain/types";
 import { loadPrefs, loadSchedule, type BookedJob } from "@/lib/services/after-sale";
@@ -76,34 +74,16 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
       gone = true;
     };
   }, [first, last]);
-  // The next six weeks' capacity: installations booked against what the business can do in a week.
-  const [capacity, setCapacity] = useState<CapacityWeek[] | null>(null);
-  const [ahead, setAhead] = useState<CalendarEntry[]>([]);
-  const [capacityFrom, setCapacityFrom] = useState<ISODate | null>(null);
+  // What the business can do in a week (Settings → Installers), and whether customers are reminded before their day.
+  const [canDo, setCanDo] = useState<number | null>(null);
   useEffect(() => {
-    void (async () => {
-      const prefs = await loadPrefs();
+    void loadPrefs().then((prefs) => {
       if (!prefs.ok) return;
       setReminders({ on: prefs.prefs.automations.installReminders, days: prefs.prefs.reminderDaysBefore });
-      const now = new Date();
-      const from = capacityWeeks([], 1, now)[0].monday;
-      setCapacityFrom(from);
-      const booked = await loadSchedule(from, addDaysISO(from, CAPACITY_WEEKS * 7 - 1));
-      if (booked.ok)
-        setCapacity(
-          capacityWeeks(
-            booked.jobs.map((j) => j.date),
-            prefs.prefs.weeklyCapacity,
-            now,
-          ),
-        );
-    })();
+      setCanDo(prefs.prefs.weeklyCapacity);
+    });
   }, []);
-  // The tentative installs in the capacity weeks, read again whenever an entry changes.
-  useEffect(() => {
-    if (!capacityFrom) return;
-    void loadEntries(capacityFrom, addDaysISO(capacityFrom, CAPACITY_WEEKS * 7 - 1)).then((r) => r.ok && setAhead(r.entries));
-  }, [capacityFrom, entries]);
+  const weeks = Array.from({ length: Math.ceil(cal.days.length / 7) }, (_, i) => cal.days.slice(i * 7, i * 7 + 7));
 
   const on = (d: string) => (jobs ?? []).filter((j) => j.date === d);
   const inView = jobs?.length ?? 0;
@@ -115,45 +95,31 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
 
   return (
     <div className={ui.page}>
-      {/* One row: the title and where you are in time on the left; what is in view, Month | Week and Calendar | List on
-          the right (10 Nov 2026, Martin: fit more of the calendar into view). */}
+      {/* The title with the switches on the right; the month and its arrows under it (10 Nov 2026, Martin: room for the
+          calendar to breathe). Capacity sits in each week's row, reminders behind the bell, and a day is added to by
+          clicking it. */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-xl font-semibold leading-tight tracking-[-0.02em] text-ink">Installations</h1>
-          <div className="flex items-center gap-1.5">
-            <button type="button" className={ARROW} onClick={() => setDate(cal.prev)} aria-label={`Earlier ${view}`}>
-              <ChevronLeft className="size-4" />
-            </button>
-            <p className="min-w-[9.5rem] text-center text-[17px] tracking-tight text-ink" aria-live="polite">
-              {cal.title}
-            </p>
-            <button type="button" className={ARROW} onClick={() => setDate(cal.next)} aria-label={`Later ${view}`}>
-              <ChevronRight className="size-4" />
-            </button>
-            {!cal.days.includes(today) && (
-              <button
-                type="button"
-                onClick={() => setDate(today)}
-                className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-sun-ink ring-1 ring-sun-line hover:bg-sun"
-              >
-                <CalendarCheck className="size-3.5" aria-hidden />
-                Back to today
-              </button>
-            )}
-          </div>
-        </div>
+        <h1 className="text-xl font-semibold leading-tight tracking-[-0.02em] text-ink">Installations</h1>
         <div className="flex flex-wrap items-center gap-2">
-          <p className="mr-1 text-[12.5px] text-muted">
-            {jobs ? `${inView} booked, ${ready} ready${tentatives ? `, ${tentatives} tentative` : ""}` : "Loading…"}
-          </p>
-          <button
-            type="button"
-            onClick={() => setEditing({ id: null, entry: blank(cal.days.includes(today) ? today : first) })}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[13px] font-medium text-primary-ink hover:opacity-90"
-          >
-            <Plus className="size-4" aria-hidden />
-            Add to calendar
-          </button>
+          {reminders && (
+            <Link
+              href={`${PATHS.settings}/automations`}
+              aria-label={
+                reminders.on ? `Reminders: ${reminders.days} ${reminders.days === 1 ? "day" : "days"} before` : "Reminders are off"
+              }
+              title={
+                reminders.on
+                  ? `Customers are emailed ${reminders.days} ${reminders.days === 1 ? "day" : "days"} before their installation. Change it in Settings.`
+                  : "Customers aren't reminded before their installation. Switch reminders on in Settings."
+              }
+              className="relative inline-flex size-9 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line hover:text-ink hover:ring-ink-2"
+            >
+              <Bell className="size-4" aria-hidden />
+              {!reminders.on && (
+                <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-sun-line ring-2 ring-surface" aria-hidden />
+              )}
+            </Link>
+          )}
           <Segmented
             label="Show a month or a week"
             size="sm"
@@ -167,63 +133,31 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
           {switcher}
         </div>
       </div>
-
-      {/* Capacity and reminders in one slim row. */}
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {capacity && (
-          <>
-            <span className="pr-1 text-[11px] text-muted" title="Installations booked against what you can do in a week">
-              Booked / can do
-            </span>
-            {capacity.map((w) => {
-              const shown = cal.days.includes(w.monday);
-              const pencilled = tentativeInWeek(ahead, w.monday);
-              return (
-                <button
-                  key={w.monday}
-                  type="button"
-                  onClick={() => {
-                    setView("week");
-                    setDate(w.monday);
-                  }}
-                  title={`${w.label}: ${w.booked} booked, room for ${Math.max(0, w.canDo - w.booked)} more${pencilled ? `, ${pencilled} tentative` : ""}`}
-                  className={clsx(
-                    "relative inline-flex h-8 items-center gap-1.5 overflow-hidden rounded-full bg-surface px-3 text-[12px] ring-1 hover:ring-ink-2",
-                    shown ? "ring-ink" : "ring-line",
-                  )}
-                >
-                  <span className="text-muted">{w.label}</span>
-                  <span className={clsx("font-medium tabular-nums", w.full ? "text-positive" : "text-ink")}>
-                    {w.booked}/{w.canDo}
-                  </span>
-                  {pencilled > 0 && <span className="tabular-nums text-sun-ink">+{pencilled}</span>}
-                  <span
-                    aria-hidden
-                    className={clsx("absolute inset-x-0 bottom-0 h-0.5", w.full ? "bg-positive" : "bg-ink")}
-                    style={{ width: `${Math.min(100, (w.booked / w.canDo) * 100)}%` }}
-                  />
-                </button>
-              );
-            })}
-            <Link href={`${PATHS.settings}/installers`} className="px-1 text-[11px] text-muted underline underline-offset-4 hover:text-ink">
-              Change
-            </Link>
-          </>
-        )}
-        {reminders && (
-          <Link
-            href={`${PATHS.settings}/automations`}
-            className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12px] text-ink-2 ring-1 ring-line hover:ring-ink-2"
-            title={
-              reminders.on
-                ? `Customers are emailed ${reminders.days} ${reminders.days === 1 ? "day" : "days"} before their installation.`
-                : "Customers aren't reminded before their installation."
-            }
-          >
-            <Bell className={clsx("size-3.5", reminders.on ? "text-positive" : "text-sun-line")} aria-hidden />
-            {reminders.on ? `Reminders ${reminders.days} ${reminders.days === 1 ? "day" : "days"} before` : "Reminders off · switch on"}
-          </Link>
-        )}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex items-center gap-1.5">
+          <button type="button" className={ARROW} onClick={() => setDate(cal.prev)} aria-label={`Earlier ${view}`}>
+            <ChevronLeft className="size-4" />
+          </button>
+          <p className="min-w-[9.5rem] text-center text-[17px] tracking-tight text-ink" aria-live="polite">
+            {cal.title}
+          </p>
+          <button type="button" className={ARROW} onClick={() => setDate(cal.next)} aria-label={`Later ${view}`}>
+            <ChevronRight className="size-4" />
+          </button>
+          {!cal.days.includes(today) && (
+            <button
+              type="button"
+              onClick={() => setDate(today)}
+              className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-sun-ink ring-1 ring-sun-line hover:bg-sun"
+            >
+              <CalendarCheck className="size-3.5" aria-hidden />
+              Back to today
+            </button>
+          )}
+        </div>
+        <p className="text-[12.5px] text-muted">
+          {jobs ? `${inView} booked, ${ready} ready${tentatives ? `, ${tentatives} tentative` : ""}` : "Loading…"}
+        </p>
       </div>
       {problem && (
         <p className="mt-3 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
@@ -232,96 +166,120 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
       )}
 
       <div className="mt-3 overflow-x-auto">
-        <div className={clsx("grid min-w-[44rem] grid-cols-7 overflow-hidden rounded-lg border border-line bg-line", "gap-px")}>
+        <div className="grid min-w-[46rem] grid-cols-[3.25rem_repeat(7,minmax(0,1fr))] gap-px overflow-hidden rounded-lg border border-line bg-line">
+          <div
+            className="bg-surface px-1.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted"
+            title="Each week: installations booked against what you can do. Change it in Settings, Installers."
+          >
+            Week
+          </div>
           {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
             <div key={d} className="bg-surface px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted">
               {d}
             </div>
           ))}
-          {cal.days.map((d) => {
-            const outside = view === "month" && d.slice(0, 7) !== date.slice(0, 7);
-            const holiday = holidayOn(d);
-            const made = entriesOn(entries, d);
-            return (
-              <div
-                key={d}
-                role="button"
-                tabIndex={0}
-                aria-label={`Add to ${d}`}
-                onClick={(e) => e.target === e.currentTarget && setEditing({ id: null, entry: blank(d) })}
-                onKeyDown={(e) => {
-                  if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
-                    e.preventDefault();
-                    setEditing({ id: null, entry: blank(d) });
-                  }
-                }}
-                className={clsx(
-                  "group relative flex cursor-pointer flex-col gap-0.5 p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sun-line",
-                  view === "week" ? "min-h-64" : "min-h-[5.25rem]",
-                  outside || isWeekend(d) ? "bg-surface-2" : "bg-surface",
-                )}
-              >
-                <p
+          {weeks.map((week) => [
+            <WeekLoad
+              key={`w${week[0]}`}
+              booked={(jobs ?? []).filter((j) => week.includes(j.date as ISODate)).length}
+              tentative={tentativeInWeek(entries, week[0])}
+              canDo={canDo}
+              onOpen={
+                view === "month"
+                  ? () => {
+                      setView("week");
+                      setDate(week[0]);
+                    }
+                  : undefined
+              }
+            />,
+            ...week.map((d) => {
+              const outside = view === "month" && d.slice(0, 7) !== date.slice(0, 7);
+              const holiday = holidayOn(d);
+              const made = entriesOn(entries, d);
+              return (
+                <div
+                  key={d}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Add to ${d}`}
+                  onClick={(e) => e.target === e.currentTarget && setEditing({ id: null, entry: blank(d) })}
+                  onKeyDown={(e) => {
+                    if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                      e.preventDefault();
+                      setEditing({ id: null, entry: blank(d) });
+                    }
+                  }}
                   className={clsx(
-                    "pointer-events-none flex items-center text-[11.5px] tabular-nums",
-                    d === today ? "font-semibold text-sun-line" : outside ? "text-muted" : "text-ink-2",
+                    "group relative flex cursor-pointer flex-col gap-0.5 p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sun-line",
+                    view === "week" ? "min-h-64" : "min-h-[5.25rem]",
+                    outside || isWeekend(d) ? "bg-surface-2" : "bg-surface",
                   )}
                 >
-                  {Number(d.slice(8))}
-                  {holiday && <span className="ml-1 truncate text-[10px] font-normal text-muted">{holiday}</span>}
-                  <Plus className="ml-auto size-3.5 text-muted opacity-0 group-hover:opacity-100" aria-hidden />
-                </p>
-                {on(d).map((j) => (
-                  <button
-                    type="button"
-                    key={j.jobId}
-                    onClick={() => setOpen(j.jobId)}
+                  <p
                     className={clsx(
-                      "rounded border-l-[3px] px-1.5 py-0.5 text-left text-[12px] leading-tight hover:brightness-95",
-                      TONE[j.state],
+                      "pointer-events-none flex items-center text-[11.5px] tabular-nums",
+                      d === today ? "font-semibold text-sun-line" : outside ? "text-muted" : "text-ink-2",
                     )}
-                    title={j.checks.map((c) => `${c.label}: ${c.value}`).join(" · ")}
                   >
-                    <span className="flex items-center gap-1">
-                      <span className="truncate font-medium text-ink">{j.customer}</span>
-                      <span className="ml-auto flex shrink-0 gap-0.5">
-                        {j.checks.map((c) => (
-                          <span key={c.key} className={clsx("size-1.5 rounded-full", c.done ? "bg-positive" : "bg-muted")} aria-hidden />
-                        ))}
-                      </span>
-                    </span>
-                    {view === "week" && (
-                      <>
-                        <span className="block truncate text-[11px] text-ink-2">{j.address}</span>
-                        <span className="block text-[10.5px] text-muted">{j.checks.map((c) => `${c.label}: ${c.value}`).join(" · ")}</span>
-                      </>
-                    )}
-                  </button>
-                ))}
-                {made.map((e) => {
-                  const Icon = KIND_ICON[e.kind];
-                  return (
+                    {Number(d.slice(8))}
+                    {holiday && <span className="ml-1 truncate text-[10px] font-normal text-muted">{holiday}</span>}
+                    <Plus className="ml-auto size-3.5 text-muted opacity-0 group-hover:opacity-100" aria-hidden />
+                  </p>
+                  {on(d).map((j) => (
                     <button
                       type="button"
-                      key={e.id}
-                      onClick={() => setEditing({ id: e.id, entry: e })}
+                      key={j.jobId}
+                      onClick={() => setOpen(j.jobId)}
                       className={clsx(
-                        "flex items-center gap-1 rounded px-1.5 py-0.5 text-left text-[12px] leading-tight",
-                        ENTRY_TONE[e.kind],
+                        "rounded border-l-[3px] px-1.5 py-0.5 text-left text-[12px] leading-tight hover:brightness-95",
+                        TONE[j.state],
                       )}
-                      title={`${ENTRY_WORDS[e.kind].label}${e.note ? `: ${e.note}` : ""}`}
+                      title={j.checks.map((c) => `${c.label}: ${c.value}`).join(" · ")}
                     >
-                      <Icon className={clsx("size-3 shrink-0", e.kind === "tentative" ? "text-sun-line" : "")} aria-hidden />
-                      <span className="truncate">
-                        {e.from !== d && "↳ "}
-                        {entryLabel(e)}
+                      <span className="flex items-center gap-1">
+                        <span className="truncate font-medium text-ink">{j.customer}</span>
+                        <span className="ml-auto flex shrink-0 gap-0.5">
+                          {j.checks.map((c) => (
+                            <span key={c.key} className={clsx("size-1.5 rounded-full", c.done ? "bg-positive" : "bg-muted")} aria-hidden />
+                          ))}
+                        </span>
                       </span>
+                      {view === "week" && (
+                        <>
+                          <span className="block truncate text-[11px] text-ink-2">{j.address}</span>
+                          <span className="block text-[10.5px] text-muted">
+                            {j.checks.map((c) => `${c.label}: ${c.value}`).join(" · ")}
+                          </span>
+                        </>
+                      )}
                     </button>
-                  );
-                })}
-              </div>
-            );
-          })}
+                  ))}
+                  {made.map((e) => {
+                    const Icon = KIND_ICON[e.kind];
+                    return (
+                      <button
+                        type="button"
+                        key={e.id}
+                        onClick={() => setEditing({ id: e.id, entry: e })}
+                        className={clsx(
+                          "flex items-center gap-1 rounded px-1.5 py-0.5 text-left text-[12px] leading-tight",
+                          ENTRY_TONE[e.kind],
+                        )}
+                        title={`${ENTRY_WORDS[e.kind].label}${e.note ? `: ${e.note}` : ""}`}
+                      >
+                        <Icon className={clsx("size-3 shrink-0", e.kind === "tentative" ? "text-sun-line" : "")} aria-hidden />
+                        <span className="truncate">
+                          {e.from !== d && "↳ "}
+                          {entryLabel(e)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            }),
+          ])}
         </div>
       </div>
       <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted">
@@ -550,6 +508,41 @@ function EntryEditor({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A week's load, in the calendar's first column (10 Nov 2026, Martin: the row of capacity pills crowded the calendar):
+ * installations booked against what the business can do, as a figure and a fine bar filling up its side, green once
+ * full; tentative installs as "+N" under it. Pressing a month's week opens that week.
+ */
+function WeekLoad({ booked, tentative, canDo, onOpen }: { booked: number; tentative: number; canDo: number | null; onOpen?: () => void }) {
+  const full = canDo !== null && booked >= canDo;
+  const share = canDo ? Math.min(1, booked / canDo) : 0;
+  const words = `${booked} booked${canDo !== null ? ` of ${canDo} you can do` : ""}${tentative ? `, ${tentative} tentative` : ""}`;
+  const inner = (
+    <>
+      <span className={clsx("text-[12px] font-medium tabular-nums", full ? "text-positive" : booked ? "text-ink" : "text-muted")}>
+        {booked}
+        {canDo !== null && <span className="text-muted">/{canDo}</span>}
+      </span>
+      {canDo !== null && (
+        <span aria-hidden className="block h-[3px] w-full overflow-hidden rounded-full bg-line">
+          <span className={clsx("block h-full rounded-full", full ? "bg-positive" : "bg-ink-2")} style={{ width: `${share * 100}%` }} />
+        </span>
+      )}
+      {tentative > 0 && <span className="text-[10.5px] tabular-nums text-sun-ink">+{tentative}</span>}
+    </>
+  );
+  const box = "flex flex-col items-end justify-start gap-1 bg-surface-2 px-1.5 py-1";
+  return onOpen ? (
+    <button type="button" onClick={onOpen} title={`${words}. Open this week.`} aria-label={words} className={clsx(box, "hover:bg-surface")}>
+      {inner}
+    </button>
+  ) : (
+    <div className={box} title={words} aria-label={words}>
+      {inner}
     </div>
   );
 }

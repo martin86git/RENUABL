@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
+    area: "Installation",
+    words:
+      "The install calendar breathes: each week's booked and can-do sits in its own row, reminders are a bell, and the month sits under the title.",
+  },
+  {
+    day: "2026-11-10",
     area: "Team chat",
     words: "The bell is gone: customers' messages and your mentions are under Customers, a switch at the top of team chat.",
   },
