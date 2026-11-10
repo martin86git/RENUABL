@@ -206,7 +206,7 @@ export function DesignDrawer(props: {
       >
         {/* No bar of its own (8 Nov 2026, Martin: the map taller and wider): the close round sits in the corner, beside the
             designer's own slim row, which keeps it clear. */}
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
+        <div className="absolute right-6 top-4 z-10 flex items-center gap-1">
           <button
             type="button"
             onClick={onFold}

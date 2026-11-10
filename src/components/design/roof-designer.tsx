@@ -5378,7 +5378,7 @@ export function RoofDesigner(props: {
   );
 
   return (
-    <div className={clsx(props.tight && "relative p-4")}>
+    <div className={clsx(props.tight && "relative p-2")}>
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
           and the address being designed; then which design this is and its quote on the left, and publishing it and
           its proposal on the right. A firmer line under it sets it off from the work below. */}
@@ -5387,7 +5387,7 @@ export function RoofDesigner(props: {
           "z-40 text-ink",
           // In the pop-up (8 Nov 2026, Martin: no menu bar, the map taller and wider; the buttons can run down one side):
           // a rail of rounds down the left, beside the picture, each saying what it is on hover.
-          props.tight ? "absolute left-4 top-4 w-11" : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
+          props.tight ? "absolute left-2 top-2 w-11" : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
         )}
       >
         <BarRow
@@ -5664,7 +5664,7 @@ export function RoofDesigner(props: {
         </BarRow>
       </header>
 
-      <div className={clsx("relative", props.tight ? "pl-14 pr-11" : "mt-5")}>
+      <div className={clsx("relative", props.tight ? "pl-[4.25rem] pr-11" : "mt-5")}>
         <div className="min-w-0">
           <div>
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
