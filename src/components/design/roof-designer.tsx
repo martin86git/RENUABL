@@ -5,6 +5,8 @@ import { accessColour, shadeHint, shadeReport, type ShadeReport } from "@/lib/do
 import { loadTerrain, type Heights } from "@/lib/services/terrain";
 import { loadRoofCheck } from "@/lib/services/roof-check";
 import { useDesignTips } from "./design-tips";
+import { BlockTray } from "./block-tray";
+import { BLOCK_MIN, joinBlock, resizeBlock, splitBlock, startingBlocks, type PanelBlock } from "@/lib/domain/design/panel-blocks";
 import { SolNudges } from "./sol-nudges";
 import { nudgesFor, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
 import { SideViewsButton } from "./side-views";
@@ -1760,7 +1762,7 @@ export function RoofDesigner(props: {
       ? { ...working(), label: undefined }
       : // A new design is clean (10 Nov 2026, Martin: the inverter carried over): no panels, no panel or inverter chosen,
         // no battery, strings or marks. Only the home itself (its roof, storeys and phase) is shared, as for every design.
-        { ...spot, faces: [], loose: [] };
+        { ...spot, faces: faces.map((f) => ({ ...f, off: panelPlaces(f, size).map((pl) => pl.index) })), loose: [] };
     // A copy takes its quote's settings and hand changes with it; a new design starts with the same home and no changes.
     setQuotes([...everyQuote(), copy ? quoteNow : { form: quoteNow.form, edits: {} }]);
     show([...list, made], list.length);
@@ -2615,7 +2617,7 @@ export function RoofDesigner(props: {
     if (focused && focused !== document.body && focused.tagName !== "TEXTAREA") focused.blur();
     const p = pointAt(e);
     if (!p) return;
-    if (tapFill && tool === "select") return void fillFaceAt(p);
+    if (tray && tool === "select") return void dropBlock(p);
     if (tool === "pan") {
       svg.current?.setPointerCapture(e.pointerId);
       press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: view };
@@ -2830,6 +2832,7 @@ export function RoofDesigner(props: {
   const onPointerMove = (e: React.PointerEvent) => {
     pointer.current = pointAt(e);
     const held = press.current;
+    if (tray && !held && tool === "select") previewAt(pointer.current);
     if (!held) {
       const under = pointer.current ? hitAt(pointer.current) : null;
       const key = under && !under.empty && under.pick.kind !== "label" ? keyOf(under.pick) : null;
@@ -4190,38 +4193,63 @@ export function RoofDesigner(props: {
     void answerExisting(replace);
   };
   /**
-   * Tap to fill (10 Nov 2026, Martin: the whole roof read into faces kept putting panels in the wrong places, so he
-   * shows where): Sol has sized the system; each tap on the roof fills the face under it (a face already read there,
-   * else one grown from the tap in the heights, `faceAt`) with the panels still to place, clear of what's on the roof
-   * and of the panels placed already. Done when they're all placed, or when the person says.
+   * The block tray (10 Nov 2026, Martin: Sol sizes, the designer shows where): the panels Sol sized as blocks
+   * (`panel-blocks.ts`, two about half each when another face as sunny looks another way), each laid by the rules on
+   * the face it is dropped on, a preview showing where while the pointer is over a face. A tap off any face read grows
+   * one from the tap in the heights (`faceAt`). Clear of what's on the roof and of the panels placed already.
    */
-  const [tapFill, setTapFill] = useState<{ want: number } | null>(null);
-  const [tapBusy, setTapBusy] = useState(false);
-  const [tapNote, setTapNote] = useState<string | null>(null);
-  const startTapFill = (want: number) => {
+  const [tray, setTray] = useState<{ blocks: PanelBlock[]; carrying: string | null } | null>(null);
+  const [trayBusy, setTrayBusy] = useState(false);
+  const [trayNote, setTrayNote] = useState<string | null>(null);
+  const [trayPreview, setTrayPreview] = useState<{ key: string; panels: LoosePanel[]; of: number } | null>(null);
+  const trayAvoid = (): Point[][] => {
+    const check = inUse(roofCheckNow);
+    return [...(check ? avoidFor(check) : []), ...loose.map((pl) => [...looseCorners(pl, size)])];
+  };
+  const carried = (): PanelBlock | undefined => (tray ? (tray.blocks.find((b) => b.id === tray.carrying) ?? tray.blocks[0]) : undefined);
+  const startTray = (want: number) => {
     if (want < 1) return;
     setOpening(null);
     setLoose([]);
     setStrings([]);
     setTool("select");
-    setTapNote(null);
-    setTapFill({ want });
+    setTrayNote(null);
+    setTrayPreview(null);
+    const check = inUse(roofCheckNow);
+    const avoid = check ? avoidFor(check) : [];
+    const split = faces.length > 1 && splitPartner(faces, size, want, avoid.length ? avoid : undefined) !== null;
+    setTray({ blocks: startingBlocks(want, split, () => newId("b")), carrying: null });
     putSolAway();
+    void checkRoof();
   };
-  const fillFaceAt = async (p: Point) => {
-    if (!tapFill || tapBusy) return;
-    setTapBusy(true);
-    setTapNote(null);
+  /** Where the block picked would go on the face under the pointer. */
+  const previewAt = (at: Point | null) => {
+    const block = carried();
+    const face = at ? faces.find((f) => inside(at, f.points)) : undefined;
+    if (!block || !face) {
+      if (trayPreview) setTrayPreview(null);
+      return;
+    }
+    const key = `${face.id}:${block.id}:${block.count}:${loose.length}`;
+    if (trayPreview?.key === key) return;
+    const avoid = trayAvoid();
+    const packed = packFaces([face], size, block.count, () => "preview", avoid.length ? avoid : undefined);
+    setTrayPreview({ key, panels: packed.loose, of: block.count });
+  };
+  const dropBlock = async (at: Point) => {
+    const block = carried();
+    if (!tray || !block || trayBusy) return;
+    setTrayBusy(true);
+    setTrayNote(null);
     try {
       const seen = await checkRoof();
       const check = inUse(seen);
-      // Clear of what is on the roof, and of the panels placed already.
       const avoid = [...(check ? avoidFor(check) : []), ...loose.map((pl) => [...looseCorners(pl, size)])];
-      let face = faces.find((f) => inside(p, f.points));
+      let face = faces.find((f) => inside(at, f.points));
       if (!face) {
         const heights = await loadTerrain(spot.lat, spot.lng, { nearmap: Boolean(props.nearmapPicture) });
-        const found = heights ? faceAt(heights, p, check?.notRoof?.map((x) => x.box) ?? []) : null;
-        if (!found) return setTapNote("I can't read a roof face there: tap the middle of a face, or trace it.");
+        const found = heights ? faceAt(heights, at, check?.notRoof?.map((x) => x.box) ?? []) : null;
+        if (!found) return setTrayNote("I can't read a roof face there: tap the middle of a face, or trace it.");
         face = {
           id: newId("f"),
           points: found.points,
@@ -4233,23 +4261,54 @@ export function RoofDesigner(props: {
           ...faceFromAspect({ points: found.points }, found.aspect),
         };
       }
-      const left = tapFill.want - loose.length;
-      if (left <= 0) return setTapFill(null);
-      const packed = packFaces([face], size, left, () => newId("p"), avoid.length ? avoid : undefined);
-      if (!packed.loose.length) return setTapNote("No panels fit on that face clear of what's there. Tap another.");
+      const packed = packFaces([face], size, block.count, () => newId("p"), avoid.length ? avoid : undefined);
+      if (!packed.loose.length) return setTrayNote("No panels fit on that face clear of what's there. Tap another.");
       const done = packed.faces[0];
       setFaces((list) => (list.some((f) => f.id === done.id) ? list.map((f) => (f.id === done.id ? done : f)) : [...list, done]));
       setLoose((list) => [...list, ...packed.loose]);
       setStrings([]);
+      setTrayPreview(null);
       changed();
-      const placed = loose.length + packed.loose.length;
-      if (placed >= tapFill.want) {
-        setTapFill(null);
-        setCommandReply(`All ${placed} panels placed. Move any you want, then string them.`);
+      const short = block.count - packed.loose.length;
+      const rest = tray.blocks.flatMap((b) => (b.id !== block.id ? [b] : short >= BLOCK_MIN ? [{ ...b, count: short }] : []));
+      if (!rest.length) {
+        setTray(null);
+        setCommandReply(
+          `All ${loose.length + packed.loose.length} panels placed${short > 0 ? ` (${short} didn't fit)` : ""}. Move or turn any block, then string them.`,
+        );
+      } else {
+        setTray({ blocks: rest, carrying: null });
+        if (short > 0) setTrayNote(`${packed.loose.length} fitted there; the other ${short} wait in the tray.`);
       }
     } finally {
-      setTapBusy(false);
+      setTrayBusy(false);
     }
+  };
+  /**
+   * The roof first (10 Nov 2026, Martin): on a Nearmap picture, a roof with nothing on any design has its faces read
+   * from Nearmap's heights as it opens, and the designer asks whether that's the roof before anything is laid. The
+   * faces confirmed are kept with the design (`Face.confirmed`), carried to new designs and never read again unasked.
+   */
+  const [roofToConfirm, setRoofToConfirm] = useState(false);
+  const roofRead = useRef<string | null>(null);
+  useEffect(() => {
+    if (!props.nearmapPicture || roofRead.current === spotKey) return;
+    if (everyDesign().some((d) => d.faces.length || (d.loose ?? []).length)) return;
+    // A moment after the picture settles, so a roof opened and left at once isn't read.
+    const t = window.setTimeout(() => {
+      roofRead.current = spotKey;
+      void nearmapRoofFaces().then((read) => {
+        if (read) setRoofToConfirm(true);
+      });
+    }, 600);
+    return () => window.clearTimeout(t);
+    // Once a roof and picture: the designs and faces are read when it runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.nearmapPicture, spotKey]);
+  const confirmRoof = () => {
+    setFaces((list) => list.map((f) => ({ ...f, confirmed: true })));
+    changed();
+    setRoofToConfirm(false);
   };
   // A press anywhere outside the panel (on the map, say) puts it away, as its cross does.
   useEffect(() => {
@@ -6187,7 +6246,7 @@ export function RoofDesigner(props: {
                           const sized = daily ? quickSize({ kwhPerDay: daily }) : null;
                           const lead = opening.kind === "advice" ? opening.advice.lead : "battery";
                           const kw = sized ? (lead === "battery" ? sized.withBattery.kw : sized.solar.kw) : 6.6;
-                          startTapFill(Math.ceil((kw * 1000) / (panelOf(design).watts || 475)));
+                          startTray(Math.ceil((kw * 1000) / (panelOf(design).watts || 475)));
                         }}
                         onClose={() => setOpening(null)}
                       />
@@ -6229,11 +6288,11 @@ export function RoofDesigner(props: {
                             </button>
                           </span>
                         )}
-                        {!existingQ && summary.panels > 0 && !tapFill && (
+                        {!existingQ && summary.panels > 0 && !tray && (
                           <button
                             type="button"
                             disabled={commandBusy}
-                            onClick={() => startTapFill(summary.panels)}
+                            onClick={() => startTray(summary.panels)}
                             className="mr-1.5 mt-2 rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
                           >
                             Show me where: tap the roof
@@ -6367,7 +6426,7 @@ export function RoofDesigner(props: {
                           const sized = daily ? quickSize({ kwhPerDay: daily }) : null;
                           const lead = opening.kind === "advice" ? opening.advice.lead : "battery";
                           const kw = sized ? (lead === "battery" ? sized.withBattery.kw : sized.solar.kw) : 6.6;
-                          startTapFill(Math.ceil((kw * 1000) / (panelOf(design).watts || 475)));
+                          startTray(Math.ceil((kw * 1000) / (panelOf(design).watts || 475)));
                         }}
                         onClose={() => setOpening(null)}
                       />
@@ -7276,6 +7335,20 @@ export function RoofDesigner(props: {
                       ))}
                     </g>
                   )}
+                  {/* Where the tray's block would go on the face under the pointer (orange when not all of it fits). */}
+                  {tray &&
+                    trayPreview?.panels.map((g, i) => (
+                      <polygon
+                        key={`tray${i}`}
+                        pointerEvents="none"
+                        points={path(looseCorners(g, size))}
+                        fill={trayPreview.panels.length < trayPreview.of ? "#f97316" : "#ffffff"}
+                        fillOpacity="0.3"
+                        stroke="#ffffff"
+                        strokeWidth={u}
+                        strokeDasharray={`${3 * u} ${2 * u}`}
+                      />
+                    ))}
                   {/* The panel a click would place, as an outline. */}
                   {(tool === "panel" || tool === "select") &&
                     ghosts.map((ghost, i) => (
@@ -9253,25 +9326,54 @@ export function RoofDesigner(props: {
                     <SolNudges nudges={nudges} onAct={actOnNudge} onDismiss={(id) => setNudgesAside((a) => [...a, id])} />
                   </div>
                 )}
-              {tapFill && (
-                <div className="absolute left-1/2 top-[4.75rem] z-30 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 flex-col items-center gap-1">
-                  <div className="flex items-center gap-3 rounded-full bg-primary/90 py-1.5 pl-4 pr-1.5 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md">
-                    <span>
-                      {tapBusy ? "Reading that face…" : "Tap a roof face to fill it"} ·{" "}
-                      <span className="tabular-nums text-sun-line">
-                        {loose.length} of {tapFill.want}
-                      </span>{" "}
-                      panels
-                    </span>
+              {tray && (
+                <BlockTray
+                  blocks={tray.blocks}
+                  carrying={tray.carrying}
+                  watts={panelOf(design).watts || 475}
+                  busy={trayBusy}
+                  note={trayNote}
+                  preview={trayPreview ? { laid: trayPreview.panels.length, of: trayPreview.of } : null}
+                  onCarry={(id) => setTray({ ...tray, carrying: id })}
+                  onResize={(id, by) => setTray({ ...tray, blocks: resizeBlock(tray.blocks, id, by) })}
+                  onSplit={(id) => setTray({ ...tray, blocks: splitBlock(tray.blocks, id, () => newId("b")) })}
+                  onJoin={(id) => setTray({ blocks: joinBlock(tray.blocks, id), carrying: null })}
+                  onDone={() => {
+                    setTray(null);
+                    setTrayPreview(null);
+                  }}
+                />
+              )}
+              {roofToConfirm && !tray && faces.length > 0 && (
+                <div className="absolute left-1/2 top-[4.75rem] z-30 w-[min(30rem,calc(100%-2rem))] -translate-x-1/2 rounded-2xl bg-primary/90 px-4 py-3 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md">
+                  <p className="font-medium">Is this the roof?</p>
+                  <p className="mt-0.5 text-white/75">
+                    {faces.length} face{faces.length === 1 ? "" : "s"} read from Nearmap&apos;s heights. Check each against the photo: tap
+                    one to change its slope or delete it, or trace one that&apos;s missing. Panels go on these faces.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setTapFill(null)}
-                      className="rounded-full bg-white/15 px-3 py-1 text-[12.5px] font-medium hover:bg-white/25"
+                      onClick={confirmRoof}
+                      className="rounded-full bg-sun-line px-3.5 py-1 text-[12.5px] font-medium text-white hover:brightness-110"
                     >
-                      Done
+                      Looks right
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void nearmapRoofFaces()}
+                      className="rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10"
+                    >
+                      Read it again
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRoofToConfirm(false)}
+                      className="rounded-full px-3 py-1 text-[12.5px] text-white/60 hover:text-white"
+                    >
+                      Later
                     </button>
                   </div>
-                  {tapNote && <p className="rounded-full bg-primary/85 px-3 py-1 text-[12px] text-white/85">{tapNote}</p>}
                 </div>
               )}
               {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its

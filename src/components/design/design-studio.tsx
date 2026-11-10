@@ -40,7 +40,7 @@ import { DesignToolHome } from "./design-tool-home";
 import { goUnderneath, inDrawer, openDesigner, useInDrawer } from "./design-drawer";
 import { DealNotes, ProposalSide, PutOnDeal } from "./designer-side";
 import { PictureMenu } from "./picture-menu";
-import { loadImagery, nearmapPictureHref, type RoofImagery } from "@/lib/services/nearmap";
+import { fetchNearmap, loadImagery, nearmapPictureHref, type RoofImagery } from "@/lib/services/nearmap";
 import { capturedWords } from "@/lib/domain/design/nearmap";
 import { RoofDesigner } from "./roof-designer";
 
@@ -144,7 +144,15 @@ export function DesignStudio() {
   useEffect(() => {
     if (!roof || !spot || !business) return;
     let live = true;
-    void loadImagery(roof.lat, roof.lng).then((res) => live && res.ok && setImagery({ spot, value: res }));
+    void loadImagery(roof.lat, roof.lng).then(async (res) => {
+      if (!live || !res.ok) return;
+      setImagery({ spot, value: res });
+      // A roof seen for the first time opens on Nearmap's newest picture where it has one (10 Nov 2026, Martin): its
+      // heights read the roof's faces. Fetched once and kept; a roof set back to Google by hand stays on Google.
+      if (!res.ready || res.use !== "google" || res.kept.length) return;
+      const got = await fetchNearmap(roof.lat, roof.lng);
+      if (live && got.ok) setImagery({ spot, value: { ...res, use: got.use, kept: got.kept } });
+    });
     return () => {
       live = false;
     };

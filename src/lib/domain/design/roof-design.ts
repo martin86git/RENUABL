@@ -89,6 +89,8 @@ export interface Face {
   plan?: boolean;
   /** Which of the home's roofs it is on, when there are several (as `LoosePanel.roof`). */
   roof?: number;
+  /** Confirmed as the roof by a person (10 Nov 2026): read from the heights and checked against the photo. */
+  confirmed?: boolean;
 }
 
 /**
@@ -770,6 +772,7 @@ export function cleanDesign(raw: unknown): RoofDesign | null {
       tilt: Math.round(finite(f.tilt, 0, TILT.max) ?? TILT.roof),
       off: off.sort((a, b) => a - b),
       ...(f.plan === true ? { plan: true } : {}),
+      ...(f.confirmed === true ? { confirmed: true } : {}),
       ...cleanRoofTag(f.roof),
     });
   }

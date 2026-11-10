@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
+    area: "Designer",
+    words: "A roof opens on Nearmap where it has one, its faces read and offered to confirm before any panel goes down.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Designer",
+    words: "Panels come as blocks to place: pick a block, see where it lands on a face, tap to lay it. Resize, split or join them.",
+  },
+  {
+    day: "2026-11-10",
     area: "Jobs",
     words: "CRM, Procurement and Installation are one menu, Jobs: every job by stage, Selling to Done, as a list, board, calendar or map.",
   },
