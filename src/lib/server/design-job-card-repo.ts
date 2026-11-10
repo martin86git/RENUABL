@@ -25,6 +25,8 @@ export interface JobCardView {
   customer: { name: string; phone: string; email?: string };
   /** The system, as the deal and its design say: only the lines filled in. */
   details: { label: string; value: string }[];
+  /** The solar and battery in sizes, for the card's title (`cardHeadline`): the design's, else the deal's. */
+  system: { kw: number | null; batteryKwh: number | null };
   /** The roof picture's place, for the drawings' backdrop. Null without a design. */
   roof: { lat: number; lng: number } | null;
   layout: JobDrawing | null;
@@ -98,6 +100,12 @@ export async function jobCard(
     },
     customer: { name: customer.name, phone: customer.phone, ...(forInstaller ? {} : { email: customer.email }) },
     details,
+    system: {
+      kw: design ? designSummary(design).kw || null : (job.kw ?? null),
+      batteryKwh: design?.battery
+        ? Math.round(design.battery.kwh * design.battery.qty * 10) / 10
+        : Number.parseFloat(String(job.details?.batteryStorage ?? "")) || null,
+    },
     roof: design && saved !== NO_DESIGN ? { lat: saved.project.lat, lng: saved.project.lng } : null,
     layout: design ? jobDrawing(design, "layout") : null,
     strings: design && (design.strings ?? []).some((s) => s.panels.length) ? jobDrawing(design, "strings") : null,

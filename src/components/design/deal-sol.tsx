@@ -12,13 +12,6 @@ import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer } from "./sol-text";
 import { answerFor } from "@/lib/domain/design/sol-format";
 
-/** What the empty thread offers to ask, all answered from this deal. */
-const STARTERS = [
-  "Where is this deal up to, and what's the next step?",
-  "What has the customer asked for so far?",
-  "Draft a follow-up email for this customer.",
-];
-
 /**
  * Sol's thread on one deal (sol-chat-work.ts): the member's questions asked from this deal and his answers, kept
  * together here. Each question carries the deal's tag, so he reads this deal first (its notes, emails, the customer's
@@ -79,7 +72,11 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
   };
 
   return (
-    <section className="flex h-[min(70dvh,40rem)] min-h-[24rem] flex-col rounded-2xl bg-surface ring-1 ring-line">
+    // As tall as the conversation needs: an empty one is the box straight under its header, in the first fold (10 Nov
+    // 2026, Martin: the box sat below suggested questions, out of view; the suggestions are gone).
+    <section
+      className={`flex flex-col rounded-2xl bg-surface ring-1 ring-line ${thread.length || busy ? "h-[min(70dvh,40rem)] min-h-[24rem]" : ""}`}
+    >
       <header className="flex items-center gap-2 border-b border-line px-4 py-3">
         <SolBadge className="size-5" />
         <div className="min-w-0 flex-1">
@@ -91,21 +88,7 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
       </header>
       <div className="staff-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 text-sm">
         {turns === null && !problem && <p className="text-muted">Opening…</p>}
-        {turns && thread.length === 0 && (
-          <div className="space-y-2">
-            <p className="text-ink-2">Ask Sol anything about {name.split(" · ")[0]}&apos;s deal.</p>
-            {STARTERS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => void send(s)}
-                className="block w-full rounded-2xl bg-canvas px-3 py-2 text-left text-ink hover:bg-surface-2"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
+        {turns && thread.length === 0 && <p className="text-ink-2">Ask Sol anything about {name.split(" · ")[0]}&apos;s deal.</p>}
         {thread.map((t, i) => (
           <div key={`${t.at}-${i}`} className={t.role === "you" ? "flex justify-end" : "space-y-2"}>
             {t.role === "you" ? (

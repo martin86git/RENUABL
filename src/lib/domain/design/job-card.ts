@@ -286,3 +286,16 @@ ${input.strings.length ? `<p style="margin-top:16px"><strong>Strings</strong><br
 </div>`;
   return { subject, text, html };
 }
+
+/** The kW and kWh one figure each: up to two places, no trailing zeros. */
+const figure = (n: number) => String(Math.round(n * 100) / 100);
+
+/**
+ * The job card's title (10 Nov 2026, Martin: "Solar (kW) / Solar (kW) & Battery (kWh)", with the address under it as
+ * the title): what is being installed, in sizes. Null when neither is known.
+ */
+export function cardHeadline(system: { kw: number | null; batteryKwh: number | null }): string | null {
+  const solar = system.kw && system.kw > 0 ? `Solar ${figure(system.kw)} kW` : null;
+  const battery = system.batteryKwh && system.batteryKwh > 0 ? `Battery ${figure(system.batteryKwh)} kWh` : null;
+  return solar && battery ? `${solar} & ${battery}` : (solar ?? battery);
+}

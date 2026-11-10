@@ -7,7 +7,7 @@ import { InspectionStatus } from "./inspections";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { isJobPicture, type JobDrawing, type JobNote } from "@/lib/domain/design/job-card";
+import { cardHeadline, isJobPicture, type JobDrawing, type JobNote } from "@/lib/domain/design/job-card";
 import { PHOTO_CHECK_BY } from "@/lib/domain/design/photo-check";
 import { SolBadge } from "./sol-icon";
 import {
@@ -262,82 +262,85 @@ function CardBody({
   /** Keeps the as-built: the team's own way, or through the installer's link. */
   onAsBuilt?: (input: AsBuiltInput) => Promise<{ ok: true; asBuilt: AsBuilt } | { ok: false; message: string }>;
 }) {
+  // The title (10 Nov 2026, Martin): what is being installed in sizes, the address under it; the drawings top right.
+  const headline = cardHeadline(card.system) ?? card.job.title;
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <div className="min-w-0 space-y-5">
-        <section className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <p className={head}>Installation</p>
-            <p className="mt-1 text-[15px] font-medium text-ink">{dayWords(card.job.installDate)}</p>
-            <p className="text-xs text-muted">{card.job.stage}</p>
-          </div>
-          <div>
-            <p className={head}>Address</p>
+    <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+        <div className="min-w-0 space-y-5">
+          <section>
+            <h3 className="text-2xl font-semibold tracking-tight text-ink">{headline}</h3>
             <a
               href={mapLink(card.job.address)}
               target="_blank"
               rel="noreferrer"
-              className="mt-1 flex items-start gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline"
+              className="mt-1 flex items-start gap-1.5 text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline"
             >
               <MapPin className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
               {card.job.address || "No address"}
             </a>
-          </div>
-          <div>
-            <p className={head}>Customer</p>
-            <p className="mt-1 text-[15px] text-ink">{card.customer.name}</p>
+            <p className="mt-1.5 text-sm text-muted">
+              Installation: <span className="text-ink">{dayWords(card.job.installDate)}</span> · {card.job.stage}
+            </p>
+          </section>
+
+          <section className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[15px]">
+            <span className="text-muted">Customer:</span>
+            <span className="font-medium text-ink">{card.customer.name}</span>
             {card.customer.phone && (
               <a
                 href={`tel:${card.customer.phone.replace(/\s+/g, "")}`}
-                className="mt-0.5 inline-flex items-center gap-1.5 text-sm text-ink-2 hover:text-ink"
+                className="inline-flex items-center gap-1.5 text-ink-2 hover:text-ink"
               >
                 <Phone className="size-3.5" aria-hidden /> {card.customer.phone}
               </a>
             )}
-            {card.customer.email && <p className="text-sm text-ink-2">{card.customer.email}</p>}
-          </div>
-          {aside}
-        </section>
-
-        {card.details.length > 0 && (
-          <section>
-            <p className={head}>System</p>
-            <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-              {card.details.map((d) => (
-                <div key={d.label} className="contents">
-                  <dt className="text-muted">{d.label}</dt>
-                  <dd className="text-ink">{d.value}</dd>
-                </div>
-              ))}
-            </dl>
           </section>
-        )}
+
+          {card.details.length > 0 && (
+            <section>
+              <p className={head}>System</p>
+              <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                {card.details.map((d) => (
+                  <div key={d.label} className="contents">
+                    <dt className="text-muted">{d.label}</dt>
+                    <dd className="text-ink">{d.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+
+          {aside && <section className="space-y-5">{aside}</section>}
+        </div>
 
         {card.layout || card.strings ? (
-          <section className="grid gap-4 sm:grid-cols-2">
+          <section className="min-w-0 space-y-3">
             {card.layout && <Drawing title="Panel layout" drawing={card.layout} picture={picture} />}
             {card.strings && <Drawing title="String design" drawing={card.strings} picture={picture} />}
             {card.stringWords.length > 0 && (
-              <ul className="space-y-0.5 text-sm text-ink-2 sm:col-span-2">
-                {card.stringWords.map((s) => (
-                  <li key={s}>{s}</li>
+              <ul className="space-y-0.5 text-sm text-ink-2">
+                {card.stringWords.map((w) => (
+                  <li key={w}>{w}</li>
                 ))}
               </ul>
             )}
           </section>
         ) : (
-          <p className="rounded-md bg-surface-2 px-3 py-2.5 text-sm text-ink-2">
+          <p className="self-start rounded-md bg-surface-2 px-3 py-2.5 text-sm text-ink-2">
             No roof design for this job yet, so there are no drawings.
           </p>
         )}
       </div>
 
-      {card.designed && onAsBuilt && <AsBuiltPanel designed={card.designed} saved={card.asBuilt} onSave={onAsBuilt} />}
-      <section aria-label="Notes and photos" className="min-w-0">
-        <p className={head}>Notes and photos</p>
-        <div className="mt-2">{composer}</div>
-        <Thread notes={card.notes} fileHref={fileHref} />
-      </section>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {card.designed && onAsBuilt && <AsBuiltPanel designed={card.designed} saved={card.asBuilt} onSave={onAsBuilt} />}
+        <section aria-label="Notes and photos" className="min-w-0">
+          <p className={head}>Notes and photos</p>
+          <div className="mt-2">{composer}</div>
+          <Thread notes={card.notes} fileHref={fileHref} />
+        </section>
+      </div>
     </div>
   );
 }
@@ -555,10 +558,8 @@ export function JobCardDialog({ jobId, onClose, onEvent }: { jobId: string; onCl
       <div role="dialog" aria-modal="true" aria-label="Job card" className="w-full max-w-5xl rounded-2xl bg-canvas p-5 shadow-lift sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className={head}>Job card</p>
-            <h2 className="mt-1 truncate text-xl font-semibold tracking-tight text-ink">
-              {card ? `${card.customer.name} · ${card.job.title}` : "Loading…"}
-            </h2>
+            <p className={head}>Job card{card ? ` · ${card.customer.name}` : ""}</p>
+            {!card && <p className="mt-1 text-sm text-muted">Loading…</p>}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {onEvent && (
@@ -727,7 +728,6 @@ export function InstallerJobCard({ token, framed, person: known }: { token: stri
       <p className={head}>
         Job card from {card.business} · for {installer}
       </p>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">{card.job.address.split(",")[0] || card.job.title}</h1>
       <div className="mt-5">
         <CardBody
           card={card}

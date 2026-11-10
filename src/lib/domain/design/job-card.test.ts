@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cardHeadline,
   JOB_FILES_MAX,
   cleanInstallers,
   cleanNoteText,
@@ -105,5 +106,14 @@ describe("the email to the installer", () => {
     expect(e.text).toContain("https://x.example/job/abc");
     expect(e.html).toContain("Casey &lt;Test&gt;");
     expect(e.text).not.toContain("@");
+  });
+});
+
+describe("cardHeadline", () => {
+  it("says the solar and the battery in sizes", () => {
+    expect(cardHeadline({ kw: 26.125, batteryKwh: null })).toBe("Solar 26.13 kW");
+    expect(cardHeadline({ kw: 6.6, batteryKwh: 10 })).toBe("Solar 6.6 kW & Battery 10 kWh");
+    expect(cardHeadline({ kw: null, batteryKwh: 12.8 })).toBe("Battery 12.8 kWh");
+    expect(cardHeadline({ kw: 0, batteryKwh: null })).toBeNull();
   });
 });
