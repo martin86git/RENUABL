@@ -502,7 +502,10 @@ export function dealsAtStage(jobs: readonly SolJob[], stage: string, today: stri
 
 /** Where things are in RENUABL, from the sections across the top, for "where do I…" questions. */
 export function whereThingsAre(): string {
-  return SECTIONS.map((s) => `- ${s.label}: ${s.pages.map((p) => p.label).join(", ")}`).join("\n");
+  return [
+    ...SECTIONS.map((s) => `- ${s.label}: ${s.pages.map((p) => p.label).join(", ")}`),
+    "- Inside Jobs, by stage (Selling, Getting ready, Installing, Finishing, Done) and as a list, board, calendar or map: the deals board, pre-approvals, Solar Victoria, booking installations, the installations calendar, the job map, after install and grid connections",
+  ].join("\n");
 }
 
 /** How Sol answers, and what he is. Every figure he gives comes from the facts below or a tool. */

@@ -3,15 +3,16 @@ import { marketplacePagesFor, pageAt, sectionAt, SECTIONS } from "./sections";
 
 describe("the sections across the top", () => {
   it("lights the section and page an address belongs to, the closest match winning", () => {
-    expect(pageAt("/design/installations/underway")?.page.id).toBe("calendar");
-    expect(pageAt("/design/installations/completed")?.page.id).toBe("completed");
-    expect(pageAt("/design/installations")?.page.id).toBe("calendar");
-    expect(pageAt("/design/procurement/scheduler")?.section.id).toBe("installation");
+    expect(pageAt("/design/installations/invoices")?.page.id).toBe("invoices");
     expect(pageAt("/design/procurement/orders/job_123")?.page.id).toBe("orders");
+    expect(pageAt("/design/sales/proposals")?.page.id).toBe("sent");
   });
 
-  it("counts a deal's own page as Deals", () => {
-    expect(pageAt("/design/deals/job_abc")).toMatchObject({ section: { id: "crm" }, page: { id: "deals" } });
+  it("counts a deal's own page, and the pages folded into Jobs, as Jobs", () => {
+    expect(pageAt("/design/deals/job_abc")).toMatchObject({ section: { id: "work" }, page: { id: "jobs" } });
+    expect(pageAt("/design/installations/completed")).toMatchObject({ section: { id: "work" }, page: { id: "jobs" } });
+    expect(pageAt("/design/procurement/scheduler")?.section.id).toBe("work");
+    expect(pageAt("/design/customers/c_1")?.section.id).toBe("customers");
   });
 
   it("falls back to Today for pages in no section, and lights Today only on the overview itself", () => {

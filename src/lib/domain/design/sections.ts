@@ -17,7 +17,7 @@ export interface SectionPage {
 }
 
 export interface Section {
-  id: "today" | "crm" | "procurement" | "installation" | "service" | "marketplace" | "jobs" | "inspections" | "connections";
+  id: "today" | "work" | "customers" | "service" | "marketplace" | "jobs" | "inspections" | "connections";
   label: string;
   pages: readonly SectionPage[];
 }
@@ -38,49 +38,39 @@ export const MARKETPLACE_PAGES: readonly SectionPage[] = [
 
 export const SECTIONS: readonly Section[] = [
   { id: "today", label: "Today", pages: [{ id: "home", label: "Today", href: "/design" }] },
+  // CRM, Procurement and Installation folded into one, Jobs (10 Nov 2026, Martin): every job by where it is in its
+  // life (jobs-view.ts). The pages they held are views and filters of it now, or the few pages of their own below.
   {
-    id: "crm",
-    label: "CRM",
+    id: "work",
+    label: "Jobs",
     pages: [
-      { id: "deals", label: "Deals", href: "/design/sales/pipelines", also: ["/design/deals", "/design/sales"] },
-      { id: "customers", label: "Customers", href: "/design/customers" },
+      {
+        id: "jobs",
+        label: "Jobs",
+        href: "/design/work",
+        also: [
+          "/design/deals",
+          "/design/sales",
+          "/design/procurement/pre-approvals",
+          "/design/procurement/solar-victoria",
+          "/design/procurement/book",
+          "/design/procurement/map",
+          "/design/procurement/scheduler",
+          "/design/installations",
+        ],
+      },
       { id: "sent", label: "Proposals sent", href: "/design/sales/proposals" },
       { id: "signed", label: "Proposals signed", href: "/design/sales/signed" },
+      { id: "orders", label: "Ordering station", href: "/design/procurement/orders" },
+      { id: "invoices", label: "Installer invoices", href: "/design/installations/invoices" },
       // The call log (8 Nov 2026), a tab on Today until Today became one page (10 Nov 2026, Martin).
       { id: "calls", label: "Calls", href: "/design/calls" },
-    ],
-  },
-  {
-    id: "procurement",
-    label: "Procurement",
-    pages: [
-      { id: "preapproval", label: "Pre-approvals", href: "/design/procurement/pre-approvals" },
-      { id: "solarvic", label: "Solar Victoria", href: "/design/procurement/solar-victoria" },
-      { id: "book", label: "Book an installation", href: "/design/procurement/book" },
-      { id: "orders", label: "Ordering station", href: "/design/procurement/orders" },
-      { id: "map", label: "Job map", href: "/design/procurement/map" },
-    ],
-  },
-  {
-    id: "installation",
-    label: "Installation",
-    pages: [
-      // 8 Nov 2026, Martin: the calendar, Upcoming and In the works were one thing seen two ways, so they are one
-      // page with Calendar and List; After install takes each installed job through invoice, CoES, STCs and grid.
-      {
-        id: "calendar",
-        label: "Installations",
-        href: "/design/installations",
-        also: ["/design/procurement/scheduler", "/design/installations/underway"],
-      },
-      { id: "completed", label: "After install", href: "/design/installations/completed" },
-      // 8 Nov 2026, Martin: installed and inspected, waiting to be connected, with the retailer and the distributor.
-      { id: "grid", label: "Grid connections", href: "/design/installations/grid" },
-      { id: "invoices", label: "Installer invoices", href: "/design/installations/invoices" },
       // The installers and inspectors this retailer works with (connections.ts).
       { id: "connections", label: "Connections", href: "/design/connections" },
     ],
   },
+  // People are looked up by name, not by job, so they keep a word of their own.
+  { id: "customers", label: "Customers", pages: [{ id: "customers", label: "Customers", href: "/design/customers" }] },
   { id: "service", label: "Service", pages: [{ id: "service", label: "Service pipeline", href: "/design/service" }] },
   {
     id: "marketplace",

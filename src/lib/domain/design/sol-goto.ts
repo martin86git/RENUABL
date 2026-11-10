@@ -24,6 +24,15 @@ export interface SolPlace {
 
 /** The places of the product besides the sections' own pages: the round icons, Sol, the account. */
 const EXTRA_PLACES: readonly SolPlace[] = [
+  // Pages folded into Jobs (10 Nov 2026), still pages of their own that Sol can open.
+  { key: "deals", label: "Deals board", path: "/design/sales/pipelines" },
+  { key: "preapproval", label: "Pre-approvals", path: "/design/procurement/pre-approvals" },
+  { key: "solarvic", label: "Solar Victoria", path: "/design/procurement/solar-victoria" },
+  { key: "book", label: "Book an installation", path: "/design/procurement/book" },
+  { key: "map", label: "Job map", path: "/design/procurement/map" },
+  { key: "calendar", label: "Installations calendar", path: "/design/installations" },
+  { key: "completed", label: "After install", path: "/design/installations/completed" },
+  { key: "grid", label: "Grid connections", path: "/design/installations/grid" },
   { key: "messages", label: "Messages", path: "/design/messages" },
   { key: "notifications", label: "Notifications", path: "/design/notifications" },
   { key: "inbox", label: "Email inbox", path: "/design/inbox" },

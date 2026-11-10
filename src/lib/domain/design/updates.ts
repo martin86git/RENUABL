@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
+    area: "Jobs",
+    words: "CRM, Procurement and Installation are one menu, Jobs: every job by stage, Selling to Done, as a list, board, calendar or map.",
+  },
+  {
+    day: "2026-11-10",
     area: "Today",
     words: "Today is one page: what needs you, what Sol does next, what is in hand, and the industry news. Each deal says what it needs once.",
   },
