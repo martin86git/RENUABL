@@ -199,6 +199,22 @@ function Shell({
     const res = await notificationCount();
     return res.ok ? res.unread : null;
   });
+  // The top bar's height as --studio-head, so what sticks on a page (a deal's rails) sits just under it, not behind it.
+  // A callback ref: the header is only drawn once the account has loaded, after the shell first mounts.
+  const watchHead = useRef<ResizeObserver | null>(null);
+  const headRef = (el: HTMLElement | null) => {
+    watchHead.current?.disconnect();
+    watchHead.current = null;
+    const root = document.documentElement;
+    if (!el) {
+      root.style.removeProperty("--studio-head");
+      return;
+    }
+    const set = () => root.style.setProperty("--studio-head", `${el.offsetHeight}px`);
+    set();
+    watchHead.current = new ResizeObserver(set);
+    watchHead.current.observe(el);
+  };
   // The approval gates' counts (Procurement), refreshed when a job is moved on from one.
   const [gates, setGates] = useState<Record<string, number>>({});
   useEffect(() => {
@@ -357,6 +373,7 @@ function Shell({
       {/* Across the top on a wide screen: the logo, the sections (with the design tool in orange and Sol at the end), and on
           the right the search, the Marketplace and a small card with the date and weather and the profile round. */}
       <header
+        ref={headRef}
         className={clsx("studio-top z-[35] hidden bg-canvas/90 backdrop-blur print:hidden lg:block lg:px-14", !tool && "sticky top-0")}
       >
         {/* The sections sit in the middle of the screen (3 Nov 2026, Martin: on a laptop they didn't): two equal sides round

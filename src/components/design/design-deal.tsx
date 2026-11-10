@@ -1236,7 +1236,10 @@ function ToolRail({
   onCard: () => void;
 }) {
   return (
-    <nav aria-label="Tools on this deal" className="sticky top-6 hidden flex-col items-center gap-3.5 pt-1 xl:flex">
+    <nav
+      aria-label="Tools on this deal"
+      className="sticky top-[calc(var(--studio-head,0px)+1rem)] hidden flex-col items-center gap-3.5 pt-1 xl:flex"
+    >
       <RailRound label="Design" title={designable ? "Design" : "Give the deal an address to design it"} onClick={onDesign}>
         <span className="flex size-12 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition group-hover:brightness-105">
           <PenTool className="size-5" aria-hidden />
@@ -1345,7 +1348,7 @@ function PageRail({
   );
   const group = "px-3 pb-1 pt-2 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted";
   return (
-    <nav aria-label="This deal's pages" className="sticky top-6 hidden xl:block">
+    <nav aria-label="This deal's pages" className="sticky top-[calc(var(--studio-head,0px)+1rem)] hidden xl:block">
       <div
         role="tablist"
         aria-orientation="vertical"
