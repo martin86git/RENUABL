@@ -31,8 +31,6 @@ const EXTRA_PLACES: readonly SolPlace[] = [
   { key: "book", label: "Book an installation", path: "/design/procurement/book" },
   { key: "map", label: "Job map", path: "/design/procurement/map" },
   { key: "calendar", label: "Installations calendar", path: "/design/installations" },
-  { key: "completed", label: "After install", path: "/design/installations/completed" },
-  { key: "grid", label: "Grid connections", path: "/design/installations/grid" },
   { key: "messages", label: "Messages", path: "/design/messages" },
   { key: "notifications", label: "Notifications", path: "/design/notifications" },
   { key: "inbox", label: "Email inbox", path: "/design/inbox" },

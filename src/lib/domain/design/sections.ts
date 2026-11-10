@@ -62,6 +62,9 @@ export const SECTIONS: readonly Section[] = [
       { id: "sent", label: "Proposals sent", href: "/design/sales/proposals" },
       { id: "signed", label: "Proposals signed", href: "/design/sales/signed" },
       { id: "orders", label: "Ordering station", href: "/design/procurement/orders" },
+      // After install and Grid connections keep pages of their own (10 Nov 2026, Martin: they were lost in the fold).
+      { id: "completed", label: "After install", href: "/design/installations/completed" },
+      { id: "grid", label: "Grid connections", href: "/design/installations/grid" },
       { id: "invoices", label: "Installer invoices", href: "/design/installations/invoices" },
       // The call log (8 Nov 2026), a tab on Today until Today became one page (10 Nov 2026, Martin).
       { id: "calls", label: "Calls", href: "/design/calls" },
