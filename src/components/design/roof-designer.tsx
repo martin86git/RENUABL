@@ -8581,7 +8581,7 @@ export function RoofDesigner(props: {
                       title={fitted.length ? `Inverter: ${fitted.map((i) => i.name).join(" + ")}` : "Inverter: choose one"}
                       aria-label="The inverters this design is drawn for"
                       className={clsx(
-                        "flex h-[2.625rem] w-[4.75rem] flex-col items-start justify-center rounded-l-full border pl-3 shadow-lift backdrop-blur-md",
+                        "flex h-[2.625rem] w-[5.75rem] whitespace-nowrap flex-col items-start justify-center rounded-l-full border pl-3 shadow-lift backdrop-blur-md",
                         menu === "inverters"
                           ? "border-line bg-primary text-primary-ink"
                           : fitted.length
@@ -8760,7 +8760,7 @@ export function RoofDesigner(props: {
                       title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Battery: add one"}
                       aria-label="The battery on this design"
                       className={clsx(
-                        "flex h-[2.625rem] w-[4.75rem] flex-col items-end justify-center rounded-r-full border pr-3 shadow-lift backdrop-blur-md",
+                        "flex h-[2.625rem] w-[5.75rem] whitespace-nowrap flex-col items-end justify-center rounded-r-full border pr-3 shadow-lift backdrop-blur-md",
                         menu === "batteries"
                           ? "border-line bg-primary text-primary-ink"
                           : battery
