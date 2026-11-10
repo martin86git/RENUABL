@@ -155,9 +155,9 @@
   --canvas: #3b3f46;
   --surface: rgb(46 49 56 / 0.74);
   --surface-2: rgb(255 255 255 / 0.09);
-  --ink: #f4f4f5;
-  --ink-2: #cfd1d6;
-  --muted: #989ba3;
+  --ink: #ffffff;
+  --ink-2: #eceef1;
+  --muted: #c4c7cd;
   --line: rgb(255 255 255 / 0.12);
   --line-strong: rgb(255 255 255 / 0.22);
   --primary: #3a3d43;
@@ -173,6 +173,13 @@
   --danger: #ff6b5e;
   --shadow-lift: 0 0 0 1px rgb(0 0 0 / 0.25), 0 14px 34px -12px rgb(0 0 0 / 0.55);
   color-scheme: dark;
+}
+/* Everything solid inside the picture is the same blurred black glass as its menus (10 Nov 2026, Martin): the map
+   shows through, softened, behind each round, card and dial. */
+.glass-dark .bg-surface,
+.glass-dark [class*="bg-surface/"] {
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  backdrop-filter: blur(14px) saturate(1.5);
 }
 /*
  * The frame of the signed-in screens (31 Oct 2026, Primero's layout in RENUABL's colours): a near-white page, the soft

@@ -520,10 +520,10 @@ function Dial(props: {
     <div
       className={clsx(
         "absolute right-0 top-[56%] z-10 -translate-y-1/2 rounded-l-full border border-r-0 shadow-lift backdrop-blur-md",
-        // Glass, so the map shows through (10 Nov 2026, Martin: the grey half circle covered too much of it).
+        // Black glass, as the menus over the picture (10 Nov 2026, Martin): the map shows through, softened.
         props.dark
-          ? "border-sun-line bg-primary/95 text-white ring-2 ring-sun-line"
-          : "border-white/50 bg-white/10 shadow-[inset_0_1px_0_rgb(255_255_255/0.5),0_10px_30px_rgb(11_11_12/0.18)] backdrop-blur-[1px]",
+          ? "border-sun-line bg-surface/75 text-white ring-2 ring-sun-line backdrop-saturate-150"
+          : "border-line bg-surface/75 backdrop-saturate-150",
       )}
       style={{ width: `${R}rem`, height: `${R * 2}rem` }}
       role="group"
