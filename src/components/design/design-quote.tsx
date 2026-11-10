@@ -501,7 +501,7 @@ export function DesignQuote(props: {
             </Link>
           </span>
         </div>
-        <div className="mt-3 grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_17rem]">
+        <div className="mt-3 grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_21rem]">
           <div className="min-w-0 [&>table:first-child]:mt-0">
             {tableBlock}
             {footBox}

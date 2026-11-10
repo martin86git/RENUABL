@@ -9742,7 +9742,7 @@ export function RoofDesigner(props: {
                 ? "w-[min(15rem,100%)]"
                 : shown === "quote"
                   ? // The quote's lines down one side, what needs deciding on the other (8 Nov 2026, Martin).
-                    "w-[min(calc(100%-5rem),56rem)]"
+                    "w-[min(calc(100%-1.5rem),70rem)]"
                   : "w-[min(26rem,100%)]",
             peek ? "translate-x-0 opacity-100" : "pointer-events-none invisible translate-x-6 opacity-0",
             !shown && "hidden",
