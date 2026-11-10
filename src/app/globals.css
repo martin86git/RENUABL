@@ -173,6 +173,8 @@
   --danger: #ff6b5e;
   --shadow-lift: 0 0 0 1px rgb(0 0 0 / 0.25), 0 14px 34px -12px rgb(0 0 0 / 0.55);
   color-scheme: dark;
+  /* Text that sets no colour of its own inherits it, worked out where it was set (outside, near black): set it here. */
+  color: var(--ink);
 }
 /* Everything solid inside the picture is the same blurred black glass as its menus (10 Nov 2026, Martin): the map
    shows through, softened, behind each round, card and dial. */

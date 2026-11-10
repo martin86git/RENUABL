@@ -8249,9 +8249,13 @@ export function RoofDesigner(props: {
                         <button
                           onClick={() => setSuggesting(!suggesting)}
                           aria-expanded={suggesting}
-                          className={clsx(button, "mt-2 w-full justify-center", suggesting && "!border-forest")}
+                          // Lit, so it stands apart from the list (10 Nov 2026, Martin).
+                          className={clsx(
+                            "mt-2 inline-flex min-h-10 w-full items-center justify-center rounded-md border border-sun-line/70 px-4 text-sm font-semibold text-ink hover:bg-sun-line/35",
+                            suggesting ? "bg-sun-line/35" : "bg-sun-line/20",
+                          )}
                         >
-                          <Sparkles className="mr-1.5 size-4 text-sun-ink" aria-hidden /> Suggest one for these panels
+                          <Sparkles className="mr-1.5 size-4 text-sun-line" aria-hidden /> Suggest one for these panels
                         </button>
                         {suggesting && (
                           <div className="mt-1 space-y-1 rounded-md border border-sun-line bg-sun p-2">
