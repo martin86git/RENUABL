@@ -698,10 +698,16 @@ export function DealService({ jobId }: { jobId: string }) {
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-ink-2">No service case open.</p>
-          <button className={clsx(ui.quiet, "h-8 px-3 text-xs")} onClick={() => setRaising(true)}>
-            <Wrench className="size-3.5" aria-hidden /> Flag for service
+          <button
+            className="inline-flex h-9 items-center gap-2 rounded-full bg-primary pl-1.5 pr-4 text-[13px] font-medium text-primary-ink transition hover:shadow-[0_4px_16px_rgb(255_90_31_/_0.3)]"
+            onClick={() => setRaising(true)}
+          >
+            <span className="inline-flex size-6 items-center justify-center rounded-full bg-sun-line text-white">
+              <Plus className="size-4" strokeWidth={2.5} aria-hidden />
+            </span>
+            Flag for service
           </button>
         </div>
       )}

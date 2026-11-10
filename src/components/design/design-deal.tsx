@@ -633,7 +633,7 @@ export function DealPage({ id }: { id: string }) {
             >
               <SolBadge className="size-5" />
             </button>
-            {/* Service sits apart at the end, in its own colour: putting something right after the sale. */}
+            {/* Service sits apart at the end: putting something right after the sale. */}
             <button
               role="tab"
               aria-selected={tab === "service"}
@@ -642,9 +642,7 @@ export function DealPage({ id }: { id: string }) {
               onClick={() => setTab("service")}
               className={clsx(
                 "flex size-11 shrink-0 items-center justify-center rounded-full ring-1",
-                tab === "service"
-                  ? "bg-warning text-white ring-warning"
-                  : "bg-warning-soft text-warning ring-warning/20 hover:bg-warning-soft/70",
+                tab === "service" ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line hover:text-ink",
               )}
             >
               <Wrench className="size-4" aria-hidden />
@@ -683,7 +681,7 @@ export function DealPage({ id }: { id: string }) {
           ) : tab === "service" ? (
             <section className={clsx(ui.card, "mt-5 p-5")}>
               <h2 className="flex items-center gap-2 text-[15px] font-medium text-ink">
-                <Wrench className="size-4 text-warning" aria-hidden /> Service
+                <Wrench className="size-4 text-ink-2" aria-hidden /> Service
               </h2>
               <p className="mt-1 text-xs text-muted">Something to put right after the sale: its open case, or the way to flag one.</p>
               <div className="mt-4">
@@ -1217,8 +1215,8 @@ function ToolRail({
       >
         <span
           className={clsx(
-            "flex size-12 items-center justify-center rounded-full ring-1 transition",
-            tab === "service" ? "bg-warning text-white ring-warning" : "bg-warning-soft text-warning ring-warning/20",
+            "flex size-12 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
+            tab === "service" ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line group-hover:text-ink",
           )}
         >
           <Wrench className="size-[18px]" aria-hidden />
