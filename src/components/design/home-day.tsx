@@ -197,8 +197,8 @@ export function DayOverlay(props: {
           points={join(arc)}
           fill="none"
           stroke="#ffffff"
-          strokeOpacity={0.3}
-          strokeWidth={0.6 * u}
+          strokeOpacity={0.5}
+          strokeWidth={0.9 * u}
           strokeDasharray={`${2 * u} ${3 * u}`}
         />
       )}
@@ -207,9 +207,9 @@ export function DayOverlay(props: {
           style={{ transform: `translate(${sx}px, ${sy}px)`, transition: `transform ${TICK_MS}ms linear, opacity ${TICK_MS}ms linear` }}
           opacity={r2(clamp((up + 2) / 6))}
         >
-          <circle r={15 * u} fill="#ffcf5c" opacity={0.18} />
-          <circle r={9 * u} fill="#ffcf5c" opacity={0.3} />
-          <circle r={5.5 * u} fill="#ffd978" stroke="#fff3d1" strokeWidth={0.8 * u} />
+          <circle r={26 * u} fill="#ffcf5c" opacity={0.14} />
+          <circle r={16 * u} fill="#ffcf5c" opacity={0.28} />
+          <circle r={9 * u} fill="#ffd978" stroke="#fff3d1" strokeWidth={1.2 * u} />
         </g>
       )}
     </g>
@@ -229,25 +229,11 @@ function curve(steps: readonly DayStep[], of: (s: DayStep) => number, top: numbe
     : line;
 }
 
-/**
- * The day's card, floating over the foot of the picture: the clock, the season, play, the day as a chart to drag
- * through (what the panels make over what the home uses, the battery's level under it, and where the grid is drawn
- * on), what is happening at the moment, and the day in a sentence or two.
- */
-export function HomeDayCard(props: {
-  state: HomeDayState;
-  hasBattery: boolean;
-  hasHome: boolean;
-  /** On a customer's proposal: worded for them, in the business's own colour, as part of the page and with no way to put it away. */
-  yours?: boolean;
-}) {
-  const { state } = props;
+/** The day as a chart to drag through: what the panels make over what the home uses, the battery's level under it, and where the grid is drawn on. */
+function DayChart(props: { state: HomeDayState; day: HomeDay; step: DayStep; hasBattery: boolean; hasHome: boolean; flat?: boolean }) {
+  const { state, day, step, hasBattery, hasHome, flat } = props;
   const chart = useRef<SVGSVGElement>(null);
   const dragging = useRef(false);
-  const { day, step } = state;
-  if (!day || !step) return null;
-  const seasonLabel = DAY_SEASONS.find((s) => s.id === state.season)?.label ?? "Summer";
-  const moment = momentWords(step, props.hasBattery, props.hasHome);
   const seek = (clientX: number) => {
     const box = chart.current?.getBoundingClientRect();
     if (!box || box.width <= 0) return;
@@ -260,192 +246,263 @@ export function HomeDayCard(props: {
   const batteryH = 14;
   const gridTop = 88;
   const half = W / DAY_STEPS / 2;
-  const dot = "size-2 shrink-0 rounded-full";
+  return (
+    <svg
+      ref={chart}
+      viewBox={`0 0 ${W} ${flat ? H : H + 12}`}
+      preserveAspectRatio={flat ? "none" : undefined}
+      className={clsx("block w-full cursor-ew-resize touch-none select-none", flat && "h-[4.5rem] rounded-lg")}
+      role="slider"
+      aria-label="The time of day"
+      aria-valuemin={0}
+      aria-valuemax={DAY_STEPS - 1}
+      aria-valuenow={state.at}
+      aria-valuetext={clockWords(step.hour)}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        e.preventDefault();
+        e.stopPropagation();
+        state.setPlaying(false);
+        state.setAt((state.at + (e.key === "ArrowRight" ? 1 : DAY_STEPS - 1)) % DAY_STEPS);
+      }}
+      onPointerDown={(e) => {
+        dragging.current = true;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        seek(e.clientX);
+      }}
+      onPointerMove={(e) => dragging.current && seek(e.clientX)}
+      onPointerUp={() => (dragging.current = false)}
+      onPointerCancel={() => (dragging.current = false)}
+    >
+      {/* The hours the sun is down, shaded. */}
+      {day.steps.map(
+        (s) =>
+          s.sun.elevation <= 0 && (
+            <rect key={s.hour} x={xAt(s.hour) - half} y={0} width={half * 2 + 0.3} height={H} fill="#000000" opacity={0.22} />
+          ),
+      )}
+      {/* What the home uses, and over it what the panels make. */}
+      {hasHome && (
+        <>
+          <path d={curve(day.steps, (s) => s.use, powerTop, powerH, day.peakKw, true)} fill="currentColor" opacity={0.16} />
+          <path
+            d={curve(day.steps, (s) => s.use, powerTop, powerH, day.peakKw, false)}
+            fill="none"
+            stroke="currentColor"
+            strokeOpacity={0.6}
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+          />
+        </>
+      )}
+      <path d={curve(day.steps, (s) => s.solar, powerTop, powerH, day.peakKw, true)} fill="#ffcf5c" opacity={0.3} />
+      <path
+        d={curve(day.steps, (s) => s.solar, powerTop, powerH, day.peakKw, false)}
+        fill="none"
+        stroke="#ffcf5c"
+        strokeWidth={flat ? 2 : 1.4}
+        vectorEffect="non-scaling-stroke"
+      />
+      {/* The battery's level through the day. */}
+      {hasBattery && (
+        <>
+          <rect x={0} y={batteryTop} width={W} height={batteryH} rx={3} fill="currentColor" opacity={0.08} />
+          <path d={curve(day.steps, (s) => s.share, batteryTop, batteryH, 1, true)} fill="#5b8def" opacity={0.85} />
+        </>
+      )}
+      {/* Where the grid is drawn on (red) and where the spare goes out to it (grey). */}
+      {hasHome &&
+        day.steps.map((s) =>
+          s.imported > 0.05 || s.exported > 0.05 ? (
+            <rect
+              key={s.hour}
+              x={xAt(s.hour) - half}
+              y={gridTop}
+              width={half * 2 + 0.3}
+              height={4}
+              fill={s.imported > 0.05 ? "#e2725b" : "currentColor"}
+              opacity={s.imported > 0.05 ? 0.9 : 0.25}
+            />
+          ) : null,
+        )}
+      {!flat &&
+        [6, 12, 18].map((hour) => (
+          <text key={hour} x={xAt(hour)} y={H + 10} textAnchor="middle" fontSize={8} fill="currentColor" opacity={0.5}>
+            {hour === 12 ? "noon" : hour < 12 ? `${hour} am` : `${hour - 12} pm`}
+          </text>
+        ))}
+      {/* The moment. */}
+      <line
+        x1={xAt(step.hour)}
+        y1={0}
+        x2={xAt(step.hour)}
+        y2={H}
+        stroke="var(--sun-line)"
+        strokeWidth={flat ? 2 : 1.4}
+        vectorEffect="non-scaling-stroke"
+        style={{ transition: `all ${TICK_MS}ms linear` }}
+      />
+      {!flat && <circle cx={xAt(step.hour)} cy={0} r={3} fill="var(--sun-line)" style={{ transition: `all ${TICK_MS}ms linear` }} />}
+    </svg>
+  );
+}
+
+const DOT = "size-2 shrink-0 rounded-full";
+
+/** What is happening at the moment, a line each: the panels, the home, the battery, the grid. */
+function Moment(props: { step: DayStep; hasBattery: boolean; hasHome: boolean; className?: string }) {
+  const moment = momentWords(props.step, props.hasBattery, props.hasHome);
+  return (
+    <div className={clsx("text-[12px] font-medium leading-tight", props.className)}>
+      <p className="flex items-center gap-1.5">
+        <i className={clsx(DOT, "bg-[#ffcf5c]")} aria-hidden />
+        {moment.sun}
+      </p>
+      {moment.home && (
+        <p className="flex items-center gap-1.5">
+          <i className={clsx(DOT, "bg-current opacity-50")} aria-hidden />
+          {moment.home}
+        </p>
+      )}
+      {moment.battery && (
+        <p className="flex items-center gap-1.5">
+          <i className={clsx(DOT, "bg-[#5b8def]")} aria-hidden />
+          {moment.battery}
+        </p>
+      )}
+      {moment.grid && (
+        <p className="flex items-center gap-1.5">
+          <i className={clsx(DOT, props.step.imported > 0.05 ? "bg-[#e2725b]" : "bg-current opacity-25")} aria-hidden />
+          {moment.grid}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Seasons(props: { state: HomeDayState }) {
+  const { state } = props;
+  return (
+    <div className="flex items-center rounded-full border border-line p-0.5 text-[12px] font-medium" role="group" aria-label="The season">
+      {DAY_SEASONS.map((s) => (
+        <button
+          key={s.id}
+          onClick={() => state.setSeason(s.id)}
+          aria-pressed={state.season === s.id}
+          className={clsx(
+            "h-7 flex-1 rounded-full px-2.5",
+            state.season === s.id ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+          )}
+        >
+          {s.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PlayButton(props: { state: HomeDayState; className: string }) {
+  const { state } = props;
+  return (
+    <button
+      onClick={() => state.setPlaying(!state.playing)}
+      aria-label={state.playing ? "Pause the day" : "Play the day"}
+      title={state.playing ? "Pause" : "Play the day"}
+      className={clsx("flex shrink-0 items-center justify-center rounded-full", props.className)}
+    >
+      {state.playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4 translate-x-px" aria-hidden />}
+    </button>
+  );
+}
+
+const HOUR_MARKS: readonly (readonly [number, string])[] = [
+  [6, "6 am"],
+  [12, "noon"],
+  [18, "6 pm"],
+];
+
+/**
+ * The day's controls. In the designer, a player's bar along the foot of the picture (Martin: the card sat over the
+ * roof it was about, and over the buttons beside it): play, the clock and the season on the left, the day as one
+ * long timeline to drag through, the moment on the right, and the day in a line under it; low, so the roof and the
+ * sun above it stay in view. On a customer's proposal (`yours`), part of the page: the controls over the chart.
+ */
+export function HomeDayCard(props: {
+  state: HomeDayState;
+  hasBattery: boolean;
+  hasHome: boolean;
+  /** On a customer's proposal: worded for them, in the business's own colour, as part of the page and with no way to put it away. */
+  yours?: boolean;
+}) {
+  const { state } = props;
+  const { day, step } = state;
+  if (!day || !step) return null;
+  const seasonLabel = DAY_SEASONS.find((s) => s.id === state.season)?.label ?? "Summer";
+  const words = dayWords(day, seasonLabel, props.hasBattery, props.yours).join(" ");
+  if (props.yours)
+    return (
+      <div className="pointer-events-auto w-full text-ink" role="group" aria-label="A day with this system">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-row flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex items-center gap-2">
+              <PlayButton state={state} className="size-9 bg-primary text-primary-ink" />
+              <p className="text-xl font-semibold tabular-nums leading-none">{clockWords(step.hour)}</p>
+            </div>
+            <Seasons state={state} />
+            <Moment step={step} hasBattery={props.hasBattery} hasHome={props.hasHome} className="flex w-full flex-wrap gap-x-4 gap-y-1" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <DayChart state={state} day={day} step={step} hasBattery={props.hasBattery} hasHome={props.hasHome} />
+            <p className="mt-1.5 text-[12px] leading-snug text-ink-2">
+              {words} <span className="text-muted">{DAY_NOTE_YOURS}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   return (
     <div
-      className={clsx(
-        "pointer-events-auto text-ink",
-        props.yours
-          ? "w-full"
-          : "w-[min(44rem,calc(100vw-3rem))] rounded-2xl border border-line bg-surface/85 p-3 shadow-lift backdrop-blur-md",
-      )}
+      className="pointer-events-auto w-full rounded-2xl border border-line bg-surface/90 px-3 pb-2 pt-2.5 text-ink shadow-lift backdrop-blur-md"
       role="group"
       aria-label="The home's day"
     >
-      <div className={clsx("flex flex-col gap-3", !props.yours && "sm:flex-row")}>
-        {/* The clock, play, the season, and what is happening at the moment. */}
-        <div className={clsx("flex shrink-0 gap-2", props.yours ? "flex-row flex-wrap items-center gap-x-4" : "flex-col sm:w-[12.5rem]")}>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => state.setPlaying(!state.playing)}
-              aria-label={state.playing ? "Pause the day" : "Play the day"}
-              title={state.playing ? "Pause" : "Play the day"}
-              className={clsx(
-                "flex size-9 shrink-0 items-center justify-center rounded-full",
-                props.yours ? "bg-primary text-primary-ink" : "bg-sun-line text-white",
-              )}
-            >
-              {state.playing ? <Pause className="size-4" aria-hidden /> : <Play className="size-4 translate-x-px" aria-hidden />}
-            </button>
-            <p className="text-xl font-semibold tabular-nums leading-none">{clockWords(step.hour)}</p>
-            {!props.yours && (
-              <button
-                onClick={state.close}
-                aria-label="Put the day away"
-                title="Put the day away"
-                className="ml-auto flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-            )}
+      <div className="flex items-stretch gap-3">
+        <div className="flex w-[13rem] shrink-0 flex-col justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <PlayButton state={state} className="size-10 bg-sun-line text-white" />
+            <p className="text-[22px] font-semibold tabular-nums leading-none">{clockWords(step.hour)}</p>
           </div>
-          <div
-            className="flex items-center rounded-full border border-line p-0.5 text-[12px] font-medium"
-            role="group"
-            aria-label="The season"
-          >
-            {DAY_SEASONS.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => state.setSeason(s.id)}
-                aria-pressed={state.season === s.id}
-                className={clsx(
-                  "h-7 flex-1 rounded-full px-2",
-                  state.season === s.id ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-          <div
-            className={clsx("text-[12px] font-medium leading-tight", props.yours ? "flex w-full flex-wrap gap-x-4 gap-y-1" : "space-y-1")}
-          >
-            <p className="flex items-center gap-1.5">
-              <i className={clsx(dot, "bg-[#ffcf5c]")} aria-hidden />
-              {moment.sun}
-            </p>
-            {moment.home && (
-              <p className="flex items-center gap-1.5">
-                <i className={clsx(dot, "bg-current opacity-50")} aria-hidden />
-                {moment.home}
-              </p>
-            )}
-            {moment.battery && (
-              <p className="flex items-center gap-1.5">
-                <i className={clsx(dot, "bg-[#5b8def]")} aria-hidden />
-                {moment.battery}
-              </p>
-            )}
-            {moment.grid && (
-              <p className="flex items-center gap-1.5">
-                <i className={clsx(dot, step.imported > 0.05 ? "bg-[#e2725b]" : "bg-current opacity-25")} aria-hidden />
-                {moment.grid}
-              </p>
-            )}
-          </div>
+          <Seasons state={state} />
         </div>
-        {/* The day itself, to drag through, and the day in words. */}
         <div className="min-w-0 flex-1">
-          <svg
-            ref={chart}
-            viewBox={`0 0 ${W} ${H + 12}`}
-            className="block w-full cursor-ew-resize touch-none select-none"
-            role="slider"
-            aria-label="The time of day"
-            aria-valuemin={0}
-            aria-valuemax={DAY_STEPS - 1}
-            aria-valuenow={state.at}
-            aria-valuetext={clockWords(step.hour)}
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-              e.preventDefault();
-              e.stopPropagation();
-              state.setPlaying(false);
-              state.setAt((state.at + (e.key === "ArrowRight" ? 1 : DAY_STEPS - 1)) % DAY_STEPS);
-            }}
-            onPointerDown={(e) => {
-              dragging.current = true;
-              e.currentTarget.setPointerCapture(e.pointerId);
-              seek(e.clientX);
-            }}
-            onPointerMove={(e) => dragging.current && seek(e.clientX)}
-            onPointerUp={() => (dragging.current = false)}
-            onPointerCancel={() => (dragging.current = false)}
-          >
-            {/* The hours the sun is down, shaded. */}
-            {day.steps.map(
-              (s) =>
-                s.sun.elevation <= 0 && (
-                  <rect key={s.hour} x={xAt(s.hour) - half} y={0} width={half * 2 + 0.3} height={H} fill="#000000" opacity={0.22} />
-                ),
-            )}
-            {/* What the home uses, and over it what the panels make. */}
-            {props.hasHome && (
-              <>
-                <path d={curve(day.steps, (s) => s.use, powerTop, powerH, day.peakKw, true)} fill="currentColor" opacity={0.16} />
-                <path
-                  d={curve(day.steps, (s) => s.use, powerTop, powerH, day.peakKw, false)}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeOpacity={0.6}
-                  strokeWidth={1}
-                />
-              </>
-            )}
-            <path d={curve(day.steps, (s) => s.solar, powerTop, powerH, day.peakKw, true)} fill="#ffcf5c" opacity={0.3} />
-            <path
-              d={curve(day.steps, (s) => s.solar, powerTop, powerH, day.peakKw, false)}
-              fill="none"
-              stroke="#ffcf5c"
-              strokeWidth={1.4}
-            />
-            {/* The battery's level through the day. */}
-            {props.hasBattery && (
-              <>
-                <rect x={0} y={batteryTop} width={W} height={batteryH} rx={3} fill="currentColor" opacity={0.08} />
-                <path d={curve(day.steps, (s) => s.share, batteryTop, batteryH, 1, true)} fill="#5b8def" opacity={0.85} />
-              </>
-            )}
-            {/* Where the grid is drawn on (red) and where the spare goes out to it (grey). */}
-            {props.hasHome &&
-              day.steps.map((s) =>
-                s.imported > 0.05 || s.exported > 0.05 ? (
-                  <rect
-                    key={s.hour}
-                    x={xAt(s.hour) - half}
-                    y={gridTop}
-                    width={half * 2 + 0.3}
-                    height={4}
-                    fill={s.imported > 0.05 ? "#e2725b" : "currentColor"}
-                    opacity={s.imported > 0.05 ? 0.9 : 0.25}
-                  />
-                ) : null,
-              )}
-            {[6, 12, 18].map((hour) => (
-              <text key={hour} x={xAt(hour)} y={H + 10} textAnchor="middle" fontSize={8} fill="currentColor" opacity={0.5}>
-                {hour === 12 ? "noon" : hour < 12 ? `${hour} am` : `${hour - 12} pm`}
-              </text>
+          <DayChart state={state} day={day} step={step} hasBattery={props.hasBattery} hasHome={props.hasHome} flat />
+          <div className="relative mt-0.5 h-3.5 text-[10px] leading-none text-muted" aria-hidden>
+            {HOUR_MARKS.map(([hour, label]) => (
+              <span key={label} className="absolute -translate-x-1/2" style={{ left: `${(hour / 24) * 100}%` }}>
+                {label}
+              </span>
             ))}
-            {/* The moment. */}
-            <line
-              x1={xAt(step.hour)}
-              y1={0}
-              x2={xAt(step.hour)}
-              y2={H}
-              stroke="var(--sun-line)"
-              strokeWidth={1.4}
-              style={{ transition: `all ${TICK_MS}ms linear` }}
-            />
-            <circle cx={xAt(step.hour)} cy={0} r={3} fill="var(--sun-line)" style={{ transition: `all ${TICK_MS}ms linear` }} />
-          </svg>
-          <p className="mt-1.5 text-[12px] leading-snug text-ink-2">
-            {dayWords(day, seasonLabel, props.hasBattery, props.yours).join(" ")}{" "}
-            <span className="text-muted">{props.yours ? DAY_NOTE_YOURS : props.hasHome ? DAY_NOTE : DAY_NO_BILL}</span>
-          </p>
+          </div>
         </div>
+        <Moment
+          step={step}
+          hasBattery={props.hasBattery}
+          hasHome={props.hasHome}
+          className="hidden w-[12.5rem] shrink-0 space-y-1.5 self-center md:block"
+        />
+        <button
+          onClick={state.close}
+          aria-label="Put the day away"
+          title="Put the day away"
+          className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
       </div>
+      <p className="mt-1.5 border-t border-line pt-1.5 text-[12px] leading-snug text-ink-2">
+        {words} <span className="text-muted">{props.hasHome ? DAY_NOTE : DAY_NO_BILL}</span>
+      </p>
     </div>
   );
 }

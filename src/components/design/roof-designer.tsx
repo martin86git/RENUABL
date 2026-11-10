@@ -7296,6 +7296,8 @@ export function RoofDesigner(props: {
                 className={clsx(
                   "pointer-events-auto absolute right-4 z-20 flex flex-col items-end gap-2",
                   props.tight ? "bottom-10" : "bottom-3",
+                  // The day's bar takes the foot of the picture while it plays.
+                  homeDay.on && "hidden",
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -7336,9 +7338,10 @@ export function RoofDesigner(props: {
                 </div>
                 {props.pictureMenu}
               </div>
-              {/* The day's card, over the foot of the picture. */}
+              {/* The day's bar, along the foot of the picture like a player's: low, so the roof and the sun stay in view,
+                  and clear of the round that moves the picture (bottom left). The other controls at the foot step aside. */}
               {homeDay.on && (
-                <div className="pointer-events-none absolute bottom-[5.25rem] left-1/2 z-30 flex -translate-x-1/2 justify-center">
+                <div className={clsx("pointer-events-none absolute left-[5.25rem] right-3 z-30", props.tight ? "bottom-7" : "bottom-3")}>
                   <HomeDayCard state={homeDay} hasBattery={battery !== undefined} hasHome={(finance?.dailyKwh ?? 0) > 0} />
                 </div>
               )}
@@ -9077,6 +9080,7 @@ export function RoofDesigner(props: {
               <div
                 className={clsx(
                   "pointer-events-none absolute inset-x-2 bottom-7 flex items-end gap-2",
+                  homeDay.on && "hidden",
                   // Over Sol's black panel while it is out, so the pill stands at its foot as one piece.
                   props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen) ? "z-[55]" : "z-10",
                 )}
