@@ -44,7 +44,7 @@ import {
 } from "@/lib/domain/design/crm";
 import { systemDetails, type DealDetail, type JobExtra } from "@/lib/domain/design/deal";
 import { fieldLine, resolveDealFields, type DealFieldsConfig } from "@/lib/domain/design/deal-sections";
-import { INSTALLER_KEY, splitName } from "@/lib/domain/design/crm";
+import { INSTALLER_KEY } from "@/lib/domain/design/crm";
 import { loadInstallExtras } from "@/lib/services/after-sale";
 import {
   addActivity,
@@ -773,46 +773,29 @@ export function DealPage({ id }: { id: string }) {
               <DealFiles jobId={id} />
             </div>
           ) : tab === "details" ? (
+            // The banner already says who it's for, where and the stage (10 Nov 2026, Martin), so one card holds what can be
+            // changed: the deal's own fields, then how to reach the customer and the address.
             <div className="mt-5 grid items-start gap-5 lg:grid-cols-2">
-              <section className={clsx(ui.card, "p-5")}>
-                <h2 className="text-[15px] font-medium text-ink">Who it&apos;s for</h2>
-                <div className="mt-4 space-y-1.5">
+              <section className={clsx(ui.card, "p-5 lg:col-span-2")}>
+                <h2 className="text-[15px] font-medium text-ink">The deal</h2>
+                <div className="mt-4 grid gap-x-6 gap-y-4 sm:grid-cols-2">
                   <EditLine
-                    row
-                    key={`name:${customer.name}`}
-                    label="Customer name"
-                    value={customer.name}
+                    key={`title:${job.title}`}
+                    label="Deal name"
+                    value={job.title}
                     max={120}
-                    onSave={async (name) => {
-                      const parts = splitName(name);
-                      if (!parts.firstName) {
-                        setStatus("Enter the customer's name.");
+                    onSave={async (title) => {
+                      if (!title) {
+                        setStatus("Give the deal a name.");
                         return false;
                       }
-                      return saveWho(parts);
+                      return patchOk({ title });
                     }}
                   />
-                  <HeadRow label="Address">
-                    <AddressField
-                      wrap
-                      value={moving ? "" : job.address}
-                      placed={job.lat !== null}
-                      onChange={(place) => {
-                        if (!place.address) return setMoving(true);
-                        setMoving(false);
-                        void patchOk(place);
-                      }}
-                    />
-                    {moving && (
-                      <button type="button" onClick={() => setMoving(false)} className={clsx(ui.link, "mt-1 text-xs")}>
-                        Keep {job.address ? "the address as it was" : "it empty"}
-                      </button>
-                    )}
-                  </HeadRow>
-                  <HeadRow label="Deal stage">
+                  <label className="block text-xs text-muted">
+                    Deal stage
                     <select
-                      className={clsx(HEAD_INPUT, "appearance-auto")}
-                      aria-label="Deal stage"
+                      className={clsx(ui.input, "mt-1 appearance-auto")}
                       value={job.stage}
                       onChange={(e) => void patch({ stage: e.target.value as JobStage })}
                     >
@@ -822,9 +805,61 @@ export function DealPage({ id }: { id: string }) {
                         </option>
                       ))}
                     </select>
-                  </HeadRow>
+                  </label>
+                  <label className="block text-xs text-muted">
+                    Quoted price, inc. GST ($)
+                    <input
+                      className={clsx(ui.input, "mt-1 tabular-nums")}
+                      inputMode="numeric"
+                      value={value}
+                      onChange={(e) => setValue(e.target.value.replace(/[^d]/g, "").slice(0, 8))}
+                      onBlur={() => {
+                        const next = value === "" ? null : Number(value);
+                        if (next !== job.value) void patch({ value: next });
+                      }}
+                      placeholder="From the design"
+                    />
+                  </label>
+                  <label className="block text-xs text-muted">
+                    Install date
+                    <input
+                      type="date"
+                      className={clsx(ui.input, "mt-1 tabular-nums")}
+                      value={job.installDate ?? ""}
+                      onChange={(e) => void patch({ installDate: e.target.value || null })}
+                    />
+                  </label>
                   <EditLine
-                    row
+                    key={`source:${customer.source}`}
+                    label="Lead source"
+                    value={customer.source}
+                    max={120}
+                    placeholder="Website, referral, Facebook…"
+                    onSave={(source) => saveWho({ source })}
+                  />
+                  <label className="block text-xs text-muted">
+                    Owner
+                    <select
+                      className={clsx(ui.input, "mt-1 appearance-auto")}
+                      value={job.owner ?? ""}
+                      onChange={async (e) => {
+                        const res = await setDealOwner(job.id, e.target.value || null);
+                        if (!res.ok) return setStatus(res.message);
+                        setJob(res.job);
+                        setStatus("Saved");
+                        void load();
+                      }}
+                    >
+                      <option value="">No one yet</option>
+                      {/* Someone who has left the business still shows, so the deal isn't silently handed on. */}
+                      {[...new Set([...members, ...(job.owner ? [job.owner] : [])])].map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <EditLine
                     key={`email:${customer.email}`}
                     label="Email"
                     type="email"
@@ -832,7 +867,6 @@ export function DealPage({ id }: { id: string }) {
                     onSave={(email) => saveWho({ email })}
                   />
                   <EditLine
-                    row
                     key={`phone:${customer.phone}`}
                     label="Contact #"
                     type="tel"
@@ -840,78 +874,28 @@ export function DealPage({ id }: { id: string }) {
                     max={30}
                     onSave={(phone) => saveWho({ phone })}
                   />
+                  <div className="text-xs text-muted sm:col-span-2">
+                    Address
+                    <div className="mt-1">
+                      <AddressField
+                        value={moving ? "" : job.address}
+                        placed={job.lat !== null}
+                        onChange={(place) => {
+                          if (!place.address) return setMoving(true);
+                          setMoving(false);
+                          void patchOk(place);
+                        }}
+                      />
+                    </div>
+                    {moving && (
+                      <button type="button" onClick={() => setMoving(false)} className={clsx(ui.link, "mt-1 text-xs")}>
+                        Keep {job.address ? "the address as it was" : "it empty"}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </section>
-              <section className={clsx(ui.card, "space-y-4 p-5")}>
-                <h2 className="text-[15px] font-medium text-ink">The deal</h2>
-                <EditLine
-                  key={`title:${job.title}`}
-                  label="Deal name"
-                  value={job.title}
-                  max={120}
-                  onSave={async (title) => {
-                    if (!title) {
-                      setStatus("Give the deal a name.");
-                      return false;
-                    }
-                    return patchOk({ title });
-                  }}
-                />
-                <label className="block text-xs text-muted">
-                  Quoted price, inc. GST ($)
-                  <input
-                    className={clsx(ui.input, "mt-1 tabular-nums")}
-                    inputMode="numeric"
-                    value={value}
-                    onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, "").slice(0, 8))}
-                    onBlur={() => {
-                      const next = value === "" ? null : Number(value);
-                      if (next !== job.value) void patch({ value: next });
-                    }}
-                    placeholder="From the design"
-                  />
-                </label>
-                <label className="block text-xs text-muted">
-                  Install date
-                  <input
-                    type="date"
-                    className={clsx(ui.input, "mt-1 tabular-nums")}
-                    value={job.installDate ?? ""}
-                    onChange={(e) => void patch({ installDate: e.target.value || null })}
-                  />
-                </label>
-                <EditLine
-                  key={`source:${customer.source}`}
-                  label="Lead source"
-                  value={customer.source}
-                  max={120}
-                  placeholder="Website, referral, Facebook…"
-                  onSave={(source) => saveWho({ source })}
-                />
-                <label className="block text-xs text-muted">
-                  Owner
-                  <select
-                    className={clsx(ui.input, "mt-1 appearance-auto")}
-                    value={job.owner ?? ""}
-                    onChange={async (e) => {
-                      const res = await setDealOwner(job.id, e.target.value || null);
-                      if (!res.ok) return setStatus(res.message);
-                      setJob(res.job);
-                      setStatus("Saved");
-                      void load();
-                    }}
-                  >
-                    <option value="">No one yet</option>
-                    {/* Someone who has left the business still shows, so the deal isn't silently handed on. */}
-                    {[...new Set([...members, ...(job.owner ? [job.owner] : [])])].map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <Link href={`${PATHS.customers}/${customer.id}`} className={clsx(ui.link, "block text-xs")}>
-                  Open {customer.firstName || "the customer"}&apos;s page
+                <Link href={`${PATHS.customers}/${customer.id}`} className={clsx(ui.link, "mt-4 block text-xs")}>
+                  Open {customer.firstName || "the customer"}&apos;s page to change their name
                 </Link>
               </section>
               <section className={clsx(ui.card, "overflow-hidden lg:col-span-2")}>
