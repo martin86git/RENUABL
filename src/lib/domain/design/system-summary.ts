@@ -91,3 +91,31 @@ export function systemSummary(lines: readonly Line[]): SystemSummary {
     ]),
   };
 }
+
+/** One figure on the deal's banner: what it is, its size, and a few words under it. */
+export interface BannerFigure {
+  label: string;
+  value: string;
+  note: string | null;
+}
+
+/**
+ * The system in the banner's figures (10 Nov 2026, Martin: the banner should tell us something useful, the system size,
+ * the panels, the storage): solar, battery, inverter and EV charger, only those known. `kw` is the deal's own kW, used
+ * when the design hasn't said the system's size.
+ */
+export function bannerFigures(lines: readonly Line[], kw: number | null = null): BannerFigure[] {
+  const get = (key: string) => lines.find((l) => l.key === key)?.value?.trim() || null;
+  const figures: BannerFigure[] = [];
+  const solar = get("systemSize") ?? (kw ? `${kw} kW` : null);
+  const panels = get("panelQty");
+  if (solar)
+    figures.push({ label: "Solar", value: solar, note: panels ? `${panels} ${panels === "1" ? "panel" : "panels"}` : get("panel") });
+  const storage = get("batteryStorage");
+  if (storage) figures.push({ label: "Battery", value: storage, note: get("battery") });
+  const inverter = get("inverterCapacity");
+  if (inverter) figures.push({ label: "Inverter", value: inverter, note: get("inverter") });
+  const charger = get("evCharger");
+  if (charger) figures.push({ label: "EV charger", value: "Included", note: charger });
+  return figures;
+}

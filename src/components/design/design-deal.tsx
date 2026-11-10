@@ -10,6 +10,10 @@ import {
   ClipboardList,
   FileText,
   HardHat,
+  History,
+  Mail,
+  MessageCircle,
+  SlidersHorizontal,
   NotebookPen,
   Phone,
   MessagesSquare,
@@ -45,7 +49,6 @@ import { loadInstallExtras } from "@/lib/services/after-sale";
 import {
   addActivity,
   deleteJob,
-  dollars,
   loadCustomer,
   loadDealDesign,
   loadDealFields,
@@ -73,7 +76,7 @@ import { DealSol } from "./deal-sol";
 import { hasPulse, type DealPulse } from "@/lib/domain/design/deal-heat";
 import { NOT_TRACKED, openedWords } from "@/lib/domain/design/email-opens";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
-import { systemSummary } from "@/lib/domain/design/system-summary";
+import { bannerFigures, systemSummary } from "@/lib/domain/design/system-summary";
 import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
 import { DealEmails } from "./deal-emails";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
@@ -542,571 +545,578 @@ export function DealPage({ id }: { id: string }) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[64rem] space-y-4 px-5 py-6">
-      {(job.lat !== null || tool === "proposal") && (
-        <DesignDrawer
-          src={tool === "proposal" ? proposalHref(job.id) : designHref(job.id)}
-          onSwitch={(href) => openTool(toolOf(href).kind)}
-          open={drawer}
-          onOpen={() => setDrawer(true)}
-          onFold={() => setDrawer(false)}
-          onSaved={() => {
-            void load();
-            setDesignVersion((v) => v + 1);
-          }}
-          onGo={(href) => {
-            // This deal: the tab asked for (the customer's name in the designer comes back to Activity).
-            if (href.startsWith(`${PATHS.deals}/${job.id}`)) {
-              const want = new URL(href, window.location.origin).searchParams.get("tab");
-              return setTab(want && (DEAL_TABS.some((t) => t.key === want) || want === "service") ? (want as Tab) : "activities");
-            }
-            router.push(href);
-          }}
-          back="Back to the deal"
-        />
-      )}
-      <div className="flex items-center justify-between gap-3">
-        <Link href={PATHS.pipelines} className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink">
-          <ChevronLeft className="size-4 text-muted" aria-hidden /> Deals
-        </Link>
-        <p className="min-h-4 flex-1 text-right text-xs text-muted" role="status">
-          {status}
-        </p>
-        <button
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-danger"
-          onClick={async () => {
-            if (!window.confirm(`Delete this deal for ${customer.name}? Its design and history are kept.`)) return;
-            const res = await deleteJob(id);
-            if (res.ok) router.push(PATHS.pipelines);
-            else setStatus(res.message);
-          }}
-        >
-          <Trash2 className="size-3.5" aria-hidden /> Delete
-        </button>
-      </div>
-
-      {/* The deal as a picture (8 Nov 2026, Martin): the roof across the top with who it's for laid over it. */}
-      <DealBanner
-        job={job}
-        designVersion={designVersion}
-        customer={customer}
-        pulse={pulse && hasPulse(job.stage) ? pulse : null}
-        compact={tab !== "activities"}
-        onDesign={job.lat !== null ? () => openTool("design") : null}
-        onPlace={() => {
+    // On a wide screen the deal's tools and pages float beside it as two rails that stay in view while it scrolls (10 Nov
+    // 2026, Martin: as the designer's rounds beside its window, so more of the deal is in the first fold); narrower, the
+    // row under the banner.
+    <div className="mx-auto w-full max-w-[64rem] px-5 py-6 xl:grid xl:max-w-[81rem] xl:grid-cols-[3.5rem_minmax(0,1fr)_10rem] xl:items-start xl:gap-6">
+      <ToolRail
+        tab={tab}
+        onTab={setTab}
+        designable={job.lat !== null}
+        onDesign={() => {
+          if (job.lat !== null) return openTool("design");
           setTab("details");
           setMoving(true);
         }}
+        onProposal={() => openTool("proposal")}
+        onCard={() => setCard(true)}
       />
-
-      <CallNotetaker
-        handle={notetaker}
-        button={false}
-        jobId={job.id}
-        customerId={customer.id}
-        phone={customer.phone}
-        onAdded={() => void load()}
-      />
-      <div className="min-w-0">
-        {/* Under the picture, the ways of looking at the deal; its fields are behind Details. */}
-        <div className="flex items-center gap-2">
-          {/* The design first, as the design tool is everywhere: its orange round opens it over the deal. Without a place on
-              the map, it asks for one. */}
-          <button
-            type="button"
-            aria-label="Design"
-            title={job.lat !== null ? "Design" : "Give the deal an address to design it"}
-            onClick={() => {
-              if (job.lat !== null) return openTool("design");
-              setTab("details");
-              setMoving(true);
+      <div className="min-w-0 space-y-4">
+        {(job.lat !== null || tool === "proposal") && (
+          <DesignDrawer
+            src={tool === "proposal" ? proposalHref(job.id) : designHref(job.id)}
+            onSwitch={(href) => openTool(toolOf(href).kind)}
+            open={drawer}
+            onOpen={() => setDrawer(true)}
+            onFold={() => setDrawer(false)}
+            onSaved={() => {
+              void load();
+              setDesignVersion((v) => v + 1);
             }}
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition hover:brightness-105"
-          >
-            <PenTool className="size-[18px]" aria-hidden />
-          </button>
-          {/* The proposal, the deal's other tool: what the customer sees, opened over the deal like the designer. */}
+            onGo={(href) => {
+              // This deal: the tab asked for (the customer's name in the designer comes back to Activity).
+              if (href.startsWith(`${PATHS.deals}/${job.id}`)) {
+                const want = new URL(href, window.location.origin).searchParams.get("tab");
+                return setTab(want && (DEAL_TABS.some((t) => t.key === want) || want === "service") ? (want as Tab) : "activities");
+              }
+              router.push(href);
+            }}
+            back="Back to the deal"
+          />
+        )}
+        <div className="flex items-center justify-between gap-3">
+          <Link href={PATHS.pipelines} className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink">
+            <ChevronLeft className="size-4 text-muted" aria-hidden /> Deals
+          </Link>
+          <p className="min-h-4 flex-1 text-right text-xs text-muted" role="status">
+            {status}
+          </p>
           <button
-            type="button"
-            aria-label="Proposal"
-            title="Proposal"
-            onClick={() => openTool("proposal")}
-            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_6px_18px_rgba(11,11,12,0.12)] ring-1 ring-line transition hover:text-ink"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-danger"
+            onClick={async () => {
+              if (!window.confirm(`Delete this deal for ${customer.name}? Its design and history are kept.`)) return;
+              const res = await deleteJob(id);
+              if (res.ok) router.push(PATHS.pipelines);
+              else setStatus(res.message);
+            }}
           >
-            <FileText className="size-[18px]" aria-hidden />
-          </button>
-          <div
-            className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto rounded-full bg-surface p-1 ring-1 ring-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            role="tablist"
-          >
-            {DEAL_TABS.map(({ key, label, icon: Icon }) => [
-              <button
-                key={key}
-                role="tab"
-                aria-selected={tab === key}
-                aria-label={Icon ? label : undefined}
-                title={Icon ? label : undefined}
-                onClick={() => setTab(key)}
-                className={clsx(
-                  "flex h-9 shrink-0 items-center justify-center rounded-full text-sm transition-colors",
-                  Icon ? "w-11" : "px-4",
-                  tab === key ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                {Icon ? <Icon className="size-[18px]" /> : label}
-              </button>,
-              key === "email" && (
-                <CallMenu key="call" phone={customer.phone} name={customer.firstName} onNotes={() => notetaker.current?.start()} />
-              ),
-            ])}
-            {/* The job card opens over the page, so it sits at the end of the row rather than being a tab of its own. */}
-            <button
-              type="button"
-              aria-label="Job card"
-              title="Job card"
-              onClick={() => setCard(true)}
-              className="ml-auto flex h-9 w-11 shrink-0 items-center justify-center rounded-full text-ink-2 transition-colors hover:text-ink"
-            >
-              <HardHat className="size-[18px]" aria-hidden />
-            </button>
-          </div>
-          {card && <JobCardDialog jobId={job.id} onClose={() => setCard(false)} />}
-          {/* Sol, his own lit round (10 Nov 2026, Martin: off the banner and into the row): his conversation on this deal. */}
-          <button
-            role="tab"
-            aria-selected={tab === "sol"}
-            aria-label="Sol on this deal"
-            title="Sol on this deal"
-            onClick={() => setTab("sol")}
-            className={clsx(
-              "flex size-11 shrink-0 items-center justify-center rounded-full bg-primary shadow-[0_6px_18px_rgba(11,11,12,0.18)] transition hover:bg-forest",
-              tab === "sol" && "ring-2 ring-sun-line/60 ring-offset-2 ring-offset-canvas",
-            )}
-          >
-            <SolBadge className="size-5" />
-          </button>
-          {/* Service sits apart at the end, in its own colour: putting something right after the sale. */}
-          <button
-            role="tab"
-            aria-selected={tab === "service"}
-            aria-label="Service"
-            title="Service"
-            onClick={() => setTab("service")}
-            className={clsx(
-              "flex size-11 shrink-0 items-center justify-center rounded-full ring-1",
-              tab === "service"
-                ? "bg-warning text-white ring-warning"
-                : "bg-warning-soft text-warning ring-warning/20 hover:bg-warning-soft/70",
-            )}
-          >
-            <Wrench className="size-4" aria-hidden />
+            <Trash2 className="size-3.5" aria-hidden /> Delete
           </button>
         </div>
 
-        {tab === "team" ? (
-          <section className={clsx(ui.card, "mt-5 p-5")}>
-            <h2 className="text-[15px] font-medium text-ink">Team chat on this deal</h2>
-            <div className="mt-3">
-              <DealTeamChat jobId={id} />
-            </div>
-          </section>
-        ) : tab === "email" ? (
-          <div className="mt-5">
-            <DealEmail
-              job={job}
-              customer={customer}
-              business={business}
-              onSent={(a) => {
-                if (a) setActivity((all) => [a, ...all]);
-                // The new email's tracking, so it reads "Not opened yet" at once.
-                void loadOpens(job.id).then((r) => r.ok && setOpens({ times: r.opens, counts: r.counts ?? {} }));
+        {/* The deal as a picture (8 Nov 2026, Martin): the roof across the top with who it's for laid over it. */}
+        <DealBanner
+          job={job}
+          designVersion={designVersion}
+          customer={customer}
+          pulse={pulse && hasPulse(job.stage) ? pulse : null}
+          compact={tab !== "activities"}
+          figures={bannerFigures(details, job.kw)}
+          onDesign={job.lat !== null ? () => openTool("design") : null}
+          onPlace={() => {
+            setTab("details");
+            setMoving(true);
+          }}
+        />
+
+        <CallNotetaker
+          handle={notetaker}
+          button={false}
+          jobId={job.id}
+          customerId={customer.id}
+          phone={customer.phone}
+          onAdded={() => void load()}
+        />
+        <div className="min-w-0">
+          {/* Under the picture, the ways of looking at the deal; its fields are behind Details. On a wide screen the rails
+            beside the page take its place. */}
+          <div className="flex items-center gap-2 xl:hidden">
+            {/* The design first, as the design tool is everywhere: its orange round opens it over the deal. Without a place on
+              the map, it asks for one. */}
+            <button
+              type="button"
+              aria-label="Design"
+              title={job.lat !== null ? "Design" : "Give the deal an address to design it"}
+              onClick={() => {
+                if (job.lat !== null) return openTool("design");
+                setTab("details");
+                setMoving(true);
               }}
-            />
-            <DealEmails activity={activity.filter((a) => !a.jobId || a.jobId === job.id)} opens={opens} />
-          </div>
-        ) : tab === "chat" ? (
-          <div className="mt-5">
-            <DealChat jobId={id} />
-          </div>
-        ) : tab === "sol" ? (
-          <div className="mt-5">
-            <DealSol jobId={id} name={`${customer.name} · ${job.title}`} />
-          </div>
-        ) : tab === "service" ? (
-          <section className={clsx(ui.card, "mt-5 p-5")}>
-            <h2 className="flex items-center gap-2 text-[15px] font-medium text-ink">
-              <Wrench className="size-4 text-warning" aria-hidden /> Service
-            </h2>
-            <p className="mt-1 text-xs text-muted">Something to put right after the sale: its open case, or the way to flag one.</p>
-            <div className="mt-4">
-              <DealService jobId={job.id} />
-            </div>
-          </section>
-        ) : tab === "files" ? (
-          <div className="mt-5">
-            <DealFiles jobId={id} />
-          </div>
-        ) : tab === "details" ? (
-          <div className="mt-5 grid items-start gap-5 lg:grid-cols-2">
-            <section className={clsx(ui.card, "p-5")}>
-              <h2 className="text-[15px] font-medium text-ink">Who it&apos;s for</h2>
-              <div className="mt-4 space-y-1.5">
-                <EditLine
-                  row
-                  key={`name:${customer.name}`}
-                  label="Customer name"
-                  value={customer.name}
-                  max={120}
-                  onSave={async (name) => {
-                    const parts = splitName(name);
-                    if (!parts.firstName) {
-                      setStatus("Enter the customer's name.");
-                      return false;
-                    }
-                    return saveWho(parts);
-                  }}
-                />
-                <HeadRow label="Address">
-                  <AddressField
-                    wrap
-                    value={moving ? "" : job.address}
-                    placed={job.lat !== null}
-                    onChange={(place) => {
-                      if (!place.address) return setMoving(true);
-                      setMoving(false);
-                      void patchOk(place);
-                    }}
-                  />
-                  {moving && (
-                    <button type="button" onClick={() => setMoving(false)} className={clsx(ui.link, "mt-1 text-xs")}>
-                      Keep {job.address ? "the address as it was" : "it empty"}
-                    </button>
+              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition hover:brightness-105"
+            >
+              <PenTool className="size-[18px]" aria-hidden />
+            </button>
+            {/* The proposal, the deal's other tool: what the customer sees, opened over the deal like the designer. */}
+            <button
+              type="button"
+              aria-label="Proposal"
+              title="Proposal"
+              onClick={() => openTool("proposal")}
+              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_6px_18px_rgba(11,11,12,0.12)] ring-1 ring-line transition hover:text-ink"
+            >
+              <FileText className="size-[18px]" aria-hidden />
+            </button>
+            <div
+              className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto rounded-full bg-surface p-1 ring-1 ring-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              role="tablist"
+            >
+              {DEAL_TABS.map(({ key, label, icon: Icon }) => [
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={tab === key}
+                  aria-label={Icon ? label : undefined}
+                  title={Icon ? label : undefined}
+                  onClick={() => setTab(key)}
+                  className={clsx(
+                    "flex h-9 shrink-0 items-center justify-center rounded-full text-sm transition-colors",
+                    Icon ? "w-11" : "px-4",
+                    tab === key ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
                   )}
-                </HeadRow>
-                <HeadRow label="Deal stage">
-                  <select
-                    className={clsx(HEAD_INPUT, "appearance-auto")}
-                    aria-label="Deal stage"
-                    value={job.stage}
-                    onChange={(e) => void patch({ stage: e.target.value as JobStage })}
-                  >
-                    {JOB_STAGES.map((s) => (
-                      <option key={s} value={s}>
-                        {STAGE_LABELS[s]}
-                      </option>
-                    ))}
-                  </select>
-                </HeadRow>
-                <EditLine
-                  row
-                  key={`email:${customer.email}`}
-                  label="Email"
-                  type="email"
-                  value={customer.email}
-                  onSave={(email) => saveWho({ email })}
-                />
-                <EditLine
-                  row
-                  key={`phone:${customer.phone}`}
-                  label="Contact #"
-                  type="tel"
-                  value={customer.phone}
-                  max={30}
-                  onSave={(phone) => saveWho({ phone })}
-                />
+                >
+                  {Icon ? <Icon className="size-[18px]" /> : label}
+                </button>,
+                key === "email" && (
+                  <CallMenu key="call" phone={customer.phone} name={customer.firstName} onNotes={() => notetaker.current?.start()} />
+                ),
+              ])}
+              {/* The job card opens over the page, so it sits at the end of the row rather than being a tab of its own. */}
+              <button
+                type="button"
+                aria-label="Job card"
+                title="Job card"
+                onClick={() => setCard(true)}
+                className="ml-auto flex h-9 w-11 shrink-0 items-center justify-center rounded-full text-ink-2 transition-colors hover:text-ink"
+              >
+                <HardHat className="size-[18px]" aria-hidden />
+              </button>
+            </div>
+            {card && <JobCardDialog jobId={job.id} onClose={() => setCard(false)} />}
+            {/* Sol, his own lit round (10 Nov 2026, Martin: off the banner and into the row): his conversation on this deal. */}
+            <button
+              role="tab"
+              aria-selected={tab === "sol"}
+              aria-label="Sol on this deal"
+              title="Sol on this deal"
+              onClick={() => setTab("sol")}
+              className={clsx(
+                "flex size-11 shrink-0 items-center justify-center rounded-full bg-primary shadow-[0_6px_18px_rgba(11,11,12,0.18)] transition hover:bg-forest",
+                tab === "sol" && "ring-2 ring-sun-line/60 ring-offset-2 ring-offset-canvas",
+              )}
+            >
+              <SolBadge className="size-5" />
+            </button>
+            {/* Service sits apart at the end, in its own colour: putting something right after the sale. */}
+            <button
+              role="tab"
+              aria-selected={tab === "service"}
+              aria-label="Service"
+              title="Service"
+              onClick={() => setTab("service")}
+              className={clsx(
+                "flex size-11 shrink-0 items-center justify-center rounded-full ring-1",
+                tab === "service"
+                  ? "bg-warning text-white ring-warning"
+                  : "bg-warning-soft text-warning ring-warning/20 hover:bg-warning-soft/70",
+              )}
+            >
+              <Wrench className="size-4" aria-hidden />
+            </button>
+          </div>
+
+          {tab === "team" ? (
+            <section className={clsx(ui.card, "mt-5 p-5")}>
+              <h2 className="text-[15px] font-medium text-ink">Team chat on this deal</h2>
+              <div className="mt-3">
+                <DealTeamChat jobId={id} />
               </div>
             </section>
-            <section className={clsx(ui.card, "space-y-4 p-5")}>
-              <h2 className="text-[15px] font-medium text-ink">The deal</h2>
-              <EditLine
-                key={`title:${job.title}`}
-                label="Deal name"
-                value={job.title}
-                max={120}
-                onSave={async (title) => {
-                  if (!title) {
-                    setStatus("Give the deal a name.");
-                    return false;
-                  }
-                  return patchOk({ title });
+          ) : tab === "email" ? (
+            <div className="mt-5">
+              <DealEmail
+                job={job}
+                customer={customer}
+                business={business}
+                onSent={(a) => {
+                  if (a) setActivity((all) => [a, ...all]);
+                  // The new email's tracking, so it reads "Not opened yet" at once.
+                  void loadOpens(job.id).then((r) => r.ok && setOpens({ times: r.opens, counts: r.counts ?? {} }));
                 }}
               />
-              <label className="block text-xs text-muted">
-                Quoted price, inc. GST ($)
-                <input
-                  className={clsx(ui.input, "mt-1 tabular-nums")}
-                  inputMode="numeric"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, "").slice(0, 8))}
-                  onBlur={() => {
-                    const next = value === "" ? null : Number(value);
-                    if (next !== job.value) void patch({ value: next });
-                  }}
-                  placeholder="From the design"
-                />
-              </label>
-              <label className="block text-xs text-muted">
-                Install date
-                <input
-                  type="date"
-                  className={clsx(ui.input, "mt-1 tabular-nums")}
-                  value={job.installDate ?? ""}
-                  onChange={(e) => void patch({ installDate: e.target.value || null })}
-                />
-              </label>
-              <EditLine
-                key={`source:${customer.source}`}
-                label="Lead source"
-                value={customer.source}
-                max={120}
-                placeholder="Website, referral, Facebook…"
-                onSave={(source) => saveWho({ source })}
-              />
-              <label className="block text-xs text-muted">
-                Owner
-                <select
-                  className={clsx(ui.input, "mt-1 appearance-auto")}
-                  value={job.owner ?? ""}
-                  onChange={async (e) => {
-                    const res = await setDealOwner(job.id, e.target.value || null);
-                    if (!res.ok) return setStatus(res.message);
-                    setJob(res.job);
-                    setStatus("Saved");
-                    void load();
-                  }}
-                >
-                  <option value="">No one yet</option>
-                  {/* Someone who has left the business still shows, so the deal isn't silently handed on. */}
-                  {[...new Set([...members, ...(job.owner ? [job.owner] : [])])].map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <Link href={`${PATHS.customers}/${customer.id}`} className={clsx(ui.link, "block text-xs")}>
-                Open {customer.firstName || "the customer"}&apos;s page
-              </Link>
-            </section>
-            <section className={clsx(ui.card, "overflow-hidden lg:col-span-2")}>
-              <Block
-                title="Deal properties"
-                action={
-                  <span className="text-xs tabular-nums text-muted">
-                    {tabFilled} of {tabLines.length} filled
-                  </span>
-                }
-              >
-                {/* The tabs as the business has set them out (Settings → Deal fields). */}
-                <div className="-mx-1 flex flex-wrap gap-1 rounded-md bg-surface-2 p-1" role="tablist" aria-label="Deal properties">
-                  {tabs.map((t) => (
-                    <button
-                      key={t.id}
-                      role="tab"
-                      aria-selected={shownTab?.id === t.id}
-                      onClick={() => setSection(t.id)}
-                      className={clsx(
-                        "h-7 flex-1 whitespace-nowrap rounded px-1.5 text-[11.5px] font-medium",
-                        shownTab?.id === t.id ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-2 hover:text-ink",
-                      )}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-                {tabFields.some((f) => f.source === "design") && (
-                  <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
-                    {job.projectId
-                      ? "Filled in from the design. Click any line to type over it."
-                      : "These fill in from the design once the roof has been drawn and saved. Click any line to type it in now."}
-                  </p>
-                )}
-                {!extra && tabFields.some((f) => PROPOSAL_KEYS.includes(f.key)) && (
-                  <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
-                    The price, STCs and deposit fill in once the customer signs a proposal.
-                  </p>
-                )}
-                {tabLines.map((l) => {
-                  const d = l.source === "design" ? details.find((x) => x.key === l.key) : null;
-                  return d ? (
-                    <DetailField key={l.key} line={{ ...d, label: l.label }} onSave={(text) => setDetail(l.key, text)} />
-                  ) : (
-                    <SectionFieldLine key={l.key} line={l} onSave={(text) => setDetail(l.key, text)} />
-                  );
-                })}
-                {tabs.length === 0 && <p className="text-sm text-ink-2">Every tab is hidden in Settings → Deal fields.</p>}
-                <Link
-                  href={`${PATHS.settings}/deal-fields`}
-                  className="block text-xs text-muted underline underline-offset-4 hover:text-ink"
-                >
-                  Arrange these fields
-                </Link>
-              </Block>
-            </section>
-          </div>
-        ) : (
-          // Activity: the deal at a glance, then its record (8 Nov 2026, Martin: Overview folded into it).
-          <div className="mt-5 space-y-5">
-            {(job.projectId || (marketplaceOpen() && PRE_INSTALL_STAGES.includes(job.stage))) && (
-              <div className="flex flex-wrap gap-2">
-                {job.projectId && (
-                  <Link href={`${PATHS.deals}/${job.id}/materials`} className={ui.quiet}>
-                    <ClipboardList className="size-4" aria-hidden /> Materials order
-                  </Link>
-                )}
-                {marketplaceOpen() && PRE_INSTALL_STAGES.includes(job.stage) && (
-                  <ListOnMarketplace jobId={job.id} suburb={suburbAlone(job.address || customer.address)} />
-                )}
+              <DealEmails activity={activity.filter((a) => !a.jobId || a.jobId === job.id)} opens={opens} />
+            </div>
+          ) : tab === "chat" ? (
+            <div className="mt-5">
+              <DealChat jobId={id} />
+            </div>
+          ) : tab === "sol" ? (
+            <div className="mt-5">
+              <DealSol jobId={id} name={`${customer.name} · ${job.title}`} />
+            </div>
+          ) : tab === "service" ? (
+            <section className={clsx(ui.card, "mt-5 p-5")}>
+              <h2 className="flex items-center gap-2 text-[15px] font-medium text-ink">
+                <Wrench className="size-4 text-warning" aria-hidden /> Service
+              </h2>
+              <p className="mt-1 text-xs text-muted">Something to put right after the sale: its open case, or the way to flag one.</p>
+              <div className="mt-4">
+                <DealService jobId={job.id} />
               </div>
-            )}
-            {/* What was sent and its deposit, once a proposal is out; the Proposal round opens it. */}
-            <section className={clsx(ui.card, "overflow-hidden empty:hidden [&>div]:border-t-0")}>
-              <DealProposal jobId={job.id} hasDesign={Boolean(job.projectId)} statusOnly />
             </section>
-            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {[
-                ["Stage", STAGE_LABELS[job.stage]],
-                ["Quoted, inc. GST", dollars(job.value)],
-                ["Install date", job.installDate ? shortDate(job.installDate) : "Not booked"],
-                ["System", details.find((d) => d.key === "systemSize")?.value ?? "Not designed"],
-              ].map(([k, v]) => (
-                <div key={k} className={clsx(ui.card, "px-4 py-3.5")}>
-                  <dt className={ui.eyebrow}>{k}</dt>
-                  <dd className="mt-1.5 text-[19px] tabular-nums tracking-tight text-ink">{v}</dd>
-                </div>
-              ))}
-            </dl>
-            <section className={clsx(ui.card, "p-5")}>
-              <h2 className="text-[15px] font-medium text-ink">The system</h2>
-              {known ? <SystemSetOut lines={details} /> : <p className="mt-2 text-sm text-ink-2">Nothing designed yet.</p>}
-            </section>
-            <div>
-              <div className="flex flex-wrap gap-x-5 border-b border-line" role="group" aria-label="Kind of activity">
-                {FILTERS.map((f) => (
-                  <button
-                    key={f.key}
-                    aria-pressed={filter === f.key}
-                    onClick={() => setFilter(f.key)}
-                    className={clsx(
-                      "-mb-px h-10 border-b-[3px] text-sm font-medium",
-                      filter === f.key ? "border-ink text-ink" : "border-transparent text-ink-2 hover:text-ink",
-                    )}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <label className="relative block w-64 max-w-full">
-                  <span className="sr-only">Search activities</span>
-                  <input
-                    className={clsx(ui.input, "rounded-full pl-4 pr-9")}
-                    value={find}
-                    onChange={(e) => setFind(e.target.value)}
-                    placeholder="Search activities"
+          ) : tab === "files" ? (
+            <div className="mt-5">
+              <DealFiles jobId={id} />
+            </div>
+          ) : tab === "details" ? (
+            <div className="mt-5 grid items-start gap-5 lg:grid-cols-2">
+              <section className={clsx(ui.card, "p-5")}>
+                <h2 className="text-[15px] font-medium text-ink">Who it&apos;s for</h2>
+                <div className="mt-4 space-y-1.5">
+                  <EditLine
+                    row
+                    key={`name:${customer.name}`}
+                    label="Customer name"
+                    value={customer.name}
+                    max={120}
+                    onSave={async (name) => {
+                      const parts = splitName(name);
+                      if (!parts.firstName) {
+                        setStatus("Enter the customer's name.");
+                        return false;
+                      }
+                      return saveWho(parts);
+                    }}
                   />
-                  <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
-                </label>
-                <p className="text-xs tabular-nums text-muted">
-                  Showing {shown.length} of {activity.length}
-                </p>
-              </div>
-
-              <div className={clsx(ui.card, "mt-4 flex flex-wrap gap-2 p-3")}>
-                <select
-                  aria-label="What happened"
-                  className={clsx(ui.input, "w-28 appearance-auto")}
-                  value={kind}
-                  onChange={(e) => setKind(e.target.value as Written)}
-                >
-                  <option value="note">Note</option>
-                  <option value="call">Call</option>
-                  <option value="email">Email</option>
-                </select>
-                <input
-                  aria-label="What was said or done"
-                  className={clsx(ui.input, "min-w-0 flex-1")}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && void say()}
-                  maxLength={1000}
-                  placeholder="Write a note, or log a call or an email. Type @ to mention someone"
+                  <HeadRow label="Address">
+                    <AddressField
+                      wrap
+                      value={moving ? "" : job.address}
+                      placed={job.lat !== null}
+                      onChange={(place) => {
+                        if (!place.address) return setMoving(true);
+                        setMoving(false);
+                        void patchOk(place);
+                      }}
+                    />
+                    {moving && (
+                      <button type="button" onClick={() => setMoving(false)} className={clsx(ui.link, "mt-1 text-xs")}>
+                        Keep {job.address ? "the address as it was" : "it empty"}
+                      </button>
+                    )}
+                  </HeadRow>
+                  <HeadRow label="Deal stage">
+                    <select
+                      className={clsx(HEAD_INPUT, "appearance-auto")}
+                      aria-label="Deal stage"
+                      value={job.stage}
+                      onChange={(e) => void patch({ stage: e.target.value as JobStage })}
+                    >
+                      {JOB_STAGES.map((s) => (
+                        <option key={s} value={s}>
+                          {STAGE_LABELS[s]}
+                        </option>
+                      ))}
+                    </select>
+                  </HeadRow>
+                  <EditLine
+                    row
+                    key={`email:${customer.email}`}
+                    label="Email"
+                    type="email"
+                    value={customer.email}
+                    onSave={(email) => saveWho({ email })}
+                  />
+                  <EditLine
+                    row
+                    key={`phone:${customer.phone}`}
+                    label="Contact #"
+                    type="tel"
+                    value={customer.phone}
+                    max={30}
+                    onSave={(phone) => saveWho({ phone })}
+                  />
+                </div>
+              </section>
+              <section className={clsx(ui.card, "space-y-4 p-5")}>
+                <h2 className="text-[15px] font-medium text-ink">The deal</h2>
+                <EditLine
+                  key={`title:${job.title}`}
+                  label="Deal name"
+                  value={job.title}
+                  max={120}
+                  onSave={async (title) => {
+                    if (!title) {
+                      setStatus("Give the deal a name.");
+                      return false;
+                    }
+                    return patchOk({ title });
+                  }}
                 />
-                {members.length > 1 && (
+                <label className="block text-xs text-muted">
+                  Quoted price, inc. GST ($)
+                  <input
+                    className={clsx(ui.input, "mt-1 tabular-nums")}
+                    inputMode="numeric"
+                    value={value}
+                    onChange={(e) => setValue(e.target.value.replace(/[^\d]/g, "").slice(0, 8))}
+                    onBlur={() => {
+                      const next = value === "" ? null : Number(value);
+                      if (next !== job.value) void patch({ value: next });
+                    }}
+                    placeholder="From the design"
+                  />
+                </label>
+                <label className="block text-xs text-muted">
+                  Install date
+                  <input
+                    type="date"
+                    className={clsx(ui.input, "mt-1 tabular-nums")}
+                    value={job.installDate ?? ""}
+                    onChange={(e) => void patch({ installDate: e.target.value || null })}
+                  />
+                </label>
+                <EditLine
+                  key={`source:${customer.source}`}
+                  label="Lead source"
+                  value={customer.source}
+                  max={120}
+                  placeholder="Website, referral, Facebook…"
+                  onSave={(source) => saveWho({ source })}
+                />
+                <label className="block text-xs text-muted">
+                  Owner
                   <select
-                    aria-label="Mention someone"
-                    className={clsx(ui.input, "w-36 appearance-auto")}
-                    value=""
-                    onChange={(e) => {
-                      const who = e.target.value;
-                      if (who) setText((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${mentionText(who)}`);
+                    className={clsx(ui.input, "mt-1 appearance-auto")}
+                    value={job.owner ?? ""}
+                    onChange={async (e) => {
+                      const res = await setDealOwner(job.id, e.target.value || null);
+                      if (!res.ok) return setStatus(res.message);
+                      setJob(res.job);
+                      setStatus("Saved");
+                      void load();
                     }}
                   >
-                    <option value="">Mention…</option>
-                    {members.map((m) => (
+                    <option value="">No one yet</option>
+                    {/* Someone who has left the business still shows, so the deal isn't silently handed on. */}
+                    {[...new Set([...members, ...(job.owner ? [job.owner] : [])])].map((m) => (
                       <option key={m} value={m}>
-                        @{handleOf(m)}
+                        {m}
                       </option>
                     ))}
                   </select>
-                )}
-                <button className={ui.primary} onClick={say} disabled={!text.trim()}>
-                  Add
-                </button>
-              </div>
-
-              {months.length === 0 && (
-                <p className="mt-6 text-sm text-ink-2">{activity.length ? "Nothing matches that." : "Nothing yet."}</p>
-              )}
-              {months.map(({ month, items }) => (
-                <section key={month} className="mt-6">
-                  <h2 className="text-[15px] text-ink-2">{month}</h2>
-                  <ol className="mt-2.5 space-y-2.5">
-                    {items.map((a) => (
-                      <li key={a.id} className={clsx(ui.card, "px-5 py-4")}>
-                        <div className="flex items-baseline justify-between gap-3">
-                          <p className="text-sm text-ink">
-                            <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
-                            <span className="text-ink-2">by {a.by.split("@")[0]}</span>
-                          </p>
-                          <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={a.at}>
-                            {new Date(a.at).toLocaleString("en-AU", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })}
-                          </time>
-                        </div>
-                        <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
-                        {a.kind === "email" &&
-                          opens &&
-                          (opens.times[a.id] ? (
-                            <p
-                              className={clsx("mt-1.5 text-xs", opens.times[a.id].length ? "font-medium text-positive" : "text-muted")}
-                              title="Only the customer's copy is counted. Apple Mail can open an email by itself when it arrives, so this is a guide."
-                            >
-                              {openedWords(opens.times[a.id], LAUNCH_MARKET.timeZone, new Date(), opens.counts[a.id])}
-                            </p>
-                          ) : (
-                            <p
-                              className="mt-1.5 text-xs text-muted"
-                              title="Opens are counted for emails sent from this deal while the site's address is set up. This one was sent before, or another way."
-                            >
-                              {NOT_TRACKED}
-                            </p>
-                          ))}
-                      </li>
+                </label>
+                <Link href={`${PATHS.customers}/${customer.id}`} className={clsx(ui.link, "block text-xs")}>
+                  Open {customer.firstName || "the customer"}&apos;s page
+                </Link>
+              </section>
+              <section className={clsx(ui.card, "overflow-hidden lg:col-span-2")}>
+                <Block
+                  title="Deal properties"
+                  action={
+                    <span className="text-xs tabular-nums text-muted">
+                      {tabFilled} of {tabLines.length} filled
+                    </span>
+                  }
+                >
+                  {/* The tabs as the business has set them out (Settings → Deal fields). */}
+                  <div className="-mx-1 flex flex-wrap gap-1 rounded-md bg-surface-2 p-1" role="tablist" aria-label="Deal properties">
+                    {tabs.map((t) => (
+                      <button
+                        key={t.id}
+                        role="tab"
+                        aria-selected={shownTab?.id === t.id}
+                        onClick={() => setSection(t.id)}
+                        className={clsx(
+                          "h-7 flex-1 whitespace-nowrap rounded px-1.5 text-[11.5px] font-medium",
+                          shownTab?.id === t.id ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-2 hover:text-ink",
+                        )}
+                      >
+                        {t.label}
+                      </button>
                     ))}
-                  </ol>
-                </section>
-              ))}
+                  </div>
+                  {tabFields.some((f) => f.source === "design") && (
+                    <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
+                      {job.projectId
+                        ? "Filled in from the design. Click any line to type over it."
+                        : "These fill in from the design once the roof has been drawn and saved. Click any line to type it in now."}
+                    </p>
+                  )}
+                  {!extra && tabFields.some((f) => PROPOSAL_KEYS.includes(f.key)) && (
+                    <p className="rounded-md bg-surface-2 px-3 py-2 text-xs text-ink-2">
+                      The price, STCs and deposit fill in once the customer signs a proposal.
+                    </p>
+                  )}
+                  {tabLines.map((l) => {
+                    const d = l.source === "design" ? details.find((x) => x.key === l.key) : null;
+                    return d ? (
+                      <DetailField key={l.key} line={{ ...d, label: l.label }} onSave={(text) => setDetail(l.key, text)} />
+                    ) : (
+                      <SectionFieldLine key={l.key} line={l} onSave={(text) => setDetail(l.key, text)} />
+                    );
+                  })}
+                  {tabs.length === 0 && <p className="text-sm text-ink-2">Every tab is hidden in Settings → Deal fields.</p>}
+                  <Link
+                    href={`${PATHS.settings}/deal-fields`}
+                    className="block text-xs text-muted underline underline-offset-4 hover:text-ink"
+                  >
+                    Arrange these fields
+                  </Link>
+                </Block>
+              </section>
             </div>
-          </div>
-        )}
+          ) : (
+            // Activity: the deal at a glance, then its record (8 Nov 2026, Martin: Overview folded into it).
+            <div className="mt-5 space-y-5">
+              {(job.projectId || (marketplaceOpen() && PRE_INSTALL_STAGES.includes(job.stage))) && (
+                <div className="flex flex-wrap gap-2">
+                  {job.projectId && (
+                    <Link href={`${PATHS.deals}/${job.id}/materials`} className={ui.quiet}>
+                      <ClipboardList className="size-4" aria-hidden /> Materials order
+                    </Link>
+                  )}
+                  {marketplaceOpen() && PRE_INSTALL_STAGES.includes(job.stage) && (
+                    <ListOnMarketplace jobId={job.id} suburb={suburbAlone(job.address || customer.address)} />
+                  )}
+                </div>
+              )}
+              {/* What was sent and its deposit, once a proposal is out; the Proposal round opens it. */}
+              <section className={clsx(ui.card, "overflow-hidden empty:hidden [&>div]:border-t-0")}>
+                <DealProposal jobId={job.id} hasDesign={Boolean(job.projectId)} statusOnly />
+              </section>
+              <section className={clsx(ui.card, "p-5")}>
+                <h2 className="text-[15px] font-medium text-ink">The system</h2>
+                {known ? <SystemSetOut lines={details} /> : <p className="mt-2 text-sm text-ink-2">Nothing designed yet.</p>}
+              </section>
+              <div>
+                <div className="flex flex-wrap gap-x-5 border-b border-line" role="group" aria-label="Kind of activity">
+                  {FILTERS.map((f) => (
+                    <button
+                      key={f.key}
+                      aria-pressed={filter === f.key}
+                      onClick={() => setFilter(f.key)}
+                      className={clsx(
+                        "-mb-px h-10 border-b-[3px] text-sm font-medium",
+                        filter === f.key ? "border-ink text-ink" : "border-transparent text-ink-2 hover:text-ink",
+                      )}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <label className="relative block w-64 max-w-full">
+                    <span className="sr-only">Search activities</span>
+                    <input
+                      className={clsx(ui.input, "rounded-full pl-4 pr-9")}
+                      value={find}
+                      onChange={(e) => setFind(e.target.value)}
+                      placeholder="Search activities"
+                    />
+                    <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
+                  </label>
+                  <p className="text-xs tabular-nums text-muted">
+                    Showing {shown.length} of {activity.length}
+                  </p>
+                </div>
+
+                <div className={clsx(ui.card, "mt-4 flex flex-wrap gap-2 p-3")}>
+                  <select
+                    aria-label="What happened"
+                    className={clsx(ui.input, "w-28 appearance-auto")}
+                    value={kind}
+                    onChange={(e) => setKind(e.target.value as Written)}
+                  >
+                    <option value="note">Note</option>
+                    <option value="call">Call</option>
+                    <option value="email">Email</option>
+                  </select>
+                  <input
+                    aria-label="What was said or done"
+                    className={clsx(ui.input, "min-w-0 flex-1")}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && void say()}
+                    maxLength={1000}
+                    placeholder="Write a note, or log a call or an email. Type @ to mention someone"
+                  />
+                  {members.length > 1 && (
+                    <select
+                      aria-label="Mention someone"
+                      className={clsx(ui.input, "w-36 appearance-auto")}
+                      value=""
+                      onChange={(e) => {
+                        const who = e.target.value;
+                        if (who) setText((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${mentionText(who)}`);
+                      }}
+                    >
+                      <option value="">Mention…</option>
+                      {members.map((m) => (
+                        <option key={m} value={m}>
+                          @{handleOf(m)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button className={ui.primary} onClick={say} disabled={!text.trim()}>
+                    Add
+                  </button>
+                </div>
+
+                {months.length === 0 && (
+                  <p className="mt-6 text-sm text-ink-2">{activity.length ? "Nothing matches that." : "Nothing yet."}</p>
+                )}
+                {months.map(({ month, items }) => (
+                  <section key={month} className="mt-6">
+                    <h2 className="text-[15px] text-ink-2">{month}</h2>
+                    <ol className="mt-2.5 space-y-2.5">
+                      {items.map((a) => (
+                        <li key={a.id} className={clsx(ui.card, "px-5 py-4")}>
+                          <div className="flex items-baseline justify-between gap-3">
+                            <p className="text-sm text-ink">
+                              <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
+                              <span className="text-ink-2">by {a.by.split("@")[0]}</span>
+                            </p>
+                            <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={a.at}>
+                              {new Date(a.at).toLocaleString("en-AU", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </time>
+                          </div>
+                          <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
+                          {a.kind === "email" &&
+                            opens &&
+                            (opens.times[a.id] ? (
+                              <p
+                                className={clsx("mt-1.5 text-xs", opens.times[a.id].length ? "font-medium text-positive" : "text-muted")}
+                                title="Only the customer's copy is counted. Apple Mail can open an email by itself when it arrives, so this is a guide."
+                              >
+                                {openedWords(opens.times[a.id], LAUNCH_MARKET.timeZone, new Date(), opens.counts[a.id])}
+                              </p>
+                            ) : (
+                              <p
+                                className="mt-1.5 text-xs text-muted"
+                                title="Opens are counted for emails sent from this deal while the site's address is set up. This one was sent before, or another way."
+                              >
+                                {NOT_TRACKED}
+                              </p>
+                            ))}
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+      <PageRail tab={tab} onTab={setTab} phone={customer.phone} name={customer.firstName} onNotes={() => notetaker.current?.start()} />
     </div>
   );
 }
@@ -1116,10 +1126,21 @@ export function DealPage({ id }: { id: string }) {
  * offering to ring the customer, or to ring them with the note-taker open. The menu is drawn fixed under the round, so
  * the row's scrolling doesn't cut it off.
  */
-function CallMenu({ phone, name, onNotes }: { phone: string; name: string; onNotes: () => void }) {
+function CallMenu({
+  phone,
+  name,
+  onNotes,
+  rail = false,
+}: {
+  phone: string;
+  name: string;
+  onNotes: () => void;
+  /** As a line of the rail beside the page (its words shown, the menu opening to its left). */
+  rail?: boolean;
+}) {
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
-  const dial = phone.replace(/s/g, "");
+  const dial = phone.replace(/\s/g, "");
   useEffect(() => {
     if (!at) return;
     const away = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setAt(null);
@@ -1146,15 +1167,16 @@ function CallMenu({ phone, name, onNotes }: { phone: string; name: string; onNot
         onClick={(e) => {
           if (at) return setAt(null);
           const r = e.currentTarget.getBoundingClientRect();
-          setAt({ top: r.bottom + 8, left: r.left });
+          setAt(rail ? { top: r.top, left: Math.max(8, r.left - 264) } : { top: r.bottom + 8, left: r.left });
         }}
         className={clsx(
-          "flex h-9 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
+          rail ? RAIL_ITEM : "flex h-9 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
           at ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
           !phone && "text-muted hover:text-muted",
         )}
       >
-        <Phone className="size-[18px]" aria-hidden />
+        <Phone className={rail ? "size-4" : "size-[18px]"} aria-hidden />
+        {rail && "Call"}
       </button>
       {at && (
         <div
@@ -1187,5 +1209,159 @@ function CallMenu({ phone, name, onNotes }: { phone: string; name: string; onNot
         </div>
       )}
     </div>
+  );
+}
+
+/** One line of the rail of the deal's pages: its icon and its word. */
+const RAIL_ITEM = "flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm transition-colors";
+
+/**
+ * The deal's tools, down the left of the page (10 Nov 2026, Martin: grouped by what they have to do with each other):
+ * Design and Proposal (the sale), then the Job card and Service (after it), then Sol on his own. Each opens over the
+ * page or its own tab; the rail stays in view while the deal scrolls. Wide screens only.
+ */
+function ToolRail({
+  tab,
+  onTab,
+  designable,
+  onDesign,
+  onProposal,
+  onCard,
+}: {
+  tab: string;
+  onTab: (tab: "sol" | "service") => void;
+  designable: boolean;
+  onDesign: () => void;
+  onProposal: () => void;
+  onCard: () => void;
+}) {
+  return (
+    <nav aria-label="Tools on this deal" className="sticky top-6 hidden flex-col items-center gap-3.5 pt-1 xl:flex">
+      <RailRound label="Design" title={designable ? "Design" : "Give the deal an address to design it"} onClick={onDesign}>
+        <span className="flex size-12 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition group-hover:brightness-105">
+          <PenTool className="size-5" aria-hidden />
+        </span>
+      </RailRound>
+      <RailRound label="Proposal" title="Proposal: what the customer sees" onClick={onProposal}>
+        <span className="flex size-12 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_6px_18px_rgba(11,11,12,0.12)] ring-1 ring-line transition group-hover:text-ink">
+          <FileText className="size-5" aria-hidden />
+        </span>
+      </RailRound>
+      <span className="h-px w-8 bg-line" aria-hidden />
+      <RailRound label="Job card" title="Job card: what the installers take to the job" onClick={onCard}>
+        <span className="flex size-12 items-center justify-center rounded-full bg-surface text-ink-2 shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 ring-line transition group-hover:text-ink">
+          <HardHat className="size-5" aria-hidden />
+        </span>
+      </RailRound>
+      <RailRound
+        label="Service"
+        title="Service: something to put right after the sale"
+        onClick={() => onTab("service")}
+        on={tab === "service"}
+      >
+        <span
+          className={clsx(
+            "flex size-12 items-center justify-center rounded-full ring-1 transition",
+            tab === "service" ? "bg-warning text-white ring-warning" : "bg-warning-soft text-warning ring-warning/20",
+          )}
+        >
+          <Wrench className="size-[18px]" aria-hidden />
+        </span>
+      </RailRound>
+      <span className="h-px w-8 bg-line" aria-hidden />
+      <RailRound label="Sol" title="Sol on this deal" onClick={() => onTab("sol")} on={tab === "sol"}>
+        <span
+          className={clsx(
+            "flex size-12 items-center justify-center rounded-full bg-primary shadow-[0_6px_18px_rgba(11,11,12,0.18)] transition group-hover:bg-forest",
+            tab === "sol" && "ring-2 ring-sun-line/60 ring-offset-2 ring-offset-canvas",
+          )}
+        >
+          <SolBadge className="size-[22px]" />
+        </span>
+      </RailRound>
+    </nav>
+  );
+}
+
+function RailRound({
+  label,
+  title,
+  onClick,
+  on,
+  children,
+}: {
+  label: string;
+  title: string;
+  onClick: () => void;
+  /** A tab of the page: pressed while it is the one open. */
+  on?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      aria-pressed={on}
+      className="group flex flex-col items-center gap-1"
+    >
+      {children}
+      <span className={clsx("text-[11px] font-medium", on ? "text-ink" : "text-ink-2")}>{label}</span>
+    </button>
+  );
+}
+
+/**
+ * The deal's pages, down the right of the page in words (10 Nov 2026, Martin), in two groups: the record (Activity,
+ * Details, Files) and talking (Email, Call, the customer's chat, the team's). Wide screens only.
+ */
+function PageRail({
+  tab,
+  onTab,
+  phone,
+  name,
+  onNotes,
+}: {
+  tab: string;
+  onTab: (tab: "activities" | "details" | "files" | "email" | "chat" | "team") => void;
+  phone: string;
+  name: string;
+  onNotes: () => void;
+}) {
+  const item = (key: "activities" | "details" | "files" | "email" | "chat" | "team", label: string, Icon: typeof Mail, title?: string) => (
+    <button
+      key={key}
+      type="button"
+      role="tab"
+      aria-selected={tab === key}
+      title={title}
+      onClick={() => onTab(key)}
+      className={clsx(RAIL_ITEM, tab === key ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink")}
+    >
+      <Icon className="size-4 shrink-0" aria-hidden />
+      {label}
+    </button>
+  );
+  const group = "px-3 pb-1 pt-2 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted";
+  return (
+    <nav aria-label="This deal's pages" className="sticky top-6 hidden xl:block">
+      <div
+        role="tablist"
+        aria-orientation="vertical"
+        className="rounded-2xl bg-surface p-1.5 shadow-[0_8px_30px_rgba(11,11,12,0.06)] ring-1 ring-line"
+      >
+        <p className={group}>The record</p>
+        {item("activities", "Activity", History)}
+        {item("details", "Details", SlidersHorizontal)}
+        {item("files", "Files", Paperclip)}
+        <span className="mx-3 my-1.5 block h-px bg-line" aria-hidden />
+        <p className={group}>Talk</p>
+        {item("email", "Email", Mail)}
+        <CallMenu rail phone={phone} name={name} onNotes={onNotes} />
+        {item("chat", "Customer chat", MessageCircle, `Chat with ${name || "the customer"}`)}
+        {item("team", "Team chat", MessagesSquare, "Your team's chat on this deal")}
+      </div>
+    </nav>
   );
 }

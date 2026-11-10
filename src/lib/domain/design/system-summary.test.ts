@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { systemSummary } from "./system-summary";
+import { bannerFigures, systemSummary } from "./system-summary";
 
 const line = (key: string, value: string | null) => ({ key, value });
 
@@ -50,5 +50,28 @@ describe("the deal's system, set out", () => {
   it("doesn't say a word twice when it was typed in full", () => {
     const s = systemSummary([line("storeys", "Single storey"), line("roofType", "Tin roof"), line("phases", "Three phase")]);
     expect(s.home.map((h) => h.value)).toEqual(["Single storey", "Tin roof", "Three phase"]);
+  });
+});
+
+describe("the banner's figures", () => {
+  it("names the solar with its panels, then the battery, inverter and EV charger", () => {
+    const lines = [
+      { key: "systemSize", value: "11.88 kW" },
+      { key: "panelQty", value: "25" },
+      { key: "batteryStorage", value: "16 kWh" },
+      { key: "battery", value: "Sigenergy SigenStor" },
+      { key: "inverterCapacity", value: "10 kW" },
+      { key: "inverter", value: "Sigenergy 10 kW hybrid" },
+    ];
+    expect(bannerFigures(lines)).toEqual([
+      { label: "Solar", value: "11.88 kW", note: "25 panels" },
+      { label: "Battery", value: "16 kWh", note: "Sigenergy SigenStor" },
+      { label: "Inverter", value: "10 kW", note: "Sigenergy 10 kW hybrid" },
+    ]);
+  });
+
+  it("falls back to the deal's own kW, and leaves out what isn't known", () => {
+    expect(bannerFigures([], 6.6)).toEqual([{ label: "Solar", value: "6.6 kW", note: null }]);
+    expect(bannerFigures([])).toEqual([]);
   });
 });
