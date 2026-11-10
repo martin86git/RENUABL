@@ -3905,6 +3905,23 @@ export function RoofDesigner(props: {
   const [otherText, setOtherText] = useState("");
   /** The design (by index) Sol has been asked to delete, waiting for the person's Yes (9 Nov 2026, Martin). */
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  // Sol's answer belongs to the design it was about (10 Nov 2026, Martin: a new design showed the last design's
+  // chat). The design a reply came on is noted as it arrives (a command that opens another design, such as Design it
+  // for me or a delete, sets both together, so its reply belongs to the design it opened); turning to another design
+  // by hand puts away that reply, his question with options and a delete waiting for Yes. Not while he is working.
+  const replyOn = useRef(active);
+  useEffect(() => {
+    if (commandReply || choices || confirmDelete !== null) replyOn.current = active;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when a reply arrives, not when the design changes
+  }, [commandReply, choices, confirmDelete]);
+  useEffect(() => {
+    if (commandBusy || replyOn.current === active) return;
+    replyOn.current = active;
+    setCommandReply(null);
+    setChoices(null);
+    setConfirmDelete(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the open design changes
+  }, [active]);
   const commandBox = useRef<HTMLInputElement>(null);
   // "Did you know?" (10 Nov 2026, Martin: pointers for new users, a lightbulb to switch them off): each tip answers
   // what was just done, and its "Show me" does it.
