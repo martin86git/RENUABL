@@ -53,74 +53,8 @@ export const SMALL_NIGHTS_KWH = 4;
 /** The most suggestions shown. */
 const MAX_SUGGESTIONS = 6;
 
-/** Makers the designer knows, as their names flatten (spaces and marks taken out). */
-const MAKERS = [
-  "sungrow",
-  "sigenergy",
-  "goodwe",
-  "solaredge",
-  "byd",
-  "tesla",
-  "fronius",
-  "alphaess",
-  "enphase",
-  "huawei",
-  "redback",
-  "growatt",
-];
-/** Other ways a maker's name is written on price lists ("Sigen Energy Gateway"). */
-const ALIASES: Record<string, string> = { sigen: "sigenergy" };
-
-/** The maker a product is from: one the designer knows, by name with the spaces taken out, else the first word. */
-export function makerOf(name: string): string {
-  const flat = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const known = MAKERS.find((m) => flat.startsWith(m));
-  if (known) return known;
-  const alias = Object.keys(ALIASES).find((a) => flat.startsWith(a));
-  if (alias) return ALIASES[alias];
-  return (name.trim().split(/\s+/)[0] ?? "").toLowerCase();
-}
-
-const SPELLING: Record<string, string> = {
-  byd: "BYD",
-  goodwe: "GoodWe",
-  solaredge: "SolarEdge",
-  alphaess: "AlphaESS",
-};
-/** A maker as people write it. */
-export function makerName(maker: string): string {
-  return SPELLING[maker] ?? (maker ? maker[0].toUpperCase() + maker.slice(1) : "");
-}
-
-/** Whether an inverter takes a battery: its own flag when the list gives one, else its name. */
-export function takesBattery(inverter: { name: string; hybrid?: boolean }): boolean {
-  if (typeof inverter.hybrid === "boolean") return inverter.hybrid;
-  return /hybrid|\bSH\d|sigenstor/i.test(inverter.name);
-}
-
-/**
- * Makers whose batteries are AC coupled: they bring their own inverter and work beside any (10 Nov 2026, Martin: "a
- * Sungrow inverter takes only Sungrow batteries, or an AC coupled battery like a Sigenergy"). VERIFY against each
- * maker's range: some sell both kinds.
- */
-export const AC_COUPLED_MAKERS = ["sigenergy", "tesla", "enphase"] as const;
-
-/** Whether a battery is AC coupled: its maker, or "AC coupled" in its name. */
-export function acCoupled(battery: { name: string }): boolean {
-  return (AC_COUPLED_MAKERS as readonly string[]).includes(makerOf(battery.name)) || /ac[s-]?coupl/i.test(battery.name);
-}
-
-/**
- * Whether a battery works with the inverters on a design: anything goes with no inverter yet; else the same maker as an
- * inverter that takes a battery (a hybrid; a string inverter of the same maker doesn't make its batteries fit), or an
- * AC coupled one, which works beside any.
- */
-export function batteryFits(battery: { name: string }, inverters: readonly { name: string; hybrid?: boolean }[]): boolean {
-  if (!inverters.length) return true;
-  if (acCoupled(battery)) return true;
-  const maker = makerOf(battery.name);
-  return inverters.some((i) => takesBattery(i) && makerOf(i.name) === maker);
-}
+export { acCoupled, AC_COUPLED_MAKERS, batteryFits, controllerFor, makerName, makerOf, needsController, takesBattery } from "./makers";
+import { batteryFits, makerName, makerOf, needsController, takesBattery } from "./makers";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -204,7 +138,9 @@ export function suggestBatteries(input: {
           ? ""
           : fitted.some((f) => f.hybrid && f.maker === maker)
             ? " The same maker as the inverter on the design."
-            : " AC coupled: it brings its own inverter and works beside the one on the design."),
+            : needsController(pick.battery, input.inverters)
+              ? ` AC coupled beside the inverter on the design: its ${makerName(maker)} controller is added to the quote.`
+              : " AC coupled: its inverter is built in, so it works beside the one on the design."),
     });
   }
   suggestions.sort((a, b) => a.battery.kwh * a.qty - b.battery.kwh * b.qty);

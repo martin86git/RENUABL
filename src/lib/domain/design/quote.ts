@@ -12,7 +12,18 @@
  */
 import { deemingYears, batteryFactor, taperedKwh, type RebateRates } from "../rebates";
 import { zoneRating } from "../zone-ratings";
-import { GST, chargerCost, commissionFor, componentCost, listed, marginFor, type ComponentKey, type Workspace } from "./pricing";
+import { controllerFor, makerName, makerOf, needsController } from "./makers";
+import {
+  GST,
+  chargerCost,
+  commissionFor,
+  componentCost,
+  listed,
+  marginFor,
+  workspaceCatalogue,
+  type ComponentKey,
+  type Workspace,
+} from "./pricing";
 import { MAX_DESIGNS } from "./roof-design";
 
 export const COST_GROUPS = [
@@ -144,6 +155,20 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
   if (panels) product("Panels", spec.panel.sku, spec.panel.name, panels);
   for (const inverter of spec.inverters) product("Inverters", inverter.sku, inverter.name, 1);
   if (spec.battery) product("Battery", spec.battery.sku, spec.battery.name, batteryQty);
+  // A battery needs its maker's controller unless the design has one (10 Nov 2026, Martin: a Sigenergy battery sold
+  // alone was quoted without its controller): the smallest of its maker's on the lists for the home's phase, else a
+  // line marked missing, so nothing goes out priced without it.
+  if (spec.battery && needsController(spec.battery, spec.inverters)) {
+    const controller = controllerFor(spec.battery, workspaceCatalogue(workspace).inverters ?? [], form.phase);
+    if (controller) product("Inverters", controller.sku, `${controller.name} (for the battery)`, 1);
+    else
+      lines.push({
+        group: "Inverters",
+        label: `${makerName(makerOf(spec.battery.name))} controller for the battery: add one to your price lists`,
+        amount: 0,
+        missing: true,
+      });
+  }
   // The EV charger the design names: its cost from the lists (`chargerCost`), and its installation at the business's rate.
   if (spec.charger) {
     const each = chargerCost(workspace, spec.charger.sku);
