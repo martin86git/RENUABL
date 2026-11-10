@@ -55,6 +55,10 @@ export const ROOF_FACES = {
   enclosedMax: 12,
   /** ...with at least this share of its edge against one other face, is part of that face (existing panels read as a slope of their own). */
   enclosedShare: 0.7,
+  /** A face cut from the outline is kept this far past the hull of its cells, metres... */
+  hullReach: 0.4,
+  /** ...and used only when its area is within this share of its cells' (low, high). */
+  cutAgree: [0.8, 1.3],
 } as const;
 
 /** One face found: its outline (metres east and south of the picture's middle), slope and size from above. */
@@ -547,6 +551,65 @@ export function facesFromHeights(
       meets.set(h, (meets.get(h) ?? new Set()).add(g));
     }
 
+  /**
+   * The face `g` as the outline cut by straight lines: the convex hull of its cells grown by `ROOF_FACES.hullReach`,
+   * and for each face it meets, the side of their seam its own cells are on. Null when the cut doesn't agree with the
+   * cells (a face that isn't convex, a seam read badly).
+   */
+  const cutFace = (g: number, cells: Set<number>): Point[] | null => {
+    const plane = planes.get(g);
+    if (!plane) return null;
+    const lines: ((p: Point) => number)[] = [];
+    // The hull of the cells, each edge pushed out.
+    const corners: Point[] = [];
+    for (const i of cells) {
+      const x0 = -t.widthM / 2 + (i % cols) * cell;
+      const y0 = -t.heightM / 2 + Math.floor(i / cols) * cell;
+      corners.push({ x: x0, y: y0 }, { x: x0 + cell, y: y0 }, { x: x0, y: y0 + cell }, { x: x0 + cell, y: y0 + cell });
+    }
+    const hull = convexHull(corners);
+    if (hull.length < 3) return null;
+    for (let k = 0; k < hull.length; k++) {
+      const a = hull[k];
+      const b = hull[(k + 1) % hull.length];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len < 1e-6) continue;
+      // Counter-clockwise hull: inside is to the left.
+      const nx = -(b.y - a.y) / len;
+      const ny = (b.x - a.x) / len;
+      lines.push((p) => nx * (p.x - a.x) + ny * (p.y - a.y) + ROOF_FACES.hullReach);
+    }
+    // Each seam: the side of it this face's cells sit on.
+    for (const h of meets.get(g) ?? []) {
+      const other = planes.get(h);
+      if (!other) continue;
+      const da = other.a - plane.a;
+      const db = other.b - plane.b;
+      const dc = other.c - plane.c;
+      if (Math.hypot(da, db) < 0.05) continue;
+      const side: number[] = [];
+      for (const i of cells) {
+        const x = xOf(i % cols);
+        const y = yOf(Math.floor(i / cols));
+        side.push(da * x + db * y + dc);
+      }
+      side.sort((p, q) => p - q);
+      const sign = Math.sign(side[Math.floor(side.length / 2)]);
+      if (!sign) continue;
+      lines.push((p) => sign * (da * p.x + db * p.y + dc));
+    }
+    let poly = outline.slice();
+    for (const f of lines) {
+      poly = clipBy(poly, f);
+      if (poly.length < 3) return null;
+    }
+    const area = Math.abs(ringArea(poly));
+    const want = cells.size * cell * cell;
+    if (area < want * ROOF_FACES.cutAgree[0] || area > want * ROOF_FACES.cutAgree[1]) return null;
+    const tidy = simplifyRing(poly, 0.05);
+    return tidy.length >= 3 && tidy.length <= FACE_MAX_POINTS ? tidy : null;
+  };
+
   const out: FoundFace[] = [];
   for (const [g, all] of final) {
     // The largest piece only: a stray cell or two on the plane elsewhere isn't this face.
@@ -570,6 +633,11 @@ export function facesFromHeights(
       points.map((v) => straighten(v, seams, outline)),
       0.05,
     );
+    // Better still, the face cut out exactly (10 Nov 2026, Martin: the edges still zigzagged at 29 Shearer Drive): the
+    // roof's outline, kept to where this face's cells are, and cut along each seam on the side this face is (where two
+    // planes meet is a straight line). Used when it agrees with the cells; else the straightened corners above.
+    const cut = cutFace(g, cells);
+    if (cut) points = cut;
     if (points.length < 3) continue;
     out.push({
       points: points.map((p) => ({ x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100 })),
@@ -578,6 +646,52 @@ export function facesFromHeights(
     });
   }
   return out.sort((a, b) => b.areaM2 - a.areaM2).slice(0, most);
+}
+
+/** The convex hull of points, counter-clockwise (y down, as the picture). */
+function convexHull(points: Point[]): Point[] {
+  const ps = [...new Map(points.map((p) => [`${p.x.toFixed(3)},${p.y.toFixed(3)}`, p])).values()].sort((a, b) => a.x - b.x || a.y - b.y);
+  if (ps.length < 3) return ps;
+  const cross = (o: Point, a: Point, b: Point) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower: Point[] = [];
+  for (const p of ps) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper: Point[] = [];
+  for (const p of [...ps].reverse()) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
+
+/** A polygon kept to where `f` is zero or more (Sutherland–Hodgman, one line). */
+function clipBy(poly: Point[], f: (p: Point) => number): Point[] {
+  const out: Point[] = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % poly.length];
+    const fa = f(a);
+    const fb = f(b);
+    if (fa >= 0) out.push(a);
+    if (fa >= 0 !== fb >= 0) {
+      const k = fa / (fa - fb);
+      out.push({ x: a.x + k * (b.x - a.x), y: a.y + k * (b.y - a.y) });
+    }
+  }
+  return out;
+}
+
+/** A ring's signed area (shoelace). */
+function ringArea(ring: Point[]): number {
+  let sum = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return sum / 2;
 }
 
 /** A corner moved onto the nearest of a face's seams (lines A·x + B·y + C = 0) and the outline's edges, when near. */

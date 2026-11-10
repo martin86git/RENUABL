@@ -5,6 +5,7 @@ import { accessColour, shadeHint, shadeReport, type ShadeReport } from "@/lib/do
 import { loadTerrain, type Heights } from "@/lib/services/terrain";
 import { loadRoofCheck } from "@/lib/services/roof-check";
 import { useDesignTips } from "./design-tips";
+import { batteryFill } from "@/lib/domain/design/battery-fill";
 import {
   HAS_SOLAR_NOTE,
   REPLACING_NOTE,
@@ -6615,7 +6616,8 @@ export function RoofDesigner(props: {
                         </g>
                       );
                     })()}
-                  {/* The battery: a stack of its modules charging from the bottom up, in a breathing glow, with the roof's power running down a line to it. */}
+                  {/* The battery: a stack of its modules lit from the bottom up as far as the panels fill it on an average day
+                      (10 Nov 2026, Martin: no line from the panels; too few panels for the home and it isn't filled). */}
                   {battery &&
                     (() => {
                       const [bx, by] = px(battery);
@@ -6623,30 +6625,17 @@ export function RoofDesigner(props: {
                       const w = 24 * ku;
                       const lh = 8 * ku;
                       const top = by - (layers * lh) / 2;
-                      const roof = Object.values(centres);
-                      const from = roof.length ? px(middle(roof)) : null;
-                      const run = from ? `M${from[0]},${from[1]} L${bx},${by}` : "";
+                      const fill = batteryFill({
+                        solarDayKwh: Number(summary.kwhPerDay) || 0,
+                        homeDayKwh: finance?.dailyKwh ?? null,
+                        batteryKwh: battery.kwh * battery.qty,
+                        backupKwh: battery.backup ? battery.kwh : 0,
+                      });
+                      const share = fill?.share ?? 0;
+                      // The bars lit, counted from the bottom: seven a module.
+                      const lit = Math.round(share * layers * 7);
                       return (
                         <g pointerEvents="none">
-                          {from && (
-                            <>
-                              <path
-                                d={run}
-                                fill="none"
-                                stroke={GOLD}
-                                strokeWidth={1.1 * ku}
-                                strokeDasharray={`${4 * ku} ${4 * ku}`}
-                                opacity="0.9"
-                              >
-                                <animate attributeName="stroke-dashoffset" from={8 * ku} to="0" dur="0.8s" repeatCount="indefinite" />
-                              </path>
-                              {[0, 0.8, 1.6].map((begin) => (
-                                <circle key={begin} r={1.8 * ku} fill="#ffffff">
-                                  <animateMotion dur="2.4s" begin={`${begin}s`} repeatCount="indefinite" path={run} />
-                                </circle>
-                              ))}
-                            </>
-                          )}
                           <circle cx={bx} cy={by} r={20 * ku} fill={GOLD}>
                             <animate attributeName="r" values={`${17 * ku};${27 * ku};${17 * ku}`} dur="3s" repeatCount="indefinite" />
                             <animate attributeName="opacity" values="0.26;0.04;0.26" dur="3s" repeatCount="indefinite" />
@@ -6688,17 +6677,9 @@ export function RoofDesigner(props: {
                                     y2={y + lh - 1.7 * ku}
                                     stroke={GOLD}
                                     strokeWidth={0.9 * ku}
-                                    opacity="0.15"
-                                  >
-                                    <animate
-                                      attributeName="opacity"
-                                      values="0.15;1;1;0.15"
-                                      keyTimes="0;0.25;0.8;1"
-                                      dur={`${Math.max(3, layers * 0.6)}s`}
-                                      begin={`${i * 0.4 + k * 0.05}s`}
-                                      repeatCount="indefinite"
-                                    />
-                                  </line>
+                                    opacity={i * 7 + k < lit ? 1 : 0.15}
+                                    style={{ transition: "opacity 300ms ease-out" }}
+                                  />
                                 ))}
                               </g>
                             );
@@ -6714,7 +6695,7 @@ export function RoofDesigner(props: {
                             strokeWidth={2.4 * ku}
                             paintOrder="stroke"
                           >
-                            {batteryKwh} kWh
+                            {batteryKwh} kWh{fill && fill.share < 1 ? ` · ${Math.round(fill.share * 100)}%` : ""}
                           </text>
                         </g>
                       );
