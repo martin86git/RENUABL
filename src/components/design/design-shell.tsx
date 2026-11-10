@@ -427,7 +427,7 @@ function Shell({
                       href={sec.pages[0].href}
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
-                        "flex h-10 items-center gap-1.5 rounded-full px-4 text-sm transition-colors",
+                        "flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm transition-colors",
                         lit ? "bg-primary font-medium text-primary-ink" : "text-ink-2 hover:bg-canvas hover:text-ink",
                       )}
                     >
@@ -446,7 +446,7 @@ function Shell({
                         title="Design tool"
                         aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
                         className={clsx(
-                          "flex size-10 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition hover:brightness-105",
+                          "-my-2 mx-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
                           path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
                         )}
                       >
@@ -462,7 +462,7 @@ function Shell({
                         title="Proposals"
                         aria-current={path.startsWith(PATHS.proposalsSent) ? "page" : undefined}
                         className={clsx(
-                          "flex size-10 shrink-0 items-center justify-center rounded-full bg-sun text-sun-line transition hover:brightness-[0.97]",
+                          "-my-2 mr-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_4px_14px_rgba(11,11,12,0.12)] ring-1 ring-line transition hover:text-ink",
                           path.startsWith(PATHS.proposalsSent) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
                         )}
                       >
@@ -490,7 +490,7 @@ function Shell({
                         title="Design tool"
                         aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
                         className={clsx(
-                          "flex size-10 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition hover:brightness-105",
+                          "-my-2 mx-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
                           path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
                         )}
                       >
@@ -506,7 +506,7 @@ function Shell({
                       href={sec.pages[0].href}
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
-                        "flex h-10 items-center gap-1.5 rounded-full px-4 text-sm transition-colors",
+                        "flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm transition-colors",
                         lit ? "bg-primary font-medium text-primary-ink" : "text-ink-2 hover:bg-canvas hover:text-ink",
                       )}
                     >
