@@ -545,6 +545,22 @@ create table if not exists design_passwords (
   hash text not null,
   updated_at timestamptz not null default now()
 );
+-- Entries put on the install calendar by hand (domain/design/calendar-entries.ts): tentative installs, days off,
+-- notes. Never a booking: a deal's install date stays on the deal.
+create table if not exists design_calendar_entries (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  kind text not null,
+  day_from date not null,
+  day_to date not null,
+  title text not null default '',
+  note text not null default '',
+  who text not null default '',
+  job_id text,
+  by_email text not null,
+  at timestamptz not null default now()
+);
+create index if not exists design_calendar_entries_days on design_calendar_entries(business_id, day_from, day_to);
 -- Reminders sent to a business's customers, so each is sent once (server/design-reminders.ts).
 create table if not exists design_reminders_sent (
   business_id text not null references businesses(id) on delete cascade,

@@ -15,6 +15,17 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
+    area: "Installation",
+    words:
+      "Click a day on the install calendar to add a tentative install, a day off or a note. Tentative installs show on the week's capacity.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Installation",
+    words: "The install calendar fits the whole month in view: one toolbar row, a slimmer capacity strip and shorter days.",
+  },
+  {
+    day: "2026-11-10",
     area: "Customers",
     words: "A Compact switch on Customers and Contacts: each person on one line, so many more fit on the screen.",
   },
