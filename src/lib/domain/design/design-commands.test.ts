@@ -275,3 +275,17 @@ describe("reading the roof again", () => {
     expect(parseCommand("trace a roof face")).toBeNull();
   });
 });
+
+describe("two ways at once", () => {
+  it("reads east west as a split, in the order said", () => {
+    expect(parseCommand("fit a 10 kW east west system")).toEqual({ do: "targetKw", kw: 10, facing: "E", also: "W" });
+    expect(parseCommand("put 8 kW on the west and east faces")).toEqual({ do: "targetKw", kw: 8, facing: "W", also: "E" });
+    expect(parseCommand("fit 8 kW on the north face")).toEqual({ do: "targetKw", kw: 8, facing: "N" });
+  });
+  it("takes Sol's second way only beside a first, never the same one", () => {
+    const base = { do: "targetKw", kw: 10, words: "" };
+    expect(commandFrom({ ...base, facing: "E", also_facing: "W" })).toEqual({ do: "targetKw", kw: 10, facing: "E", also: "W" });
+    expect(commandFrom({ ...base, facing: "E", also_facing: "E" })).toEqual({ do: "targetKw", kw: 10, facing: "E" });
+    expect(commandFrom({ ...base, facing: null, also_facing: "W" })).toEqual({ do: "targetKw", kw: 10 });
+  });
+});

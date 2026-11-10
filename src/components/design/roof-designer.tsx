@@ -3662,7 +3662,7 @@ export function RoofDesigner(props: {
       : [];
   };
   /** The last thing laid by rule, so changing the existing panels' answer lays it again. */
-  const lastLay = useRef<{ kind: "fill"; kw: number; facing?: Way } | { kind: "mine"; goal: DesignGoal } | null>(null);
+  const lastLay = useRef<{ kind: "fill"; kw: number; facing?: Way; also?: Way } | { kind: "mine"; goal: DesignGoal } | null>(null);
   /**
    * Shared across two faces (10 Nov 2026, Martin: "sol placed all panels on the west, he should ask me if I want to
    * split some panels over to the east"): when one face holds the whole system and another nearly as sunny looks
@@ -4024,10 +4024,10 @@ export function RoofDesigner(props: {
     ].join("\n"),
   );
   /** Fills the roof to about so many kW: on the traced faces (those looking the way asked), else Google's roof model. */
-  const fillTo = async (kw: number, facing?: Way): Promise<{ words: string; laid: number }> => {
+  const fillTo = async (kw: number, facing?: Way, also?: Way): Promise<{ words: string; laid: number }> => {
     const watts = panelOf(design).watts || 475;
     const n = Math.max(1, Math.ceil((kw * 1000) / watts));
-    lastLay.current = { kind: "fill", kw, ...(facing ? { facing } : {}) };
+    lastLay.current = { kind: "fill", kw, ...(facing ? { facing } : {}), ...(facing && also ? { also } : {}) };
     const seen = await checkRoof();
     const check = inUse(seen);
     const avoid = check && avoidFor(check).length ? avoidFor(check) : undefined;
@@ -4040,6 +4040,29 @@ export function RoofDesigner(props: {
       .join(" ");
     const fromHeights = readFacesFromHeights() ? await nearmapRoofFaces() : null;
     const roofFaces = fromHeights?.faces ?? faces;
+    if (roofFaces.length && facing && also && also !== facing) {
+      // Two ways asked for (10 Nov 2026, Martin: "a 10 kW east west system"): about half on the faces looking each
+      // way, the first way taking any the second can't hold.
+      const name = (w: Way) => ({ N: "north", E: "east", S: "south", W: "west" })[w];
+      const wayA = roofFaces.filter((fc) => facesWay(facing, faceFacing(fc)));
+      const wayB = roofFaces.filter((fc) => facesWay(also, faceFacing(fc)));
+      const missing = [...(wayA.length ? [] : [facing]), ...(wayB.length ? [] : [also])];
+      if (missing.length) return { words: `No roof face looks ${missing.map(name).join(" or ")}.`, laid: 0 };
+      const lay = (list: Face[], k: number) => (k > 0 ? packFaces(list, size, k, () => newId("p"), avoid).loose : []);
+      let first = lay(wayA, Math.ceil(n / 2));
+      const second = lay(wayB, n - first.length);
+      if (first.length + second.length < n) first = lay(wayA, n - second.length);
+      const used = new Set([...wayA, ...wayB].map((fc) => fc.id));
+      setFaces(roofFaces.map((fc) => (used.has(fc.id) ? { ...fc, off: panelPlaces(fc, size).map((pl) => pl.index) } : fc)));
+      setLoose([...first, ...second]);
+      setStrings([]);
+      changed();
+      const laid = first.length + second.length;
+      return {
+        words: `${laid} panels, ${((laid * watts) / 1000).toFixed(2)} kW${laid < n ? ": only that many fit" : ""}: ${first.length} on the ${name(facing)}, ${second.length} on the ${name(also)}. Strings cleared: string them again.${fromHeights ? ` ${fromHeights.words}` : ""}${clear ? ` ${clear}` : ""}`,
+        laid,
+      };
+    }
     if (roofFaces.length) {
       const chosen = facing ? roofFaces.filter((fc) => facesWay(facing, faceFacing(fc))) : roofFaces;
       if (!chosen.length)
@@ -4238,7 +4261,7 @@ export function RoofDesigner(props: {
       await designForMe(false, last.goal);
       return said;
     }
-    return `${said} ${(await fillTo(last.kw, last.facing)).words}`;
+    return `${said} ${(await fillTo(last.kw, last.facing, last.also)).words}`;
   };
   /**
    * The roof's faces read again from Nearmap's heights in place of those on the design (9 Nov 2026, Martin: faces kept
@@ -4250,7 +4273,7 @@ export function RoofDesigner(props: {
     const read = await nearmapRoofFaces();
     if (!read) return "Nearmap's heights didn't show this roof's faces: trace them by hand.";
     const last = lastLay.current;
-    if (last?.kind === "fill") return `${read.words} ${(await fillTo(last.kw, last.facing)).words}`;
+    if (last?.kind === "fill") return `${read.words} ${(await fillTo(last.kw, last.facing, last.also)).words}`;
     if (last?.kind === "mine") {
       await designForMe(false, last.goal);
       return read.words;
@@ -4318,14 +4341,14 @@ export function RoofDesigner(props: {
       case "targetKw":
         if (!command.facing && summary.panels > 0 && Math.abs(summary.kw - command.kw) <= Math.max(0.5, command.kw * 0.05))
           return `The panels already make ${summary.kw.toFixed(2)} kW: left as they are.`;
-        return (await fillTo(command.kw, command.facing)).words;
+        return (await fillTo(command.kw, command.facing, command.also)).words;
       case "system": {
         // The panels already make about that size, and no direction was asked for: they stay as they are, and only the
         // inverter and battery follow (8 Nov 2026, Martin: adding a battery re-laid his panels).
         const keep = !command.facing && summary.panels > 0 && Math.abs(summary.kw - command.kw) <= Math.max(0.5, command.kw * 0.05);
         const done = keep
           ? { words: `Panels kept as they are (${summary.kw.toFixed(2)} kW).`, laid: summary.panels }
-          : await fillTo(command.kw, command.facing);
+          : await fillTo(command.kw, command.facing, command.also);
         if (!done.laid) return done.words;
         systemAsk.current = {
           ...(command.inverter !== undefined ? { inverter: command.inverter } : {}),

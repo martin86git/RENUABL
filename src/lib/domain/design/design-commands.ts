@@ -7,12 +7,13 @@
 export type Facing = "N" | "E" | "S" | "W";
 
 export type DesignCommand =
-  | { do: "targetKw"; kw: number; facing?: Facing }
+  /** `also`: a second way, the panels shared about half each (10 Nov 2026, Martin: "a 10 kW east west system"). */
+  | { do: "targetKw"; kw: number; facing?: Facing; also?: Facing }
   /**
    * A whole system in one request (3 Nov 2026, Martin: "load 8 kW PV + an inverter and a battery"): fill to the kW, then
    * the inverter and the battery. Each is left out when not asked for; "" chooses it by rule, other words by name.
    */
-  | { do: "system"; kw: number; facing?: Facing; inverter?: string; battery?: string }
+  | { do: "system"; kw: number; facing?: Facing; also?: Facing; inverter?: string; battery?: string }
   | { do: "battery"; query: string }
   | { do: "noBattery" }
   | { do: "inverter"; query: string }
@@ -74,6 +75,15 @@ const FACINGS: [RegExp, Facing][] = [
   [/\bsouth/i, "S"],
   [/\bwest/i, "W"],
 ];
+
+/** The ways named, in the order said: one, or two for a split ("east west", "east and west"). */
+export function waysIn(text: string): { facing?: Facing; also?: Facing } {
+  const found = FACINGS.map(([re, way]) => ({ way, at: text.search(re) }))
+    .filter((f) => f.at >= 0)
+    .sort((a, b) => a.at - b.at)
+    .map((f) => f.way);
+  return { ...(found[0] ? { facing: found[0] } : {}), ...(found[1] ? { also: found[1] } : {}) };
+}
 
 /** The words left once the verbs and the kind of product are taken out: what to look the product up by. */
 const queryOf = (text: string, kind: RegExp) =>
@@ -231,11 +241,10 @@ export function parseCommand(raw: string): DesignCommand | null {
     const inverter = productAsked(text, /\binverters?\b/i);
     const battery = productAsked(text, /\bbatter(y|ies)\b/i, /\b(no|without|remove|drop)\b[^+,]*\bbatter(y|ies)\b/i);
     if (inverter !== undefined || battery !== undefined) {
-      const facing = FACINGS.find(([re]) => re.test(t))?.[1];
       return {
         do: "system",
         kw: Number(kw[1]),
-        ...(facing ? { facing } : {}),
+        ...waysIn(t),
         ...(inverter !== undefined ? { inverter } : {}),
         ...(battery !== undefined ? { battery } : {}),
       };
@@ -249,8 +258,7 @@ export function parseCommand(raw: string): DesignCommand | null {
     !/\b(battery|batteries|storage)\b/.test(t) &&
     /\b(fit|make|size|design|put|lay|give|go|target|want|load|add)\b/.test(t)
   ) {
-    const facing = FACINGS.find(([re]) => re.test(t))?.[1];
-    return { do: "targetKw", kw: Number(kw[1]), ...(facing ? { facing } : {}) };
+    return { do: "targetKw", kw: Number(kw[1]), ...waysIn(t) };
   }
   if (/\b(no|remove|take (off|out)|drop|without)\b.*\b(battery|storage)\b/.test(t)) return { do: "noBattery" };
   // "Add a battery", "add the storage it needs": no product named is one chosen by rule (the inverter's maker, sized to the home).
@@ -352,6 +360,11 @@ export const DESIGN_COMMAND_SCHEMA = {
     },
     kw: { type: ["number", "null"] as ("number" | "null")[] },
     facing: { type: ["string", "null"] as ("string" | "null")[], enum: ["N", "E", "S", "W", null] },
+    also_facing: {
+      type: ["string", "null"] as ("string" | "null")[],
+      enum: ["N", "E", "S", "W", null],
+      description: 'A second way when the panels are to be shared across two ("east west": facing E, also_facing W), else null.',
+    },
     query: {
       type: ["string", "null"] as ("string" | "null")[],
       description:
@@ -398,6 +411,7 @@ export const DESIGN_COMMAND_SCHEMA = {
     "do",
     "kw",
     "facing",
+    "also_facing",
     "query",
     "inverter",
     "battery",
@@ -425,11 +439,21 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
     case "targetKw": {
       const kw = n(read.kw);
       const facing = ["N", "E", "S", "W"].includes(read.facing as string) ? (read.facing as Facing) : undefined;
-      return kw && kw > 0 && kw <= 100 ? { do: "targetKw", kw, ...(facing ? { facing } : {}) } : { do: "answer", words };
+      const also =
+        facing && ["N", "E", "S", "W"].includes(read.also_facing as string) && read.also_facing !== facing
+          ? (read.also_facing as Facing)
+          : undefined;
+      return kw && kw > 0 && kw <= 100
+        ? { do: "targetKw", kw, ...(facing ? { facing } : {}), ...(also ? { also } : {}) }
+        : { do: "answer", words };
     }
     case "system": {
       const kw = n(read.kw);
       const facing = ["N", "E", "S", "W"].includes(read.facing as string) ? (read.facing as Facing) : undefined;
+      const also =
+        facing && ["N", "E", "S", "W"].includes(read.also_facing as string) && read.also_facing !== facing
+          ? (read.also_facing as Facing)
+          : undefined;
       const part = (v: unknown) => (typeof v === "string" ? { value: v.slice(0, 80) } : null);
       const inverter = part(read.inverter);
       const battery = part(read.battery);
@@ -438,6 +462,7 @@ export function commandFrom(read: Record<string, unknown>): DesignCommand {
         do: "system",
         kw,
         ...(facing ? { facing } : {}),
+        ...(also ? { also } : {}),
         ...(inverter ? { inverter: inverter.value } : {}),
         ...(battery ? { battery: battery.value } : {}),
       };
@@ -530,7 +555,7 @@ export const DESIGN_COMMAND_PROMPT = `You are Sol, inside a solar business's roo
 - noBattery, stringAuto (string the panels by rule), designForMe (make the three designs), flat (the roof is flat), pitch (the roof's pitch in degrees), phase, storeys, undo, redo.
 - The panels themselves, the picked ones or else all of them: tilt (their tilt in degrees, on frames or the roof), orient (landscape true or false: portrait), rotate (turn them by degrees round their middle, + clockwise), move (east and south in metres, negative for west and north).
 - rows: lay the panels (the picked ones, else all) in that many rows, the same panels where they stood; with landscape true or false when portrait or landscape is asked for too, and kw (and facing) when a size is asked for too ("10 kW in two rows"): that size is laid first, then put in the rows. relay: lay the same number of panels again on the roof by the rules, to fit it ("lay them so they fit the roof", "tidy them up").
-- To place panels somewhere, targetKw with a facing lays them on the faces looking that way. To string them, stringAuto.
+- To place panels somewhere, targetKw with a facing lays them on the faces looking that way; two ways ("east west", "east and west") are facing and also_facing, the panels shared about half each. To string them, stringAuto.
 - explainString: show the check for a string, by its letter; put the reason in words too, from the string checks above.
 - choose: when the request could fairly mean different things (which face, how many kW, portrait or landscape, which battery), don't guess: ask a short question with two or three options, each a label, a line on what it means and the request to carry out if chosen, written as the person would say it ("fit 10 kW on the north face"). Only when it is truly unclear.
 - removePanels: take the panels off (the picked ones, else all), when asked to delete, remove or clear them.
