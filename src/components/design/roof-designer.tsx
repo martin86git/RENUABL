@@ -31,6 +31,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
 import { CELLS_UP_TO } from "@/lib/domain/design/illustrated-roof";
 import { FlowLine, PanelArt, RoofArt, WallStrip, useRoofGhost, type ArtFace } from "./illustrated-roof";
+import { DayOverlay, HomeDayCard, useHomeDay } from "./home-day";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import {
@@ -61,6 +62,7 @@ import {
   SunMedium,
   Brush,
   House,
+  Sunrise,
   LayoutGrid,
   Radio,
   Send,
@@ -3329,6 +3331,16 @@ export function RoofDesigner(props: {
     props.workspace.settings.bill.selfUseShare,
   );
   const dollars = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
+  // The home's day (10 Nov 2026, Martin: the second dimension of a design is time): the design played through a
+  // summer, autumn or winter day, the sun crossing the roof and the home's power under it (home-day.tsx).
+  const homeDay = useHomeDay({
+    latitude: spot.lat,
+    panels: standingPanels.map((p) => ({ kw: size.watts / 1000, tilt: p.tilt, facing: p.facing, x: p.x, y: p.y })),
+    monthKwh: year,
+    homeDayKwh: finance?.dailyKwh ?? null,
+    batteryKwh: shiftingKwhOf({ battery }),
+    terrain: terrain && terrain !== "none" ? terrain : null,
+  });
   // The system as the quote reads it. Worked out in the domain (systemSpecOf), so a published proposal reads the design the same way.
   const firstListed = props.catalogue[0];
   const spec: SystemSpec = useMemo(
@@ -5195,6 +5207,9 @@ export function RoofDesigner(props: {
                 <Leg label={illustrated ? "Show the photo" : "Draw the roof"} on={illustrated} onClick={toggleIllustrated}>
                   <Brush className="size-5" aria-hidden />
                 </Leg>
+                <Leg label="The home's day" on={homeDay.on} onClick={() => (homeDay.on ? homeDay.close() : homeDay.open())}>
+                  <Sunrise className="size-5" aria-hidden />
+                </Leg>
               </>
             ) : undefined
           }
@@ -6433,6 +6448,16 @@ export function RoofDesigner(props: {
                       </g>
                     );
                   })}
+                  {/* The home's day: night, each panel lit as the sun reaches it, and the sun on its arc. */}
+                  {homeDay.day && homeDay.step && (
+                    <DayOverlay
+                      day={homeDay.day}
+                      step={homeDay.step}
+                      panels={standingPanels.map((p) => p.corners.map(px))}
+                      view={view}
+                      u={u}
+                    />
+                  )}
                   {/* Guide lines, at rest: thin gold lines along the roof edges they were drawn on. */}
                   {!guide &&
                     rules.map((g) => (
@@ -7142,29 +7167,50 @@ export function RoofDesigner(props: {
                   props.tight ? "bottom-10" : "bottom-3",
                 )}
               >
-                {/* Roof and Sides (10 Nov 2026, Martin: make Sides stand out; Drawn left this pair and lives in the
-                    tools): the roof from above, and the house from its four sides in Nearmap's angled photos. */}
-                <div
-                  role="group"
-                  aria-label="The roof from above, or the house from its sides"
-                  className="flex items-center rounded-full border border-line bg-surface p-1 text-[13px] font-semibold shadow-lift"
-                >
+                <div className="flex items-center gap-2">
+                  {/* The home's day: the design played through a day. */}
                   <button
-                    onClick={() => illustrated && toggleIllustrated()}
-                    aria-pressed={!illustrated}
-                    title="The roof from above"
+                    onClick={() => (homeDay.on ? homeDay.close() : homeDay.open())}
+                    aria-pressed={homeDay.on}
+                    title="The home's day: the sun across the roof, and the home's power hour by hour"
                     className={clsx(
-                      "flex h-9 items-center gap-1.5 rounded-full px-3.5",
-                      !illustrated ? "bg-sun-line text-white" : "text-ink hover:bg-canvas",
+                      "flex h-11 items-center gap-1.5 rounded-full border border-line px-4 text-[13px] font-semibold shadow-lift",
+                      homeDay.on ? "bg-sun-line text-white" : "bg-surface text-ink hover:bg-canvas",
                     )}
                   >
-                    <House className="size-4" aria-hidden />
-                    Roof
+                    <Sunrise className="size-4" aria-hidden />
+                    Day
                   </button>
-                  {props.sidesReady && <SideViewsButton lat={spot.lat} lng={spot.lng} tab />}
+                  {/* Roof and Sides (10 Nov 2026, Martin: make Sides stand out; Drawn left this pair and lives in the
+                      tools): the roof from above, and the house from its four sides in Nearmap's angled photos. */}
+                  <div
+                    role="group"
+                    aria-label="The roof from above, or the house from its sides"
+                    className="flex items-center rounded-full border border-line bg-surface p-1 text-[13px] font-semibold shadow-lift"
+                  >
+                    <button
+                      onClick={() => illustrated && toggleIllustrated()}
+                      aria-pressed={!illustrated}
+                      title="The roof from above"
+                      className={clsx(
+                        "flex h-9 items-center gap-1.5 rounded-full px-3.5",
+                        !illustrated ? "bg-sun-line text-white" : "text-ink hover:bg-canvas",
+                      )}
+                    >
+                      <House className="size-4" aria-hidden />
+                      Roof
+                    </button>
+                    {props.sidesReady && <SideViewsButton lat={spot.lat} lng={spot.lng} tab />}
+                  </div>
                 </div>
                 {props.pictureMenu}
               </div>
+              {/* The day's card, over the foot of the picture. */}
+              {homeDay.on && (
+                <div className="pointer-events-none absolute bottom-[5.25rem] left-1/2 z-30 flex -translate-x-1/2 justify-center">
+                  <HomeDayCard state={homeDay} hasBattery={battery !== undefined} hasHome={(finance?.dailyKwh ?? 0) > 0} />
+                </div>
+              )}
               {/* Drawn, with no face traced and none from Google: there is nothing to draw the roof from yet. */}
               {illustrated && !art && modelFaces === "none" && (
                 <p className="pointer-events-none absolute bottom-20 right-3 z-10 w-64 rounded-lg border border-line bg-surface/90 px-3 py-2 text-[12px] text-ink-2 shadow-lift">

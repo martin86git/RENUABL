@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
+    area: "Designer",
+    words: "A Day button plays a design through a summer, autumn or winter day: the sun across the roof, the battery filling and emptying.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Proposals",
+    words: "A proposal's output now shows a day with the system, hour by hour, for the system the customer is looking at.",
+  },
+  {
+    day: "2026-11-10",
     area: "Menu",
     words: "The menu at the top is one tidy white bar, and the place you are in is lit in black with orange words.",
   },

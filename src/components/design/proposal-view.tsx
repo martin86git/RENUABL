@@ -32,6 +32,7 @@ import type { OptionKey } from "@/lib/domain/design/proposal";
 import { money } from "@/lib/domain/design/deposit";
 import { ROOF_IMAGE, metresPerPixel } from "@/lib/domain/design/roof-design";
 import { HERO_DARK, batteryHero, heroGlow, type BatteryHero } from "@/lib/domain/design/battery-hero";
+import { ProposalDay, hasDay } from "./proposal-day";
 
 const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -782,6 +783,13 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
             <Months kwh={view.production.monthlyKwh} style={chart} />
           </div>
           <p className={clsx(fine, "mt-4")}>{PRODUCTION_NOTE}</p>
+          {/* A day with the system: the sun across their roof, and their home's power hour by hour. */}
+          {hasDay(view) && (
+            <div className="mt-6 border-t border-line pt-5">
+              <p className="mb-3 text-[15px] font-semibold text-ink">A day with this system</p>
+              <ProposalDay view={view} />
+            </div>
+          )}
         </div>
       ) : (
         <p className="text-[15px] text-muted">{NO_SUNSHINE_NOTE}</p>

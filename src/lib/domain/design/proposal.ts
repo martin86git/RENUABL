@@ -62,13 +62,18 @@ import {
   DESIGN_GOALS,
   designPanels,
   designSummary,
+  faceFacing,
+  facePanels,
   monthlyProduction,
+  panelFacing,
+  panelOf,
   type DesignGoal,
   type DesignSet,
   type RoofDesign,
 } from "./roof-design";
 import { NETCC_INFORMATION, STANDARD_TERMS_VERSION, fillTerms, type TermsSection } from "./standard-terms";
 import { YIELD_PER_KW_DAY, batteryKwhOf, shiftingKwhOf, systemSpecOf } from "./system";
+import { TILT } from "./tilt";
 
 // ---------------------------------------------------------------------------
 // What the customer sees
@@ -115,6 +120,11 @@ export interface ProposalView {
     kw: number;
     /** What the battery holds in all, kWh: 0 with none. */
     batteryKwh: number;
+    /**
+     * Of that, what carries the home's evenings, kWh: all of it, less a module held back for blackouts. For the
+     * home's day. Left out on a proposal published before the day was shown (the whole battery is then taken).
+     */
+    eveningKwh?: number;
     /** The system in lines, as the deal shows it: "PV panel", "Inverter", "Roof type". */
     details: { label: string; value: string }[];
   };
@@ -123,6 +133,11 @@ export interface ProposalView {
     lng: number;
     /** Each panel's four corners, in metres east and south of the middle of the roof's picture: x1, y1, … x4, y4. */
     panels: number[][];
+    /**
+     * Each panel's tilt (degrees up from flat) and the way it faces (degrees clockwise from north), in the same
+     * order, for the home's day. Left out on a proposal published before the day was shown.
+     */
+    aspects?: number[][];
   };
   /** What the system is estimated to make, kWh. Null where we have no sunshine record for the home's state. */
   production: { monthlyKwh: number[]; yearKwh: number } | null;
@@ -225,6 +240,7 @@ export interface ProposalOption {
   backup: boolean;
   system: ProposalView["system"];
   roofPanels: number[][];
+  roofAspects?: number[][];
   price: Pick<ProposalView["price"], "incGst" | "stc" | "youPay" | "solarVic" | "beforeGst" | "gst">;
   production: ProposalView["production"];
   bill: ProposalView["bill"];
@@ -268,7 +284,7 @@ export function viewForChoice(view: ProposalView, goal: OptionKey | null | undef
   return {
     ...view,
     system: o.system,
-    roof: { ...view.roof, panels: o.roofPanels },
+    roof: { lat: view.roof.lat, lng: view.roof.lng, panels: o.roofPanels, ...(o.roofAspects ? { aspects: o.roofAspects } : {}) },
     production: o.production,
     bill: o.bill,
     price: { ...view.price, ...o.price },
@@ -633,6 +649,7 @@ export function buildProposal(given: ProposalInputs): Built {
       panels: spec.panels,
       kw: summary.kw,
       batteryKwh,
+      eveningKwh: shiftingKwhOf(design),
       details: systemDetails(design, form, input.job.details)
         .filter((d) => SHOWN_DETAILS.includes(d.key) && d.value)
         .map((d) => ({ label: d.label, value: d.value as string })),
@@ -641,6 +658,7 @@ export function buildProposal(given: ProposalInputs): Built {
       lat: project.lat,
       lng: project.lng,
       panels: roofPanels(design),
+      aspects: roofAspects(design),
     },
     production: monthlyKwh ? { monthlyKwh, yearKwh: monthlyKwh.reduce((n, m) => n + m, 0) } : null,
     bill: finance
@@ -714,11 +732,13 @@ export function buildProposal(given: ProposalInputs): Built {
                 panels: out.spec.panels,
                 kw: designSummary(d, YIELD_PER_KW_DAY).kw,
                 batteryKwh: batteryKwhOf(d),
+                eveningKwh: shiftingKwhOf(d),
                 details: systemDetails(d, quoteForm, input.job.details)
                   .filter((x) => SHOWN_DETAILS.includes(x.key) && x.value)
                   .map((x) => ({ label: x.label, value: x.value as string })),
               },
               roofPanels: roofPanels(d),
+              roofAspects: roofAspects(d),
               price: {
                 incGst: out.totals.priceIncGst,
                 stc: out.stc,
@@ -785,6 +805,12 @@ const internalLines = (lines: readonly CostLine[]): ProposalInternal["lines"] =>
 /** Each panel's four corners, in metres from the middle of the roof's picture, to the centimetre. */
 const roofPanels = (design: RoofDesign) =>
   designPanels(design).map((p) => p.corners.flatMap((c) => [Math.round(c.x * 100) / 100, Math.round(c.y * 100) / 100]));
+
+/** Each panel's tilt and the way it faces, in the order of `roofPanels`. */
+const roofAspects = (design: RoofDesign) => [
+  ...design.faces.flatMap((face) => facePanels(face, panelOf(design)).map(() => [face.tilt ?? TILT.roof, Math.round(faceFacing(face))])),
+  ...(design.loose ?? []).map((p) => [p.tilt ?? TILT.roof, Math.round(panelFacing(p))]),
+];
 
 /**
  * One of the roof's designs read and priced exactly as the designer's quote
