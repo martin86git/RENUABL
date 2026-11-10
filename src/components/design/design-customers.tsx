@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Check, PenTool, Plus, Search, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeft, Check, PenTool, Plus, Rows3, Search, Trash2, UserPlus } from "lucide-react";
 import { INTERESTS, INTEREST_WORDS, interestsOf, toggleInterest } from "@/lib/domain/design/deal-interest";
 import clsx from "clsx";
 import { AddressEntry } from "@/components/consumer/address-entry";
@@ -158,6 +158,9 @@ function CustomerFields({ value, onChange, narrow }: { value: CustomerInput; onC
 }
 
 /** /design/customers: everyone the business is dealing with, and the way to add someone. */
+/** Where the device keeps whether the people list is compact. */
+const COMPACT_KEY = "renuabl.design.people-compact";
+
 export function CustomersPage() {
   const router = useRouter();
   const params = useSearchParams();
@@ -168,6 +171,25 @@ export function CustomersPage() {
   const [tab, setTab] = useState<PeopleTab>(params.get("tab") === "contacts" ? "contacts" : "customers");
   const [has, setHas] = useState<HasFilter>({});
   const [emailing, setEmailing] = useState(false);
+  // Compact (10 Nov 2026, Martin: see more of them at once): rows a line each, kept on the device.
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the device's choice is only readable after the first render
+      setCompact(localStorage.getItem(COMPACT_KEY) === "1");
+    } catch {
+      // Storage blocked: the full rows.
+    }
+  }, []);
+  const toggleCompact = () => {
+    const next = !compact;
+    setCompact(next);
+    try {
+      localStorage.setItem(COMPACT_KEY, next ? "1" : "0");
+    } catch {
+      // Storage blocked: kept for this visit only.
+    }
+  };
   const [adding, setAdding] = useState(params.get("new") === "1");
   const [draft, setDraft] = useState<CustomerInput>(BLANK);
   const [saving, setSaving] = useState(false);
@@ -372,6 +394,19 @@ export function CustomersPage() {
           />
         </label>
         {customers && <p className="text-xs tabular-nums text-muted">{shown.length} shown</p>}
+        <button
+          type="button"
+          onClick={toggleCompact}
+          aria-pressed={compact}
+          title={compact ? "Show the full rows" : "Show more people at once, a line each"}
+          className={clsx(
+            "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium ring-1",
+            compact ? "bg-primary text-primary-ink ring-primary" : "text-ink-2 ring-line hover:text-ink",
+          )}
+        >
+          <Rows3 className="size-3.5" aria-hidden />
+          Compact
+        </button>
         {customers && shown.length > 0 && (
           <button type="button" className={clsx(ui.quiet, "ml-auto")} onClick={() => setEmailing(true)}>
             Email these {shown.length}
@@ -421,9 +456,9 @@ export function CustomersPage() {
               <tr
                 key={c.id}
                 onClick={() => router.push(`${PATHS.customers}/${c.id}`)}
-                className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
+                className={clsx("cursor-pointer border-b border-line last:border-0 hover:bg-surface-2", compact && "text-[13px]")}
               >
-                <td className="px-5 py-3">
+                <td className={clsx("px-5", compact ? "whitespace-nowrap py-1.5" : "py-3")}>
                   <Link
                     href={`${PATHS.customers}/${c.id}`}
                     className="font-medium text-ink hover:underline"
@@ -437,17 +472,29 @@ export function CustomersPage() {
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-3 text-ink-2">
-                  {c.phone || c.email || "–"}
-                  {c.phone && c.email && <span className="block text-xs text-muted">{c.email}</span>}
+                {compact ? (
+                  // One line: the phone, then the email quieter beside it.
+                  <td className="max-w-[20rem] truncate px-3 py-1.5 text-ink-2">
+                    {c.phone || c.email || "–"}
+                    {c.phone && c.email && <span className="text-muted"> · {c.email}</span>}
+                  </td>
+                ) : (
+                  <td className="px-3 py-3 text-ink-2">
+                    {c.phone || c.email || "–"}
+                    {c.phone && c.email && <span className="block text-xs text-muted">{c.email}</span>}
+                  </td>
+                )}
+                <td className={clsx("max-w-[18rem] truncate px-3 text-ink-2", compact ? "py-1.5" : "py-3")}>{c.address || "–"}</td>
+                <td className={clsx("px-3", compact ? "py-1.5" : "py-3")}>
+                  <span title={c.unsubscribed ? "No group emails" : undefined}>
+                    <HasMarks has={c.has} small={compact} />
+                  </span>
+                  {c.unsubscribed && !compact && <span className="mt-1 block text-[11px] text-muted">No group emails</span>}
                 </td>
-                <td className="max-w-[18rem] truncate px-3 py-3 text-ink-2">{c.address || "–"}</td>
-                <td className="px-3 py-3">
-                  <HasMarks has={c.has} />
-                  {c.unsubscribed && <span className="mt-1 block text-[11px] text-muted">No group emails</span>}
+                <td className={clsx("px-3", compact ? "py-1.5" : "py-3")}>
+                  {c.stage ? <StageTag stage={c.stage} small={compact} /> : <span className="text-muted">–</span>}
                 </td>
-                <td className="px-3 py-3">{c.stage ? <StageTag stage={c.stage} /> : <span className="text-muted">–</span>}</td>
-                <td className="px-5 py-3 text-right tabular-nums text-ink-2">{c.jobs}</td>
+                <td className={clsx("px-5 text-right tabular-nums text-ink-2", compact ? "py-1.5" : "py-3")}>{c.jobs}</td>
               </tr>
             ))}
           </tbody>

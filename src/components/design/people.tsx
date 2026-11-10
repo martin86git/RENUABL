@@ -8,14 +8,18 @@ import { groupEmailStatus, sendGroupEmail, type CustomerLine } from "@/lib/servi
 import { ui } from "./design-shell";
 
 /** What someone's jobs put in, as three small marks: lit when they have it. */
-export function HasMarks({ has }: { has: CustomerHas }) {
+export function HasMarks({ has, small }: { has: CustomerHas; small?: boolean }) {
   const mark = (on: boolean, Icon: typeof Sun, label: string) => (
     <span
       title={`${label}: ${on ? "yes" : "no"}`}
       aria-label={`${label}: ${on ? "yes" : "no"}`}
-      className={clsx("grid size-6 place-items-center rounded-full", on ? "bg-sun text-sun-line" : "bg-surface-2 text-line")}
+      className={clsx(
+        "grid place-items-center rounded-full",
+        small ? "size-5" : "size-6",
+        on ? "bg-sun text-sun-line" : "bg-surface-2 text-line",
+      )}
     >
-      <Icon className="size-3.5" aria-hidden />
+      <Icon className={small ? "size-3" : "size-3.5"} aria-hidden />
     </span>
   );
   return (

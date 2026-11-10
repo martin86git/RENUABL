@@ -38,11 +38,12 @@ import { CompletedInstallsView, UpcomingInstallsView } from "./install-lists";
 import { TodayPad } from "./today-pad";
 
 /** A stage as a small tag. Won and installed are the good news; lost is quiet. */
-export function StageTag({ stage }: { stage: JobStage }) {
+export function StageTag({ stage, small }: { stage: JobStage; small?: boolean }) {
   return (
     <span
       className={clsx(
-        "inline-flex h-6 items-center whitespace-nowrap rounded px-2 text-[11px] font-medium uppercase tracking-[0.08em]",
+        "inline-flex items-center whitespace-nowrap rounded font-medium uppercase tracking-[0.08em]",
+        small ? "h-5 px-1.5 text-[10px]" : "h-6 px-2 text-[11px]",
         WON_STAGES.includes(stage)
           ? "bg-positive-soft text-positive"
           : stage === "lost"
