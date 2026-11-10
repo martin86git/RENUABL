@@ -185,6 +185,15 @@
 .studio-frame .studio-pad {
   --canvas: #f0f0f2;
 }
+/* A page that floats its own rails beside its column (the deal) draws its own grey; the shell's pad steps back on a wide
+   screen so the rails sit on the page itself. */
+@media (min-width: 80rem) {
+  .studio-frame .studio-pad:has(> [data-rails-out]) {
+    background: transparent;
+    padding: 0;
+    min-height: 0;
+  }
+}
 .studio-frame ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

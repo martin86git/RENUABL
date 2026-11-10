@@ -548,7 +548,12 @@ export function DealPage({ id }: { id: string }) {
     // On a wide screen the deal's tools and pages float beside it as two rails that stay in view while it scrolls (10 Nov
     // 2026, Martin: as the designer's rounds beside its window, so more of the deal is in the first fold); narrower, the
     // row under the banner.
-    <div className="mx-auto w-full max-w-[64rem] px-5 py-6 xl:grid xl:max-w-[81rem] xl:grid-cols-[3.5rem_minmax(0,1fr)_10rem] xl:items-start xl:gap-6">
+    // From xl the shell's grey pad steps back (data-rails-out, globals.css) and only the deal's own column sits on grey, so
+    // the two rails float on the page outside it (10 Nov 2026, Martin).
+    <div
+      data-rails-out
+      className="mx-auto w-full max-w-[64rem] px-5 py-6 xl:grid xl:max-w-[84rem] xl:grid-cols-[3.5rem_minmax(0,1fr)_10rem] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
+    >
       <ToolRail
         tab={tab}
         onTab={setTab}
@@ -561,7 +566,7 @@ export function DealPage({ id }: { id: string }) {
         onProposal={() => openTool("proposal")}
         onCard={() => setCard(true)}
       />
-      <div className="min-w-0 space-y-4">
+      <div className="min-w-0 space-y-4 xl:min-h-[calc(100dvh-10rem)] xl:rounded-[28px] xl:bg-canvas xl:p-6">
         {(job.lat !== null || tool === "proposal") && (
           <DesignDrawer
             src={tool === "proposal" ? proposalHref(job.id) : designHref(job.id)}
