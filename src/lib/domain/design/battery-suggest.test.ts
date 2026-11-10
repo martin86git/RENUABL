@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makerName, makerOf, SMALL_NIGHTS_KWH, suggestBatteries, takesBattery } from "./battery-suggest";
+import { batteryFits, makerName, makerOf, SMALL_NIGHTS_KWH, suggestBatteries, takesBattery } from "./battery-suggest";
 import type { CatalogueBattery } from "./catalogue";
 import { DAY } from "./quote";
 import { MAX_BATTERY_QTY } from "./roof-design";
@@ -43,10 +43,13 @@ describe("suggesting a battery", () => {
     const s = suggestBatteries({ ...base, inverters: [{ name: "Sungrow SH10RT", hybrid: true }], dailyKwh: 20 });
     // 12 kWh of nights, 90% usable: 13.3 kWh asked for.
     expect(s.size).toBe(13.3);
-    expect(s.suggestions).toHaveLength(1);
-    expect(s.suggestions[0]).toMatchObject({ maker: "Sungrow", qty: 5 });
-    expect(s.suggestions[0].why).toMatch(/5 × 3.2 kWh = 16 kWh/);
-    expect(s.suggestions[0].why).toMatch(/same maker as the inverter/);
+    // Sungrow's own, and Sigenergy's, which is AC coupled; never GoodWe or SolarEdge.
+    expect(s.suggestions.map((x) => x.maker).sort()).toEqual(["Sigenergy", "Sungrow"]);
+    const sungrow = s.suggestions.find((x) => x.maker === "Sungrow")!;
+    expect(sungrow.qty).toBe(5);
+    expect(sungrow.why).toMatch(/5 × 3.2 kWh = 16 kWh/);
+    expect(sungrow.why).toMatch(/same maker as the inverter/);
+    expect(s.suggestions.find((x) => x.maker === "Sigenergy")!.why).toMatch(/AC coupled/);
     expect(s.note).toMatch(/sized to the nights/);
     expect(s.note).not.toMatch(/hybrid/);
   });
@@ -86,10 +89,34 @@ describe("suggesting a battery", () => {
     expect(s.suggestions.every((x) => !/inverter/.test(x.why))).toBe(true);
   });
 
-  it("asks to check the inverter when the list has none of its maker", () => {
+  it("offers only AC coupled batteries when the list has none of the inverter's maker", () => {
     const s = suggestBatteries({ ...base, inverters: [{ name: "Fronius Primo 5.0", hybrid: true }], dailyKwh: 20 });
-    expect(s.suggestions.length).toBe(4);
-    expect(s.suggestions.every((x) => /Check it works with the inverter/.test(x.why))).toBe(true);
+    expect(s.suggestions.map((x) => x.maker)).toEqual(["Sigenergy"]);
+  });
+
+  it("never offers another maker's DC battery: a Sigenergy controller beside a Sungrow string inverter takes no Sungrow battery", () => {
+    const s = suggestBatteries({
+      ...base,
+      inverters: [{ name: "Sigenergy 10.0kW SigenStor Three Phase Controller" }, { name: "Sungrow 10kW Three Phase 2 MPPT Inverter" }],
+      dailyKwh: 20,
+    });
+    expect(s.suggestions.map((x) => x.maker)).toEqual(["Sigenergy"]);
+    expect(batteryFits({ name: "Sungrow SBR 3.2 kWh module" }, [{ name: "Sigenergy 8.0kW SigenStor Single Phase Controller" }])).toBe(
+      false,
+    );
+    expect(batteryFits({ name: "Tesla Powerwall 3" }, [{ name: "Sungrow SH5.0RS" }])).toBe(true);
+    expect(batteryFits({ name: "Sungrow SBR 3.2 kWh module" }, [])).toBe(true);
+  });
+
+  it("says so when nothing on the lists works with the inverter", () => {
+    const s = suggestBatteries({
+      ...base,
+      batteries: batteries.filter((b) => !b.sku.startsWith("SIG")),
+      inverters: [{ name: "Fronius Primo 5.0", hybrid: true }],
+      dailyKwh: 20,
+    });
+    expect(s.suggestions).toEqual([]);
+    expect(s.note).toMatch(/No battery on your lists works with the Fronius inverter/);
   });
 
   it("picks the fewest units between two stacks of the same size", () => {

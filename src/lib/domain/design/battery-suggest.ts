@@ -98,6 +98,30 @@ export function takesBattery(inverter: { name: string; hybrid?: boolean }): bool
   return /hybrid|\bSH\d|sigenstor/i.test(inverter.name);
 }
 
+/**
+ * Makers whose batteries are AC coupled: they bring their own inverter and work beside any (10 Nov 2026, Martin: "a
+ * Sungrow inverter takes only Sungrow batteries, or an AC coupled battery like a Sigenergy"). VERIFY against each
+ * maker's range: some sell both kinds.
+ */
+export const AC_COUPLED_MAKERS = ["sigenergy", "tesla", "enphase"] as const;
+
+/** Whether a battery is AC coupled: its maker, or "AC coupled" in its name. */
+export function acCoupled(battery: { name: string }): boolean {
+  return (AC_COUPLED_MAKERS as readonly string[]).includes(makerOf(battery.name)) || /ac[s-]?coupl/i.test(battery.name);
+}
+
+/**
+ * Whether a battery works with the inverters on a design: anything goes with no inverter yet; else the same maker as an
+ * inverter that takes a battery (a hybrid; a string inverter of the same maker doesn't make its batteries fit), or an
+ * AC coupled one, which works beside any.
+ */
+export function batteryFits(battery: { name: string }, inverters: readonly { name: string; hybrid?: boolean }[]): boolean {
+  if (!inverters.length) return true;
+  if (acCoupled(battery)) return true;
+  const maker = makerOf(battery.name);
+  return inverters.some((i) => takesBattery(i) && makerOf(i.name) === maker);
+}
+
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
 export function suggestBatteries(input: {
@@ -139,12 +163,15 @@ export function suggestBatteries(input: {
   if (nights !== null && nights < SMALL_NIGHTS_KWH) note += " That is a small night: a battery wouldn't do much for this home.";
   if (!(size > 0)) return { size: 0, note, suggestions: [] };
 
-  // The inverter decides the maker, when the list has that maker's batteries.
+  // Only batteries that work with the inverters on the design (`batteryFits`): the same maker as a hybrid, or AC coupled.
   const fitted = input.inverters.map((i) => ({ maker: makerOf(i.name), hybrid: takesBattery(i) }));
-  const sameMaker = input.batteries.filter((b) => fitted.some((f) => f.maker === makerOf(b.name)));
-  const pool = sameMaker.length ? sameMaker : input.batteries;
+  const pool = input.batteries.filter((b) => batteryFits(b, input.inverters));
   if (fitted.length && !fitted.some((f) => f.hybrid))
-    note += " The inverter on the design doesn't take a battery: it needs a hybrid inverter.";
+    note += " The inverter on the design doesn't take a battery: it needs a hybrid inverter, or an AC coupled battery.";
+  if (fitted.length && !pool.length) {
+    const makers = [...new Set(fitted.filter((f) => f.hybrid).map((f) => makerName(f.maker)))].join(" or ");
+    note += ` No battery on your lists works with ${makers ? `the ${makers} inverter` : "this inverter"}: add one to your price lists, or an AC coupled battery.`;
+  }
 
   const byMaker = new Map<string, CatalogueBattery[]>();
   for (const b of pool) {
@@ -173,11 +200,11 @@ export function suggestBatteries(input: {
       why:
         `${pick.qty > 1 ? `${pick.qty} × ${pick.battery.kwh} kWh = ` : ""}${pick.total} kWh against about ${size} kWh asked for` +
         (short ? ": the most this one stacks to." : ".") +
-        (sameMaker.length
-          ? " The same maker as the inverter on the design."
-          : fitted.length
-            ? " Check it works with the inverter on the design."
-            : ""),
+        (!fitted.length
+          ? ""
+          : fitted.some((f) => f.hybrid && f.maker === maker)
+            ? " The same maker as the inverter on the design."
+            : " AC coupled: it brings its own inverter and works beside the one on the design."),
     });
   }
   suggestions.sort((a, b) => a.battery.kwh * a.qty - b.battery.kwh * b.qty);

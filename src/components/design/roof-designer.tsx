@@ -126,7 +126,7 @@ import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/su
 import { shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
 import { autoStringDesign } from "@/lib/domain/design/auto-string";
-import { suggestBatteries } from "@/lib/domain/design/battery-suggest";
+import { batteryFits, suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
 import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
@@ -3997,6 +3997,15 @@ export function RoofDesigner(props: {
         strings: strings.map((x) => x.panels.length),
       })
     : [];
+  // The batteries that work with the inverters on the design (10 Nov 2026, Martin: a Sigenergy controller was offered a
+  // Sungrow battery): the same maker as a hybrid, or AC coupled. The rest are a press away.
+  const [allBatteries, setAllBatteries] = useState(false);
+  const fittedInverters = fitted.map((f, n) => ({
+    name: f.name,
+    ...(fittedItems[n]?.hybrid !== undefined ? { hybrid: fittedItems[n]?.hybrid } : {}),
+  }));
+  const batteriesThatFit = props.batteries.filter((b) => batteryFits(b, fittedInverters));
+  const batteriesShown = allBatteries ? props.batteries : batteriesThatFit;
   // How much storage the home needs, by rule (`battery-suggest.ts`): from what the panels make each month and, with the bill in, the home's evenings.
   const batteryIdea =
     menu === "batteries" && summary.panels > 0
@@ -8771,8 +8780,18 @@ export function RoofDesigner(props: {
                           </div>
                         )}
                         <p className={clsx(label, "mt-2 px-2 py-1")}>
-                          {battery ? "Change it" : "Batteries to choose from"} · {props.batteries.length} to choose from
+                          {battery ? "Change it" : "Batteries to choose from"} · {batteriesShown.length} to choose from
                         </p>
+                        {fitted.length > 0 && batteriesThatFit.length < props.batteries.length && (
+                          <p className="px-2 pb-1 text-[11.5px] text-muted">
+                            {allBatteries
+                              ? "Showing every battery on your lists, including those that don't work with the inverter on this design. "
+                              : `Only batteries that work with the inverter on this design: its own maker's, or AC coupled. `}
+                            <button type="button" onClick={() => setAllBatteries((a) => !a)} className="font-medium text-ink underline underline-offset-2">
+                              {allBatteries ? "Show only those that fit" : `Show the ${props.batteries.length - batteriesThatFit.length} others`}
+                            </button>
+                          </p>
+                        )}
                         <input
                           value={seek}
                           onChange={(e) => setSeek(e.target.value)}
@@ -8781,7 +8800,7 @@ export function RoofDesigner(props: {
                         />
                         <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
                           {favourites
-                            .sorted("batteries", props.batteries)
+                            .sorted("batteries", batteriesShown)
                             .filter((b) =>
                               seek
                                 .toLowerCase()
