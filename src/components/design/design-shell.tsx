@@ -405,7 +405,13 @@ function Shell({
             )}
           </div>
           <div className="mt-4 flex min-w-0 items-center justify-center">
-            <nav aria-label="Sections" className="studio-sections flex items-center gap-0.5 rounded-full bg-surface-2 p-1">
+            {/* One white pill like the rail (10 Nov 2026, Martin: the toggle hadn't looked right since the sections folded): every
+                round sits inside it at the same height, nothing standing out of it, and the section you're in is lit as the
+                rail's are, black with its word in orange. */}
+            <nav
+              aria-label="Sections"
+              className="studio-sections flex items-center gap-1 rounded-full bg-surface p-1 shadow-[0_6px_24px_rgba(20,22,26,0.07)] ring-1 ring-line"
+            >
               {(() => {
                 // The business's own sections (CRM, Procurement, Installation, Service) fold behind one layers icon
                 // (section-fold.tsx, 8 Nov 2026, Martin): Today, the designer and Sol are the surface; the sections are
@@ -423,8 +429,8 @@ function Shell({
                       href={sec.pages[0].href}
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
-                        "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
-                        lit ? "bg-surface font-medium text-sun-line shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                        "flex h-10 items-center gap-1.5 rounded-full px-4 text-sm transition-colors",
+                        lit ? "bg-ink font-medium text-sun-line" : "text-ink-2 hover:bg-canvas hover:text-ink",
                       )}
                     >
                       {sec.label}
@@ -432,7 +438,6 @@ function Shell({
                     </Link>
                   );
                 };
-                const onToday = current.id === sections[0].id;
                 return (
                   <>
                     {link(sections[0])}
@@ -443,9 +448,8 @@ function Shell({
                         title="Design tool"
                         aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
                         className={clsx(
-                          "-my-2 mx-1.5 flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
-                          onToday && "ml-3.5",
-                          path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface-2",
+                          "flex size-10 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition hover:brightness-105",
+                          path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
                         )}
                       >
                         <PenTool className="size-5" aria-hidden />
@@ -460,8 +464,8 @@ function Shell({
                         title="Proposals"
                         aria-current={path.startsWith(PATHS.proposalsSent) ? "page" : undefined}
                         className={clsx(
-                          "-my-2 mr-1.5 flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_4px_14px_rgba(11,11,12,0.12)] ring-1 ring-line transition hover:text-ink",
-                          path.startsWith(PATHS.proposalsSent) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface-2",
+                          "flex size-10 shrink-0 items-center justify-center rounded-full bg-sun text-sun-line transition hover:brightness-[0.97]",
+                          path.startsWith(PATHS.proposalsSent) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
                         )}
                       >
                         <FileText className="size-5" aria-hidden />
@@ -494,9 +498,8 @@ function Shell({
                         title="Design tool"
                         aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
                         className={clsx(
-                          "-my-2 flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
-                          current.id === sections[0].id ? "ml-3.5" : "mx-0",
-                          path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface-2",
+                          "flex size-10 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition hover:brightness-105",
+                          path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
                         )}
                       >
                         <PenTool className="size-5" aria-hidden />
@@ -511,8 +514,8 @@ function Shell({
                       href={sec.pages[0].href}
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
-                        "flex items-center gap-1.5 rounded-full px-3.5 py-1 text-sm transition-colors",
-                        lit ? "bg-surface font-medium text-sun-line shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2 hover:text-ink",
+                        "flex h-10 items-center gap-1.5 rounded-full px-4 text-sm transition-colors",
+                        lit ? "bg-ink font-medium text-sun-line" : "text-ink-2 hover:bg-canvas hover:text-ink",
                       )}
                     >
                       {sec.label}
@@ -522,7 +525,7 @@ function Shell({
                 })}
               {/* Sol, the other tool, as the graphite round at the far end: the two rounds frame the sections. */}
               {retail && (
-                <span className="ml-1">
+                <span className="flex">
                   <SolNavButton />
                 </span>
               )}

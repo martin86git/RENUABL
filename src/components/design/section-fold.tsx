@@ -108,8 +108,8 @@ export function SectionFold({ inside, waiting, children }: { inside: boolean; wa
           setHover((h) => !h);
         }}
         className={clsx(
-          "relative flex size-9 shrink-0 items-center justify-center rounded-full transition-colors",
-          open ? "text-ink" : "text-ink-2 hover:text-ink",
+          "relative flex size-10 shrink-0 items-center justify-center rounded-full transition-colors",
+          open ? "bg-canvas text-ink" : "text-ink-2 hover:bg-canvas hover:text-ink",
         )}
       >
         <Layers className="size-[18px]" aria-hidden />
