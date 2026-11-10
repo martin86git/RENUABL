@@ -27,6 +27,8 @@ import { facesFoundNote, facesFromHeights } from "@/lib/domain/design/roof-faces
 import { NO_BILL_KW, SELF_DESIGN_AIMS, SELF_DESIGN_LABELS, selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
 import { todayInMarket } from "@/lib/domain/market";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
+import { CELLS_UP_TO } from "@/lib/domain/design/illustrated-roof";
+import { FlowLine, PanelArt, RoofArt, WallStrip, useRoofGhost, type ArtFace } from "./illustrated-roof";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import {
@@ -55,6 +57,7 @@ import {
   FileText,
   Layers,
   SunMedium,
+  Brush,
   LayoutGrid,
   Radio,
   Send,
@@ -278,6 +281,8 @@ const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
  */
 type SideView = "designer" | "quote" | "proposal";
 const SIDE_KEY = "renuabl.design.side";
+/** Where the device keeps whether the roof is shown drawn (the Drawn view) or as the photo. */
+const ART_KEY = "renuabl.design.drawn-roof";
 const SIDE_VIEWS: { id: SideView; label: string; hint: string }[] = [
   { id: "designer", label: "Designer", hint: "The home's roof, storeys and phase, Sol, and the deal's notes" },
   { id: "quote", label: "Quote", hint: "The quote, worked out as you draw" },
@@ -1257,12 +1262,35 @@ export function RoofDesigner(props: {
   const [picks, setPicks] = useState<Pick[]>([]);
   // Drawing mode (the photo put away and the roof drawn plainly) has no button now; the code stays for later.
   const [drawn] = useState(false);
+  // The Drawn view (10 Nov 2026, Martin): the roof as an illustration in place of the photo, its surroundings a dim
+  // ghost of it, panels drawn as panels and the kit on a wall of its own. Made in the browser from what is already
+  // loaded (illustrated-roof.tsx). The choice is kept on the device.
+  const [illustrated, setIllustrated] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (window.localStorage.getItem(ART_KEY) === "1") setIllustrated(true);
+    } catch {
+      // Storage is off: the photo shows.
+    }
+  }, []);
+  const toggleIllustrated = () => {
+    const next = !illustrated;
+    setIllustrated(next);
+    try {
+      window.localStorage.setItem(ART_KEY, next ? "1" : "0");
+    } catch {
+      // Nothing to do: it still changes for this visit.
+    }
+  };
+  const ghost = useRoofGhost(props.image, illustrated, ROOF_IMAGE.width, ROOF_IMAGE.height);
   // The roof's faces from Google's roof model, for the drawing: null until asked for, "none" when there is no data.
   const [modelFaces, setModelFaces] = useState<DrawnFace[] | "none" | null>(null);
   // The drawing view has no button now (8 Nov 2026, Martin: no use to him); it stays off, whatever a device kept.
   useEffect(() => {
     // The first time the drawing is asked for on a roof, Google's roof model is fetched once (the server keeps it).
-    if (!drawn || modelFaces !== null) return;
+    // The Drawn view asks for it only while no face is traced: traced faces are the roof.
+    if (!(drawn || (illustrated && faces.length === 0)) || modelFaces !== null) return;
     let gone = false;
     void loadRoofModel(spot.lat, spot.lng).then((model) => {
       if (gone) return;
@@ -1274,7 +1302,7 @@ export function RoofDesigner(props: {
     };
     // The roof is the same for the life of this designer: its place never changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawn, modelFaces]);
+  }, [drawn, illustrated, faces.length, modelFaces]);
   // The ground around the roof for the drawing (lawn, trees, paving), painted from the photo's own colours: a small
   // picture made in the browser from the photo already loaded, so it costs nothing and is there at once.
   const [ground, setGround] = useState<string | null>(null);
@@ -1539,6 +1567,26 @@ export function RoofDesigner(props: {
   const ku = u * KIT_SIZE;
   const px = (p: Point) => [ROOF_IMAGE.width / 2 + p.x / scale, ROOF_IMAGE.height / 2 + p.y / scale] as const;
   const path = (points: readonly Point[]) => points.map((p) => px(p).join(",")).join(" ");
+  // What the Drawn view draws as the roof: the faces traced here (exact), else Google's faces for the home. With
+  // neither there is nothing to draw, and the photo stays.
+  const artFaces = useMemo<ArtFace[]>(() => {
+    if (!illustrated) return [];
+    const at = (p: Point) => [ROOF_IMAGE.width / 2 + p.x / scale, ROOF_IMAGE.height / 2 + p.y / scale] as const;
+    if (faces.length) return faces.map((f) => ({ id: f.id, points: f.points.map(at), azimuth: faceFacing(f), pitch: f.tilt ?? TILT.roof }));
+    return Array.isArray(modelFaces)
+      ? modelFaces.map((f, i) => ({ id: `model${i}`, points: f.points.map(at), azimuth: f.azimuth, pitch: f.pitch }))
+      : [];
+  }, [illustrated, faces, modelFaces, scale]);
+  const art = illustrated && artFaces.length > 0;
+  const wallKit = useMemo(
+    () => ({
+      inverters: fitted.map((f) => ({ name: f.name, kw: f.kw })),
+      battery: battery ? { name: battery.name, kwh: battery.kwh, qty: battery.qty, backup: battery.backup === true } : null,
+      charger: charger ? { name: charger.name, kw: charger.kw } : null,
+      switchboard: msb !== null,
+    }),
+    [fitted, battery, charger, msb],
+  );
   const design = useMemo(() => ({ faces, loose, panel }), [faces, loose, panel]);
   // The panel this design is drawn with: its size on the roof and its output.
   const size = useMemo(() => panelOf({ panel }), [panel]);
@@ -5099,6 +5147,9 @@ export function RoofDesigner(props: {
                 <Leg label="Shade analysis" on={shadeOn} onClick={toggleShade}>
                   <SunMedium className="size-5" aria-hidden />
                 </Leg>
+                <Leg label={illustrated ? "Show the photo" : "Draw the roof"} on={illustrated} onClick={toggleIllustrated}>
+                  <Brush className="size-5" aria-hidden />
+                </Leg>
               </>
             ) : undefined
           }
@@ -6180,7 +6231,18 @@ export function RoofDesigner(props: {
                   role="img"
                   aria-label={`The roof at ${props.address} from above, with ${summary.panels} panels placed`}
                 >
-                  {props.image && !drawn && <image href={props.image} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} />}
+                  {props.image && !drawn && !art && <image href={props.image} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} />}
+                  {/* The Drawn view: the roof as an illustration, its surroundings a dim ghost of the photo. */}
+                  {art && !drawn && (
+                    <RoofArt
+                      faces={artFaces}
+                      ghost={ghost}
+                      width={ROOF_IMAGE.width}
+                      height={ROOF_IMAGE.height}
+                      u={u}
+                      perMetre={1 / scale}
+                    />
+                  )}
                   {/* Drawing mode: plain ground, and the roof's faces drawn on it, each a grey of its own by the way it
                       faces. Google's faces (where there is roof data) go underneath; the faces traced here, which are
                       exact, go over them. */}
@@ -6241,6 +6303,21 @@ export function RoofDesigner(props: {
                           const pick: Pick = { kind: "grid", face: f.id, index: panel.index };
                           const lit = isPicked(pick);
                           const wired = stringOf(keyOf(pick));
+                          if (art)
+                            return (
+                              <PanelArt
+                                key={panel.index}
+                                corners={panel.corners.map(px)}
+                                u={u}
+                                cells={summary.panels <= CELLS_UP_TO}
+                                {...(wired >= 0 ? { fill: STRING_COLOURS[wired % STRING_COLOURS.length] } : {})}
+                                {...(lit
+                                  ? { edge: GOLD, edgeWidth: 1 }
+                                  : severalRoofs && wired < 0
+                                    ? { edge: roofEdge(f), edgeWidth: 0.8 }
+                                    : {})}
+                              />
+                            );
                           return (
                             <g key={panel.index}>
                               <polygon
@@ -6275,6 +6352,21 @@ export function RoofDesigner(props: {
                     const pick: Pick = { kind: "loose", id: panel.id };
                     const lit = isPicked(pick);
                     const wired = stringOf(keyOf(pick));
+                    if (art)
+                      return (
+                        <PanelArt
+                          key={panel.id}
+                          corners={looseCorners(panel, size).map(px)}
+                          u={u}
+                          cells={summary.panels <= CELLS_UP_TO}
+                          {...(wired >= 0 ? { fill: STRING_COLOURS[wired % STRING_COLOURS.length] } : {})}
+                          {...(lit
+                            ? { edge: GOLD, edgeWidth: 1 }
+                            : severalRoofs && wired < 0
+                              ? { edge: roofEdge(panel), edgeWidth: 0.8 }
+                              : {})}
+                        />
+                      );
                     return (
                       <g key={panel.id}>
                         <polygon
@@ -6412,6 +6504,8 @@ export function RoofDesigner(props: {
                           strokeLinejoin="round"
                           opacity={s.id === wiring || s.id === hover || tool !== "string" ? 1 : 0.6}
                         />
+                        {/* The Drawn view: power moving along the string, towards its first panel and the inverter. */}
+                        {art && points.length > 1 && <FlowLine points={path([...points].reverse())} u={u} />}
                         {points.map((p, n) => (
                           <circle key={n} cx={px(p)[0]} cy={px(p)[1]} r={1.6 * u} fill="#ffffff" />
                         ))}
@@ -7017,14 +7111,55 @@ export function RoofDesigner(props: {
               {/* Which picture of the roof is under the design: Google's or a Nearmap capture (3 Nov 2026, as Primero's). */}
               {/* In the pop-up, Publish in the top right corner, and the picture's switch level with Ask Sol. */}
               {props.tight && publishControl && <div className="pointer-events-auto absolute right-4 top-4 z-30">{publishControl}</div>}
-              {props.pictureMenu && (
+              <div
+                className={clsx(
+                  "pointer-events-auto absolute right-4 z-20 flex flex-col items-end gap-2",
+                  props.tight ? "bottom-10" : "bottom-3",
+                )}
+              >
+                {/* Photo or Drawn (10 Nov 2026, Martin): the roof as the photo, or as an illustration made from it. */}
                 <div
-                  className={clsx(
-                    "pointer-events-auto absolute right-3 z-20",
-                    props.tight ? "bottom-7 flex h-14 items-center" : "bottom-3",
-                  )}
+                  role="group"
+                  aria-label="Show the roof as the photo or drawn"
+                  className="flex items-center rounded-full border border-line bg-surface p-1 text-[13px] font-semibold shadow-lift"
                 >
-                  {props.pictureMenu}
+                  {(
+                    [
+                      { on: false, label: "Photo", hint: "The roof as photographed from above" },
+                      {
+                        on: true,
+                        label: "Drawn",
+                        hint: "The roof drawn from its faces, with panels as panels and the kit on its wall",
+                      },
+                    ] as const
+                  ).map((choice) => (
+                    <button
+                      key={choice.label}
+                      onClick={() => illustrated !== choice.on && toggleIllustrated()}
+                      aria-pressed={illustrated === choice.on}
+                      title={choice.hint}
+                      className={clsx(
+                        "flex h-9 items-center gap-1.5 rounded-full px-3.5",
+                        illustrated === choice.on ? "bg-sun-line text-white" : "text-ink hover:bg-canvas",
+                      )}
+                    >
+                      {choice.on && <Brush className="size-4" aria-hidden />}
+                      {choice.label}
+                    </button>
+                  ))}
+                </div>
+                {props.pictureMenu}
+              </div>
+              {/* Drawn, with no face traced and none from Google: there is nothing to draw the roof from yet. */}
+              {illustrated && !art && modelFaces === "none" && (
+                <p className="pointer-events-none absolute bottom-20 right-3 z-10 w-64 rounded-lg border border-line bg-surface/90 px-3 py-2 text-[12px] text-ink-2 shadow-lift">
+                  Trace the roof&apos;s faces, or use Design it for me, and the roof is drawn from them.
+                </p>
+              )}
+              {/* The Drawn view's wall: the inverter, battery, switchboard and EV charger standing where they go. */}
+              {art && (
+                <div className="absolute bottom-[5.75rem] left-[4.5rem] z-10">
+                  <WallStrip kit={wallKit} panels={summary.panels} />
                 </div>
               )}
 
