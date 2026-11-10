@@ -11,12 +11,30 @@
  * no story twice. Pure, tested.
  */
 import { BLOCKED_SITES, hostOf, urlKey } from "./sol-knowledge";
+import type { ListMatch, SystemsMatch } from "./product-watch";
 
-export const NEWS_TOPICS = ["companies", "rebates", "rules", "networks", "products", "technology"] as const;
+/**
+ * Recalls, approved products and maker notices joined on 10 Nov 2026 (Martin: news at the product level), matched to
+ * each business's lists and customers' systems (product-watch.ts).
+ */
+export const NEWS_TOPICS = [
+  "recalls",
+  "listings",
+  "companies",
+  "notices",
+  "rebates",
+  "rules",
+  "networks",
+  "products",
+  "technology",
+] as const;
 export type NewsTopic = (typeof NEWS_TOPICS)[number];
 
 export const NEWS_TOPIC_LABELS: Record<NewsTopic, string> = {
+  recalls: "Recalls and safety",
+  listings: "Approved products",
   companies: "Companies",
+  notices: "Maker notices",
   rebates: "Rebates",
   rules: "Rules and standards",
   networks: "Networks and the grid",
@@ -39,6 +57,10 @@ export interface NewsItem {
   publishedOn: string | null;
   /** Makers or businesses named in it ("SolarEdge"), as written. */
   brands: string[];
+  /** The exact models it is about ("SE5000H", "Powerwall 3"), as written; empty on older stories. */
+  models?: string[];
+  /** For a new model: the models it replaces, when the page says so. */
+  replaces?: string[];
   /** How sure it is (`NEWS_STANDINGS`); null on stories kept before 10 Nov 2026. */
   standing: NewsStanding | null;
   /** Sol's one line on why ("Announced on the CER's own site.", "A press report; the government hasn't confirmed it."). */
@@ -49,6 +71,12 @@ export interface NewsItem {
   hasImage?: boolean;
   /** For the business reading it: its products that name the story's makers (added by the route, never stored). */
   mine?: OnYourLists | null;
+  /** For the business reading it (added by the route, never stored): its price-list products the story names. */
+  lists?: ListMatch | null;
+  /** Its sold and installed deals whose systems the story names. */
+  systems?: SystemsMatch | null;
+  /** A recall, delisting, maker notice or maker leaving that touches this business. */
+  look?: boolean;
 }
 
 /**
@@ -66,7 +94,7 @@ export const NEWS_STANDING_LABELS: Record<NewsStanding, string> = {
 };
 
 /** Topics whose facts belong to a government body, regulator or network: confirmed only from one of their own pages. */
-export const OFFICIAL_TOPICS: readonly NewsTopic[] = ["rebates", "rules", "networks"];
+export const OFFICIAL_TOPICS: readonly NewsTopic[] = ["rebates", "rules", "networks", "listings"];
 
 /**
  * Official sites beyond every .gov.au address: the market operator, standards and accreditation bodies, and every
@@ -76,6 +104,8 @@ export const OFFICIAL_SITES: readonly string[] = [
   "aemo.com.au",
   "standards.org.au",
   "solaraccreditation.com.au",
+  // The approved product lists for panels, inverters and batteries (VERIFY who keeps each list as it changes).
+  "cleanenergycouncil.org.au",
   // Victoria
   "ausnetservices.com.au",
   "citipower.com.au",
@@ -140,7 +170,7 @@ export function cleanStanding(
 }
 
 /** What Sol is asked to return for each story, before it is checked. */
-export type NewsDraft = Omit<NewsItem, "id" | "site" | "foundAt" | "hasImage" | "mine">;
+export type NewsDraft = Omit<NewsItem, "id" | "site" | "foundAt" | "hasImage" | "mine" | "lists" | "systems" | "look">;
 
 /** The most of a story's page read to find its picture, and the largest picture fetched. */
 export const PAGE_READ_BYTES = 600_000;
@@ -187,7 +217,7 @@ export const NEWS_REFRESH_HOURS = 20;
 /** How long to wait before trying again after a reading failed. */
 export const NEWS_RETRY_HOURS = 1;
 
-const LIMITS = { headline: 120, summary: 480, meaning: 220, note: 200, brand: 40, brands: 6 } as const;
+const LIMITS = { headline: 120, summary: 480, meaning: 220, note: 200, brand: 40, brands: 6, model: 40, models: 8 } as const;
 
 const DAY_MS = 86_400_000;
 const dayNum = (d: string) => Date.parse(`${d}T12:00:00Z`);
@@ -242,6 +272,8 @@ export function cleanNewsItems(raw: unknown, seen: readonly string[], known: rea
     const brands = Array.isArray(o.brands)
       ? [...new Set(o.brands.map((b) => oneLine(b, LIMITS.brand)).filter(Boolean))].slice(0, LIMITS.brands)
       : [];
+    const listOf = (v: unknown, max: number, one: number) =>
+      Array.isArray(v) ? [...new Set(v.map((b) => oneLine(b, one)).filter(Boolean))].slice(0, max) : [];
     taken.add(key);
     out.push({
       topic,
@@ -251,6 +283,8 @@ export function cleanNewsItems(raw: unknown, seen: readonly string[], known: rea
       url,
       publishedOn,
       brands,
+      models: listOf(o.models, LIMITS.models, LIMITS.model),
+      replaces: listOf(o.replaces, LIMITS.models, LIMITS.model),
       ...cleanStanding(topic, url, o.standing, o.standingNote),
     });
   }
@@ -281,7 +315,10 @@ export function newsPrompt(today: string, recent: readonly string[]): string {
   return `Today is ${today} in Melbourne. You are Sol, the assistant inside RENUABL, software for Australian solar retailers and installers.
 
 Search the web for the news from the last 7 days that an Australian solar, battery and EV charger business should know. Look for:
-- companies: makers, wholesalers, retailers or installers entering or leaving Australia, closing, going into administration, merging, recalls, warranty support changing
+- recalls: safety recalls and warnings for panels, inverters, batteries, isolators and EV chargers sold in Australia (productsafety.gov.au, Energy Safe Victoria and the other electrical safety regulators, the maker's own recall notice)
+- listings: panels, inverters and batteries added to or taken off the approved product lists that rebates depend on, and listings expiring
+- companies: makers, wholesalers, retailers or installers entering or leaving Australia, closing, going into administration, merging, warranty support changing
+- notices: makers' own technical notices for Australia: firmware updates, installation or safety bulletins, warranty terms and support changing
 - rebates: the federal STCs and battery incentive, Solar Victoria and other state rebates and loans, changes to amounts, rules or dates
 - rules: standards (AS/NZS 4777, 5139, 3000), the CEC and Solar Accreditation Australia, Energy Safe Victoria, the CER's approved products, consumer rules
 - networks: export limits, flexible exports, emergency backstop, tariffs, AEMO and the distributors (AusNet, CitiPower, Powercor, Jemena, United Energy and others)
@@ -296,7 +333,7 @@ Sources:
 - If you can't find or open the official page, don't drop the story: link a reputable news outlet (ABC, AFR, RenewEconomy, pv magazine and the like) and mark it "reported".
 - Report the news; don't spend your searches on one story. Cover the week's main stories first, then look for official pages for the rebate and rule ones.
 
-Aim for ${AIM_STORIES} stories or more, across the topics, not all rebates. Always search for products: new panels, inverters, batteries and EV chargers launched in Australia or added to the Clean Energy Council's approved lists, and makers' announcements (makers' own news pages, pv magazine Australia and the trade press). Include at least two product stories when there are any that week.
+Aim for ${AIM_STORIES} stories or more, across the topics, not all rebates. Always search for recalls (productsafety.gov.au first) and for approved-list changes; say none were found by sending none, never a made-up recall. Always search for products: new panels, inverters, batteries and EV chargers launched in Australia or added to the Clean Energy Council's approved lists, and makers' announcements (makers' own news pages, pv magazine Australia and the trade press). Include at least two product stories when there are any that week.
 ${already}
 Rules:
 - Every story must come from a page your search showed or you read. Copy its address exactly. Never make up or guess a link.
@@ -304,10 +341,11 @@ Rules:
 - Write the headline and summary in your own words. Never copy a sentence from the page.
 - Only facts the page states. No figure, date or name it doesn't give. If something is uncertain or reported but not confirmed, say so.
 - "meaning" is one plain sentence on what it means for a solar retailer or installer (for example: customers with this product may ask about warranty support). Practical, never financial or legal advice.
+- Name the exact models a story is about in "models", as the page writes them (for example "SE5000H", "Powerwall 3", "JKM475N-54HL4"), only when the page names them; for a recall, the models recalled. For a new model, "replaces" lists the models it replaces when the page says so. Never guess a model number.
 - Up to ${MAX_PER_RUN} stories, the most important first. Fewer is fine: no filler, nothing older than ${NEWS_DAYS} days.
 
 End your reply with the stories as JSON in a \`\`\`json fence: a list of objects with
-"topic" (one of ${NEWS_TOPICS.map((t) => `"${t}"`).join(", ")}), "headline" (under 15 words), "summary" (2 or 3 sentences), "meaning" (1 sentence), "url", "publishedOn" (YYYY-MM-DD if the page says, else null), "brands" (makers or businesses named, as written), "standing" ("confirmed", "reported" or "unconfirmed"), "standingNote" (1 short sentence).`;
+"topic" (one of ${NEWS_TOPICS.map((t) => `"${t}"`).join(", ")}), "headline" (under 15 words), "summary" (2 or 3 sentences), "meaning" (1 sentence), "url", "publishedOn" (YYYY-MM-DD if the page says, else null), "brands" (makers or businesses named, as written), "models" (exact model numbers named, else []), "replaces" (models a new one replaces, else []), "standing" ("confirmed", "reported" or "unconfirmed"), "standingNote" (1 short sentence).`;
 }
 
 /** Whether a fresh reading is due: never read, the last good one over `NEWS_REFRESH_HOURS` ago, a failed one over `NEWS_RETRY_HOURS`. */

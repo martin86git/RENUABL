@@ -10,11 +10,17 @@ import {
   Building2,
   CircleHelp,
   Cpu,
+  Home,
+  ListChecks,
   Newspaper,
   PackageSearch,
+  Receipt,
   Scale,
+  TriangleAlert,
   UtilityPole,
+  Wrench,
 } from "lucide-react";
+import Link from "next/link";
 import {
   NEWS_STANDING_LABELS,
   NEWS_TOPICS,
@@ -22,7 +28,6 @@ import {
   NEWS_TOPIC_LABELS,
   newsDayGroup,
   newsShown,
-  onYourListsWords,
   type NewsItem,
   type NewsTopic,
 } from "@/lib/domain/design/industry-news";
@@ -32,6 +37,15 @@ import { mergeFeed, type FeedEntry, type FeedPost } from "@/lib/domain/design/fe
 import { loadPosts } from "@/lib/services/feed-posts";
 import { PostCard, PostComposer } from "./feed-posts";
 import { SolBadge } from "./sol-icon";
+import { listWords, moveShare, priceMovesWords, systemsWords, type PriceMovesNote } from "@/lib/domain/design/product-watch";
+
+const money = (n: number) => "$" + n.toLocaleString("en-AU", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
+
+/** A story, a post, or the business's own price moves, in the order they happened. */
+type Entry = FeedEntry | { kind: "prices"; note: PriceMovesNote; at: number };
+
+/** A story that touches this business: its products on the lists, or its customers' systems. */
+const touches = (n: NewsItem) => Boolean(n.lists || n.systems);
 
 const dayWords = (d: string) =>
   new Intl.DateTimeFormat("en-AU", { timeZone: "UTC", day: "numeric", month: "short" }).format(new Date(`${d}T12:00:00Z`));
@@ -50,7 +64,7 @@ export function NewsPage() {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [staff, setStaff] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [filter, setFilter] = useState<NewsTopic | "all" | "posts" | "reported">("all");
+  const [filter, setFilter] = useState<NewsTopic | "all" | "yours" | "posts" | "reported">("all");
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -61,7 +75,14 @@ export function NewsPage() {
         if (gone) return;
         if (!r.ok) return setProblem(r.message);
         setProblem(null);
-        setData({ items: r.items, readAt: r.readAt, reading: r.reading, configured: r.configured, missed: r.missed });
+        setData({
+          items: r.items,
+          readAt: r.readAt,
+          reading: r.reading,
+          configured: r.configured,
+          missed: r.missed,
+          priceMoves: r.priceMoves ?? [],
+        });
         // While Sol is reading, look again shortly; else every ten minutes.
         timer = window.setTimeout(go, r.reading ? 15_000 : 600_000);
       });
@@ -91,24 +112,38 @@ export function NewsPage() {
   const refresh = () => setTick((n) => n + 1);
 
   const today = todayInMarket();
-  const stories = data && filter !== "posts" && filter !== "reported" ? newsShown(data.items, filter === "all" ? "all" : filter) : [];
+  const stories =
+    data && filter !== "posts" && filter !== "reported"
+      ? filter === "yours"
+        ? newsShown(data.items, "all").filter(touches)
+        : newsShown(data.items, filter === "all" ? "all" : filter)
+      : [];
   const shownPosts = filter === "all" || filter === "posts" || filter === "reported" ? posts : [];
-  const entries = mergeFeed(stories, shownPosts);
-  const groups: { day: string; entries: FeedEntry[] }[] = [];
+  const notes = filter === "all" || filter === "yours" ? (data?.priceMoves ?? []) : [];
+  const entries: Entry[] = [
+    ...mergeFeed(stories, shownPosts),
+    ...notes.map((note) => ({ kind: "prices" as const, note, at: Date.parse(note.at) })),
+  ].sort((a, b) => b.at - a.at);
+  const groups: { day: string; entries: Entry[] }[] = [];
   for (const e of entries) {
-    const day = e.kind === "story" ? newsDayGroup(e.item, today) : newsDayGroup({ publishedOn: null, foundAt: e.post.at }, today);
+    const day =
+      e.kind === "story"
+        ? newsDayGroup(e.item, today)
+        : newsDayGroup({ publishedOn: null, foundAt: e.kind === "post" ? e.post.at : e.note.at }, today);
     const last = groups[groups.length - 1];
     if (last?.day === day) last.entries.push(e);
     else groups.push({ day, entries: [e] });
   }
   const topics = NEWS_TOPICS.filter((t) => data?.items.some((n) => n.topic === t));
+  const touching = data?.items.filter(touches).length ?? 0;
+  const looks = data?.items.filter((n) => n.look).length ?? 0;
   const chips: { id: typeof filter; label: string }[] = [
     { id: "all", label: "All" },
+    ...(touching || data?.priceMoves.length ? [{ id: "yours" as const, label: "Your products" }] : []),
     { id: "posts", label: "Posts" },
     ...topics.map((t) => ({ id: t, label: NEWS_TOPIC_LABELS[t] })),
     ...(staff ? [{ id: "reported" as const, label: "Reported" }] : []),
   ];
-  const touching = data?.items.filter((n) => n.mine).length ?? 0;
 
   return (
     <div className="mx-auto w-full max-w-3xl pb-10">
@@ -152,10 +187,23 @@ export function NewsPage() {
         ))}
       </div>
 
-      {touching > 0 && filter !== "posts" && filter !== "reported" && (
+      {looks > 0 && filter !== "posts" && filter !== "reported" && (
+        <button
+          type="button"
+          onClick={() => setFilter("yours")}
+          className="mt-4 flex w-full items-start gap-2.5 rounded-2xl bg-warning-soft px-4 py-3 text-left text-[13.5px] text-warning"
+        >
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>
+            <span className="font-semibold">{looks === 1 ? "One story needs a look" : `${looks} stories need a look`}.</span> A recall,
+            listing change, maker notice or maker leaving names products in your customers&apos; systems or on your price lists.
+          </span>
+        </button>
+      )}
+      {!looks && touching > 0 && filter !== "posts" && filter !== "reported" && filter !== "yours" && (
         <p className="mt-4 flex items-center gap-2 text-[13px] text-ink">
           <PackageSearch className="size-4 text-sun-line" aria-hidden />
-          {touching === 1 ? "One story names" : `${touching} stories name`} a maker on your price lists. They&apos;re marked below.
+          {touching === 1 ? "One story names" : `${touching} stories name`} your products. They&apos;re marked below.
         </p>
       )}
 
@@ -206,6 +254,8 @@ export function NewsPage() {
             {g.entries.map((e) =>
               e.kind === "story" ? (
                 <Story key={e.item.id} item={e.item} />
+              ) : e.kind === "prices" ? (
+                <PriceMovesCard key={e.note.id} note={e.note} />
               ) : (
                 <PostCard key={e.post.id} post={e.post} staff={staff} onChange={refresh} />
               ),
@@ -242,9 +292,12 @@ function StandingPill({ standing }: { standing: NewsStanding }) {
 
 /** Each topic's colour and mark, for the drawn picture on a story whose page has none of its own. */
 const TOPIC_ART: Record<NewsTopic, { icon: typeof Newspaper; soft: string; ink: string }> = {
-  companies: { icon: Building2, soft: "bg-kind-approvals-soft", ink: "text-kind-approvals" },
+  recalls: { icon: TriangleAlert, soft: "bg-warning-soft", ink: "text-warning" },
+  listings: { icon: ListChecks, soft: "bg-kind-follow-up-soft", ink: "text-kind-follow-up" },
+  notices: { icon: Wrench, soft: "bg-kind-approvals-soft", ink: "text-kind-approvals" },
+  companies: { icon: Building2, soft: "bg-kind-message-soft", ink: "text-kind-message" },
   rebates: { icon: BadgePercent, soft: "bg-kind-order-soft", ink: "text-kind-order" },
-  rules: { icon: Scale, soft: "bg-kind-message-soft", ink: "text-kind-message" },
+  rules: { icon: Scale, soft: "bg-canvas", ink: "text-ink-2" },
   networks: { icon: UtilityPole, soft: "bg-kind-lead-soft", ink: "text-kind-lead" },
   products: { icon: BatteryCharging, soft: "bg-kind-install-soft", ink: "text-kind-install" },
   technology: { icon: Cpu, soft: "bg-kind-date-soft", ink: "text-kind-date" },
@@ -287,7 +340,17 @@ function Story({ item }: { item: NewsItem }) {
   const [open, setOpen] = useState(false);
   const long = item.summary.length > 240;
   return (
-    <li className="overflow-hidden rounded-2xl bg-surface shadow-[0_1px_3px_rgba(0,0,0,0.06)] ring-1 ring-line">
+    <li
+      className={clsx(
+        "overflow-hidden rounded-2xl bg-surface shadow-[0_1px_3px_rgba(0,0,0,0.06)]",
+        item.look ? "ring-2 ring-warning" : "ring-1 ring-line",
+      )}
+    >
+      {item.look && (
+        <p className="flex items-center gap-1.5 bg-warning px-5 py-1.5 text-[12.5px] font-semibold text-canvas">
+          <TriangleAlert className="size-3.5" aria-hidden /> Needs a look
+        </p>
+      )}
       <StoryPicture item={item} />
       <div className="px-5 pb-4 pt-3.5">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
@@ -321,15 +384,45 @@ function Story({ item }: { item: NewsItem }) {
             <span>{item.standingNote}</span>
           </p>
         )}
-        {item.mine && (
+        {item.systems && (
+          <div className="mt-3 rounded-xl bg-canvas px-3 py-2.5 text-[13px] text-ink ring-1 ring-line">
+            <p className="flex items-center gap-2 font-medium">
+              <Home className="size-3.5 shrink-0 text-sun-line" aria-hidden />
+              {systemsWords(item.systems)}
+            </p>
+            <p className="mt-1.5 flex flex-wrap gap-1.5">
+              {item.systems.deals.map((d) => (
+                <Link
+                  key={d.jobId}
+                  href={`/design/deals/${encodeURIComponent(d.jobId)}`}
+                  className="rounded-full bg-surface px-2.5 py-1 text-[12.5px] text-ink ring-1 ring-line hover:ring-ink"
+                >
+                  {d.customer}
+                  <span className="text-muted"> · {d.installed ? "installed" : "sold"}</span>
+                </Link>
+              ))}
+              {item.systems.installed + item.systems.sold > item.systems.deals.length && (
+                <span className="px-1 py-1 text-[12.5px] text-muted">
+                  and {item.systems.installed + item.systems.sold - item.systems.deals.length} more
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+        {item.lists && (
           <p className="mt-3 flex items-start gap-2 rounded-xl bg-canvas px-3 py-2 text-[13px] text-ink ring-1 ring-sun-line">
             <PackageSearch className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
             <span>
-              <span className="font-medium">{onYourListsWords(item.mine)}</span>
-              <span className="text-muted">
-                : {item.mine.examples.join(", ")}
-                {item.mine.count > item.mine.examples.length ? "…" : ""}
-              </span>
+              <span className="font-medium">{listWords(item.lists)}</span>
+              {item.lists.count > 0 && (
+                <span className="text-muted">
+                  : {item.lists.examples.join(", ")}
+                  {item.lists.count > item.lists.examples.length ? "…" : ""}
+                </span>
+              )}
+              {item.lists.count > 0 && item.lists.replaced.length > 0 && (
+                <span className="text-muted">. Replaces {item.lists.replaced.join(", ")}</span>
+              )}
             </span>
           </p>
         )}
@@ -342,6 +435,42 @@ function Story({ item }: { item: NewsItem }) {
             </span>
           </p>
         )}
+      </div>
+    </li>
+  );
+}
+
+/** What moved when one of the business's price lists was saved (its own costs: only for members who see them). */
+function PriceMovesCard({ note }: { note: PriceMovesNote }) {
+  const m = note.moves;
+  return (
+    <li className="overflow-hidden rounded-2xl bg-surface shadow-[0_1px_3px_rgba(0,0,0,0.06)] ring-1 ring-line">
+      <div className="flex items-center gap-3 bg-kind-order-soft px-5 py-3 text-kind-order">
+        <span className="grid size-9 place-items-center rounded-full bg-surface shadow-sm">
+          <Receipt className="size-4" aria-hidden />
+        </span>
+        <span className="text-[13px] font-medium">Your price lists · only your business sees this</span>
+      </div>
+      <div className="px-5 pb-4 pt-3.5">
+        <p className="text-[17px] font-semibold leading-snug text-ink">{priceMovesWords(m)}</p>
+        <ul className="mt-2.5 divide-y divide-line text-[13.5px]">
+          {m.biggest.map((x) => (
+            <li key={x.sku} className="flex items-baseline gap-3 py-1.5">
+              <span className="min-w-0 flex-1 truncate text-ink">{x.name}</span>
+              <span className="tabular-nums text-muted">
+                {money(x.was)} → {money(x.now)}
+              </span>
+              <span className={clsx("w-14 text-right font-medium tabular-nums", x.now > x.was ? "text-warning" : "text-positive")}>
+                {moveShare(x)}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-[12.5px] text-muted">
+          Against the prices you had before this list, ex GST.
+          {m.added > 0 && ` ${m.added} product${m.added === 1 ? " is" : "s are"} new to your lists.`}
+          {m.up + m.down > m.biggest.length && ` The ${m.biggest.length} biggest moves are shown.`}
+        </p>
       </div>
     </li>
   );

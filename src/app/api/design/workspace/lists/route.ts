@@ -6,6 +6,7 @@ import { businessDatasheets } from "@/lib/server/design-datasheets-repo";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { allow } from "@/lib/server/rate-limit";
 import { loadLists, removeList, saveList } from "@/lib/server/design-repo";
+import { keepPriceMoves } from "@/lib/server/design-product-watch";
 
 /** Finding a datasheet online (a search, a download, a read) can take a couple of minutes, after the answer too. */
 export const maxDuration = 300;
@@ -23,7 +24,10 @@ export async function PUT(request: Request) {
     if ("refuse" in read) return read.refuse;
     const list = cleanSupplierList(read.body.list);
     if (!list) return Response.json({ ok: false, message: "That price list has no priced rows to keep." }, { status: 422 });
+    // The prices before this list, so what moved can be told on the News tab (product-watch.ts); never stops a save.
+    const before = await loadLists(who.member.businessId).catch(() => []);
     await saveList(who.member.businessId, list, who.member.email);
+    await keepPriceMoves(who.member.businessId, list, before, who.member.email).catch(() => null);
     // Its panels and inverters with no figures anywhere: their datasheets are looked for online once the answer has gone
     // (datasheet-finder.ts), a few at a time, and kept unchecked until a person confirms them.
     const businessId = who.member.businessId;

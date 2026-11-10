@@ -61,6 +61,16 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
     area: "Today",
+    words: "News reports recalls, approved-list changes and maker notices, and says which of your customers' systems they touch.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Today",
+    words: "Saving a supplier price list shows on the News tab what went up and down since your last prices.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Today",
     words: "News stories each carry a picture, or a drawn one for their topic, and stand apart from posts so the feed is easy to scan.",
   },
   {

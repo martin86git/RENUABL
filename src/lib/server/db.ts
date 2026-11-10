@@ -629,6 +629,19 @@ alter table industry_news add column if not exists standing_note text not null d
 alter table industry_news add column if not exists image bytea;
 alter table industry_news add column if not exists image_type text;
 alter table industry_news add column if not exists image_tried boolean not null default false;
+-- The exact models a story names, and those a new model replaces (10 Nov 2026: news at the product level).
+alter table industry_news add column if not exists models jsonb not null default '[]';
+alter table industry_news add column if not exists replaces jsonb not null default '[]';
+-- What moved when a business saved a price list against its earlier prices (domain/design/product-watch.ts), shown on
+-- its own News tab to members who see costs. Gone with the business.
+create table if not exists design_price_moves (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  moves jsonb not null,
+  by_email text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists design_price_moves_business on design_price_moves(business_id, created_at desc);
 create table if not exists industry_news_runs (
   id text primary key,
   started_at timestamptz not null default now(),

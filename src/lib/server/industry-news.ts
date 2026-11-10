@@ -51,11 +51,15 @@ interface Row {
   site: string;
   publishedOn: string | null;
   brands: unknown;
+  models: unknown;
+  replaces: unknown;
   standing: string | null;
   standingNote: string;
   hasImage: boolean;
   foundAt: string;
 }
+
+const words = (v: unknown) => (Array.isArray(v) ? v.filter((b): b is string => typeof b === "string") : []);
 
 const itemOf = (r: Row): NewsItem => ({
   id: r.id,
@@ -66,7 +70,9 @@ const itemOf = (r: Row): NewsItem => ({
   url: r.url,
   site: r.site,
   publishedOn: r.publishedOn,
-  brands: Array.isArray(r.brands) ? r.brands.filter((b): b is string => typeof b === "string") : [],
+  brands: words(r.brands),
+  models: words(r.models),
+  replaces: words(r.replaces),
   standing: NEWS_STANDINGS.includes(r.standing as NewsStanding) ? (r.standing as NewsStanding) : null,
   standingNote: r.standingNote ?? "",
   hasImage: Boolean(r.hasImage),
@@ -103,7 +109,7 @@ const lastRun = (q: typeof query = query) =>
 export async function newsFeed(): Promise<NewsFeed> {
   const [rows, last, good] = await Promise.all([
     query<Row>(
-      `select id, topic, headline, summary, meaning, url, site, to_char(published_on, 'YYYY-MM-DD') as "publishedOn", brands,
+      `select id, topic, headline, summary, meaning, url, site, to_char(published_on, 'YYYY-MM-DD') as "publishedOn", brands, models, replaces,
               standing, standing_note as "standingNote", image is not null as "hasImage",
               ${moment("found_at")} as "foundAt"
          from industry_news
@@ -303,8 +309,8 @@ export async function readTheNews(force = false): Promise<number | null> {
     let kept = 0;
     for (const s of stories) {
       const rows = await query(
-        `insert into industry_news (id, url_key, url, site, topic, headline, summary, meaning, brands, published_on, standing, standing_note)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)
+        `insert into industry_news (id, url_key, url, site, topic, headline, summary, meaning, brands, published_on, standing, standing_note, models, replaces)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13::jsonb, $14::jsonb)
          on conflict (url_key) do nothing returning id`,
         [
           newId("story", 8),
@@ -319,6 +325,8 @@ export async function readTheNews(force = false): Promise<number | null> {
           s.publishedOn,
           s.standing,
           s.standingNote,
+          JSON.stringify(s.models ?? []),
+          JSON.stringify(s.replaces ?? []),
         ],
       );
       kept += rows.length;
