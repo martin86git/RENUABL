@@ -41,7 +41,6 @@ import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawe
 import { TeamChatButton } from "./team-chat";
 import { DayWeather, NotificationsMenu, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
-import { SectionFold } from "./section-fold";
 import { QuickCalc } from "./quick-calc";
 
 export { MarketplaceMark };
@@ -419,7 +418,6 @@ function Shell({
                 // them to be worth folding (a retailer's); an installer's or inspector's few stay as they are.
                 const foldable = sections.filter((s, i) => i > 0 && s.id !== "marketplace");
                 if (foldable.length < 3) return null;
-                const folded = foldable.filter((s) => s.id !== "crm");
                 const link = (sec: (typeof sections)[number]) => {
                   const lit = sec.id === current.id;
                   const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);
@@ -430,7 +428,7 @@ function Shell({
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
                         "flex h-10 items-center gap-1.5 rounded-full px-4 text-sm transition-colors",
-                        lit ? "bg-ink font-medium text-sun-line" : "text-ink-2 hover:bg-canvas hover:text-ink",
+                        lit ? "bg-primary font-medium text-primary-ink" : "text-ink-2 hover:bg-canvas hover:text-ink",
                       )}
                     >
                       {sec.label}
@@ -471,15 +469,9 @@ function Shell({
                         <FileText className="size-5" aria-hidden />
                       </Link>
                     )}
-                    {/* The CRM stays in view (8 Nov 2026, Martin: the deals and customers are where the day starts); the
-                        engine behind it (procurement, installation, service) stays folded. */}
-                    {foldable.filter((s) => s.id === "crm").map(link)}
-                    <SectionFold
-                      inside={folded.some((s) => s.id === current.id)}
-                      waiting={folded.reduce((n, s) => n + s.pages.reduce((m, p) => m + count(p.id), 0), 0)}
-                    >
-                      {folded.map(link)}
-                    </SectionFold>
+                    {/* Every section in view again (10 Nov 2026, Martin: reveal the rest of the menu), CRM first. The
+                        layers fold (section-fold.tsx) is no longer used here. */}
+                    {foldable.map(link)}
                   </>
                 );
               })()}
@@ -515,7 +507,7 @@ function Shell({
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
                         "flex h-10 items-center gap-1.5 rounded-full px-4 text-sm transition-colors",
-                        lit ? "bg-ink font-medium text-sun-line" : "text-ink-2 hover:bg-canvas hover:text-ink",
+                        lit ? "bg-primary font-medium text-primary-ink" : "text-ink-2 hover:bg-canvas hover:text-ink",
                       )}
                     >
                       {sec.label}
