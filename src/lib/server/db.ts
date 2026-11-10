@@ -606,6 +606,35 @@ create table if not exists design_sol_knowledge (
   used_at timestamptz
 );
 create index if not exists design_sol_knowledge_business on design_sol_knowledge(business_id, saved_at desc);
+-- Industry news (domain/design/industry-news.ts): the stories Sol finds each morning, the same for every business
+-- (public news, no business's data), and each morning's reading with what it cost.
+create table if not exists industry_news (
+  id text primary key,
+  url_key text not null unique,
+  url text not null,
+  site text not null,
+  topic text not null,
+  headline text not null,
+  summary text not null,
+  meaning text not null default '',
+  brands jsonb not null default '[]',
+  published_on date,
+  found_at timestamptz not null default now()
+);
+create index if not exists industry_news_found on industry_news(found_at desc);
+-- How sure each story is, and Sol's line on why (10 Nov 2026).
+alter table industry_news add column if not exists standing text;
+alter table industry_news add column if not exists standing_note text not null default '';
+create table if not exists industry_news_runs (
+  id text primary key,
+  started_at timestamptz not null default now(),
+  finished_at timestamptz,
+  ok boolean,
+  found integer not null default 0,
+  error text,
+  cost_micros bigint
+);
+create index if not exists industry_news_runs_started on industry_news_runs(started_at desc);
 -- The team chat (domain/design/team-chat.ts): a business's members talking in its channels and in direct
 -- conversations, the files sent with lines, and when each member last had each room open. Gone with the business.
 create table if not exists design_team_lines (

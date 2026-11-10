@@ -19,6 +19,8 @@ export const TODAY_TABS = [
   { id: "inbox", label: "Inbox" },
   { id: "calendar", label: "Calendar" },
   { id: "pipeline", label: "Pipeline" },
+  // 10 Nov 2026, Martin: the solar industry's news, read by Sol each morning (industry-news.ts).
+  { id: "news", label: "News" },
 ] as const;
 export type TodayTab = (typeof TODAY_TABS)[number]["id"];
 

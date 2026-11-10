@@ -7,6 +7,10 @@
       "schedule": "0 20 * * *"
     },
     {
+      "path": "/api/cron/news",
+      "schedule": "0 19 * * *"
+    },
+    {
       "path": "/api/cron/sol-outbox",
       "schedule": "0 * * * *"
     }

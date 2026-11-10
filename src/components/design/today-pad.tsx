@@ -14,6 +14,7 @@ import {
   HardHat,
   KanbanSquare,
   Mail,
+  Newspaper,
   Phone,
   Play,
   Plus,
@@ -54,6 +55,7 @@ import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { InboxPage } from "./inbox";
 import { CallLogPage } from "./call-log";
+import { NewsPage } from "./industry-news";
 import { DealFeed } from "./deal-feed";
 import { NewDeal } from "./design-customers";
 import { NewLook, Spotlight } from "./new-look";
@@ -74,6 +76,7 @@ const TAB_ICONS: Record<TodayTab, typeof Sun> = {
   inbox: Mail,
   calendar: CalendarDays,
   pipeline: KanbanSquare,
+  news: Newspaper,
 };
 /** Items under To action before "N more". */
 const SHOWN = 5;
@@ -452,6 +455,7 @@ export function TodayPad(props: {
           {tab === "inbox" && <InboxPage />}
           {tab === "calendar" && <CalendarView jobs={props.jobs} today={props.today} />}
           {tab === "pipeline" && <PipelineView jobs={props.jobs} today={props.today} />}
+          {tab === "news" && <NewsPage />}
           {tab === "day" && props.day}
         </div>
       )}
