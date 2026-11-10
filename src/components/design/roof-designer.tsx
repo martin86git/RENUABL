@@ -5,6 +5,8 @@ import { accessColour, shadeHint, shadeReport, type ShadeReport } from "@/lib/do
 import { loadTerrain, type Heights } from "@/lib/services/terrain";
 import { loadRoofCheck } from "@/lib/services/roof-check";
 import { useDesignTips } from "./design-tips";
+import { SolNudges } from "./sol-nudges";
+import { nudgesFor, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
 import { SideViewsButton } from "./side-views";
 import { batteryFill } from "@/lib/domain/design/battery-fill";
 import {
@@ -3433,6 +3435,44 @@ export function RoofDesigner(props: {
     });
   })();
   const light = readinessLight(ready);
+  /**
+   * Sol beside the design (10 Nov 2026, Martin: options as you design, and the questions the quote needs answered):
+   * worked out by rule from the design as it stands (`sol-nudges.ts`), shown one at a time over Ask Sol.
+   */
+  const [nudgesAside, setNudgesAside] = useState<string[]>([]);
+  const [backupAnswered, setBackupAnswered] = useState(false);
+  const nudges = (() => {
+    const strung = new Set(strings.flatMap((x) => x.panels));
+    const keys = Object.keys(centres);
+    const fill = battery
+      ? batteryFill({
+          solarDayKwh: Number(summary.kwhPerDay) || 0,
+          homeDayKwh: finance?.dailyKwh ?? null,
+          batteryKwh: battery.kwh * battery.qty,
+          backupKwh: battery.backup ? battery.kwh : 0,
+        })
+      : null;
+    return nudgesFor({
+      panels: summary.panels,
+      kw: summary.kw,
+      inverterKw: fittedKw,
+      inverters: fitted.length,
+      unstrung: fitted.length ? keys.filter((k) => !strung.has(k)).length : 0,
+      oversize: oversize ? { percent: oversize.percent, limit: oversize.limit, over: oversize.over } : null,
+      battery: battery ? { kwh: battery.kwh * battery.qty, ...(battery.backup !== undefined ? { backup: battery.backup } : {}) } : null,
+      fill,
+      panelDayKwh: summary.panels ? (Number(summary.kwhPerDay) || 0) / summary.panels : 0,
+      homeDayKwh: finance?.dailyKwh ?? null,
+      onDeal: Boolean(props.jobId),
+      phase: quoteNow.form.phase === "three" ? "three" : "single",
+      shaded: shade ? shade.report.panels.filter((x) => typeof x.access === "number" && x.access < 1 - SHADE_LOSS).length : 0,
+      undecided: costsHidden
+        ? []
+        : undecidedLines(costSystem(spec, quoteNow.form, props.workspace).lines, quoteNow.edits).map((l) => l.label),
+      backupAnswered,
+      costsHidden,
+    }).filter((n) => !nudgesAside.includes(n.id));
+  })();
   const [readyOpen, setReadyOpen] = useState(false);
   const goTo = (where: ReadinessItem["goTo"]) => {
     setReadyOpen(false);
@@ -4021,6 +4061,49 @@ export function RoofDesigner(props: {
           eveningShare: DAY.eveningShare,
         })
       : null;
+  /** What a press on one of Sol's suggestions or questions does (`SolNudges`). */
+  const actOnNudge = (nudge: Nudge, action: NudgeAction) => {
+    const aside = () => setNudgesAside((list) => [...list, nudge.id]);
+    switch (action.act) {
+      case "suggest-inverter":
+        openMenu("inverters");
+        setSuggesting(true);
+        return;
+      case "find-usage":
+        openMenu("bill");
+        void askSol();
+        return;
+      case "open-bill":
+        return openMenu("bill");
+      case "string":
+        stringForMe();
+        return;
+      case "battery-menu":
+        return openMenu("batteries");
+      case "add-panels":
+        return pickTool("panel");
+      case "show-shade":
+        setShadeOn(true);
+        return aside();
+      case "backup-yes":
+        setBattery((b) => (b ? { ...b, backup: true } : b));
+        setBackupAnswered(true);
+        return changed();
+      case "backup-no":
+        setBackupAnswered(true);
+        return;
+      case "line-on":
+      case "line-off": {
+        const line = costSystem(spec, quoteNow.form, props.workspace).lines.find((l) => l.label === action.line);
+        if (!line) return aside();
+        setQuote({
+          ...quoteNow,
+          edits: { ...quoteNow.edits, [lineKey(line)]: action.act === "line-on" ? { on: true } : { removed: true } },
+        });
+        return;
+      }
+    }
+  };
   /** Strings the panels by rule (`auto-string.ts`) in place of the strings drawn, and says what it did. */
   const stringForMe = () => {
     const done = autoStringDesign(
@@ -8787,8 +8870,14 @@ export function RoofDesigner(props: {
                             {allBatteries
                               ? "Showing every battery on your lists, including those that don't work with the inverter on this design. "
                               : `Only batteries that work with the inverter on this design: its own maker's, or AC coupled. `}
-                            <button type="button" onClick={() => setAllBatteries((a) => !a)} className="font-medium text-ink underline underline-offset-2">
-                              {allBatteries ? "Show only those that fit" : `Show the ${props.batteries.length - batteriesThatFit.length} others`}
+                            <button
+                              type="button"
+                              onClick={() => setAllBatteries((a) => !a)}
+                              className="font-medium text-ink underline underline-offset-2"
+                            >
+                              {allBatteries
+                                ? "Show only those that fit"
+                                : `Show the ${props.batteries.length - batteriesThatFit.length} others`}
                             </button>
                           </p>
                         )}
@@ -9153,6 +9242,17 @@ export function RoofDesigner(props: {
                 </div>
               )}
               {tips.corner}
+              {/* Sol beside the design: one suggestion or question at a time, over Ask Sol, never while his panel is out. */}
+              {nudges.length > 0 &&
+                !menu &&
+                !opening &&
+                !calcOpen &&
+                !(props.tight && !solAway && (commandOpen || commandReply || commandBusy)) &&
+                !(!props.tight && commandOpen) && (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-[6.25rem] z-30 flex justify-center">
+                    <SolNudges nudges={nudges} onAct={actOnNudge} onDismiss={(id) => setNudgesAside((a) => [...a, id])} />
+                  </div>
+                )}
               {tapFill && (
                 <div className="absolute left-1/2 top-[4.75rem] z-30 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 flex-col items-center gap-1">
                   <div className="flex items-center gap-3 rounded-full bg-primary/90 py-1.5 pl-4 pr-1.5 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md">
