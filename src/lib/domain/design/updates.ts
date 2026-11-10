@@ -56,6 +56,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
     area: "Today",
+    words: "News stories each carry a picture, or a drawn one for their topic, and stand apart from posts so the feed is easy to scan.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Today",
     words: "Post to every business on RENUABL from the News tab: words, a photo or a link, with likes, comments and Report.",
   },
   {

@@ -176,7 +176,7 @@ export function PostCard({ post, staff, onChange }: { post: FeedPost; staff: boo
   };
 
   return (
-    <li className="rounded-2xl bg-surface px-4 py-3.5 ring-1 ring-line">
+    <li className="rounded-2xl bg-surface px-5 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] ring-1 ring-line">
       <div className="flex items-start gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-[12px] font-semibold text-primary-ink">
           {initials(post.author)}

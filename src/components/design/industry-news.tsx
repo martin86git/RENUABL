@@ -2,7 +2,19 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowUpRight, BadgeCheck, CircleHelp, Newspaper, PackageSearch } from "lucide-react";
+import {
+  ArrowUpRight,
+  BadgeCheck,
+  BadgePercent,
+  BatteryCharging,
+  Building2,
+  CircleHelp,
+  Cpu,
+  Newspaper,
+  PackageSearch,
+  Scale,
+  UtilityPole,
+} from "lucide-react";
 import {
   NEWS_STANDING_LABELS,
   NEWS_TOPICS,
@@ -188,9 +200,9 @@ export function NewsPage() {
       )}
 
       {groups.map((g) => (
-        <section key={g.day} className="mt-6">
+        <section key={g.day} className="mt-8">
           <h3 className="text-[12px] font-medium uppercase tracking-[0.08em] text-muted">{g.day}</h3>
-          <ul className="mt-2 grid gap-2">
+          <ul className="mt-3 grid gap-5">
             {g.entries.map((e) =>
               e.kind === "story" ? (
                 <Story key={e.item.id} item={e.item} />
@@ -228,52 +240,89 @@ function StandingPill({ standing }: { standing: NewsStanding }) {
   );
 }
 
-function Story({ item }: { item: NewsItem }) {
+/** Each topic's colour and mark, for the drawn picture on a story whose page has none of its own. */
+const TOPIC_ART: Record<NewsTopic, { icon: typeof Newspaper; soft: string; ink: string }> = {
+  companies: { icon: Building2, soft: "bg-kind-approvals-soft", ink: "text-kind-approvals" },
+  rebates: { icon: BadgePercent, soft: "bg-kind-order-soft", ink: "text-kind-order" },
+  rules: { icon: Scale, soft: "bg-kind-message-soft", ink: "text-kind-message" },
+  networks: { icon: UtilityPole, soft: "bg-kind-lead-soft", ink: "text-kind-lead" },
+  products: { icon: BatteryCharging, soft: "bg-kind-install-soft", ink: "text-kind-install" },
+  technology: { icon: Cpu, soft: "bg-kind-date-soft", ink: "text-kind-date" },
+};
+
+/**
+ * The picture across the top of a story (10 Nov 2026, Martin: the feed blended into itself, with no pictures): its page's
+ * own preview picture, kept by us; else a drawn band in the topic's colour with its mark, so every story reads at a glance.
+ */
+function StoryPicture({ item }: { item: NewsItem }) {
+  const [failed, setFailed] = useState(false);
+  if (item.hasImage && !failed)
+    return (
+      <a href={item.url} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden className="block bg-canvas">
+        {/* eslint-disable-next-line @next/next/no-img-element -- the story page's preview picture, redrawn and kept by us */}
+        <img
+          src={`/api/design/news/${encodeURIComponent(item.id)}/image`}
+          alt=""
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="aspect-[2/1] max-h-72 w-full object-cover"
+        />
+      </a>
+    );
+  const art = TOPIC_ART[item.topic];
+  const Icon = art.icon;
   return (
-    <li className="flex flex-col gap-3 rounded-2xl bg-surface px-4 py-3.5 ring-1 ring-line sm:flex-row sm:items-start sm:gap-4">
-      {item.hasImage && (
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          tabIndex={-1}
-          aria-hidden
-          className="block shrink-0 overflow-hidden rounded-xl bg-canvas ring-1 ring-line sm:order-last sm:mt-1 sm:w-48"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element -- the story page's preview picture, redrawn and kept by us */}
-          <img
-            src={`/api/design/news/${encodeURIComponent(item.id)}/image`}
-            alt=""
-            loading="lazy"
-            className="aspect-[16/9] w-full object-cover"
-          />
-        </a>
-      )}
-      <div className="min-w-0 flex-1">
+    <div aria-hidden className={clsx("relative flex h-24 items-center overflow-hidden px-5", art.soft)}>
+      <Icon className={clsx("absolute -right-3 -top-4 size-36 opacity-15", art.ink)} strokeWidth={1.2} />
+      <Icon className={clsx("absolute right-36 top-12 size-10 opacity-10", art.ink)} strokeWidth={1.2} />
+      <span className={clsx("grid size-11 place-items-center rounded-full bg-surface shadow-sm", art.ink)}>
+        <Icon className="size-5" />
+      </span>
+      <span className={clsx("ml-3 text-[13px] font-medium", art.ink)}>{NEWS_TOPIC_LABELS[item.topic]}</span>
+    </div>
+  );
+}
+
+function Story({ item }: { item: NewsItem }) {
+  const [open, setOpen] = useState(false);
+  const long = item.summary.length > 240;
+  return (
+    <li className="overflow-hidden rounded-2xl bg-surface shadow-[0_1px_3px_rgba(0,0,0,0.06)] ring-1 ring-line">
+      <StoryPicture item={item} />
+      <div className="px-5 pb-4 pt-3.5">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
-          <span className="rounded-full bg-canvas px-2 py-0.5 text-ink-2 ring-1 ring-line">{NEWS_TOPIC_LABELS[item.topic]}</span>
-          {item.standing && <StandingPill standing={item.standing} />}
-          <span>{item.site}</span>
+          <span className="font-medium text-ink-2">{item.site}</span>
           {item.publishedOn && <span>· {dayWords(item.publishedOn)}</span>}
+          <span className="ml-auto flex flex-wrap items-center gap-1.5">
+            {item.hasImage && (
+              <span className="rounded-full bg-canvas px-2 py-0.5 text-ink-2 ring-1 ring-line">{NEWS_TOPIC_LABELS[item.topic]}</span>
+            )}
+            {item.standing && <StandingPill standing={item.standing} />}
+          </span>
         </p>
         <a
           href={item.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="group mt-1.5 flex items-start gap-1 text-[15px] font-medium leading-snug text-ink hover:underline"
+          className="group mt-2 flex items-start gap-1 text-[17px] font-semibold leading-snug text-ink hover:underline"
         >
           <span>{item.headline}</span>
-          <ArrowUpRight className="mt-0.5 size-4 shrink-0 text-muted group-hover:text-ink" aria-hidden />
+          <ArrowUpRight className="mt-1 size-4 shrink-0 text-muted group-hover:text-ink" aria-hidden />
         </a>
-        <p className="mt-1 text-[14px] leading-relaxed text-ink-2">{item.summary}</p>
+        <p className={clsx("mt-1.5 text-[14px] leading-relaxed text-ink-2", long && !open && "line-clamp-3")}>{item.summary}</p>
+        {long && (
+          <button type="button" onClick={() => setOpen((v) => !v)} className="mt-1 text-[13px] font-medium text-ink hover:underline">
+            {open ? "Less" : "More"}
+          </button>
+        )}
         {item.standingNote && (
-          <p className="mt-1.5 flex items-start gap-1.5 text-[12.5px] italic text-muted">
+          <p className="mt-2 flex items-start gap-1.5 text-[12.5px] italic text-muted">
             <SolBadge className="mt-0.5 size-3 shrink-0" />
             <span>{item.standingNote}</span>
           </p>
         )}
         {item.mine && (
-          <p className="mt-2.5 flex items-start gap-2 rounded-xl bg-canvas px-3 py-2 text-[13px] text-ink ring-1 ring-sun-line">
+          <p className="mt-3 flex items-start gap-2 rounded-xl bg-canvas px-3 py-2 text-[13px] text-ink ring-1 ring-sun-line">
             <PackageSearch className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
             <span>
               <span className="font-medium">{onYourListsWords(item.mine)}</span>
@@ -285,7 +334,7 @@ function Story({ item }: { item: NewsItem }) {
           </p>
         )}
         {item.meaning && (
-          <p className="mt-2.5 flex items-start gap-2 rounded-xl bg-sun px-3 py-2 text-[13px] text-sun-ink">
+          <p className="mt-3 flex items-start gap-2 rounded-xl bg-sun px-3 py-2 text-[13px] text-sun-ink">
             <SolBadge className="mt-0.5 size-3.5 shrink-0" />
             <span>
               <span className="font-medium">For you: </span>
