@@ -49,6 +49,8 @@ const COMMON_PAGES = [
   "/design/account",
   "/design/team",
   "/design/updates",
+  // The industry feed (Sol's news and businesses' posts), for every kind (10 Nov 2026).
+  "/design/news",
   "/design/feedback",
   "/design/terms",
   "/design/sign-in",
@@ -83,6 +85,8 @@ const COMMON_API = [
   "view-as",
   "team",
   "updates",
+  "news",
+  "posts",
   "feedback",
   "weather",
   "calendar",

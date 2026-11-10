@@ -15,6 +15,7 @@ import {
   CloudSun,
   LogOut,
   MessageSquarePlus,
+  Newspaper,
   Moon,
   SlidersHorizontal,
   Sparkles,
@@ -392,6 +393,7 @@ export function ProfileMenu(props: {
           {row("Your account", props.account, UserRound)}
           {props.connections && row("Connections", props.connections.href, Users, props.connections.waiting)}
           <div className="my-1 border-t border-line" />
+          {row("Industry news", "/design/news", Newspaper)}
           {row("Updates", props.updates, Sparkles, props.unseen)}
           {row("Feedback", props.feedback, MessageSquarePlus)}
           <div className="mt-2 flex items-center gap-3 border-t border-line px-3 pt-3 text-sm">

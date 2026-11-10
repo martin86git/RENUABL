@@ -8,6 +8,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import sharp from "sharp";
 import { sniffImage } from "@/lib/domain/design/brand";
+import { pageTitle } from "@/lib/domain/design/feed-posts";
 import { safeFetch } from "./safe-fetch";
 import { addUsage, costUsd, noUsage, toMicros, usageOf } from "@/lib/domain/ai-costs";
 import {
@@ -150,9 +151,18 @@ const PICTURES_A_GO = 24;
  * JPEG so nothing but the picture is kept. Null when there is none to be had.
  */
 async function pictureFor(pageUrl: string): Promise<Buffer | null> {
+  return (await linkPreview(pageUrl)).picture;
+}
+
+/** A page's title and its preview picture, redrawn (each null when there is none): for a story or a shared link. */
+export async function linkPreview(pageUrl: string): Promise<{ title: string | null; picture: Buffer | null }> {
   const page = await safeFetch(pageUrl, PAGE_READ_BYTES, "page");
-  if (!page) return null;
-  const imageUrl = pageImageUrl(page.bytes.toString("utf8"), pageUrl);
+  if (!page) return { title: null, picture: null };
+  const html = page.bytes.toString("utf8");
+  return { title: pageTitle(html), picture: await redrawnPicture(pageImageUrl(html, pageUrl)) };
+}
+
+async function redrawnPicture(imageUrl: string | null): Promise<Buffer | null> {
   if (!imageUrl) return null;
   const pic = await safeFetch(imageUrl, PICTURE_BYTES, "picture");
   if (!pic || !sniffImage(pic.bytes)) return null;

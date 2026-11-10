@@ -40,6 +40,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-10",
+    area: "Today",
+    words: "Post to every business on RENUABL from the News tab: words, a photo or a link, with likes, comments and Report.",
+  },
+  {
+    day: "2026-11-10",
     area: "Designer",
     words: "Photo or Drawn, bottom right of the roof picture: Drawn shows the roof as a drawing, panels as panels and the kit on its wall.",
   },

@@ -639,6 +639,50 @@ create table if not exists industry_news_runs (
   cost_micros bigint
 );
 create index if not exists industry_news_runs_started on industry_news_runs(started_at desc);
+-- Posts in the industry feed (domain/design/feed-posts.ts): every business sees them. Each row carries the business
+-- and member that wrote it; readers are sent a first name and business only. Gone with the business.
+create table if not exists design_feed_posts (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  member_email text not null,
+  author text not null,
+  body text not null default '',
+  link_url text,
+  link_title text,
+  link_image bytea,
+  photo bytea,
+  created_at timestamptz not null default now(),
+  hidden_at timestamptz,
+  removed_at timestamptz,
+  removed_by text
+);
+create index if not exists design_feed_posts_created on design_feed_posts(created_at desc);
+create table if not exists design_feed_comments (
+  id text primary key,
+  post_id text not null references design_feed_posts(id) on delete cascade,
+  business_id text not null references businesses(id) on delete cascade,
+  member_email text not null,
+  author text not null,
+  body text not null,
+  created_at timestamptz not null default now(),
+  removed_at timestamptz
+);
+create index if not exists design_feed_comments_post on design_feed_comments(post_id, created_at);
+create table if not exists design_feed_likes (
+  post_id text not null references design_feed_posts(id) on delete cascade,
+  business_id text not null references businesses(id) on delete cascade,
+  member_email text not null,
+  at timestamptz not null default now(),
+  primary key (post_id, member_email)
+);
+create table if not exists design_feed_reports (
+  post_id text not null references design_feed_posts(id) on delete cascade,
+  business_id text not null references businesses(id) on delete cascade,
+  member_email text not null,
+  reason text not null default '',
+  at timestamptz not null default now(),
+  primary key (post_id, business_id)
+);
 -- The team chat (domain/design/team-chat.ts): a business's members talking in its channels and in direct
 -- conversations, the files sent with lines, and when each member last had each room open. Gone with the business.
 create table if not exists design_team_lines (

@@ -16,6 +16,9 @@ import {
 } from "@/lib/domain/design/industry-news";
 import { todayInMarket } from "@/lib/domain/market";
 import { loadNews, type NewsAnswer } from "@/lib/services/industry-news";
+import { mergeFeed, type FeedEntry, type FeedPost } from "@/lib/domain/design/feed-posts";
+import { loadPosts } from "@/lib/services/feed-posts";
+import { PostCard, PostComposer } from "./feed-posts";
 import { SolBadge } from "./sol-icon";
 
 const dayWords = (d: string) =>
@@ -27,12 +30,16 @@ const readWords = (iso: string) =>
 /**
  * News on Today (10 Nov 2026, Martin, on learning SolarEdge had left Australia): the solar, battery and EV charger news
  * Sol reads each morning, every story in his words with one line on what it means for the business, linked to where it
- * came from. By topic, grouped by day.
+ * came from; and since the same day the posts businesses share with each other (feed-posts.tsx: every business sees
+ * them). Newest first, grouped by day, by topic or posts alone; staff also see what has been reported.
  */
 export function NewsPage() {
   const [data, setData] = useState<NewsAnswer | null>(null);
+  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [staff, setStaff] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [topic, setTopic] = useState<NewsTopic | "all">("all");
+  const [filter, setFilter] = useState<NewsTopic | "all" | "posts" | "reported">("all");
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let gone = false;
@@ -53,16 +60,42 @@ export function NewsPage() {
     };
   }, []);
 
+  // Posts: on opening, after posting or changing one, and each minute.
+  useEffect(() => {
+    let gone = false;
+    const go = () =>
+      void loadPosts(filter === "reported").then((r) => {
+        if (gone || !r.ok) return;
+        setPosts(r.posts);
+        setStaff(r.staff);
+      });
+    go();
+    const t = window.setInterval(go, 60_000);
+    return () => {
+      gone = true;
+      window.clearInterval(t);
+    };
+  }, [tick, filter]);
+  const refresh = () => setTick((n) => n + 1);
+
   const today = todayInMarket();
-  const shown = data ? newsShown(data.items, topic) : [];
-  const groups: { day: string; items: NewsItem[] }[] = [];
-  for (const n of shown) {
-    const day = newsDayGroup(n, today);
+  const stories = data && filter !== "posts" && filter !== "reported" ? newsShown(data.items, filter === "all" ? "all" : filter) : [];
+  const shownPosts = filter === "all" || filter === "posts" || filter === "reported" ? posts : [];
+  const entries = mergeFeed(stories, shownPosts);
+  const groups: { day: string; entries: FeedEntry[] }[] = [];
+  for (const e of entries) {
+    const day = e.kind === "story" ? newsDayGroup(e.item, today) : newsDayGroup({ publishedOn: null, foundAt: e.post.at }, today);
     const last = groups[groups.length - 1];
-    if (last?.day === day) last.items.push(n);
-    else groups.push({ day, items: [n] });
+    if (last?.day === day) last.entries.push(e);
+    else groups.push({ day, entries: [e] });
   }
   const topics = NEWS_TOPICS.filter((t) => data?.items.some((n) => n.topic === t));
+  const chips: { id: typeof filter; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "posts", label: "Posts" },
+    ...topics.map((t) => ({ id: t, label: NEWS_TOPIC_LABELS[t] })),
+    ...(staff ? [{ id: "reported" as const, label: "Reported" }] : []),
+  ];
   const touching = data?.items.filter((n) => n.mine).length ?? 0;
 
   return (
@@ -81,26 +114,33 @@ export function NewsPage() {
         </div>
       </div>
 
-      {topics.length > 1 && (
-        <div className="mt-4 flex flex-wrap gap-1.5" role="group" aria-label="Topic">
-          {(["all", ...topics] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTopic(t)}
-              aria-pressed={topic === t}
-              className={clsx(
-                "rounded-full px-3 py-1.5 text-[13px] ring-1 transition",
-                topic === t ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line hover:text-ink",
-              )}
-            >
-              {t === "all" ? "All" : NEWS_TOPIC_LABELS[t]}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="mt-4">
+        <PostComposer
+          onPosted={() => {
+            if (filter !== "all" && filter !== "posts") setFilter("all");
+            refresh();
+          }}
+        />
+      </div>
 
-      {touching > 0 && (
+      <div className="mt-4 flex flex-wrap gap-1.5" role="group" aria-label="Show">
+        {chips.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => setFilter(c.id)}
+            aria-pressed={filter === c.id}
+            className={clsx(
+              "rounded-full px-3 py-1.5 text-[13px] ring-1 transition",
+              filter === c.id ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line hover:text-ink",
+            )}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {touching > 0 && filter !== "posts" && filter !== "reported" && (
         <p className="mt-4 flex items-center gap-2 text-[13px] text-ink">
           <PackageSearch className="size-4 text-sun-line" aria-hidden />
           {touching === 1 ? "One story names" : `${touching} stories name`} a maker on your price lists. They&apos;re marked below.
@@ -113,7 +153,7 @@ export function NewsPage() {
         </p>
       )}
 
-      {data && !data.configured && data.items.length === 0 && (
+      {data && !data.configured && data.items.length === 0 && filter !== "posts" && (
         <p className="mt-6 rounded-2xl bg-surface px-4 py-3 text-[13px] text-ink-2 ring-1 ring-line">
           The news isn&apos;t set up on this site yet: Sol needs Claude (ANTHROPIC_API_KEY) to read it.
         </p>
@@ -125,14 +165,24 @@ export function NewsPage() {
         </p>
       )}
 
-      {data && data.configured && shown.length === 0 && (
+      {data && entries.length === 0 && (
         <div className="mt-16 text-center">
           <Newspaper className={clsx("mx-auto size-6 text-muted", data.reading && "animate-pulse")} aria-hidden />
-          <p className="mt-3 text-[15px] text-ink">{data.reading ? "Reading the news…" : "No news yet."}</p>{" "}
+          <p className="mt-3 text-[15px] text-ink">
+            {filter === "posts" || filter === "reported"
+              ? filter === "reported"
+                ? "Nothing reported."
+                : "No posts yet."
+              : data.reading
+                ? "Reading the news…"
+                : "No news yet."}
+          </p>
           <p className="mt-1 text-[13px] text-muted">
-            {data.reading
-              ? "This takes a minute or two. Stories appear here as soon as Sol has them."
-              : "Stories show here after Sol's morning read."}
+            {filter === "posts"
+              ? "Be the first to share something with solar businesses on RENUABL."
+              : data.reading
+                ? "This takes a minute or two. Stories appear here as soon as Sol has them."
+                : "Stories show here after Sol's morning read."}
           </p>
         </div>
       )}
@@ -141,15 +191,21 @@ export function NewsPage() {
         <section key={g.day} className="mt-6">
           <h3 className="text-[12px] font-medium uppercase tracking-[0.08em] text-muted">{g.day}</h3>
           <ul className="mt-2 grid gap-2">
-            {g.items.map((n) => (
-              <Story key={n.id} item={n} />
-            ))}
+            {g.entries.map((e) =>
+              e.kind === "story" ? (
+                <Story key={e.item.id} item={e.item} />
+              ) : (
+                <PostCard key={e.post.id} post={e.post} staff={staff} onChange={refresh} />
+              ),
+            )}
           </ul>
         </section>
       ))}
 
-      {shown.length > 0 && (
-        <p className="mt-8 text-[12px] text-muted">Written by Sol from the pages linked. Check the source before acting on a story.</p>
+      {stories.length > 0 && (
+        <p className="mt-8 text-[12px] text-muted">
+          Stories are written by Sol from the pages linked. Check the source before acting on one.
+        </p>
       )}
     </div>
   );
