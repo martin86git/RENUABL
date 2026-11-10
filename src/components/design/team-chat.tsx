@@ -1,5 +1,6 @@
 "use client";
 
+import { CustomerConversations } from "./customer-conversations";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -89,7 +90,20 @@ const SOL_ROOM = "sol";
  * pasting a screenshot, or dropping them on the room). It asks for new lines every ten seconds while open; whatever is
  * on screen counts as read.
  */
-export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me: string; start?: string | null }) {
+export function TeamChatPanel({
+  onClose,
+  me,
+  start,
+  customers = 0,
+}: {
+  onClose?: () => void;
+  me: string;
+  start?: string | null;
+  /** Customers' lines waiting and this member's unread mentions: the count on the Customers side. */
+  customers?: number;
+}) {
+  // Team or Customers (10 Nov 2026, Martin: the bell went; customer chat is a toggle in team chat).
+  const [side, setSide] = useState<"team" | "customers">("team");
   const [room, setRoomState] = useState<string>(() => {
     if (start) return start;
     try {
@@ -331,9 +345,30 @@ export function TeamChatPanel({ onClose, me, start }: { onClose?: () => void; me
     void load();
   };
 
+  const sides = <SideToggle side={side} onSide={setSide} customers={customers} />;
+  if (side === "customers")
+    return (
+      <div className="flex h-full min-h-0 flex-col bg-surface text-ink">
+        <div className="flex items-center justify-between border-b border-line px-3 py-2.5">
+          {sides}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+          )}
+        </div>
+        <CustomerConversations deal={(id) => `/design/deals/${encodeURIComponent(id)}`} onOpen={onClose} />
+      </div>
+    );
   return (
     <div className="flex h-full min-h-0 bg-surface text-ink">
       <nav aria-label="Conversations" className="flex w-44 shrink-0 flex-col border-r border-line bg-canvas/60 sm:w-48">
+        <div className="px-2 pt-2">{sides}</div>
         <DealChatsList
           deals={view?.dealChats ?? []}
           room={room}
@@ -1308,8 +1343,9 @@ export function useTeamUnread(): number {
  * The team chat's place on the rail (as Primero's): a round with the unread count that opens the chat beside the
  * rail, over the page. `?team=<room>` (a tag's email link) opens it on that room; so does `TEAM_OPEN`.
  */
-export function TeamChatButton({ me }: { me: string }) {
-  const unread = useTeamUnread();
+export function TeamChatButton({ me, customers = 0 }: { me: string; customers?: number }) {
+  // The team's unread, and the customers' lines and mentions that the bell used to carry.
+  const unread = useTeamUnread() + customers;
   const [open, setOpen] = useState(false);
   const [start, setStart] = useState<string | null>(null);
   useEffect(() => {
@@ -1360,11 +1396,47 @@ export function TeamChatButton({ me }: { me: string }) {
       {open &&
         createPortal(
           <div className="theme-studio team-pop fixed right-20 top-1/2 z-[52] h-[min(48rem,90dvh)] w-[min(50rem,calc(100vw-7rem))] -translate-y-1/2 overflow-hidden rounded-3xl bg-surface shadow-[0_12px_40px_rgba(20,22,26,0.16)] ring-1 ring-line">
-            <TeamChatPanel key={start ?? "last"} me={me} start={start} onClose={() => setOpen(false)} />
+            <TeamChatPanel key={start ?? "last"} me={me} start={start} customers={customers} onClose={() => setOpen(false)} />
           </div>,
           document.body,
         )}
     </>
+  );
+}
+
+/** Team or Customers, at the top of team chat. */
+function SideToggle({
+  side,
+  onSide,
+  customers,
+}: {
+  side: "team" | "customers";
+  onSide: (side: "team" | "customers") => void;
+  customers: number;
+}) {
+  return (
+    <div role="tablist" aria-label="Team or customers" className="flex rounded-full bg-canvas p-0.5 ring-1 ring-line">
+      {(["team", "customers"] as const).map((s) => (
+        <button
+          key={s}
+          type="button"
+          role="tab"
+          aria-selected={side === s}
+          onClick={() => onSide(s)}
+          className={clsx(
+            "relative flex-1 rounded-full px-3 py-1 text-xs font-medium",
+            side === s ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:text-ink",
+          )}
+        >
+          {s === "team" ? "Team" : "Customers"}
+          {s === "customers" && customers > 0 && (
+            <span className="ml-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white">
+              {customers}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
   );
 }
 

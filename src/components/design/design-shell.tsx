@@ -39,7 +39,7 @@ import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail } from "./sol-dock";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { TeamChatButton } from "./team-chat";
-import { DayWeather, NotificationsMenu, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
+import { DayWeather, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
 import { QuickCalc } from "./quick-calc";
 
@@ -547,14 +547,7 @@ function Shell({
               {/* On the design tool the rail is put away for the roof, so notifications and email come up here. */}
               {retail && tool && (
                 <>
-                  <NotificationsMenu
-                    place="top"
-                    messages={unread}
-                    mentions={mentions}
-                    full={PATHS.notifications}
-                    messagesFull={PATHS.messages}
-                    deal={(id) => `${PATHS.deals}/${id}`}
-                  />
+                  <TeamChatButton me={account.email} customers={unread + mentions} />
                   <TopIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />
                 </>
               )}
@@ -792,17 +785,10 @@ function Shell({
           room) and Sol's panel. */}
       {retail && !tool && (
         <SolRail
-          team={<TeamChatButton me={account.email} />}
+          team={<TeamChatButton me={account.email} customers={unread + mentions} />}
           calc={designsRoofs(kind) ? <QuickCalc place="rail" /> : undefined}
           tools={
             <>
-              <NotificationsMenu
-                messages={unread}
-                mentions={mentions}
-                full={PATHS.notifications}
-                messagesFull={PATHS.messages}
-                deal={(id) => `${PATHS.deals}/${id}`}
-              />
               <RailIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />
             </>
           }
