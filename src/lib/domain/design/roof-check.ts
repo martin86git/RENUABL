@@ -168,6 +168,12 @@ export function keptClearWords(things: readonly RoofThing[]): string | null {
   return `Kept clear of ${list}, as the picture shows them: check on site.`;
 }
 
+/**
+ * What Sol asks before laying anything on a home that has panels already (10 Nov 2026, Martin: "it should be asking
+ * whether there are existing panels, and whether I want to replace them or add to them").
+ */
+export const EXISTING_QUESTION = "This home already has panels. Are they being replaced, or are the new panels added to them?";
+
 /** The line a design from a home with panels already carries. */
 export const HAS_SOLAR_NOTE =
   "This home already has panels. New panels are kept clear of them: it may be a battery or an addition to the system there, so ask on the call.";

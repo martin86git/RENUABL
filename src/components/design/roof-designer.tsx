@@ -10,6 +10,7 @@ import { batteryFill } from "@/lib/domain/design/battery-fill";
 import {
   HAS_SOLAR_NOTE,
   REPLACING_NOTE,
+  EXISTING_QUESTION,
   avoidFor,
   hasSolar,
   keptClearWords,
@@ -25,7 +26,7 @@ import { OLD_FACE_CORNERS, mendCutOutline, outlineNote } from "@/lib/domain/desi
 import { MOUNT_STANDOFF, clearanceFor, inRows, laidAs, packFaces, reorient, splitPartner } from "@/lib/domain/design/pack";
 import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
-import { facesFoundNote, facesFromHeights } from "@/lib/domain/design/roof-faces";
+import { faceAt, facesFoundNote, facesFromHeights } from "@/lib/domain/design/roof-faces";
 import { NO_BILL_KW, SELF_DESIGN_AIMS, SELF_DESIGN_LABELS, selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
 import { todayInMarket } from "@/lib/domain/market";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
@@ -2561,6 +2562,7 @@ export function RoofDesigner(props: {
     if (focused && focused !== document.body && focused.tagName !== "TEXTAREA") focused.blur();
     const p = pointAt(e);
     if (!p) return;
+    if (tapFill && tool === "select") return void fillFaceAt(p);
     if (tool === "pan") {
       svg.current?.setPointerCapture(e.pointerId);
       press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: view };
@@ -3686,6 +3688,15 @@ export function RoofDesigner(props: {
    * about half on each, for this visit.
    */
   const splitRef = useRef(false);
+  // Sol's answer in the command bar (declared here: Design it for me, below, asks with it).
+  const [commandReply, setCommandReply] = useState<string | null>(null);
+  /** Whether Sol has asked about the panels already on the roof this visit, and his question is waiting for an answer. */
+  const existingAsked = useRef(false);
+  const [existingQ, setExistingQ] = useState(false);
+  const askExisting = () => {
+    setExistingQ(true);
+    setCommandReply(EXISTING_QUESTION);
+  };
   const [splitOffer, setSplitOffer] = useState<string | null>(null);
   const [splitting, setSplitting] = useState(false);
   const designForMe = async (auto = false, goal: DesignGoal = "return") => {
@@ -3693,6 +3704,11 @@ export function RoofDesigner(props: {
     setMine("busy");
     if (!auto) lastLay.current = { kind: "mine", goal };
     const found = await checkRoof();
+    // Panels on the roof already: Sol asks first whether they are being replaced or added to (10 Nov 2026, Martin).
+    if (found && hasSolar(found.things) && !existingAsked.current) {
+      setMine("idle");
+      return askExisting();
+    }
     const check = inUse(found);
     const avoid = check && avoidFor(check).length ? avoidFor(check) : undefined;
     let model: RoofModel | null = null;
@@ -3915,7 +3931,6 @@ export function RoofDesigner(props: {
   const [commandBusy, setCommandBusy] = useState(false);
   // What was just asked, shown with Sol thinking until he answers (9 Nov 2026, Martin: pressing Enter gave no sign he had it).
   const [asked, setAsked] = useState<string | null>(null);
-  const [commandReply, setCommandReply] = useState<string | null>(null);
   // Sol's question with options, when a request could mean different things; the request of the one chosen is run.
   const [choices, setChoices] = useState<{ question: string; options: Choice[] } | null>(null);
   const [otherText, setOtherText] = useState("");
@@ -3964,6 +3979,74 @@ export function RoofDesigner(props: {
     setAwayFrom([commandReply, commandBusy, opening]);
     setCommandOpen(false);
     setCalcOpen(false);
+  };
+  /** The answer: replacing or adding to them, then what was asked laid again. */
+  const answerExistingQ = (replace: boolean) => {
+    existingAsked.current = true;
+    setExistingQ(false);
+    void answerExisting(replace);
+  };
+  /**
+   * Tap to fill (10 Nov 2026, Martin: the whole roof read into faces kept putting panels in the wrong places, so he
+   * shows where): Sol has sized the system; each tap on the roof fills the face under it (a face already read there,
+   * else one grown from the tap in the heights, `faceAt`) with the panels still to place, clear of what's on the roof
+   * and of the panels placed already. Done when they're all placed, or when the person says.
+   */
+  const [tapFill, setTapFill] = useState<{ want: number } | null>(null);
+  const [tapBusy, setTapBusy] = useState(false);
+  const [tapNote, setTapNote] = useState<string | null>(null);
+  const startTapFill = (want: number) => {
+    if (want < 1) return;
+    setOpening(null);
+    setLoose([]);
+    setStrings([]);
+    setTool("select");
+    setTapNote(null);
+    setTapFill({ want });
+    putSolAway();
+  };
+  const fillFaceAt = async (p: Point) => {
+    if (!tapFill || tapBusy) return;
+    setTapBusy(true);
+    setTapNote(null);
+    try {
+      const seen = await checkRoof();
+      const check = inUse(seen);
+      // Clear of what is on the roof, and of the panels placed already.
+      const avoid = [...(check ? avoidFor(check) : []), ...loose.map((pl) => [...looseCorners(pl, size)])];
+      let face = faces.find((f) => inside(p, f.points));
+      if (!face) {
+        const heights = await loadTerrain(spot.lat, spot.lng, { nearmap: Boolean(props.nearmapPicture) });
+        const found = heights ? faceAt(heights, p, check?.notRoof?.map((x) => x.box) ?? []) : null;
+        if (!found) return setTapNote("I can't read a roof face there: tap the middle of a face, or trace it.");
+        face = {
+          id: newId("f"),
+          points: found.points,
+          landscape: false,
+          setback: 0.3,
+          off: [],
+          plan: true,
+          ...roofTag,
+          ...faceFromAspect({ points: found.points }, found.aspect),
+        };
+      }
+      const left = tapFill.want - loose.length;
+      if (left <= 0) return setTapFill(null);
+      const packed = packFaces([face], size, left, () => newId("p"), avoid.length ? avoid : undefined);
+      if (!packed.loose.length) return setTapNote("No panels fit on that face clear of what's there. Tap another.");
+      const done = packed.faces[0];
+      setFaces((list) => (list.some((f) => f.id === done.id) ? list.map((f) => (f.id === done.id ? done : f)) : [...list, done]));
+      setLoose((list) => [...list, ...packed.loose]);
+      setStrings([]);
+      changed();
+      const placed = loose.length + packed.loose.length;
+      if (placed >= tapFill.want) {
+        setTapFill(null);
+        setCommandReply(`All ${placed} panels placed. Move any you want, then string them.`);
+      }
+    } finally {
+      setTapBusy(false);
+    }
   };
   // A press anywhere outside the panel (on the map, say) puts it away, as its cross does.
   useEffect(() => {
@@ -4045,6 +4128,10 @@ export function RoofDesigner(props: {
     const n = Math.max(1, Math.ceil((kw * 1000) / watts));
     lastLay.current = { kind: "fill", kw, ...(facing ? { facing } : {}), ...(facing && also ? { also } : {}) };
     const seen = await checkRoof();
+    if (seen && hasSolar(seen.things) && !existingAsked.current) {
+      askExisting();
+      return { words: EXISTING_QUESTION, laid: 0 };
+    }
     const check = inUse(seen);
     const avoid = check && avoidFor(check).length ? avoidFor(check) : undefined;
     const clear = [
@@ -5892,6 +5979,13 @@ export function RoofDesigner(props: {
                         onLead={(lead) => designForGoal(lead === "battery" ? "return" : "payback")}
                         onGoal={designForGoal}
                         onCalc={() => setCalcOpen(true)}
+                        onPlace={() => {
+                          const daily = dailyFromBillFields(bill);
+                          const sized = daily ? quickSize({ kwhPerDay: daily }) : null;
+                          const lead = opening.kind === "advice" ? opening.advice.lead : "battery";
+                          const kw = sized ? (lead === "battery" ? sized.withBattery.kw : sized.solar.kw) : 6.6;
+                          startTapFill(Math.ceil((kw * 1000) / (panelOf(design).watts || 475)));
+                        }}
                         onClose={() => setOpening(null)}
                       />
                     )
@@ -5912,7 +6006,37 @@ export function RoofDesigner(props: {
                           {commandReply}
                           {systemWords && ` ${systemWords}`}
                         </p>
-                        {roofCheckNow && hasSolar(roofCheckNow.things) && (
+                        {existingQ && (
+                          <span className="mt-2 flex flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              disabled={commandBusy}
+                              onClick={() => answerExistingQ(true)}
+                              className="rounded-full bg-sun-line px-3 py-1 text-[12.5px] font-medium text-white hover:brightness-110"
+                            >
+                              Replacing them
+                            </button>
+                            <button
+                              type="button"
+                              disabled={commandBusy}
+                              onClick={() => answerExistingQ(false)}
+                              className="rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+                            >
+                              Adding to them
+                            </button>
+                          </span>
+                        )}
+                        {!existingQ && summary.panels > 0 && !tapFill && (
+                          <button
+                            type="button"
+                            disabled={commandBusy}
+                            onClick={() => startTapFill(summary.panels)}
+                            className="mr-1.5 mt-2 rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+                          >
+                            Show me where: tap the roof
+                          </button>
+                        )}
+                        {!existingQ && roofCheckNow && hasSolar(roofCheckNow.things) && (
                           <button
                             type="button"
                             disabled={commandBusy}
@@ -6035,6 +6159,13 @@ export function RoofDesigner(props: {
                         onLead={(lead) => designForGoal(lead === "battery" ? "return" : "payback")}
                         onGoal={designForGoal}
                         onCalc={() => setCalcOpen(true)}
+                        onPlace={() => {
+                          const daily = dailyFromBillFields(bill);
+                          const sized = daily ? quickSize({ kwhPerDay: daily }) : null;
+                          const lead = opening.kind === "advice" ? opening.advice.lead : "battery";
+                          const kw = sized ? (lead === "battery" ? sized.withBattery.kw : sized.solar.kw) : 6.6;
+                          startTapFill(Math.ceil((kw * 1000) / (panelOf(design).watts || 475)));
+                        }}
                         onClose={() => setOpening(null)}
                       />
                     )
@@ -8883,6 +9014,27 @@ export function RoofDesigner(props: {
                 </div>
               )}
               {tips.corner}
+              {tapFill && (
+                <div className="absolute left-1/2 top-[4.75rem] z-30 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 flex-col items-center gap-1">
+                  <div className="flex items-center gap-3 rounded-full bg-primary/90 py-1.5 pl-4 pr-1.5 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md">
+                    <span>
+                      {tapBusy ? "Reading that face…" : "Tap a roof face to fill it"} ·{" "}
+                      <span className="tabular-nums text-sun-line">
+                        {loose.length} of {tapFill.want}
+                      </span>{" "}
+                      panels
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setTapFill(null)}
+                      className="rounded-full bg-white/15 px-3 py-1 text-[12.5px] font-medium hover:bg-white/25"
+                    >
+                      Done
+                    </button>
+                  </div>
+                  {tapNote && <p className="rounded-full bg-primary/85 px-3 py-1 text-[12px] text-white/85">{tapNote}</p>}
+                </div>
+              )}
               {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its
                   circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}
               <div className="absolute bottom-8 left-4 z-10">

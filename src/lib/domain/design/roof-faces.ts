@@ -729,6 +729,114 @@ function straighten(v: Point, seams: { A: number; B: number; C: number }[], outl
   return near[0].foot;
 }
 
+/** A face found from a tap on the roof (`faceAt`). */
+export const TAP_FACE = {
+  /** How far from the tap the face may reach, metres. */
+  reach: 25,
+  /** The plane is first fitted to the heights within this of the tap, metres. */
+  seed: 1,
+  /** A tap where that plane fits worse than this (a ridge, a tree, the edge) finds no face, metres. */
+  seedRms: 0.12,
+  /** A height at most this near the face's plane is on it (nearer on a smooth roof), metres. */
+  onPlane: 0.15,
+  /** ...and at least this (Nearmap's heights over tiles and panels on them, 10 Nov 2026), metres. */
+  onPlaneMin: 0.15,
+  /** Times the face is grown and its plane fitted again. */
+  rounds: 3,
+  /** Outlines simplified to within this, metres. */
+  simplify: 0.35,
+  /** Smaller than this, square metres, and it isn't a face. */
+  minArea: 3,
+} as const;
+
+/**
+ * The one roof face under a tap (10 Nov 2026, Martin: the whole roof read into faces kept going wrong, so he points at
+ * the face he means): a plane fitted to the heights round the tap, then grown out over every joined height that sits
+ * on it, fitted again and grown again. Hips, ridges, valleys and the drop at the gutter stop it; places in `skip` (a
+ * pergola, a clear roof) are left out. Null when the tap isn't on a roof face.
+ */
+export function faceAt(t: Terrain, at: Point, skip: readonly Point[][] = []): FoundFace | null {
+  const { cols, rows, cell } = t;
+  const xOf = (c: number) => -t.widthM / 2 + (c + 0.5) * cell;
+  const yOf = (r: number) => -t.heightM / 2 + (r + 0.5) * cell;
+  const c0 = Math.floor((at.x + t.widthM / 2) / cell);
+  const r0 = Math.floor((at.y + t.heightM / 2) / cell);
+  if (c0 < 0 || r0 < 0 || c0 >= cols || r0 >= rows) return null;
+  const usable = (i: number) => {
+    if (!Number.isFinite(t.heights[i])) return false;
+    if (!skip.length) return true;
+    const p = { x: xOf(i % cols), y: yOf(Math.floor(i / cols)) };
+    return !skip.some((box) => inside(p, box));
+  };
+  // The plane round the tap: within `seed`, else nearer (a tap by a hip or the gutter takes in the next face).
+  const planeWithin = (radius: number) => {
+    const near = Math.ceil(radius / cell);
+    const s = new Sums();
+    for (let dr = -near; dr <= near; dr++)
+      for (let dc = -near; dc <= near; dc++) {
+        const [c, r] = [c0 + dc, r0 + dr];
+        if (c < 0 || r < 0 || c >= cols || r >= rows || Math.hypot(dc, dr) * cell > radius) continue;
+        const i = r * cols + c;
+        if (usable(i)) s.add(xOf(c), yOf(r), t.heights[i]);
+      }
+    const f = s.n >= 6 ? s.fit() : null;
+    return f && f.rms <= TAP_FACE.seedRms ? f : null;
+  };
+  let fit = planeWithin(TAP_FACE.seed) ?? planeWithin(TAP_FACE.seed * 0.6) ?? planeWithin(TAP_FACE.seed * 0.4);
+  if (!fit) return null;
+  // As near the plane as the roof's own roughness allows: a smooth roof doesn't take in a strip past its ridge.
+  const onPlane = Math.min(TAP_FACE.onPlane, Math.max(TAP_FACE.onPlaneMin, fit.rms * 4));
+  let sums = new Sums();
+  const reach = TAP_FACE.reach / cell;
+  let region = new Set<number>();
+  for (let round = 0; round < TAP_FACE.rounds; round++) {
+    const f = fit;
+    const on = (i: number) =>
+      usable(i) && Math.abs(t.heights[i] - (f.a * xOf(i % cols) + f.b * yOf(Math.floor(i / cols)) + f.c)) <= onPlane;
+    const start = r0 * cols + c0;
+    if (!on(start)) break;
+    const next = new Set<number>([start]);
+    for (const queue = [start]; queue.length;) {
+      const i = queue.pop()!;
+      const c = i % cols;
+      const r = Math.floor(i / cols);
+      for (const [dc, dr] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const [nc, nr] = [c + dc, r + dr];
+        if (nc < 0 || nr < 0 || nc >= cols || nr >= rows || Math.hypot(nc - c0, nr - r0) > reach) continue;
+        const j = nr * cols + nc;
+        if (next.has(j) || !on(j)) continue;
+        next.add(j);
+        queue.push(j);
+      }
+    }
+    region = next;
+    sums = new Sums();
+    for (const i of region) sums.add(xOf(i % cols), yOf(Math.floor(i / cols)), t.heights[i]);
+    const refit = sums.fit();
+    if (!refit) break;
+    fit = refit;
+  }
+  const cells = largestPiece(region, cols);
+  const areaM2 = cells.size * cell * cell;
+  if (areaM2 < TAP_FACE.minArea) return null;
+  const aspect = aspectOf(fit);
+  if (aspect.pitch >= ROOF_FACES.wall) return null;
+  const ring = ringOf(cells, cols).map(([c, r]) => ({ x: -t.widthM / 2 + c * cell, y: -t.heightM / 2 + r * cell }));
+  let points = simplifyRing(ring, TAP_FACE.simplify);
+  for (let tol = TAP_FACE.simplify * 1.5; points.length > FACE_MAX_POINTS; tol *= 1.5) points = simplifyRing(ring, tol);
+  if (points.length < 3) return null;
+  return {
+    points: points.map((q) => ({ x: Math.round(q.x * 100) / 100, y: Math.round(q.y * 100) / 100 })),
+    aspect,
+    areaM2: Math.round(areaM2 * 10) / 10,
+  };
+}
+
 /** What the designer says when it has put the faces down from the heights. */
 export function facesFoundNote(count: number, captured: string | null): string {
   return `${count} roof face${count === 1 ? "" : "s"} read from Nearmap's heights${captured ? ` (${captured})` : ""}, each with its own slope and direction. Check them against the picture: change or remove any that's wrong.`;

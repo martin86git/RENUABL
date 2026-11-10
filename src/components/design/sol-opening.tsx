@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import clsx from "clsx";
-import { Calculator, Moon, Sun, TriangleAlert, X } from "lucide-react";
+import { Calculator, Moon, Pointer, Sun, TriangleAlert, X } from "lucide-react";
 import {
   BATTERY_CHOICES,
   QUICK_DEFAULTS,
@@ -41,12 +41,15 @@ export function SolOpening({
   onGoal,
   onCalc,
   onClose,
+  onPlace,
 }: {
   opening: Opening;
   onLead: (lead: "battery" | "solar") => void;
   onGoal: (goal: DesignGoal) => void;
   onCalc: () => void;
   onClose: () => void;
+  /** "I'll show you where": the system sized, the person taps the roof faces it goes on (10 Nov 2026, Martin). */
+  onPlace?: () => void;
 }) {
   const hello = opening.customer ? `Let's design ${opening.customer}'s system.` : "Let's design this one.";
   return (
@@ -101,6 +104,11 @@ export function SolOpening({
           <button type="button" onClick={() => onLead(opening.advice.lead === "battery" ? "solar" : "battery")} className={chip}>
             {opening.advice.lead === "battery" ? "Solar only" : "With a battery"}
           </button>
+          {onPlace && (
+            <button type="button" onClick={onPlace} className={clsx(chip, "inline-flex items-center gap-1.5")}>
+              <Pointer className="size-3.5" aria-hidden /> I&apos;ll show you where
+            </button>
+          )}
           <button type="button" onClick={onCalc} className={clsx(chip, "inline-flex items-center gap-1.5")}>
             <Calculator className="size-3.5" aria-hidden /> Size it myself
           </button>

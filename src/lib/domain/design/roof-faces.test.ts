@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bearingGap } from "./face-aspect";
-import { facesFromHeights } from "./roof-faces";
+import { faceAt, facesFromHeights } from "./roof-faces";
 import { inside, type Point } from "./roof-design";
 import type { Terrain } from "./shade";
 
@@ -75,5 +75,39 @@ describe("facesFromHeights", () => {
         terrainOf(hip),
       ),
     ).toEqual([]);
+  });
+});
+
+describe("faceAt: the face under a tap", () => {
+  const t = terrainOf(hip);
+  it("finds the north face of a hip from a tap on it, stopped by its hips and the gutter", () => {
+    const f = faceAt(t, { x: 0, y: -2.5 })!;
+    expect(bearingGap(f.aspect.azimuth, 0)).toBeLessThan(3);
+    expect(f.aspect.pitch).toBeCloseTo(22, 0);
+    // The north face is a trapezoid of (12 + 4) / 2 × 4 = 32 m².
+    expect(f.areaM2).toBeGreaterThan(26);
+    expect(f.areaM2).toBeLessThan(38);
+    expect(Math.max(...f.points.map((p) => p.y))).toBeLessThan(0.6);
+  });
+  it("finds the east face from a tap on it", () => {
+    const f = faceAt(t, { x: 5, y: 0 })!;
+    expect(bearingGap(f.aspect.azimuth, 90)).toBeLessThan(3);
+  });
+  it("finds nothing on the ground beside the house or past the picture", () => {
+    expect(faceAt(t, { x: 0, y: 7 })?.aspect.pitch ?? 0).toBeLessThan(3);
+    expect(faceAt(t, { x: 50, y: 0 })).toBeNull();
+  });
+  it("leaves out places to skip", () => {
+    const f = faceAt(t, { x: 0, y: -2.5 }, [
+      [
+        { x: -6, y: -4 },
+        { x: 0, y: -4 },
+        { x: 0, y: 0 },
+        { x: -6, y: 0 },
+      ],
+    ])!;
+    // About half the north face: the half under the box is left out.
+    expect(f.areaM2).toBeLessThan(21);
+    expect(Math.min(...f.points.map((p) => p.x))).toBeGreaterThan(-3);
   });
 });

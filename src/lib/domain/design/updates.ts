@@ -16,6 +16,16 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
     area: "Designer",
+    words: "Before laying panels on a home that has some, Sol asks whether they are being replaced or added to.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Designer",
+    words: "Show me where: tap a roof face and it fills with the panels Sol sized, face by face.",
+  },
+  {
+    day: "2026-11-10",
+    area: "Designer",
     words: "A Day button plays a design through a summer, autumn or winter day: the sun across the roof, the battery filling and emptying.",
   },
   {
