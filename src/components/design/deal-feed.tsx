@@ -23,19 +23,24 @@ import {
   Snowflake,
   StickyNote,
   PenTool,
+  Plus,
   Undo2,
   X,
 } from "lucide-react";
 import {
-  FEED_VIEWS,
   LATER_CHOICES,
   agoWords,
   allClearWords,
+  lastAt,
+  openAskLine,
+  padLines,
+  solLine,
+  todayParts,
+  todaySummary,
   markHolds,
   markWords,
   caption,
   feedFilter,
-  feedOf,
   needsYou,
   nextMove,
   systemLine,
@@ -44,7 +49,6 @@ import {
   type FeedDeal,
   type FeedEventKind,
   type FeedPipeline,
-  type FeedView,
   type FeedMark,
   type LaterChoice,
 } from "@/lib/domain/design/deal-feed";
@@ -61,8 +65,8 @@ import { PATHS } from "./design-shell";
 import { DealTeamChat } from "./deal-team-chat";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { SolIcon } from "./sol-icon";
+import { TodayNews } from "./today-news";
 
-const FEED_VIEW_KEY = "renuabl.design.feed-view";
 const FEED_PICK_KEY = "renuabl.design.feed-pipeline";
 const POLL_MS = 60_000;
 
@@ -84,17 +88,11 @@ const EVENT_ICONS: Record<FeedEventKind, React.ComponentType<{ className?: strin
  * where it's at in Sol's words, the latest of the conversation and what Sol has lined up, with the controls to write
  * to the customer with Sol, have Sol call them, or bring in a teammate, all without leaving Today.
  */
-export function DealFeed({ me }: { me: string }) {
+export function DealFeed(props: { me: string; onNew?: () => void; adding?: boolean; onDay?: () => void }) {
+  const { me } = props;
+  const [showAll, setShowAll] = useState(false);
   const [data, setData] = useState<FeedAnswer | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [view, setView] = useState<FeedView>(() => {
-    try {
-      const v = typeof window !== "undefined" ? localStorage.getItem(FEED_VIEW_KEY) : null;
-      return v === "needs" || v === "sol" || v === "all" ? v : "all";
-    } catch {
-      return "all";
-    }
-  });
   const load = useCallback(async () => {
     const r = await loadFeed();
     if (r.ok) {
@@ -114,14 +112,6 @@ export function DealFeed({ me }: { me: string }) {
       window.removeEventListener(DEAL_TEAM_CHANGED, changed);
     };
   }, [load]);
-  const pick = (v: FeedView) => {
-    setView(v);
-    try {
-      localStorage.setItem(FEED_VIEW_KEY, v);
-    } catch {
-      // Private window: the view resets next time.
-    }
-  };
   // Which pipeline, and whose deals (8 Nov 2026, Martin: an admin sees every deal), kept on the device.
   const [feedPick, setFeedPick] = useState<{ pipeline: FeedPipeline; mine: boolean }>(() => {
     try {
@@ -163,8 +153,6 @@ export function DealFeed({ me }: { me: string }) {
       }),
     [data, feedPick, pickedPipeline, me],
   );
-  const shown = feedOf(deals, view, now);
-  const needs = deals.filter((d) => needsYou(d, now)).length;
   const open = deals.filter((d) => OPEN_STAGES.includes(d.stage));
   const openValue = open.reduce((sum, d) => sum + (d.value ?? 0), 0);
   // Done or Later on a card: the deal's mark put in place at once, then the feed read again (for the day's count).
@@ -180,49 +168,56 @@ export function DealFeed({ me }: { me: string }) {
     setFilling(false);
   };
 
+  const parts = todayParts(deals, now);
+  const needs = parts.needs.length;
+
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} />
-          <p className="text-[13px] text-ink-2">
-            {data ? (
-              <>
-                <span className="font-semibold text-ink">{needs}</span> need{needs === 1 ? "s" : ""} you ·{" "}
-                <span className="font-semibold text-ink">{open.length}</span> being sold
-                {openValue > 0 && (
-                  <>
-                    {" "}
-                    · <span className="font-semibold text-ink">${Math.round(openValue / 1000).toLocaleString("en-AU")}k</span> in play
-                  </>
-                )}
-              </>
-            ) : (
-              "Looking over your deals…"
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div role="tablist" aria-label="What to show" className="inline-flex rounded-full bg-surface p-1 ring-1 ring-line">
-            {FEED_VIEWS.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                role="tab"
-                aria-selected={view === v.id}
-                onClick={() => pick(v.id)}
-                className={clsx(
-                  "rounded-full px-3 py-1 text-[12.5px] font-medium transition",
-                  view === v.id ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                {v.label}
-                {v.id === "needs" && needs > 0 && <span className="ml-1 tabular-nums">{needs}</span>}
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="flex flex-wrap items-center gap-3">
+        {/* A new deal: the orange + at the start of Today (10 Nov 2026, Martin). */}
+        <button
+          type="button"
+          onClick={props.onNew}
+          aria-expanded={props.adding}
+          aria-label="New deal"
+          title="New deal"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white shadow-sm transition hover:brightness-105"
+        >
+          <Plus className={clsx("size-5 transition", props.adding && "rotate-45")} strokeWidth={2.25} aria-hidden />
+        </button>
+        <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} />
+        <p className="text-[13px] text-ink-2">
+          {data ? (
+            <>
+              <span className="font-semibold text-ink">{open.length}</span> being sold
+              {openValue > 0 && (
+                <>
+                  {" "}
+                  · <span className="font-semibold text-ink">${Math.round(openValue / 1000).toLocaleString("en-AU")}k</span> in play
+                </>
+              )}
+            </>
+          ) : (
+            "Looking over your deals…"
+          )}
+        </p>
       </div>
+      {/* Sol's line: what needs you, what he does next, what's been done (10 Nov 2026, Martin: Today in one page). */}
+      {data && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl bg-surface px-4 py-3 ring-1 ring-line">
+          <SolIcon className="size-4 shrink-0 text-sun-line" />
+          <p className="min-w-0 flex-1 text-[14px] text-ink">{todaySummary(parts, data.today ?? null, now)}</p>
+          {props.onDay && (
+            <button
+              type="button"
+              onClick={props.onDay}
+              className="text-[13px] font-medium text-ink-2 underline-offset-4 hover:text-ink hover:underline"
+            >
+              Show me my day
+            </button>
+          )}
+        </div>
+      )}
       {data?.examples !== null && data?.examples !== undefined && (
         <p className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] text-ink-2">
           {data.examples > 0
@@ -243,10 +238,11 @@ export function DealFeed({ me }: { me: string }) {
           {problem}
         </p>
       )}
-      <div className="mt-4 space-y-3">
+
+      <Part title="Needs you" count={data ? needs : null}>
         {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
-        {data && shown.length === 0 && view === "needs" && (
-          <div className="flex flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-10 text-center ring-1 ring-line">
+        {data && needs === 0 && (
+          <div className="flex flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-8 text-center ring-1 ring-line">
             <span className="grid size-11 place-items-center rounded-full bg-positive-soft text-positive">
               <Check className="size-5" aria-hidden />
             </span>
@@ -254,12 +250,7 @@ export function DealFeed({ me }: { me: string }) {
             <p className="text-[13px] text-ink-2">Nothing needs you right now. Sol has the rest in hand.</p>
           </div>
         )}
-        {data && shown.length === 0 && view !== "needs" && (
-          <p className="rounded-2xl bg-surface px-5 py-8 text-center text-[14px] text-ink-2 ring-1 ring-line">
-            {view === "sol" ? "Sol has nothing lined up just now." : "No deals being sold yet."}
-          </p>
-        )}
-        {shown.map((d) => (
+        {parts.needs.map((d) => (
           <DealCard
             key={d.jobId}
             deal={d}
@@ -271,8 +262,166 @@ export function DealFeed({ me }: { me: string }) {
             onMark={(mark) => setMark(d.jobId, mark)}
           />
         ))}
-      </div>
+      </Part>
+
+      {parts.coming.length > 0 && (
+        <Part title="Coming up" note="What Sol does next. Review one to change it, or let it go.">
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+            {parts.coming.map((d) => (
+              <ComingRow key={d.jobId} deal={d} now={now} onChanged={load} />
+            ))}
+          </ul>
+        </Part>
+      )}
+
+      {parts.inHand.length > 0 && (
+        <Part title="In hand" count={parts.inHand.length} note="Moving along. Nothing needs you on these.">
+          <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+            {(showAll ? parts.inHand : parts.inHand.slice(0, IN_HAND_SHOWN)).map((d) => (
+              <DealRow
+                key={d.jobId}
+                deal={d}
+                now={now}
+                me={me}
+                callsOn={Boolean(data?.callsOn)}
+                team={data?.team ?? []}
+                onChanged={load}
+                onMark={(mark) => setMark(d.jobId, mark)}
+              />
+            ))}
+          </ul>
+          {parts.inHand.length > IN_HAND_SHOWN && (
+            <button
+              type="button"
+              onClick={() => setShowAll((v) => !v)}
+              className="mt-2 text-[13px] font-medium text-ink-2 underline-offset-4 hover:text-ink hover:underline"
+            >
+              {showAll ? "Show fewer" : `Show all ${parts.inHand.length}`}
+            </button>
+          )}
+        </Part>
+      )}
+
+      <TodayNews />
     </div>
+  );
+}
+
+/** How many deals In hand shows before "Show all". */
+const IN_HAND_SHOWN = 5;
+
+/** A part of Today: its title, how many, a line on what it is. */
+function Part(props: { title: string; count?: number | null; note?: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-8">
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
+          {props.title}
+          {props.count !== undefined && props.count !== null && <span className="ml-1.5 tabular-nums text-muted">{props.count}</span>}
+        </h2>
+        {props.note && <p className="text-[12.5px] text-muted">{props.note}</p>}
+      </div>
+      <div className="space-y-3">{props.children}</div>
+    </section>
+  );
+}
+
+/** What Sol has lined up on a deal: the email, when it goes, and Review to change, send or stop it. */
+function ComingRow({ deal: d, now, onChanged }: { deal: FeedDeal; now: Date; onChanged: () => void }) {
+  const [reviewing, setReviewing] = useState(false);
+  const sol = d.sol!;
+  const state = sol.state ?? (sol.held ? "held" : "counting");
+  return (
+    <li className="px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <RoofThumb deal={d} small />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] text-ink">
+            <Link href={`${PATHS.deals}/${d.jobId}`} className="font-medium hover:underline">
+              {d.customer}
+            </Link>
+            {sol.subject && <span className="text-ink-2"> · {sol.subject}</span>}
+          </p>
+          <p className="text-[12.5px] text-muted">
+            {state === "counting"
+              ? `Sol emails ${countdownWords(sol.firesAt, now)}`
+              : state === "held"
+                ? "Held: yours to send"
+                : state === "no-email"
+                  ? "No email on file"
+                  : "Waiting for you to send it"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setReviewing((r) => !r)}
+          aria-expanded={reviewing}
+          className={clsx(
+            "inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold transition",
+            reviewing ? "bg-primary text-primary-ink" : "bg-surface text-ink ring-1 ring-line hover:bg-surface-2",
+          )}
+        >
+          {state === "counting" ? <Countdown sol={sol} now={now} /> : <Mail className="size-4" aria-hidden />}
+          Review
+        </button>
+      </div>
+      {reviewing && sol.id && (
+        <ReviewSol
+          deal={d}
+          now={now}
+          onClose={() => setReviewing(false)}
+          onDone={() => {
+            setReviewing(false);
+            onChanged();
+          }}
+        />
+      )}
+    </li>
+  );
+}
+
+/** A deal in hand, as one line: opened in place to its whole card. */
+function DealRow(props: {
+  deal: FeedDeal;
+  now: Date;
+  me: string;
+  callsOn: boolean;
+  team: { email: string; name: string }[];
+  onChanged: () => void;
+  onMark: (mark: FeedMark | null) => void;
+}) {
+  const { deal: d, now } = props;
+  const [open, setOpen] = useState(false);
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-2"
+      >
+        <RoofThumb deal={d} small />
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-x-2">
+            <span className="text-[14px] font-medium text-ink">{d.customer}</span>
+            {d.suburb && <span className="text-[12.5px] text-muted">· {d.suburb}</span>}
+            <HeatChip deal={d} />
+          </span>
+          <span className="block truncate text-[12.5px] text-ink-2">
+            {[systemLine(d) || d.title || "Solar", STAGE_LABELS[d.stage], caption(d, now)]
+              .filter((w, i, all) => all.indexOf(w) === i)
+              .join(" · ")}
+          </span>
+        </span>
+        <span className="shrink-0 text-[12px] text-muted">{agoWords(lastAt(d), now)}</span>
+        <ChevronDown className={clsx("size-4 shrink-0 text-muted transition", open && "rotate-180")} aria-hidden />
+      </button>
+      {open && (
+        <div className="border-t border-line bg-canvas p-3">
+          <DealCard {...props} />
+        </div>
+      )}
+    </li>
   );
 }
 
@@ -311,6 +460,10 @@ function DealCard(props: {
   };
   // The deal's chat opened over the page from its glance (null: closed), with what was typed in the glance's box.
   const [chat, setChat] = useState<string | null>(null);
+  // The pad beside the card only when the team has said something there (10 Nov 2026, Martin): Sol's open request is
+  // already the card's own line.
+  const pad = padLines(d).length > 0;
+  const hide = openAskLine(d)?.id;
   // Call only dials; the note-taker is its own round, opened by hand with its microphone off (8 Nov 2026, Martin: the
   // phone icon started the note-taker when it shouldn't).
   const notetaker = useRef<NotetakerHandle>(null);
@@ -321,7 +474,7 @@ function DealCard(props: {
   // The deal and its team chat as two cards side by side (8 Nov 2026, Martin: the chat wider and floating, not inside
   // the deal's post); the chat drops under the deal on a narrow screen.
   return (
-    <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_22rem]">
+    <div className={clsx("grid items-stretch gap-3", pad && "lg:grid-cols-[minmax(0,1fr)_22rem]")}>
       <article
         className={clsx("relative flex min-w-0 flex-col rounded-2xl bg-surface p-4 ring-1 sm:p-5", need ? "ring-sun-line/50" : "ring-line")}
       >
@@ -350,14 +503,6 @@ function DealCard(props: {
               {systemLine(d) || d.title || "Solar"} · <span className="text-ink">{STAGE_LABELS[d.stage]}</span>
               {d.clock && OPEN_STAGES.includes(d.stage) ? ` · ${d.clock}` : ""}
             </p>
-            {need && (
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <p className="inline-flex items-center gap-1.5 rounded-full bg-sun px-2.5 py-0.5 text-[12px] font-medium text-sun-ink">
-                  {need}
-                </p>
-                <MarkButtons busy={marking} onDone={() => void mark("done")} onLater={(c) => void mark("later", c)} />
-              </div>
-            )}
             {held && (
               <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] text-ink-2">
                 {held.kind === "done" ? (
@@ -399,7 +544,7 @@ function DealCard(props: {
         {/* Sol's line: why the next move is the next move, or where the deal is at when nothing is needed. */}
         <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface-2 px-3 py-2">
           <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
-          <p className="text-[13px] leading-snug text-ink">{move ? move.why : caption(d, now)}</p>
+          <p className="whitespace-pre-line text-[13px] leading-snug text-ink">{solLine(d, now)}</p>
         </div>
 
         {/* The foot of the card, kept at the bottom however tall the chat beside it makes the row: tell Sol what to write,
@@ -459,35 +604,54 @@ function DealCard(props: {
                 <FileText className={clsx("size-4", !move && "text-sun-line")} aria-hidden />
               </Tool>
             )}
+            {!pad && (
+              <Tool quiet={Boolean(move)} label="Team chat" title="Talk about this deal with the team" onClick={() => setChat("")}>
+                <MessageCircle className="size-4" aria-hidden />
+              </Tool>
+            )}
             <Tool quiet={Boolean(move)} label="Deal" title={`${d.customer}'s deal`} href={`${PATHS.deals}/${d.jobId}`}>
               <Handshake className="size-4" aria-hidden />
             </Tool>
+            {need && (
+              <span className="ml-auto">
+                <MarkButtons busy={marking} onDone={() => void mark("done")} onLater={(c) => void mark("later", c)} />
+              </span>
+            )}
           </div>
         </div>
         <CallNotetaker handle={notetaker} button={false} jobId={d.jobId} customerId="" phone={d.phone ?? ""} onAdded={props.onChanged} />
       </article>
       {/* The deal's team chat: its own card beside the deal (deal-team.ts). */}
-      <aside
-        className="flex min-w-0 flex-col gap-2 rounded-2xl bg-surface p-4 shadow-[0_8px_30px_rgba(11,11,12,0.06)] ring-1 ring-line"
-        aria-label={`Team chat on ${d.customer}'s deal`}
-      >
-        <p className="flex items-center justify-between text-[11.5px] font-medium uppercase tracking-wide text-muted">
-          Team chat
-          <Link href={`${PATHS.deals}/${d.jobId}?tab=team`} className="normal-case tracking-normal text-ink-2 hover:text-ink">
-            All
-          </Link>
-        </p>
-        <div
-          className="flex min-w-0 flex-1 cursor-pointer flex-col"
-          onClick={(e) => {
-            // Anywhere on the glance but its buttons and box opens the deal's chat.
-            if (!(e.target as HTMLElement).closest("button, a, input, textarea")) setChat("");
-          }}
+      {pad && (
+        <aside
+          className="flex min-w-0 flex-col gap-2 rounded-2xl bg-surface p-4 shadow-[0_8px_30px_rgba(11,11,12,0.06)] ring-1 ring-line"
+          aria-label={`Team chat on ${d.customer}'s deal`}
         >
-          <DealTeamChat jobId={d.jobId} pad initial={d.team?.lines ?? []} onChanged={props.onChanged} onOpen={(typed) => setChat(typed)} />
-        </div>
-        {chat !== null && <DealChatSheet deal={d} startText={chat} onClose={() => setChat(null)} onChanged={props.onChanged} />}
-      </aside>
+          <p className="flex items-center justify-between text-[11.5px] font-medium uppercase tracking-wide text-muted">
+            Team chat
+            <Link href={`${PATHS.deals}/${d.jobId}?tab=team`} className="normal-case tracking-normal text-ink-2 hover:text-ink">
+              All
+            </Link>
+          </p>
+          <div
+            className="flex min-w-0 flex-1 cursor-pointer flex-col"
+            onClick={(e) => {
+              // Anywhere on the glance but its buttons and box opens the deal's chat.
+              if (!(e.target as HTMLElement).closest("button, a, input, textarea")) setChat("");
+            }}
+          >
+            <DealTeamChat
+              jobId={d.jobId}
+              pad
+              initial={padLines(d)}
+              hide={hide ? [hide] : undefined}
+              onChanged={props.onChanged}
+              onOpen={(typed) => setChat(typed)}
+            />
+          </div>
+        </aside>
+      )}
+      {chat !== null && <DealChatSheet deal={d} startText={chat} onClose={() => setChat(null)} onChanged={props.onChanged} />}
     </div>
   );
 }

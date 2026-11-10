@@ -354,3 +354,61 @@ export function allClearWords(done: DayDone | null): string {
   const parts = [done.mine > 0 ? `${done.mine} done today` : null, done.sol > 0 ? `Sol sent ${done.sol}` : null].filter(Boolean);
   return parts.length ? `All clear. ${parts.join(". ")}.` : "All clear.";
 }
+
+/**
+ * Today as one page (10 Nov 2026, Martin: no tabs; what needs me, what Sol is about to do, what's in hand, what's done).
+ * **Needs you**: the deals a person must act on. **Coming up**: what Sol has lined up on the others, soonest first.
+ * **In hand**: the rest, newest happening first.
+ */
+export interface TodayParts {
+  needs: FeedDeal[];
+  coming: FeedDeal[];
+  inHand: FeedDeal[];
+}
+export function todayParts(deals: readonly FeedDeal[], now = new Date()): TodayParts {
+  const needs = feedOf(deals, "needs", now);
+  const needing = new Set(needs.map((d) => d.jobId));
+  const rest = deals.filter((d) => !needing.has(d.jobId));
+  const coming = rest.filter((d) => d.sol).sort((a, b) => a.sol!.firesAt.localeCompare(b.sol!.firesAt));
+  const inHand = feedOf(
+    rest.filter((d) => !d.sol),
+    "all",
+    now,
+  );
+  return { needs, coming, inHand };
+}
+
+/** The open request of Sol's on the deal, as its line in the team chat (its words carry the brief), when there is one. */
+export function openAskLine(d: Pick<FeedDeal, "team">): DealLine | null {
+  const open = new Set(d.team?.openAsks.map((a) => a.id) ?? []);
+  return d.team?.lines.find((l) => open.has(l.id)) ?? null;
+}
+
+/**
+ * Sol's one line on a card (10 Nov 2026, Martin: a card said the same thing four times). An open request of his reads in
+ * his own words (the brief); else why the next move is the next move; else what it needs; else where it is at.
+ */
+export function solLine(d: FeedDeal, now = new Date()): string {
+  const ask = openAskLine(d);
+  if (ask) return ask.text;
+  return nextMove(d, now)?.why ?? needsYou(d, now) ?? caption(d, now);
+}
+
+/** The deal's team chat lines worth a pad of their own: not Sol's open request, which the card already says. */
+export function padLines(d: Pick<FeedDeal, "team">): DealLine[] {
+  const open = new Set(d.team?.openAsks.map((a) => a.id) ?? []);
+  return (d.team?.lines ?? []).filter((l) => !open.has(l.id));
+}
+
+/** Sol's line at the top of Today: "2 need you. Sol emails Sam in 1h 52m. 3 done today, Sol sent 4." */
+export function todaySummary(parts: TodayParts, done: DayDone | null, now = new Date()): string {
+  const n = parts.needs.length;
+  const first = n === 0 ? "Nothing needs you right now." : `${n === 1 ? "One deal needs" : `${n} deals need`} you.`;
+  const next = parts.coming.find((d) => d.sol && (d.sol.state ?? (d.sol.held ? "held" : "counting")) === "counting");
+  const coming = next?.sol ? `I email ${first_(next.customer)} ${countdownWords(next.sol.firesAt, now)}.` : null;
+  const did = [done && done.mine > 0 ? `${done.mine} done by you today` : null, done && done.sol > 0 ? `I sent ${done.sol}` : null]
+    .filter(Boolean)
+    .join(", ");
+  return [first, coming, did ? `${did[0].toUpperCase()}${did.slice(1)}.` : null].filter(Boolean).join(" ");
+}
+const first_ = (name: string) => name.trim().split(/\s+/)[0] || "them";

@@ -7,20 +7,15 @@ import { useRouter } from "next/navigation";
 import {
   ArrowUp,
   ArrowUpRight,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Eye,
   HardHat,
-  KanbanSquare,
   Mail,
-  Newspaper,
   Phone,
   Play,
-  Plus,
   RefreshCw,
   Search,
-  Sun,
   X,
 } from "lucide-react";
 import { LAUNCH_MARKET, greeting } from "@/lib/domain/market";
@@ -28,7 +23,6 @@ import { nextHeadline, searchNext, searchWords, workThroughAt, type NextItem } f
 import { WELCOME_TOUR } from "@/lib/domain/design/welcome";
 import { agentFor, type AgentStage } from "@/lib/domain/design/sol-agents";
 import {
-  TODAY_TABS,
   agendaFor,
   beforeYouCall,
   daySoFar,
@@ -38,7 +32,6 @@ import {
   solDayScript,
   type BeforeCall,
   type SolBeat,
-  type TodayTab,
 } from "@/lib/domain/design/today-pad";
 import type { Activity } from "@/lib/domain/design/crm";
 import { mailMarkWords, type MailMark } from "@/lib/domain/design/email-opens";
@@ -48,14 +41,10 @@ import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { loadMailMarks } from "@/lib/services/deal-pulse";
-import { inboxUnread } from "@/lib/services/inbox";
 import { SOL_CHANGED, SOL_TOGGLE, askSol, loadSol, retrySol } from "@/lib/services/sol";
 import { goWhereAsked, openSolPage } from "./sol-chat";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
-import { InboxPage } from "./inbox";
-import { CallLogPage } from "./call-log";
-import { NewsPage } from "./industry-news";
 import { DealFeed } from "./deal-feed";
 import { NewDeal } from "./design-customers";
 import { NewLook, Spotlight } from "./new-look";
@@ -70,14 +59,6 @@ import { AttachButton, AttachedFiles, solFilesOf, useSolAttach } from "./sol-att
 import { DictateButton, withSpoken } from "./dictate";
 import { SolThinking } from "./sol-thinking";
 
-const TAB_ICONS: Record<TodayTab, typeof Sun> = {
-  today: SolIcon,
-  calls: Phone,
-  inbox: Mail,
-  calendar: CalendarDays,
-  pipeline: KanbanSquare,
-  news: Newspaper,
-};
 /** Items under To action before "N more". */
 const SHOWN = 5;
 /** How long Sol waits for his drafts, and for Before you call, before telling the day without them. */
@@ -154,8 +135,7 @@ export function TodayPad(props: {
   owner?: boolean;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<TodayTab | "day">("today");
-  // The new deal form under the tabs, opened by the orange + beside them.
+  // The new deal form at the top of Today, opened by the orange + on the feed.
   const [adding, setAdding] = useState(false);
   const [welcoming, setWelcoming] = useState(Boolean(props.welcome));
   // After the first visit Today opens on the deal feed (deal-feed.ts, 6 Nov 2026, Martin): Sol's typed greeting is for
@@ -167,15 +147,6 @@ export function TodayPad(props: {
     setWelcoming(false);
     window.setTimeout(() => setTouring(true), 80);
   };
-  // Gmail's own unread count on the Inbox tab (none until a mailbox is connected).
-  const [unread, setUnread] = useState(0);
-  useEffect(() => {
-    let gone = false;
-    void inboxUnread().then((r) => !gone && r.ok && setUnread(r.unread));
-    return () => {
-      gone = true;
-    };
-  }, [tab]);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [asking, setAsking] = useState(false);
   const items = useNextUp(props.jobs, props.today);
@@ -192,7 +163,6 @@ export function TodayPad(props: {
   }, []);
 
   const showDay = () => {
-    setTab("today");
     setOnFeed(false);
     if (!dayTold) setTurns((t) => [...t, { id: Date.now(), kind: "day" }]);
   };
@@ -202,7 +172,6 @@ export function TodayPad(props: {
     if (asking) return;
     setReplyTo(null);
     const id = Date.now();
-    setTab("today");
     setOnFeed(false);
     setAsking(true);
     const shownQ = q + (files.length ? `${q ? "\n" : ""}(Attached: ${files.map((f) => f.name).join(", ")})` : "");
@@ -246,76 +215,8 @@ export function TodayPad(props: {
 
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-13rem)] w-full max-w-6xl flex-col">
-      <div className="flex items-center gap-2">
-        <nav aria-label="Today" className="flex min-w-0 flex-1 items-center justify-center gap-2">
-          {/* A new deal, wherever you are on Today (10 Nov 2026, Martin: one orange + beside the tabs, not a button on each view). */}
-          <button
-            type="button"
-            onClick={() => setAdding((a) => !a)}
-            aria-expanded={adding}
-            aria-label="New deal"
-            title="New deal"
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white shadow-sm transition hover:brightness-105"
-          >
-            <Plus className={clsx("size-5 transition", adding && "rotate-45")} strokeWidth={2.25} aria-hidden />
-          </button>
-          <div className="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-full bg-surface p-1 ring-1 ring-line">
-            {TODAY_TABS.map((t) => {
-              const Icon = TAB_ICONS[t.id];
-              const on = tab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    setTab(t.id);
-                    // "Deals" always brings the feed back, even from Sol's conversation (8 Nov 2026, Martin).
-                    if (t.id === "today" && !welcoming) setOnFeed(true);
-                  }}
-                  aria-pressed={on}
-                  className={clsx(
-                    "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[13px] transition",
-                    // News is the industry's, not the business's own work: it wears the Marketplace's blue (10 Nov 2026, Martin).
-                    t.id === "news"
-                      ? on
-                        ? "bg-market text-white"
-                        : "text-market hover:bg-market/10"
-                      : on
-                        ? "bg-primary text-primary-ink"
-                        : "text-ink-2 hover:text-ink",
-                  )}
-                >
-                  <Icon className="size-4" aria-hidden />
-                  {t.label}
-                  {t.id === "inbox" && unread > 0 && (
-                    <span
-                      className={clsx(
-                        "rounded-full px-1.5 text-[11px] font-semibold tabular-nums",
-                        on ? "bg-white/20" : "bg-sun text-sun-ink",
-                      )}
-                    >
-                      {unread}
-                    </span>
-                  )}
-                  {t.id === "today" && items && items.length > 0 && (
-                    <span
-                      className={clsx(
-                        "rounded-full px-1.5 text-[11px] font-semibold tabular-nums",
-                        on ? "bg-white/20" : "bg-sun text-sun-ink",
-                      )}
-                    >
-                      {items.length}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </nav>
-      </div>
-
       {adding && (
-        <div className="mx-auto mt-4 w-full max-w-5xl">
+        <div className="mx-auto mb-4 w-full max-w-5xl">
           <NewDeal onClose={() => setAdding(false)} />
         </div>
       )}
@@ -326,7 +227,7 @@ export function TodayPad(props: {
         </p>
       )}
 
-      <div className={clsx("mt-8 flex flex-1 flex-col", tab !== "today" && "hidden")}>
+      <div className="mt-2 flex flex-1 flex-col">
         {welcoming && (
           <Welcome
             firstName={props.name}
@@ -343,16 +244,7 @@ export function TodayPad(props: {
         )}
         {!welcoming && onFeed && (
           <div className="pb-6">
-            <div className="mx-auto -mt-3 mb-3 flex w-full max-w-5xl justify-end">
-              <button
-                type="button"
-                onClick={showDay}
-                className="inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
-              >
-                <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Show me my day
-              </button>
-            </div>
-            <DealFeed me={props.email} />
+            <DealFeed me={props.email} onNew={() => setAdding((a) => !a)} adding={adding} onDay={showDay} />
           </div>
         )}
         {/* The greeting, in the middle of the screen until the conversation starts, then folded away. */}
@@ -443,31 +335,20 @@ export function TodayPad(props: {
         )}
       </div>
 
-      {tab !== "today" && (
-        <div className="mt-8 flex-1">
-          {tab === "calls" && <CallLogPage />}
-          {tab === "inbox" && <InboxPage />}
-          {tab === "calendar" && <CalendarView jobs={props.jobs} today={props.today} />}
-          {tab === "pipeline" && <PipelineView jobs={props.jobs} today={props.today} />}
-          {tab === "news" && <NewsPage />}
-          {tab === "day" && props.day}
-        </div>
-      )}
-
       {touring && <Spotlight steps={WELCOME_TOUR} onEnd={() => setTouring(false)} />}
 
       {/* Not on the deal feed (8 Nov 2026, Martin: a third place to ask Sol confused more than it helped; each deal has
           its own chat and Sol's round is in the nav). */}
-      {(tab !== "today" || (talking && !onFeed)) && (
+      {talking && !onFeed && (
         <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-60% to-transparent pb-5 pt-10 print:hidden">
           <div className="mx-auto max-w-3xl">
-            {tab === "today" && !welcoming && (!onFeed || talking) && (
+            {!welcoming && (
               <button
                 type="button"
                 onClick={() => setOnFeed(!onFeed)}
                 className="mb-2.5 mr-2 inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
               >
-                {onFeed ? "Back to the conversation" : "Deals"}
+                Back to your deals
               </button>
             )}
             {!dayTold && (
@@ -1079,7 +960,7 @@ function CallCard({ got }: { got: CallFacts }) {
 }
 
 /** A day's installs and the member's own reminders, stepping through the working days. */
-function CalendarView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
+export function CalendarView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
   const [days, setDays] = useState<string[]>([today]);
   const [reminders, setReminders] = useState<SolReminder[] | null>(null);
   useEffect(() => {
@@ -1194,7 +1075,7 @@ function MailBadge({ mark }: { mark: MailMark }) {
 }
 
 /** The deals being sold as a board, or the numbers. */
-function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
+export function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
   const [numbers, setNumbers] = useState(false);
   // Which deals an email has gone from, and whether the latest was opened (Sol and the team's emails alike).
   const [marks, setMarks] = useState<Record<string, MailMark> | null>(null);

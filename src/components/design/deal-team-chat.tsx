@@ -44,6 +44,8 @@ export function DealTeamChat(props: {
   /** Words to start the box with, and the box focused, for the larger chat opened from the pad. */
   startText?: string;
   autoFocus?: boolean;
+  /** Lines the pad leaves out because its card already says them (Sol's open request, 10 Nov 2026). */
+  hide?: readonly string[];
 }) {
   const { jobId, pad, fill } = props;
   const [following, setFollowing] = useState<boolean | null>(null);
@@ -130,7 +132,7 @@ export function DealTeamChat(props: {
   // Once it has read the chat itself, the pad still takes the feed's lines when they are newer (written elsewhere since).
   const newest = (l: readonly DealLine[] | undefined) => l?.at(-1)?.at ?? "";
   const current = view && (!pad || newest(lines) >= newest(props.initial)) ? lines : (props.initial ?? lines);
-  const shown = pad ? current.slice(-4) : current;
+  const shown = pad ? current.filter((l) => !props.hide?.includes(l.id)).slice(-4) : current;
   const people: Person[] = view?.members ?? [];
   useEffect(() => {
     if (fill) end.current?.scrollIntoView({ block: "end" });

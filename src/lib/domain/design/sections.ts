@@ -46,6 +46,8 @@ export const SECTIONS: readonly Section[] = [
       { id: "customers", label: "Customers", href: "/design/customers" },
       { id: "sent", label: "Proposals sent", href: "/design/sales/proposals" },
       { id: "signed", label: "Proposals signed", href: "/design/sales/signed" },
+      // The call log (8 Nov 2026), a tab on Today until Today became one page (10 Nov 2026, Martin).
+      { id: "calls", label: "Calls", href: "/design/calls" },
     ],
   },
   {
