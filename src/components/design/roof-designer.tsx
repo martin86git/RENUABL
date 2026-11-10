@@ -7016,7 +7016,7 @@ export function RoofDesigner(props: {
 
               {/* Which picture of the roof is under the design: Google's or a Nearmap capture (3 Nov 2026, as Primero's). */}
               {/* In the pop-up, Publish in the top right corner, and the picture's switch level with Ask Sol. */}
-              {props.tight && publishControl && <div className="pointer-events-auto absolute right-3 top-3 z-30">{publishControl}</div>}
+              {props.tight && publishControl && <div className="pointer-events-auto absolute right-4 top-4 z-30">{publishControl}</div>}
               {props.pictureMenu && (
                 <div
                   className={clsx(
@@ -7851,7 +7851,7 @@ export function RoofDesigner(props: {
                   beneath, centred under the three. (Which design is open is in the bar at the top of the page, and
                   the customer's bill in the figures above the picture.) */}
               <div
-                className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 flex-col items-center"
+                className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 flex-col items-center"
                 role="group"
                 aria-label="System"
                 data-menu-host
@@ -8372,7 +8372,7 @@ export function RoofDesigner(props: {
               {/* The pad, in the top left corner: the select arrow in a circle of its own, since it is the tool every other
                   is left for, with two smaller half-rounds growing out of it for the two things done most with it:
                   add a panel (to its right) and erase (beneath it). */}
-              <div className="absolute left-3 top-3 z-20 size-[6.25rem]" role="toolbar" aria-label="Select, add a panel, landscape, erase">
+              <div className="absolute left-4 top-4 z-20 size-[6.25rem]" role="toolbar" aria-label="Select, add a panel, landscape, erase">
                 <button
                   onClick={() => {
                     const wasOpen = fanOpen;
@@ -8646,7 +8646,7 @@ export function RoofDesigner(props: {
               {/* Top right (8 Nov 2026, Martin: one round, its tools folded under it): stringing, with tracing a roof face and
                   the guide line coming out beneath on hover. The round shows whichever of the three is in use. */}
               {!props.tight && (
-                <div className="absolute right-3 top-3 z-20">
+                <div className="absolute right-4 top-4 z-20">
                   <ToolFan
                     label="String panels (trace a roof face and the guide line beneath)"
                     direction="down"
@@ -8685,7 +8685,7 @@ export function RoofDesigner(props: {
               {tips.corner}
               {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its
                   circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}
-              <div className="absolute bottom-8 left-3 z-10">
+              <div className="absolute bottom-8 left-4 z-10">
                 <ToolFan
                   label="Getting about: zoom in, zoom out, move the picture"
                   direction="right"

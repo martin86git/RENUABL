@@ -220,7 +220,7 @@ export function SolCalculator({
               onClick={() => setPhase(p)}
               className={clsx(
                 "flex-1 rounded-[9px] text-[13px] font-medium",
-                phase === p ? "bg-white text-ink" : "text-white/70 hover:text-white",
+                phase === p ? "bg-ink text-canvas" : "text-white/70 hover:text-white",
               )}
             >
               {p === "single" ? "Single" : "Three"}
@@ -263,8 +263,8 @@ export function SolCalculator({
           )
         ))}
       {size ? (
-        <div className="mt-2.5 rounded-2xl bg-white p-3 text-ink" aria-live="polite">
-          {/* The result, on its own light card so it reads as the answer. */}
+        <div className="mt-2.5 rounded-2xl bg-white/[0.07] p-3 text-ink ring-1 ring-white/10" aria-live="polite">
+          {/* The result, on its own card so it reads as the answer. */}
           <div className="grid grid-cols-3 gap-2">
             <Figure label="Panels" big={`${size.panels}`} small={`${size.kw} kW · ${QUICK_DEFAULTS.panelWatts} W`} />
             <Figure label="Inverter" big={`${size.inverterKw} kW`} small={size.hybrid ? "Hybrid" : "String"} />
