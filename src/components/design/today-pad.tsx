@@ -247,7 +247,6 @@ export function TodayPad(props: {
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-13rem)] w-full max-w-6xl flex-col">
       <div className="flex items-center gap-2">
-        <span className="hidden w-28 shrink-0 sm:block" aria-hidden />
         <nav aria-label="Today" className="flex min-w-0 flex-1 items-center justify-center gap-2">
           {/* A new deal, wherever you are on Today (10 Nov 2026, Martin: one orange + beside the tabs, not a button on each view). */}
           <button
@@ -313,18 +312,6 @@ export function TodayPad(props: {
             })}
           </div>
         </nav>
-        <button
-          type="button"
-          onClick={() => setTab(tab === "day" ? "today" : "day")}
-          aria-pressed={tab === "day"}
-          title="Your day: what needs clearing before the sun sets"
-          className={clsx(
-            "flex w-28 shrink-0 items-center justify-end gap-1.5 rounded-full py-1.5 pl-2 pr-3 text-[13px] text-ink-2 transition hover:text-ink",
-            tab === "day" && "bg-surface ring-1 ring-line",
-          )}
-        >
-          <Sun className="size-4 text-sun-line" aria-hidden /> Your day
-        </button>
       </div>
 
       {adding && (
