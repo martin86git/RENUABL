@@ -4,7 +4,6 @@ import clsx from "clsx";
 import { Check, ImageIcon, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { capturedWords, offersOf } from "@/lib/domain/design/nearmap";
-import { SideViewsButton } from "./side-views";
 import { chooseImagery, fetchNearmap, loadImagery, type NearmapSurvey, type RoofImagery } from "@/lib/services/nearmap";
 
 /**
@@ -91,9 +90,6 @@ export function PictureMenu({
         >
           <ImageIcon className="size-3.5" aria-hidden /> {inUse ? label : "Nearmap"}
         </button>
-        {/* The house from its four sides in Nearmap's angled photos (9 Nov 2026, Martin). The 3D model (mesh-3d.tsx) is
-            kept off: it wasn't sharp enough to be of use. */}
-        {imagery.ready && <SideViewsButton lat={lat} lng={lng} />}
       </div>
       {open && (
         <div className="absolute bottom-11 right-0 w-[min(20rem,calc(100vw-2rem))] rounded-lg bg-surface p-2 shadow-[var(--shadow-lift)] ring-1 ring-line">

@@ -349,6 +349,7 @@ export function DesignStudio() {
             ) : undefined
           }
           nearmapPicture={Boolean(roofImagery && roofImagery.use !== "google")}
+          sidesReady={Boolean(roofImagery?.ready)}
           nearmapCaptured={nearmapKept?.captured ? capturedWords(nearmapKept.captured) : null}
           noDeal={
             signedIn && !onJob ? (

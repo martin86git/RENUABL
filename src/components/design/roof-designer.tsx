@@ -5,6 +5,7 @@ import { accessColour, shadeHint, shadeReport, type ShadeReport } from "@/lib/do
 import { loadTerrain, type Heights } from "@/lib/services/terrain";
 import { loadRoofCheck } from "@/lib/services/roof-check";
 import { useDesignTips } from "./design-tips";
+import { SideViewsButton } from "./side-views";
 import { batteryFill } from "@/lib/domain/design/battery-fill";
 import {
   HAS_SOLAR_NOTE,
@@ -59,6 +60,7 @@ import {
   Layers,
   SunMedium,
   Brush,
+  House,
   LayoutGrid,
   Radio,
   Send,
@@ -965,6 +967,8 @@ export function RoofDesigner(props: {
   onFindSheet?: (product: { kind: "panel" | "inverter"; sku: string; name: string }) => Promise<{ ok: boolean; message: string }>;
   /** The roof picture's menu (Google or a Nearmap capture), in the picture's bottom right corner. */
   pictureMenu?: React.ReactNode;
+  /** Nearmap is set up for this roof, so its angled photos (Sides) can be shown beside the roof. */
+  sidesReady?: boolean;
   /** The picture under the design is Nearmap's: drawn straight down, so Google's roof model needs no shifting onto it. */
   nearmapPicture?: boolean;
   /** When that Nearmap picture was captured, in words ("25 Apr 2026"), for the notes that name it. */
@@ -7138,36 +7142,26 @@ export function RoofDesigner(props: {
                   props.tight ? "bottom-10" : "bottom-3",
                 )}
               >
-                {/* Photo or Drawn (10 Nov 2026, Martin): the roof as the photo, or as an illustration made from it. */}
+                {/* Roof and Sides (10 Nov 2026, Martin: make Sides stand out; Drawn left this pair and lives in the
+                    tools): the roof from above, and the house from its four sides in Nearmap's angled photos. */}
                 <div
                   role="group"
-                  aria-label="Show the roof as the photo or drawn"
+                  aria-label="The roof from above, or the house from its sides"
                   className="flex items-center rounded-full border border-line bg-surface p-1 text-[13px] font-semibold shadow-lift"
                 >
-                  {(
-                    [
-                      { on: false, label: "Photo", hint: "The roof as photographed from above" },
-                      {
-                        on: true,
-                        label: "Drawn",
-                        hint: "The roof drawn from its faces, with panels as panels and the kit on its wall",
-                      },
-                    ] as const
-                  ).map((choice) => (
-                    <button
-                      key={choice.label}
-                      onClick={() => illustrated !== choice.on && toggleIllustrated()}
-                      aria-pressed={illustrated === choice.on}
-                      title={choice.hint}
-                      className={clsx(
-                        "flex h-9 items-center gap-1.5 rounded-full px-3.5",
-                        illustrated === choice.on ? "bg-sun-line text-white" : "text-ink hover:bg-canvas",
-                      )}
-                    >
-                      {choice.on && <Brush className="size-4" aria-hidden />}
-                      {choice.label}
-                    </button>
-                  ))}
+                  <button
+                    onClick={() => illustrated && toggleIllustrated()}
+                    aria-pressed={!illustrated}
+                    title="The roof from above"
+                    className={clsx(
+                      "flex h-9 items-center gap-1.5 rounded-full px-3.5",
+                      !illustrated ? "bg-sun-line text-white" : "text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <House className="size-4" aria-hidden />
+                    Roof
+                  </button>
+                  {props.sidesReady && <SideViewsButton lat={spot.lat} lng={spot.lng} tab />}
                 </div>
                 {props.pictureMenu}
               </div>

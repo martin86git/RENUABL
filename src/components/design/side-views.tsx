@@ -19,7 +19,7 @@ const VIEWS = [
  * what stands on it and the walls. Opened from the picture's corner; each side asked for only when shown, through
  * RENUABL's server so Nearmap's key never reaches the browser.
  */
-export function SideViewsButton({ lat, lng }: { lat: number; lng: number }) {
+export function SideViewsButton({ lat, lng, tab }: { lat: number; lng: number; tab?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -27,9 +27,13 @@ export function SideViewsButton({ lat, lng }: { lat: number; lng: number }) {
         type="button"
         onClick={() => setOpen(true)}
         title="See the house from its four sides (Nearmap's angled photos)"
-        className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
+        className={
+          tab
+            ? "flex h-9 items-center gap-1.5 rounded-full px-3.5 text-ink hover:bg-canvas"
+            : "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
+        }
       >
-        <Rotate3d className="size-3.5" aria-hidden />
+        <Rotate3d className={tab ? "size-4" : "size-3.5"} aria-hidden />
         Sides
       </button>
       {/* On the page body: the picture's corner sits in a moved (transformed) part of the page. */}
