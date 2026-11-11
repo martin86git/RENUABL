@@ -43,9 +43,14 @@ export function SolGuide(props: {
   onBackup: (yes: boolean) => void;
   onStop: () => void;
 }) {
-  const [home, setHome] = useState(props.home);
-  const [kliplok, setKliplok] = useState(true);
-  const [tilt, setTilt] = useState<number | null>(null);
+  // Nothing is chosen until it is pressed (11 Nov 2026, Martin: a lit answer reads as a decision already made).
+  const [home, setHome] = useState<{ phase: Phase | null; storeys: Storeys | null; roof: Roof | null }>({
+    phase: null,
+    storeys: null,
+    roof: null,
+  });
+  const [kliplok, setKliplok] = useState<boolean | null>(null);
+  const [tilt, setTilt] = useState<number | null | undefined>(undefined);
   // The boxes show the size Sol suggests (it fills in once the bill arrives) until they are typed in.
   const start = props.target ?? props.suggested;
   const [typedKw, setKw] = useState<string | null>(null);
@@ -97,7 +102,14 @@ export function SolGuide(props: {
               />
             </div>
             <Actions>
-              <Main onClick={() => props.onHome(home)}>Next</Main>
+              <Main
+                disabled={!home.phase || !home.storeys || !home.roof}
+                onClick={() =>
+                  home.phase && home.storeys && home.roof && props.onHome({ phase: home.phase, storeys: home.storeys, roof: home.roof })
+                }
+              >
+                Next
+              </Main>
             </Actions>
           </>
         );
@@ -111,7 +123,7 @@ export function SolGuide(props: {
                   ["yes", "Kliplok interfaces"],
                   ["no", "No Kliplok"],
                 ]}
-                value={kliplok ? "yes" : "no"}
+                value={kliplok === null ? null : kliplok ? "yes" : "no"}
                 onPick={(v) => setKliplok(v === "yes")}
               />
               <Choice
@@ -120,12 +132,17 @@ export function SolGuide(props: {
                   ["10", "Tilt 10°"],
                   ["15", "Tilt 15°"],
                 ]}
-                value={String(tilt ?? 0)}
+                value={tilt === undefined ? null : String(tilt ?? 0)}
                 onPick={(v) => setTilt(v === "0" ? null : Number(v))}
               />
             </div>
             <Actions>
-              <Main onClick={() => props.onFlat({ kliplok, tilt })}>Next</Main>
+              <Main
+                disabled={kliplok === null || tilt === undefined}
+                onClick={() => kliplok !== null && tilt !== undefined && props.onFlat({ kliplok, tilt })}
+              >
+                Next
+              </Main>
             </Actions>
           </>
         );
@@ -255,7 +272,7 @@ export function SolGuide(props: {
   );
 }
 
-function Choice({ options, value, onPick }: { options: [string, string][]; value: string; onPick: (v: string) => void }) {
+function Choice({ options, value, onPick }: { options: [string, string][]; value: string | null; onPick: (v: string) => void }) {
   return (
     <div className="flex flex-wrap gap-1">
       {options.map(([v, label]) => (
