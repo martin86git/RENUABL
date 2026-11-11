@@ -5,6 +5,7 @@ import { accessColour, shadeHint, shadeReport, type ShadeReport } from "@/lib/do
 import { loadTerrain, type Heights } from "@/lib/services/terrain";
 import { loadRoofCheck } from "@/lib/services/roof-check";
 import { useDesignTips } from "./design-tips";
+import { shareDesignPanels } from "@/lib/services/side-view-design";
 import { BlockTray } from "./block-tray";
 import { SolGuide } from "./sol-guide";
 import { guideStep, guiding, panelsFor, type GuideFacts, type GuideStepId, type GuideTarget } from "@/lib/domain/design/sol-guide";
@@ -1948,6 +1949,14 @@ export function RoofDesigner(props: {
   const summary = useMemo(() => designSummary(design, props.yieldPerKwDay), [design, props.yieldPerKwDay]);
   const year = useMemo(() => monthlyProduction(design, props.yieldPerKwDay), [design, props.yieldPerKwDay]);
   const centres = useMemo(() => Object.fromEntries(designPanels(design).map((p) => [p.key, middle(p.corners)])), [design]);
+  // The panels as they are, for the side views to draw on Nearmap's angled photos (12 Nov 2026, Martin).
+  useEffect(() => {
+    shareDesignPanels(
+      spot.lat,
+      spot.lng,
+      designPanels(design).map((p) => [...p.corners]),
+    );
+  }, [design, spot.lat, spot.lng]);
   const face = faces.find((f) => f.id === selected) ?? null;
   const isPicked = (pick: Pick) => picks.some((p) => same(p, pick));
   const panelPicks = picks.filter((p) => p.kind !== "label");
