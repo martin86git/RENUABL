@@ -124,6 +124,12 @@ describe("New in", () => {
     expect(todaySummary(parts, null, now)).toBe("One new lead to get in touch with. One deal needs you.");
   });
 
+  it("holds new leads only: a deal won this week isn't in it", () => {
+    const won = deal({ jobId: "won", stage: "won", createdAt: ago(5) });
+    const lead = deal({ jobId: "lead", stage: "lead", createdAt: ago(5), events: [] });
+    expect(todayParts([won, lead], now).fresh.map((d) => d.jobId)).toEqual(["lead"]);
+  });
+
   it("says where a new arrival has got to", () => {
     expect(arrivalWords(deal({ stage: "lead", events: [] }))).toEqual({ words: "Not contacted yet", waiting: true });
     expect(arrivalWords(deal({ stage: "lead", events: [{ kind: "call", text: "Spoke", at: ago(1), by: "sam" }] }))).toEqual({

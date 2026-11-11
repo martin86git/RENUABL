@@ -430,7 +430,10 @@ const first_ = (name: string) => name.trim().split(/\s+/)[0] || "them";
 export const NEW_IN_DAYS = 7;
 export function newIn(deals: readonly FeedDeal[], now = new Date()): FeedDeal[] {
   const from = now.getTime() - NEW_IN_DAYS * DAY;
-  return deals.filter((d) => Date.parse(d.createdAt) >= from).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  // New leads only (12 Nov 2026, Martin): a deal already won has left New in, whenever it arrived.
+  return deals
+    .filter((d) => OPEN.includes(d.stage) && Date.parse(d.createdAt) >= from)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /** Whether anyone has been in touch with the deal's customer: a call, an email or a reply on record. */
