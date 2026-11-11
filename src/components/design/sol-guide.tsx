@@ -266,7 +266,7 @@ function Choice({ options, value, onPick }: { options: [string, string][]; value
           aria-pressed={value === v}
           className={clsx(
             "rounded-full px-3 py-1 text-[13px] font-medium",
-            value === v ? "bg-white text-ink" : "text-white/80 ring-1 ring-white/20 hover:bg-white/10",
+            value === v ? "bg-sun-line text-white" : "text-white/80 ring-1 ring-white/20 hover:bg-white/10",
           )}
         >
           {label}
