@@ -29,6 +29,7 @@ import { siteUrl } from "@/lib/domain/sms";
 import { query } from "./db";
 import { markFollowUp } from "./design-after-sale-repo";
 import { addActivity, listJobs } from "./design-crm-repo";
+import { isDemoBusiness } from "./design-demo-check";
 import { readyFor, type Pending } from "./design-prepared";
 import { loadBrand } from "./design-proposal-repo";
 import { listMembers } from "./design-repo";
@@ -181,7 +182,8 @@ export async function sendOutboxItem(
   by: string,
   replyTo?: string,
 ): Promise<"sent" | "gone" | "no-email" | "failed"> {
-  if (!emailProvider()) return "failed";
+  // A demo account sends nothing to anyone (demo.ts).
+  if (!emailProvider() || (await isDemoBusiness(business.id))) return "failed";
   const claimed = await query<{ item: Held; customerId: string }>(
     `update design_prepared p set status = 'sent', item = jsonb_set(p.item, '{status}', '"sent"'), done_at = now(), done_by = $3
        from design_jobs j

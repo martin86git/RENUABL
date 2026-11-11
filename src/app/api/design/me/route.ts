@@ -1,5 +1,6 @@
 import { BUSINESS_TERMS_VERSION, can } from "@/lib/domain/design/account";
 import { cleanKind, needsPlan } from "@/lib/domain/design/business-kind";
+import { isDemoEmail } from "@/lib/domain/design/demo";
 import { sampleByEmail } from "@/lib/domain/design/staff-view";
 import { subscriptionOf } from "@/lib/server/design-billing-repo";
 import { answer, designAccess } from "@/lib/server/design-context";
@@ -19,8 +20,12 @@ export async function GET() {
     const staff = await staffBehind().catch(() => null);
     // A new retailer's owner chooses a plan and pays before going in (needsPlan). Not RENUABL's own business, nor the
     // sample businesses staff look through.
+    const demo = isDemoEmail(member?.email);
     const exempt =
-      !member || Boolean(sampleByEmail(access.email)) || access.email.toLowerCase() === process.env.RENUABL_CRM_EMAIL?.trim().toLowerCase();
+      !member ||
+      demo ||
+      Boolean(sampleByEmail(access.email)) ||
+      access.email.toLowerCase() === process.env.RENUABL_CRM_EMAIL?.trim().toLowerCase();
     const plan = exempt ? null : await subscriptionOf(member.businessId).catch(() => undefined);
     const planDue = !exempt && plan !== undefined && needsPlan(cleanKind(member.businessKind), member.role, plan?.status ?? null);
     return Response.json({
@@ -37,12 +42,14 @@ export async function GET() {
       },
       termsVersion: BUSINESS_TERMS_VERSION,
       ...(planDue ? { needsPlan: true } : {}),
+      // A demo account (demo.ts): no plan asked for, and the shell says it is a demo.
+      ...(demo ? { demo: true, ...(member?.firstName ? {} : { demoNeedsDetails: true }) } : {}),
       // About you (profile.ts): their own first name to greet them by, or, until given, that it is still to ask. Not
       // while viewing as someone, nor in the sample businesses staff look through.
       ...(member?.firstName ? { firstName: member.firstName } : {}),
       // The welcome on Today (welcome.ts), until they finish or skip it. Not while viewing as someone.
       ...(member && member.welcomed === false && !member.viewedBy ? { welcome: true } : {}),
-      ...(member && !member.firstName && !member.viewedBy && !sampleByEmail(access.email) ? { needsProfile: true } : {}),
+      ...(member && !member.firstName && !member.viewedBy && !demo && !sampleByEmail(access.email) ? { needsProfile: true } : {}),
       // The owner viewing as this member: whose own view it really is.
       ...(member?.viewedBy ? { viewedBy: member.viewedBy } : {}),
       // RENUABL staff: Settings offers View as a retailer, installer or inspector; while in a sample, which one.

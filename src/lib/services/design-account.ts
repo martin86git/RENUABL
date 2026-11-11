@@ -30,6 +30,10 @@ export type DesignAccount =
       viewedBy?: string;
       /** A new retailer's owner who hasn't chosen a plan and paid yet (business-kind.ts `needsPlan`). */
       needsPlan?: boolean;
+      /** A demo account (demo.ts): made-up deals, nothing sent to anyone. */
+      demo?: boolean;
+      /** In a demo, who is trying it hasn't been said yet: asked before a roof is designed, Sol is asked or a proposal published. */
+      demoNeedsDetails?: boolean;
       /** Their own first name, once given (About you); nobody is greeted by name before. */
       firstName?: string;
       /** About you is still to be given (profile.ts). */

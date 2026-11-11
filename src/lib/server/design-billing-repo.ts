@@ -240,9 +240,9 @@ export async function spendToken(businessId: string, projectId: string, by: stri
   });
 }
 
-export type LeadKind = "marketplace" | "enterprise";
+export type LeadKind = "marketplace" | "enterprise" | "demo";
 
-/** Someone who asked about the marketplace, or an Enterprise plan, on the sign-up page. */
+/** Someone who asked about the marketplace, or an Enterprise plan, on the sign-up page, or opened the demo (demo.ts). */
 export async function recordLead(
   kind: LeadKind,
   lead: {

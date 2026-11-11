@@ -27,6 +27,7 @@ import {
   type Visual,
 } from "@/lib/domain/design/sales-page";
 import { askSales, registerInterest, startPlan } from "@/lib/services/billing";
+import { TryDemoButton } from "./business-demo";
 import {
   AfterSigningDemo,
   AskDesignDemo,
@@ -52,7 +53,7 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
     <div className="theme-studio min-h-dvh bg-canvas text-ink">
       <Header signedIn={signedIn} />
       {notice && <p className="mx-auto max-w-3xl px-5 pt-4 text-center text-sm text-danger">{notice}</p>}
-      <Hero />
+      <Hero signedIn={signedIn} />
       <Upgrade />
       <BigThree />
       <Journey />
@@ -191,6 +192,11 @@ function Header({ signedIn }: { signedIn: boolean }) {
             <Link href="/design/sign-in" className="whitespace-nowrap text-[14px] text-ink-2 hover:text-ink">
               Sign in
             </Link>
+          )}
+          {!signedIn && (
+            <span className="hidden sm:inline-flex">
+              <TryDemoButton look="bar" />
+            </span>
           )}
           <a
             href="#pricing"
@@ -336,7 +342,7 @@ function VisualOf({ visual }: { visual: Visual }) {
   );
 }
 
-function Hero() {
+function Hero({ signedIn }: { signedIn: boolean }) {
   return (
     <section
       id="start"
@@ -360,7 +366,11 @@ function Hero() {
           </h1>
           <p className="mt-7 max-w-xl text-[18px] leading-relaxed text-ink-2">{SALES_HERO.sub}</p>
           <div className="mt-8 max-w-xl">
-            <SignUpLink />
+            <div className="flex flex-wrap items-center gap-3">
+              <SignUpLink />
+              {/* Try the demo (demo.ts): one press into a demo account, no form. Not for someone already signed in. */}
+              {!signedIn && <TryDemoButton look="quiet" />}
+            </div>
             <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-ink-2">
               {SALES_HERO.small.map((s) => (
                 <li key={s} className="inline-flex items-center gap-1.5">

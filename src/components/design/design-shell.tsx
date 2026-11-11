@@ -31,6 +31,7 @@ import { Wordmark } from "@/components/ui/primitives";
 import { KIND_SECTIONS, designsRoofs, pageAt, sectionAt } from "@/lib/domain/design/sections";
 import { MarketplaceMark, MarketplaceMenu } from "./marketplace-bar";
 import { BUSINESS_KINDS, cleanKind, pageAllowed, type BusinessKind } from "@/lib/domain/design/business-kind";
+import { DemoBar, DemoDetailsPrompt } from "./demo-details";
 import { staffView } from "./staff-view-as";
 import { notificationCount, serviceCount, approvalCounts, updatesUnseen } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
@@ -312,6 +313,7 @@ function Shell({
     return (
       <div className="theme-studio min-h-dvh">
         <DrawerFrameLinks />
+        <DemoDetailsPrompt account={account} />
         {children}
       </div>
     );
@@ -369,6 +371,9 @@ function Shell({
           </button>
         </div>
       )}
+      {/* A demo account (demo.ts): says so on every page, with the way to what RENUABL is. */}
+      <DemoBar account={account} />
+      <DemoDetailsPrompt account={account} />
       {/* Across the top on a wide screen: the logo, the sections (with the design tool in orange and Sol at the end), and on
           the right the search, the Marketplace and a small card with the date and weather and the profile round. */}
       <header

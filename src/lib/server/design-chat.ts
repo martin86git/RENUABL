@@ -28,6 +28,7 @@ import {
   type PublicChat,
   type ReplyEmail,
 } from "@/lib/domain/design/chat";
+import { isDemoEmail } from "@/lib/domain/design/demo";
 import { FROM_CUSTOMER, proposalPath } from "@/lib/domain/design/proposal";
 import { solActive } from "@/lib/domain/design/sol-customer";
 import { chatMessageEmail, chatReplyEmail } from "@/lib/domain/emails";
@@ -146,13 +147,14 @@ export async function memberReplies(
   const token = await tokenForJob(member.businessId, jobId);
   const site = siteUrl();
   // Without a proposal out there is nowhere for the customer to read or answer it.
-  const block: "switched-off" | "no-address" | "not-set-up" | null = !brand.emailReplies
-    ? "switched-off"
-    : !found.customer.email
-      ? "no-address"
-      : !canNotify() || !site || !token
-        ? "not-set-up"
-        : null;
+  const block: "switched-off" | "no-address" | "not-set-up" | null =
+    !brand.emailReplies || isDemoEmail(member.email)
+      ? "switched-off"
+      : !found.customer.email
+        ? "no-address"
+        : !canNotify() || !site || !token
+          ? "not-set-up"
+          : null;
   if (files.length && block) return { refused: filesNeedEmail(block) };
   const parts = await emailParts(files);
   // The chat on the proposal shows words only, so the line says what went with the email.

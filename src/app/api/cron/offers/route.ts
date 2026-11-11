@@ -4,6 +4,7 @@ import { sendHealthReminders } from "@/lib/server/health-reminders";
 import { processOffers } from "@/lib/server/offers-engine";
 import { sendInstallReminders } from "@/lib/server/design-reminders";
 import { endTwelveMonthPlans } from "@/lib/server/design-twelve-months";
+import { clearOldDemos } from "@/lib/server/design-demo";
 import { remindWatchers } from "@/lib/server/design-market-watch-repo";
 
 /**
@@ -37,5 +38,19 @@ export async function GET(request: Request) {
     console.error("watch reminders failed", e instanceof Error ? e.message : e);
     return 0;
   });
-  return Response.json({ ok: true, ...offers, healthReminders, unfinishedBriefs, installReminders, watchReminders, twelveMonthsEnded });
+  // RENUABL Business demo accounts (demo.ts) are cleared once they are old.
+  const demosCleared = await clearOldDemos().catch((e) => {
+    console.error("old demos not cleared", e instanceof Error ? e.message : e);
+    return 0;
+  });
+  return Response.json({
+    ok: true,
+    ...offers,
+    healthReminders,
+    unfinishedBriefs,
+    installReminders,
+    watchReminders,
+    twelveMonthsEnded,
+    demosCleared,
+  });
 }

@@ -9,6 +9,15 @@ import { BUSINESS_TERMS_VERSION, can, refusal, seesAllDeals, type DealViewer, ty
 import { cookies, headers } from "next/headers";
 import { VIEW_AS_COOKIE, mayViewAs } from "@/lib/domain/design/view-as";
 import { KIND_REFUSAL, PATH_HEADER, apiAllowed, cleanKind } from "@/lib/domain/design/business-kind";
+import {
+  DEMO_DETAILS,
+  DEMO_DETAILS_HEADER,
+  DEMO_REFUSAL,
+  METHOD_HEADER,
+  demoNeedsDetails,
+  demoRefuses,
+  isDemoEmail,
+} from "@/lib/domain/design/demo";
 import { currentSession } from "./accounts";
 import { dbConfigured } from "./db";
 import { memberByEmail, type Member } from "./design-repo";
@@ -50,8 +59,19 @@ export async function requireMember(action: MemberAction): Promise<{ member: Mem
   if (access.state !== "ready") return { refuse: refused(401, "Sign in to your business to do this.") };
   if (!can(access.member.role, action, access.member.permissions)) return { refuse: refused(403, refusal(action)) };
   // An installer's or inspector's login holds only part of the product: the proxy tells us the address asked for.
-  const path = (await headers()).get(PATH_HEADER);
+  const sent = await headers();
+  const path = sent.get(PATH_HEADER);
   if (path && !apiAllowed(cleanKind(access.member.businessKind), path)) return { refuse: refused(403, KIND_REFUSAL) };
+  // A demo account never reaches a real person, another business or money (demo.ts).
+  if (isDemoEmail(access.member.email)) {
+    const method = sent.get(METHOD_HEADER);
+    if (demoRefuses(method, path)) return { refuse: refused(403, DEMO_REFUSAL) };
+    // And asks who is trying it before the parts that cost money to run: the product opens the box on this header.
+    if (!access.member.firstName && demoNeedsDetails(method, path))
+      return {
+        refuse: Response.json({ ok: false, message: DEMO_DETAILS.needed }, { status: 403, headers: { [DEMO_DETAILS_HEADER]: "details" } }),
+      };
+  }
   return { member: access.member };
 }
 

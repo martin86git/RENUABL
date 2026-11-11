@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { VIEWING_REFUSAL, VIEW_AS_COOKIE, passesWhileViewing } from "@/lib/domain/design/view-as";
 import { PATH_HEADER } from "@/lib/domain/design/business-kind";
+import { METHOD_HEADER } from "@/lib/domain/design/demo";
 
 /**
  * While the owner is viewing the product as someone else (domain/design/view-as.ts), the designer's API takes no
@@ -14,6 +15,8 @@ export function proxy(request: NextRequest) {
   // (business-kind.ts). Set here, so a header sent by a browser is replaced, never believed.
   const headers = new Headers(request.headers);
   headers.set(PATH_HEADER, request.nextUrl.pathname);
+  // And its method, for what a demo account never does (demo.ts).
+  headers.set(METHOD_HEADER, request.method);
   return NextResponse.next({ request: { headers } });
 }
 
