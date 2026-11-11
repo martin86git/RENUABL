@@ -5,12 +5,20 @@ import { ask } from "./crm";
 export interface FeedAnswer {
   deals: FeedDeal[];
   callsOn: boolean;
-  team: { email: string; name: string }[];
+  team: { email: string; name: string; role?: string }[];
   /** How many example deals a made-up business has; null for a real business. */
   examples: number | null;
   /** The day's work beside All clear; null when it couldn't be read. */
   today?: DayDone | null;
+  /** The reader's role: the owner opens on everyone's deals, others on their own. */
+  role?: "owner" | "member" | "designer";
+  /** Who the owner's new leads go to (deal-feed.ts `LeadRule`). */
+  leadRule?: "adder" | "turns";
 }
+
+/** Who the owner's new leads go to: whoever adds them, or the salespeople in turn (the owner only). */
+export const saveLeadRule = (leadRule: "adder" | "turns") =>
+  ask<{ leadRule: "adder" | "turns" }>("/api/design/feed", { method: "POST", body: { leadRule } });
 
 export const loadFeed = () => ask<FeedAnswer>("/api/design/feed");
 /** Sol writes an email to the deal's customer, as asked: words to change and send, nothing sent. */

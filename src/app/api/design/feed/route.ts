@@ -3,7 +3,8 @@ import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
 import { fireDue } from "@/lib/server/design-sol-agents";
 import { solAsksForDesigns } from "@/lib/server/design-deal-team-repo";
 import { dayDone, dealFeed, exampleCount, feedExtras, markDeal, unmarkDeal } from "@/lib/server/design-feed";
-import type { LaterChoice, MarkKind } from "@/lib/domain/design/deal-feed";
+import { cleanLeadRule, type LaterChoice, type MarkKind } from "@/lib/domain/design/deal-feed";
+import { loadPrefs, savePrefs } from "@/lib/server/design-after-sale-repo";
 
 /**
  * GET → { deals, callsOn, team }: the deal feed on Today (deal-feed.ts), every deal this member may see that is being
@@ -16,18 +17,20 @@ export async function GET() {
     // Sol looks over the deals not yet designed whose customers have said what they want, and asks for a design in
     // the deal's team chat (at most every few minutes a business; by rule, no credit).
     await solAsksForDesigns(who.member.businessId).catch((e) => console.error("sol's design requests", e instanceof Error ? e.message : e));
-    const [deals, extras, examples, today] = await Promise.all([
+    const [deals, extras, examples, today, prefs] = await Promise.all([
       dealFeed(who.member, viewerOf(who.member)),
       feedExtras(who.member.businessId, who.member.email),
       exampleCount(who.member.businessId).catch(() => null),
       dayDone(who.member.businessId, who.member.email).catch(() => null),
+      loadPrefs(who.member.businessId).catch(() => null),
     ]);
     // What has come due in Sol's outbox goes after the answer, as when the board is read (not while viewing as someone).
     if (!who.member.viewedBy) {
       const business = { id: who.member.businessId, name: who.member.businessName };
       after(() => fireDue(business).catch((e) => console.error("Sol's outbox couldn't send", e instanceof Error ? e.message : e)));
     }
-    return Response.json({ ok: true, deals, ...extras, examples, today });
+    // Who is reading, so Today follows the team (10 Nov 2026): the owner opens on everyone's deals, others on their own.
+    return Response.json({ ok: true, deals, ...extras, examples, today, role: who.member.role, leadRule: prefs?.leadRule ?? "adder" });
   });
 }
 
@@ -43,6 +46,13 @@ export async function POST(request: Request) {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    // { leadRule }: who the owner's new leads go to (the owner only).
+    if (body && "leadRule" in body) {
+      if (who.member.role !== "owner") return Response.json({ ok: false, message: "Only the owner sets this." }, { status: 403 });
+      const prefs = await loadPrefs(who.member.businessId);
+      const saved = await savePrefs(who.member.businessId, { ...prefs, leadRule: cleanLeadRule(body.leadRule) }, who.member.email);
+      return Response.json({ ok: true, leadRule: saved.leadRule });
+    }
     const jobId = typeof body?.jobId === "string" ? body.jobId : "";
     const act = body?.do;
     if (!jobId) return Response.json({ ok: false, message: "Which deal?" }, { status: 400 });

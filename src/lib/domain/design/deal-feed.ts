@@ -31,6 +31,8 @@ export interface FeedDeal {
   address?: string;
   /** Who owns the deal (a member's email), or null: for "Mine". */
   owner?: string | null;
+  /** Where the customer came from ("Website", "Referral"), as kept on them. */
+  source?: string;
   title: string;
   stage: JobStage;
   value: number | null;
@@ -361,21 +363,26 @@ export function allClearWords(done: DayDone | null): string {
  * **In hand**: the rest, newest happening first.
  */
 export interface TodayParts {
+  /** Arrived in the last week, newest first (New in). */
+  fresh: FeedDeal[];
   needs: FeedDeal[];
   coming: FeedDeal[];
   inHand: FeedDeal[];
 }
 export function todayParts(deals: readonly FeedDeal[], now = new Date()): TodayParts {
-  const needs = feedOf(deals, "needs", now);
+  const fresh = newIn(deals, now);
+  const isFresh = new Set(fresh.map((d) => d.jobId));
+  // A new arrival is in New in; it is also in Needs you only for something more than a first call (a customer waiting).
+  const needs = feedOf(deals, "needs", now).filter((d) => !(isFresh.has(d.jobId) && onlyNeedsContact(d, now)));
   const needing = new Set(needs.map((d) => d.jobId));
-  const rest = deals.filter((d) => !needing.has(d.jobId));
+  const rest = deals.filter((d) => !needing.has(d.jobId) && !isFresh.has(d.jobId));
   const coming = rest.filter((d) => d.sol).sort((a, b) => a.sol!.firesAt.localeCompare(b.sol!.firesAt));
   const inHand = feedOf(
     rest.filter((d) => !d.sol),
     "all",
     now,
   );
-  return { needs, coming, inHand };
+  return { fresh, needs, coming, inHand };
 }
 
 /** The open request of Sol's on the deal, as its line in the team chat (its words carry the brief), when there is one. */
@@ -404,11 +411,104 @@ export function padLines(d: Pick<FeedDeal, "team">): DealLine[] {
 export function todaySummary(parts: TodayParts, done: DayDone | null, now = new Date()): string {
   const n = parts.needs.length;
   const first = n === 0 ? "Nothing needs you right now." : `${n === 1 ? "One deal needs" : `${n} deals need`} you.`;
+  const fresh = parts.fresh.filter((d) => onlyNeedsContact(d, now)).length;
+  const toContact = fresh ? `${fresh === 1 ? "One new lead" : `${fresh} new leads`} to get in touch with.` : null;
   const next = parts.coming.find((d) => d.sol && (d.sol.state ?? (d.sol.held ? "held" : "counting")) === "counting");
   const coming = next?.sol ? `I email ${first_(next.customer)} ${countdownWords(next.sol.firesAt, now)}.` : null;
   const did = [done && done.mine > 0 ? `${done.mine} done by you today` : null, done && done.sol > 0 ? `I sent ${done.sol}` : null]
     .filter(Boolean)
     .join(", ");
-  return [first, coming, did ? `${did[0].toUpperCase()}${did.slice(1)}.` : null].filter(Boolean).join(" ");
+  return [toContact, first, coming, did ? `${did[0].toUpperCase()}${did.slice(1)}.` : null].filter(Boolean).join(" ");
 }
 const first_ = (name: string) => name.trim().split(/\s+/)[0] || "them";
+
+/**
+ * New in (10 Nov 2026, Martin: with the CRM folded away you couldn't see the flow of new people coming in): every deal
+ * that arrived in the last `NEW_IN_DAYS`, newest first, at the top of Today. A lead nobody has been in touch with is
+ * shown here with its button, and so isn't in Needs you as well.
+ */
+export const NEW_IN_DAYS = 7;
+export function newIn(deals: readonly FeedDeal[], now = new Date()): FeedDeal[] {
+  const from = now.getTime() - NEW_IN_DAYS * DAY;
+  return deals.filter((d) => Date.parse(d.createdAt) >= from).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Whether anyone has been in touch with the deal's customer: a call, an email or a reply on record. */
+export const contacted = (d: Pick<FeedDeal, "events">) =>
+  d.events.some((e) => e.kind === "call" || e.kind === "email" || e.kind === "reply");
+
+/** Where a new arrival has got to, in words: "Not called yet", "Sam called", "Designed", "Proposal sent". */
+export function arrivalWords(d: FeedDeal): { words: string; waiting: boolean } {
+  if (d.stage !== "lead") return { words: STAGE_LABELS[d.stage], waiting: false };
+  const touch = d.events.find((e) => e.kind === "call" || e.kind === "email" || e.kind === "reply");
+  if (!touch) return { words: "Not contacted yet", waiting: true };
+  const who = touch.by && touch.by !== "Sol" ? `${touch.by} ` : "";
+  return { words: `${who}${touch.kind === "call" ? "called" : "emailed"}`.replace(/^./, (c) => c.toUpperCase()), waiting: false };
+}
+
+/** Whether a deal's only call on a person is that nobody has been in touch: New in shows it, so Needs you needn't. */
+export const onlyNeedsContact = (d: FeedDeal, now = new Date()) => {
+  const need = needsYou(d, now);
+  return need === "New lead: nobody has been in touch yet" || need === "Lead with no contact yet";
+};
+
+/**
+ * Whose deals a person sees when they haven't chosen (10 Nov 2026, Martin: the experience follows the team): alone,
+ * there is only theirs; the owner sees everyone's; anyone else in a team sees their own.
+ */
+export const opensOnMine = (role: "owner" | "member" | "designer", teamSize: number) => teamSize > 1 && role !== "owner";
+
+/**
+ * Who a new lead belongs to (10 Nov 2026, Martin): the person who made it, except that a lead the owner adds goes to
+ * the business's one salesperson when there is exactly one (the owner can give it back). Designers aren't salespeople.
+ */
+export function leadOwnerFor(
+  by: string,
+  members: readonly { email: string; role: string }[],
+  rule: LeadRule = "adder",
+  lastGiven: Readonly<Record<string, string>> = {},
+): string {
+  const who = by.toLowerCase();
+  if (members.find((m) => m.email.toLowerCase() === who)?.role !== "owner") return who;
+  const sellers = members.filter((m) => m.role === "member").map((m) => m.email.toLowerCase());
+  if (sellers.length === 1) return sellers[0];
+  if (rule !== "turns" || sellers.length === 0) return who;
+  // Taking turns: the salesperson given a lead longest ago (never, first), then by email so it is always the same.
+  return [...sellers].sort((x, y) => (lastGiven[x] ?? "").localeCompare(lastGiven[y] ?? "") || x.localeCompare(y))[0];
+}
+
+/**
+ * Who the owner's new leads go to once there is more than one salesperson (Settings, from New in; 10 Nov 2026): kept by
+ * whoever adds them, or shared out in turns. Leads a salesperson adds are always theirs.
+ */
+export type LeadRule = "adder" | "turns";
+export const LEAD_RULES: { id: LeadRule; label: string }[] = [
+  { id: "adder", label: "Whoever adds them" },
+  { id: "turns", label: "The salespeople in turn" },
+];
+export const cleanLeadRule = (v: unknown): LeadRule => (v === "turns" ? "turns" : "adder");
+
+/** One line a salesperson for the owner (10 Nov 2026): new this week, not yet contacted, and what they have in play. */
+export interface PersonLine {
+  email: string;
+  name: string;
+  fresh: number;
+  waiting: number;
+  inPlay: number;
+  value: number;
+}
+export function teamLines(deals: readonly FeedDeal[], people: readonly { email: string; name: string }[], now = new Date()): PersonLine[] {
+  const fresh = new Set(newIn(deals, now).map((d) => d.jobId));
+  return people.map((p) => {
+    const mine = deals.filter((d) => (d.owner ?? "").toLowerCase() === p.email.toLowerCase());
+    const open = mine.filter((d) => OPEN.includes(d.stage));
+    return {
+      email: p.email,
+      name: p.name,
+      fresh: mine.filter((d) => fresh.has(d.jobId)).length,
+      waiting: mine.filter((d) => fresh.has(d.jobId) && !contacted(d) && d.stage === "lead").length,
+      inPlay: open.length,
+      value: open.reduce((sum, d) => sum + (d.value ?? 0), 0),
+    };
+  });
+}

@@ -28,7 +28,8 @@ describe.skipIf(!url)("deal owners and mentions (database)", () => {
 
   async function deal(name: string): Promise<{ jobId: string; customerId: string }> {
     const customer = cleanCustomerInput({ name, address: "1 Sample Street, Exampleton VIC 3000" });
-    const job = cleanJobInput({ address: "1 Sample Street, Exampleton VIC 3000" });
+    // Past the lead stage, so it stays with whoever made it (a lead the owner adds goes to the one salesperson, below).
+    const job = cleanJobInput({ address: "1 Sample Street, Exampleton VIC 3000", stage: "designed" });
     if (!customer.ok || !job.ok) throw new Error("unexpected");
     const made = await crm.createCustomer(a, customer.value, job.value, OWNER);
     if (made === "full" || !made.job) throw new Error("unexpected");
@@ -52,6 +53,16 @@ describe.skipIf(!url)("deal owners and mentions (database)", () => {
   });
   afterAll(async () => {
     await db.query(`delete from businesses where created_by in ($1,$2)`, [OWNER, OTHER]);
+  });
+
+  it("gives a lead the owner adds to the business's one salesperson", async () => {
+    const customer = cleanCustomerInput({ name: "Cleo Lead", address: "2 Sample Street, Exampleton VIC 3000" });
+    const job = cleanJobInput({ address: "2 Sample Street, Exampleton VIC 3000" });
+    if (!customer.ok || !job.ok) throw new Error("unexpected");
+    const made = await crm.createCustomer(a, customer.value, job.value, OWNER);
+    if (made === "full" || !made.job) throw new Error("unexpected");
+    expect(made.job.owner).toBe(SAM);
+    await crm.setJobOwner(a, made.job.id, OWNER, OWNER);
   });
 
   it("gives a deal to whoever made it, and to someone else or no one, on its record", async () => {

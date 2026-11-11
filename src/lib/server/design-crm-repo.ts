@@ -8,6 +8,7 @@
  * activity that belongs to another business reads as not there at all.
  */
 import { isCustomer, jobHas, together, type CustomerHas } from "@/lib/domain/design/customers";
+import { leadOwnerFor } from "@/lib/domain/design/deal-feed";
 import { marketDateTime, todayInMarket } from "@/lib/domain/market";
 import { roofKey, type DealViewer } from "@/lib/domain/design/account";
 import {
@@ -214,11 +215,29 @@ async function customerRow(q: Q | typeof query, businessId: string, id: string):
   return rows[0] ?? null;
 }
 
+/** Who a new lead belongs to (deal-feed.ts `leadOwnerFor`): the business's members, its rule and who was given one last. */
+async function newLeadOwner(q: Q, businessId: string, by: string): Promise<string> {
+  const [members, prefs, given] = await Promise.all([
+    q<{ email: string; role: string }>(`select email, role from business_members where business_id = $1`, [businessId]),
+    q<{ prefs: { leadRule?: unknown } | null }>(`select prefs from design_prefs where business_id = $1`, [businessId]),
+    q<{ owner: string; at: string }>(
+      `select owner_email as owner, max(created_at)::text as at from design_jobs
+        where business_id = $1 and owner_email is not null group by owner_email`,
+      [businessId],
+    ),
+  ]);
+  const rule = prefs[0]?.prefs?.leadRule === "turns" ? "turns" : "adder";
+  return leadOwnerFor(by, members, rule, Object.fromEntries(given.map((g) => [g.owner.toLowerCase(), g.at])));
+}
+
 async function insertJob(q: Q, businessId: string, customerId: string, job: JobInput, by: string): Promise<Job> {
   const id = newId("job");
+  // A lead the owner adds goes to the business's one salesperson when there is exactly one (deal-feed.ts, 10 Nov 2026).
+  // Once there are more salespeople, the business's rule decides (Today → New in): kept by whoever adds them, or in turns.
+  const owner = job.stage === "lead" ? await newLeadOwner(q, businessId, by) : by;
   await q(
     `insert into design_jobs (id, business_id, customer_id, title, address, lat, lng, roof_key, stage, value, install_date, created_by, details, owner_email)
-     values ($2,$1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$12)`,
+     values ($2,$1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14)`,
     [
       businessId,
       id,
@@ -233,6 +252,7 @@ async function insertJob(q: Q, businessId: string, customerId: string, job: JobI
       job.installDate,
       by,
       JSON.stringify(job.details ?? {}),
+      owner,
     ],
   );
   // If the business has already drawn this roof, the new job is for that design.

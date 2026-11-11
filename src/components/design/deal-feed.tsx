@@ -31,6 +31,11 @@ import {
   LATER_CHOICES,
   agoWords,
   allClearWords,
+  LEAD_RULES,
+  teamLines,
+  type LeadRule,
+  arrivalWords,
+  opensOnMine,
   lastAt,
   openAskLine,
   padLines,
@@ -54,11 +59,11 @@ import {
 } from "@/lib/domain/design/deal-feed";
 import { OPEN_STAGES, STAGE_LABELS } from "@/lib/domain/design/crm";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
-import { emailDeal, listPipelines } from "@/lib/services/crm";
+import { emailDeal, listPipelines, setDealOwner } from "@/lib/services/crm";
 import { PIPELINES, type Pipeline } from "@/lib/domain/design/deal";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
 import { briefHref } from "@/lib/domain/design/deal-team";
-import { exampleDeals, loadFeed, markFeedDeal, writeWithSol, type FeedAnswer } from "@/lib/services/deal-feed";
+import { exampleDeals, loadFeed, markFeedDeal, saveLeadRule, writeWithSol, type FeedAnswer } from "@/lib/services/deal-feed";
 import { DEAL_TEAM_CHANGED } from "@/lib/services/deal-team";
 import { AerialRoof, type AerialRoofSpec, type RoofFinish, type RoofForm } from "./aerial-roof";
 import { PATHS } from "./design-shell";
@@ -96,7 +101,15 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
   const load = useCallback(async () => {
     const r = await loadFeed();
     if (r.ok) {
-      setData({ deals: r.deals, callsOn: r.callsOn, team: r.team, examples: r.examples, today: r.today ?? null });
+      setData({
+        deals: r.deals,
+        callsOn: r.callsOn,
+        team: r.team,
+        examples: r.examples,
+        today: r.today ?? null,
+        role: r.role,
+        leadRule: r.leadRule,
+      });
       setProblem(null);
     } else setProblem(r.message);
   }, []);
@@ -113,17 +126,24 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
     };
   }, [load]);
   // Which pipeline, and whose deals (8 Nov 2026, Martin: an admin sees every deal), kept on the device.
-  const [feedPick, setFeedPick] = useState<{ pipeline: FeedPipeline; mine: boolean }>(() => {
+  // Whose deals: the person's own choice once made (null until then: the owner opens on everyone's, others in a team
+  // on their own, 10 Nov 2026).
+  const [kept, setFeedPick] = useState<{ pipeline: FeedPipeline; mine: boolean | null }>(() => {
     try {
-      const kept = typeof window !== "undefined" ? JSON.parse(localStorage.getItem(FEED_PICK_KEY) ?? "null") : null;
+      const k = typeof window !== "undefined" ? JSON.parse(localStorage.getItem(FEED_PICK_KEY) ?? "null") : null;
       return {
-        pipeline: typeof kept?.pipeline === "string" ? kept.pipeline : "all",
-        mine: kept?.mine === true,
+        pipeline: typeof k?.pipeline === "string" ? k.pipeline : "all",
+        mine: typeof k?.mine === "boolean" ? k.mine : null,
       };
     } catch {
-      return { pipeline: "all", mine: false };
+      return { pipeline: "all", mine: null };
     }
   });
+  const solo = Boolean(data) && (data?.team.length ?? 0) === 0;
+  const feedPick = {
+    pipeline: kept.pipeline,
+    mine: solo ? false : (kept.mine ?? (data ? opensOnMine(data.role ?? "owner", data.team.length + 1) : false)),
+  };
   const choosePick = (next: { pipeline: FeedPipeline; mine: boolean }) => {
     setFeedPick(next);
     try {
@@ -151,7 +171,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         mine: feedPick.mine,
         me,
       }),
-    [data, feedPick, pickedPipeline, me],
+    [data, feedPick.pipeline, feedPick.mine, pickedPipeline, me],
   );
   const open = deals.filter((d) => OPEN_STAGES.includes(d.stage));
   const openValue = open.reduce((sum, d) => sum + (d.value ?? 0), 0);
@@ -169,23 +189,23 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
   };
 
   const parts = todayParts(deals, now);
+  // The salespeople (members, not designers or the owner): two or more and the owner sees a line for each, and chooses
+  // who their new leads go to (10 Nov 2026).
+  const sellers = (data?.team ?? []).filter((m) => m.role === "member");
+  const ownerOfTeam = data?.role === "owner" && sellers.length >= 2;
+  const [rule, setRule] = useState<LeadRule | null>(null);
+  const leadRule = rule ?? data?.leadRule ?? "adder";
+  const chooseRule = async (next: LeadRule) => {
+    setRule(next);
+    const r = await saveLeadRule(next);
+    if (!r.ok) setRule(null);
+  };
   const needs = parts.needs.length;
 
   return (
     <div className="mx-auto w-full max-w-5xl">
       <div className="flex flex-wrap items-center gap-3">
-        {/* A new deal: the orange + at the start of Today (10 Nov 2026, Martin). */}
-        <button
-          type="button"
-          onClick={props.onNew}
-          aria-expanded={props.adding}
-          aria-label="New deal"
-          title="New deal"
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white shadow-sm transition hover:brightness-105"
-        >
-          <Plus className={clsx("size-5 transition", props.adding && "rotate-45")} strokeWidth={2.25} aria-hidden />
-        </button>
-        <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} />
+        <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} solo={solo} />
         <p className="text-[13px] text-ink-2">
           {data ? (
             <>
@@ -239,6 +259,88 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         </p>
       )}
 
+      {/* The owner of a team: a line for each salesperson, new this week, not yet contacted, in play. */}
+      {ownerOfTeam && (
+        <section className="mt-8" aria-label="Your team">
+          <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink">Your team</h2>
+          <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+            <div className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 border-b border-line px-4 py-2 text-[11.5px] text-muted">
+              <span>Salesperson</span>
+              <span>New this week</span>
+              <span>Not contacted</span>
+              <span>In play</span>
+            </div>
+            {teamLines(data?.deals ?? [], sellers, now).map((l) => (
+              <div
+                key={l.email}
+                className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 px-4 py-2.5 text-[13.5px] text-ink"
+              >
+                <span className="truncate font-medium">{l.name}</span>
+                <span className="tabular-nums">{l.fresh}</span>
+                <span className={clsx("tabular-nums", l.waiting > 0 && "font-semibold text-sun-ink")}>{l.waiting}</span>
+                <span className="tabular-nums">
+                  {l.inPlay}
+                  {l.value > 0 && <span className="text-muted"> · ${Math.round(l.value / 1000).toLocaleString("en-AU")}k</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* New in (10 Nov 2026, Martin: the flow of new people coming in), first: who arrived this week and how quickly
+          they were got to, with New lead to add one. */}
+      <section className="mt-8" aria-label="New in">
+        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
+            New in<span className="ml-1.5 tabular-nums text-muted">{data ? `${parts.fresh.length} this week` : ""}</span>
+          </h2>
+          {ownerOfTeam && (
+            <label className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
+              Your new leads go to
+              <select
+                value={leadRule}
+                onChange={(e) => void chooseRule(e.target.value as LeadRule)}
+                className="cursor-pointer rounded-full bg-surface px-2.5 py-1 text-[12.5px] font-medium text-ink ring-1 ring-line focus:outline-none"
+              >
+                {LEAD_RULES.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.id === "adder" ? "You" : r.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <button
+            type="button"
+            onClick={props.onNew}
+            aria-expanded={props.adding}
+            className={clsx(
+              !ownerOfTeam && "ml-auto",
+              "inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line pl-2.5 pr-4 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-105",
+            )}
+          >
+            <Plus className={clsx("size-4 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden /> New lead
+          </button>
+        </div>
+        {data && parts.fresh.length === 0 ? (
+          <p className="rounded-2xl bg-surface px-5 py-5 text-[13.5px] text-ink-2 ring-1 ring-line">No one new this week.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {parts.fresh.map((d) => (
+              <ArrivalCard
+                key={d.jobId}
+                deal={d}
+                now={now}
+                team={solo ? null : [{ email: me, name: "You" }, ...(data?.team ?? [])]}
+                mayGive={data?.role === "owner"}
+                onChanged={load}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
       <Part title="Needs you" count={data ? needs : null}>
         {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
         {data && needs === 0 && (
@@ -258,6 +360,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
             me={me}
             callsOn={Boolean(data?.callsOn)}
             team={data?.team ?? []}
+            solo={solo}
             onChanged={load}
             onMark={(mark) => setMark(d.jobId, mark)}
           />
@@ -285,6 +388,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
                 me={me}
                 callsOn={Boolean(data?.callsOn)}
                 team={data?.team ?? []}
+                solo={solo}
                 onChanged={load}
                 onMark={(mark) => setMark(d.jobId, mark)}
               />
@@ -304,6 +408,92 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
 
       <TodayNews />
     </div>
+  );
+}
+
+/**
+ * One arrival in New in: who, from where and how long ago, whose it is (with a way for the owner to give it to someone
+ * else), how far it has got, and the first call when nobody has been in touch.
+ */
+function ArrivalCard(props: {
+  deal: FeedDeal;
+  now: Date;
+  /** Everyone in the business, the reader first as "You"; null for a business of one. */
+  team: { email: string; name: string }[] | null;
+  mayGive: boolean;
+  onChanged: () => void;
+}) {
+  const { deal: d, now } = props;
+  const at = arrivalWords(d);
+  const owner = props.team?.find((m) => m.email.toLowerCase() === (d.owner ?? "").toLowerCase());
+  const [giving, setGiving] = useState(false);
+  const give = async (email: string) => {
+    setGiving(true);
+    await setDealOwner(d.jobId, email || null);
+    setGiving(false);
+    props.onChanged();
+  };
+  const first = d.customer.trim().split(/\s+/)[0] || "them";
+  return (
+    <article
+      className={clsx("flex min-w-0 flex-col gap-2 rounded-2xl bg-surface p-3.5 ring-1", at.waiting ? "ring-sun-line/50" : "ring-line")}
+    >
+      <div className="flex items-start gap-3">
+        <RoofThumb deal={d} small />
+        <div className="min-w-0 flex-1">
+          <Link href={`${PATHS.deals}/${d.jobId}`} className="block truncate text-[14px] font-semibold text-ink hover:underline">
+            {d.customer}
+          </Link>
+          <p className="truncate text-[12px] text-muted">{d.suburb || d.title || "No address yet"}</p>
+        </div>
+      </div>
+      <p className="text-[12px] text-ink-2">{[d.source || null, agoWords(d.createdAt, now)].filter(Boolean).join(" · ")}</p>
+      <p className={clsx("inline-flex items-center gap-1.5 text-[12.5px] font-medium", at.waiting ? "text-sun-ink" : "text-positive")}>
+        {at.waiting ? <span className="size-1.5 rounded-full bg-sun-line" aria-hidden /> : <Check className="size-3.5" aria-hidden />}
+        {at.words}
+      </p>
+      {props.team && (
+        <label className="flex items-center gap-1.5 text-[12px] text-muted">
+          <span>With</span>
+          {props.mayGive ? (
+            <select
+              value={owner?.email ?? ""}
+              disabled={giving}
+              onChange={(e) => void give(e.target.value)}
+              className="min-w-0 flex-1 cursor-pointer rounded-md bg-surface-2 px-1.5 py-0.5 text-[12px] font-medium text-ink focus:outline-none"
+            >
+              <option value="">No one yet</option>
+              {props.team.map((m) => (
+                <option key={m.email} value={m.email}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="font-medium text-ink">{owner?.name ?? "No one yet"}</span>
+          )}
+        </label>
+      )}
+      {at.waiting && (
+        <div className="mt-auto pt-1">
+          {d.phone ? (
+            <a
+              href={`tel:${d.phone.replace(/\s+/g, "")}`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105"
+            >
+              <Phone className="size-3.5" aria-hidden /> Call {first}
+            </a>
+          ) : (
+            <Link
+              href={`${PATHS.deals}/${d.jobId}?tab=email`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105"
+            >
+              <Mail className="size-3.5" aria-hidden /> Email {first}
+            </Link>
+          )}
+        </div>
+      )}
+    </article>
   );
 }
 
@@ -387,6 +577,7 @@ function DealRow(props: {
   me: string;
   callsOn: boolean;
   team: { email: string; name: string }[];
+  solo?: boolean;
   onChanged: () => void;
   onMark: (mark: FeedMark | null) => void;
 }) {
@@ -431,6 +622,8 @@ function DealCard(props: {
   me: string;
   callsOn: boolean;
   team: { email: string; name: string }[];
+  /** A business of one: no team chat. */
+  solo?: boolean;
   onChanged: () => void;
   onMark: (mark: FeedMark | null) => void;
 }) {
@@ -462,7 +655,7 @@ function DealCard(props: {
   const [chat, setChat] = useState<string | null>(null);
   // The pad beside the card only when the team has said something there (10 Nov 2026, Martin): Sol's open request is
   // already the card's own line.
-  const pad = padLines(d).length > 0;
+  const pad = !props.solo && padLines(d).length > 0;
   const hide = openAskLine(d)?.id;
   // Call only dials; the note-taker is its own round, opened by hand with its microphone off (8 Nov 2026, Martin: the
   // phone icon started the note-taker when it shouldn't).
@@ -604,7 +797,7 @@ function DealCard(props: {
                 <FileText className={clsx("size-4", !move && "text-sun-line")} aria-hidden />
               </Tool>
             )}
-            {!pad && (
+            {!pad && !props.solo && (
               <Tool quiet={Boolean(move)} label="Team chat" title="Talk about this deal with the team" onClick={() => setChat("")}>
                 <MessageCircle className="size-4" aria-hidden />
               </Tool>
@@ -1190,11 +1383,14 @@ function FeedPicker({
   pipelines,
   picked,
   onPick,
+  solo,
 }: {
   pick: { pipeline: FeedPipeline; mine: boolean };
   pipelines: readonly Pipeline[];
   picked: Pipeline | null;
   onPick: (next: { pipeline: FeedPipeline; mine: boolean }) => void;
+  /** A business of one: there is nobody else's to see. */
+  solo?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -1228,28 +1424,34 @@ function FeedPicker({
       </button>
       {open && (
         <div role="menu" className="absolute left-0 top-11 z-30 w-60 rounded-2xl bg-surface p-2 shadow-lg ring-1 ring-line">
-          <div role="radiogroup" aria-label="Whose deals" className="grid grid-cols-2 gap-0.5 rounded-full bg-canvas p-1 ring-1 ring-line">
-            {(
-              [
-                [false, "Everyone's"],
-                [true, "Mine"],
-              ] as const
-            ).map(([mine, words]) => (
-              <button
-                key={words}
-                type="button"
-                role="radio"
-                aria-checked={pick.mine === mine}
-                onClick={() => onPick({ ...pick, mine })}
-                className={clsx(
-                  "rounded-full py-1 text-[12.5px] font-medium transition",
-                  pick.mine === mine ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
-                )}
-              >
-                {words}
-              </button>
-            ))}
-          </div>
+          {!solo && (
+            <div
+              role="radiogroup"
+              aria-label="Whose deals"
+              className="grid grid-cols-2 gap-0.5 rounded-full bg-canvas p-1 ring-1 ring-line"
+            >
+              {(
+                [
+                  [false, "Everyone's"],
+                  [true, "Mine"],
+                ] as const
+              ).map(([mine, words]) => (
+                <button
+                  key={words}
+                  type="button"
+                  role="radio"
+                  aria-checked={pick.mine === mine}
+                  onClick={() => onPick({ ...pick, mine })}
+                  className={clsx(
+                    "rounded-full py-1 text-[12.5px] font-medium transition",
+                    pick.mine === mine ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+                  )}
+                >
+                  {words}
+                </button>
+              ))}
+            </div>
+          )}
           <p className="px-2.5 pb-1 pt-2.5 text-[11px] font-medium uppercase tracking-wide text-muted">Pipeline</p>
           {[{ id: "all", name: "All deals" }, ...pipelines].map((p) => {
             const on = (picked?.id ?? "all") === p.id;

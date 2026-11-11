@@ -65,8 +65,8 @@ export async function dealFeed(
   const [pulses, box, customers, activity, messages, proposals, pads, marks] = await Promise.all([
     dealPulses(businessId, viewer).catch(() => ({}) as Awaited<ReturnType<typeof dealPulses>>),
     outbox(member, viewer, true).catch(() => null),
-    query<{ id: string; phone: string; email: string; sample: boolean }>(
-      `select id, phone, email, sample from design_customers where business_id = $1 and id = any($2)`,
+    query<{ id: string; phone: string; email: string; sample: boolean; source: string }>(
+      `select id, phone, email, sample, source from design_customers where business_id = $1 and id = any($2)`,
       [businessId, jobs.map((j) => j.customerId)],
     ),
     query<{ job: string; kind: string; text: string; by: string; at: string }>(
@@ -129,6 +129,7 @@ export async function dealFeed(
       suburb: suburbOfAddress(j.address),
       address: j.address,
       owner: j.owner ?? null,
+      source: c?.source || "",
       title: j.title,
       stage: j.stage,
       value: j.value,
@@ -166,15 +167,18 @@ export async function dealFeed(
 }
 
 /** Whether Sol may ring this business's customers (voice-calls.ts), and the other people in the business to bring in. */
-export async function feedExtras(businessId: string, me: string): Promise<{ callsOn: boolean; team: { email: string; name: string }[] }> {
+export async function feedExtras(
+  businessId: string,
+  me: string,
+): Promise<{ callsOn: boolean; team: { email: string; name: string; role: string }[] }> {
   const [callsOn, members] = await Promise.all([
     voiceOnFor(businessId).catch(() => false),
-    query<{ email: string; first_name: string | null }>(
-      `select email, first_name from business_members where business_id = $1 and email <> $2 order by first_name nulls last, email`,
+    query<{ email: string; first_name: string | null; role: string }>(
+      `select email, first_name, role from business_members where business_id = $1 and email <> $2 order by first_name nulls last, email`,
       [businessId, me.toLowerCase()],
     ),
   ]);
-  return { callsOn, team: members.map((m) => ({ email: m.email, name: m.first_name || m.email.split("@")[0] })) };
+  return { callsOn, team: members.map((m) => ({ email: m.email, name: m.first_name || m.email.split("@")[0], role: m.role })) };
 }
 
 /**

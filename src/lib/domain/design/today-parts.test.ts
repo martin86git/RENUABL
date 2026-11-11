@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { padLines, solLine, todayParts, todaySummary, type FeedDeal } from "./deal-feed";
+import {
+  arrivalWords,
+  leadOwnerFor,
+  opensOnMine,
+  teamLines,
+  padLines,
+  solLine,
+  todayParts,
+  todaySummary,
+  type FeedDeal,
+} from "./deal-feed";
 import type { DealLine } from "./deal-team";
 
 const now = new Date("2026-11-06T03:00:00Z"); // Friday 2 pm in Melbourne
@@ -97,6 +107,88 @@ describe("Sol's line at the top of Today", () => {
   });
 
   it("says nothing needs you when that's so", () => {
-    expect(todaySummary({ needs: [], coming: [], inHand: [] }, null, now)).toBe("Nothing needs you right now.");
+    expect(todaySummary({ fresh: [], needs: [], coming: [], inHand: [] }, null, now)).toBe("Nothing needs you right now.");
+  });
+});
+
+describe("New in", () => {
+  it("shows the last week's arrivals newest first, keeps a lead nobody has contacted out of Needs you, and in nothing else", () => {
+    const fresh = deal({ jobId: "f", stage: "lead", projectId: null, createdAt: ago(3), events: [] });
+    const freshWaiting = deal({ jobId: "w", createdAt: ago(10), events: [{ kind: "message", text: "Hi?", at: ago(1), by: "Jo" }] });
+    const old = deal({ jobId: "o" });
+    const parts = todayParts([old, freshWaiting, fresh], now);
+    expect(parts.fresh.map((d) => d.jobId)).toEqual(["f", "w"]);
+    // The customer waiting on a reply needs a person for more than a first call, so is in Needs you too.
+    expect(parts.needs.map((d) => d.jobId)).toEqual(["w"]);
+    expect(parts.inHand.map((d) => d.jobId)).toEqual(["o"]);
+    expect(todaySummary(parts, null, now)).toBe("One new lead to get in touch with. One deal needs you.");
+  });
+
+  it("says where a new arrival has got to", () => {
+    expect(arrivalWords(deal({ stage: "lead", events: [] }))).toEqual({ words: "Not contacted yet", waiting: true });
+    expect(arrivalWords(deal({ stage: "lead", events: [{ kind: "call", text: "Spoke", at: ago(1), by: "sam" }] }))).toEqual({
+      words: "Sam called",
+      waiting: false,
+    });
+    expect(arrivalWords(deal({ stage: "proposal" })).words).toBe("Proposal sent");
+  });
+});
+
+describe("the team's size and roles", () => {
+  it("opens the owner on everyone's deals, anyone else in a team on their own, and someone alone on theirs", () => {
+    expect(opensOnMine("owner", 3)).toBe(false);
+    expect(opensOnMine("member", 3)).toBe(true);
+    expect(opensOnMine("member", 1)).toBe(false);
+  });
+
+  it("gives a lead the owner adds to the one salesperson, and leaves everyone else's with them", () => {
+    const two = [
+      { email: "Ann@co.example", role: "owner" },
+      { email: "sam@co.example", role: "member" },
+    ];
+    expect(leadOwnerFor("ann@co.example", two)).toBe("sam@co.example");
+    expect(leadOwnerFor("sam@co.example", two)).toBe("sam@co.example");
+    // Two salespeople: nobody is chosen for them by this rule.
+    expect(leadOwnerFor("ann@co.example", [...two, { email: "jo@co.example", role: "member" }])).toBe("ann@co.example");
+    // A designer isn't a salesperson.
+    expect(leadOwnerFor("ann@co.example", [two[0], { email: "di@co.example", role: "designer" }])).toBe("ann@co.example");
+  });
+});
+
+describe("sharing out leads in a larger team", () => {
+  const team = [
+    { email: "ann@co.example", role: "owner" },
+    { email: "sam@co.example", role: "member" },
+    { email: "jo@co.example", role: "member" },
+  ];
+  it("keeps the owner's leads by default, and in turns gives each to the salesperson given one longest ago", () => {
+    expect(leadOwnerFor("ann@co.example", team)).toBe("ann@co.example");
+    expect(leadOwnerFor("ann@co.example", team, "turns", { "sam@co.example": "2026-11-09T00:00:00Z" })).toBe("jo@co.example");
+    expect(
+      leadOwnerFor("ann@co.example", team, "turns", { "jo@co.example": "2026-11-10T00:00:00Z", "sam@co.example": "2026-11-09T00:00:00Z" }),
+    ).toBe("sam@co.example");
+    // A salesperson's own lead is theirs whatever the rule.
+    expect(leadOwnerFor("sam@co.example", team, "turns")).toBe("sam@co.example");
+  });
+
+  it("gives the owner a line a salesperson", () => {
+    const deals = [
+      deal({ jobId: "a", owner: "sam@co.example", stage: "lead", createdAt: ago(5), events: [] }),
+      deal({ jobId: "b", owner: "sam@co.example", stage: "proposal", value: 10000 }),
+      deal({ jobId: "c", owner: "jo@co.example", stage: "won" }),
+    ];
+    expect(
+      teamLines(
+        deals,
+        [
+          { email: "sam@co.example", name: "Sam" },
+          { email: "jo@co.example", name: "Jo" },
+        ],
+        now,
+      ),
+    ).toEqual([
+      { email: "sam@co.example", name: "Sam", fresh: 1, waiting: 1, inPlay: 2, value: 24890 },
+      { email: "jo@co.example", name: "Jo", fresh: 0, waiting: 0, inPlay: 0, value: 0 },
+    ]);
   });
 });

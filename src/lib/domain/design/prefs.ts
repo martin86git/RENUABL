@@ -44,6 +44,8 @@ export interface BusinessPrefs {
   weeklyCapacity: number;
   /** Sol answers a question asked in a team channel when nobody has after a moment, without being tagged. */
   solJoinsIn: boolean;
+  /** Who the owner's new leads go to once there are two salespeople or more (deal-feed.ts `LeadRule`). */
+  leadRule: "adder" | "turns";
 }
 
 export const DEFAULT_PREFS: BusinessPrefs = {
@@ -58,6 +60,7 @@ export const DEFAULT_PREFS: BusinessPrefs = {
   installers: [],
   weeklyCapacity: DEFAULT_WEEKLY_CAPACITY,
   solJoinsIn: true,
+  leadRule: "adder",
 };
 
 export const MAX_SUPPLIERS = 12;
@@ -105,6 +108,7 @@ export function cleanPrefs(raw: unknown, newId?: () => string): BusinessPrefs {
     weeklyCapacity: cleanCapacity(r.weeklyCapacity),
     // On unless switched off.
     solJoinsIn: r.solJoinsIn !== false,
+    leadRule: r.leadRule === "turns" ? "turns" : "adder",
   };
 }
 
