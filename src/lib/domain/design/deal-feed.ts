@@ -363,17 +363,18 @@ export function allClearWords(done: DayDone | null): string {
  * **In hand**: the rest, newest happening first.
  */
 export interface TodayParts {
-  /** Arrived in the last week, newest first (New in). */
+  /** New leads waiting for a design, newest first (New in). */
   fresh: FeedDeal[];
   needs: FeedDeal[];
   coming: FeedDeal[];
   inHand: FeedDeal[];
 }
 export function todayParts(deals: readonly FeedDeal[], now = new Date()): TodayParts {
-  const fresh = newIn(deals, now);
+  const fresh = toDesign(deals);
   const isFresh = new Set(fresh.map((d) => d.jobId));
-  // A new arrival is in New in; it is also in Needs you only for something more than a first call (a customer waiting).
-  const needs = feedOf(deals, "needs", now).filter((d) => !(isFresh.has(d.jobId) && onlyNeedsContact(d, now)));
+  // Needs you is for everything after the proposal has gone out (12 Nov 2026, Martin): before that, the work is the
+  // design and the quote, which New in carries.
+  const needs = feedOf(deals, "needs", now).filter((d) => AFTER_PROPOSAL(d.stage) && !isFresh.has(d.jobId));
   const needing = new Set(needs.map((d) => d.jobId));
   const rest = deals.filter((d) => !needing.has(d.jobId) && !isFresh.has(d.jobId));
   const coming = rest.filter((d) => d.sol).sort((a, b) => a.sol!.firesAt.localeCompare(b.sol!.firesAt));
@@ -411,8 +412,8 @@ export function padLines(d: Pick<FeedDeal, "team">): DealLine[] {
 export function todaySummary(parts: TodayParts, done: DayDone | null, now = new Date()): string {
   const n = parts.needs.length;
   const first = n === 0 ? "Nothing needs you right now." : `${n === 1 ? "One deal needs" : `${n} deals need`} you.`;
-  const fresh = parts.fresh.filter((d) => onlyNeedsContact(d, now)).length;
-  const toContact = fresh ? `${fresh === 1 ? "One new lead" : `${fresh} new leads`} to get in touch with.` : null;
+  const fresh = parts.fresh.length;
+  const toContact = fresh ? `${fresh === 1 ? "One new lead" : `${fresh} new leads`} to design.` : null;
   const next = parts.coming.find((d) => d.sol && (d.sol.state ?? (d.sol.held ? "held" : "counting")) === "counting");
   const coming = next?.sol ? `I email ${first_(next.customer)} ${countdownWords(next.sol.firesAt, now)}.` : null;
   const did = [done && done.mine > 0 ? `${done.mine} done by you today` : null, done && done.sol > 0 ? `I sent ${done.sol}` : null]
@@ -435,6 +436,17 @@ export function newIn(deals: readonly FeedDeal[], now = new Date()): FeedDeal[] 
     .filter((d) => OPEN.includes(d.stage) && Date.parse(d.createdAt) >= from)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
+
+/**
+ * New in on Today (12 Nov 2026, Martin: new leads that need a design, so a quote can be sent quickly): every lead with no
+ * roof design yet, newest first, whenever it came in.
+ */
+export function toDesign(deals: readonly FeedDeal[]): FeedDeal[] {
+  return deals.filter((d) => d.stage === "lead" && !d.projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Whether a deal is past its proposal going out: the part of the sale Needs you is for. */
+export const AFTER_PROPOSAL = (stage: JobStage) => stage !== "lead" && stage !== "designed";
 
 /** Whether anyone has been in touch with the deal's customer: a call, an email or a reply on record. */
 export const contacted = (d: Pick<FeedDeal, "events">) =>

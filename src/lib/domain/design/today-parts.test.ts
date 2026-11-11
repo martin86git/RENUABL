@@ -112,24 +112,46 @@ describe("Sol's line at the top of Today", () => {
 });
 
 describe("New in", () => {
-  it("shows the last week's arrivals newest first, keeps a lead nobody has contacted out of Needs you, and in nothing else", () => {
+  it("holds the leads waiting for a design, newest first, whenever they came in, and keeps them out of Needs you", () => {
     const fresh = deal({ jobId: "f", stage: "lead", projectId: null, createdAt: ago(3), events: [] });
-    const freshWaiting = deal({ jobId: "w", createdAt: ago(10), events: [{ kind: "message", text: "Hi?", at: ago(1), by: "Jo" }] });
+    const older = deal({ jobId: "g", stage: "lead", projectId: null, createdAt: ago(400), events: [] });
+    const asking = deal({
+      jobId: "w",
+      stage: "lead",
+      projectId: null,
+      createdAt: ago(10),
+      events: [{ kind: "message", text: "Hi?", at: ago(1), by: "Jo" }],
+    });
     const old = deal({ jobId: "o" });
-    const parts = todayParts([old, freshWaiting, fresh], now);
-    expect(parts.fresh.map((d) => d.jobId)).toEqual(["f", "w"]);
-    // The customer waiting on a reply needs a person for more than a first call, so is in Needs you too.
-    expect(parts.needs.map((d) => d.jobId)).toEqual(["w"]);
+    const parts = todayParts([old, older, asking, fresh], now);
+    expect(parts.fresh.map((d) => d.jobId)).toEqual(["f", "w", "g"]);
+    expect(parts.needs).toEqual([]);
     expect(parts.inHand.map((d) => d.jobId)).toEqual(["o"]);
-    expect(todaySummary(parts, null, now)).toBe("One new lead to get in touch with. One deal needs you.");
+    expect(todaySummary(parts, null, now)).toBe("3 new leads to design. Nothing needs you right now.");
   });
 
-  it("holds new leads only: a deal won this week isn't in it", () => {
+  it("leaves out a lead with a design, a designed deal and a deal won", () => {
+    const drawn = deal({ jobId: "drawn", stage: "lead", projectId: "proj_2", events: [] });
+    const designed = deal({ jobId: "designed", stage: "designed", events: [] });
     const won = deal({ jobId: "won", stage: "won", createdAt: ago(5) });
-    const lead = deal({ jobId: "lead", stage: "lead", createdAt: ago(5), events: [] });
-    expect(todayParts([won, lead], now).fresh.map((d) => d.jobId)).toEqual(["lead"]);
+    expect(todayParts([drawn, designed, won], now).fresh).toEqual([]);
   });
+});
 
+describe("Needs you", () => {
+  it("is for deals past the proposal: a designed deal with a customer waiting stays out of it", () => {
+    const designed = deal({ jobId: "d", stage: "designed", events: [{ kind: "message", text: "Hi?", at: ago(1), by: "Jo" }] });
+    const sent = deal({ jobId: "s", events: [{ kind: "message", text: "Hi?", at: ago(1), by: "Jo" }] });
+    const won = deal({ jobId: "w", stage: "won", installDate: null, events: [] });
+    expect(
+      todayParts([designed, sent, won], now)
+        .needs.map((d) => d.jobId)
+        .sort(),
+    ).toEqual(["s", "w"]);
+  });
+});
+
+describe("a new arrival", () => {
   it("says where a new arrival has got to", () => {
     expect(arrivalWords(deal({ stage: "lead", events: [] }))).toEqual({ words: "Not contacted yet", waiting: true });
     expect(arrivalWords(deal({ stage: "lead", events: [{ kind: "call", text: "Spoke", at: ago(1), by: "sam" }] }))).toEqual({

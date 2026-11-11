@@ -288,12 +288,12 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         </section>
       )}
 
-      {/* New in (10 Nov 2026, Martin: the flow of new people coming in), first: who arrived this week and how quickly
-          they were got to, with New lead to add one. */}
+      {/* New in (12 Nov 2026, Martin): new leads that need a design, each with Design, so a quote goes out quickly;
+          New lead adds one. */}
       <section className="mt-8" aria-label="New in">
         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
-            New in<span className="ml-1.5 tabular-nums text-muted">{data ? `${parts.fresh.length} this week` : ""}</span>
+            New in<span className="ml-1.5 tabular-nums text-muted">{data ? `${parts.fresh.length} to design` : ""}</span>
           </h2>
           {ownerOfTeam && (
             <label className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
@@ -324,7 +324,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
           </button>
         </div>
         {data && parts.fresh.length === 0 ? (
-          <p className="rounded-2xl bg-surface px-5 py-5 text-[13.5px] text-ink-2 ring-1 ring-line">No one new this week.</p>
+          <p className="rounded-2xl bg-surface px-5 py-5 text-[13.5px] text-ink-2 ring-1 ring-line">Every new lead has a design.</p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {parts.fresh.map((d) => (
@@ -434,10 +434,10 @@ function ArrivalCard(props: {
     props.onChanged();
   };
   const first = d.customer.trim().split(/\s+/)[0] || "them";
+  // A design Sol asked the team for opens with his brief.
+  const designAsk = d.team?.openAsks.find((x) => x.type === "design");
   return (
-    <article
-      className={clsx("flex min-w-0 flex-col gap-2 rounded-2xl bg-surface p-3.5 ring-1", at.waiting ? "ring-sun-line/50" : "ring-line")}
-    >
+    <article className="flex min-w-0 flex-col gap-2 rounded-2xl bg-surface p-3.5 ring-1 ring-line">
       <div className="flex items-start gap-3">
         <RoofThumb deal={d} small />
         <div className="min-w-0 flex-1">
@@ -448,8 +448,8 @@ function ArrivalCard(props: {
         </div>
       </div>
       <p className="text-[12px] text-ink-2">{[d.source || null, agoWords(d.createdAt, now)].filter(Boolean).join(" · ")}</p>
-      <p className={clsx("inline-flex items-center gap-1.5 text-[12.5px] font-medium", at.waiting ? "text-sun-ink" : "text-positive")}>
-        {at.waiting ? <span className="size-1.5 rounded-full bg-sun-line" aria-hidden /> : <Check className="size-3.5" aria-hidden />}
+      <p className={clsx("inline-flex items-center gap-1.5 text-[12.5px]", at.waiting ? "text-muted" : "text-ink-2")}>
+        {at.waiting ? <span className="size-1.5 rounded-full bg-line" aria-hidden /> : <Check className="size-3.5" aria-hidden />}
         {at.words}
       </p>
       {props.team && (
@@ -474,25 +474,35 @@ function ArrivalCard(props: {
           )}
         </label>
       )}
-      {at.waiting && (
-        <div className="mt-auto pt-1">
-          {d.phone ? (
+      {/* Design is the one thing to do here (12 Nov 2026, Martin): the roof designed, the quote can go. */}
+      <div className="mt-auto flex items-center gap-2 pt-1">
+        <Link
+          href={designAsk ? briefHref(d.jobId, designAsk.id) : `${PATHS.designer}?job=${encodeURIComponent(d.jobId)}`}
+          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105"
+        >
+          <PenTool className="size-3.5" aria-hidden /> Design
+        </Link>
+        {at.waiting &&
+          (d.phone ? (
             <a
               href={`tel:${d.phone.replace(/\s+/g, "")}`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105"
+              title={`Call ${first}`}
+              aria-label={`Call ${first}`}
+              className="grid size-8 place-items-center rounded-full bg-surface-2 text-ink-2 hover:text-ink"
             >
-              <Phone className="size-3.5" aria-hidden /> Call {first}
+              <Phone className="size-3.5" aria-hidden />
             </a>
           ) : (
             <Link
               href={`${PATHS.deals}/${d.jobId}?tab=email`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105"
+              title={`Email ${first}`}
+              aria-label={`Email ${first}`}
+              className="grid size-8 place-items-center rounded-full bg-surface-2 text-ink-2 hover:text-ink"
             >
-              <Mail className="size-3.5" aria-hidden /> Email {first}
+              <Mail className="size-3.5" aria-hidden />
             </Link>
-          )}
-        </div>
-      )}
+          ))}
+      </div>
     </article>
   );
 }
