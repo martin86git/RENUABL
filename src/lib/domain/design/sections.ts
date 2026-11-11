@@ -17,7 +17,7 @@ export interface SectionPage {
 }
 
 export interface Section {
-  id: "today" | "work" | "customers" | "service" | "marketplace" | "jobs" | "inspections" | "connections";
+  id: "today" | "work" | "proposals" | "customers" | "service" | "marketplace" | "jobs" | "inspections" | "connections";
   label: string;
   pages: readonly SectionPage[];
 }
@@ -59,17 +59,25 @@ export const SECTIONS: readonly Section[] = [
           "/design/installations",
         ],
       },
-      { id: "sent", label: "Proposals sent", href: "/design/sales/proposals" },
-      { id: "signed", label: "Proposals signed", href: "/design/sales/signed" },
       { id: "orders", label: "Ordering station", href: "/design/procurement/orders" },
       // After install and Grid connections keep pages of their own (10 Nov 2026, Martin: they were lost in the fold).
       { id: "completed", label: "After install", href: "/design/installations/completed" },
       { id: "grid", label: "Grid connections", href: "/design/installations/grid" },
       { id: "invoices", label: "Installer invoices", href: "/design/installations/invoices" },
-      // The call log (8 Nov 2026), a tab on Today until Today became one page (10 Nov 2026, Martin).
-      { id: "calls", label: "Calls", href: "/design/calls" },
       // The installers and inspectors this retailer works with (connections.ts).
       { id: "connections", label: "Connections", href: "/design/connections" },
+    ],
+  },
+  // The proposal round's own menu (10 Nov 2026, Martin): what was sent, what was signed, and the calls. Drawn as the
+  // round beside the designer's, never as a word in the pill.
+  {
+    id: "proposals",
+    label: "Proposals",
+    pages: [
+      { id: "sent", label: "Proposals sent", href: "/design/sales/proposals" },
+      { id: "signed", label: "Proposals signed", href: "/design/sales/signed" },
+      // The call log (8 Nov 2026), a tab on Today until Today became one page.
+      { id: "calls", label: "Calls", href: "/design/calls" },
     ],
   },
   // People are looked up by name, not by job, so they keep a word of their own.

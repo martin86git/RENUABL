@@ -179,7 +179,7 @@ describe("Sol's tools", () => {
     const base = { business: "Sunny Co", member: "sam@sunny.example", facts: "Today is 2026-11-02.", prefs: [], now: morning };
     expect(solSystem({ ...base, costs: false })).toContain("can't see costs");
     expect(solSystem({ ...base, costs: true })).toContain("price_lookup gives supplier costs");
-    expect(solSystem({ ...base, costs: true })).toContain("Jobs: Jobs, Proposals sent");
+    expect(solSystem({ ...base, costs: true })).toContain("Proposals: Proposals sent, Proposals signed, Calls");
   });
 });
 

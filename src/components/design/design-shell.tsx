@@ -416,7 +416,7 @@ function Shell({
                 // (section-fold.tsx, 8 Nov 2026, Martin): Today, the designer and Sol are the surface; the sections are
                 // the engine, opened on hover, kept open inside one of them, or pinned. Only where there are enough of
                 // them to be worth folding (a retailer's); an installer's or inspector's few stay as they are.
-                const foldable = sections.filter((s, i) => i > 0 && s.id !== "marketplace");
+                const foldable = sections.filter((s, i) => i > 0 && s.id !== "marketplace" && s.id !== "proposals");
                 if (foldable.length < 3) return null;
                 const link = (sec: (typeof sections)[number]) => {
                   const lit = sec.id === current.id;
@@ -460,10 +460,10 @@ function Shell({
                         href={PATHS.proposalsSent}
                         aria-label="Proposals"
                         title="Proposals"
-                        aria-current={path.startsWith(PATHS.proposalsSent) ? "page" : undefined}
+                        aria-current={current.id === "proposals" ? "page" : undefined}
                         className={clsx(
                           "-my-2 mr-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_4px_14px_rgba(11,11,12,0.12)] ring-1 ring-line transition hover:text-ink",
-                          path.startsWith(PATHS.proposalsSent) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
+                          current.id === "proposals" && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
                         )}
                       >
                         <FileText className="size-5" aria-hidden />
@@ -475,7 +475,7 @@ function Shell({
                   </>
                 );
               })()}
-              {sections.filter((s, i) => i > 0 && s.id !== "marketplace").length < 3 &&
+              {sections.filter((s, i) => i > 0 && s.id !== "marketplace" && s.id !== "proposals").length < 3 &&
                 sections.map((sec, i) => {
                   const lit = sec.id === current.id;
                   const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);

@@ -5,7 +5,8 @@ describe("the sections across the top", () => {
   it("lights the section and page an address belongs to, the closest match winning", () => {
     expect(pageAt("/design/installations/invoices")?.page.id).toBe("invoices");
     expect(pageAt("/design/procurement/orders/job_123")?.page.id).toBe("orders");
-    expect(pageAt("/design/sales/proposals")?.page.id).toBe("sent");
+    expect(pageAt("/design/sales/proposals")).toMatchObject({ section: { id: "proposals" }, page: { id: "sent" } });
+    expect(pageAt("/design/calls")?.section.id).toBe("proposals");
   });
 
   it("counts a deal's own page, and the pages folded into Jobs, as Jobs", () => {
