@@ -6,6 +6,8 @@ import { loadTerrain, type Heights } from "@/lib/services/terrain";
 import { loadRoofCheck } from "@/lib/services/roof-check";
 import { useDesignTips } from "./design-tips";
 import { BlockTray } from "./block-tray";
+import { SolGuide } from "./sol-guide";
+import { guideStep, guiding, panelsFor, type GuideFacts, type GuideStepId, type GuideTarget } from "@/lib/domain/design/sol-guide";
 import { BLOCK_MIN, joinBlock, resizeBlock, splitBlock, startingBlocks, type PanelBlock } from "@/lib/domain/design/panel-blocks";
 import { SolNudges } from "./sol-nudges";
 import { nudgesFor, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
@@ -134,7 +136,7 @@ import { batteryFits, suggestBatteries } from "@/lib/domain/design/battery-sugge
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
 import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
-import { openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
+import { EVENING_WORTH_STORING, openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
 import { SolThinking } from "./sol-thinking";
 import { CaptureButtons } from "@/components/ui/capture";
@@ -1765,6 +1767,10 @@ export function RoofDesigner(props: {
         { ...spot, faces: faces.map((f) => ({ ...f, off: panelPlaces(f, size).map((pl) => pl.index) })), loose: [] };
     // A copy takes its quote's settings and hand changes with it; a new design starts with the same home and no changes.
     setQuotes([...everyQuote(), copy ? quoteNow : { form: quoteNow.form, edits: {} }]);
+    if (!copy && !costsHidden) {
+      setGuideAnswered((list) => list.filter((id) => id === "home" || id === "flat"));
+      setGuideOn(true);
+    }
     show([...list, made], list.length);
     setSaved("changed");
   };
@@ -3994,7 +4000,19 @@ export function RoofDesigner(props: {
   const autoDesigned = useRef(false);
   const [opening, setOpening] = useState<Opening | null>(null);
   const [calcOpen, setCalcOpen] = useState(false);
-  const firstName = props.customerName?.trim().split(/s+/)[0];
+  const firstName = props.customerName?.trim().split(/\s+/)[0];
+  /**
+   * Sol leads the design (11 Nov 2026, Martin; `sol-guide.ts`): on a design with nothing on it yet, one card at a time
+   * over Ask Sol asks the next thing (the home, the size from the bill, the panel, placing, the inverter, strings, the
+   * battery, backup), each answered with a press, and a no goes on to the next. It takes the place of the opening.
+   */
+  const [guideOn, setGuideOn] = useState(
+    () => !costsHidden && props.set.designs.every((d) => !(d.loose ?? []).length && !(d.inverters ?? []).length),
+  );
+  const [guideAnswered, setGuideAnswered] = useState<GuideStepId[]>([]);
+  const [guideTarget, setGuideTarget] = useState<GuideTarget | null>(null);
+  const [guideFlat, setGuideFlat] = useState<{ kliplok: boolean; tilt: number | null }>({ kliplok: true, tilt: null });
+  const answerGuide = (id: GuideStepId) => setGuideAnswered((list) => (list.includes(id) ? list : [...list, id]));
   const adviceFrom = (fields: typeof bill, found: string[]): Opening | null => {
     const daily = dailyFromBillFields(fields);
     const size = daily ? quickSize({ kwhPerDay: daily }) : null;
@@ -4002,6 +4020,14 @@ export function RoofDesigner(props: {
   };
   useEffect(() => {
     if (autoDesigned.current || costsHidden) return;
+    if (guideOn) {
+      autoDesigned.current = true;
+      if (!adviceFrom(bill, []) && props.jobId) {
+        const t = window.setTimeout(() => void askSol(), 400);
+        return () => window.clearTimeout(t);
+      }
+      return;
+    }
     if (!props.set.designs.every((d) => !d.faces.length && !(d.loose ?? []).length)) return;
     const t = window.setTimeout(() => {
       autoDesigned.current = true;
@@ -4128,6 +4154,125 @@ export function RoofDesigner(props: {
     setStrings(done.strings);
     setWiring(null);
     changed();
+  };
+  // The guide's facts: what the design and the bill say now.
+  const guideSuggested = (() => {
+    const daily = dailyFromBillFields(bill);
+    const size = daily ? quickSize({ kwhPerDay: daily }) : null;
+    if (!size) return null;
+    const battery = size.withBattery.eveningKwh >= EVENING_WORTH_STORING;
+    const amount = Number(bill.amount) || 0;
+    const per = { monthly: "a month", bimonthly: "every two months", quarterly: "a quarter", annual: "a year" }[bill.interval];
+    return {
+      kw: battery ? size.withBattery.kw : size.solar.kw,
+      kwh: battery ? size.withBattery.batteryKwh : 0,
+      spend: amount > 0 ? `$${amount.toLocaleString("en-AU")} ${per}` : null,
+    };
+  })();
+  const guideFacts: GuideFacts = {
+    roof: quoteNow.form.roof,
+    suggested: guideSuggested,
+    target: guideTarget,
+    panels: summary.panels,
+    kw: summary.kw,
+    inverters: fitted.length,
+    unstrung: fitted.length ? Object.keys(centres).filter((k) => !strings.some((x) => x.panels.includes(k))).length : 0,
+    battery: battery ? { kwh: battery.kwh * battery.qty, ...(battery.backup ? { backup: true } : {}) } : null,
+  };
+  const guideNow = guideOn ? guideStep(guideAnswered, guideFacts) : null;
+  const guideActive = guideOn && guiding(guideAnswered, guideFacts);
+  // What Sol would choose at the inverter and battery steps.
+  const guideInverter =
+    guideNow === "inverter" && summary.panels > 0
+      ? (() => {
+          const list = suggestInverters({ arrayKw: summary.kw, inverters: props.inverters, panel: chosenPanel?.electrical, strings: [] });
+          const hybrid = (guideTarget?.kwh ?? 0) > 0;
+          return list.find((x) => /hybrid/i.test(x.kind) === hybrid) ?? list[0] ?? null;
+        })()
+      : null;
+  const guideBattery =
+    guideNow === "battery"
+      ? (() => {
+          const idea = suggestBatteries({
+            batteries: batteriesThatFit.length ? batteriesThatFit : props.batteries,
+            inverters: fittedInverters,
+            monthlyKwh: year,
+            dailyKwh: finance?.dailyKwh ?? null,
+            selfUseShare: props.workspace.settings.bill.selfUseShare,
+            eveningShare: DAY.eveningShare,
+          });
+          const want = guideTarget?.kwh ?? 0;
+          return idea.suggestions.find((x) => x.battery.kwh * x.qty >= want - 0.01) ?? idea.suggestions[0] ?? null;
+        })()
+      : null;
+  // The panel Sol offers: the person's own favourite first, else the one on the design, else the first on the lists.
+  const guidePanel = favourites.sorted("panels", props.catalogue)[0] ?? chosenPanel ?? null;
+  const guideHandlers = {
+    onHome: (home: { phase: "single" | "three"; storeys: "single" | "double"; roof: "tile" | "tin" | "flat" }) => {
+      setQuote({ ...quoteNow, form: { ...quoteNow.form, ...home } });
+      answerGuide("home");
+    },
+    onFlat: (answer: { kliplok: boolean; tilt: number | null }) => {
+      setGuideFlat(answer);
+      answerGuide("flat");
+    },
+    onTarget: (target: GuideTarget | null) => {
+      setGuideTarget(target);
+      answerGuide("target");
+    },
+    onFind: () => void askSol(),
+    onPanel: (use: boolean) => {
+      if (use && guidePanel && guidePanel.sku !== chosenPanel?.sku) choosePanel(guidePanel.sku);
+      if (!use) openMenu("panels");
+      answerGuide("panel");
+    },
+    onPlace: (blocks: boolean) => {
+      answerGuide("place");
+      if (blocks) startTray(guideTarget ? panelsFor(guideTarget.kw, panelOf(design).watts) : 16);
+      else pickTool("panel");
+    },
+    onReached: (done: boolean) => {
+      answerGuide("reached");
+      if (!done) return pickTool("panel");
+      setTray(null);
+      setTrayPreview(null);
+      pickTool("select");
+      // No Kliplok on a flat roof: its line taken off the quote now the panels are down.
+      if (quoteNow.form.roof === "flat" && !guideFlat.kliplok) {
+        const line = costSystem(spec, quoteNow.form, props.workspace).lines.find((l) => /^Kliplok/i.test(l.label));
+        if (line) setQuote({ ...quoteNow, edits: { ...quoteNow.edits, [lineKey(line)]: { removed: true } } });
+      }
+    },
+    onInverter: (use: boolean | "choose") => {
+      answerGuide("inverter");
+      if (use === true && guideInverter) takeSuggestion(guideInverter);
+      if (use === "choose") {
+        openMenu("inverters");
+        setSuggesting(true);
+      }
+    },
+    onString: (yes: boolean) => {
+      answerGuide("string");
+      if (yes) stringForMe();
+      else pickTool("string");
+    },
+    onBattery: (add: boolean | "choose") => {
+      answerGuide("battery");
+      if (add === true && guideBattery) {
+        chooseBattery(guideBattery.battery);
+        setBattery((b) => (b ? { ...b, qty: guideBattery.qty } : b));
+      }
+      if (add === "choose") openMenu("batteries");
+    },
+    onBackup: (yes: boolean) => {
+      answerGuide("backup");
+      setBackupAnswered(true);
+      if (yes) {
+        setBattery((b) => (b ? { ...b, backup: true } : b));
+        changed();
+      }
+    },
+    onStop: () => setGuideOn(false),
   };
   // Sol drives the designer (1 Nov 2026, Martin): a request typed or spoken in the command bar, read at once when it is
   // a common one (`parseCommand`), else read by Sol against the design described in words (`/api/design/command`),
@@ -4265,7 +4410,8 @@ export function RoofDesigner(props: {
       if (!packed.loose.length) return setTrayNote("No panels fit on that face clear of what's there. Tap another.");
       const done = packed.faces[0];
       setFaces((list) => (list.some((f) => f.id === done.id) ? list.map((f) => (f.id === done.id ? done : f)) : [...list, done]));
-      setLoose((list) => [...list, ...packed.loose]);
+      const tiltTo = quoteNow.form.roof === "flat" ? guideFlat.tilt : null;
+      setLoose((list) => [...list, ...packed.loose.map((pl) => (tiltTo ? { ...pl, tilt: tiltTo } : pl))]);
       setStrings([]);
       setTrayPreview(null);
       changed();
@@ -9315,8 +9461,41 @@ export function RoofDesigner(props: {
                 </div>
               )}
               {tips.corner}
+              {/* Sol leading the design: the step at hand, over Ask Sol. */}
+              {guideActive && !menu && !(props.tight && !solAway && (commandOpen || commandReply || commandBusy)) && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-[6.25rem] z-30 flex justify-center">
+                  <SolGuide
+                    step={guideNow}
+                    placing={
+                      guideAnswered.includes("place") && !guideAnswered.includes("reached")
+                        ? {
+                            panels: summary.panels,
+                            of: guideTarget ? panelsFor(guideTarget.kw, panelOf(design).watts) : null,
+                            kw: summary.kw,
+                          }
+                        : null
+                    }
+                    first={firstName ?? null}
+                    home={{ phase: quoteNow.form.phase, storeys: quoteNow.form.storeys, roof: quoteNow.form.roof }}
+                    suggested={guideSuggested}
+                    target={guideTarget}
+                    canFind={Boolean(props.jobId)}
+                    finding={Boolean(usageRead?.busy)}
+                    panelName={guidePanel?.name ?? "standard panel"}
+                    inverterName={
+                      guideInverter ? `${guideInverter.count > 1 ? `${guideInverter.count} × ` : ""}${guideInverter.inverter.name}` : null
+                    }
+                    batteryName={
+                      guideBattery ? `${guideBattery.qty > 1 ? `${guideBattery.qty} × ` : ""}${guideBattery.battery.name}` : null
+                    }
+                    kw={summary.kw}
+                    {...guideHandlers}
+                  />
+                </div>
+              )}
               {/* Sol beside the design: one suggestion or question at a time, over Ask Sol, never while his panel is out. */}
-              {nudges.length > 0 &&
+              {!guideActive &&
+                nudges.length > 0 &&
                 !menu &&
                 !opening &&
                 !calcOpen &&

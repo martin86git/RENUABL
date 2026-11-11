@@ -15,8 +15,14 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-11",
+    area: "Designer",
+    words: "Sol leads a new design: the home, the size from the bill, the panel, placing, inverter, strings, battery and backup.",
+  },
+  {
+    day: "2026-11-11",
     area: "Today",
-    words: "New in shows who arrived this week and whether anyone has called. Owners see a line per salesperson and choose who new leads go to.",
+    words:
+      "New in shows who arrived this week and whether anyone has called. Owners see a line per salesperson and choose who new leads go to.",
   },
   {
     day: "2026-11-10",
@@ -36,7 +42,8 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-10",
     area: "Today",
-    words: "Today is one page: what needs you, what Sol does next, what is in hand, and the industry news. Each deal says what it needs once.",
+    words:
+      "Today is one page: what needs you, what Sol does next, what is in hand, and the industry news. Each deal says what it needs once.",
   },
   {
     day: "2026-11-10",
