@@ -5,6 +5,7 @@
  */
 import type { DealViewer } from "@/lib/domain/design/account";
 import { CALL_LOG_DAYS, CALL_LOG_MAX, loggedWords, type CallComing, type CallLogEntry } from "@/lib/domain/design/call-log";
+import { livePhase } from "@/lib/domain/live-call";
 import type { CallOutcome } from "@/lib/domain/voice-agent";
 import { query } from "./db";
 import { seen, seenParams } from "./design-crm-repo";
@@ -60,8 +61,12 @@ export async function callLog(businessId: string, viewer: DealViewer): Promise<C
     status: string;
     attempts: number;
     at: Date;
+    live_status: string | null;
+    live_started_at: Date | null;
+    by: string | null;
   }>(
-    `select c.id, j.id as job_id, cu.name as customer, j.title as deal, c.mode, c.status, c.attempts, c.updated_at as at
+    `select c.id, j.id as job_id, cu.name as customer, j.title as deal, c.mode, c.status, c.attempts, c.updated_at as at,
+            c.live_status, c.live_started_at, c.lead->>'assistant' as by
        from voice_calls c
        join design_jobs j on j.business_id = c.business_id and j.id = c.job_id
        join design_customers cu on cu.business_id = j.business_id and cu.id = j.customer_id
@@ -108,6 +113,9 @@ export async function callLog(businessId: string, viewer: DealViewer): Promise<C
       status: r.status === "calling" ? "calling" : "waiting",
       attempts: r.attempts,
       at: new Date(r.at).toISOString(),
+      phase: livePhase({ status: r.status, liveStatus: r.live_status }),
+      startedAt: r.live_started_at ? new Date(r.live_started_at).toISOString() : null,
+      by: r.by || "Sol",
     })),
     solOn: await voiceOnFor(businessId),
   };

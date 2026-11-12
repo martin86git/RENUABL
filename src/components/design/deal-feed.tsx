@@ -71,6 +71,7 @@ import { DealTeamChat } from "./deal-team-chat";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { CallChooser } from "./call-choice";
 import { SolIcon } from "./sol-icon";
+import { TodayCalls } from "./today-calls";
 import { TodayNews } from "./today-news";
 
 const FEED_PICK_KEY = "renuabl.design.feed-pipeline";
@@ -259,6 +260,9 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
           {problem}
         </p>
       )}
+
+      {/* The phone assistant's calls: on now, lined up and done today (12 Nov 2026, Martin). */}
+      <TodayCalls />
 
       {/* The owner of a team: a line for each salesperson, new this week, not yet contacted, in play. */}
       {ownerOfTeam && (

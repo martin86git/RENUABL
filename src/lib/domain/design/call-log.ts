@@ -5,6 +5,7 @@
  * a deal (the note-taker or a note of kind call). Above them, the calls Sol still has lined up. Pure, tested.
  */
 import { recordingOf } from "../browser-call";
+import type { LivePhase } from "../live-call";
 import { OUTCOME_WORDS, type CallOutcome } from "../voice-agent";
 
 /** How far back the log reaches. */
@@ -41,6 +42,12 @@ export interface CallComing {
   status: "waiting" | "calling";
   attempts: number;
   at: string;
+  /** Where the call stands as Vapi last said (live-call.ts): lined up, ringing, on the call, trying again. */
+  phase?: LivePhase;
+  /** ISO time the customer picked up, while on the call. */
+  startedAt?: string | null;
+  /** The phone assistant's name on this call (Sol until the business names it). */
+  by?: string;
 }
 
 export type CallFilter = "all" | "sol" | "team";
@@ -97,4 +104,53 @@ export function callDay(at: string, now = new Date()): string {
   if (that === day(now)) return "Today";
   if (that === day(new Date(now.getTime() - 86_400_000))) return "Yesterday";
   return new Date(at).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: "Australia/Melbourne" });
+}
+
+/**
+ * Today's calls at a glance (12 Nov 2026, Martin: the assistant calls on its own, so Today shows the calls happening,
+ * lined up and done today, so the team knows it is going on).
+ */
+export interface TodayCalls {
+  /** Ringing or on the call now. */
+  live: CallComing[];
+  /** Still to be made: waiting for calling hours or a retry. */
+  lined: CallComing[];
+  /** Made or logged today (the market's day), newest first. */
+  done: CallLogEntry[];
+}
+
+export function todaysCalls(log: { calls: readonly CallLogEntry[]; coming: readonly CallComing[] }, now = new Date()): TodayCalls {
+  const isLive = (c: CallComing) => c.phase === "ringing" || c.phase === "on-call";
+  return {
+    live: log.coming.filter(isLive),
+    lined: log.coming.filter((c) => !isLive(c)),
+    done: log.calls.filter((e) => callDay(e.at, now) === "Today").sort((a, b) => b.at.localeCompare(a.at)),
+  };
+}
+
+/** "1 on a call now · 3 done today · 2 lined up"; null when there is nothing. */
+export function todayCallsWords(t: TodayCalls): string | null {
+  const parts = [
+    t.live.length ? `${t.live.length} on a call now` : null,
+    t.done.length ? `${t.done.length} done today` : null,
+    t.lined.length ? `${t.lined.length} lined up` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/** "Charlie is on the call with Jo", "Charlie is ringing Jo…", "Charlie will call Jo". */
+export function liveCallWords(c: Pick<CallComing, "phase" | "customer" | "by">): string {
+  const who = c.customer.trim().split(/\s+/)[0] || "the customer";
+  const name = c.by?.trim() || "Sol";
+  if (c.phase === "on-call") return `${name} is on the call with ${who}`;
+  if (c.phase === "ringing") return `${name} is ringing ${who}…`;
+  if (c.phase === "trying-again") return `${name} couldn't reach ${who} and will try again`;
+  return `${name} will call ${who}`;
+}
+
+/** "9:41 am", the market's time. */
+export function callTime(at: string): string {
+  return new Date(at)
+    .toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", timeZone: "Australia/Melbourne" })
+    .replace(/\s/g, " ");
 }

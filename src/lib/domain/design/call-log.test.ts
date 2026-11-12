@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { callDay, callerName, callsOf, comingWords, loggedWords, outcomeTone, outcomeWords, type CallLogEntry } from "./call-log";
+import {
+  callDay,
+  callerName,
+  callsOf,
+  comingWords,
+  liveCallWords,
+  loggedWords,
+  outcomeTone,
+  outcomeWords,
+  todayCallsWords,
+  todaysCalls,
+  type CallComing,
+  type CallLogEntry,
+} from "./call-log";
 
 const entry = (o: Partial<CallLogEntry>): CallLogEntry => ({
   id: "a",
@@ -50,5 +63,46 @@ describe("call log", () => {
     expect(callDay("2026-11-08T00:30:00Z", now)).toBe("Today");
     expect(callDay("2026-11-07T03:00:00Z", now)).toBe("Yesterday");
     expect(callDay("2026-11-05T03:00:00Z", now)).toMatch(/Thu/);
+  });
+});
+
+describe("today's calls", () => {
+  const now = new Date("2026-11-12T03:00:00Z"); // 2pm in Melbourne
+  const coming = (o: Partial<CallComing>): CallComing => ({
+    id: "c",
+    jobId: "j",
+    customer: "Jo Example",
+    deal: "Solar",
+    mode: "lead",
+    status: "calling",
+    attempts: 1,
+    at: now.toISOString(),
+    by: "Charlie",
+    ...o,
+  });
+
+  it("splits live, lined up and today's done calls", () => {
+    const t = todaysCalls(
+      {
+        calls: [entry({ id: "old", at: "2026-11-10T01:00:00Z" }), entry({ id: "today", at: "2026-11-12T00:30:00Z" })],
+        coming: [
+          coming({ id: "on", phase: "on-call" }),
+          coming({ id: "ring", phase: "ringing" }),
+          coming({ id: "wait", status: "waiting", phase: "lined-up" }),
+        ],
+      },
+      now,
+    );
+    expect(t.live.map((c) => c.id)).toEqual(["on", "ring"]);
+    expect(t.lined.map((c) => c.id)).toEqual(["wait"]);
+    expect(t.done.map((c) => c.id)).toEqual(["today"]);
+    expect(todayCallsWords(t)).toBe("2 on a call now · 1 done today · 1 lined up");
+    expect(todayCallsWords({ live: [], lined: [], done: [] })).toBeNull();
+  });
+
+  it("says what the assistant is doing, by its name and their first name", () => {
+    expect(liveCallWords(coming({ phase: "on-call" }))).toBe("Charlie is on the call with Jo");
+    expect(liveCallWords(coming({ phase: "ringing" }))).toBe("Charlie is ringing Jo…");
+    expect(liveCallWords(coming({ phase: "lined-up", by: "" }))).toBe("Sol will call Jo");
   });
 });
