@@ -3,17 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
-import { clockWords, joinRuns, phaseWords, type LiveLine } from "@/lib/domain/live-call";
+import { ArrowUp, ChevronDown, ChevronUp, X } from "lucide-react";
+import { clockWords, joinRuns, phaseWords, TEAM_NOTE_MAX, teamLineWords, type LiveLine } from "@/lib/domain/live-call";
 import { CALL_HEADLINES } from "@/lib/domain/voice-agent";
-import { stopWatching, useLiveCall, useWatchedCall } from "@/lib/services/assistant-call";
+import { stopWatching, tellAssistant, useLiveCall, useWatchedCall } from "@/lib/services/assistant-call";
 import { useCaller } from "@/lib/services/caller";
 import { CallerAvatar } from "./settings-caller";
 
 /**
  * The window that opens when a call is handed to the phone assistant (12 Nov 2026, Martin): its face and name, where
  * the call stands, how long it has run, and what is being said as it is said. Bottom right of every page while a call
- * is watched (mounted once in the shell); closing it leaves the call going.
+ * is watched (mounted once in the shell); closing it leaves the call going. While the call is on, the window pulses in the
+ * signal colour with the clock lit, and the team can type to the assistant: an answer to give, or something to mention
+ * (or, ticked, words to say as typed).
  */
 export function AssistantCallWindow() {
   const watched = useWatchedCall();
@@ -47,15 +49,23 @@ export function AssistantCallWindow() {
   const customer = call?.customer || watched.name || "the customer";
   const phase = call?.phase ?? "lined-up";
   const live = phase === "ringing" || phase === "on-call";
+  const onCall = phase === "on-call";
   const time = phase === "on-call" ? clockWords(elapsed) : phase === "ended" && call?.ranFor ? clockWords(call.ranFor) : null;
   const outcome = phase === "ended" && call?.outcome ? `${CALL_HEADLINES[call.outcome]}${call.booked ? ` · ${call.booked}` : ""}` : null;
 
   return createPortal(
     <section
       aria-label={`${caller.name}'s call`}
-      className="fixed bottom-20 right-4 z-[85] w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-2xl bg-surface shadow-lift ring-1 ring-line lg:bottom-6 lg:right-6 print:hidden"
+      className={clsx(
+        "fixed bottom-20 right-4 z-[85] w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-2xl bg-surface shadow-lift lg:bottom-6 lg:right-6 print:hidden",
+        onCall ? "ring-2 ring-sun-line" : "ring-1 ring-line",
+      )}
     >
-      <header className="flex items-center gap-3 bg-primary px-4 py-3 text-white">
+      <header className="relative flex items-center gap-3 bg-primary px-4 py-3 text-white">
+        {/* While the call is on, a slow pulse of the signal colour across the header: plain that it's under way. */}
+        {onCall && (
+          <span className="pointer-events-none absolute inset-0 animate-pulse bg-sun-line/25 motion-reduce:animate-none" aria-hidden />
+        )}
         <span className="relative shrink-0">
           {live && <span className="absolute -inset-1 animate-ping rounded-full bg-positive/40" aria-hidden />}
           <CallerAvatar caller={caller} size={44} className="relative ring-2 ring-white/20" />
@@ -65,7 +75,18 @@ export function AssistantCallWindow() {
           <p className="truncate text-xs text-white/70">{phaseWords(phase, customer)}</p>
         </div>
         {time && (
-          <span className={clsx("rounded-full px-2.5 py-1 text-sm tabular-nums", live ? "bg-positive text-white" : "bg-white/10")}>
+          <span
+            className={clsx(
+              "relative flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-semibold tabular-nums",
+              onCall ? "bg-sun-line text-white" : "bg-white/10",
+            )}
+          >
+            {onCall && (
+              <span className="relative flex size-2" aria-hidden>
+                <span className="absolute inset-0 animate-ping rounded-full bg-white/80 motion-reduce:animate-none" />
+                <span className="relative size-2 rounded-full bg-white" />
+              </span>
+            )}
             {time}
           </span>
         )}
@@ -115,11 +136,15 @@ export function AssistantCallWindow() {
               </>
             )}
           </div>
-          <p className="border-t border-line px-4 py-2 text-[11px] text-muted">
-            {phase === "ended"
-              ? "The call and its summary are on the deal."
-              : "Words appear as they're said, transcribed by machine. Closing this leaves the call going."}
-          </p>
+          {call?.canSteer ? (
+            <TellBox jobId={watched.jobId} assistant={caller.name} />
+          ) : (
+            <p className="border-t border-line px-4 py-2 text-[11px] text-muted">
+              {phase === "ended"
+                ? "The call and its summary are on the deal."
+                : "Words appear as they're said, transcribed by machine. Closing this leaves the call going."}
+            </p>
+          )}
         </>
       )}
     </section>,
@@ -127,7 +152,73 @@ export function AssistantCallWindow() {
   );
 }
 
+/** Typing to the assistant mid-call: something to work in, or (ticked) words to say as typed. */
+function TellBox({ jobId, assistant }: { jobId: string; assistant: string }) {
+  const [text, setText] = useState("");
+  const [say, setSay] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const send = async () => {
+    const t = text.trim();
+    if (!t || sending) return;
+    setSending(true);
+    setProblem(null);
+    const res = await tellAssistant(jobId, t, say);
+    setSending(false);
+    if (!res.ok) return setProblem(res.message);
+    setText("");
+    setSay(false);
+  };
+  return (
+    <div className="border-t border-line px-3 py-2.5">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void send();
+        }}
+        className="flex items-center gap-2 rounded-full bg-surface-2 py-1 pl-3.5 pr-1 ring-1 ring-line focus-within:ring-sun-line"
+      >
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          maxLength={TEAM_NOTE_MAX}
+          placeholder={say ? `What ${assistant} should say…` : `Tell ${assistant} something…`}
+          aria-label={`Tell ${assistant} something during the call`}
+          className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+        />
+        <button
+          type="submit"
+          disabled={!text.trim() || sending}
+          aria-label="Send"
+          className="grid size-8 shrink-0 place-items-center rounded-full bg-sun-line text-white disabled:bg-line disabled:text-muted"
+        >
+          <ArrowUp className="size-4" aria-hidden />
+        </button>
+      </form>
+      <label className="mt-1.5 flex items-center gap-2 px-1 text-[11px] text-muted">
+        <input type="checkbox" checked={say} onChange={(e) => setSay(e.target.checked)} className="size-3.5 accent-[var(--sun-line)]" />
+        Have {assistant} say it word for word
+      </label>
+      {problem ? (
+        <p className="px-1 pt-1 text-[11px] text-danger">{problem}</p>
+      ) : (
+        <p className="px-1 pt-1 text-[11px] text-muted">
+          {say ? `${assistant} says it next, as typed.` : `Only ${assistant} sees this: an answer to give, or something to mention.`}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Bubble({ line, assistant, customer, saying }: { line: LiveLine; assistant: string; customer: string; saying?: boolean }) {
+  if (line.role === "team" || line.role === "team-say")
+    return (
+      <div className="flex flex-col items-center">
+        <p className="max-w-[90%] rounded-xl bg-sun px-3 py-1.5 text-center text-xs leading-snug text-sun-ink">
+          <span className="font-semibold">{teamLineWords(line.role, assistant)}:</span> {line.text}
+        </p>
+      </div>
+    );
   const ours = line.role === "assistant";
   return (
     <div className={clsx("flex flex-col", ours ? "items-start" : "items-end")}>

@@ -463,8 +463,9 @@ export function assistantConfig(o: {
       tools,
     },
     ...(o.voice ? { voice: o.voice } : {}),
-    // VERIFY: Deepgram's Australian English model name with Vapi.
-    transcriber: { provider: "deepgram", model: "nova-2", language: "en-AU" },
+    transcriber: transcriberFor([b.assistant, b.business, b.firstName ?? ""]),
+    // A control address for the call, so the team can tell the assistant something while it's on (live-call.ts).
+    monitorPlan: { controlEnabled: true },
     ...(b.inbound ? {} : { voicemailMessage: voicemailMessage(b) }),
     endCallMessage: "Thanks, bye for now.",
     maxDurationSeconds: b.inbound ? MAX_INBOUND_SECONDS : MAX_CALL_SECONDS[b.mode],
@@ -472,6 +473,41 @@ export function assistantConfig(o: {
     serverMessages: ["tool-calls", "end-of-call-report", "status-update", "transcript"],
     server: { url: o.serverUrl, headers: { [VOICE_SECRET_HEADER]: o.secret } },
   };
+}
+
+/**
+ * Words the transcriber should expect on a solar call (12 Nov 2026, Martin: what he said came out wrong). Deepgram's
+ * nova-3 takes them as key terms, in Australian English (docs.vapi.ai/providers/transcriber/deepgram).
+ */
+export const SOLAR_KEYTERMS = [
+  "solar",
+  "solar panels",
+  "battery",
+  "kilowatt",
+  "kilowatt hours",
+  "inverter",
+  "rebate",
+  "Solar Victoria",
+  "STCs",
+  "feed-in tariff",
+  "proposal",
+  "quote",
+  "blackout",
+  "EV charger",
+  "switchboard",
+  "three phase",
+  "single phase",
+  "Sigenergy",
+  "Powerwall",
+  "Fronius",
+  "Sungrow",
+] as const;
+
+/** The transcriber for a call: Deepgram nova-3 in Australian English, told the names and solar words to expect. */
+export function transcriberFor(names: readonly string[]) {
+  const own = names.map((n) => plain(n, 40)).filter((n) => n.length > 1);
+  const keyterm = [...new Set([...own, ...SOLAR_KEYTERMS])].slice(0, 50);
+  return { provider: "deepgram", model: "nova-3", language: "en-AU", keyterm };
 }
 
 export const VOICE_SECRET_HEADER = "x-renuabl-voice";
@@ -492,7 +528,7 @@ export function closedAssistant(o: { business: string; model: string }) {
       messages: [{ role: "system", content: "Say goodbye politely and end the call." }],
       tools: [{ type: "endCall" }],
     },
-    transcriber: { provider: "deepgram", model: "nova-2", language: "en-AU" },
+    transcriber: transcriberFor([o.business]),
     maxDurationSeconds: 60,
   };
 }

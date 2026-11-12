@@ -20,7 +20,7 @@
  */
 import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
 import { normaliseMobile } from "@/lib/domain/contact";
-import { MAX_LINES, livePhase, type LiveCallView, type LiveEvent, type LiveLine } from "@/lib/domain/live-call";
+import { MAX_LINES, livePhase, teamCommand, type LiveCallView, type LiveEvent, type LiveLine } from "@/lib/domain/live-call";
 import { customerFacts } from "@/lib/domain/design/sol-customer";
 import { callbackRequestEmail, consultBookedEmail } from "@/lib/domain/emails";
 import { todayInMarket } from "@/lib/domain/market";
@@ -47,6 +47,7 @@ import {
   speakableName,
   strongerOutcome,
   toolWords,
+  transcriberFor,
   type VapiEvent,
   VOICE_TOOLS,
   voiceSlots,
@@ -718,7 +719,7 @@ export async function ringToHearVoice(businessId: string, mobile: string | null)
             tools: [{ type: "endCall" }],
           },
           ...(voice ? { voice } : {}),
-          transcriber: { provider: "deepgram", model: "nova-2", language: "en-AU" },
+          transcriber: transcriberFor([caller.name]),
           maxDurationSeconds: 40,
         },
       }),
@@ -749,9 +750,10 @@ export async function keepLive(row: VoiceRow, e: LiveEvent): Promise<void> {
            live_started_at = case when live_vapi_id is distinct from $2 then null else live_started_at end,
            live_ended_at = case when live_vapi_id is distinct from $2 then null else live_ended_at end,
            live_partial = case when live_vapi_id is distinct from $2 then null else live_partial end,
+           live_control_url = coalesce($4, case when live_vapi_id is distinct from $2 then null else live_control_url end),
            live_vapi_id = $2, live_status = $3
          where id = $1`,
-        [row.id, callId, e.status],
+        [row.id, callId, e.status, e.controlUrl],
       );
       if (e.status === "in-progress")
         await query(`update voice_calls set live_started_at = coalesce(live_started_at, now()) where id = $1`, [row.id]);
@@ -786,6 +788,7 @@ export async function liveCallFor(businessId: string, jobId: string): Promise<Li
       live_started_at: Date | null;
       live_ended_at: Date | null;
       live_partial: LiveLine | null;
+      live_control_url: string | null;
       now: Date;
     }
   >(
@@ -816,5 +819,49 @@ export async function liveCallFor(businessId: string, jobId: string): Promise<Li
     ranFor: started !== null && ended !== null ? ended - started : null,
     lines,
     partial: r.live_partial && (r.live_partial.role === "assistant" || r.live_partial.role === "customer") ? r.live_partial : null,
+    canSteer: Boolean(r.live_control_url) && r.live_status === "in-progress",
   };
+}
+
+/**
+ * The team types to the assistant while it is on the call on this deal: something to work in (an answer, a thing to
+ * mention), or words to say as typed. Sent to the call's control address (never the browser's), and kept on the call
+ * as the team's line. Business id first; the caller has checked the member may see the deal.
+ */
+export async function steerCall(
+  businessId: string,
+  jobId: string,
+  o: { text: string; say: boolean },
+): Promise<"sent" | "not-on" | "failed"> {
+  const rows = await query<{ id: string; live_vapi_id: string | null; live_control_url: string | null }>(
+    `select id, live_vapi_id, live_control_url from voice_calls
+      where business_id = $1 and job_id = $2 and live_status = 'in-progress' and live_control_url is not null
+      order by created_at desc limit 1`,
+    [businessId, jobId],
+  );
+  const r = rows[0];
+  if (!r?.live_control_url) return "not-on";
+  try {
+    const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [businessId]);
+    const brand = await loadBrand(businessId, biz[0]?.name ?? "").catch(() => null);
+    const res = await fetch(r.live_control_url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(teamCommand({ ...o, business: brand?.name || biz[0]?.name || "" })),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) {
+      console.error("call note not sent", `Vapi ${res.status}`);
+      return res.status === 400 ? "not-on" : "failed";
+    }
+    await query(
+      `insert into voice_call_lines (voice_call_id, vapi_call_id, role, text)
+       select $1, $2, $3, $4 where (select count(*) from voice_call_lines where voice_call_id = $1) < $5`,
+      [r.id, r.live_vapi_id, o.say ? "team-say" : "team", o.text, MAX_LINES],
+    );
+    return "sent";
+  } catch (e) {
+    console.error("call note not sent", e instanceof Error ? e.message : e);
+    return "failed";
+  }
 }

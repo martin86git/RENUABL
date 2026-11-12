@@ -58,6 +58,22 @@ export function useWatchedCall(): Watched | null {
   );
 }
 
+/** Tells the assistant something while it's on the call (say: it says the words as typed). */
+export async function tellAssistant(jobId: string, text: string, say: boolean): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const res = await fetch(`/api/design/jobs/${encodeURIComponent(jobId)}/call/live`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text, say }),
+    });
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
+    if (res.ok && json?.ok) return { ok: true };
+    return { ok: false, message: json?.message ?? "That didn't reach the call. Try again in a moment." };
+  } catch {
+    return { ok: false, message: "We couldn't reach the server just now. Try again in a moment." };
+  }
+}
+
 export type LiveCall = LiveCallView & {
   /** When the answer arrived, on this computer's clock, to run the timer from. */
   receivedAt: number;

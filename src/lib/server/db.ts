@@ -1312,6 +1312,8 @@ alter table voice_calls add column if not exists live_status text;
 alter table voice_calls add column if not exists live_started_at timestamptz;
 alter table voice_calls add column if not exists live_ended_at timestamptz;
 alter table voice_calls add column if not exists live_partial jsonb;
+-- Vapi's control address for the attempt now on, so the team can type to the assistant mid-call. Never sent to a browser.
+alter table voice_calls add column if not exists live_control_url text;
 -- Each thing said on the assistant's calls, in order, kept with the call (server/voice-calls.ts, keepLive).
 create table if not exists voice_call_lines (
   id bigserial primary key,

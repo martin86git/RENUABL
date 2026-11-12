@@ -7,8 +7,11 @@
  */
 import type { CallOutcome } from "./voice-agent";
 
-/** Who said a line: the business's assistant, or the customer. */
-export type LiveRole = "assistant" | "customer";
+/**
+ * Who a line is from: the business's assistant, the customer, or the team typing to the assistant while the call is on
+ * ("team": told it something to work in; "team-say": had it say these words).
+ */
+export type LiveRole = "assistant" | "customer" | "team" | "team-say";
 
 export interface LiveLine {
   role: LiveRole;
@@ -17,7 +20,7 @@ export interface LiveLine {
 
 /** What a Vapi server message means for the live view, if anything. */
 export type LiveEvent =
-  | { kind: "status"; callId: string | null; status: VapiStatus }
+  | { kind: "status"; callId: string | null; status: VapiStatus; controlUrl: string | null }
   | { kind: "line"; callId: string | null; role: LiveRole; text: string; final: boolean };
 
 export type VapiStatus = "scheduled" | "queued" | "ringing" | "in-progress" | "forwarding" | "ended";
@@ -36,7 +39,9 @@ export function readLiveEvent(body: unknown): LiveEvent | null {
   const callId = typeof call.id === "string" ? call.id : null;
   if (m.type === "status-update") {
     const status = STATUSES.find((s) => s === m.status);
-    return status ? { kind: "status", callId, status } : null;
+    const monitor = (call.monitor ?? {}) as Record<string, unknown>;
+    const controlUrl = typeof monitor.controlUrl === "string" && isControlUrl(monitor.controlUrl) ? monitor.controlUrl : null;
+    return status ? { kind: "status", callId, status, controlUrl } : null;
   }
   if (typeof m.type === "string" && m.type.startsWith("transcript")) {
     const text = typeof m.transcript === "string" ? tidy(m.transcript) : "";
@@ -46,6 +51,52 @@ export function readLiveEvent(body: unknown): LiveEvent | null {
   }
   return null;
 }
+
+/** Vapi's control address for a call: only https on Vapi's own hosts, so a message can't send us anywhere else. */
+export function isControlUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && (u.hostname === "vapi.ai" || u.hostname.endsWith(".vapi.ai")) && !u.username && !u.password;
+  } catch {
+    return false;
+  }
+}
+
+// --- The team typing to the assistant while it's on the call (12 Nov 2026, Martin: to give it an answer, or have it
+// mention something). Sent to the call's control address (Vapi's live call control, docs.vapi.ai/calls/call-features).
+
+/** The longest note the team can send at once. */
+export const TEAM_NOTE_MAX = 500;
+
+/** The team's note, one line, cut to length; empty when there's nothing to send. */
+export const cleanTeamNote = (raw: unknown): string =>
+  typeof raw === "string" ? raw.replace(/\s+/g, " ").trim().slice(0, TEAM_NOTE_MAX) : "";
+
+/**
+ * What Vapi is sent. Told something, the assistant takes it as a note from the team the customer can't hear, worked
+ * into its next words in its own way and under every rule it was given; had it say something, it says the words as typed.
+ */
+export function teamCommand(o: { text: string; say: boolean; business: string }) {
+  if (o.say) return { type: "say", content: o.text, endCallAfterSpoken: false };
+  const team = o.business ? `the ${o.business} team` : "the team";
+  return {
+    type: "add-message",
+    message: {
+      role: "system",
+      content:
+        `A note from ${team}, typed to you during this call. The customer can't see or hear it. ` +
+        "If it answers something they asked, give them the answer now; if it asks you to mention something, bring it up naturally. " +
+        "Say it in your own words, and keep every rule you were given: no price, discount, date, rebate or promise that isn't in your facts or this note. " +
+        "Never say you were sent a note. The note: " +
+        JSON.stringify(o.text),
+    },
+    triggerResponseEnabled: true,
+  };
+}
+
+/** How the window labels the team's own lines. */
+export const teamLineWords = (role: LiveRole, assistant: string) =>
+  role === "team-say" ? `You had ${assistant} say` : `You told ${assistant}`;
 
 /** Where a call stands, for the window. */
 export type LivePhase = "lined-up" | "ringing" | "on-call" | "trying-again" | "ended";
@@ -98,4 +149,6 @@ export interface LiveCallView {
   ranFor: number | null;
   lines: LiveLine[];
   partial: LiveLine | null;
+  /** The team can type to the assistant now (it is on the call and Vapi gave a control address). */
+  canSteer: boolean;
 }
