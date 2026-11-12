@@ -4,6 +4,7 @@ import Link from "next/link";
 import { distributorFor } from "@/lib/domain/design/networks";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronLeft,
   ClipboardList,
@@ -19,6 +20,7 @@ import {
   Search,
   Trash2,
   Wrench,
+  X,
 } from "lucide-react";
 import { SolBadge } from "./sol-icon";
 import { JobCardDialog } from "./job-card";
@@ -77,6 +79,7 @@ import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { bannerFigures } from "@/lib/domain/design/system-summary";
 import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
 import { DealEmails } from "./deal-emails";
+import { CallEntryBy, CallEntryText } from "./call-entry";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
 type Written = "note" | "call" | "email";
@@ -233,6 +236,9 @@ export function DealPage({ id }: { id: string }) {
   const [status, setStatus] = useState("");
   // The address search is open in Deal details, to give the deal a new address.
   const [moving, setMoving] = useState(false);
+  // The box that asks for the address when Design is pressed on a deal with no place on the map (12 Nov 2026, Martin:
+  // pressing Design did nothing he could see): "design" opens the designer once it is found.
+  const [askPlace, setAskPlace] = useState<null | "design" | "place">(null);
   // "?tab=chat" (from Messages, and from the email about a new message) opens the deal on its conversation; "?tab=email"
   // (a draft Sol wrote) on its Email tab.
   const asked = useSearchParams().get("tab");
@@ -449,18 +455,12 @@ export function DealPage({ id }: { id: string }) {
   const tabLines = tabFields.map((f) => fieldLine(f, job.details, ctx));
   const tabFilled = tabLines.filter((l) => l.value).length;
   const PROPOSAL_KEYS = ["incGst", "stc", "youPay", "depositAsked", "depositReceived"];
-  // The address lives on Details' first tab; a deal with no place on the map is sent there to find one.
-  const findAddress = () => {
-    setTab("details");
-    setSection("deal");
-    setMoving(true);
-  };
   const menu = {
     tab,
     onTab: setTab,
     stage: job.stage,
     designable: job.lat !== null,
-    onDesign: () => (job.lat !== null ? openTool("design") : findAddress()),
+    onDesign: () => (job.lat !== null ? openTool("design") : setAskPlace("design")),
     onProposal: () => openTool("proposal"),
     onCard: () => setCard(true),
     phone: customer.phone,
@@ -537,10 +537,23 @@ export function DealPage({ id }: { id: string }) {
           compact={tab !== "activities"}
           figures={bannerFigures(details, job.kw)}
           onDesign={job.lat !== null ? () => openTool("design") : null}
-          onPlace={() => {
-            findAddress();
-          }}
+          onPlace={() => setAskPlace("place")}
         />
+        {askPlace && (
+          <AskPlace
+            name={customer.firstName}
+            had={job.address}
+            then={askPlace}
+            onClose={() => setAskPlace(null)}
+            onPlace={async (place) => {
+              if (!(await patchOk(place))) return false;
+              const then = askPlace;
+              setAskPlace(null);
+              if (then === "design" && place.lat !== null) openTool("design");
+              return true;
+            }}
+          />
+        )}
 
         <CallNotetaker
           handle={notetaker}
@@ -906,7 +919,7 @@ export function DealPage({ id }: { id: string }) {
                           <div className="flex items-baseline justify-between gap-3">
                             <p className="text-sm text-ink">
                               <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
-                              <span className="text-ink-2">by {a.by.split("@")[0]}</span>
+                              {a.kind === "call" ? <CallEntryBy by={a.by} /> : <span className="text-ink-2">by {a.by.split("@")[0]}</span>}
                             </p>
                             <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={a.at}>
                               {new Date(a.at).toLocaleString("en-AU", {
@@ -918,7 +931,11 @@ export function DealPage({ id }: { id: string }) {
                               })}
                             </time>
                           </div>
-                          <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
+                          {a.kind === "call" ? (
+                            <CallEntryText text={a.text} />
+                          ) : (
+                            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
+                          )}
                           {a.kind === "email" &&
                             opens &&
                             (opens.times[a.id] ? (
@@ -1213,6 +1230,73 @@ function DealMenu({
         </span>
       </RailRound>
     </nav>
+  );
+}
+
+/**
+ * The deal has no place on the map, so there is no roof to design yet (12 Nov 2026, Martin): a box over the page says so
+ * and finds the address; once picked it is kept on the deal and, from Design, the designer opens on it.
+ */
+function AskPlace(props: {
+  name: string;
+  /** The address as typed on the deal, when it has one that isn't on the map. */
+  had: string;
+  then: "design" | "place";
+  onClose: () => void;
+  onPlace: (place: { address: string; lat: number | null; lng: number | null }) => Promise<boolean>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && props.onClose();
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [props]);
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ask-place-title"
+      className="theme-studio fixed inset-0 z-[80] flex items-start justify-center bg-ink/40 px-4 pt-[18vh]"
+      onPointerDown={(e) => e.target === e.currentTarget && props.onClose()}
+    >
+      <div className="w-full max-w-lg rounded-2xl bg-surface p-5 shadow-[0_24px_60px_rgba(11,11,12,0.25)] ring-1 ring-line">
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="ask-place-title" className="text-base font-semibold text-ink">
+            {props.then === "design" ? "Where is the roof?" : "Find the address"}
+          </h2>
+          <button type="button" onClick={props.onClose} aria-label="Close" className="-m-1 rounded-full p-1 text-muted hover:text-ink">
+            <X className="size-4" aria-hidden />
+          </button>
+        </div>
+        <p className="mt-1.5 text-sm text-ink-2">
+          {props.had
+            ? `${props.name || "This deal"}'s address isn't on the map yet, so there's no roof to design. Find it below.`
+            : `This deal has no address yet, so there's no roof to design. Type ${props.name ? `${props.name}'s` : "the"} address.`}
+        </p>
+        {props.had && <p className="mt-1 text-xs text-muted">As typed: {props.had}</p>}
+        <div className={clsx("mt-3", saving && "pointer-events-none opacity-60")}>
+          <AddressField
+            value=""
+            placed={false}
+            onChange={async (place) => {
+              if (!place.address) return;
+              if (place.lat === null) return setProblem("That address isn't on the map. Pick one from the list.");
+              setSaving(true);
+              setProblem(null);
+              const ok = await props.onPlace(place);
+              setSaving(false);
+              if (!ok) setProblem("It couldn't be saved. Try again.");
+            }}
+          />
+        </div>
+        {problem && <p className="mt-2 text-xs text-warning">{problem}</p>}
+        <p className="mt-3 text-xs text-muted">
+          {props.then === "design" ? "It's kept on the deal, then the designer opens on the roof." : "It's kept on the deal."}
+        </p>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
