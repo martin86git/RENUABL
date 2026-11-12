@@ -268,14 +268,6 @@ describe("the panels already on the roof", () => {
   });
 });
 
-describe("reading the roof again", () => {
-  it("reads the asking", () => {
-    expect(parseCommand("read the roof again")).toEqual({ do: "readRoof" });
-    expect(parseCommand("retrace the roof faces")).toEqual({ do: "readRoof" });
-    expect(parseCommand("trace a roof face")).toBeNull();
-  });
-});
-
 describe("two ways at once", () => {
   it("reads east west as a split, in the order said", () => {
     expect(parseCommand("fit a 10 kW east west system")).toEqual({ do: "targetKw", kw: 10, facing: "E", also: "W" });

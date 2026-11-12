@@ -16,7 +16,15 @@ import {
   type GuideStepId,
   type GuideTarget,
 } from "@/lib/domain/design/sol-guide";
-import { BLOCK_MIN, joinBlock, resizeBlock, splitBlock, startingBlocks, type PanelBlock } from "@/lib/domain/design/panel-blocks";
+import {
+  BLOCK_MIN,
+  blockPlaces,
+  joinBlock,
+  resizeBlock,
+  splitBlock,
+  startingBlocks,
+  type PanelBlock,
+} from "@/lib/domain/design/panel-blocks";
 import { SolNudges } from "./sol-nudges";
 import { nudgesFor, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
 import { SideViewsButton } from "./side-views";
@@ -29,18 +37,17 @@ import {
   hasSolar,
   keptClearWords,
   notRoofWords,
-  roofFacesOnly,
   thingLabel,
   withoutExisting,
   type RoofCheck,
 } from "@/lib/domain/design/roof-check";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
 import { loadNearmapOutline } from "@/lib/services/nearmap";
-import { OLD_FACE_CORNERS, mendCutOutline, outlineNote } from "@/lib/domain/design/nearmap";
+import { OLD_FACE_CORNERS, mendCutOutline } from "@/lib/domain/design/nearmap";
 import { MOUNT_STANDOFF, clearanceFor, inRows, laidAs, packFaces, reorient, splitPartner } from "@/lib/domain/design/pack";
 import { edgeShift, snapShift } from "@/lib/domain/design/snap";
 import { faceFromAspect, readAspect, type AspectReading } from "@/lib/domain/design/face-aspect";
-import { faceAt, facesFoundNote, facesFromHeights } from "@/lib/domain/design/roof-faces";
+import { facesFromHeights } from "@/lib/domain/design/roof-faces";
 import { PITCH_NOT_READ, pitchOfRoof, pitchReadWords, type PitchReading } from "@/lib/domain/design/roof-pitch";
 import { NO_BILL_KW, SELF_DESIGN_AIMS, SELF_DESIGN_LABELS, selfDesign, type SelfDesignResult } from "@/lib/domain/design/self-design";
 import { todayInMarket } from "@/lib/domain/market";
@@ -312,8 +319,6 @@ const SIDE_VIEWS: { id: SideView; label: string; hint: string }[] = [
 ];
 
 /** What the card says when the three designs were made by themselves as the roof opened. */
-/** A face with this many corners or more, alone on the roof, is the home's outline put down whole, not a face traced by hand. */
-const OUTLINE_FACE_CORNERS = 8;
 const AUTO_DESIGNED = "Designed as the roof opened, from Google's roof data and your prices: check each against the photo before sending.";
 
 /** A key for each tool (2 Nov 2026, Martin: speed), as the shortcuts card lists them. */
@@ -3690,63 +3695,6 @@ export function RoofDesigner(props: {
     // Looked at once each design opens; the faces themselves are read when the outline arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, props.nearmapPicture]);
-  /** The outline put on the picture for a person to check: picked, the pitch asked for when it isn't set. */
-  const putOutlineDown = (face: Face) => {
-    setFaces((list) => [...list, face]);
-    changed();
-    setSelected(face.id);
-    setPicks([]);
-    setTool("select");
-    if (homePitch !== 0) setPitchDue((due) => [...due, face.id]);
-  };
-  /**
-   * On a Nearmap picture, the home's roof faces read from Nearmap's own heights inside its outline (`roof-faces.ts`;
-   * 9 Nov 2026, Martin: not Google's roof model, which can be years older than the roof), each with its slope and
-   * direction, put down as traced faces to check and change. Null when the outline or the heights can't be had, or
-   * they show no faces: then the designer goes on as before.
-   */
-  /**
-   * Whether to read the roof's faces from Nearmap's heights before laying panels: nothing traced, or only the home's
-   * outline put down whole (one face of many corners, 9 Nov 2026, Martin: at 29 Shearer Drive the outline left from an
-   * earlier try was packed as one roof facing north, and nothing fitted). Faces someone traced are left as they are.
-   */
-  const readFacesFromHeights = () =>
-    !faces.length || (Boolean(props.nearmapPicture) && faces.length === 1 && faces[0].points.length >= OUTLINE_FACE_CORNERS);
-  const nearmapRoofFaces = async (): Promise<{ faces: Face[]; words: string } | null> => {
-    if (!props.nearmapPicture) return null;
-    const [outline, heights, check] = await Promise.all([nearmapFace(), loadTerrain(spot.lat, spot.lng, { nearmap: true }), checkRoof()]);
-    if ("note" in outline || !heights || heights.from !== "nearmap") return null;
-    // Faces over a pergola, a clear roof or the house next door aren't the home's roof (10 Nov 2026, Martin).
-    const found = roofFacesOnly(
-      facesFromHeights(
-        outline.face.points,
-        heights,
-        undefined,
-        undefined,
-        check?.notRoof?.map((x) => x.box),
-      ),
-      check?.notRoof,
-    );
-    if (!found.length) return null;
-    const made: Face[] = found.map((f) => ({
-      id: newId("f"),
-      points: f.points,
-      landscape: false,
-      setback: 0.3,
-      off: [],
-      plan: true,
-      ...faceFromAspect({ points: f.points }, f.aspect),
-    }));
-    setFaces(made);
-    changed();
-    setSelected(null);
-    setPicks([]);
-    setTool("select");
-    const day = heights.captured
-      ? new Date(`${heights.captured}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })
-      : null;
-    return { faces: made, words: facesFoundNote(made.length, day) };
-  };
   /**
    * The roof's pitch read from Nearmap's heights (10 Nov 2026, Martin: measured, not guessed): the home's faces found
    * in the heights inside its outline, and the pitch most of the roof is at (`roof-pitch.ts`). Nothing is put on the
@@ -3819,15 +3767,6 @@ export function RoofDesigner(props: {
     // Asked once a roof: what it reads is the roof's, whichever design is open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.nearmapPicture, pitchUnset, spotKey]);
-  /** The right click's "Roof outline from Nearmap": the outline down, said in the command bar's reply. */
-  const outlineFromNearmap = async () => {
-    setToolMenu(null);
-    const got = await nearmapFace();
-    setCommandOpen(true);
-    if ("note" in got) return setCommandReply(got.note);
-    putOutlineDown(got.face);
-    setCommandReply(outlineNote(homePitch === 0, got.captured));
-  };
   /**
    * "Design it for me": the roof designs itself for three outcomes, the fastest payback, the best return and the most
    * independence (`self-design.ts`), from the traced faces (else Google's roof model), the customer's bill and the
@@ -3902,30 +3841,17 @@ export function RoofDesigner(props: {
     const avoid = check && avoidFor(check).length ? avoidFor(check) : undefined;
     let model: RoofModel | null = null;
     let modelOffsetM: { x: number; y: number } | undefined;
-    let fromFaces = faces;
+    const fromFaces = faces;
     const notes: string[] = [];
-    const fromHeights = readFacesFromHeights() ? await nearmapRoofFaces() : null;
-    if (fromHeights) {
-      fromFaces = fromHeights.faces;
-      notes.push(fromHeights.words);
-    } else if (!faces.length) {
+    if (!faces.length) {
       const found = await googleModelInPlace();
       // Opened by itself with nothing to design from (Google's roof data missing or older than the photo): it says
       // nothing (3 Nov 2026, Martin: "we don't need the Google pop up"); pressed by a person, it says why.
       if ("note" in found && auto) return setMine("idle");
-      if ("note" in found) {
-        // On a Nearmap picture, the roof's outline in that capture stands in (laid on only when the roof is flat).
-        const outline = props.nearmapPicture ? await nearmapFace() : null;
-        if (!outline || "note" in outline)
-          return setMine({ options: [], notes: [found.note, ...(outline ? [outline.note] : [])], from: null });
-        putOutlineDown(outline.face);
-        if (homePitch !== 0) return setMine({ options: [], notes: [outlineNote(false, outline.captured)], from: null });
-        fromFaces = [outline.face];
-        notes.push(outlineNote(true, outline.captured));
-      } else {
-        model = found.model;
-        modelOffsetM = found.offset;
-      }
+      if ("note" in found)
+        return setMine({ options: [], notes: [`${found.note} Trace the roof's faces (T), then ask again.`], from: null });
+      model = found.model;
+      modelOffsetM = found.offset;
     }
     const amount = Number(bill.amount) || 0;
     const rate = Number(bill.rate) || 0;
@@ -4368,7 +4294,7 @@ export function RoofDesigner(props: {
   };
   /**
    * Start again (12 Nov 2026, Martin: a reset under the design's name, asked first): the open design back to
-   * nothing (no panels, inverter, battery, strings, marks or hand changes to its quote), the roof's confirmed faces
+   * nothing (no panels, inverter, battery, strings, marks or hand changes to its quote), the roof faces traced
    * kept, and Sol leading it from the start.
    */
   const [resetAsk, setResetAsk] = useState(false);
@@ -4376,7 +4302,7 @@ export function RoofDesigner(props: {
     const list = everyDesign();
     list[active] = {
       ...spot,
-      faces: faces.filter((f) => f.confirmed).map((f) => ({ ...f, off: panelPlaces(f, size).map((pl) => pl.index) })),
+      faces: faces.map((f) => ({ ...f, off: panelPlaces(f, size).map((pl) => pl.index) })),
       loose: [],
     };
     setQuotes(everyQuote().map((q, i) => (i === active ? { form: q.form, edits: {} } : q)));
@@ -4486,9 +4412,16 @@ export function RoofDesigner(props: {
   const previewAt = (at: Point | null) => {
     const block = carried();
     const face = at ? faces.find((f) => inside(at, f.points)) : undefined;
-    if (!block || !face) {
+    if (!block || !at) {
       if (trayPreview) setTrayPreview(null);
       return;
+    }
+    if (!face) {
+      const key = `${Math.round(at.x * 2)}:${Math.round(at.y * 2)}:${block.id}:${block.count}`;
+      if (trayPreview?.key === key) return;
+      const tilt = quoteNow.form.roof === "flat" ? (guideFlat.tilt ?? 0) : homePitch;
+      const panels = blockPlaces(at, block.count, size, tilt).map((c) => ({ id: "preview", x: c.x, y: c.y, angle: 0, tilt }));
+      return setTrayPreview({ key, panels, of: block.count });
     }
     const key = `${face.id}:${block.id}:${block.count}:${loose.length}`;
     if (trayPreview?.key === key) return;
@@ -4505,27 +4438,27 @@ export function RoofDesigner(props: {
       const seen = await checkRoof();
       const check = inUse(seen);
       const avoid = [...(check ? avoidFor(check) : []), ...loose.map((pl) => [...looseCorners(pl, size)])];
-      let face = faces.find((f) => inside(at, f.points));
+      const face = faces.find((f) => inside(at, f.points));
       if (!face) {
-        // Read inside Nearmap's outline of the home when there is one, and clear of the faces already down, so a
-        // new face stops at the gutter and never lies over another (12 Nov 2026, Martin).
-        const [heights, outline] = await Promise.all([
-          loadTerrain(spot.lat, spot.lng, { nearmap: Boolean(props.nearmapPicture) }),
-          props.nearmapPicture ? nearmapFace() : Promise.resolve(null),
-        ]);
-        const skip = [...(check?.notRoof?.map((x) => x.box) ?? []), ...faces.map((f) => f.points)];
-        const found = heights ? faceAt(heights, at, skip, outline && "face" in outline ? outline.face.points : undefined) : null;
-        if (!found) return setTrayNote("I can't read a roof face there: tap the middle of a face, or trace it.");
-        face = {
-          id: newId("f"),
-          points: found.points,
-          landscape: false,
-          setback: 0.3,
-          off: [],
-          plan: true,
+        const tilt = quoteNow.form.roof === "flat" ? (guideFlat.tilt ?? 0) : homePitch;
+        const placed = blockPlaces(at, block.count, size, tilt).map((c) => ({
+          id: newId("p"),
+          x: c.x,
+          y: c.y,
+          angle: 0,
+          tilt,
           ...roofTag,
-          ...faceFromAspect({ points: found.points }, found.aspect),
-        };
+        }));
+        setLoose((list) => [...list, ...placed]);
+        setStrings([]);
+        setTrayPreview(null);
+        changed();
+        const rest = tray.blocks.filter((b) => b.id !== block.id);
+        if (!rest.length) {
+          setTray(null);
+          setCommandReply(`All ${loose.length + placed.length} panels placed. Move or turn each block into place, then string them.`);
+        } else setTray({ blocks: rest, carrying: null });
+        return;
       }
       const packed = packFaces([face], size, block.count, () => newId("p"), avoid.length ? avoid : undefined);
       if (!packed.loose.length) return setTrayNote("No panels fit on that face clear of what's there. Tap another.");
@@ -4550,32 +4483,6 @@ export function RoofDesigner(props: {
     } finally {
       setTrayBusy(false);
     }
-  };
-  /**
-   * The roof first (10 Nov 2026, Martin): on a Nearmap picture, a roof with nothing on any design has its faces read
-   * from Nearmap's heights as it opens, and the designer asks whether that's the roof before anything is laid. The
-   * faces confirmed are kept with the design (`Face.confirmed`), carried to new designs and never read again unasked.
-   */
-  const [roofToConfirm, setRoofToConfirm] = useState(false);
-  const roofRead = useRef<string | null>(null);
-  useEffect(() => {
-    if (!props.nearmapPicture || roofRead.current === spotKey) return;
-    if (everyDesign().some((d) => d.faces.length || (d.loose ?? []).length)) return;
-    // A moment after the picture settles, so a roof opened and left at once isn't read.
-    const t = window.setTimeout(() => {
-      roofRead.current = spotKey;
-      void nearmapRoofFaces().then((read) => {
-        if (read) setRoofToConfirm(true);
-      });
-    }, 600);
-    return () => window.clearTimeout(t);
-    // Once a roof and picture: the designs and faces are read when it runs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.nearmapPicture, spotKey]);
-  const confirmRoof = () => {
-    setFaces((list) => list.map((f) => ({ ...f, confirmed: true })));
-    changed();
-    setRoofToConfirm(false);
   };
   // A press anywhere outside the panel (on the map, say) puts it away, as its cross does.
   useEffect(() => {
@@ -4670,8 +4577,7 @@ export function RoofDesigner(props: {
     ]
       .filter(Boolean)
       .join(" ");
-    const fromHeights = readFacesFromHeights() ? await nearmapRoofFaces() : null;
-    const roofFaces = fromHeights?.faces ?? faces;
+    const roofFaces = faces;
     if (roofFaces.length && facing && also && also !== facing) {
       // Two ways asked for (10 Nov 2026, Martin: "a 10 kW east west system"): about half on the faces looking each
       // way, the first way taking any the second can't hold.
@@ -4691,7 +4597,7 @@ export function RoofDesigner(props: {
       changed();
       const laid = first.length + second.length;
       return {
-        words: `${laid} panels, ${((laid * watts) / 1000).toFixed(2)} kW${laid < n ? ": only that many fit" : ""}: ${first.length} on the ${name(facing)}, ${second.length} on the ${name(also)}. Strings cleared: string them again.${fromHeights ? ` ${fromHeights.words}` : ""}${clear ? ` ${clear}` : ""}`,
+        words: `${laid} panels, ${((laid * watts) / 1000).toFixed(2)} kW${laid < n ? ": only that many fit" : ""}: ${first.length} on the ${name(facing)}, ${second.length} on the ${name(also)}. Strings cleared: string them again.${clear ? ` ${clear}` : ""}`,
         laid,
       };
     }
@@ -4706,27 +4612,12 @@ export function RoofDesigner(props: {
       setStrings([]);
       changed();
       return {
-        words: `${packed.loose.length} panels, ${((packed.loose.length * watts) / 1000).toFixed(2)} kW${packed.loose.length < n ? `: only that many fit` : ""}. Strings cleared: string them again.${fromHeights ? ` ${fromHeights.words}` : ""}${clear ? ` ${clear}` : ""}`,
+        words: `${packed.loose.length} panels, ${((packed.loose.length * watts) / 1000).toFixed(2)} kW${packed.loose.length < n ? `: only that many fit` : ""}. Strings cleared: string them again.${clear ? ` ${clear}` : ""}`,
         laid: packed.loose.length,
       };
     }
     const found = await googleModelInPlace();
-    if ("note" in found) {
-      // On a Nearmap picture, the roof's outline in that capture stands in: laid on when the roof is flat (a flat
-      // roof looks no way, so a direction asked for doesn't narrow it), else put down for its slopes to be traced.
-      const outline = props.nearmapPicture ? await nearmapFace() : null;
-      if (!outline || "note" in outline) return { words: [found.note, outline?.note].filter(Boolean).join(" "), laid: 0 };
-      putOutlineDown(outline.face);
-      if (homePitch !== 0) return { words: outlineNote(false, outline.captured), laid: 0 };
-      const packed = packFaces([outline.face], size, n, () => newId("p"), avoid);
-      setFaces((list) => list.map((fc) => (fc.id === outline.face.id ? (packed.faces[0] ?? fc) : fc)));
-      setLoose(packed.loose);
-      setStrings([]);
-      return {
-        words: `${outlineNote(true, outline.captured, packed.loose.length)} That's ${((packed.loose.length * watts) / 1000).toFixed(2)} kW${packed.loose.length < n ? ": only that many fit" : ""}.`,
-        laid: packed.loose.length,
-      };
-    }
+    if ("note" in found) return { words: `${found.note} Trace the roof's faces (T), then ask again.`, laid: 0 };
     let laid = suggestPanels(found.model, spot, n, size, () => newId("p"), found.offset, avoid);
     if (facing) laid = laid.filter((p) => facesWay(facing, panelFacing(p)));
     if (!laid.length) return { words: "Nothing fits that way round on Google's roof data: trace the roof faces and ask again.", laid: 0 };
@@ -4895,39 +4786,6 @@ export function RoofDesigner(props: {
     }
     return `${said} ${(await fillTo(last.kw, last.facing, last.also)).words}`;
   };
-  /**
-   * The roof's faces read again from Nearmap's heights in place of those on the design (9 Nov 2026, Martin: faces kept
-   * from an older reading at 29 Shearer Drive were wrong, and only an empty roof was ever read), then what was last
-   * laid by rule laid again on them.
-   */
-  const readRoofAgain = async (): Promise<string> => {
-    if (!props.nearmapPicture) return "Only a Nearmap picture has the heights to read the roof from: switch to Nearmap, then ask again.";
-    const read = await nearmapRoofFaces();
-    if (!read) return "Nearmap's heights didn't show this roof's faces: trace them by hand.";
-    const last = lastLay.current;
-    if (last?.kind === "fill") return `${read.words} ${(await fillTo(last.kw, last.facing, last.also)).words}`;
-    if (last?.kind === "mine") {
-      await designForMe(false, last.goal);
-      return read.words;
-    }
-    setLoose([]);
-    setStrings([]);
-    return `${read.words} Ask for a size, or Design it for me, to lay panels on them.`;
-  };
-  /** The button's answer, shown as Sol's (busy, then what he did). */
-  const answerReadRoof = async () => {
-    if (commandBusy) return;
-    setCommandBusy(true);
-    setAsked("Read the roof again.");
-    setCommandReply(null);
-    setSystemWords("");
-    try {
-      setCommandReply(await readRoofAgain());
-    } finally {
-      setCommandBusy(false);
-      setAsked(null);
-    }
-  };
   /** The split chip's answer: the panels shared across two faces, or back on one, laid again by Design it for me. */
   const answerSplit = async (on: boolean) => {
     if (commandBusy) return;
@@ -4964,8 +4822,6 @@ export function RoofDesigner(props: {
   };
   const runCommand = async (command: DesignCommand): Promise<string> => {
     switch (command.do) {
-      case "readRoof":
-        return readRoofAgain();
       case "replaceExisting":
         return existingPanels(true);
       case "keepExisting":
@@ -5651,7 +5507,7 @@ export function RoofDesigner(props: {
               >
                 <p className="font-medium">Reset to default and start again?</p>
                 <p className="mt-1 text-white/70">
-                  Design {active + 1}&apos;s panels, inverter, battery and strings are taken off. The roof&apos;s confirmed faces stay.
+                  Design {active + 1}&apos;s panels, inverter, battery and strings are taken off. The roof faces you traced stay.
                 </p>
                 <div className="mt-2.5 flex gap-1.5">
                   <button
@@ -6627,16 +6483,6 @@ export function RoofDesigner(props: {
                             className="mr-1.5 mt-2 rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
                           >
                             {splitting ? "Keep them on one face" : `Split some to the ${splitOffer}?`}
-                          </button>
-                        )}
-                        {props.nearmapPicture && faces.length > 0 && (
-                          <button
-                            type="button"
-                            disabled={commandBusy}
-                            onClick={() => void answerReadRoof()}
-                            className="ml-1.5 mt-2 rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
-                          >
-                            Faces look wrong? Read the roof again
                           </button>
                         )}
                       </div>
@@ -8078,20 +7924,6 @@ export function RoofDesigner(props: {
                           </button>
                         ));
                       })}
-                    {/* On a Nearmap picture: the roof's outline in that capture, put down as a face to check. */}
-                    {props.nearmapPicture && (
-                      <>
-                        <div className="mx-2 my-1 h-px bg-line" aria-hidden />
-                        <button
-                          role="menuitem"
-                          onClick={() => void outlineFromNearmap()}
-                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left hover:bg-canvas"
-                        >
-                          <PenTool className="size-4 shrink-0" aria-hidden />
-                          Roof outline from Nearmap
-                        </button>
-                      </>
-                    )}
                   </div>
                 </>
               )}
@@ -9692,38 +9524,6 @@ export function RoofDesigner(props: {
                     setTrayPreview(null);
                   }}
                 />
-              )}
-              {roofToConfirm && !tray && faces.length > 0 && (
-                <div className="absolute left-1/2 top-[4.75rem] z-30 w-[min(30rem,calc(100%-2rem))] -translate-x-1/2 rounded-2xl bg-primary/90 px-4 py-3 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md">
-                  <p className="font-medium">Is this the roof?</p>
-                  <p className="mt-0.5 text-white/75">
-                    {faces.length} face{faces.length === 1 ? "" : "s"} read from Nearmap&apos;s heights. Check each against the photo: tap
-                    one to change its slope or delete it, or trace one that&apos;s missing. Panels go on these faces.
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={confirmRoof}
-                      className="rounded-full bg-sun-line px-3.5 py-1 text-[12.5px] font-medium text-white hover:brightness-110"
-                    >
-                      Looks right
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void nearmapRoofFaces()}
-                      className="rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10"
-                    >
-                      Read it again
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRoofToConfirm(false)}
-                      className="rounded-full px-3 py-1 text-[12.5px] text-white/60 hover:text-white"
-                    >
-                      Later
-                    </button>
-                  </div>
-                </div>
               )}
               {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its
                   circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}

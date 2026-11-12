@@ -64,3 +64,28 @@ export function trayWords(blocks: readonly PanelBlock[], watts: number): string 
   const kw = Math.round((n * watts) / 10) / 100;
   return `${n} panel${n === 1 ? "" : "s"} to place (${kw} kW)`;
 }
+
+/**
+ * A block laid where it was tapped when no traced face is there (12 Nov 2026, Martin: the roof faces read by
+ * themselves kept failing, so they're gone): portrait rows square to the picture, centred on the tap, the
+ * fuller rows first and a shorter one last, for the designer to move and turn into place. Centres in metres.
+ */
+export function blockPlaces(
+  at: { x: number; y: number },
+  count: number,
+  size: { long: number; short: number; gap: number },
+  tilt: number,
+): { x: number; y: number }[] {
+  const n = Math.max(0, Math.round(count));
+  if (!n) return [];
+  const rows = Math.max(1, Math.round(Math.sqrt(n / 2)));
+  const cols = Math.ceil(n / rows);
+  const w = size.short + size.gap;
+  const h = size.long * Math.cos((tilt * Math.PI) / 180) + size.gap;
+  const out: { x: number; y: number }[] = [];
+  for (let r = 0; r < rows && out.length < n; r++) {
+    const inRow = Math.min(cols, n - out.length);
+    for (let c = 0; c < inRow; c++) out.push({ x: at.x + (c - (inRow - 1) / 2) * w, y: at.y + (r - (rows - 1) / 2) * h });
+  }
+  return out;
+}

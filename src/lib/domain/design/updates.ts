@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-12",
+    area: "Designer",
+    words:
+      "Roof faces are no longer read by themselves: trace them by hand. A block of panels tapped anywhere is laid there to move into place.",
+  },
+  {
+    day: "2026-11-12",
     area: "Calls",
     words: "Pick your phone assistant's voice in Settings, an Australian one included, and ring your own mobile to hear it.",
   },
