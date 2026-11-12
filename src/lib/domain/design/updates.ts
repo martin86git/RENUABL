@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-12",
+    area: "Team chat",
+    words: "Drag team chat's window from its left edge, foot or corner, and its list of conversations from its edge, so long names show.",
+  },
+  {
+    day: "2026-11-12",
+    area: "Deals",
+    words: "Sol's design requests are short now: \"Call with Michelle complete. Design required.\" What they said is behind Why.",
+  },
+  {
+    day: "2026-11-12",
     area: "Calls",
     words: "Hand a call to your phone assistant from Call and watch it: its face, how long the call has run and what's said, live.",
   },

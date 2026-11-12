@@ -12,6 +12,7 @@ import {
   PAD_LINES,
   SOL_WRITER,
   askFollowers,
+  askWords,
   cleanAsk,
   dealChatOrder,
   designAskFor,
@@ -260,7 +261,14 @@ export async function markDealSeen(me: DealTeamMe, jobId: string): Promise<void>
  */
 export async function dealChats(me: DealTeamMe): Promise<{ deals: DealChatLine[]; unread: number }> {
   const self = me.email.toLowerCase();
-  const rows = await query<{ job: string; by: string | null; text: string | null; at: string | null; unread: number }>(
+  const rows = await query<{
+    job: string;
+    by: string | null;
+    text: string | null;
+    ask: DealLine["ask"] | null;
+    at: string | null;
+    unread: number;
+  }>(
     `with mine as (
        select j.id from design_jobs j
          left join design_deal_follows f on f.business_id = j.business_id and f.job_id = j.id and f.email = $2
@@ -269,13 +277,13 @@ export async function dealChats(me: DealTeamMe): Promise<{ deals: DealChatLine[]
                or (f.following is null and lower(coalesce(j.owner_email, '')) = $2
                    and exists (select 1 from design_deal_lines l where l.business_id = j.business_id and l.job_id = j.id)))
      )
-     select m.id as job, last.by_email as by, last.text, ${moment("last.at")} as at,
+     select m.id as job, last.by_email as by, last.text, last.ask, ${moment("last.at")} as at,
             (select count(*)::int from design_deal_lines l
                left join design_deal_seen s on s.business_id = l.business_id and s.job_id = l.job_id and s.email = $2
               where l.business_id = $1 and l.job_id = m.id and l.by_email <> $2
                 and l.at > coalesce(s.seen_at, now() - interval '1 day')) as unread
        from mine m
-       left join lateral (select by_email, text, at from design_deal_lines l
+       left join lateral (select by_email, text, ask, at from design_deal_lines l
                             where l.business_id = $1 and l.job_id = m.id order by at desc, id desc limit 1) last on true`,
     [me.businessId, self],
   );
@@ -290,7 +298,17 @@ export async function dealChats(me: DealTeamMe): Promise<{ deals: DealChatLine[]
           jobId: r.job,
           customer: j.customerName,
           title: j.title,
-          last: r.by && r.at ? { by: r.by, text: (r.text ?? "").replace(/\s+/g, " ").slice(0, 160), at: r.at } : null,
+          // A request reads as its short words (askWords), as the card shows it.
+          last:
+            r.by && r.at
+              ? {
+                  by: r.by,
+                  text: askWords({ text: r.text ?? "", ask: r.ask ?? undefined })
+                    .replace(/\s+/g, " ")
+                    .slice(0, 160),
+                  at: r.at,
+                }
+              : null,
           unread: r.unread,
         };
       }),
@@ -426,11 +444,7 @@ export async function solAsksForDesigns(businessId: string, force = false, now =
         .filter((r) => r.job === j.id)
         .map((r) => ({ from: r.kind === "call" ? ("call" as const) : ("note" as const), text: r.text, at: r.at })),
     ];
-    const asked = designAskFor(
-      { stage: j.stage, projectId: null, kw: null, customerFirst: j.first || j.name.split(/\s+/)[0] || "" },
-      said,
-      now,
-    );
+    const asked = designAskFor({ stage: j.stage, projectId: null, kw: null, customerFirst: j.first || j.name.split(/\s+/)[0] || "" }, said);
     if (!asked) continue;
     if (await solPostsOnDeal(businessId, j.id, { kind: "ask", text: asked.text, ask: asked.ask })) written += 1;
   }

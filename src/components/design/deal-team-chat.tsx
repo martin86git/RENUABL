@@ -7,6 +7,7 @@ import { Bell, Check, PencilRuler, RotateCcw, SendHorizonal } from "lucide-react
 import {
   ASK_TYPES,
   DEAL_TEAM_POLL_MS,
+  askWords,
   SOL_WRITER,
   briefHref,
   saidWhen,
@@ -242,6 +243,8 @@ function AskCard(props: { line: DealLine; jobId: string; pad?: boolean; onSettle
   const ask = l.ask!;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  // What it rests on is a press away (12 Nov 2026, Martin: "its too much. just ask for whats needed").
+  const [showWhy, setShowWhy] = useState(false);
   const type = ASK_TYPES[ask.type];
   const done = ask.done;
   const settle = async (to: boolean) => {
@@ -265,11 +268,10 @@ function AskCard(props: { line: DealLine; jobId: string; pad?: boolean; onSettle
         </span>
         <span className="ml-auto text-[11px] text-muted">{agoWords(l.at)}</span>
       </p>
-      <p className={clsx("mt-1.5 text-ink", done && "text-ink-2", pad && !done && "line-clamp-4")}>{l.text}</p>
-      {!pad && ask.why.length > 0 && (
-        <div className="mt-2.5">
-          <p className="text-[11.5px] font-medium uppercase tracking-wide text-muted">What it rests on</p>
-          <ul className="mt-1 space-y-1.5">
+      <p className={clsx("mt-1.5 font-medium text-ink", done && "font-normal text-ink-2", pad && !done && "line-clamp-2")}>{askWords(l)}</p>
+      {!pad && ask.why.length > 0 && showWhy && (
+        <div className="mt-2">
+          <ul className="space-y-1.5">
             {ask.why.map((q, i) => (
               <li key={i} className="border-l-2 border-sun-line/60 pl-2.5 text-ink-2">
                 &ldquo;{q.text}&rdquo;{" "}
@@ -316,6 +318,16 @@ function AskCard(props: { line: DealLine; jobId: string; pad?: boolean; onSettle
               <Check className="size-3.5" /> Mark done
             </button>
           </>
+        )}
+        {!pad && ask.why.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowWhy((w) => !w)}
+            aria-expanded={showWhy}
+            className="ml-auto text-[12px] font-medium text-ink-2 hover:text-ink"
+          >
+            {showWhy ? "Hide why" : "Why"}
+          </button>
         )}
       </div>
     </li>

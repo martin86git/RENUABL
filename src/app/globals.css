@@ -783,3 +783,12 @@ body:has(.theme-installer) {
     animation: none;
   }
 }
+
+/* While team chat's window or its list is being resized (team-chat.tsx, Grip), nothing is picked and nothing eases. */
+html.team-resizing,
+html.team-resizing * {
+  user-select: none;
+}
+html.team-resizing .team-pop {
+  transition: none;
+}

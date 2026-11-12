@@ -9,6 +9,7 @@ import {
   dealChatOrder,
   dealRoom,
   dealUnread,
+  askWords,
   designAskFor,
   isFollowing,
   jobOfRoom,
@@ -37,30 +38,41 @@ describe("the design request", () => {
   const lead = { stage: "lead", projectId: null, kw: null, customerFirst: "Tom" };
 
   it("asks for a design from what the customer said, quoting them with where and when", () => {
-    const got = designAskFor(
-      lead,
-      [{ from: "note", text: "Enquiry from the website: bill about $480 a quarter, wants a battery for the evenings.", at: ago(0.1) }],
-      now,
-    );
+    const got = designAskFor(lead, [
+      { from: "note", text: "Enquiry from the website: bill about $480 a quarter, wants a battery for the evenings.", at: ago(0.1) },
+    ]);
     expect(got?.ask.type).toBe("design");
-    expect(got?.text).toContain("I need a design for Tom");
-    expect(got?.text).toContain('"Enquiry from the website: bill about $480 a quarter');
-    expect(got?.text).toContain("on the deal's notes, today");
+    // Only what happened and what is needed; the words it rests on stay on the request.
+    expect(got?.text).toBe("Tom's enquiry is in. Design required.");
+    expect(got?.ask.why[0].text).toContain("Enquiry from the website: bill about $480 a quarter");
     expect(got?.ask.why[0].where).toBe("on the deal's notes");
-    expect(got?.text).toContain("Our notes say");
-    expect(designAskFor(lead, [{ from: "chat", text: "Could we get a battery?", at: ago(1) }], now)?.text).toContain(
-      'Tom wrote: "Could we get a battery?" (in the proposal chat, today)',
+    expect(designAskFor(lead, [{ from: "chat", text: "Could we get a battery?", at: ago(1) }])?.text).toBe(
+      "Tom wrote in. Design required.",
     );
+    expect(designAskFor(lead, [{ from: "call", text: "Wants a battery for the evenings.", at: ago(1) }])?.text).toBe(
+      "Call with Tom complete. Design required.",
+    );
+  });
+
+  it("reads a request kept in full before as the short one", () => {
+    const why = [{ text: "New lead from Quick quote…", where: "on the deal's notes", at: ago(1) }];
+    expect(
+      askWords({
+        text: 'I need a design for Michelle. Our notes say: "New lead from Quick quote…"',
+        ask: { type: "design", want: "", why },
+      }),
+    ).toBe("Michelle's enquiry is in. Design required.");
+    expect(askWords({ text: "A note.", ask: undefined })).toBe("A note.");
   });
 
   it("doesn't ask once there is a design, past designed, or with nothing to build on", () => {
     const said = [{ from: "chat" as const, text: "We'd like a battery", at: ago(2) }];
-    expect(designAskFor({ ...lead, projectId: "prj_1" }, said, now)).toBeNull();
-    expect(designAskFor({ ...lead, kw: 6.6 }, said, now)).toBeNull();
-    expect(designAskFor({ ...lead, stage: "proposal" }, said, now)).toBeNull();
-    expect(designAskFor({ ...lead, stage: "designed" }, said, now)).toBeNull();
-    expect(designAskFor(lead, [{ from: "call", text: "Left a voicemail. Will try again tomorrow.", at: ago(1) }], now)).toBeNull();
-    expect(designAskFor(lead, [], now)).toBeNull();
+    expect(designAskFor({ ...lead, projectId: "prj_1" }, said)).toBeNull();
+    expect(designAskFor({ ...lead, kw: 6.6 }, said)).toBeNull();
+    expect(designAskFor({ ...lead, stage: "proposal" }, said)).toBeNull();
+    expect(designAskFor({ ...lead, stage: "designed" }, said)).toBeNull();
+    expect(designAskFor(lead, [{ from: "call", text: "Left a voicemail. Will try again tomorrow.", at: ago(1) }])).toBeNull();
+    expect(designAskFor(lead, [])).toBeNull();
   });
 
   it("puts the customer's own chat lines first, then the latest notes, at most three", () => {

@@ -156,7 +156,6 @@ export function wantsFrom(said: readonly SaidSomewhere[]): AskQuote[] {
 export function designAskFor(
   deal: { stage: string; projectId: string | null; kw: number | null; customerFirst: string },
   said: readonly SaidSomewhere[],
-  now = new Date(),
 ): { text: string; ask: DealAsk } | null {
   // Only a lead: a deal moved to Designed has a design somewhere, even when it isn't linked to a roof here.
   if (deal.stage !== "lead") return null;
@@ -165,13 +164,30 @@ export function designAskFor(
   if (!why.length) return null;
   const name = deal.customerFirst || "the customer";
   const want = `A roof design for ${name}, built round what they've told us.`;
-  const said1 = why[0];
-  // Their own words when they wrote them; else what we noted from them, said as such.
-  const lead = said1.where === WHERE.chat ? `${name} wrote` : "Our notes say";
-  const text =
-    `I need a design for ${name}. ${lead}: "${said1.text}" (${said1.where}, ${saidWhen(said1.at, now)}).` +
-    (why.length > 1 ? ` There's more in the brief.` : "");
-  return { text, ask: { type: "design", want, why } };
+  // Only what happened and what is needed (12 Nov 2026, Martin: "its too much. just ask for whats needed"); the words it
+  // rests on stay on the request, a press away.
+  return { text: designAskText(name, why[0].where), ask: { type: "design", want, why } };
+}
+
+const OPENERS: Record<string, (name: string) => string> = {
+  [WHERE.call]: (n) => `Call with ${n} complete.`,
+  [WHERE.chat]: (n) => `${n} wrote in.`,
+  [WHERE.note]: (n) => `${n}'s enquiry is in.`,
+};
+
+/** A design request in two short sentences: what happened, then "Design required." */
+export function designAskText(name: string, where: string): string {
+  return `${(OPENERS[where] ?? ((n: string) => `${n}'s enquiry is in.`))(name)} Design required.`;
+}
+
+/**
+ * What a request reads as. A design request kept before 12 Nov 2026 carried the customer's words in full ("I need a
+ * design for Tom. Our notes say: …"); it is read as the short one, from the same quote.
+ */
+export function askWords(line: Pick<DealLine, "text" | "ask">): string {
+  const old = /^I need a design for ([^.]+)./.exec(line.text);
+  if (line.ask?.type !== "design" || !old) return line.text;
+  return designAskText(old[1], line.ask.why[0]?.where ?? WHERE.note);
 }
 
 /** A request's brief as the designer shows it: what he wants, then each quote with where and when. */

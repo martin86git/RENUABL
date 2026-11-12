@@ -16,6 +16,7 @@ import {
   type ChatAction,
 } from "@/lib/domain/design/sol-chat-work";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { TEAM_LIST, readWindowSize, teamListWidth, teamWindowSize } from "@/lib/domain/design/team-window";
 import { matches } from "@/lib/domain/design/find";
 import { handleOf } from "@/lib/domain/design/mentions";
 import {
@@ -114,6 +115,24 @@ export function TeamChatPanel({
   });
   const [view, setView] = useState<TeamRoomView | null>(null);
   const [error, setError] = useState("");
+  // The list down the left is dragged wider or narrower by its edge (12 Nov 2026, Martin: the deals' names were cut off).
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [listW, setListW] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem(LIST_KEY)) || TEAM_LIST.width;
+    } catch {
+      return TEAM_LIST.width;
+    }
+  });
+  const keepListW = (w: number) => {
+    const sized = teamListWidth(w, panelRef.current?.clientWidth ?? 800);
+    setListW(sized);
+    try {
+      localStorage.setItem(LIST_KEY, String(sized));
+    } catch {
+      // Private window: it resets next time.
+    }
+  };
   // Only a retailer has Sol (installers and inspectors join without him), so only a retailer's members talk to him here.
   const [account] = useDesignAccount();
   const hasSol = cleanKind(account?.signedIn ? account.business?.kind : undefined) === "retailer";
@@ -366,8 +385,21 @@ export function TeamChatPanel({
       </div>
     );
   return (
-    <div className="flex h-full min-h-0 bg-surface text-ink">
-      <nav aria-label="Conversations" className="flex w-44 shrink-0 flex-col border-r border-line bg-canvas/60 sm:w-48">
+    <div ref={panelRef} className="flex h-full min-h-0 bg-surface text-ink">
+      <nav
+        aria-label="Conversations"
+        style={{ width: listW }}
+        className="relative flex shrink-0 flex-col border-r border-line bg-canvas/60"
+      >
+        <Grip
+          label="Drag to make the list wider or narrower"
+          className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize"
+          onDrag={(dx, _dy, start) => keepListW(start.width + dx)}
+          start={() => ({ width: listW, height: 0 })}
+          onReset={() => keepListW(TEAM_LIST.width)}
+          keys={(k) => (k === "ArrowLeft" ? keepListW(listW - 16) : k === "ArrowRight" ? keepListW(listW + 16) : undefined)}
+          orientation="vertical"
+        />
         <div className="px-2 pt-2">{sides}</div>
         <DealChatsList
           deals={view?.dealChats ?? []}
@@ -1106,7 +1138,7 @@ function RoomButton(props: { on: boolean; unread: number; onClick: () => void; t
       title={props.title}
       aria-current={props.on ? "true" : undefined}
       className={clsx(
-        "mx-1.5 flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm",
+        "mx-1.5 flex w-[calc(100%-0.75rem)] min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm",
         props.on
           ? "bg-surface font-medium text-ink shadow-[0_1px_3px_rgba(11,11,12,0.1)]"
           : props.unread
@@ -1262,7 +1294,7 @@ function DealChatsList(props: {
           {words && props.jobs && !found.length && <p className="px-1 pt-1 text-[11px] text-muted">No deal by that name.</p>}
         </div>
       )}
-      <div className="staff-scroll max-h-56 overflow-y-auto">
+      <div className="staff-scroll max-h-56 overflow-y-auto overflow-x-hidden">
         {props.deals.length === 0 && !finding && (
           <p className="px-3 pt-1 text-[11.5px] leading-snug text-muted">
             Deal chats you take part in show here. Press # to open one by its name.
@@ -1276,7 +1308,7 @@ function DealChatsList(props: {
             onClick={() => props.onPick(d.jobId)}
             title={d.last ? `${writerName(d.last.by)}: ${d.last.text}` : undefined}
           >
-            <span className="min-w-0">
+            <span className="min-w-0 flex-1">
               <span className="block truncate">{d.customer}</span>
               <span className="block truncate text-[11px] font-normal text-muted">
                 {d.last ? `${writerName(d.last.by)}: ${d.last.text}` : d.title}
@@ -1348,6 +1380,32 @@ export function TeamChatButton({ me, customers = 0 }: { me: string; customers?: 
   const unread = useTeamUnread() + customers;
   const [open, setOpen] = useState(false);
   const [start, setStart] = useState<string | null>(null);
+  // The window is resized from its left edge, its foot or the corner between them (12 Nov 2026, Martin).
+  const [size, setSize] = useState(() => {
+    try {
+      return readWindowSize(localStorage.getItem(WINDOW_KEY));
+    } catch {
+      return null;
+    }
+  });
+  const fitted = typeof window === "undefined" ? null : teamWindowSize(size, screenRoom());
+  const keepSize = (next: { width: number; height: number }) => {
+    const sized = teamWindowSize(next, screenRoom());
+    setSize(sized);
+    try {
+      localStorage.setItem(WINDOW_KEY, JSON.stringify(sized));
+    } catch {
+      // Private window: it resets next time.
+    }
+  };
+  const resetSize = () => {
+    setSize(null);
+    try {
+      localStorage.removeItem(WINDOW_KEY);
+    } catch {
+      // Nothing kept.
+    }
+  };
   useEffect(() => {
     const openOn = (e: Event) => {
       setStart((e as CustomEvent<string | undefined>).detail ?? null);
@@ -1395,8 +1453,55 @@ export function TeamChatButton({ me, customers = 0 }: { me: string; customers?: 
       {/* On the page itself, not inside the rail: the rail is moved by a transform, which would carry it along. */}
       {open &&
         createPortal(
-          <div className="theme-studio team-pop fixed right-20 top-1/2 z-[52] h-[min(48rem,90dvh)] w-[min(50rem,calc(100vw-7rem))] -translate-y-1/2 overflow-hidden rounded-3xl bg-surface shadow-[0_12px_40px_rgba(20,22,26,0.16)] ring-1 ring-line">
+          <div
+            style={fitted ? { width: fitted.width, height: fitted.height } : undefined}
+            className="theme-studio team-pop fixed right-20 top-1/2 z-[52] h-[min(48rem,90dvh)] w-[min(50rem,calc(100vw-7rem))] -translate-y-1/2 overflow-hidden rounded-3xl bg-surface shadow-[0_12px_40px_rgba(20,22,26,0.16)] ring-1 ring-line"
+          >
             <TeamChatPanel key={start ?? "last"} me={me} start={start} customers={customers} onClose={() => setOpen(false)} />
+            {fitted && (
+              <>
+                {/* The window stays against the rail on its right and centred top to bottom: its left edge sets the
+                    width, its foot the height (growing both ways, so the foot follows the pointer). */}
+                <Grip
+                  label="Drag to make team chat wider or narrower"
+                  className="absolute left-0 top-6 z-20 h-[calc(100%-3rem)] w-2 cursor-ew-resize"
+                  start={() => fitted}
+                  onDrag={(dx, _dy, s) => keepSize({ width: s.width - dx, height: s.height })}
+                  onReset={resetSize}
+                  keys={(k) =>
+                    k === "ArrowLeft"
+                      ? keepSize({ ...fitted, width: fitted.width + 32 })
+                      : k === "ArrowRight"
+                        ? keepSize({ ...fitted, width: fitted.width - 32 })
+                        : undefined
+                  }
+                  orientation="vertical"
+                />
+                <Grip
+                  label="Drag to make team chat taller or shorter"
+                  className="absolute bottom-0 left-6 z-20 h-2 w-[calc(100%-3rem)] cursor-ns-resize"
+                  start={() => fitted}
+                  onDrag={(_dx, dy, s) => keepSize({ width: s.width, height: s.height + dy * 2 })}
+                  onReset={resetSize}
+                  keys={(k) =>
+                    k === "ArrowUp"
+                      ? keepSize({ ...fitted, height: fitted.height - 32 })
+                      : k === "ArrowDown"
+                        ? keepSize({ ...fitted, height: fitted.height + 32 })
+                        : undefined
+                  }
+                  orientation="horizontal"
+                />
+                <Grip
+                  label="Drag to resize team chat"
+                  className="absolute bottom-0 left-0 z-30 size-5 cursor-nesw-resize"
+                  start={() => fitted}
+                  onDrag={(dx, dy, s) => keepSize({ width: s.width - dx, height: s.height + dy * 2 })}
+                  onReset={resetSize}
+                  corner
+                />
+              </>
+            )}
           </div>,
           document.body,
         )}
@@ -1447,6 +1552,80 @@ export function TeamChatPage() {
   return (
     <div className="h-[calc(100dvh-12rem)] min-h-[28rem] overflow-hidden rounded-2xl ring-1 ring-line">
       <TeamChatPanel me={account.email} />
+    </div>
+  );
+}
+
+const LIST_KEY = "renuabl.design.team-list-w";
+const WINDOW_KEY = "renuabl.design.team-window";
+
+/** The screen's room for the window: the whole window, less Sol's panel while it is docked beside the page. */
+function screenRoom(): { width: number; height: number } {
+  const docked = document.documentElement.classList.contains("sol-docked");
+  const sol = docked ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sol-w")) || 0 : 0;
+  return { width: window.innerWidth - sol, height: window.innerHeight };
+}
+
+/**
+ * An edge or corner dragged to resize (12 Nov 2026, Martin). It reports how far the pointer has moved since the press,
+ * with the size it started from; a double click puts it back as it was; the arrow keys step it when it has focus.
+ */
+function Grip(props: {
+  label: string;
+  className: string;
+  start: () => { width: number; height: number };
+  onDrag: (dx: number, dy: number, start: { width: number; height: number }) => void;
+  onReset: () => void;
+  keys?: (key: string) => void;
+  orientation?: "vertical" | "horizontal";
+  corner?: boolean;
+}) {
+  const down = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const from = { x: e.clientX, y: e.clientY };
+    const size = props.start();
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    document.documentElement.classList.add("team-resizing");
+    const move = (m: PointerEvent) => props.onDrag(m.clientX - from.x, m.clientY - from.y, size);
+    const up = () => {
+      document.documentElement.classList.remove("team-resizing");
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+  };
+  return (
+    <div
+      role={props.corner ? undefined : "separator"}
+      aria-orientation={props.corner ? undefined : props.orientation}
+      aria-label={props.label}
+      title={`${props.label} (double-click to reset)`}
+      tabIndex={props.corner ? -1 : 0}
+      onPointerDown={down}
+      onDoubleClick={props.onReset}
+      onKeyDown={(e) => {
+        if (!props.keys || !e.key.startsWith("Arrow")) return;
+        e.preventDefault();
+        props.keys(e.key);
+      }}
+      className={clsx("group touch-none select-none focus:outline-none", props.className)}
+    >
+      <span
+        aria-hidden
+        className={clsx(
+          "pointer-events-none absolute rounded-full bg-sun-line opacity-0 transition-opacity group-hover:opacity-60 group-focus-visible:opacity-80",
+          props.corner
+            ? "bottom-1.5 left-1.5 size-2"
+            : props.orientation === "horizontal"
+              ? "inset-x-0 bottom-0.5 h-0.5"
+              : "inset-y-0 left-1/2 w-0.5 -translate-x-1/2",
+        )}
+      />
     </div>
   );
 }
