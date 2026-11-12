@@ -111,3 +111,37 @@ describe("faceAt: the face under a tap", () => {
     expect(Math.min(...f.points.map((p) => p.x))).toBeGreaterThan(-3);
   });
 });
+
+describe("faceAt on a hip line (12 Nov 2026: taps there grew a zigzag sliver along the hip)", () => {
+  const t = terrainOf(hip);
+  it("gives a whole face, never a strip along the hip", () => {
+    // On the hip between the north and east faces.
+    const f = faceAt(t, { x: 3.6, y: -2.1 })!;
+    expect(f.areaM2).toBeGreaterThan(12);
+    const near = [0, 90].some((w) => bearingGap(f.aspect.azimuth, w) < 3);
+    expect(near).toBe(true);
+  });
+  it("stays inside the home's outline when it is given", () => {
+    const f = faceAt(t, { x: 0, y: -2.5 }, [], outline)!;
+    for (const p of f.points) expect(Math.abs(p.y)).toBeLessThanOrEqual(4.01);
+  });
+});
+
+describe("no face is a sliver or lies over another", () => {
+  it("leaves no strip narrower than a panel along a hip", () => {
+    // Tiles rough enough to read a band along each hip as its own slope.
+    const rough = (x: number, y: number) => hip(x, y) + 0.03 * Math.sin(x * 9) * Math.cos(y * 7);
+    for (const f of facesFromHeights(outline, terrainOf(rough))) expect(f.areaM2).toBeGreaterThan(4);
+  });
+  it("draws the four faces of a hip apart", () => {
+    const found = facesFromHeights(outline, terrainOf(hip));
+    // Points well inside each face are inside that face only.
+    for (const p of [
+      { x: 0, y: -3 },
+      { x: 0, y: 3 },
+      { x: -5, y: 0 },
+      { x: 5, y: 0 },
+    ])
+      expect(found.filter((f) => inside(p, f.points))).toHaveLength(1);
+  });
+});

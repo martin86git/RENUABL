@@ -55,10 +55,18 @@ export const ROOF_FACES = {
   enclosedMax: 12,
   /** ...with at least this share of its edge against one other face, is part of that face (existing panels read as a slope of their own). */
   enclosedShare: 0.7,
+  /** ...or any size, sloping within this of it (a rise per metre, either way). */
+  enclosedSlope: 0.15,
+  /** A face with little of it this wide or more is a sliver (along a hip), not a face, metres... */
+  sliverWidth: 1.25,
+  /** ...that is, with less than this share of its cells that wide round. */
+  sliverCore: 0.2,
   /** A face cut from the outline is kept this far past the hull of its cells, metres... */
   hullReach: 0.4,
   /** ...and used only when its area is within this share of its cells' (low, high). */
   cutAgree: [0.8, 1.3],
+  /** ...and when it takes in no more than this share (of its own cells) of another face's cells. */
+  cutForeign: 0.05,
 } as const;
 
 /** One face found: its outline (metres east and south of the picture's middle), slope and size from above. */
@@ -67,6 +75,8 @@ export interface FoundFace {
   aspect: FaceAspect;
   /** Square metres, seen from above. */
   areaM2: number;
+  /** Its plane, height = a·x + b·y + c (metres, as the outline): which face a point is on, where outlines overlap. */
+  plane?: { a: number; b: number; c: number };
 }
 
 const turn360 = (d: number) => ((d % 360) + 360) % 360;
@@ -517,8 +527,10 @@ export function facesFromHeights(
 
   // A small face set inside another is part of it (10 Nov 2026, Martin: at 29 Shearer Drive the existing panels on the
   // west face, lying a few degrees flatter than the tiles, were read as a face of their own inside it).
-  for (const [, set] of [...final].sort((p, q) => p[1].size - q[1].size)) {
-    if (!set.size || set.size * cellArea >= ROOF_FACES.enclosedMax) continue;
+  // Any size when it slopes nearly as the face round it does (12 Nov 2026: a patch of 29 Shearer Drive's east face,
+  // read a touch steeper, was left as a face of its own in the middle of it).
+  for (const [g, set] of [...final].sort((p, q) => p[1].size - q[1].size)) {
+    if (!set.size) continue;
     const round = new Map<number, number>();
     let edge = 0;
     for (const i of set)
@@ -532,9 +544,60 @@ export function facesFromHeights(
     let most = 0;
     for (const [h, n] of round) if (n > most) [into, most] = [h, n];
     if (into < 0 || most / edge < ROOF_FACES.enclosedShare) continue;
+    const [mine, theirs] = [planes.get(g), planes.get(into)];
+    const alike =
+      mine && theirs && Math.abs(mine.a - theirs.a) <= ROOF_FACES.enclosedSlope && Math.abs(mine.b - theirs.b) <= ROOF_FACES.enclosedSlope;
+    if (set.size * cellArea >= ROOF_FACES.enclosedMax && !alike) continue;
     for (const i of set) {
       label.set(i, into);
       final.get(into)!.add(i);
+    }
+    set.clear();
+  }
+
+  // A sliver is no face (12 Nov 2026, Martin: "the roof tracings are so inaccurate that they are a bug"): a strip read
+  // along a hip, where the heights are half one plane and half the other, too narrow for a panel. Its cells go to the
+  // face beside it whose plane they sit on, so the hip comes out as one clean line between two faces.
+  const thin = ROOF_FACES.sliverWidth / 2 / cell;
+  const k = Math.max(1, Math.floor(thin));
+  for (const [g, set] of [...final].sort((p, q) => p[1].size - q[1].size)) {
+    if (!set.size) continue;
+    let core = 0;
+    for (const i of set) {
+      const c = i % cols;
+      const r = Math.floor(i / cols);
+      let whole = true;
+      for (let dr = -k; dr <= k && whole; dr++)
+        for (let dc = -k; dc <= k; dc++)
+          if (!set.has((r + dr) * cols + (c + dc))) {
+            whole = false;
+            break;
+          }
+      if (whole) core++;
+    }
+    if (core * cellArea >= ROOF_FACES.minArea / 2 && core >= set.size * ROOF_FACES.sliverCore) continue;
+    for (const i of set) {
+      const c = i % cols;
+      const r = Math.floor(i / cols);
+      let best = -1;
+      let bestOff: number = ROOF_FACES.onPlane * 2;
+      const round = new Set<number>();
+      for (let dr = -3; dr <= 3; dr++)
+        for (let dc = -3; dc <= 3; dc++) {
+          const h = label.get((r + dr) * cols + (c + dc));
+          if (h !== undefined && h !== g && final.get(h)!.size) round.add(h);
+        }
+      for (const h of round) {
+        const f = planes.get(h)!;
+        const off = Math.abs(t.heights[i] - (f.a * xOf(c) + f.b * yOf(r) + f.c));
+        if (off < bestOff) [best, bestOff] = [h, off];
+      }
+      if (best >= 0) label.set(i, best);
+      else label.delete(i);
+    }
+    for (const i of set) {
+      const h = label.get(i);
+      if (h !== undefined && h !== g) final.get(h)!.add(i);
     }
     set.clear();
   }
@@ -636,13 +699,19 @@ export function facesFromHeights(
     // Better still, the face cut out exactly (10 Nov 2026, Martin: the edges still zigzagged at 29 Shearer Drive): the
     // roof's outline, kept to where this face's cells are, and cut along each seam on the side this face is (where two
     // planes meet is a straight line). Used when it agrees with the cells; else the straightened corners above.
+    // Never over another face: a cut taking in more than a few of another face's cells is set aside.
     const cut = cutFace(g, cells);
-    if (cut) points = cut;
+    if (cut) {
+      let foreign = 0;
+      for (const [i, h] of ownerOf) if (h !== g && inside({ x: xOf(i % cols), y: yOf(Math.floor(i / cols)) }, cut)) foreign++;
+      if (foreign <= cells.size * ROOF_FACES.cutForeign) points = cut;
+    }
     if (points.length < 3) continue;
     out.push({
       points: points.map((p) => ({ x: Math.round(p.x * 100) / 100, y: Math.round(p.y * 100) / 100 })),
       aspect: aspectOf(plane),
       areaM2: Math.round(areaM2 * 10) / 10,
+      plane: { a: plane.a, b: plane.b, c: plane.c },
     });
   }
   return out.sort((a, b) => b.areaM2 - a.areaM2).slice(0, most);
@@ -733,6 +802,12 @@ function straighten(v: Point, seams: { A: number; B: number; C: number }[], outl
 export const TAP_FACE = {
   /** How far from the tap the face may reach, metres. */
   reach: 25,
+  /** The roof read whole this far round the tap (a house is rarely wider), metres. */
+  around: 13,
+  /** A tap this near a face read round it (on its hip or ridge line) is on that face, metres. */
+  nearFace: 1,
+  /** ...and its plane passes within this of the roof's height there (a storey is metres off), metres. */
+  offPlane: 0.7,
   /** The plane is first fitted to the heights within this of the tap, metres. */
   seed: 1,
   /** A tap where that plane fits worse than this (a ridge, a tree, the edge) finds no face, metres. */
@@ -755,7 +830,69 @@ export const TAP_FACE = {
  * on it, fitted again and grown again. Hips, ridges, valleys and the drop at the gutter stop it; places in `skip` (a
  * pergola, a clear roof) are left out. Null when the tap isn't on a roof face.
  */
-export function faceAt(t: Terrain, at: Point, skip: readonly Point[][] = []): FoundFace | null {
+export function faceAt(
+  t: Terrain,
+  at: Point,
+  skip: readonly Point[][] = [],
+  /** The home's roof outline (Nearmap's), when known: the roof is read inside it, so no face reaches past the gutter. */
+  bound?: readonly Point[],
+): FoundFace | null {
+  // The roof round the tap read whole first, and the face the tap is on taken from it (12 Nov 2026, Martin: "the roof
+  // tracings are so inaccurate that they are a bug"): grown on its own, a face crept along a hip where two planes meet
+  // and came out as a zigzag sliver; read with its neighbours, every face stops at its hips and ridges, edges straight.
+  const r = TAP_FACE.around;
+  const box = [
+    { x: at.x - r, y: at.y - r },
+    { x: at.x + r, y: at.y - r },
+    { x: at.x + r, y: at.y + r },
+    { x: at.x - r, y: at.y + r },
+  ];
+  const within = bound && bound.length >= 3 && inside(at, [...bound]) ? [...bound] : box;
+  const read = facesFromHeights(within, t, at, 40, skip).filter((f) => f.aspect.pitch < ROOF_FACES.wall);
+  // Of the faces drawn round the tap, the one whose plane the roof there sits on (a face reaching round another, as
+  // the ground round a house does, can hold the tap in its outline without being under it).
+  // The roof's height at the tap: the middle of the heights within half a metre (tiles and dips make one cell rough).
+  const c = Math.floor((at.x + t.widthM / 2) / t.cell);
+  const row = Math.floor((at.y + t.heightM / 2) / t.cell);
+  const near: number[] = [];
+  const k = Math.max(1, Math.round(0.5 / t.cell));
+  for (let dr = -k; dr <= k; dr++)
+    for (let dc = -k; dc <= k; dc++) {
+      const [cc, rr] = [c + dc, row + dr];
+      if (cc < 0 || rr < 0 || cc >= t.cols || rr >= t.rows) continue;
+      const v = t.heights[rr * t.cols + cc];
+      if (Number.isFinite(v)) near.push(v);
+    }
+  near.sort((p, q) => p - q);
+  const h = near.length ? near[Math.floor(near.length / 2)] : NaN;
+  const off = (f: FoundFace) => (f.plane && Number.isFinite(h) ? Math.abs(h - (f.plane.a * at.x + f.plane.b * at.y + f.plane.c)) : 0);
+  const onIt = (f: FoundFace) => off(f) <= TAP_FACE.offPlane;
+  const holding = read.filter((f) => inside(at, f.points) && onIt(f)).sort((p, q) => off(p) - off(q));
+  const hit = holding[0] ?? nearestWithin(read.filter(onIt), at, TAP_FACE.nearFace);
+  if (hit) return hit;
+  return grownFrom(t, at, skip);
+}
+
+/** The face whose edge is nearest the point, when within `reach` metres (a tap on a hip or ridge line). */
+function nearestWithin(faces: FoundFace[], at: Point, reach: number): FoundFace | null {
+  let best: FoundFace | null = null;
+  let gap = reach;
+  for (const f of faces)
+    for (let i = 0; i < f.points.length; i++) {
+      const a = f.points[i];
+      const b = f.points[(i + 1) % f.points.length];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = dx * dx + dy * dy;
+      const k = len ? Math.max(0, Math.min(1, ((at.x - a.x) * dx + (at.y - a.y) * dy) / len)) : 0;
+      const d = Math.hypot(at.x - (a.x + k * dx), at.y - (a.y + k * dy));
+      if (d < gap) [gap, best] = [d, f];
+    }
+  return best;
+}
+
+/** The face grown from the tap on its own: only when the roof read whole has no face under it. */
+function grownFrom(t: Terrain, at: Point, skip: readonly Point[][]): FoundFace | null {
   const { cols, rows, cell } = t;
   const xOf = (c: number) => -t.widthM / 2 + (c + 0.5) * cell;
   const yOf = (r: number) => -t.heightM / 2 + (r + 0.5) * cell;

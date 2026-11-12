@@ -5,7 +5,10 @@
 import { query } from "./db";
 import { homeOutline } from "@/lib/domain/design/nearmap";
 import type { Point } from "@/lib/domain/design/roof-design";
+import { shiftTerrain } from "@/lib/domain/design/heights-shift";
+import { packTerrain, unpackTerrain } from "@/lib/domain/design/shade";
 import { nearmapHeights, nearmapPicture, nearmapRoofOutlines, nearmapSurveys } from "./nearmap";
+import { heightsShift } from "./nearmap-heights-shift";
 
 /** A roof's place, to six decimals, as its key. */
 export const spotOf = (lat: number, lng: number) => `${lat.toFixed(6)},${lng.toFixed(6)}`;
@@ -142,12 +145,30 @@ export async function roofHeights(
   const imagery = await roofImagery(businessId, place.lat, place.lng);
   if (imagery.use === "google") return "google";
   const spot = spotOf(place.lat, place.lng);
-  const kept = await query<{ terrain: Buffer | null; captured: string | null; layer: string | null; stale: boolean }>(
-    `select terrain, captured, layer, fetched_at < now() - make_interval(days => $2) as stale from nearmap_heights where spot = $1`,
+  const kept = await query<{
+    terrain: Buffer | null;
+    survey: string | null;
+    captured: string | null;
+    layer: string | null;
+    stale: boolean;
+  }>(
+    `select terrain, survey, captured, layer, fetched_at < now() - make_interval(days => $2) as stale from nearmap_heights where spot = $1`,
     [spot, HEIGHTS_RETRY_DAYS],
   );
   const row = kept[0];
-  if (row?.terrain) return { terrain: row.terrain, captured: row.captured, layer: row.layer };
+  // Moved onto the picture in use when that is another flight's (12 Nov 2026, Martin: the faces read from them were
+  // drawn across the roof's real hips and ridges; heights-shift.ts).
+  const onPicture = async (got: { terrain: Buffer; survey: string | null; captured: string | null; layer: string | null }) => {
+    const by =
+      got.survey && got.survey !== imagery.use
+        ? await heightsShift(spot, place, got.survey, imagery.use, () => keptPicture(businessId, place.lat, place.lng, imagery.use)).catch(
+            () => null,
+          )
+        : null;
+    const t = by && (by.x || by.y) ? unpackTerrain(got.terrain) : null;
+    return { terrain: t && by ? Buffer.from(packTerrain(shiftTerrain(t, by))) : got.terrain, captured: got.captured, layer: got.layer };
+  };
+  if (row?.terrain) return onPicture({ terrain: row.terrain, survey: row.survey, captured: row.captured, layer: row.layer });
   if (row && !row.stale) return null;
   const got = await nearmapHeights(place.lat, place.lng);
   await query(
@@ -156,5 +177,5 @@ export async function roofHeights(
        terrain = excluded.terrain, fetched_at = now()`,
     [spot, got?.survey ?? null, got?.captured ?? null, got?.layer ?? null, got?.terrain ?? null],
   );
-  return got ? { terrain: got.terrain, captured: got.captured, layer: got.layer } : null;
+  return got ? onPicture(got) : null;
 }

@@ -932,6 +932,17 @@ create table if not exists nearmap_heights (
   terrain bytea,
   fetched_at timestamptz not null default now()
 );
+-- How far those heights sit from a picture of another flight at the same place (server/nearmap-heights-shift.ts), metres
+-- east and south; null when the two pictures didn't match clearly. Nearmap's pictures, so kept for every business.
+create table if not exists nearmap_heights_shift (
+  spot text not null,
+  heights_survey text not null,
+  picture_survey text not null,
+  x real,
+  y real,
+  found_at timestamptz not null default now(),
+  primary key (spot, heights_survey, picture_survey)
+);
 -- What the designer found on a roof's picture before designing (domain/design/roof-check.ts): existing panels, vents and the
 -- like, once a picture ("google" or a Nearmap capture's survey), kept for the business.
 create table if not exists design_roof_checks (

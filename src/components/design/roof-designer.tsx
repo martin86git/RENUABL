@@ -4499,8 +4499,14 @@ export function RoofDesigner(props: {
       const avoid = [...(check ? avoidFor(check) : []), ...loose.map((pl) => [...looseCorners(pl, size)])];
       let face = faces.find((f) => inside(at, f.points));
       if (!face) {
-        const heights = await loadTerrain(spot.lat, spot.lng, { nearmap: Boolean(props.nearmapPicture) });
-        const found = heights ? faceAt(heights, at, check?.notRoof?.map((x) => x.box) ?? []) : null;
+        // Read inside Nearmap's outline of the home when there is one, and clear of the faces already down, so a
+        // new face stops at the gutter and never lies over another (12 Nov 2026, Martin).
+        const [heights, outline] = await Promise.all([
+          loadTerrain(spot.lat, spot.lng, { nearmap: Boolean(props.nearmapPicture) }),
+          props.nearmapPicture ? nearmapFace() : Promise.resolve(null),
+        ]);
+        const skip = [...(check?.notRoof?.map((x) => x.box) ?? []), ...faces.map((f) => f.points)];
+        const found = heights ? faceAt(heights, at, skip, outline && "face" in outline ? outline.face.points : undefined) : null;
         if (!found) return setTrayNote("I can't read a roof face there: tap the middle of a face, or trace it.");
         face = {
           id: newId("f"),
