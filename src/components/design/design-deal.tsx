@@ -9,15 +9,13 @@ import {
   ClipboardList,
   FileText,
   HardHat,
-  History,
   Mail,
-  MessageCircle,
-  SlidersHorizontal,
   NotebookPen,
   Phone,
   MessagesSquare,
   Paperclip,
   PenTool,
+  ScrollText,
   Search,
   Trash2,
   Wrench,
@@ -34,12 +32,13 @@ import {
   JOB_STAGES,
   STAGE_LABELS,
   type Activity,
-  type ActivityKind,
   type Customer,
   type CustomerInput,
   type Job,
   type JobStage,
   PRE_INSTALL_STAGES,
+  WON_STAGES,
+  INSTALLED_STAGES,
 } from "@/lib/domain/design/crm";
 import { systemDetails, type DealDetail, type JobExtra } from "@/lib/domain/design/deal";
 import { fieldLine, resolveDealFields, type DealFieldsConfig } from "@/lib/domain/design/deal-sections";
@@ -87,6 +86,13 @@ type Tab = "activities" | "team" | "email" | "chat" | "sol" | "files" | "service
  * record (8 Nov 2026, Martin: Overview folded into it); the team's chat and the files are their icons. Call sits beside
  * Email, and Sol is his own lit round after the row (10 Nov 2026, Martin: off the banner).
  */
+/** What Notes holds: the timeline first, then the two chats and the deal's details. */
+const NOTES_VIEWS = [
+  ["activities", "Timeline"],
+  ["chat", "Customer chat"],
+  ["team", "Team chat"],
+  ["details", "Details"],
+] as const;
 const DEAL_TABS: { key: Exclude<Tab, "service">; label: string; icon?: (p: { className?: string }) => React.ReactNode }[] = [
   { key: "activities", label: "Activity" },
   { key: "team", label: "Team chat", icon: ({ className }) => <MessagesSquare className={className} aria-hidden /> },
@@ -94,16 +100,6 @@ const DEAL_TABS: { key: Exclude<Tab, "service">; label: string; icon?: (p: { cla
   { key: "chat", label: "Chat" },
   { key: "files", label: "Files", icon: ({ className }) => <Paperclip className={className} aria-hidden /> },
   { key: "details", label: "Details" },
-];
-const FILTERS: { key: "all" | ActivityKind; label: string }[] = [
-  { key: "all", label: "All activities" },
-  { key: "note", label: "Notes" },
-  { key: "email", label: "Emails" },
-  { key: "call", label: "Calls" },
-  { key: "stage", label: "Stage moves" },
-  { key: "proposal", label: "Proposal" },
-  { key: "message", label: "Messages" },
-  { key: "service", label: "Service" },
 ];
 
 /**
@@ -323,7 +319,6 @@ export function DealPage({ id }: { id: string }) {
     void loadInstallExtras().then((res) => res.ok && setExtra(res.extras.find((e) => e.jobId === id) ?? null));
   }, [id]);
   const business = account?.signedIn ? (account.business?.name ?? "") : "";
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
   const [find, setFind] = useState("");
   const [kind, setKind] = useState<Written>("note");
   const [text, setText] = useState("");
@@ -419,9 +414,7 @@ export function DealPage({ id }: { id: string }) {
   if (!job || !customer) return <div className={ui.page} aria-busy="true" />;
 
   const words = find.trim().toLowerCase();
-  const shown = activity.filter(
-    (a) => (filter === "all" || a.kind === filter) && (!words || `${a.text} ${a.by}`.toLowerCase().includes(words)),
-  );
+  const shown = activity.filter((a) => !words || `${a.text} ${a.by}`.toLowerCase().includes(words));
   // Newest first, under the month they happened in.
   const months: { month: string; items: Activity[] }[] = [];
   for (const a of shown) {
@@ -462,6 +455,18 @@ export function DealPage({ id }: { id: string }) {
     setSection("deal");
     setMoving(true);
   };
+  const menu = {
+    tab,
+    onTab: setTab,
+    stage: job.stage,
+    designable: job.lat !== null,
+    onDesign: () => (job.lat !== null ? openTool("design") : findAddress()),
+    onProposal: () => openTool("proposal"),
+    onCard: () => setCard(true),
+    phone: customer.phone,
+    name: customer.firstName,
+    onNotes: () => notetaker.current?.start(),
+  };
   const setDetail = (key: string, text: string) => {
     const next = { ...job.details };
     if (text) next[key] = text;
@@ -477,19 +482,9 @@ export function DealPage({ id }: { id: string }) {
     // the two rails float on the page outside it (10 Nov 2026, Martin).
     <div
       data-rails-out
-      className="mx-auto w-full max-w-[64rem] px-5 py-6 xl:grid xl:max-w-[84rem] xl:grid-cols-[3.5rem_minmax(0,1fr)_10rem] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
+      className="mx-auto w-full max-w-[64rem] px-5 py-6 xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
     >
-      <ToolRail
-        tab={tab}
-        onTab={setTab}
-        designable={job.lat !== null}
-        onDesign={() => {
-          if (job.lat !== null) return openTool("design");
-          findAddress();
-        }}
-        onProposal={() => openTool("proposal")}
-        onCard={() => setCard(true)}
-      />
+      <DealMenu vertical {...menu} />
       <div className="min-w-0 space-y-4 xl:min-h-[calc(100dvh-10rem)] xl:rounded-[28px] xl:bg-canvas xl:p-6">
         {(job.lat !== null || tool === "proposal") && (
           <DesignDrawer
@@ -513,7 +508,7 @@ export function DealPage({ id }: { id: string }) {
             back="Back to the deal"
           />
         )}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <Link href={PATHS.pipelines} className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink">
             <ChevronLeft className="size-4 text-muted" aria-hidden /> Deals
           </Link>
@@ -558,96 +553,33 @@ export function DealPage({ id }: { id: string }) {
         <div className="min-w-0">
           {/* Under the picture, the ways of looking at the deal; its fields are behind Details. On a wide screen the rails
             beside the page take its place. */}
-          <div className="flex items-center gap-2 xl:hidden">
-            {/* The design first, as the design tool is everywhere: its orange round opens it over the deal. Without a place on
-              the map, it asks for one. */}
-            <button
-              type="button"
-              aria-label="Design"
-              title={job.lat !== null ? "Design" : "Give the deal an address to design it"}
-              onClick={() => {
-                if (job.lat !== null) return openTool("design");
-                findAddress();
-              }}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition hover:brightness-105"
-            >
-              <PenTool className="size-[18px]" aria-hidden />
-            </button>
-            {/* The proposal, the deal's other tool: what the customer sees, opened over the deal like the designer. */}
-            <button
-              type="button"
-              aria-label="Proposal"
-              title="Proposal"
-              onClick={() => openTool("proposal")}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_6px_18px_rgba(11,11,12,0.12)] ring-1 ring-line transition hover:text-ink"
-            >
-              <FileText className="size-[18px]" aria-hidden />
-            </button>
+          <DealMenu {...menu} />
+          {card && <JobCardDialog jobId={job.id} onClose={() => setCard(false)} />}
+
+          {/* Notes holds the deal's timeline and, beside it, its details and both chats (12 Nov 2026, Martin). */}
+          {NOTES_VIEWS.some(([key]) => key === tab) && (
             <div
-              className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto rounded-full bg-surface p-1 ring-1 ring-line [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               role="tablist"
+              aria-label="Notes"
+              className="mt-5 inline-flex flex-wrap gap-0.5 rounded-full bg-surface p-1 ring-1 ring-line"
             >
-              {DEAL_TABS.map(({ key, label, icon: Icon }) => [
+              {NOTES_VIEWS.map(([key, label]) => (
                 <button
                   key={key}
+                  type="button"
                   role="tab"
                   aria-selected={tab === key}
-                  aria-label={Icon ? label : undefined}
-                  title={Icon ? label : undefined}
                   onClick={() => setTab(key)}
                   className={clsx(
-                    "flex h-9 shrink-0 items-center justify-center rounded-full text-sm transition-colors",
-                    Icon ? "w-11" : "px-4",
+                    "h-8 rounded-full px-3.5 text-[13px] font-medium transition-colors",
                     tab === key ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
                   )}
                 >
-                  {Icon ? <Icon className="size-[18px]" /> : label}
-                </button>,
-                key === "email" && (
-                  <CallMenu key="call" phone={customer.phone} name={customer.firstName} onNotes={() => notetaker.current?.start()} />
-                ),
-              ])}
-              {/* The job card opens over the page, so it sits at the end of the row rather than being a tab of its own. */}
-              <button
-                type="button"
-                aria-label="Job card"
-                title="Job card"
-                onClick={() => setCard(true)}
-                className="ml-auto flex h-9 w-11 shrink-0 items-center justify-center rounded-full text-ink-2 transition-colors hover:text-ink"
-              >
-                <HardHat className="size-[18px]" aria-hidden />
-              </button>
+                  {label}
+                </button>
+              ))}
             </div>
-            {card && <JobCardDialog jobId={job.id} onClose={() => setCard(false)} />}
-            {/* Sol, his own lit round (10 Nov 2026, Martin: off the banner and into the row): his conversation on this deal. */}
-            <button
-              role="tab"
-              aria-selected={tab === "sol"}
-              aria-label="Sol on this deal"
-              title="Sol on this deal"
-              onClick={() => setTab("sol")}
-              className={clsx(
-                "flex size-11 shrink-0 items-center justify-center rounded-full bg-primary shadow-[0_6px_18px_rgba(11,11,12,0.18)] transition hover:bg-forest",
-                tab === "sol" && "ring-2 ring-sun-line/60 ring-offset-2 ring-offset-canvas",
-              )}
-            >
-              <SolBadge className="size-5" />
-            </button>
-            {/* Service sits apart at the end: putting something right after the sale. */}
-            <button
-              role="tab"
-              aria-selected={tab === "service"}
-              aria-label="Service"
-              title="Service"
-              onClick={() => setTab("service")}
-              className={clsx(
-                "flex size-11 shrink-0 items-center justify-center rounded-full ring-1",
-                tab === "service" ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line hover:text-ink",
-              )}
-            >
-              <Wrench className="size-4" aria-hidden />
-            </button>
-          </div>
+          )}
 
           {tab === "team" ? (
             <section className={clsx(ui.card, "mt-5 p-5")}>
@@ -884,27 +816,8 @@ export function DealPage({ id }: { id: string }) {
               </section>
             </div>
           ) : (
-            // Activity: the deal at a glance, then its record (8 Nov 2026, Martin: Overview folded into it).
+            // Notes: the deal's whole record as one timeline, newest first (12 Nov 2026, Martin: notes are the feed of the job).
             <div className="mt-5 space-y-5">
-              <div
-                className="sticky top-[var(--studio-head,0px)] z-10 flex flex-wrap gap-x-5 border-b border-line bg-canvas"
-                role="group"
-                aria-label="Kind of activity"
-              >
-                {FILTERS.map((f) => (
-                  <button
-                    key={f.key}
-                    aria-pressed={filter === f.key}
-                    onClick={() => setFilter(f.key)}
-                    className={clsx(
-                      "-mb-px h-10 border-b-[3px] text-sm font-medium",
-                      filter === f.key ? "border-ink text-ink" : "border-transparent text-ink-2 hover:text-ink",
-                    )}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
               {(job.projectId || (marketplaceOpen() && PRE_INSTALL_STAGES.includes(job.stage))) && (
                 <div className="flex flex-wrap gap-2">
                   {job.projectId && (
@@ -924,12 +837,12 @@ export function DealPage({ id }: { id: string }) {
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="relative block w-64 max-w-full">
-                    <span className="sr-only">Search activities</span>
+                    <span className="sr-only">Search notes</span>
                     <input
                       className={clsx(ui.input, "rounded-full pl-4 pr-9")}
                       value={find}
                       onChange={(e) => setFind(e.target.value)}
-                      placeholder="Search activities"
+                      placeholder="Search notes"
                     />
                     <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
                   </label>
@@ -1033,7 +946,6 @@ export function DealPage({ id }: { id: string }) {
           )}
         </div>
       </div>
-      <PageRail tab={tab} onTab={setTab} phone={customer.phone} name={customer.firstName} onNotes={() => notetaker.current?.start()} />
     </div>
   );
 }
@@ -1048,10 +960,13 @@ function CallMenu({
   name,
   onNotes,
   rail = false,
+  round,
 }: {
   phone: string;
   name: string;
   onNotes: () => void;
+  /** A round of the deal's menu: down the left ("rail", its choices to its right) or in the row ("row", below). */
+  round?: "rail" | "row";
   /** As a line of the rail beside the page (its words shown, the menu opening to its left). */
   rail?: boolean;
 }) {
@@ -1084,16 +999,43 @@ function CallMenu({
         onClick={(e) => {
           if (at) return setAt(null);
           const r = e.currentTarget.getBoundingClientRect();
-          setAt(rail ? { top: r.top, left: Math.max(8, r.left - 264) } : { top: r.bottom + 8, left: r.left });
+          setAt(
+            round === "rail"
+              ? { top: r.top, left: r.right + 12 }
+              : rail
+                ? { top: r.top, left: Math.max(8, r.left - 264) }
+                : { top: r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 264)) },
+          );
         }}
-        className={clsx(
-          rail ? RAIL_ITEM : "flex h-9 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
-          at ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
-          !phone && "text-muted hover:text-muted",
-        )}
+        className={
+          round
+            ? "group flex flex-col items-center gap-1 disabled:opacity-100"
+            : clsx(
+                rail ? RAIL_ITEM : "flex h-9 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
+                at ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+                !phone && "text-muted hover:text-muted",
+              )
+        }
       >
-        <Phone className={rail ? "size-4" : "size-[18px]"} aria-hidden />
-        {rail && "Call"}
+        {round ? (
+          <>
+            <span
+              className={clsx(
+                "flex size-12 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
+                at ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line group-hover:text-ink",
+                !phone && "text-muted group-hover:text-muted",
+              )}
+            >
+              <Phone className="size-5" aria-hidden />
+            </span>
+            <span className={clsx("text-[11px] font-medium", phone ? "text-ink-2" : "text-muted")}>Call</span>
+          </>
+        ) : (
+          <>
+            <Phone className={rail ? "size-4" : "size-[18px]"} aria-hidden />
+            {rail && "Call"}
+          </>
+        )}
       </button>
       {at && (
         <div
@@ -1168,28 +1110,63 @@ function useCentredRail() {
   return [ref, style] as const;
 }
 
-function ToolRail({
+/**
+ * The deal's one menu (12 Nov 2026, Martin: the CRM straight to the point, the work to be done): the two tools, Design
+ * and Proposal; then the ways of working the deal, Call, Email, Notes (the deal's whole record as a timeline) and Files;
+ * then, only once it matters, the Job card (sold) and Service (installed); then Sol. Down the left on a wide screen,
+ * floating in the middle of the window; a row under the banner narrower.
+ */
+function DealMenu({
+  vertical = false,
   tab,
   onTab,
+  stage,
   designable,
   onDesign,
   onProposal,
   onCard,
+  phone,
+  name,
+  onNotes,
 }: {
-  tab: string;
-  onTab: (tab: "sol" | "service") => void;
+  vertical?: boolean;
+  tab: Tab;
+  onTab: (tab: Tab) => void;
+  stage: JobStage;
   designable: boolean;
   onDesign: () => void;
   onProposal: () => void;
   onCard: () => void;
+  phone: string;
+  name: string;
+  onNotes: () => void;
 }) {
   const [railRef, railStyle] = useCentredRail();
+  const sold = WON_STAGES.includes(stage);
+  const installed = INSTALLED_STAGES.includes(stage);
+  const round = (on: boolean) =>
+    clsx(
+      "flex size-12 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
+      on ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line group-hover:text-ink",
+    );
+  const line = <span className={vertical ? "h-px w-8 shrink-0 bg-line" : "mt-6 h-px w-4 shrink-0 bg-line"} aria-hidden />;
+  const page = (key: Tab, label: string, title: string, Icon: typeof Mail) => (
+    <RailRound label={label} title={title} onClick={() => onTab(key)} on={tab === key}>
+      <span className={round(tab === key)}>
+        <Icon className="size-5" aria-hidden />
+      </span>
+    </RailRound>
+  );
   return (
     <nav
-      ref={railRef}
-      style={railStyle}
-      aria-label="Tools on this deal"
-      className="sticky hidden flex-col items-center gap-3.5 pt-1 xl:flex"
+      ref={vertical ? railRef : undefined}
+      style={vertical ? railStyle : undefined}
+      aria-label="This deal"
+      className={
+        vertical
+          ? "sticky hidden flex-col items-center gap-3.5 pt-1 xl:flex"
+          : "-mx-1 flex items-start gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] xl:hidden [&::-webkit-scrollbar]:hidden"
+      }
     >
       <RailRound label="Design" title={designable ? "Design" : "Give the deal an address to design it"} onClick={onDesign}>
         <span className="flex size-12 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition group-hover:brightness-105">
@@ -1201,28 +1178,30 @@ function ToolRail({
           <FileText className="size-5" aria-hidden />
         </span>
       </RailRound>
-      <span className="h-px w-8 bg-line" aria-hidden />
-      <RailRound label="Job card" title="Job card: what the installers take to the job" onClick={onCard}>
-        <span className="flex size-12 items-center justify-center rounded-full bg-surface text-ink-2 shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 ring-line transition group-hover:text-ink">
-          <HardHat className="size-5" aria-hidden />
-        </span>
-      </RailRound>
+      {line}
+      <CallMenu round={vertical ? "rail" : "row"} phone={phone} name={name} onNotes={onNotes} />
+      {page("email", "Email", `Email ${name || "the customer"}`, Mail)}
       <RailRound
-        label="Service"
-        title="Service: something to put right after the sale"
-        onClick={() => onTab("service")}
-        on={tab === "service"}
+        label="Notes"
+        title="Notes: the timeline, the chats and the deal's details"
+        onClick={() => onTab("activities")}
+        on={NOTES_VIEWS.some(([key]) => key === tab)}
       >
-        <span
-          className={clsx(
-            "flex size-12 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
-            tab === "service" ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line group-hover:text-ink",
-          )}
-        >
-          <Wrench className="size-[18px]" aria-hidden />
+        <span className={round(NOTES_VIEWS.some(([key]) => key === tab))}>
+          <ScrollText className="size-5" aria-hidden />
         </span>
       </RailRound>
-      <span className="h-px w-8 bg-line" aria-hidden />
+      {page("files", "Files", "Files kept on this deal", Paperclip)}
+      {(sold || installed) && line}
+      {sold && (
+        <RailRound label="Job card" title="Job card: what the installers take to the job" onClick={onCard}>
+          <span className={round(false)}>
+            <HardHat className="size-5" aria-hidden />
+          </span>
+        </RailRound>
+      )}
+      {installed && page("service", "Service", "Service: something to put right after the install", Wrench)}
+      {line}
       <RailRound label="Sol" title="Sol on this deal" onClick={() => onTab("sol")} on={tab === "sol"}>
         <span
           className={clsx(
@@ -1263,60 +1242,5 @@ function RailRound({
       {children}
       <span className={clsx("text-[11px] font-medium", on ? "text-ink" : "text-ink-2")}>{label}</span>
     </button>
-  );
-}
-
-/**
- * The deal's pages, down the right of the page in words (10 Nov 2026, Martin), in two groups: the record (Activity,
- * Details, Files) and talking (Email, Call, the customer's chat, the team's). Wide screens only.
- */
-function PageRail({
-  tab,
-  onTab,
-  phone,
-  name,
-  onNotes,
-}: {
-  tab: string;
-  onTab: (tab: "activities" | "details" | "files" | "email" | "chat" | "team") => void;
-  phone: string;
-  name: string;
-  onNotes: () => void;
-}) {
-  const [railRef, railStyle] = useCentredRail();
-  const item = (key: "activities" | "details" | "files" | "email" | "chat" | "team", label: string, Icon: typeof Mail, title?: string) => (
-    <button
-      key={key}
-      type="button"
-      role="tab"
-      aria-selected={tab === key}
-      title={title}
-      onClick={() => onTab(key)}
-      className={clsx(RAIL_ITEM, tab === key ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink")}
-    >
-      <Icon className="size-4 shrink-0" aria-hidden />
-      {label}
-    </button>
-  );
-  const group = "px-3 pb-1 pt-2 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted";
-  return (
-    <nav ref={railRef} style={railStyle} aria-label="This deal's pages" className="sticky hidden xl:block">
-      <div
-        role="tablist"
-        aria-orientation="vertical"
-        className="rounded-2xl bg-surface p-1.5 shadow-[0_8px_30px_rgba(11,11,12,0.06)] ring-1 ring-line"
-      >
-        <p className={group}>The record</p>
-        {item("activities", "Activity", History)}
-        {item("details", "Details", SlidersHorizontal)}
-        {item("files", "Files", Paperclip)}
-        <span className="mx-3 my-1.5 block h-px bg-line" aria-hidden />
-        <p className={group}>Talk</p>
-        {item("email", "Email", Mail)}
-        <CallMenu rail phone={phone} name={name} onNotes={onNotes} />
-        {item("chat", "Customer chat", MessageCircle, `Chat with ${name || "the customer"}`)}
-        {item("team", "Team chat", MessagesSquare, "Your team's chat on this deal")}
-      </div>
-    </nav>
   );
 }
