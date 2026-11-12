@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { guideStep, guiding, panelsFor, reachedWords, targetWords, type GuideFacts } from "./sol-guide";
+import { batteryForKw, batteryWords } from "./sol-guide";
 
 const facts = (over: Partial<GuideFacts> = {}): GuideFacts => ({
   roof: "tile",
@@ -49,5 +50,30 @@ describe("Sol leads the design", () => {
     expect(targetWords("Clive", null)).toMatch(/don't have their bill/);
     expect(panelsFor(7.6, 475)).toBe(16);
     expect(reachedWords(7.6, { kw: 7.6, kwh: 10 })).toMatch(/Target reached/);
+  });
+});
+
+describe("the battery a size of panels points to", () => {
+  it("is filled by the panels' 60% spare on a winter day, and larger with the three free hours", () => {
+    // 10 kW makes 38 kWh on an average day: 22.8 spare, 11.4 in winter.
+    const b = batteryForKw(10)!;
+    expect(b.spareKwh).toBe(22.8);
+    expect(b.winterSpareKwh).toBe(11.4);
+    expect(b.solarKwh).toBe(13);
+    expect(b.freeKwh).toBe(26);
+  });
+
+  it("is never more than the home uses after dark, when its use is known", () => {
+    // 20 kWh a day: 12 after dark.
+    const b = batteryForKw(10, 20)!;
+    expect(b.eveningKwh).toBe(12);
+    expect(b.solarKwh).toBe(13);
+    expect(b.freeKwh).toBe(14);
+    expect(batteryWords(b)).toBe("The panels spare about 23 kWh on an average day, 11 in winter. They use about 12 kWh after dark.");
+  });
+
+  it("is never under the smallest battery, and nothing without panels", () => {
+    expect(batteryForKw(1)!.solarKwh).toBe(5);
+    expect(batteryForKw(0)).toBeNull();
   });
 });

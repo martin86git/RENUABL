@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { X } from "lucide-react";
 import { useState } from "react";
 import type { GuideStepId, GuideTarget } from "@/lib/domain/design/sol-guide";
-import { reachedWords, targetWords } from "@/lib/domain/design/sol-guide";
+import { FREE_HOURS, batteryForKw, batteryWords, reachedWords, targetWords } from "@/lib/domain/design/sol-guide";
 import { SolIcon } from "./sol-icon";
 
 type Phase = "single" | "three";
@@ -23,6 +23,14 @@ export function SolGuide(props: {
   home: { phase: Phase; storeys: Storeys; roof: Roof };
   suggested: (GuideTarget & { spend: string | null }) | null;
   target: GuideTarget | null;
+  /** The designer's bill: its amount and how often, changed here as there. */
+  bill: { amount: string; interval: "monthly" | "bimonthly" | "quarterly" | "annual" };
+  onBill: (change: { amount?: string; interval?: "monthly" | "bimonthly" | "quarterly" }) => void;
+  /** What the home uses a day, from the bill (null without one). */
+  dailyKwh: number | null;
+  /** A bill photo or PDF read into the bill. */
+  onUpload: (file: File) => void;
+  reading: { busy: boolean; error?: string } | null;
   /** On a deal, Sol can look for the bill in the customer's file. */
   canFind: boolean;
   finding: boolean;
@@ -39,7 +47,10 @@ export function SolGuide(props: {
   onReached: (done: boolean) => void;
   onInverter: (use: boolean | "choose") => void;
   onString: (yes: boolean) => void;
-  onBattery: (add: boolean | "choose") => void;
+  /** "both": this design with the battery the panels fill, and a copy with the bigger one for the free hours. */
+  onBattery: (add: boolean | "choose" | "both") => void;
+  /** The battery Sol would pick for the free-hours version, when there is one. */
+  freeBatteryName: string | null;
   onBackup: (yes: boolean) => void;
   onStop: () => void;
 }) {
@@ -51,12 +62,12 @@ export function SolGuide(props: {
   });
   const [kliplok, setKliplok] = useState<boolean | null>(null);
   const [tilt, setTilt] = useState<number | null | undefined>(undefined);
-  // The boxes show the size Sol suggests (it fills in once the bill arrives) until they are typed in.
+  // The kW box shows the size Sol suggests (it fills in once the bill arrives) until it is typed in.
   const start = props.target ?? props.suggested;
   const [typedKw, setKw] = useState<string | null>(null);
-  const [typedKwh, setKwh] = useState<string | null>(null);
   const kw = typedKw ?? (start ? String(start.kw) : "");
-  const kwh = typedKwh ?? (start ? String(start.kwh) : "0");
+  const [mode, setMode] = useState<"bill" | "size" | null>(null);
+  const [battPick, setBattPick] = useState<"none" | "solar" | "free" | "both" | null>(null);
 
   const body = (() => {
     if (props.placing && !props.step)
@@ -146,28 +157,126 @@ export function SolGuide(props: {
             </Actions>
           </>
         );
-      case "target":
+      case "target": {
+        // Their bill, or a system size (12 Nov 2026, Martin): the bill as an amount a month, two months or quarter, or
+        // uploaded; the size as kW, the battery then proposing itself from the panels' spare.
+        const kwNow = Number(kw);
+        const batt = batteryForKw(kwNow, props.dailyKwh);
+        const one = batt ? batt.freeKwh === batt.solarKwh : true;
+        const aim = () => {
+          if (!(kwNow > 0) || !battPick || !batt) return;
+          const k = Math.round(kwNow * 100) / 100;
+          if (battPick === "none") return props.onTarget({ kw: k, kwh: 0 });
+          if (battPick === "free") return props.onTarget({ kw: k, kwh: batt.freeKwh });
+          if (battPick === "both" && !one) return props.onTarget({ kw: k, kwh: batt.solarKwh, freeKwh: batt.freeKwh });
+          return props.onTarget({ kw: k, kwh: batt.solarKwh });
+        };
         return (
           <>
             <p>{targetWords(props.first, props.suggested)}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <Field label="kW of panels" value={kw} onChange={setKw} />
-              <Field label="kWh battery" value={kwh} onChange={setKwh} />
+            <div className="mt-2 grid gap-2">
+              <Choice
+                options={[
+                  ["bill", "Their bill"],
+                  ["size", "A system size"],
+                ]}
+                value={mode}
+                onPick={(v) => {
+                  setMode(v as "bill" | "size");
+                  setKw(null);
+                }}
+              />
+              {mode === "bill" && (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex items-center gap-1 text-[15px] text-white/70">
+                      $
+                      <input
+                        value={props.bill.amount}
+                        onChange={(e) => {
+                          setKw(null);
+                          props.onBill({ amount: e.target.value.replace(/[^0-9.]/g, "").slice(0, 7) });
+                        }}
+                        inputMode="decimal"
+                        placeholder="0"
+                        aria-label="The bill's amount"
+                        className="h-9 w-24 rounded-xl bg-white/10 px-2.5 text-[15px] tabular-nums text-white outline-none ring-1 ring-white/15 placeholder:text-white/35 focus:ring-2 focus:ring-sun-line"
+                      />
+                    </label>
+                    <Choice
+                      options={[
+                        ["monthly", "Monthly"],
+                        ["bimonthly", "2 monthly"],
+                        ["quarterly", "Quarterly"],
+                      ]}
+                      value={props.bill.interval === "annual" ? null : props.bill.interval}
+                      onPick={(v) => {
+                        setKw(null);
+                        props.onBill({ interval: v as "monthly" | "bimonthly" | "quarterly" });
+                      }}
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <label className="cursor-pointer rounded-full px-3 py-1.5 text-[13px] font-medium text-white/80 ring-1 ring-white/20 hover:bg-white/10 hover:text-white">
+                      {props.reading?.busy ? "Reading the bill…" : "Upload the bill"}
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        className="sr-only"
+                        disabled={props.reading?.busy}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (file) props.onUpload(file);
+                        }}
+                      />
+                    </label>
+                    {props.canFind && <Quiet onClick={props.onFind}>{props.finding ? "Looking…" : "Find it in their file"}</Quiet>}
+                  </div>
+                  {props.reading?.error && <p className="text-[12.5px] text-[#ffb4a0]">{props.reading.error}</p>}
+                  {props.dailyKwh !== null && (
+                    <p className="text-[12.5px] text-white/70">
+                      About {Math.round(props.dailyKwh * 10) / 10} kWh a day.
+                      {props.suggested && ` I'd aim for ${props.suggested.kw} kW of panels.`}
+                    </p>
+                  )}
+                </>
+              )}
+              {(mode === "size" || props.suggested) && <Field label="kW of panels" value={kw} onChange={setKw} />}
+              {batt && (
+                <>
+                  <p className="text-[12.5px] text-white/70">{batteryWords(batt)}</p>
+                  <Choice
+                    options={[
+                      ["none", "No battery"],
+                      ["solar", `${batt.solarKwh} kWh battery`],
+                      ...(one
+                        ? []
+                        : ([
+                            ["free", `${batt.freeKwh} kWh with the ${FREE_HOURS} free hours`],
+                            ["both", "Both, as two designs"],
+                          ] as [string, string][])),
+                    ]}
+                    value={battPick}
+                    onPick={(v) => setBattPick(v as typeof battPick)}
+                  />
+                  <p className="text-[12px] text-white/55">
+                    {one
+                      ? `The ${FREE_HOURS} free hours wouldn't change it: this battery already holds their evenings.`
+                      : `With the ${FREE_HOURS} free hours the grid tops the battery up free each day, so it can be bigger: it stores more, and costs more. Both makes a design of each, with its own price.`}
+                  </p>
+                </>
+              )}
             </div>
             <Actions>
-              <Main
-                disabled={!(Number(kw) > 0)}
-                onClick={() => props.onTarget({ kw: Math.round(Number(kw) * 100) / 100, kwh: Math.max(0, Number(kwh) || 0) })}
-              >
+              <Main disabled={!(kwNow > 0) || !battPick} onClick={aim}>
                 Aim for this
               </Main>
-              {!props.suggested && props.canFind && (
-                <Quiet onClick={props.onFind}>{props.finding ? "Looking…" : "Find their bill in the file"}</Quiet>
-              )}
               <Quiet onClick={() => props.onTarget(null)}>No target</Quiet>
             </Actions>
           </>
         );
+      }
       case "panel":
         return (
           <>
@@ -224,6 +333,22 @@ export function SolGuide(props: {
           </>
         );
       case "battery":
+        if (props.target?.freeKwh && props.batteryName)
+          return (
+            <>
+              <p>
+                Two versions: {props.batteryName} (about {props.target.kwh} kWh, filled by the panels), and{" "}
+                {props.freeBatteryName ? props.freeBatteryName : "a bigger battery"} (about {props.target.freeKwh} kWh) for the {FREE_HOURS}{" "}
+                free hours. I&apos;ll make a design of each.
+              </p>
+              <Actions>
+                <Main onClick={() => props.onBattery("both")}>Make both</Main>
+                <Quiet onClick={() => props.onBattery(true)}>Just the {props.target.kwh} kWh</Quiet>
+                <Quiet onClick={() => props.onBattery("choose")}>Choose one</Quiet>
+                <Quiet onClick={() => props.onBattery(false)}>No battery</Quiet>
+              </Actions>
+            </>
+          );
         return (
           <>
             <p>

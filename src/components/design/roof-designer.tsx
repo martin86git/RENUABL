@@ -8,7 +8,15 @@ import { useDesignTips } from "./design-tips";
 import { shareDesignPanels } from "@/lib/services/side-view-design";
 import { BlockTray } from "./block-tray";
 import { SolGuide } from "./sol-guide";
-import { guideStep, guiding, panelsFor, type GuideFacts, type GuideStepId, type GuideTarget } from "@/lib/domain/design/sol-guide";
+import {
+  FREE_HOURS,
+  guideStep,
+  guiding,
+  panelsFor,
+  type GuideFacts,
+  type GuideStepId,
+  type GuideTarget,
+} from "@/lib/domain/design/sol-guide";
 import { BLOCK_MIN, joinBlock, resizeBlock, splitBlock, startingBlocks, type PanelBlock } from "@/lib/domain/design/panel-blocks";
 import { SolNudges } from "./sol-nudges";
 import { nudgesFor, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
@@ -4199,8 +4207,8 @@ export function RoofDesigner(props: {
           return list.find((x) => /hybrid/i.test(x.kind) === hybrid) ?? list[0] ?? null;
         })()
       : null;
-  const guideBattery =
-    guideNow === "battery"
+  const batteryFor = (want: number) =>
+    guideNow === "battery" && want > 0
       ? (() => {
           const idea = suggestBatteries({
             batteries: batteriesThatFit.length ? batteriesThatFit : props.batteries,
@@ -4210,10 +4218,16 @@ export function RoofDesigner(props: {
             selfUseShare: props.workspace.settings.bill.selfUseShare,
             eveningShare: DAY.eveningShare,
           });
-          const want = guideTarget?.kwh ?? 0;
-          return idea.suggestions.find((x) => x.battery.kwh * x.qty >= want - 0.01) ?? idea.suggestions[0] ?? null;
+          // Sol's first choice of battery, stacked to the size aimed for (12 Nov 2026: his suggestions are sized to the
+          // whole roof, so two versions came out the same).
+          const pick = idea.suggestions[0];
+          return pick ? { ...pick, qty: Math.max(1, Math.ceil(want / pick.battery.kwh - 0.01)) } : null;
         })()
       : null;
+  const guideBattery = batteryFor(guideTarget?.kwh ?? 0);
+  // The bigger battery for the three free hours, when both versions were asked for (12 Nov 2026, Martin).
+  const guideFreeBattery = batteryFor(guideTarget?.freeKwh ?? 0);
+  const batteryNameOf = (b: typeof guideBattery) => (b ? `${b.qty > 1 ? `${b.qty} × ` : ""}${b.battery.name}` : null);
   // The panel Sol offers: the person's own favourite first, else the one on the design, else the first on the lists.
   const guidePanel = favourites.sorted("panels", props.catalogue)[0] ?? chosenPanel ?? null;
   const guideHandlers = {
@@ -4265,8 +4279,30 @@ export function RoofDesigner(props: {
       if (yes) stringForMe();
       else pickTool("string");
     },
-    onBattery: (add: boolean | "choose") => {
+    onBattery: (add: boolean | "choose" | "both") => {
       answerGuide("battery");
+      // Both versions: this design takes the battery the panels fill, and a copy beside it the bigger one for the free
+      // hours, offered on the proposal with it, so the customer sees both prices.
+      if (add === "both" && guideBattery && guideFreeBattery && everyDesign().length < MAX_DESIGNS) {
+        const at = (b: NonNullable<typeof guideBattery>): DesignBattery => ({
+          sku: b.battery.sku,
+          name: b.battery.name,
+          kwh: b.battery.kwh,
+          qty: b.qty,
+          x: battery?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
+          y: battery?.y ?? cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
+        });
+        const base = working();
+        const mine: RoofDesign = { ...base, battery: at(guideBattery), label: base.label ?? "Battery from the panels" };
+        const copy: RoofDesign = { ...base, battery: at(guideFreeBattery), label: `With the ${FREE_HOURS} free hours`, offer: true };
+        delete copy.goal;
+        delete copy.recommended;
+        setQuotes([...everyQuote(), quoteNow]);
+        show([...everyDesign().map((d, i) => (i === active ? mine : d)), copy], active);
+        setSaved("changed");
+        return;
+      }
+      if (add === "both") add = true;
       if (add === true && guideBattery) {
         chooseBattery(guideBattery.battery);
         setBattery((b) => (b ? { ...b, qty: guideBattery.qty } : b));
@@ -9494,9 +9530,13 @@ export function RoofDesigner(props: {
                     inverterName={
                       guideInverter ? `${guideInverter.count > 1 ? `${guideInverter.count} × ` : ""}${guideInverter.inverter.name}` : null
                     }
-                    batteryName={
-                      guideBattery ? `${guideBattery.qty > 1 ? `${guideBattery.qty} × ` : ""}${guideBattery.battery.name}` : null
-                    }
+                    batteryName={batteryNameOf(guideBattery)}
+                    freeBatteryName={batteryNameOf(guideFreeBattery)}
+                    bill={{ amount: bill.amount, interval: bill.interval }}
+                    onBill={(change) => setBill(billWith(bill, change))}
+                    dailyKwh={dailyFromBillFields(bill)}
+                    onUpload={(file) => void readBillPhoto(file)}
+                    reading={usageRead?.photo ? { busy: usageRead.busy, ...(usageRead.error ? { error: usageRead.error } : {}) } : null}
                     kw={summary.kw}
                     {...guideHandlers}
                   />

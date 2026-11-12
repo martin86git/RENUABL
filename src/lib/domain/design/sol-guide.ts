@@ -10,12 +10,70 @@
  * done (an inverter on it, every panel strung) is passed over. After the last, Sol's suggestions take over.
  */
 
+import { ASSUMPTIONS } from "../recommendation";
+
 export type GuideStepId = "home" | "flat" | "target" | "panel" | "place" | "reached" | "inverter" | "string" | "battery" | "backup";
 
 /** The size aimed for: kW of panels, and kWh of battery (0: none). */
 export interface GuideTarget {
   kw: number;
   kwh: number;
+  /**
+   * A second version's battery, sized for the three free hours (12 Nov 2026, Martin): the battery step then makes two
+   * designs side by side, one each, so the customer sees both prices.
+   */
+  freeKwh?: number;
+}
+
+/** The free hours a day some retailers offer (12 Nov 2026, Martin: "the 3 hour free electricity window"). */
+export const FREE_HOURS = 3;
+/** The share of what panels make that is spare once the home has used its share as it's made: Martin's 60%. */
+export const SPARE_SHARE = 1 - ASSUMPTIONS.baseSelfConsumption;
+
+/** The battery for a size of panels, with and without the free hours, and the figures behind it. */
+export interface GuideBattery {
+  /** Filled by the panels alone: what a winter day's spare fills, so it fills all year; kWh, whole. */
+  solarKwh: number;
+  /**
+   * With the three free hours: the grid tops it up free each day, so the panels' winter spare isn't the limit. Sized
+   * to the evenings when the home's use is known, else to an average day's spare; never smaller than the solar one.
+   */
+  freeKwh: number;
+  /** What the panels spare on an average day and on a winter day, kWh. */
+  spareKwh: number;
+  winterSpareKwh: number;
+  /** What the home uses after dark, when known. */
+  eveningKwh: number | null;
+}
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+const toBattery = (stored: number) => Math.max(5, Math.ceil(stored / ASSUMPTIONS.batteryUsableShare - 1e-9));
+
+/**
+ * The battery a size of panels points to (12 Nov 2026, Martin: "if I enter a PV kW the battery should propose itself;
+ * by rule of thumb 60% will be surplus"). Never more than the home uses after dark, when its use is known. Rules of
+ * thumb only (`ASSUMPTIONS`); null without panels.
+ */
+export function batteryForKw(kw: number, kwhPerDay?: number | null): GuideBattery | null {
+  if (!(kw > 0)) return null;
+  const spare = kw * ASSUMPTIONS.dailyYieldKwhPerKw * SPARE_SHARE;
+  const winter = spare * ASSUMPTIONS.winterSunShare;
+  const evening = kwhPerDay && kwhPerDay > 0 ? kwhPerDay * ASSUMPTIONS.eveningShare : null;
+  const solarKwh = toBattery(evening !== null ? Math.min(winter, evening) : winter);
+  const freeKwh = Math.max(solarKwh, toBattery(evening ?? spare));
+  return {
+    solarKwh,
+    freeKwh,
+    spareKwh: round1(spare),
+    winterSpareKwh: round1(winter),
+    eveningKwh: evening === null ? null : round1(evening),
+  };
+}
+
+/** The battery's line under the boxes: what the panels spare, and what the free hours change. */
+export function batteryWords(b: GuideBattery): string {
+  const spare = `The panels spare about ${Math.round(b.spareKwh)} kWh on an average day, ${Math.round(b.winterSpareKwh)} in winter.`;
+  return b.eveningKwh !== null ? `${spare} They use about ${Math.round(b.eveningKwh)} kWh after dark.` : spare;
 }
 
 /** What the design and the deal say right now. */
@@ -68,7 +126,7 @@ export const panelsFor = (kw: number, watts: number) => Math.max(1, Math.ceil((k
 /** The line the target step opens with. */
 export function targetWords(first: string | null, suggested: GuideFacts["suggested"]): string {
   const who = first ?? "They";
-  if (!suggested) return "I don't have their bill yet. Set the size to aim for, or add the bill.";
+  if (!suggested) return "I don't have their bill yet. Add it, or set the system size.";
   const size = `${suggested.kw} kW of panels${suggested.kwh > 0 ? ` with a ${suggested.kwh} kWh battery` : ""}`;
   return suggested.spend ? `${who} ${first ? "spends" : "spend"} ${suggested.spend}, so we should aim for ${size}.` : `Aim for ${size}.`;
 }
