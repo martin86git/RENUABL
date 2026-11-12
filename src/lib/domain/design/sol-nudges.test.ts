@@ -64,4 +64,13 @@ describe("Sol beside the design", () => {
     expect(ids({ oversize: { percent: 160, limit: 133, over: true } })).toContain("oversize");
     expect(ids({ phase: "single", kw: 6.65 })).toContain("export");
   });
+
+  it("gives the ways to deal with a shaded panel, naming the string it holds back", () => {
+    const n = nudgesFor({ ...base, shaded: 1, shadedStrings: [{ letter: "B", shaded: 1, others: 10 }] }).find((x) => x.id === "shade")!;
+    expect(n.why).toContain("string B");
+    expect(n.options?.join(" ")).toMatch(/optimiser/);
+    expect(n.options?.join(" ")).toMatch(/Rewire/);
+    expect(n.options?.join(" ")).toMatch(/Move it/);
+    expect(n.options?.join(" ")).toMatch(/Take it off/);
+  });
 });

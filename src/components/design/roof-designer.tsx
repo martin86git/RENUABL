@@ -3464,6 +3464,15 @@ export function RoofDesigner(props: {
   const nudges = (() => {
     const strung = new Set(strings.flatMap((x) => x.panels));
     const keys = Object.keys(centres);
+    // Panels losing more than SHADE_LOSS, by key (the report is in the order of `shade.keys`).
+    const shadedKeys = new Set(
+      shade
+        ? shade.keys.filter((_, i) => {
+            const a = shade.report.panels[i]?.access;
+            return typeof a === "number" && a < 1 - SHADE_LOSS;
+          })
+        : [],
+    );
     const fill = battery
       ? batteryFill({
           solarDayKwh: Number(summary.kwhPerDay) || 0,
@@ -3485,7 +3494,14 @@ export function RoofDesigner(props: {
       homeDayKwh: finance?.dailyKwh ?? null,
       onDeal: Boolean(props.jobId),
       phase: quoteNow.form.phase === "three" ? "three" : "single",
-      shaded: shade ? shade.report.panels.filter((x) => typeof x.access === "number" && x.access < 1 - SHADE_LOSS).length : 0,
+      shaded: shadedKeys.size,
+      shadedStrings: strings
+        .map((x, i) => ({
+          letter: String.fromCharCode(65 + i),
+          shaded: x.panels.filter((k) => shadedKeys.has(k)).length,
+          others: x.panels.filter((k) => !shadedKeys.has(k)).length,
+        }))
+        .filter((x) => x.shaded > 0),
       undecided: costsHidden
         ? []
         : undecidedLines(costSystem(spec, quoteNow.form, props.workspace).lines, quoteNow.edits).map((l) => l.label),

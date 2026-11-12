@@ -44,6 +44,19 @@ export function SolNudges({
           </p>
           <p className="mt-0.5 text-[14px] leading-snug text-white/95">{n.words}</p>
           {n.why && <p className="mt-0.5 text-[12px] leading-snug text-white/55">{n.why}</p>}
+          {n.options && n.options.length > 0 && (
+            <>
+              <p className="mt-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/50">Your options</p>
+              <ul className="mt-1 space-y-1">
+                {n.options.map((o) => (
+                  <li key={o} className="flex gap-2 text-[12.5px] leading-snug text-white/85">
+                    <span aria-hidden className="mt-[7px] size-1 shrink-0 rounded-full bg-sun-line" />
+                    {o}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           {n.actions.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {n.actions.map((a, k) => (

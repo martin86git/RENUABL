@@ -38,6 +38,8 @@ export interface Nudge {
   words: string;
   /** One line on why, when it helps. */
   why?: string;
+  /** The ways open to the designer, said only: Sol can't do them himself (12 Nov 2026, Martin). */
+  options?: string[];
   actions: NudgeAction[];
 }
 
@@ -64,6 +66,8 @@ export interface NudgeState {
   phase: "single" | "three";
   /** Panels losing more than `SHADE_LOSS` of the year's sun, when the shade is read. */
   shaded: number;
+  /** Strings holding a shaded panel: its letter, how many shaded and how many open panels share it. */
+  shadedStrings?: { letter: string; shaded: number; others: number }[];
   /** Labels of the costs decided on each job still undecided. */
   undecided: string[];
   /** Backup has been answered on this visit (no is no). */
@@ -186,13 +190,7 @@ export function nudgesFor(s: NudgeState): Nudge[] {
       actions: [{ label: "Add panels", act: "add-panels" }],
     });
   }
-  if (s.shaded > 0)
-    out.push({
-      id: "shade",
-      kind: "option",
-      words: `${s.shaded} panel${s.shaded === 1 ? " loses" : "s lose"} over ${Math.round(SHADE_LOSS * 100)}% of the year's sun to shade.`,
-      actions: [{ label: "Show the shade", act: "show-shade" }],
-    });
+  if (s.shaded > 0) out.push(shadeNudge(s));
   if (s.phase === "single" && s.kw > SINGLE_PHASE_KW)
     out.push({
       id: "export",
@@ -201,6 +199,34 @@ export function nudgesFor(s: NudgeState): Nudge[] {
       actions: [],
     });
   return out;
+}
+
+/**
+ * Shaded panels (12 Nov 2026, Martin: Sol said a panel lost 20% and suggested nothing, and one shaded panel on a string
+ * holds the whole string back): what it costs, and the ways to put it right, said, not done, since each is the
+ * designer's call (an optimiser, the wiring, where the panels go).
+ */
+function shadeNudge(s: NudgeState): Nudge {
+  const one = s.shaded === 1;
+  const loss = `${s.shaded} panel${one ? " loses" : "s lose"} over ${Math.round(SHADE_LOSS * 100)}% of the year's sun to shade.`;
+  const mixed = (s.shadedStrings ?? []).filter((x) => x.others > 0);
+  const why = mixed.length
+    ? `${one ? "It shares" : "They share"} ${mixed.length === 1 ? `string ${mixed[0].letter}` : `strings ${mixed.map((x) => x.letter).join(" and ")}`} with open panels, and a shaded panel holds back every panel on its string.`
+    : "A shaded panel holds back every panel on its string, so it's worth sorting before stringing.";
+  const it = one ? "that panel" : "each shaded panel";
+  return {
+    id: "shade",
+    kind: "option",
+    words: loss,
+    why,
+    options: [
+      `Fit an optimiser (a Tigo TS4-A-O) on ${it} only, so the rest of the string runs at full output.`,
+      `Rewire: put ${one ? "it" : "them"} on a string of ${one ? "its" : "their"} own, or on the inverter's other input.`,
+      `Move ${one ? "it" : "them"} to a sunnier part of the roof.`,
+      `Take ${one ? "it" : "them"} off: the system is a little smaller, the string isn't held back.`,
+    ],
+    actions: [{ label: "Show the shade", act: "show-shade" }],
+  };
 }
 
 /** The kind as a few words over the nudge. */
