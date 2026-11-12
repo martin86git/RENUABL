@@ -4,6 +4,7 @@
  * no picture. The picture is only ever kept as redrawn by `avatarImage`.
  */
 import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
+import { cleanNotes, cleanTurns, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { dbConfigured, query } from "./db";
 
 export interface Caller {
@@ -78,4 +79,24 @@ export async function callerPhoto(businessId: string): Promise<{ bytes: Buffer; 
   );
   const row = rows[0];
   return row?.photo && row.photo_type ? { bytes: row.photo, contentType: row.photo_type } : null;
+}
+
+/** How the business has coached its assistant: the notes it keeps for every call, and the conversation so far. */
+export async function coachingOf(businessId: string): Promise<{ notes: CoachNote[]; turns: CoachTurn[] }> {
+  if (!dbConfigured()) return { notes: [], turns: [] };
+  const rows = await query<{ coach_notes: unknown; coach_chat: unknown }>(
+    `select coach_notes, coach_chat from design_caller where business_id = $1`,
+    [businessId],
+  );
+  return { notes: cleanNotes(rows[0]?.coach_notes), turns: cleanTurns(rows[0]?.coach_chat) };
+}
+
+/** The notes and conversation, already cleaned (cleanNotes, cleanTurns). */
+export async function saveCoaching(businessId: string, c: { notes: CoachNote[]; turns: CoachTurn[] }, by: string): Promise<void> {
+  await query(
+    `insert into design_caller (business_id, name, coach_notes, coach_chat, updated_by) values ($1, $2, $3, $4, $5)
+     on conflict (business_id) do update set coach_notes = excluded.coach_notes, coach_chat = excluded.coach_chat,
+       updated_by = excluded.updated_by, updated_at = now()`,
+    [businessId, DEFAULT_CALLER, JSON.stringify(cleanNotes(c.notes)), JSON.stringify(cleanTurns(c.turns)), by],
+  );
 }

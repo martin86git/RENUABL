@@ -1375,6 +1375,10 @@ alter table design_browser_calls add column if not exists transcript_lines jsonb
 -- The voice it speaks in (Vapi's or ElevenLabs', by ID; none is the site's default).
 alter table design_caller add column if not exists voice_provider text;
 alter table design_caller add column if not exists voice_id text;
+-- How the business has coached its phone assistant (domain/design/coaching.ts): the notes it keeps for every call, and
+-- the conversation in which it was coached.
+alter table design_caller add column if not exists coach_notes jsonb;
+alter table design_caller add column if not exists coach_chat jsonb;
 -- (Kept after design_jobs, which both point at, so a new database is made in order.)
 -- Jobs a retailer sends to a connected installer (domain/design/job-shares.ts): one live a job at a time, opened in
 -- the installer's login through the job card's own installer link (token, installer id "biz:<business>").

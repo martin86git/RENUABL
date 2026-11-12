@@ -41,6 +41,7 @@ import { SolDock, SolNavButton, SolRail } from "./sol-dock";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { ComputerCallBar } from "./computer-call";
 import { AssistantCallWindow } from "./assistant-call";
+import { CoachButton, CoachWindow } from "./coach-chat";
 import { TeamChatButton } from "./team-chat";
 import { DayWeather, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
@@ -334,6 +335,8 @@ function Shell({
       <ComputerCallBar />
       {/* The phone assistant's call as it happens, once a call is handed to it. */}
       <AssistantCallWindow />
+      {/* Talking to the phone assistant to coach it, opened from its face on the rail, Settings or a call. */}
+      <CoachWindow />
       {/* The owner viewing as someone else: whose view it is, that nothing can be changed, and the way back. */}
       {account.viewedBy && (
         <div className="sticky top-0 z-[45] flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-sun-line px-4 py-2 text-center text-sm text-white print:hidden">
@@ -797,6 +800,7 @@ function Shell({
       {retail && !tool && (
         <SolRail
           team={<TeamChatButton me={account.email} customers={unread + mentions} />}
+          assistant={kind === "retailer" ? <CoachButton /> : undefined}
           calc={designsRoofs(kind) ? <QuickCalc place="rail" /> : undefined}
           tools={
             <>

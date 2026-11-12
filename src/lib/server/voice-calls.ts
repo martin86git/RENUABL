@@ -59,7 +59,7 @@ import { loadBrand, publicProposal, tokenForJob } from "./design-proposal-repo";
 import { emailProvider, sendEmail } from "./email";
 import { alertNewLead, textStaff } from "./lead-alert";
 import { testCallWords } from "@/lib/domain/design/caller";
-import { callerOf } from "./design-caller-repo";
+import { callerOf, coachingOf } from "./design-caller-repo";
 import { addHomeLead, findCustomerByMobile, type HomeLead, renuablCrm } from "./renuabl-crm";
 import { sendSms, smsConfigured } from "./sms";
 
@@ -225,6 +225,8 @@ async function briefFor(
   const brand = await loadBrand(row.business_id, biz[0]?.name ?? "");
   const own = (await renuablCrm().catch(() => null))?.businessId === row.business_id;
   const caller = await callerOf(row.business_id);
+  // How the business has coached its assistant, read fresh for every call.
+  const coaching = (await coachingOf(row.business_id).catch(() => null))?.notes.map((n) => n.text) ?? [];
   // Someone ringing in may be ringing about their proposal: theirs is read whenever one is out.
   const token = row.mode === "proposal" || row.lead.inbound ? await tokenForJob(row.business_id, row.job_id) : null;
   const view = token ? (await publicProposal(token, todayInMarket()))?.view : null;
@@ -244,6 +246,7 @@ async function briefFor(
       canSendLink: Boolean(view) && smsConfigured(),
       hasEmail: Boolean(row.email),
       inbound: Boolean(row.lead.inbound),
+      coaching,
     },
   };
 }

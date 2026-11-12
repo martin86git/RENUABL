@@ -6,6 +6,7 @@ import { CalendarCheck, ChevronDown, FileText, PhoneIncoming, PhoneMissed, Phone
 import { transcriptFor } from "@/lib/domain/call-transcript";
 import type { LiveLine } from "@/lib/domain/live-call";
 import { useCallTranscripts } from "@/lib/services/call-transcripts";
+import { openCoach } from "@/lib/services/coaching";
 import { readCallLine, type CallOutcome } from "@/lib/domain/voice-agent";
 import { recordingOf } from "@/lib/domain/browser-call";
 import { outcomeTone } from "@/lib/domain/design/call-log";
@@ -120,6 +121,22 @@ function CallTranscriptToggle(props: { jobId: string; entry: { text: string; at:
             <TranscriptLine key={i} line={l} ours={ours} />
           ))}
           <p className="pt-1 text-[11px] text-muted">Transcribed by machine, so a word may be misheard.</p>
+          {props.kind === "assistant" && caller.named && (
+            <button
+              type="button"
+              onClick={() =>
+                openCoach({
+                  jobId: props.jobId,
+                  transcriptId: found.id,
+                  about: `A call, ${new Date(found.at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}`,
+                })
+              }
+              className="tap-area mt-1 inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-xs font-medium text-ink ring-1 ring-line hover:ring-sun-line"
+            >
+              <CallerAvatar caller={caller} size={18} />
+              Tell {caller.name} about this call
+            </button>
+          )}
         </div>
       )}
     </div>

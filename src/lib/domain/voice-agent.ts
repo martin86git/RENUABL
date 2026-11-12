@@ -1,4 +1,5 @@
 import { buildCallAvailability, formatCallTime, isBookableCallSlot } from "./booking";
+import { coachingBlock } from "./design/coaching";
 import { formatDate } from "./format";
 import { LAUNCH_MARKET, marketDateTime, todayInMarket } from "./market";
 import { addDays, fromISODate, HOLIDAYS_LISTED_UNTIL, toISODate, VIC_PUBLIC_HOLIDAYS } from "./scheduling";
@@ -224,6 +225,8 @@ export interface CallBrief {
   hasEmail: boolean;
   /** They rang the business's number (not a call we placed). */
   inbound?: boolean;
+  /** How the business has coached its assistant, a note a line (domain/design/coaching.ts), after every rule above. */
+  coaching?: string[];
 }
 
 /** A name safe to say and put in a prompt: letters, spaces, apostrophes and hyphens. */
@@ -354,6 +357,8 @@ export function voiceSystemPrompt(b: CallBrief, slots: VoiceSlot[], o: { canTran
       ? `Their proposal, exactly as they can read it (the only figures you may use):\n${b.proposal}`
       : `What we know about them:\n${b.about.map((l) => `- ${plain(l, 200)}`).join("\n") || "- Nothing more yet."}`;
 
+  // How the business has coached its assistant comes last, after every rule it always keeps.
+  const coached = coachingBlock(b.coaching ?? [], business);
   return `You are ${plain(b.assistant, 20) || "Sol"}, ${business}'s automated phone assistant.
 
 ${job}
@@ -376,7 +381,7 @@ ${OBJECTIONS.map((x) => `- "${x.worry}": ${x.approach}`).join("\n")}
 Your tools:
 ${tools.join("\n")}
 
-${facts}${b.canBook ? `\n\nTimes you can offer (${LAUNCH_MARKET.capital} time):\n${times || "- None this week: offer a call back from the team instead."}` : ""}`;
+${facts}${b.canBook ? `\n\nTimes you can offer (${LAUNCH_MARKET.capital} time):\n${times || "- None this week: offer a call back from the team instead."}` : ""}${coached ? `\n\n${coached}` : ""}`;
 }
 
 export const VOICE_TOOLS = {

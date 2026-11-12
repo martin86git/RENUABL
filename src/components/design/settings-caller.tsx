@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Camera, Check, Phone, PhoneCall, Trash2 } from "lucide-react";
+import { Camera, Check, MessageCircle, Phone, PhoneCall, Trash2 } from "lucide-react";
 import {
   CALLER_COPY,
   CALLER_NAME_MAX,
@@ -27,6 +27,8 @@ import {
   type CallerState,
 } from "@/lib/services/caller";
 import { ui } from "./design-shell";
+import { COACH_COPY } from "@/lib/domain/design/coaching";
+import { openCoach } from "@/lib/services/coaching";
 
 /** The phone assistant's face: its picture, else its initial on graphite. */
 export function CallerAvatar({ caller, size = 32, className }: { caller: CallerState; size?: number; className?: string }) {
@@ -168,6 +170,18 @@ export function CallerSettings() {
             </div>
 
             <VoicePicker caller={caller} callsOn={callsOn} onSaved={(c) => setCaller(c)} onStatus={setStatus} />
+
+            {/* Coaching it (12 Nov 2026, Martin): talk to it in plain words; what it keeps is used on every call. */}
+            <div className="flex flex-wrap items-center gap-3 rounded-xl bg-surface-2 p-4">
+              <MessageCircle className="size-5 shrink-0 text-ink-2" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-ink">{COACH_COPY.title(caller.name)}</p>
+                <p className="text-xs text-muted">{COACH_COPY.intro(caller.name)}</p>
+              </div>
+              <button type="button" className={ui.primary} onClick={() => openCoach(null)}>
+                {COACH_COPY.title(caller.name)}
+              </button>
+            </div>
 
             <p className="text-xs text-muted">
               {callsOn
