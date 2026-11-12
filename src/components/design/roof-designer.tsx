@@ -2422,8 +2422,33 @@ export function RoofDesigner(props: {
   };
   const removePicked = () => removePicks(picks);
   /** The eraser: whatever is under the point goes. A panel or a label first; failing that, a guide line close by. */
+  /**
+   * Traced faces taken off every other design on the roof too (12 Nov 2026, Martin: "the roof tracing is persisting";
+   * a face is the roof's, copied onto each design made from it, so taking it off one left it on the rest to come back
+   * when they opened). Matched by id or by the same corners; their places on strings go with them, panels laid loose stay.
+   */
+  const dropFacesElsewhere = (gone: readonly Face[]) => {
+    if (!gone.length) return;
+    const ids = new Set(gone.map((f) => f.id));
+    const shapes = new Set(gone.map((f) => JSON.stringify(f.points)));
+    const matches = (f: Face) => ids.has(f.id) || shapes.has(JSON.stringify(f.points));
+    setDesigns((list) =>
+      list.map((d, i) => {
+        if (i === active || !d.faces.some(matches)) return d;
+        const lost = d.faces.filter(matches).map((f) => `g:${f.id}:`);
+        return {
+          ...d,
+          faces: d.faces.filter((f) => !matches(f)),
+          strings: (d.strings ?? [])
+            .map((st) => ({ ...st, panels: st.panels.filter((k) => !lost.some((p) => k.startsWith(p))) }))
+            .filter((st) => st.panels.length),
+        };
+      }),
+    );
+  };
   /** A traced roof face taken away, with its row panels and their places on strings (8 Nov 2026, Martin: no way to untrace). */
   const removeFace = (id: string) => {
+    dropFacesElsewhere(faces.filter((f) => f.id === id));
     setFaces((all) => all.filter((f) => f.id !== id));
     setStrings((all) =>
       all.map((s) => ({ ...s, panels: s.panels.filter((k) => !k.startsWith(`g:${id}:`)) })).filter((s) => s.panels.length),
@@ -4316,6 +4341,22 @@ export function RoofDesigner(props: {
   const [resetAsk, setResetAsk] = useState(false);
   const resetDesign = () => {
     const list = everyDesign();
+    // The faces traced on this design come off the others too (dropFacesElsewhere), so they don't come back.
+    const gone = list[active].faces;
+    const ids = new Set(gone.map((f) => f.id));
+    const shapes = new Set(gone.map((f) => JSON.stringify(f.points)));
+    list.forEach((d, i) => {
+      if (i === active) return;
+      const lost = d.faces.filter((f) => ids.has(f.id) || shapes.has(JSON.stringify(f.points))).map((f) => `g:${f.id}:`);
+      if (!lost.length) return;
+      list[i] = {
+        ...d,
+        faces: d.faces.filter((f) => !ids.has(f.id) && !shapes.has(JSON.stringify(f.points))),
+        strings: (d.strings ?? [])
+          .map((st) => ({ ...st, panels: st.panels.filter((k) => !lost.some((p) => k.startsWith(p))) }))
+          .filter((st) => st.panels.length),
+      };
+    });
     list[active] = {
       ...spot,
       faces: [],
