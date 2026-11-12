@@ -961,6 +961,9 @@ function PitchFirst(props: {
  * The widest the picture may be and still fit the window with the bar and the figures above it: the picture is
  * given all the room there is, since it is where the work is done.
  */
+/** The square round the address whose heights give the pitch when Nearmap has no outline of the home, metres. */
+const PITCH_SQUARE_M = 20;
+
 const FIT = `calc((100dvh - 14rem) * ${ROOF_IMAGE.width / ROOF_IMAGE.height})`;
 const WHOLE: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: ROOF_IMAGE.width, h: ROOF_IMAGE.height };
 /**
@@ -1760,6 +1763,9 @@ export function RoofDesigner(props: {
   const [pitchNote, setPitchNote] = useState<{ words: string; at: string } | null>(null);
   const [pitchGuess, setPitchGuess] = useState<{ read: PitchReading; words: string; at: string } | null>(null);
   const [pitchReading, setPitchReading] = useState(false);
+  // Why the pitch couldn't be read when the roof opened, shown on the card that asks for it (12 Nov 2026, Martin: it
+  // stayed at 22° with no word).
+  const [pitchMiss, setPitchMiss] = useState<{ words: string; at: string } | null>(null);
   const setQuote = (next: QuoteFields) => {
     setQuotes(
       sharedHome(
@@ -3758,14 +3764,26 @@ export function RoofDesigner(props: {
   const readRoofPitch = async (): Promise<{ read: PitchReading; words: string } | { note: string }> => {
     if (!props.nearmapPicture) return { note: "Only a Nearmap picture has the heights to read the pitch from: switch to Nearmap first." };
     const [outline, heights] = await Promise.all([nearmapFace(), loadTerrain(spot.lat, spot.lng, { nearmap: true })]);
-    if ("note" in outline) return { note: outline.note };
     if (!heights || heights.from !== "nearmap") return { note: "Nearmap has no height data at this address yet. Set the pitch by hand." };
-    const read = pitchOfRoof(facesFromHeights(outline.face.points, heights).map((f) => ({ pitch: f.aspect.pitch, areaM2: f.areaM2 })));
+    // Without Nearmap's outline of the home, the heights in a square round the address (12 Nov 2026, Martin: the
+    // pitch stayed at 22° on a Nearmap roof): the pitch most of it is at is still the home's, to check.
+    const half = PITCH_SQUARE_M / 2 / scale;
+    const [cx, cy] = [ROOF_IMAGE.width / 2, ROOF_IMAGE.height / 2];
+    const area =
+      "note" in outline
+        ? [
+            { x: cx - half, y: cy - half },
+            { x: cx + half, y: cy - half },
+            { x: cx + half, y: cy + half },
+            { x: cx - half, y: cy + half },
+          ]
+        : outline.face.points;
+    const read = pitchOfRoof(facesFromHeights(area, heights).map((f) => ({ pitch: f.aspect.pitch, areaM2: f.areaM2 })));
     if (!read) return { note: PITCH_NOT_READ };
     const day = heights.captured
       ? new Date(`${heights.captured}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })
       : null;
-    return { read, words: pitchReadWords(read, "Nearmap's heights", day) };
+    return { read, words: pitchReadWords(read, "note" in outline ? "Nearmap's heights round the address" : "Nearmap's heights", day) };
   };
   /** The reading put on the home: its pitch, or flat. As it is now, whenever the answer comes back. */
   const applyPitch = useRef<(read: PitchReading, only: "unset" | "always") => boolean>(() => false);
@@ -3799,7 +3817,7 @@ export function RoofDesigner(props: {
     void readRoofPitch().then((got) => {
       if (gone) return;
       setPitchReading(false);
-      if ("note" in got) return;
+      if ("note" in got) return setPitchMiss({ words: `I couldn't read the pitch: ${got.note}`, at: spotKey });
       if (got.read.sure) {
         if (applyPitch.current(got.read, "unset")) setPitchNote({ words: got.words, at: spotKey });
       } else setPitchGuess({ read: got.read, words: got.words, at: spotKey });
@@ -7964,7 +7982,7 @@ export function RoofDesigner(props: {
                 <PitchFirst
                   key={`${active}-${pitchGuess?.at === spotKey ? pitchGuess.read.pitch : ""}`}
                   pitch={pitchGuess?.at === spotKey && !pitchGuess.read.flat ? pitchGuess.read.pitch : (quoteNow.form.pitch ?? TILT.roof)}
-                  hint={pitchGuess?.at === spotKey ? pitchGuess.words : null}
+                  hint={pitchGuess?.at === spotKey ? pitchGuess.words : pitchMiss?.at === spotKey ? pitchMiss.words : null}
                   reading={pitchReading}
                   flat={quoteNow.form.roof === "flat"}
                   onSet={(pitch, roof) =>
