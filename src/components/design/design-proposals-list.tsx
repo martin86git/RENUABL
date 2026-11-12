@@ -89,7 +89,7 @@ function Sold({ kw, batteryKwh }: { kw: number; batteryKwh: number }) {
 function SentOn({ at, now }: { at: string; now: Date }) {
   const s = sentStamp(at, now);
   return (
-    <div className="w-24 shrink-0 rounded-md bg-sun px-3 py-2 text-sun-ink" title={`Sent ${s.full}`}>
+    <div className="w-24 shrink-0 rounded-md bg-canvas px-3 py-2 text-ink-2 ring-1 ring-line" title={`Sent ${s.full}`}>
       <p className="text-[9px] font-semibold uppercase tracking-[0.14em]">Sent</p>
       <p className="text-[17px] leading-tight tracking-tight">{s.day}</p>
       <p className="text-[11px] tabular-nums">
@@ -191,7 +191,7 @@ function Status({ state }: { state: ProposalLine["state"] }) {
         ? ["Signed", "bg-positive-soft text-positive"]
         : state === "lapsed"
           ? ["Price lapsed", "bg-canvas text-muted"]
-          : ["Waiting on the customer", "bg-sun text-sun-ink"];
+          : ["Waiting on the customer", "bg-canvas text-ink-2"];
   return <span className={clsx("rounded-full px-2.5 py-0.5 text-xs font-medium", tone)}>{words}</span>;
 }
 

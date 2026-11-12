@@ -94,7 +94,7 @@ export function JobsPage({ initialPhase }: { initialPhase?: JobPhase }) {
           aria-expanded={adding}
           aria-label="New deal"
           title="New deal"
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white shadow-sm transition hover:brightness-105"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-surface text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-ink-2"
         >
           <Plus className={clsx("size-5 transition", adding && "rotate-45")} strokeWidth={2.25} aria-hidden />
         </button>
@@ -153,7 +153,7 @@ export function JobsPage({ initialPhase }: { initialPhase?: JobPhase }) {
                   onClick={() => choosePhase(p.id)}
                   className={clsx(
                     "rounded-2xl bg-surface px-4 py-3 text-left transition",
-                    on ? "ring-2 ring-sun-line" : "ring-1 ring-line hover:ring-ink-2",
+                    on ? "ring-2 ring-ink" : "ring-1 ring-line hover:ring-ink-2",
                   )}
                 >
                   <span className="block text-[13px] text-ink-2">{p.label}</span>
