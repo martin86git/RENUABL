@@ -115,7 +115,7 @@ export default async function AdminPage() {
         </Panel>
       )}
       {voiceCalls.length > 0 && (
-        <Panel className="mt-6" title={`Revo's calls · ${voiceCalls.length}`}>
+        <Panel className="mt-6" title={`Phone assistant's calls · ${voiceCalls.length}`}>
           <ul className="divide-y divide-line">
             {voiceCalls.map((c) => (
               <li key={c.id} className="px-5 py-4">

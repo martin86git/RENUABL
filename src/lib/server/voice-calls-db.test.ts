@@ -3,7 +3,8 @@
  * assistant's calls on CRM deals, with Vapi's API faked. That a homeowner lead becomes a deal in RENUABL's own CRM and
  * is rung once, with our reference and secret; that book_call takes only an offered time and writes it on the deal;
  * that an unanswered call is tried again and booking on the page stops it; that "Call me" rings the number on the
- * customer's record about their proposal; and that another business's deals aren't called.
+ * customer's record about their proposal; that another business's deals aren't called; and that someone ringing the
+ * number is answered on their own deal, or made a new lead.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { BUSINESS_TERMS_VERSION } from "@/lib/domain/design/account";
@@ -49,6 +50,8 @@ describe.skipIf(!url)("voice calls on deals (database)", () => {
     await db.query(`delete from businesses where id in (select business_id from business_members where email in ($1, $2))`, [OWN, OTHER]);
     own = (await repo.createBusiness(OWN, "RENUABL", BUSINESS_TERMS_VERSION, "retailer")).businessId;
     other = (await repo.createBusiness(OTHER, "Other Solar", BUSINESS_TERMS_VERSION, "retailer")).businessId;
+    // RENUABL named its phone assistant (Settings → Phone assistant); the other business left it as Sol.
+    await (await import("./design-caller-repo")).setCallerName(own, "Ella", OWN);
     vi.stubGlobal("fetch", async (u: string, init?: RequestInit) => {
       sent.push({ url: String(u), method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : null });
       return new Response(JSON.stringify({ id: `call_${++n}` }), { status: 201 });
@@ -85,7 +88,7 @@ describe.skipIf(!url)("voice calls on deals (database)", () => {
     const body = calls()[0].body!;
     expect(body.customer).toEqual({ number: MOBILE, name: "Sam" });
     const assistant = body.assistant as { name: string; server: { url: string; headers: Record<string, string> } };
-    expect(assistant.name).toBe("Revo");
+    expect(assistant.name).toBe("Ella");
     expect(assistant.server.url).toBe(`https://www.renuabl.test/api/voice/vapi?ref=${row.id}`);
     expect(assistant.server.headers["x-renuabl-voice"]).toBe("a-test-secret-of-twenty-plus");
     // The same deal is never rung twice at once.
@@ -114,7 +117,7 @@ describe.skipIf(!url)("voice calls on deals (database)", () => {
       [own, row.job_id],
     );
     expect(record.map((r) => r.text).join("\n")).toContain(slot.label);
-    expect(record.every((r) => r.by_email === "Revo")).toBe(true);
+    expect(record.every((r) => r.by_email === "Ella")).toBe(true);
     expect((await voice.listVoiceCalls()).find((c) => c.id === row.id)!.events.map((e) => e.kind)).toEqual(["booked", "ended"]);
   });
 
@@ -205,7 +208,7 @@ describe.skipIf(!url)("voice calls on deals (database)", () => {
     if (theirs === "full" || !theirs.job) throw new Error("no deal");
     expect((await voice.queueCall({ businessId: other, jobId: theirs.job.id, mode: "lead", asked: false })).result).toBe("off");
     expect(await voice.callMeFor(other)).toBeNull();
-    expect(await voice.callMeFor(own)).toEqual({ assistant: "Revo" });
+    expect(await voice.callMeFor(own)).toEqual({ assistant: "Ella" });
     const none = await crm.createCustomer(
       own,
       {
@@ -226,5 +229,48 @@ describe.skipIf(!url)("voice calls on deals (database)", () => {
     if (none === "full" || !none.job) throw new Error("no deal");
     expect((await voice.queueCall({ businessId: own, jobId: none.job.id, mode: "lead", asked: false })).result).toBe("no-number");
     expect(calls()).toHaveLength(0);
+  });
+
+  it("answers someone who rings in, on their own deal or as a new lead", async () => {
+    const ring = (number: string, id: string, phoneNumberId = "pn_test") =>
+      voice.answerInbound(readVapiEvent({ message: { type: "assistant-request", call: { id, phoneNumberId, customer: { number } } } }));
+
+    // A lead rings back: answered on their own deal (the open run of calls on their number, else their latest deal), told they rang in.
+    const back = (await ring(MOBILE, "in_1")).assistant as { firstMessage: string; name: string; server?: { url: string } };
+    expect(back.name).toBe("Ella");
+    expect(back.firstMessage).toContain("thanks for calling RENUABL");
+    const ref = new URL(back.server!.url).searchParams.get("ref")!;
+    const row = (await voice.voiceCallByRef(ref))!;
+    expect(row).toMatchObject({ mobile: MOBILE, status: "calling", vapi_call_id: "in_1" });
+    expect(row.lead.inbound).toBe(true);
+    const sams = await db.query<{ id: string }>(
+      `select j.id from design_jobs j join design_customers c on c.id = j.customer_id
+        where j.business_id = $1 and regexp_replace(c.phone, '\\D', '', 'g') in ('61491570110', '0491570110')`,
+      [own],
+    );
+    expect(sams.map((j) => j.id)).toContain(row.job_id);
+
+    // The call ends with nothing booked: written on the deal as a call that came in, and no call back is lined up.
+    await voice.handleCallEnded(
+      row,
+      readVapiEvent({ message: { type: "end-of-call-report", endedReason: "customer-ended-call", call: { id: "in_1" } } }),
+    );
+    expect(calls()).toHaveLength(0);
+    expect((await voice.voiceCallByRef(ref))!.status).toBe("done");
+    const lines = await db.query<{ text: string }>(
+      `select text from design_activity where job_id = $1 and kind = 'call' order by at desc limit 1`,
+      [row.job_id],
+    );
+    expect(lines[0].text).toBe("Spoke to them, nothing booked\nThey rang in.");
+
+    // Someone we've never heard of: a new lead made from the number.
+    const stranger = (await ring("0491570199", "in_2")).assistant as { server?: { url: string } };
+    const fresh = (await voice.voiceCallByRef(new URL(stranger.server!.url).searchParams.get("ref")!))!;
+    expect(fresh.mobile).toBe("+61491570199");
+    expect(fresh.lead.source).toBe("Rang our number");
+
+    // Another number than ours, or a withheld one: a kind message and nothing kept.
+    expect((await ring(MOBILE, "in_3", "pn_someone_else")).assistant).not.toHaveProperty("server");
+    expect((await ring("", "in_4")).assistant).not.toHaveProperty("server");
   });
 });

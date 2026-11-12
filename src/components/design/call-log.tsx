@@ -18,6 +18,8 @@ import {
 } from "@/lib/domain/design/call-log";
 import { loadCallLog } from "@/lib/services/call-log";
 import { SolBadge } from "./sol-icon";
+import { useCaller } from "@/lib/services/caller";
+import { CallerAvatar } from "./settings-caller";
 
 const time = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", timeZone: "Australia/Melbourne" });
@@ -157,8 +159,11 @@ export function CallLogPage() {
 
 function CallRow({ call }: { call: CallLogEntry }) {
   const [open, setOpen] = useState(false);
+  const caller = useCaller();
   const tone = outcomeTone(call.outcome);
   const sol = call.who === "sol";
+  // The business's phone assistant, under the name and face it gave it (Settings → Phone assistant).
+  const theirs = sol && callerName(call).toLowerCase() === caller.name.toLowerCase();
   return (
     <li className="rounded-2xl bg-surface px-4 py-3 ring-1 ring-line">
       <div className="flex items-start gap-3">
@@ -169,7 +174,7 @@ function CallRow({ call }: { call: CallLogEntry }) {
           )}
           aria-hidden
         >
-          {sol ? <SolBadge className="size-5" /> : callerName(call).slice(0, 2)}
+          {theirs ? <CallerAvatar caller={caller} size={36} /> : sol ? <SolBadge className="size-5" /> : callerName(call).slice(0, 2)}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3">

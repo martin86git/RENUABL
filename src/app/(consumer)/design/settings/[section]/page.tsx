@@ -10,6 +10,7 @@ import { DatasheetSettings } from "@/components/design/settings-datasheets";
 import { StandardsSettings } from "@/components/design/settings-standards";
 import { TargetsSettings } from "@/components/design/settings-targets";
 import { CardPaymentsSettings } from "@/components/design/settings-card-payments";
+import { CallerSettings } from "@/components/design/settings-caller";
 import { StaffViewAs } from "@/components/design/staff-view-as";
 import { settingBySlug } from "@/components/design/settings-list";
 import { SettingSoon, SettingsFrame } from "@/components/design/settings-nav";
@@ -76,6 +77,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <DealFieldsSettings />
         ) : section === "billing" ? (
           <BillingPage />
+        ) : section === "calls" ? (
+          <CallerSettings />
         ) : section === "card-payments" ? (
           <CardPaymentsSettings />
         ) : section === "view-as" ? (

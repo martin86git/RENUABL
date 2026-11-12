@@ -1318,6 +1318,17 @@ create table if not exists voice_call_events (
   at timestamptz not null default now()
 );
 create index if not exists voice_call_events_call on voice_call_events(voice_call_id, at);
+-- The business's phone assistant as its customers meet it (domain/design/caller.ts): the name it gives on calls and
+-- its picture, redrawn small on the server (server/design-caller-repo.ts). One row a business; none is "Sol".
+create table if not exists design_caller (
+  business_id text primary key references businesses(id) on delete cascade,
+  name text not null,
+  photo bytea,
+  photo_type text,
+  photo_at timestamptz,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
 -- (Kept after design_jobs, which both point at, so a new database is made in order.)
 -- Jobs a retailer sends to a connected installer (domain/design/job-shares.ts): one live a job at a time, opened in
 -- the installer's login through the job card's own installer link (token, installer id "biz:<business>").

@@ -79,6 +79,7 @@ import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { bannerFigures } from "@/lib/domain/design/system-summary";
 import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
 import { DealEmails } from "./deal-emails";
+import { CallEntryBy, CallEntryText } from "./call-entry";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
 type Written = "note" | "call" | "email";
@@ -918,7 +919,7 @@ export function DealPage({ id }: { id: string }) {
                           <div className="flex items-baseline justify-between gap-3">
                             <p className="text-sm text-ink">
                               <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
-                              <span className="text-ink-2">by {a.by.split("@")[0]}</span>
+                              {a.kind === "call" ? <CallEntryBy by={a.by} /> : <span className="text-ink-2">by {a.by.split("@")[0]}</span>}
                             </p>
                             <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={a.at}>
                               {new Date(a.at).toLocaleString("en-AU", {
@@ -930,7 +931,11 @@ export function DealPage({ id }: { id: string }) {
                               })}
                             </time>
                           </div>
-                          <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
+                          {a.kind === "call" ? (
+                            <CallEntryText text={a.text} />
+                          ) : (
+                            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
+                          )}
                           {a.kind === "email" &&
                             opens &&
                             (opens.times[a.id] ? (

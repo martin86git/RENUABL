@@ -40,6 +40,26 @@ export async function safeImage(file: Uint8Array, kind: ImageKind): Promise<Safe
   }
 }
 
+/** The side of a phone assistant's picture, kept square. */
+export const AVATAR_SIDE = 320;
+
+/** A face for the phone assistant: the picture checked as any other, then cut square from its middle and kept small. */
+export async function avatarImage(file: Uint8Array): Promise<SafeImage | { problem: string }> {
+  if (file.length > IMAGE_LIMITS.uploadBytes) return { problem: IMAGE_TOO_BIG };
+  if (!sniffImage(file)) return { problem: IMAGE_WRONG };
+  try {
+    const { data, info } = await sharp(file, { limitInputPixels: 60_000_000, animated: false })
+      .rotate()
+      .resize({ width: AVATAR_SIDE, height: AVATAR_SIDE, fit: "cover", position: "attention" })
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: 86, mozjpeg: true })
+      .toBuffer({ resolveWithObject: true });
+    return { bytes: data, contentType: "image/jpeg", width: info.width, height: info.height };
+  } catch {
+    return { problem: IMAGE_WRONG };
+  }
+}
+
 /** A picture sent to a browser: its own kind and nothing else, never guessed at, kept by the browser (a picture never changes under its id). */
 export function imageResponse(image: { bytes: Buffer; contentType: string }): Response {
   return new Response(new Uint8Array(image.bytes), {

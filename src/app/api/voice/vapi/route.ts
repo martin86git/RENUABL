@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { readVapiEvent, VOICE_SECRET_HEADER } from "@/lib/domain/voice-agent";
-import { handleCallEnded, handleToolCall, voiceCallByRef, voiceSettings } from "@/lib/server/voice-calls";
+import { answerInbound, handleCallEnded, handleToolCall, voiceCallByRef, voiceSettings } from "@/lib/server/voice-calls";
 
 function sameSecret(given: string | null, expected: string): boolean {
   if (!given) return false;
@@ -11,10 +11,11 @@ function sameSecret(given: string | null, expected: string): boolean {
 }
 
 /**
- * POST ?ref=<voice call id>: Vapi's server messages for a call Revo placed (server/voice-calls.ts). Checked by the
- * shared secret in the header we gave Vapi with the call. "tool-calls" answers Revo's tools (book the 15-minute call,
- * don't call again); "end-of-call-report" keeps the call on the lead's record and tries again or hands over. Always 200
- * once checked: Vapi ignores other statuses and tells the caller it got no answer.
+ * POST: Vapi's server messages, checked by the shared secret in the header we gave Vapi (with each call we place, and on
+ * the number itself for calls coming in). "assistant-request" (someone rang the number, no ref) answers with the
+ * business's assistant (`answerInbound`); with ?ref=<voice call id>, "tool-calls" answers the assistant's tools (book
+ * the 15-minute call, don't call again) and "end-of-call-report" keeps the call on the deal's record and tries again or
+ * hands over. Always 200 once checked: Vapi ignores other statuses and tells the caller it got no answer.
  */
 export async function POST(request: Request) {
   const s = voiceSettings();
@@ -27,6 +28,9 @@ export async function POST(request: Request) {
     return Response.json({}, { status: 400 });
   }
   const event = readVapiEvent(body);
+
+  if (event.type === "assistant-request") return Response.json(await answerInbound(event));
+
   const row = await voiceCallByRef(ref).catch(() => null);
 
   if (event.type === "tool-calls") {

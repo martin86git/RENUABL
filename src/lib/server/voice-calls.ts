@@ -13,6 +13,10 @@
  * call at the next window (`schedulePlan`), so no cron is needed; unanswered calls are tried again the same way. Every
  * call ends on the deal's own record (and `voice_call_events`, with the transcript, on /admin). Never HubSpot. Never
  * throws into the request that asked for the call.
+ *
+ * Calls coming in on the number (someone ringing back) are answered too (`answerInbound`): Vapi asks the webhook for
+ * an assistant, the caller is found on the business's deals by their number (else made a new lead), and the same
+ * assistant answers. It speaks under the name the business gave it (design_caller, Settings → Phone assistant).
  */
 import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
 import { normaliseMobile } from "@/lib/domain/contact";
@@ -23,7 +27,10 @@ import { publicSiteUrl } from "@/lib/domain/site";
 import { siteUrl } from "@/lib/domain/sms";
 import {
   assistantConfig,
+  bookedLine,
+  CALL_HEADLINES,
   callRecordLine,
+  closedAssistant,
   type CallBrief,
   type CallMode,
   type CallOutcome,
@@ -49,7 +56,8 @@ import { jobById, record } from "./design-crm-repo";
 import { loadBrand, publicProposal, tokenForJob } from "./design-proposal-repo";
 import { emailProvider, sendEmail } from "./email";
 import { alertNewLead, textStaff } from "./lead-alert";
-import { addHomeLead, type HomeLead, renuablCrm } from "./renuabl-crm";
+import { callerOf } from "./design-caller-repo";
+import { addHomeLead, findCustomerByMobile, type HomeLead, renuablCrm } from "./renuabl-crm";
 import { sendSms, smsConfigured } from "./sms";
 
 const VAPI = "https://api.vapi.ai";
@@ -115,7 +123,7 @@ export interface VoiceRow {
   first_name: string | null;
   mobile: string;
   email: string | null;
-  lead: { about?: string[]; source?: string; texted?: boolean; assistant?: string };
+  lead: { about?: string[]; source?: string; texted?: boolean; assistant?: string; inbound?: boolean };
   status: "waiting" | "calling" | "booked" | "done" | "stopped";
   attempts: number;
   vapi_call_id: string | null;
@@ -203,8 +211,7 @@ export async function takeHomeLead(lead: HomeLead, call: boolean): Promise<void>
 /** For the customer's proposal page: whether "Call me" is offered, and who would call. Null when it isn't. */
 export async function callMeFor(businessId: string): Promise<{ assistant: string } | null> {
   if (!(await voiceOnFor(businessId).catch(() => false))) return null;
-  const own = (await renuablCrm().catch(() => null))?.businessId === businessId;
-  return { assistant: own ? "Revo" : "Sol" };
+  return { assistant: (await callerOf(businessId)).name };
 }
 
 /** What the assistant is told for this call, read fresh each time (the proposal as it stands now). */
@@ -212,13 +219,15 @@ async function briefFor(row: VoiceRow): Promise<{ brief: CallBrief; token: strin
   const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [row.business_id]);
   const brand = await loadBrand(row.business_id, biz[0]?.name ?? "");
   const own = (await renuablCrm().catch(() => null))?.businessId === row.business_id;
-  const token = row.mode === "proposal" ? await tokenForJob(row.business_id, row.job_id) : null;
+  const caller = await callerOf(row.business_id);
+  // Someone ringing in may be ringing about their proposal: theirs is read whenever one is out.
+  const token = row.mode === "proposal" || row.lead.inbound ? await tokenForJob(row.business_id, row.job_id) : null;
   const view = token ? (await publicProposal(token, todayInMarket()))?.view : null;
   return {
     token: view ? token : null,
     brief: {
       mode: view ? "proposal" : "lead",
-      assistant: own ? "Revo" : "Sol",
+      assistant: caller.name,
       business: brand.name || biz[0]?.name || "",
       firstName: row.first_name,
       about: row.lead.about ?? [],
@@ -227,6 +236,7 @@ async function briefFor(row: VoiceRow): Promise<{ brief: CallBrief; token: strin
       canBook: own && !view,
       canSendLink: Boolean(view) && smsConfigured(),
       hasEmail: Boolean(row.email),
+      inbound: Boolean(row.lead.inbound),
     },
   };
 }
@@ -377,7 +387,7 @@ export async function handleToolCall(
         .join("; ")}.`;
     await said(row, "booked", { status: "booked", call_label: slot.label });
     await event(row, "booked", { outcome: "booked", summary: slot.label });
-    await onDeal(row, `${assistant} booked a 15-minute call on the phone (automated): ${slot.label}.`);
+    await onDeal(row, bookedLine(slot.label));
     const who = row.first_name || "New lead";
     const details = {
       Stage: `Booked a 15-minute call on a call from ${assistant} (automated)`,
@@ -411,10 +421,7 @@ export async function handleToolCall(
     const when = toolWords(args, "when", 120);
     await said(row, "callback");
     await event(row, "callback", { outcome: "callback", summary: [about, when && `when: ${when}`].filter(Boolean).join("; ") });
-    await onDeal(
-      row,
-      `${assistant} on the phone (automated): they'd like a call back from the team${when ? ` (${when})` : ""}. About: ${about || "not said"}.`,
-    );
+    await onDeal(row, `${CALL_HEADLINES.callback}${when ? ` · ${when}` : ""}\nAbout: ${about || "not said"}.`);
     later(async () => {
       if (!emailProvider()) return;
       const found = await jobById(row.business_id, row.job_id).catch(() => null);
@@ -445,7 +452,7 @@ export async function handleToolCall(
       return "The text couldn't be sent just now. Tell them the link is in the email the proposal came with, and offer a call back.";
     await said(row, "link-sent");
     await event(row, "link", { outcome: "link-sent" });
-    await onDeal(row, `${assistant} texted the proposal link on the phone (automated).`);
+    await onDeal(row, `${CALL_HEADLINES["link-sent"]}\nTexted to them during the call.`);
     return "Sent: the link to their proposal is on its way by text.";
   }
 
@@ -453,7 +460,7 @@ export async function handleToolCall(
     const reason = toolWords(args, "reason");
     await said(row, "no-more-calls", { status: "stopped", stop_reason: reason || "not interested" });
     await event(row, "stopped", { outcome: "no-more-calls", summary: reason || undefined });
-    await onDeal(row, `${assistant} on the phone (automated): they asked not to be called again${reason ? ` (${reason})` : ""}.`);
+    await onDeal(row, `${CALL_HEADLINES["no-more-calls"]}${reason ? `\n${reason}` : ""}`);
     return "Noted. No one will call them again.";
   }
   return "That tool isn't available.";
@@ -465,11 +472,20 @@ export async function handleCallEnded(row: VoiceRow, e: VapiEvent): Promise<void
   const outcome = outcomeOf(e.endedReason, row.outcome);
   const assistant = row.lead.assistant || "Sol";
   await event(row, "ended", { outcome, endedReason: e.endedReason, summary: e.summary, transcript: e.transcript });
-  await onDeal(row, callRecordLine({ assistant, outcome, summary: e.summary, detail: row.call_label }));
+  await onDeal(row, callRecordLine({ outcome, summary: e.summary, detail: row.call_label, inbound: row.lead.inbound }));
   if (row.status === "booked" || row.status === "stopped") return;
 
   const s = voiceSettings();
   const own = (await renuablCrm().catch(() => null))?.businessId === row.business_id;
+  // They rang us: nothing to try again. The team hears when they spoke and nothing was booked.
+  if (row.lead.inbound) {
+    await finish(row.id, "done", { outcome });
+    if (own && outcome === "talked")
+      await textStaff(
+        `RENUABL: ${row.first_name || "Someone"} (${row.mobile}) rang and spoke to ${assistant}, but no call was booked. See the deal.`,
+      );
+    return;
+  }
   if (shouldRetry(outcome)) {
     const link = `${siteUrl() ?? publicSiteUrl()}/book-a-call`;
     let texted = Boolean(row.lead.texted);
@@ -549,4 +565,116 @@ export async function listVoiceCalls(limit = 50): Promise<VoiceCallListing[]> {
      from voice_calls c order by c.created_at desc limit $1`,
     [limit],
   );
+}
+
+/** Vapi's answer to a call coming in: the assistant to put on it. */
+export type InboundAnswer = { assistant: unknown };
+
+/**
+ * Someone rang the number (Vapi's "assistant-request"): find who they are on RENUABL's own deals by their number (the
+ * open run of calls on it, else their latest deal still going, else a new lead made from the number), keep the call
+ * on that deal and answer with the business's assistant, told they rang in. When calling is off, the number isn't
+ * ours, it's withheld, or anything fails, a short message says we can't take the call. Only RENUABL's own number for
+ * now: each business's own number comes later.
+ */
+export async function answerInbound(e: VapiEvent): Promise<InboundAnswer> {
+  const s = voiceSettings();
+  const crm = await renuablCrm().catch(() => null);
+  const closed = (): InboundAnswer => ({ assistant: closedAssistant({ business: crm?.name ?? "", model: s?.model ?? "claude-sonnet-5" }) });
+  if (!s || !crm || !dbConfigured()) return closed();
+  if (e.phoneNumberId && e.phoneNumberId !== s.phoneNumberId) return closed();
+  const mobile = normaliseMobile(e.number ?? "");
+  if (!mobile || !e.callId) return closed();
+  try {
+    const row = await inboundRow(s, crm.businessId, mobile, e.callId);
+    if (!row) return closed();
+    const { brief } = await briefFor(row);
+    const today = todayInMarket();
+    return {
+      assistant: assistantConfig({
+        brief,
+        slots: brief.canBook ? voiceSlots(today) : [],
+        serverUrl: `${s.site}/api/voice/vapi?ref=${encodeURIComponent(row.id)}`,
+        secret: s.secret,
+        model: s.model,
+        voice: s.voice,
+        transferNumber: s.transferNumber,
+      }),
+    };
+  } catch (err) {
+    console.error("call coming in not answered", err instanceof Error ? err.message : err);
+    return closed();
+  }
+}
+
+/** The run of calls a call coming in belongs to: the one open on this number (a call we'd lined up is cancelled), else a new one. */
+async function inboundRow(s: VoiceSettings, businessId: string, mobile: string, callId: string): Promise<VoiceRow | null> {
+  const caller = await callerOf(businessId);
+  const open = await query<VoiceRow>(
+    `select * from voice_calls where business_id = $1 and mobile = $2 and status in ('waiting', 'calling')
+      order by updated_at desc limit 1`,
+    [businessId, mobile],
+  );
+  if (open[0]) {
+    // They're ringing us: the call we were going to make them is no longer needed.
+    if (open[0].vapi_call_id && open[0].vapi_call_id !== callId)
+      await fetch(`${VAPI}/call/${encodeURIComponent(open[0].vapi_call_id)}`, {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${s.key}` },
+        signal: AbortSignal.timeout(5_000),
+      }).catch(() => undefined);
+    const rows = await query<VoiceRow>(
+      `update voice_calls set status = 'calling', vapi_call_id = $2, attempts = attempts + 1,
+         lead = lead || jsonb_build_object('inbound', true, 'assistant', $3::text), updated_at = now()
+       where id = $1 returning *`,
+      [open[0].id, callId, caller.name],
+    );
+    return rows[0] ?? null;
+  }
+  // Their latest deal still going, else a new lead made from the number they rang from.
+  const customer = await findCustomerByMobile(businessId, mobile);
+  let jobId: string | null = null;
+  let customerId = customer;
+  if (customer) {
+    const jobs = await query<{ id: string }>(
+      `select id from design_jobs where business_id = $1 and customer_id = $2 and stage <> 'lost' order by created_at desc limit 1`,
+      [businessId, customer],
+    );
+    jobId = jobs[0]?.id ?? null;
+  }
+  if (!jobId) {
+    const deal = await addHomeLead({
+      mobile,
+      source: "Rang our number",
+      details: { "How they came": `They rang ${mobile.replace(/^\+61/, "0")} into our number and ${caller.name} answered.` },
+    });
+    if (!deal) return null;
+    jobId = deal.jobId;
+    customerId = deal.customerId;
+  }
+  const found = await jobById(businessId, jobId!);
+  if (!found || !customerId) return null;
+  const rows = await query<VoiceRow>(
+    `insert into voice_calls (id, business_id, job_id, customer_id, mode, asked, first_name, mobile, email, lead, status, attempts, vapi_call_id)
+     values ($1, $2, $3, $4, 'lead', true, $5, $6, $7, $8, 'calling', 1, $9)
+     on conflict (business_id, job_id) where status in ('waiting', 'calling') do nothing
+     returning *`,
+    [
+      newId("vc"),
+      businessId,
+      jobId,
+      customerId,
+      speakableName(found.customer.firstName || found.customer.name.split(" ")[0]) || null,
+      mobile,
+      found.customer.email || null,
+      JSON.stringify({
+        inbound: true,
+        assistant: caller.name,
+        source: "Rang our number",
+        about: [found.job.title && `Looking for: ${found.job.title}`].filter(Boolean),
+      }),
+      callId,
+    ],
+  );
+  return rows[0] ?? null;
 }

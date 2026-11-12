@@ -1,7 +1,7 @@
 /**
  * The call log on Today (8 Nov 2026, Martin: a Calls tab between Deals and Inbox for the phone assistant, Vapi, with a
- * log of its calls). Every call on the deals this member may see, newest first: the ones Sol (or Revo, on RENUABL's own
- * deals) made through Vapi, each with what it came to, his summary and the transcript, and the calls the team logged on
+ * log of its calls). Every call on the deals this member may see, newest first: the ones the business's phone
+ * assistant (Sol until the business names it) made through Vapi, each with what it came to, his summary and the transcript, and the calls the team logged on
  * a deal (the note-taker or a note of kind call). Above them, the calls Sol still has lined up. Pure, tested.
  */
 import { OUTCOME_WORDS, type CallOutcome } from "../voice-agent";
@@ -20,7 +20,7 @@ export interface CallLogEntry {
   at: string;
   /** Sol's call through Vapi, or one the team logged. */
   who: "sol" | "team";
-  /** The assistant's name ("Sol", "Revo"), or the member's email. */
+  /** The phone assistant's name (Sol, or the name the business gave it), or the member's email. */
   by: string;
   /** What Sol's call came to; null for the team's. */
   outcome: CallOutcome | null;

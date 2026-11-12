@@ -57,6 +57,19 @@ export interface HomeDeal {
 
 const digits = (s: string) => s.replace(/\D/g, "");
 
+/** A business's customer with this mobile on their record (written +61… or 04…), or null. */
+export async function findCustomerByMobile(businessId: string, mobile: string): Promise<string | null> {
+  const m = normaliseMobile(mobile);
+  if (!m) return null;
+  const local = `0${digits(m).slice(2)}`;
+  const found = await query<{ id: string }>(
+    `select id from design_customers where business_id = $1 and regexp_replace(phone, '\\D', '', 'g') in ($2, $3)
+      order by created_at desc limit 1`,
+    [businessId, digits(m), local],
+  );
+  return found[0]?.id ?? null;
+}
+
 /**
  * A homeowner lead into RENUABL's CRM: the customer found by email, else by mobile (never overwritten), else made;
  * then a new deal at "lead" with the note. Null when RENUABL's CRM isn't set up or the lead couldn't be kept (logged:

@@ -55,6 +55,7 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
     title: "Business",
     items: [
       { slug: "users", label: "Users and permissions" },
+      { slug: "calls", label: "Phone assistant" },
       { slug: "billing", label: "Billing" },
       { slug: "card-payments", label: "Card payments from customers" },
     ],

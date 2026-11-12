@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   assistantConfig,
+  bookedLine,
   callRecordLine,
+  closedAssistant,
+  readCallLine,
   type CallBrief,
   firstMessage,
   mayCallNow,
@@ -31,7 +34,7 @@ const melb = (date: string, hhmm: string) => new Date(`${date}T${hhmm}:00+11:00`
 
 const lead: CallBrief = {
   mode: "lead",
-  assistant: "Revo",
+  assistant: "Ella",
   business: "RENUABL",
   firstName: "Sam <script>",
   about: ["Looking for: Solar and a battery", "Suburb: Glen Waverley"],
@@ -114,10 +117,39 @@ describe("outcomes", () => {
     expect(shouldRetry("no-more-calls")).toBe(false);
   });
 
-  it("writes one plain line on the deal", () => {
-    expect(callRecordLine({ assistant: "Sol", outcome: "link-sent", summary: "Went through the battery <b>size</b>." })).toBe(
-      "Sol called (automated): Sent the proposal link. Went through the battery bsize/b.",
+  it("writes what the call came to first, the booked time with it, then the summary", () => {
+    expect(callRecordLine({ outcome: "link-sent", summary: "Went through the battery <b>size</b>." })).toBe(
+      "Proposal link sent\nWent through the battery bsize/b.",
     );
+    const booked = callRecordLine({
+      outcome: "booked",
+      detail: "Saturday 14 November at 9am (Melbourne time)",
+      summary: "Keen on a battery.",
+    });
+    expect(booked).toBe("15-minute call booked · Saturday 14 November at 9am (Melbourne time)\nKeen on a battery.");
+    expect(callRecordLine({ outcome: "no-answer" })).toBe("No answer");
+    expect(callRecordLine({ outcome: "talked", inbound: true })).toBe("Spoke to them, nothing booked\nThey rang in.");
+    expect(bookedLine("Monday 16 November at 10am (Melbourne time)")).toMatch(/^15-minute call booked · Monday 16 November/);
+  });
+
+  it("reads a call entry back for the timeline, the older wording too", () => {
+    const now = readCallLine(
+      callRecordLine({ outcome: "booked", detail: "Saturday 14 November at 9am (Melbourne time)", summary: "Keen." }),
+    );
+    expect(now).toEqual({
+      outcome: "booked",
+      headline: "15-minute call booked",
+      detail: "Saturday 14 November at 9am (Melbourne time)",
+      rest: "Keen.",
+    });
+    const old = readCallLine(
+      "Revo called (automated): Booked a 15-minute call. Saturday 14 November at 9am (Melbourne time) Revo called Michelle about solar.",
+    );
+    expect(old?.outcome).toBe("booked");
+    expect(old?.detail).toBe("Saturday 14 November at 9am (Melbourne time)");
+    expect(old?.rest).toBe("Revo called Michelle about solar.");
+    expect(readCallLine("Sol called (automated): No answer.")?.outcome).toBe("no-answer");
+    expect(readCallLine("Rang them about the roof, all good.")).toBeNull();
   });
 });
 
@@ -150,7 +182,7 @@ describe("what it says", () => {
   it("opens by saying who it is, that it's automated and recorded", () => {
     const m = firstMessage(lead);
     expect(m).toContain("is that Sam");
-    expect(m).toContain("Revo, RENUABL's automated assistant");
+    expect(m).toContain("Ella, RENUABL's automated assistant");
     expect(m).toContain("recorded");
     expect(m).not.toMatch(/\bAI\b|<script/);
     expect(firstMessage(asked)).toContain("You asked us to give you a call about your proposal");
@@ -200,7 +232,7 @@ describe("what it says", () => {
     });
     expect(a.server.headers[VOICE_SECRET_HEADER]).toBe("s3");
     expect(a.model.provider).toBe("anthropic");
-    expect(a.name).toBe("Revo");
+    expect(a.name).toBe("Ella");
     expect(a.maxDurationSeconds).toBe(600);
     const tools = JSON.stringify(a.model.tools);
     expect(tools).toContain("book_call");
@@ -256,5 +288,34 @@ describe("Vapi messages", () => {
     });
     expect(e).toMatchObject({ type: "end-of-call-report", endedReason: "voicemail", callId: "c2", transcript: "AI: Hi" });
     expect(readVapiEvent(null).type).toBe("");
+  });
+});
+
+describe("calls that come in", () => {
+  const rang = { ...lead, inbound: true, asked: true };
+  it("thanks them for calling, says who it is, automated and recorded, and leaves no voicemail", () => {
+    const m = firstMessage(rang);
+    expect(m).toContain("thanks for calling RENUABL");
+    expect(m).toContain("Ella, the automated assistant");
+    expect(m).toContain("recorded");
+    const a = assistantConfig({ brief: rang, slots: [], serverUrl: "u", secret: "s", model: "m" });
+    expect(a).not.toHaveProperty("voicemailMessage");
+    expect(a.maxDurationSeconds).toBe(1200);
+    expect(a.model.messages[0].content).toContain("rang RENUABL's number themselves");
+    expect(a.model.messages[0].content).not.toContain("leave this message");
+  });
+
+  it("reads who rang and on which number", () => {
+    const e = readVapiEvent({
+      message: { type: "assistant-request", call: { id: "c1", phoneNumberId: "pn1", customer: { number: "+61400111222" } } },
+    });
+    expect(e).toMatchObject({ type: "assistant-request", callId: "c1", number: "+61400111222", phoneNumberId: "pn1" });
+  });
+
+  it("says kindly when it can't take the call, with nothing to keep", () => {
+    const c = closedAssistant({ business: "RENUABL <b>", model: "m" });
+    expect(c.firstMessage).toContain("Thanks for calling RENUABL");
+    expect(c.firstMessage).not.toContain("<");
+    expect(c).not.toHaveProperty("server");
   });
 });
