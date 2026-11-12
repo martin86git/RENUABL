@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { guideStep, guiding, panelsFor, reachedWords, targetWords, type GuideFacts } from "./sol-guide";
-import { batteryForKw, batteryWords } from "./sol-guide";
+import { batteryForKw, batteryWords, unstrungWords, wantsInputs } from "./sol-guide";
 
 const facts = (over: Partial<GuideFacts> = {}): GuideFacts => ({
   roof: "tile",
@@ -75,5 +75,23 @@ describe("the battery a size of panels points to", () => {
   it("is never under the smallest battery, and nothing without panels", () => {
     expect(batteryForKw(1)!.solarKwh).toBe(5);
     expect(batteryForKw(0)).toBeNull();
+  });
+});
+
+describe("panels left off the strings", () => {
+  it("says so after Sol strings them, with why, and offers more inputs when that's the reason", () => {
+    const answered = ["home", "target", "panel", "place", "reached", "inverter", "string"] as const;
+    const f = facts({
+      panels: 15,
+      kw: 7.1,
+      inverters: 1,
+      unstrung: 4,
+      leftWhy: ["4 panels facing 0° at 22°: no inverter input is left for them"],
+    });
+    expect(guideStep(answered, f)).toBe("unstrung");
+    expect(guideStep([...answered, "unstrung"], f)).toBeNull();
+    expect(guideStep(answered, { ...f, leftWhy: undefined })).toBeNull();
+    expect(unstrungWords(4, f.leftWhy!)).toBe("I couldn't string 4 panels: 4 panels facing 0° at 22°: no inverter input is left for them.");
+    expect(wantsInputs(f.leftWhy!)).toBe(true);
   });
 });

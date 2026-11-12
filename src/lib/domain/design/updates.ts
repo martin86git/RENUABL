@@ -17,6 +17,12 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-12",
     area: "Designer",
     words:
+      "When Sol can't string every panel, he says why and offers an inverter with more inputs, taking them off, or stringing by hand.",
+  },
+  {
+    day: "2026-11-12",
+    area: "Designer",
+    words:
       "Sol asks for the bill or a system size; the battery sizes itself, and the 3 free hours can make a second design.",
   },
   {

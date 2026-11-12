@@ -4,7 +4,15 @@ import clsx from "clsx";
 import { X } from "lucide-react";
 import { useState } from "react";
 import type { GuideStepId, GuideTarget } from "@/lib/domain/design/sol-guide";
-import { FREE_HOURS, batteryForKw, batteryWords, reachedWords, targetWords } from "@/lib/domain/design/sol-guide";
+import {
+  FREE_HOURS,
+  batteryForKw,
+  batteryWords,
+  reachedWords,
+  targetWords,
+  unstrungWords,
+  wantsInputs,
+} from "@/lib/domain/design/sol-guide";
 import { SolIcon } from "./sol-icon";
 
 type Phase = "single" | "three";
@@ -47,6 +55,10 @@ export function SolGuide(props: {
   onReached: (done: boolean) => void;
   onInverter: (use: boolean | "choose") => void;
   onString: (yes: boolean) => void;
+  /** Panels still off a string after Sol strung them, and why. */
+  unstrung: { left: number; why: string[] } | null;
+  /** What to do with them: an inverter with more inputs, take them off, string them by hand, or leave them. */
+  onUnstrung: (what: "inverter" | "remove" | "hand" | "leave") => void;
   /** "both": this design with the battery the panels fill, and a copy with the bigger one for the free hours. */
   onBattery: (add: boolean | "choose" | "both") => void;
   /** The battery Sol would pick for the free-hours version, when there is one. */
@@ -329,6 +341,19 @@ export function SolGuide(props: {
             <Actions>
               <Main onClick={() => props.onString(true)}>Yes, string them</Main>
               <Quiet onClick={() => props.onString(false)}>No, I&apos;ll string them</Quiet>
+            </Actions>
+          </>
+        );
+      case "unstrung":
+        if (!props.unstrung) return null;
+        return (
+          <>
+            <p>{unstrungWords(props.unstrung.left, props.unstrung.why)}</p>
+            <Actions>
+              {wantsInputs(props.unstrung.why) && <Main onClick={() => props.onUnstrung("inverter")}>An inverter with more inputs</Main>}
+              <Quiet onClick={() => props.onUnstrung("remove")}>Take them off</Quiet>
+              <Quiet onClick={() => props.onUnstrung("hand")}>I&apos;ll string them</Quiet>
+              <Quiet onClick={() => props.onUnstrung("leave")}>Leave them</Quiet>
             </Actions>
           </>
         );

@@ -12,7 +12,8 @@
 
 import { ASSUMPTIONS } from "../recommendation";
 
-export type GuideStepId = "home" | "flat" | "target" | "panel" | "place" | "reached" | "inverter" | "string" | "battery" | "backup";
+export type GuideStepId =
+  "home" | "flat" | "target" | "panel" | "place" | "reached" | "inverter" | "string" | "unstrung" | "battery" | "backup";
 
 /** The size aimed for: kW of panels, and kWh of battery (0: none). */
 export interface GuideTarget {
@@ -88,6 +89,8 @@ export interface GuideFacts {
   inverters: number;
   /** Panels on the design not on a string, once there is an inverter. */
   unstrung: number;
+  /** Why Sol's stringing left panels, a phrase each, when it did (12 Nov 2026, Martin: it left four and said nothing). */
+  leftWhy?: string[];
   battery: { kwh: number; backup?: boolean } | null;
 }
 
@@ -110,6 +113,7 @@ export function guideStep(answered: GuideAnswered, facts: GuideFacts): GuideStep
   }
   if (open("inverter") && facts.panels > 0 && !facts.inverters) return "inverter";
   if (open("string") && facts.inverters > 0 && facts.unstrung > 0) return "string";
+  if (open("unstrung") && answered.includes("string") && facts.unstrung > 0 && facts.leftWhy?.length) return "unstrung";
   if (open("battery") && !facts.battery && (facts.target?.kwh ?? 0) > 0) return "battery";
   if (open("backup") && facts.battery && facts.battery.backup === undefined) return "backup";
   return null;
@@ -130,6 +134,14 @@ export function targetWords(first: string | null, suggested: GuideFacts["suggest
   const size = `${suggested.kw} kW of panels${suggested.kwh > 0 ? ` with a ${suggested.kwh} kWh battery` : ""}`;
   return suggested.spend ? `${who} ${first ? "spends" : "spend"} ${suggested.spend}, so we should aim for ${size}.` : `Aim for ${size}.`;
 }
+
+/** What Sol says when his stringing left panels: how many, and why. */
+export function unstrungWords(left: number, why: readonly string[]): string {
+  return `I couldn't string ${left === 1 ? "one panel" : `${left} panels`}: ${why.join("; ")}.`;
+}
+
+/** Whether panels were left for want of an inverter input: an inverter with more inputs would take them. */
+export const wantsInputs = (why: readonly string[]) => why.some((w) => /input/.test(w));
 
 /** The line once the target is reached: more panels only add cost. */
 export function reachedWords(kw: number, target: GuideTarget | null): string {

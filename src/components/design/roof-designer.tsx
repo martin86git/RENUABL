@@ -1200,6 +1200,8 @@ export function RoofDesigner(props: {
     note: string;
     /** The product whose figures aren't on file, to look for its datasheet online. */
     missing?: { kind: "panel" | "inverter"; sku: string; name: string };
+    /** Why panels were left off the strings, a phrase each. */
+    why?: string[];
   } | null>(null);
   const [findingSheet, setFindingSheet] = useState(false);
   const [labels, setLabels] = useState<DesignLabel[]>(first.labels ?? []);
@@ -4167,7 +4169,7 @@ export function RoofDesigner(props: {
       : undefined;
     const missing =
       lacking && "kind" in lacking ? lacking : lacking ? { kind: "inverter" as const, sku: lacking.sku, name: lacking.name } : undefined;
-    setAutoNote({ ok: done.ok, note: done.note, ...(missing ? { missing } : {}) });
+    setAutoNote({ ok: done.ok, note: done.note, ...(missing ? { missing } : {}), ...(done.why?.length ? { why: done.why } : {}) });
     if (!done.strings.length) return;
     setStrings(done.strings);
     setWiring(null);
@@ -4195,6 +4197,7 @@ export function RoofDesigner(props: {
     kw: summary.kw,
     inverters: fitted.length,
     unstrung: fitted.length ? Object.keys(centres).filter((k) => !strings.some((x) => x.panels.includes(k))).length : 0,
+    ...(autoNote?.why?.length ? { leftWhy: autoNote.why } : {}),
     battery: battery ? { kwh: battery.kwh * battery.qty, ...(battery.backup ? { backup: true } : {}) } : null,
   };
   const guideNow = guideOn ? guideStep(guideAnswered, guideFacts) : null;
@@ -4279,6 +4282,23 @@ export function RoofDesigner(props: {
       answerGuide("string");
       if (yes) stringForMe();
       else pickTool("string");
+    },
+    // Panels Sol's stringing left (12 Nov 2026, Martin: it left four and said nothing).
+    onUnstrung: (what: "inverter" | "remove" | "hand" | "leave") => {
+      if (what === "inverter") {
+        // Asked again once another inverter is chosen: "Ready for me to string them?"
+        setGuideAnswered((list) => list.filter((id) => id !== "string" && id !== "unstrung"));
+        setAutoNote(null);
+        openMenu("inverters");
+        setSuggesting(true);
+        return;
+      }
+      answerGuide("unstrung");
+      if (what === "hand") pickTool("string");
+      if (what === "remove") {
+        const left = new Set(Object.keys(centres).filter((k) => !strings.some((x) => x.panels.includes(k))));
+        removePicks(everyPanel().filter((pk) => left.has(keyOf(pk))));
+      }
     },
     onBattery: (add: boolean | "choose" | "both") => {
       answerGuide("battery");
@@ -9599,6 +9619,7 @@ export function RoofDesigner(props: {
                     }
                     batteryName={batteryNameOf(guideBattery)}
                     freeBatteryName={batteryNameOf(guideFreeBattery)}
+                    unstrung={guideFacts.leftWhy ? { left: guideFacts.unstrung, why: guideFacts.leftWhy } : null}
                     bill={{ amount: bill.amount, interval: bill.interval }}
                     onBill={(change) => setBill(billWith(bill, change))}
                     dailyKwh={dailyFromBillFields(bill)}

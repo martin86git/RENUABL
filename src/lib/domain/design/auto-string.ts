@@ -55,6 +55,8 @@ export interface AutoStringResult {
   left: string[];
   /** What was done, and why anything was left, in plain words. */
   note: string;
+  /** Why each lot of panels was left, a phrase each (empty when none was). */
+  why?: string[];
   /** Strings were made and none of them is outside the limits. */
   ok: boolean;
 }
@@ -409,7 +411,7 @@ export function autoString(input: {
   else if (caution)
     parts.push(`${plural(caution, "string")} ${caution === 1 ? "is" : "are"} within the limits with something to know: see the check.`);
   parts.push(VERIFY_NOTE);
-  return { strings, checks, left, note: parts.join(" "), ok: strings.length > 0 && bad === 0 };
+  return { strings, checks, left, why, note: parts.join(" "), ok: strings.length > 0 && bad === 0 };
 }
 
 /** The panels of a design as `autoString` wants them: their centres, how each sits, and the array each is in. */
