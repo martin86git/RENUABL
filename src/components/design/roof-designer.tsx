@@ -5638,18 +5638,19 @@ export function RoofDesigner(props: {
             {props.noDeal}
           </div>
         )}
-        {/* Start again, a small round out from under the design's name, asked first. */}
+        {/* Start again, a round growing out of the design's pill like a bubble from a bubble (12 Nov 2026, Martin: it
+            was missed), in white so it stands apart from the graphite, asked first. */}
         {props.tight && menu !== "designs" && (
-          <div className="absolute right-2 top-12 flex flex-col items-end gap-1.5">
+          <div className="absolute right-3 top-[2.15rem] flex flex-col items-end gap-1.5">
             <button
               type="button"
               onClick={() => setResetAsk(!resetAsk)}
               aria-expanded={resetAsk}
               aria-label="Start this design again"
               title="Start this design again"
-              className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-ink shadow-lift ring-1 ring-white/10 transition duration-200 ease-out hover:brightness-125 starting:-translate-y-2 starting:scale-50 starting:opacity-0 motion-reduce:transition-none"
+              className="flex size-10 items-center justify-center rounded-full bg-white text-ink shadow-lift ring-[5px] ring-primary transition duration-200 ease-out hover:text-sun-line starting:-translate-y-3 starting:scale-50 starting:opacity-0 motion-reduce:transition-none"
             >
-              <RotateCcw className="size-3.5" aria-hidden />
+              <RotateCcw className="size-[18px]" aria-hidden />
             </button>
             {resetAsk && (
               <div
