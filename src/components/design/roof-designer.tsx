@@ -5,7 +5,6 @@ import { accessColour, shadeHint, shadeReport, type ShadeReport } from "@/lib/do
 import { loadTerrain, type Heights } from "@/lib/services/terrain";
 import { loadRoofCheck } from "@/lib/services/roof-check";
 import { useDesignTips } from "./design-tips";
-import { BlockTray } from "./block-tray";
 import { SolGuide } from "./sol-guide";
 import {
   FREE_HOURS,
@@ -16,15 +15,6 @@ import {
   type GuideStepId,
   type GuideTarget,
 } from "@/lib/domain/design/sol-guide";
-import {
-  BLOCK_MIN,
-  blockPlaces,
-  joinBlock,
-  resizeBlock,
-  splitBlock,
-  startingBlocks,
-  type PanelBlock,
-} from "@/lib/domain/design/panel-blocks";
 import { SolNudges } from "./sol-nudges";
 import { nudgesFor, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
 import { SideViewsButton } from "./side-views";
@@ -2645,7 +2635,6 @@ export function RoofDesigner(props: {
     if (focused && focused !== document.body && focused.tagName !== "TEXTAREA") focused.blur();
     const p = pointAt(e);
     if (!p) return;
-    if (tray && tool === "select") return void dropBlock(p);
     if (tool === "pan") {
       svg.current?.setPointerCapture(e.pointerId);
       press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: view };
@@ -2860,7 +2849,6 @@ export function RoofDesigner(props: {
   const onPointerMove = (e: React.PointerEvent) => {
     pointer.current = pointAt(e);
     const held = press.current;
-    if (tray && !held && tool === "select") previewAt(pointer.current);
     if (!held) {
       const under = pointer.current ? hitAt(pointer.current) : null;
       const key = under && !under.empty && under.pick.kind !== "label" ? keyOf(under.pick) : null;
@@ -4179,6 +4167,14 @@ export function RoofDesigner(props: {
   const batteryNameOf = (b: typeof guideBattery) => (b ? `${b.qty > 1 ? `${b.qty} × ` : ""}${b.battery.name}` : null);
   // The panel Sol offers: the person's own favourite first, else the one on the design, else the first on the lists.
   const guidePanel = favourites.sorted("panels", props.catalogue)[0] ?? chosenPanel ?? null;
+  /** Lay panels by hand towards a size: the guide counts down as they go down (Sol's "I'll show you where"). */
+  const placeTo = (kw: number) => {
+    setOpening(null);
+    setGuideTarget({ kw: Math.round(kw * 10) / 10, kwh: 0 });
+    setGuideAnswered((list) => [...new Set([...list, "home", "flat", "target", "existing", "panel", "place"] as GuideStepId[])]);
+    setGuideOn(true);
+    pickTool("panel");
+  };
   const guideHandlers = {
     onHome: (home: { phase: "single" | "three"; storeys: "single" | "double"; roof: "tile" | "tin" | "flat" }) => {
       setQuote({ ...quoteNow, form: { ...quoteNow.form, ...home } });
@@ -4200,21 +4196,22 @@ export function RoofDesigner(props: {
       setReplacing(replace);
       answerGuide("existing");
     },
+    // The panel chosen, the pointer lays panels straight away (12 Nov 2026, Martin: no tray; Sol counts down to the
+    // target as they go down). Choosing another panel opens the list first, then the place step starts placing.
     onPanel: (use: boolean) => {
       if (use && guidePanel && guidePanel.sku !== chosenPanel?.sku) choosePanel(guidePanel.sku);
-      if (!use) openMenu("panels");
       answerGuide("panel");
-    },
-    onPlace: (blocks: boolean) => {
+      if (!use) return openMenu("panels");
       answerGuide("place");
-      if (blocks) startTray(guideTarget ? panelsFor(guideTarget.kw, panelOf(design).watts) : 16);
-      else pickTool("panel");
+      pickTool("panel");
+    },
+    onPlace: () => {
+      answerGuide("place");
+      pickTool("panel");
     },
     onReached: (done: boolean) => {
       answerGuide("reached");
       if (!done) return pickTool("panel");
-      setTray(null);
-      setTrayPreview(null);
       pickTool("select");
       // No Kliplok on a flat roof: its line taken off the quote now the panels are down.
       if (quoteNow.form.roof === "flat" && !guideFlat.kliplok) {
@@ -4308,8 +4305,6 @@ export function RoofDesigner(props: {
     setQuotes(everyQuote().map((q, i) => (i === active ? { form: q.form, edits: {} } : q)));
     show(list, active);
     setSaved("changed");
-    setTray(null);
-    setTrayPreview(null);
     setGuideAnswered([]);
     setGuideTarget(null);
     setGuideOn(!costsHidden);
@@ -4377,112 +4372,6 @@ export function RoofDesigner(props: {
     existingAsked.current = true;
     setExistingQ(false);
     void answerExisting(replace);
-  };
-  /**
-   * The block tray (10 Nov 2026, Martin: Sol sizes, the designer shows where): the panels Sol sized as blocks
-   * (`panel-blocks.ts`, two about half each when another face as sunny looks another way), each laid by the rules on
-   * the face it is dropped on, a preview showing where while the pointer is over a face. A tap off any face read grows
-   * one from the tap in the heights (`faceAt`). Clear of what's on the roof and of the panels placed already.
-   */
-  const [tray, setTray] = useState<{ blocks: PanelBlock[]; carrying: string | null } | null>(null);
-  const [trayBusy, setTrayBusy] = useState(false);
-  const [trayNote, setTrayNote] = useState<string | null>(null);
-  const [trayPreview, setTrayPreview] = useState<{ key: string; panels: LoosePanel[]; of: number } | null>(null);
-  const trayAvoid = (): Point[][] => {
-    const check = inUse(roofCheckNow);
-    return [...(check ? avoidFor(check) : []), ...loose.map((pl) => [...looseCorners(pl, size)])];
-  };
-  const carried = (): PanelBlock | undefined => (tray ? (tray.blocks.find((b) => b.id === tray.carrying) ?? tray.blocks[0]) : undefined);
-  const startTray = (want: number) => {
-    if (want < 1) return;
-    setOpening(null);
-    setLoose([]);
-    setStrings([]);
-    setTool("select");
-    setTrayNote(null);
-    setTrayPreview(null);
-    const check = inUse(roofCheckNow);
-    const avoid = check ? avoidFor(check) : [];
-    const split = faces.length > 1 && splitPartner(faces, size, want, avoid.length ? avoid : undefined) !== null;
-    setTray({ blocks: startingBlocks(want, split, () => newId("b")), carrying: null });
-    putSolAway();
-    void checkRoof();
-  };
-  /** Where the block picked would go on the face under the pointer. */
-  const previewAt = (at: Point | null) => {
-    const block = carried();
-    const face = at ? faces.find((f) => inside(at, f.points)) : undefined;
-    if (!block || !at) {
-      if (trayPreview) setTrayPreview(null);
-      return;
-    }
-    if (!face) {
-      const key = `${Math.round(at.x * 2)}:${Math.round(at.y * 2)}:${block.id}:${block.count}`;
-      if (trayPreview?.key === key) return;
-      const tilt = quoteNow.form.roof === "flat" ? (guideFlat.tilt ?? 0) : homePitch;
-      const panels = blockPlaces(at, block.count, size, tilt).map((c) => ({ id: "preview", x: c.x, y: c.y, angle: 0, tilt }));
-      return setTrayPreview({ key, panels, of: block.count });
-    }
-    const key = `${face.id}:${block.id}:${block.count}:${loose.length}`;
-    if (trayPreview?.key === key) return;
-    const avoid = trayAvoid();
-    const packed = packFaces([face], size, block.count, () => "preview", avoid.length ? avoid : undefined);
-    setTrayPreview({ key, panels: packed.loose, of: block.count });
-  };
-  const dropBlock = async (at: Point) => {
-    const block = carried();
-    if (!tray || !block || trayBusy) return;
-    setTrayBusy(true);
-    setTrayNote(null);
-    try {
-      const seen = await checkRoof();
-      const check = inUse(seen);
-      const avoid = [...(check ? avoidFor(check) : []), ...loose.map((pl) => [...looseCorners(pl, size)])];
-      const face = faces.find((f) => inside(at, f.points));
-      if (!face) {
-        const tilt = quoteNow.form.roof === "flat" ? (guideFlat.tilt ?? 0) : homePitch;
-        const placed = blockPlaces(at, block.count, size, tilt).map((c) => ({
-          id: newId("p"),
-          x: c.x,
-          y: c.y,
-          angle: 0,
-          tilt,
-          ...roofTag,
-        }));
-        setLoose((list) => [...list, ...placed]);
-        setStrings([]);
-        setTrayPreview(null);
-        changed();
-        const rest = tray.blocks.filter((b) => b.id !== block.id);
-        if (!rest.length) {
-          setTray(null);
-          setCommandReply(`All ${loose.length + placed.length} panels placed. Move or turn each block into place, then string them.`);
-        } else setTray({ blocks: rest, carrying: null });
-        return;
-      }
-      const packed = packFaces([face], size, block.count, () => newId("p"), avoid.length ? avoid : undefined);
-      if (!packed.loose.length) return setTrayNote("No panels fit on that face clear of what's there. Tap another.");
-      const done = packed.faces[0];
-      setFaces((list) => (list.some((f) => f.id === done.id) ? list.map((f) => (f.id === done.id ? done : f)) : [...list, done]));
-      const tiltTo = quoteNow.form.roof === "flat" ? guideFlat.tilt : null;
-      setLoose((list) => [...list, ...packed.loose.map((pl) => (tiltTo ? { ...pl, tilt: tiltTo } : pl))]);
-      setStrings([]);
-      setTrayPreview(null);
-      changed();
-      const short = block.count - packed.loose.length;
-      const rest = tray.blocks.flatMap((b) => (b.id !== block.id ? [b] : short >= BLOCK_MIN ? [{ ...b, count: short }] : []));
-      if (!rest.length) {
-        setTray(null);
-        setCommandReply(
-          `All ${loose.length + packed.loose.length} panels placed${short > 0 ? ` (${short} didn't fit)` : ""}. Move or turn any block, then string them.`,
-        );
-      } else {
-        setTray({ blocks: rest, carrying: null });
-        if (short > 0) setTrayNote(`${packed.loose.length} fitted there; the other ${short} wait in the tray.`);
-      }
-    } finally {
-      setTrayBusy(false);
-    }
   };
   // A press anywhere outside the panel (on the map, say) puts it away, as its cross does.
   useEffect(() => {
@@ -6413,7 +6302,7 @@ export function RoofDesigner(props: {
                           const sized = daily ? quickSize({ kwhPerDay: daily }) : null;
                           const lead = opening.kind === "advice" ? opening.advice.lead : "battery";
                           const kw = sized ? (lead === "battery" ? sized.withBattery.kw : sized.solar.kw) : 6.6;
-                          startTray(Math.ceil((kw * 1000) / (panelOf(design).watts || 475)));
+                          placeTo(kw);
                         }}
                         onClose={() => setOpening(null)}
                       />
@@ -6454,16 +6343,6 @@ export function RoofDesigner(props: {
                               Adding to them
                             </button>
                           </span>
-                        )}
-                        {!existingQ && summary.panels > 0 && !tray && (
-                          <button
-                            type="button"
-                            disabled={commandBusy}
-                            onClick={() => startTray(summary.panels)}
-                            className="mr-1.5 mt-2 rounded-full px-3 py-1 text-[12.5px] font-medium text-white/85 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
-                          >
-                            Show me where: tap the roof
-                          </button>
                         )}
                         {!existingQ && roofCheckNow && hasSolar(roofCheckNow.things) && (
                           <button
@@ -6583,7 +6462,7 @@ export function RoofDesigner(props: {
                           const sized = daily ? quickSize({ kwhPerDay: daily }) : null;
                           const lead = opening.kind === "advice" ? opening.advice.lead : "battery";
                           const kw = sized ? (lead === "battery" ? sized.withBattery.kw : sized.solar.kw) : 6.6;
-                          startTray(Math.ceil((kw * 1000) / (panelOf(design).watts || 475)));
+                          placeTo(kw);
                         }}
                         onClose={() => setOpening(null)}
                       />
@@ -7492,20 +7371,6 @@ export function RoofDesigner(props: {
                       ))}
                     </g>
                   )}
-                  {/* Where the tray's block would go on the face under the pointer (orange when not all of it fits). */}
-                  {tray &&
-                    trayPreview?.panels.map((g, i) => (
-                      <polygon
-                        key={`tray${i}`}
-                        pointerEvents="none"
-                        points={path(looseCorners(g, size))}
-                        fill={trayPreview.panels.length < trayPreview.of ? "#f97316" : "#ffffff"}
-                        fillOpacity="0.3"
-                        stroke="#ffffff"
-                        strokeWidth={u}
-                        strokeDasharray={`${3 * u} ${2 * u}`}
-                      />
-                    ))}
                   {/* The panel a click would place, as an outline. */}
                   {(tool === "panel" || tool === "select") &&
                     ghosts.map((ghost, i) => (
@@ -9507,24 +9372,6 @@ export function RoofDesigner(props: {
                     <SolNudges nudges={nudges} onAct={actOnNudge} onDismiss={(id) => setNudgesAside((a) => [...a, id])} />
                   </div>
                 )}
-              {tray && (
-                <BlockTray
-                  blocks={tray.blocks}
-                  carrying={tray.carrying}
-                  watts={panelOf(design).watts || 475}
-                  busy={trayBusy}
-                  note={trayNote}
-                  preview={trayPreview ? { laid: trayPreview.panels.length, of: trayPreview.of } : null}
-                  onCarry={(id) => setTray({ ...tray, carrying: id })}
-                  onResize={(id, by) => setTray({ ...tray, blocks: resizeBlock(tray.blocks, id, by) })}
-                  onSplit={(id) => setTray({ ...tray, blocks: splitBlock(tray.blocks, id, () => newId("b")) })}
-                  onJoin={(id) => setTray({ blocks: joinBlock(tray.blocks, id), carrying: null })}
-                  onDone={() => {
-                    setTray(null);
-                    setTrayPreview(null);
-                  }}
-                />
-              )}
               {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its
                   circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}
               <div className="absolute bottom-8 left-4 z-10">

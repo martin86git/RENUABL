@@ -48,7 +48,7 @@ export function SolOpening({
   onGoal: (goal: DesignGoal) => void;
   onCalc: () => void;
   onClose: () => void;
-  /** "I'll show you where": the system sized, the person taps the roof faces it goes on (10 Nov 2026, Martin). */
+  /** "I'll lay them myself": the system sized, the pointer lays panels and Sol counts down to it (12 Nov 2026, Martin). */
   onPlace?: () => void;
 }) {
   const hello = opening.customer ? `Let's design ${opening.customer}'s system.` : "Let's design this one.";
@@ -106,7 +106,7 @@ export function SolOpening({
           </button>
           {onPlace && (
             <button type="button" onClick={onPlace} className={clsx(chip, "inline-flex items-center gap-1.5")}>
-              <Pointer className="size-3.5" aria-hidden /> I&apos;ll show you where
+              <Pointer className="size-3.5" aria-hidden /> I&apos;ll lay them myself
             </button>
           )}
           <button type="button" onClick={onCalc} className={clsx(chip, "inline-flex items-center gap-1.5")}>

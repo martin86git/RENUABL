@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-12",
+    area: "Designer",
+    words: "No more block tray: once the panel is chosen your pointer lays panels, and Sol counts down how many until the target.",
+  },
+  {
+    day: "2026-11-12",
     area: "Calls",
     words: "Call on a deal or a Today card asks who calls: you, you with the note-taker, or your phone assistant.",
   },

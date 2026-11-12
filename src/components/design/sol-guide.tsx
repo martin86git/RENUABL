@@ -53,7 +53,7 @@ export function SolGuide(props: {
   onPanel: (use: boolean) => void;
   /** The panels already on the roof: replaced (new ones may go where they are) or worked around. */
   onExisting: (replace: boolean) => void;
-  onPlace: (blocks: boolean) => void;
+  onPlace: () => void;
   onReached: (done: boolean) => void;
   onInverter: (use: boolean | "choose") => void;
   onString: (yes: boolean) => void;
@@ -89,11 +89,24 @@ export function SolGuide(props: {
     if (props.placing && !props.step)
       return (
         <p>
-          Place the panels: tap a face for each block.{" "}
-          <span className="tabular-nums text-sun-line">
-            {props.placing.kw} kW{props.placing.of ? ` of ${props.target?.kw} kW` : ""}
-          </span>{" "}
-          down.
+          {props.placing.of && props.placing.of > props.placing.panels ? (
+            <>
+              Click to lay panels. <span className="tabular-nums text-sun-line">{props.placing.of - props.placing.panels} more</span> to
+              reach {props.target?.kw} kW{" "}
+              <span className="tabular-nums text-white/60">
+                ({props.placing.panels} of {props.placing.of} down)
+              </span>
+              .
+            </>
+          ) : (
+            <>
+              Click to lay panels.{" "}
+              <span className="tabular-nums text-sun-line">
+                {props.placing.panels} panel{props.placing.panels === 1 ? "" : "s"}, {props.placing.kw} kW
+              </span>{" "}
+              down.
+            </>
+          )}
         </p>
       );
     switch (props.step) {
@@ -331,12 +344,11 @@ export function SolGuide(props: {
           <>
             <p>
               {props.target
-                ? `Let's place the panels: about ${props.target.kw} kW. I'll hand them over as blocks; tap the face for each.`
-                : "Let's place the panels. I'll hand them over as blocks; tap the face for each."}
+                ? `Let's lay the panels: about ${props.target.kw} kW. Your pointer lays them, and I'll count down to the target.`
+                : "Let's lay the panels. Your pointer lays them, and I'll keep count."}
             </p>
             <Actions>
-              <Main onClick={() => props.onPlace(true)}>Proceed</Main>
-              <Quiet onClick={() => props.onPlace(false)}>I&apos;ll place them myself</Quiet>
+              <Main onClick={() => props.onPlace()}>Start laying</Main>
             </Actions>
           </>
         );
