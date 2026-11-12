@@ -933,7 +933,7 @@ export function DealPage({ id }: { id: string }) {
                             </time>
                           </div>
                           {a.kind === "call" ? (
-                            <CallEntryText text={a.text} />
+                            <CallEntryText text={a.text} jobId={id} at={a.at} by={a.by} />
                           ) : (
                             <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
                           )}

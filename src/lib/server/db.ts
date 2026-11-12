@@ -1370,6 +1370,8 @@ create table if not exists design_browser_calls (
   written_at timestamptz
 );
 create index if not exists design_browser_calls_job on design_browser_calls(business_id, job_id);
+-- The call's transcript as lines (ours and the customer's), kept for the deal's timeline (server/call-transcripts.ts).
+alter table design_browser_calls add column if not exists transcript_lines jsonb;
 -- The voice it speaks in (Vapi's or ElevenLabs', by ID; none is the site's default).
 alter table design_caller add column if not exists voice_provider text;
 alter table design_caller add column if not exists voice_id text;

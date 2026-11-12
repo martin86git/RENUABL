@@ -18,6 +18,7 @@ import {
   type CallEnd,
 } from "@/lib/domain/browser-call";
 import { normaliseMobile } from "@/lib/domain/contact";
+import { MAX_LINES, joinRuns } from "@/lib/domain/live-call";
 import { CALL_NOTES_SCHEMA, callNotesPrompt, callNotesText, cleanCallNotes } from "@/lib/domain/design/call-notes";
 import { USE_TIER } from "@/lib/domain/design/sol-routing";
 import { parseApiKey, redactSecrets } from "./bill-reader";
@@ -147,6 +148,14 @@ export async function writeUp(row: BrowserCallRow): Promise<void> {
     if (sentences === "waiting") return done(NOT_WRITTEN.late);
     if (!sentences) return done(NOT_WRITTEN.failed);
     const transcript = dialogue(sentences, row.customer_name);
+    // Kept as lines for the deal's timeline (channel 1 is ours, as `dialogue` reads it).
+    const lines = joinRuns(
+      sentences.map((x) => ({ role: x.channel === 1 ? ("assistant" as const) : ("customer" as const), text: x.text })),
+    );
+    await query(`update design_browser_calls set transcript_lines = $2 where id = $1`, [
+      row.id,
+      JSON.stringify(lines.slice(0, MAX_LINES)),
+    ]).catch((e) => console.error("browser call transcript not kept", e instanceof Error ? e.message : e));
     if (wordCount(transcript) < MIN_WRITE_UP_WORDS) return done(NOT_WRITTEN.short);
     const notes = await solWritesUp(row, transcript);
     return done(notes ?? NOT_WRITTEN.failed);
