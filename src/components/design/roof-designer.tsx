@@ -1775,8 +1775,9 @@ export function RoofDesigner(props: {
     const made: RoofDesign = copy
       ? { ...working(), label: undefined }
       : // A new design is clean (10 Nov 2026, Martin: the inverter carried over): no panels, no panel or inverter chosen,
-        // no battery, strings or marks. Only the home itself (its roof, storeys and phase) is shared, as for every design.
-        { ...spot, faces: faces.map((f) => ({ ...f, off: panelPlaces(f, size).map((pl) => pl.index) })), loose: [] };
+        // no battery, strings, marks or traced roof faces (12 Nov 2026, Martin: "i dont want roof tracing"). Only the home
+        // itself (its roof, storeys and phase) is shared, as for every design.
+        { ...spot, faces: [], loose: [] };
     // A copy takes its quote's settings and hand changes with it; a new design starts with the same home and no changes.
     setQuotes([...everyQuote(), copy ? quoteNow : { form: quoteNow.form, edits: {} }]);
     if (!copy && !costsHidden) {
@@ -4291,15 +4292,15 @@ export function RoofDesigner(props: {
   };
   /**
    * Start again (12 Nov 2026, Martin: a reset under the design's name, asked first): the open design back to
-   * nothing (no panels, inverter, battery, strings, marks or hand changes to its quote), the roof faces traced
-   * kept, and Sol leading it from the start.
+   * nothing (no panels, inverter, battery, strings, marks, traced roof faces or hand changes to its quote; 12 Nov
+   * 2026, Martin: the roof tracing persisted, and he doesn't want it), and Sol leading it from the start.
    */
   const [resetAsk, setResetAsk] = useState(false);
   const resetDesign = () => {
     const list = everyDesign();
     list[active] = {
       ...spot,
-      faces: faces.map((f) => ({ ...f, off: panelPlaces(f, size).map((pl) => pl.index) })),
+      faces: [],
       loose: [],
     };
     setQuotes(everyQuote().map((q, i) => (i === active ? { form: q.form, edits: {} } : q)));
@@ -5384,7 +5385,10 @@ export function RoofDesigner(props: {
               aria-expanded={resetAsk}
               aria-label="Start this design again"
               title="Start this design again"
-              className="flex size-10 items-center justify-center rounded-full bg-white text-ink shadow-lift ring-[5px] ring-primary transition duration-200 ease-out hover:text-sun-line starting:-translate-y-3 starting:scale-50 starting:opacity-0 motion-reduce:transition-none"
+              className={clsx(
+                "flex size-10 items-center justify-center rounded-full bg-white shadow-lift ring-[5px] ring-primary transition duration-200 ease-out hover:text-sun-line starting:-translate-y-3 starting:scale-50 starting:opacity-0 motion-reduce:transition-none",
+                resetAsk ? "text-sun-line" : "text-muted",
+              )}
             >
               <RotateCcw className="size-[18px]" aria-hidden />
             </button>
@@ -5396,7 +5400,7 @@ export function RoofDesigner(props: {
               >
                 <p className="font-medium">Reset to default and start again?</p>
                 <p className="mt-1 text-white/70">
-                  Design {active + 1}&apos;s panels, inverter, battery and strings are taken off. The roof faces you traced stay.
+                  Design {active + 1}&apos;s panels, inverter, battery, strings and traced roof faces are taken off.
                 </p>
                 <div className="mt-2.5 flex gap-1.5">
                   <button
