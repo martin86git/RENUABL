@@ -5,11 +5,6 @@ import { ChevronLeft, ChevronRight, Loader2, Rotate3d, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { capturedWords } from "@/lib/domain/design/nearmap";
-import { groundHeight, onObliqueView } from "@/lib/domain/design/oblique";
-import type { Point } from "@/lib/domain/design/roof-design";
-import { heightAt } from "@/lib/domain/design/shade";
-import { designPanelsAt } from "@/lib/services/side-view-design";
-import { loadTerrain, type Heights } from "@/lib/services/terrain";
 
 const VIEWS = [
   { id: "North", words: "Looking north" },
@@ -64,30 +59,6 @@ function SideViewsWindow({ lat, lng, onClose }: { lat: number; lng: number; onCl
     return () => window.removeEventListener("keydown", keys);
   }, [onClose]);
   const now = state[view.id];
-  // The design drawn on the photo (12 Nov 2026, Martin): its panels, each corner raised to the roof by the heights.
-  const [panels] = useState<Point[][]>(() => designPanelsAt(lat, lng));
-  const [heights, setHeights] = useState<Heights | null>(null);
-  const [showDesign, setShowDesign] = useState(true);
-  useEffect(() => {
-    if (!panels.length) return;
-    let live = true;
-    void loadTerrain(lat, lng, { nearmap: true }).then((t) => live && setHeights(t));
-    return () => {
-      live = false;
-    };
-  }, [panels.length, lat, lng]);
-  const ground = heights ? groundHeight(heights.heights) : null;
-  const drawn =
-    heights && ground !== null
-      ? panels.map((corners) =>
-          corners
-            .map((c) => {
-              const at = onObliqueView({ x: c.x, y: c.y, up: Math.max(0, heightAt(heights, c.x, c.y) - ground + 0.1) }, view.id, lat);
-              return `${at.x.toFixed(1)},${at.y.toFixed(1)}`;
-            })
-            .join(" "),
-        )
-      : [];
   // The picture is fetched once (it is made on request): its day read from the answer, then shown from that copy.
   const [pictures, setPictures] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -142,19 +113,6 @@ function SideViewsWindow({ lat, lng, onClose }: { lat: number; lng: number; onCl
             ))}
           </div>
           <div className="flex items-center gap-3">
-            {panels.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowDesign((v) => !v)}
-                aria-pressed={showDesign}
-                className={clsx(
-                  "h-8 rounded-full px-3 text-xs font-medium",
-                  showDesign ? "bg-sun-line text-white" : "text-white/75 ring-1 ring-white/25 hover:bg-white/10",
-                )}
-              >
-                {showDesign ? "Hide the design" : "Show the design"}
-              </button>
-            )}
             <span className="hidden text-xs text-white/60 sm:inline">
               Nearmap{now && typeof now === "object" && now.captured ? ` · ${capturedWords(now.captured)}` : ""}
             </span>
@@ -174,25 +132,8 @@ function SideViewsWindow({ lat, lng, onClose }: { lat: number; lng: number; onCl
               Nearmap has no angled photo of this house from this side.
             </p>
           ) : pictures[view.id] ? (
-            <div className="relative">
-              {/* eslint-disable-next-line @next/next/no-img-element -- a private picture made on request, never optimised */}
-              <img src={pictures[view.id]} alt={`${view.words} at the house`} className="block aspect-[4/3] w-full object-contain" />
-              {showDesign && drawn.length > 0 && (
-                <svg viewBox="0 0 800 600" className="pointer-events-none absolute inset-0 size-full" aria-hidden>
-                  {drawn.map((points, i) => (
-                    <polygon
-                      key={i}
-                      points={points}
-                      fill="#0d1b2e"
-                      fillOpacity="0.82"
-                      stroke="#e6edf5"
-                      strokeWidth="0.9"
-                      strokeLinejoin="round"
-                    />
-                  ))}
-                </svg>
-              )}
-            </div>
+            // eslint-disable-next-line @next/next/no-img-element -- a private picture made on request, never optimised
+            <img src={pictures[view.id]} alt={`${view.words} at the house`} className="block aspect-[4/3] w-full object-contain" />
           ) : (
             <p className="grid aspect-[4/3] place-items-center text-sm text-white/80">
               <span className="flex items-center gap-2">
@@ -217,11 +158,7 @@ function SideViewsWindow({ lat, lng, onClose }: { lat: number; lng: number; onCl
             <ChevronRight className="size-5" aria-hidden />
           </button>
         </div>
-        <p className="px-4 py-2.5 text-xs text-white/60">
-          Nearmap&apos;s angled photos, taken at 45°. Use ← → to go round the house.
-          {drawn.length > 0 && " The design is drawn where Nearmap's heights put the roof: a guide to how it will look, not exact."}
-          {panels.length > 0 && !heights && " Reading the roof's heights to draw the design…"}
-        </p>
+        <p className="px-4 py-2.5 text-xs text-white/60">Nearmap&apos;s angled photos, taken at 45°. Use ← → to go round the house.</p>
       </div>
     </div>
   );
