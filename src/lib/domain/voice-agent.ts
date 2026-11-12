@@ -468,7 +468,8 @@ export function assistantConfig(o: {
     ...(b.inbound ? {} : { voicemailMessage: voicemailMessage(b) }),
     endCallMessage: "Thanks, bye for now.",
     maxDurationSeconds: b.inbound ? MAX_INBOUND_SECONDS : MAX_CALL_SECONDS[b.mode],
-    serverMessages: ["tool-calls", "end-of-call-report"],
+    // status-update and transcript feed the team's live view of the call (domain/live-call.ts).
+    serverMessages: ["tool-calls", "end-of-call-report", "status-update", "transcript"],
     server: { url: o.serverUrl, headers: { [VOICE_SECRET_HEADER]: o.secret } },
   };
 }

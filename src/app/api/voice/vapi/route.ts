@@ -1,7 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { readVapiEvent, VOICE_SECRET_HEADER } from "@/lib/domain/voice-agent";
-import { answerInbound, handleCallEnded, handleToolCall, voiceCallByRef, voiceSettings } from "@/lib/server/voice-calls";
+import { readLiveEvent } from "@/lib/domain/live-call";
+import { answerInbound, handleCallEnded, handleToolCall, keepLive, voiceCallByRef, voiceSettings } from "@/lib/server/voice-calls";
 
 function sameSecret(given: string | null, expected: string): boolean {
   if (!given) return false;
@@ -14,7 +15,8 @@ function sameSecret(given: string | null, expected: string): boolean {
  * POST: Vapi's server messages, checked by the shared secret in the header we gave Vapi (with each call we place, and on
  * the number itself for calls coming in). "assistant-request" (someone rang the number, no ref) answers with the
  * business's assistant (`answerInbound`); with ?ref=<voice call id>, "tool-calls" answers the assistant's tools (book
- * the 15-minute call, don't call again) and "end-of-call-report" keeps the call on the deal's record and tries again or
+ * the 15-minute call, don't call again), "status-update" and "transcript" keep the call as it happens for the team's
+ * live view (`keepLive`), and "end-of-call-report" keeps the call on the deal's record and tries again or
  * hands over. Always 200 once checked: Vapi ignores other statuses and tells the caller it got no answer.
  */
 export async function POST(request: Request) {
@@ -32,6 +34,13 @@ export async function POST(request: Request) {
   if (event.type === "assistant-request") return Response.json(await answerInbound(event));
 
   const row = await voiceCallByRef(ref).catch(() => null);
+
+  // The call's status and what is said, as it happens, for the team's live view.
+  const live = readLiveEvent(body);
+  if (live) {
+    if (row) await keepLive(row, live);
+    return Response.json({});
+  }
 
   if (event.type === "tool-calls") {
     const results = [];

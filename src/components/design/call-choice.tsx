@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import clsx from "clsx";
-import { Headset, NotebookPen, Phone, Settings, X } from "lucide-react";
+import { Headset, NotebookPen, Phone, PhoneForwarded, Settings, X } from "lucide-react";
 import { askAssistantToCall, useCallerInfo } from "@/lib/services/caller";
+import { watchAssistantCall } from "@/lib/services/assistant-call";
 import { callFromComputer, useComputerCall, useComputerCallsOn } from "@/lib/services/computer-call";
 import { CallerAvatar } from "./settings-caller";
 
@@ -13,9 +14,12 @@ const ROW = "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left tex
 const SETTINGS = "/design/settings/calls";
 
 /**
- * Who makes the call (12 Nov 2026, Martin: Call anywhere on a deal or Today's feed lets me choose the caller): you from
- * this computer (where it is set up, `services/computer-call.ts`), you on your own phone, you with the note-taker, or the business's phone assistant. While the assistant isn't set up, an
- * admin (who may change settings) is sent to set it up; anyone else is told to ask one.
+ * Who makes the call (12 Nov 2026, Martin: Call anywhere on a deal or Today's feed lets me choose the caller; handing it
+ * to the assistant should feel like assigning it to Charlie, his picture and all). The business's phone assistant comes
+ * first, by its name and face: handing it the call opens the window that shows the call as it happens
+ * (`AssistantCallWindow`). Then you yourself: from this computer (where it is set up, `services/computer-call.ts`), on
+ * your own phone, or with the note-taker. While the assistant isn't set up, an admin (who may change settings) is sent
+ * to set it up; anyone else is told to ask one.
  */
 export function CallChoices(props: {
   jobId: string;
@@ -28,76 +32,28 @@ export function CallChoices(props: {
 }) {
   const { caller, callsOn, mayChange, ready } = useCallerInfo();
   const [sending, setSending] = useState(false);
-  const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const fromComputer = useComputerCallsOn();
   const onCall = useComputerCall();
   const busy = !!onCall && onCall.phase !== "ended" && onCall.phase !== "failed";
-  const dial = props.phone.replace(/\s/g, "");
+  const dial = props.phone.replace(/s/g, "");
   const who = props.name || "them";
+  const canHand = callsOn && Boolean(dial);
 
-  const assistantCalls = async () => {
+  const handOver = async () => {
     setSending(true);
+    setFailed(null);
     const res = await askAssistantToCall(props.jobId);
     setSending(false);
-    setSaid(res.ok ? { ok: true, text: res.message } : { ok: false, text: res.message });
-    if (res.ok) window.setTimeout(props.onClose, 2500);
+    if (!res.ok) return setFailed(res.message);
+    watchAssistantCall({ jobId: props.jobId, name: props.name, message: res.message });
+    props.onClose();
   };
 
   return (
     <div>
-      <p className="px-3 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Who calls {who}?</p>
-      {dial && fromComputer && (
-        <button
-          role="menuitem"
-          type="button"
-          disabled={busy}
-          onClick={() => {
-            props.onClose();
-            void callFromComputer(props.jobId, props.name);
-          }}
-          className={clsx(ROW, "disabled:hover:bg-transparent")}
-        >
-          <Headset className="size-4 text-ink-2" aria-hidden />
-          <span className={busy ? "text-muted" : ""}>
-            You, from this computer
-            <span className="block text-xs text-muted">
-              {busy ? "You're on a call already" : "Through your headset or the computer's microphone"}
-            </span>
-          </span>
-        </button>
-      )}
-      {dial ? (
-        <a role="menuitem" href={`tel:${dial}`} onClick={props.onClose} className={ROW}>
-          <Phone className="size-4 text-ink-2" aria-hidden />
-          <span>
-            You, on your phone
-            <span className="block text-xs tabular-nums text-muted">{props.phone}</span>
-          </span>
-        </a>
-      ) : (
-        <p className="px-3 py-2 text-sm text-muted">{"There's no phone number on this customer's record."}</p>
-      )}
-      {props.onNotes && dial && (
-        <button
-          role="menuitem"
-          type="button"
-          onClick={() => {
-            props.onClose();
-            props.onNotes?.();
-          }}
-          className={ROW}
-        >
-          <NotebookPen className="size-4 text-ink-2" aria-hidden />
-          <span>
-            You, with the note-taker
-            <span className="block text-xs text-muted">Ring on your phone, notes typed up here</span>
-          </span>
-        </button>
-      )}
-
-      <div className="my-1 border-t border-line" />
       {!ready ? (
-        <p className="px-3 py-2 text-xs text-muted">Looking up your phone assistant…</p>
+        <p className="px-3 py-3 text-xs text-muted">Looking up your phone assistant…</p>
       ) : !caller.named ? (
         mayChange ? (
           <Link role="menuitem" href={SETTINGS} onClick={props.onClose} className={ROW}>
@@ -116,24 +72,80 @@ export function CallChoices(props: {
         <button
           role="menuitem"
           type="button"
-          disabled={!callsOn || !dial || sending || said?.ok}
-          onClick={() => void assistantCalls()}
-          className={clsx(ROW, "disabled:hover:bg-transparent")}
+          disabled={!canHand || sending}
+          onClick={() => void handOver()}
+          className={clsx(
+            "group flex w-full items-center gap-3 rounded-xl p-3 text-left ring-1 transition-colors",
+            canHand ? "bg-surface-2 ring-line hover:bg-primary hover:text-white hover:ring-primary" : "ring-line",
+          )}
         >
-          <CallerAvatar caller={caller} size={22} />
-          <span className={clsx(!callsOn || !dial ? "text-muted" : "")}>
-            {caller.name} calls {who}
-            <span className="block text-xs text-muted">
+          <CallerAvatar caller={caller} size={44} />
+          <span className={clsx("min-w-0 flex-1", !canHand && "text-muted")}>
+            <span className="block text-[15px] font-semibold">Hand it to {caller.name}</span>
+            <span className={clsx("block text-xs", canHand ? "text-muted group-hover:text-white/70" : "text-muted")}>
               {!callsOn
                 ? "Calls aren't switched on for your business yet"
-                : sending
-                  ? "Lining up the call…"
-                  : "Your phone assistant, in calling hours"}
+                : !dial
+                  ? "There's no mobile on this customer's record"
+                  : sending
+                    ? "Lining up the call…"
+                    : `${caller.name} rings ${who} and you watch the call here`}
+            </span>
+          </span>
+          {canHand && <PhoneForwarded className="size-4 shrink-0 opacity-60" aria-hidden />}
+        </button>
+      )}
+      {failed && <p className="px-3 pt-1.5 text-xs text-danger">{failed}</p>}
+
+      <p className="px-3 pb-1 pt-3 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Or call {who} yourself</p>
+      {dial && fromComputer && (
+        <button
+          role="menuitem"
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            props.onClose();
+            void callFromComputer(props.jobId, props.name);
+          }}
+          className={clsx(ROW, "disabled:hover:bg-transparent")}
+        >
+          <Headset className="size-4 text-ink-2" aria-hidden />
+          <span className={busy ? "text-muted" : ""}>
+            From this computer
+            <span className="block text-xs text-muted">
+              {busy ? "You're on a call already" : "Through your headset or the computer's microphone"}
             </span>
           </span>
         </button>
       )}
-      {said && <p className={clsx("px-3 pb-1.5 pt-1 text-xs", said.ok ? "text-positive" : "text-danger")}>{said.text}</p>}
+      {dial ? (
+        <a role="menuitem" href={`tel:${dial}`} onClick={props.onClose} className={ROW}>
+          <Phone className="size-4 text-ink-2" aria-hidden />
+          <span>
+            On your phone
+            <span className="block text-xs tabular-nums text-muted">{props.phone}</span>
+          </span>
+        </a>
+      ) : (
+        <p className="px-3 py-2 text-sm text-muted">{"There's no phone number on this customer's record."}</p>
+      )}
+      {props.onNotes && dial && (
+        <button
+          role="menuitem"
+          type="button"
+          onClick={() => {
+            props.onClose();
+            props.onNotes?.();
+          }}
+          className={ROW}
+        >
+          <NotebookPen className="size-4 text-ink-2" aria-hidden />
+          <span>
+            With the note-taker
+            <span className="block text-xs text-muted">Ring on your phone, notes typed up here</span>
+          </span>
+        </button>
+      )}
     </div>
   );
 }

@@ -40,6 +40,7 @@ import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail } from "./sol-dock";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { ComputerCallBar } from "./computer-call";
+import { AssistantCallWindow } from "./assistant-call";
 import { TeamChatButton } from "./team-chat";
 import { DayWeather, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
@@ -331,6 +332,8 @@ function Shell({
       <ShellDesignDrawer />
       {/* A call made from the computer: who, how long, Mute and Hang up, over every page while it lasts. */}
       <ComputerCallBar />
+      {/* The phone assistant's call as it happens, once a call is handed to it. */}
+      <AssistantCallWindow />
       {/* The owner viewing as someone else: whose view it is, that nothing can be changed, and the way back. */}
       {account.viewedBy && (
         <div className="sticky top-0 z-[45] flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-sun-line px-4 py-2 text-center text-sm text-white print:hidden">

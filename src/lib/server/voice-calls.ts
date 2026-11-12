@@ -20,6 +20,7 @@
  */
 import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
 import { normaliseMobile } from "@/lib/domain/contact";
+import { MAX_LINES, livePhase, type LiveCallView, type LiveEvent, type LiveLine } from "@/lib/domain/live-call";
 import { customerFacts } from "@/lib/domain/design/sol-customer";
 import { callbackRequestEmail, consultBookedEmail } from "@/lib/domain/emails";
 import { todayInMarket } from "@/lib/domain/market";
@@ -731,4 +732,89 @@ export async function ringToHearVoice(businessId: string, mobile: string | null)
     console.error("voice test not placed", e instanceof Error ? e.message : e);
     return "failed";
   }
+}
+
+// --- The call as it happens, for the team's live view (domain/live-call.ts) ---------------------------------------
+
+/**
+ * Keeps what Vapi says while a call is on: its status for the attempt now on (a new attempt starts afresh), and each
+ * thing said (a line said in full is kept; one still being said is held as the partial). Never throws.
+ */
+export async function keepLive(row: VoiceRow, e: LiveEvent): Promise<void> {
+  try {
+    const callId = e.callId ?? row.vapi_call_id;
+    if (e.kind === "status") {
+      await query(
+        `update voice_calls set
+           live_started_at = case when live_vapi_id is distinct from $2 then null else live_started_at end,
+           live_ended_at = case when live_vapi_id is distinct from $2 then null else live_ended_at end,
+           live_partial = case when live_vapi_id is distinct from $2 then null else live_partial end,
+           live_vapi_id = $2, live_status = $3
+         where id = $1`,
+        [row.id, callId, e.status],
+      );
+      if (e.status === "in-progress")
+        await query(`update voice_calls set live_started_at = coalesce(live_started_at, now()) where id = $1`, [row.id]);
+      if (e.status === "ended")
+        await query(`update voice_calls set live_ended_at = coalesce(live_ended_at, now()), live_partial = null where id = $1`, [row.id]);
+      return;
+    }
+    if (!e.final) {
+      await query(`update voice_calls set live_partial = $2 where id = $1`, [row.id, JSON.stringify({ role: e.role, text: e.text })]);
+      return;
+    }
+    await query(
+      `insert into voice_call_lines (voice_call_id, vapi_call_id, role, text)
+       select $1, $2, $3, $4 where (select count(*) from voice_call_lines where voice_call_id = $1) < $5`,
+      [row.id, callId, e.role, e.text, MAX_LINES],
+    );
+    await query(`update voice_calls set live_partial = null where id = $1 and live_partial->>'role' = $2`, [row.id, e.role]);
+  } catch (err) {
+    console.error("live call not kept", err instanceof Error ? err.message : err);
+  }
+}
+
+/**
+ * The assistant's latest call on this deal, for the team's live view: one still lined up or on, else one from the last
+ * six hours. Business id first, as everywhere; the caller has checked the member may see the deal.
+ */
+export async function liveCallFor(businessId: string, jobId: string): Promise<LiveCallView | null> {
+  const rows = await query<
+    VoiceRow & {
+      live_vapi_id: string | null;
+      live_status: string | null;
+      live_started_at: Date | null;
+      live_ended_at: Date | null;
+      live_partial: LiveLine | null;
+      now: Date;
+    }
+  >(
+    `select *, now() as now from voice_calls
+      where business_id = $1 and job_id = $2
+        and (status in ('waiting', 'calling') or updated_at > now() - interval '6 hours')
+      order by created_at desc limit 1`,
+    [businessId, jobId],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  const lines = r.live_vapi_id
+    ? await query<LiveLine>(`select role, text from voice_call_lines where voice_call_id = $1 and vapi_call_id = $2 order by id`, [
+        r.id,
+        r.live_vapi_id,
+      ])
+    : [];
+  const now = new Date(r.now).getTime();
+  const started = r.live_started_at ? new Date(r.live_started_at).getTime() : null;
+  const ended = r.live_ended_at ? new Date(r.live_ended_at).getTime() : null;
+  return {
+    phase: livePhase({ status: r.status, liveStatus: r.live_status }),
+    customer: r.first_name ?? "",
+    outcome: r.outcome,
+    booked: r.outcome === "booked" ? r.call_label : null,
+    attempts: r.attempts,
+    startedAgo: started === null ? null : now - started,
+    ranFor: started !== null && ended !== null ? ended - started : null,
+    lines,
+    partial: r.live_partial && (r.live_partial.role === "assistant" || r.live_partial.role === "customer") ? r.live_partial : null,
+  };
 }

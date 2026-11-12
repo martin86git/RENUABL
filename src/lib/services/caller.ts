@@ -125,4 +125,4 @@ export const useCaller = (): CallerState => useCallerInfo().caller;
 
 /** The phone assistant rings this deal's customer (in calling hours). Answers what to tell the member. */
 export const askAssistantToCall = (jobId: string) =>
-  ask<{ message: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call`, { method: "POST" });
+  ask<{ message: string; already?: boolean }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call`, { method: "POST" });

@@ -44,6 +44,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       source: "Asked for by the team",
     });
     if (placed.result === "placed") return Response.json({ ok: true, message: `${caller.name} will call ${placed.when}.` });
+    // A call already lined up: the window opens on it rather than failing.
+    if (placed.result === "already") return Response.json({ ok: true, already: true, message: WORDS.already });
     return Response.json({ ok: false, message: WORDS[placed.result] }, { status: placed.result === "off" ? 409 : 422 });
   });
 }

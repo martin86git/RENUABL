@@ -1305,6 +1305,23 @@ drop index if exists voice_calls_one_open;
 create unique index if not exists voice_calls_one_open_job on voice_calls(business_id, job_id) where status in ('waiting', 'calling');
 create index if not exists voice_calls_vapi on voice_calls(vapi_call_id);
 create index if not exists voice_calls_mobile on voice_calls(mobile, status);
+-- The call as it happens, for the team's live view (domain/live-call.ts): Vapi's status for the attempt now on, when
+-- it was answered and ended, and what is being said right now (a partial line, until it is said in full).
+alter table voice_calls add column if not exists live_vapi_id text;
+alter table voice_calls add column if not exists live_status text;
+alter table voice_calls add column if not exists live_started_at timestamptz;
+alter table voice_calls add column if not exists live_ended_at timestamptz;
+alter table voice_calls add column if not exists live_partial jsonb;
+-- Each thing said on the assistant's calls, in order, kept with the call (server/voice-calls.ts, keepLive).
+create table if not exists voice_call_lines (
+  id bigserial primary key,
+  voice_call_id text not null references voice_calls(id) on delete cascade,
+  vapi_call_id text,
+  role text not null,
+  text text not null,
+  at timestamptz not null default now()
+);
+create index if not exists voice_call_lines_call on voice_call_lines(voice_call_id, vapi_call_id, id);
 create table if not exists voice_call_events (
   id text primary key,
   voice_call_id text not null references voice_calls(id) on delete cascade,
