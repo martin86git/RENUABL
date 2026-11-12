@@ -4049,6 +4049,8 @@ export function RoofDesigner(props: {
       case "open-bill":
         return openMenu("bill");
       case "string":
+        // The strings box open first, so what came of it (strung, or why not and Find its datasheet) is on screen.
+        pickTool("string");
         stringForMe();
         return;
       case "battery-menu":
