@@ -4216,10 +4216,20 @@ export function RoofDesigner(props: {
     inverters: fitted.length,
     unstrung: fitted.length ? Object.keys(centres).filter((k) => !strings.some((x) => x.panels.includes(k))).length : 0,
     ...(autoNote?.why?.length ? { leftWhy: autoNote.why } : {}),
+    ...(roofCheckNow && hasSolar(roofCheckNow.things) ? { existingSolar: true } : {}),
     battery: battery ? { kwh: battery.kwh * battery.qty, ...(battery.backup ? { backup: true } : {}) } : null,
   };
   const guideNow = guideOn ? guideStep(guideAnswered, guideFacts) : null;
   const guideActive = guideOn && guiding(guideAnswered, guideFacts);
+  // While Sol leads, look at the roof once for what is on it already, so he can ask about panels there before any are
+  // laid (12 Nov 2026, Martin: nothing asked whether to replace the existing panels or work around them).
+  const guideChecked = useRef("");
+  useEffect(() => {
+    if (!guideActive || roofCheckNow || guideChecked.current === spotKey) return;
+    guideChecked.current = spotKey;
+    void checkRoof();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once a roof while Sol leads
+  }, [guideActive, roofCheckNow, spotKey]);
   // What Sol would choose at the inverter and battery steps.
   const guideInverter =
     guideNow === "inverter" && summary.panels > 0
@@ -4266,6 +4276,13 @@ export function RoofDesigner(props: {
       answerGuide("target");
     },
     onFind: () => void askSol(),
+    // The panels already on the roof (12 Nov 2026, Martin): replaced, so new ones may go where they are, or worked round.
+    onExisting: (replace: boolean) => {
+      existingAsked.current = true;
+      replacingRef.current = replace;
+      setReplacing(replace);
+      answerGuide("existing");
+    },
     onPanel: (use: boolean) => {
       if (use && guidePanel && guidePanel.sku !== chosenPanel?.sku) choosePanel(guidePanel.sku);
       if (!use) openMenu("panels");

@@ -51,6 +51,8 @@ export function SolGuide(props: {
   onTarget: (target: GuideTarget | null) => void;
   onFind: () => void;
   onPanel: (use: boolean) => void;
+  /** The panels already on the roof: replaced (new ones may go where they are) or worked around. */
+  onExisting: (replace: boolean) => void;
   onPlace: (blocks: boolean) => void;
   onReached: (done: boolean) => void;
   onInverter: (use: boolean | "choose") => void;
@@ -79,7 +81,9 @@ export function SolGuide(props: {
   const [typedKw, setKw] = useState<string | null>(null);
   const kw = typedKw ?? (start ? String(start.kw) : "");
   const [mode, setMode] = useState<"bill" | "size" | null>(null);
-  const [battPick, setBattPick] = useState<"none" | "solar" | "free" | "both" | null>(null);
+  const [battPick, setBattPick] = useState<"none" | "solar" | "free" | "both" | "other" | null>(null);
+  // Another size of battery, typed (12 Nov 2026, Martin: pick a different storage amount).
+  const [otherKwh, setOtherKwh] = useState("");
 
   const body = (() => {
     if (props.placing && !props.step)
@@ -179,6 +183,7 @@ export function SolGuide(props: {
           if (!(kwNow > 0) || !battPick || !batt) return;
           const k = Math.round(kwNow * 100) / 100;
           if (battPick === "none") return props.onTarget({ kw: k, kwh: 0 });
+          if (battPick === "other") return props.onTarget({ kw: k, kwh: Math.round(Number(otherKwh) * 10) / 10 });
           if (battPick === "free") return props.onTarget({ kw: k, kwh: batt.freeKwh });
           if (battPick === "both" && !one) return props.onTarget({ kw: k, kwh: batt.solarKwh, freeKwh: batt.freeKwh });
           return props.onTarget({ kw: k, kwh: batt.solarKwh });
@@ -187,17 +192,27 @@ export function SolGuide(props: {
           <>
             <p>{targetWords(props.first, props.suggested)}</p>
             <div className="mt-2 grid gap-2">
-              <Choice
-                options={[
-                  ["bill", "Their bill"],
-                  ["size", "A system size"],
-                ]}
-                value={mode}
-                onPick={(v) => {
-                  setMode(v as "bill" | "size");
-                  setKw(null);
-                }}
-              />
+              {/* With the bill known Sol has already said what it comes to: the only thing to offer is changing it
+                  (12 Nov 2026, Martin: "Their bill" and "A system size" read as a question already answered). */}
+              {props.suggested ? (
+                mode !== "bill" && (
+                  <div>
+                    <Quiet onClick={() => setMode("bill")}>Update the bill</Quiet>
+                  </div>
+                )
+              ) : (
+                <Choice
+                  options={[
+                    ["bill", "Their bill"],
+                    ["size", "A system size"],
+                  ]}
+                  value={mode}
+                  onPick={(v) => {
+                    setMode(v as "bill" | "size");
+                    setKw(null);
+                  }}
+                />
+              )}
               {mode === "bill" && (
                 <>
                   <div className="flex flex-wrap items-center gap-2">
@@ -268,10 +283,12 @@ export function SolGuide(props: {
                             ["free", `${batt.freeKwh} kWh with the ${FREE_HOURS} free hours`],
                             ["both", "Both, as two designs"],
                           ] as [string, string][])),
+                      ["other", "Another size"],
                     ]}
                     value={battPick}
                     onPick={(v) => setBattPick(v as typeof battPick)}
                   />
+                  {battPick === "other" && <Field label="kWh battery" value={otherKwh} onChange={setOtherKwh} />}
                   <p className="text-[12px] text-white/55">
                     {one
                       ? `The ${FREE_HOURS} free hours wouldn't change it: this battery already holds their evenings.`
@@ -281,7 +298,7 @@ export function SolGuide(props: {
               )}
             </div>
             <Actions>
-              <Main disabled={!(kwNow > 0) || !battPick} onClick={aim}>
+              <Main disabled={!(kwNow > 0) || !battPick || (battPick === "other" && !(Number(otherKwh) > 0))} onClick={aim}>
                 Aim for this
               </Main>
               <Quiet onClick={() => props.onTarget(null)}>No target</Quiet>
@@ -289,6 +306,16 @@ export function SolGuide(props: {
           </>
         );
       }
+      case "existing":
+        return (
+          <>
+            <p>There are panels on this roof already. Are they being replaced, or do we work around them?</p>
+            <Actions>
+              <Quiet onClick={() => props.onExisting(true)}>Replace them</Quiet>
+              <Quiet onClick={() => props.onExisting(false)}>Work around them</Quiet>
+            </Actions>
+          </>
+        );
       case "panel":
         return (
           <>

@@ -13,7 +13,7 @@
 import { ASSUMPTIONS } from "../recommendation";
 
 export type GuideStepId =
-  "home" | "flat" | "target" | "panel" | "place" | "reached" | "inverter" | "string" | "unstrung" | "battery" | "backup";
+  "home" | "flat" | "target" | "existing" | "panel" | "place" | "reached" | "inverter" | "string" | "unstrung" | "battery" | "backup";
 
 /** The size aimed for: kW of panels, and kWh of battery (0: none). */
 export interface GuideTarget {
@@ -87,6 +87,8 @@ export interface GuideFacts {
   panels: number;
   kw: number;
   inverters: number;
+  /** The roof check found panels already on the roof (12 Nov 2026, Martin: replace them or work around them?). */
+  existingSolar?: boolean;
   /** Panels on the design not on a string, once there is an inverter. */
   unstrung: number;
   /** Why Sol's stringing left panels, a phrase each, when it did (12 Nov 2026, Martin: it left four and said nothing). */
@@ -103,6 +105,7 @@ export function guideStep(answered: GuideAnswered, facts: GuideFacts): GuideStep
   if (open("home")) return "home";
   if (facts.roof === "flat" && open("flat")) return "flat";
   if (open("target")) return "target";
+  if (open("existing") && open("place") && facts.existingSolar) return "existing";
   if (open("panel")) return "panel";
   if (open("place")) return "place";
   // Placing: the target reached (or panels down with no target) asks whether placing is done.

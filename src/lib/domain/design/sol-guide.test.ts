@@ -95,3 +95,12 @@ describe("panels left off the strings", () => {
     expect(wantsInputs(f.leftWhy!)).toBe(true);
   });
 });
+
+describe("panels already on the roof", () => {
+  it("asks whether to replace them or work around them after the size, only when the roof check found some", () => {
+    const answered = ["home", "target"] as const;
+    expect(guideStep(answered, facts({ existingSolar: true }))).toBe("existing");
+    expect(guideStep([...answered, "existing"], facts({ existingSolar: true }))).toBe("panel");
+    expect(guideStep(answered, facts())).toBe("panel");
+  });
+});

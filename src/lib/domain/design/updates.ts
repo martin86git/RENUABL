@@ -15,8 +15,15 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-12",
+    area: "Designer",
+    words:
+      "Sol asks whether existing panels are being replaced or worked around, and the battery can be any size you type.",
+  },
+  {
+    day: "2026-11-12",
     area: "Calls",
-    words: "Name your phone assistant and give it a picture in Settings. Calls on a deal lead with what came of them; a booked call shows its time.",
+    words:
+      "Name your phone assistant and give it a picture in Settings. Calls on a deal lead with what came of them; a booked call shows its time.",
   },
   {
     day: "2026-11-12",
