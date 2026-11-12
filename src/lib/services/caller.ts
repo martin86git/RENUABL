@@ -11,6 +11,8 @@ export interface CallerState {
   name: string;
   photoAt: string | null;
   voice: CallerVoice | null;
+  /** Whether the business has set it up in Settings (else it is Sol by default). */
+  named: boolean;
 }
 
 type Answer<T> = ({ ok: true } & T) | { ok: false; message: string };
@@ -31,7 +33,7 @@ async function ask<T>(path: string, init?: RequestInit): Promise<Answer<T>> {
 /** Heard by every `useCaller` on the page when Settings changes the assistant. */
 const CHANGED = "renuabl:caller";
 
-export const loadCaller = () => ask<{ caller: CallerState; callsOn: boolean; business: string }>("/api/design/caller");
+export const loadCaller = () => ask<{ caller: CallerState; callsOn: boolean; mayChange: boolean; business: string }>("/api/design/caller");
 
 export async function saveCallerName(name: string) {
   const res = await ask<{ caller: CallerState }>("/api/design/caller", {
@@ -74,21 +76,40 @@ export async function removeCallerPhoto() {
 /** Where the picture is: its time in the address, since the browser keeps a picture for good. */
 export const callerPhotoUrl = (c: CallerState) => (c.photoAt ? `/api/design/caller/photo?v=${encodeURIComponent(c.photoAt)}` : null);
 
-let shared: Promise<CallerState | null> | null = null;
+/** The assistant as a page needs it: who it is, whether its calls are on, and whether this member may set it up. */
+export interface CallerInfo {
+  caller: CallerState;
+  callsOn: boolean;
+  mayChange: boolean;
+  /** False until the server has answered. */
+  ready: boolean;
+}
 
-/** The assistant for this page (read once, shared by every place that shows it), or Sol while it loads. */
-export function useCaller(): CallerState {
-  const [caller, setCaller] = useState<CallerState>({ name: DEFAULT_CALLER, photoAt: null, voice: null });
+const START: CallerInfo = {
+  caller: { name: DEFAULT_CALLER, photoAt: null, voice: null, named: false },
+  callsOn: false,
+  mayChange: false,
+  ready: false,
+};
+
+let shared: Promise<CallerInfo | null> | null = null;
+
+/** The assistant for this page (read once, shared by every place that shows it; Sol while it loads), kept up to date with Settings. */
+export function useCallerInfo(): CallerInfo {
+  const [info, setInfo] = useState<CallerInfo>(START);
   useEffect(() => {
     let live = true;
-    shared ??= loadCaller().then((r) => (r.ok ? r.caller : null));
-    void shared.then((c) => {
-      if (live && c) setCaller(c);
+    shared ??= loadCaller().then((r) => (r.ok ? { caller: r.caller, callsOn: r.callsOn, mayChange: r.mayChange, ready: true } : null));
+    void shared.then((i) => {
+      if (live && i) setInfo(i);
     });
     const heard = (e: Event) => {
-      const c = (e as CustomEvent<CallerState>).detail;
-      shared = Promise.resolve(c);
-      setCaller(c);
+      const caller = (e as CustomEvent<CallerState>).detail;
+      setInfo((i) => {
+        const next = { ...i, caller };
+        shared = Promise.resolve(next);
+        return next;
+      });
     };
     window.addEventListener(CHANGED, heard);
     return () => {
@@ -96,5 +117,12 @@ export function useCaller(): CallerState {
       window.removeEventListener(CHANGED, heard);
     };
   }, []);
-  return caller;
+  return info;
 }
+
+/** The assistant for this page, or Sol while it loads. */
+export const useCaller = (): CallerState => useCallerInfo().caller;
+
+/** The phone assistant rings this deal's customer (in calling hours). Answers what to tell the member. */
+export const askAssistantToCall = (jobId: string) =>
+  ask<{ message: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call`, { method: "POST" });

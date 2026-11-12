@@ -11,7 +11,6 @@ import {
   FileText,
   HardHat,
   Mail,
-  NotebookPen,
   Phone,
   MessagesSquare,
   Paperclip,
@@ -80,6 +79,7 @@ import { bannerFigures } from "@/lib/domain/design/system-summary";
 import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
 import { DealEmails } from "./deal-emails";
 import { CallEntryBy, CallEntryText } from "./call-entry";
+import { CallChoices } from "./call-choice";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
 type Written = "note" | "call" | "email";
@@ -463,6 +463,7 @@ export function DealPage({ id }: { id: string }) {
     onDesign: () => (job.lat !== null ? openTool("design") : setAskPlace("design")),
     onProposal: () => openTool("proposal"),
     onCard: () => setCard(true),
+    jobId: job.id,
     phone: customer.phone,
     name: customer.firstName,
     onNotes: () => notetaker.current?.start(),
@@ -973,12 +974,14 @@ export function DealPage({ id }: { id: string }) {
  * the row's scrolling doesn't cut it off.
  */
 function CallMenu({
+  jobId,
   phone,
   name,
   onNotes,
   rail = false,
   round,
 }: {
+  jobId: string;
   phone: string;
   name: string;
   onNotes: () => void;
@@ -989,10 +992,10 @@ function CallMenu({
 }) {
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
-  const dial = phone.replace(/\s/g, "");
+  const menu = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!at) return;
-    const away = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setAt(null);
+    const away = (e: PointerEvent) => !box.current?.contains(e.target as Node) && !menu.current?.contains(e.target as Node) && setAt(null);
     const key = (e: KeyboardEvent) => e.key === "Escape" && setAt(null);
     const gone = () => setAt(null);
     document.addEventListener("pointerdown", away);
@@ -1004,7 +1007,6 @@ function CallMenu({
       window.removeEventListener("scroll", gone, true);
     };
   }, [at]);
-  const row = "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-surface-2";
   return (
     <div ref={box} className="contents">
       <button
@@ -1020,8 +1022,8 @@ function CallMenu({
             round === "rail"
               ? { top: r.top, left: r.right + 12 }
               : rail
-                ? { top: r.top, left: Math.max(8, r.left - 264) }
-                : { top: r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 264)) },
+                ? { top: r.top, left: Math.max(8, r.left - 296) }
+                : { top: r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 296)) },
           );
         }}
         className={
@@ -1054,36 +1056,19 @@ function CallMenu({
           </>
         )}
       </button>
-      {at && (
-        <div
-          role="menu"
-          style={{ top: at.top, left: at.left }}
-          className="fixed z-50 w-64 rounded-xl bg-surface p-1.5 shadow-lift ring-1 ring-line"
-        >
-          <a role="menuitem" href={`tel:${dial}`} onClick={() => setAt(null)} className={row}>
-            <Phone className="size-4 text-ink-2" aria-hidden />
-            <span>
-              Call {name || "them"}
-              <span className="block text-xs tabular-nums text-muted">{phone}</span>
-            </span>
-          </a>
-          <button
-            role="menuitem"
-            type="button"
-            onClick={() => {
-              setAt(null);
-              onNotes();
-            }}
-            className={row}
+      {/* On the page body, so nothing on the page draws over it (the rail is a layer of its own). */}
+      {at &&
+        createPortal(
+          <div
+            ref={menu}
+            role="menu"
+            style={{ top: at.top, left: at.left }}
+            className="fixed z-[70] w-72 rounded-xl bg-surface p-1.5 shadow-lift ring-1 ring-line"
           >
-            <NotebookPen className="size-4 text-ink-2" aria-hidden />
-            <span>
-              Call with the note-taker
-              <span className="block text-xs text-muted">Ring on your phone, notes typed up here</span>
-            </span>
-          </button>
-        </div>
-      )}
+            <CallChoices jobId={jobId} phone={phone} name={name} onNotes={onNotes} onClose={() => setAt(null)} />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -1142,6 +1127,7 @@ function DealMenu({
   onDesign,
   onProposal,
   onCard,
+  jobId,
   phone,
   name,
   onNotes,
@@ -1154,6 +1140,7 @@ function DealMenu({
   onDesign: () => void;
   onProposal: () => void;
   onCard: () => void;
+  jobId: string;
   phone: string;
   name: string;
   onNotes: () => void;
@@ -1196,7 +1183,7 @@ function DealMenu({
         </span>
       </RailRound>
       {line}
-      <CallMenu round={vertical ? "rail" : "row"} phone={phone} name={name} onNotes={onNotes} />
+      <CallMenu round={vertical ? "rail" : "row"} jobId={jobId} phone={phone} name={name} onNotes={onNotes} />
       {page("email", "Email", `Email ${name || "the customer"}`, Mail)}
       <RailRound
         label="Notes"

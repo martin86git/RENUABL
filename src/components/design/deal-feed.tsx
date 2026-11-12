@@ -69,6 +69,7 @@ import { AerialRoof, type AerialRoofSpec, type RoofFinish, type RoofForm } from 
 import { PATHS } from "./design-shell";
 import { DealTeamChat } from "./deal-team-chat";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
+import { CallChooser } from "./call-choice";
 import { SolIcon } from "./sol-icon";
 import { TodayNews } from "./today-news";
 
@@ -434,10 +435,12 @@ function ArrivalCard(props: {
     props.onChanged();
   };
   const first = d.customer.trim().split(/\s+/)[0] || "them";
+  const [calling, setCalling] = useState(false);
   // A design Sol asked the team for opens with his brief.
   const designAsk = d.team?.openAsks.find((x) => x.type === "design");
   return (
     <article className="flex min-w-0 flex-col gap-2 rounded-2xl bg-surface p-3.5 ring-1 ring-line">
+      {calling && <CallChooser jobId={d.jobId} phone={d.phone ?? ""} name={first} onClose={() => setCalling(false)} />}
       <div className="flex items-start gap-3">
         <RoofThumb deal={d} small />
         <div className="min-w-0 flex-1">
@@ -484,14 +487,15 @@ function ArrivalCard(props: {
         </Link>
         {at.waiting &&
           (d.phone ? (
-            <a
-              href={`tel:${d.phone.replace(/\s+/g, "")}`}
+            <button
+              type="button"
+              onClick={() => setCalling(true)}
               title={`Call ${first}`}
               aria-label={`Call ${first}`}
               className="grid size-8 place-items-center rounded-full bg-surface-2 text-ink-2 hover:text-ink"
             >
               <Phone className="size-3.5" aria-hidden />
-            </a>
+            </button>
           ) : (
             <Link
               href={`${PATHS.deals}/${d.jobId}?tab=email`}
@@ -667,13 +671,11 @@ function DealCard(props: {
   // already the card's own line.
   const pad = !props.solo && padLines(d).length > 0;
   const hide = openAskLine(d)?.id;
-  // Call only dials; the note-taker is its own round, opened by hand with its microphone off (8 Nov 2026, Martin: the
-  // phone icon started the note-taker when it shouldn't).
+  // Call asks who makes the call (12 Nov 2026, Martin): you on your phone, you with the note-taker, or the business's
+  // phone assistant. The note-taker is also its own round, opened by hand with its microphone off (8 Nov 2026).
   const notetaker = useRef<NotetakerHandle>(null);
-  const call = () => {
-    const phone = (d.phone ?? "").replace(/\s+/g, "");
-    if (phone) window.location.href = `tel:${phone}`;
-  };
+  const [calling, setCalling] = useState(false);
+  const call = () => setCalling(true);
   // The deal and its team chat as two cards side by side (8 Nov 2026, Martin: the chat wider and floating, not inside
   // the deal's post); the chat drops under the deal on a narrow screen.
   return (
@@ -823,6 +825,15 @@ function DealCard(props: {
           </div>
         </div>
         <CallNotetaker handle={notetaker} button={false} jobId={d.jobId} customerId="" phone={d.phone ?? ""} onAdded={props.onChanged} />
+        {calling && (
+          <CallChooser
+            jobId={d.jobId}
+            phone={d.phone ?? ""}
+            name={d.customer.trim().split(/\s+/)[0] ?? ""}
+            onNotes={() => notetaker.current?.start()}
+            onClose={() => setCalling(false)}
+          />
+        )}
       </article>
       {/* The deal's team chat: its own card beside the deal (deal-team.ts). */}
       {pad && (

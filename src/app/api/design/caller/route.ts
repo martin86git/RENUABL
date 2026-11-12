@@ -1,3 +1,4 @@
+import { can } from "@/lib/domain/design/account";
 import { cleanCallerName, cleanVoice, VOICE_BAD } from "@/lib/domain/design/caller";
 import { callerOf, setCallerName, setCallerVoice } from "@/lib/server/design-caller-repo";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
@@ -17,7 +18,9 @@ export async function GET() {
       voiceOnFor(id).catch(() => false),
       loadBrand(id, biz[0]?.name ?? ""),
     ]);
-    return Response.json({ ok: true, caller, callsOn, business: brand.name || biz[0]?.name || "" });
+    // Setting it up is for an admin: whoever may change the business's settings.
+    const mayChange = can(who.member.role, "prices", who.member.permissions);
+    return Response.json({ ok: true, caller, callsOn, mayChange, business: brand.name || biz[0]?.name || "" });
   });
 }
 

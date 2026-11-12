@@ -12,11 +12,13 @@ export interface Caller {
   photoAt: string | null;
   /** The voice it speaks in (Settings → Phone assistant), or null for the site's default. */
   voice: CallerVoice | null;
+  /** Whether the business has set its assistant up (Settings → Phone assistant), not just been given Sol. */
+  named: boolean;
 }
 
 /** The business's phone assistant: its name (Sol until named) and whether it has a picture. */
 export async function callerOf(businessId: string): Promise<Caller> {
-  if (!dbConfigured()) return { name: DEFAULT_CALLER, photoAt: null, voice: null };
+  if (!dbConfigured()) return { name: DEFAULT_CALLER, photoAt: null, voice: null, named: false };
   const rows = await query<{ name: string; photo_at: Date | null; voice_provider: string | null; voice_id: string | null }>(
     `select name, photo_at, voice_provider, voice_id from design_caller where business_id = $1`,
     [businessId],
@@ -27,6 +29,7 @@ export async function callerOf(businessId: string): Promise<Caller> {
     name: row?.name || DEFAULT_CALLER,
     photoAt: row?.photo_at ? new Date(row.photo_at).toISOString() : null,
     voice: provider && row?.voice_id ? { provider, voiceId: row.voice_id } : null,
+    named: Boolean(row),
   };
 }
 

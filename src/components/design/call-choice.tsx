@@ -1,0 +1,145 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import Link from "next/link";
+import clsx from "clsx";
+import { NotebookPen, Phone, Settings, X } from "lucide-react";
+import { askAssistantToCall, useCallerInfo } from "@/lib/services/caller";
+import { CallerAvatar } from "./settings-caller";
+
+const ROW = "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-surface-2";
+const SETTINGS = "/design/settings/calls";
+
+/**
+ * Who makes the call (12 Nov 2026, Martin: Call anywhere on a deal or Today's feed lets me choose the caller): you on
+ * your own phone, you with the note-taker, or the business's phone assistant. While the assistant isn't set up, an
+ * admin (who may change settings) is sent to set it up; anyone else is told to ask one.
+ */
+export function CallChoices(props: {
+  jobId: string;
+  phone: string;
+  /** The customer's first name. */
+  name: string;
+  /** Opens the note-taker for this deal; left out where there is none. */
+  onNotes?: () => void;
+  onClose: () => void;
+}) {
+  const { caller, callsOn, mayChange, ready } = useCallerInfo();
+  const [sending, setSending] = useState(false);
+  const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
+  const dial = props.phone.replace(/\s/g, "");
+  const who = props.name || "them";
+
+  const assistantCalls = async () => {
+    setSending(true);
+    const res = await askAssistantToCall(props.jobId);
+    setSending(false);
+    setSaid(res.ok ? { ok: true, text: res.message } : { ok: false, text: res.message });
+    if (res.ok) window.setTimeout(props.onClose, 2500);
+  };
+
+  return (
+    <div>
+      <p className="px-3 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Who calls {who}?</p>
+      {dial ? (
+        <a role="menuitem" href={`tel:${dial}`} onClick={props.onClose} className={ROW}>
+          <Phone className="size-4 text-ink-2" aria-hidden />
+          <span>
+            You, on your phone
+            <span className="block text-xs tabular-nums text-muted">{props.phone}</span>
+          </span>
+        </a>
+      ) : (
+        <p className="px-3 py-2 text-sm text-muted">{"There's no phone number on this customer's record."}</p>
+      )}
+      {props.onNotes && dial && (
+        <button
+          role="menuitem"
+          type="button"
+          onClick={() => {
+            props.onClose();
+            props.onNotes?.();
+          }}
+          className={ROW}
+        >
+          <NotebookPen className="size-4 text-ink-2" aria-hidden />
+          <span>
+            You, with the note-taker
+            <span className="block text-xs text-muted">Ring on your phone, notes typed up here</span>
+          </span>
+        </button>
+      )}
+
+      <div className="my-1 border-t border-line" />
+      {!ready ? (
+        <p className="px-3 py-2 text-xs text-muted">Looking up your phone assistant…</p>
+      ) : !caller.named ? (
+        mayChange ? (
+          <Link role="menuitem" href={SETTINGS} onClick={props.onClose} className={ROW}>
+            <Settings className="size-4 text-ink-2" aria-hidden />
+            <span>
+              Set up your phone assistant
+              <span className="block text-xs text-muted">Give it a name, a face and a voice, and it can ring {who} for you</span>
+            </span>
+          </Link>
+        ) : (
+          <p className="px-3 py-2 text-xs leading-relaxed text-muted">
+            {"Your phone assistant isn't set up yet. An admin can set it up in Settings, then it can ring customers for you."}
+          </p>
+        )
+      ) : (
+        <button
+          role="menuitem"
+          type="button"
+          disabled={!callsOn || !dial || sending || said?.ok}
+          onClick={() => void assistantCalls()}
+          className={clsx(ROW, "disabled:hover:bg-transparent")}
+        >
+          <CallerAvatar caller={caller} size={22} />
+          <span className={clsx(!callsOn || !dial ? "text-muted" : "")}>
+            {caller.name} calls {who}
+            <span className="block text-xs text-muted">
+              {!callsOn
+                ? "Calls aren't switched on for your business yet"
+                : sending
+                  ? "Lining up the call…"
+                  : "Your phone assistant, in calling hours"}
+            </span>
+          </span>
+        </button>
+      )}
+      {said && <p className={clsx("px-3 pb-1.5 pt-1 text-xs", said.ok ? "text-positive" : "text-danger")}>{said.text}</p>}
+    </div>
+  );
+}
+
+/** The same choices in a small window over the page, for a Call button with nowhere to hang a menu (Today's cards). */
+export function CallChooser(props: { jobId: string; phone: string; name: string; onNotes?: () => void; onClose: () => void }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && props.onClose();
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [props]);
+  return createPortal(
+    <div className="fixed inset-0 z-[80] grid place-items-center bg-ink/30 p-4" onPointerDown={props.onClose}>
+      <div
+        role="menu"
+        aria-label={`Call ${props.name || "them"}`}
+        className="relative w-full max-w-xs rounded-2xl bg-surface p-2 shadow-lift ring-1 ring-line"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={props.onClose}
+          aria-label="Close"
+          className="absolute right-2 top-2 grid size-7 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
+        <CallChoices {...props} />
+      </div>
+    </div>,
+    document.body,
+  );
+}
