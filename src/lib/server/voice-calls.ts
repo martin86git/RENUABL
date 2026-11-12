@@ -56,6 +56,7 @@ import { jobById, record } from "./design-crm-repo";
 import { loadBrand, publicProposal, tokenForJob } from "./design-proposal-repo";
 import { emailProvider, sendEmail } from "./email";
 import { alertNewLead, textStaff } from "./lead-alert";
+import { testCallWords } from "@/lib/domain/design/caller";
 import { callerOf } from "./design-caller-repo";
 import { addHomeLead, findCustomerByMobile, type HomeLead, renuablCrm } from "./renuabl-crm";
 import { sendSms, smsConfigured } from "./sms";
@@ -215,7 +216,9 @@ export async function callMeFor(businessId: string): Promise<{ assistant: string
 }
 
 /** What the assistant is told for this call, read fresh each time (the proposal as it stands now). */
-async function briefFor(row: VoiceRow): Promise<{ brief: CallBrief; token: string | null }> {
+async function briefFor(
+  row: VoiceRow,
+): Promise<{ brief: CallBrief; token: string | null; voice: { provider: string; voiceId: string } | null }> {
   const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [row.business_id]);
   const brand = await loadBrand(row.business_id, biz[0]?.name ?? "");
   const own = (await renuablCrm().catch(() => null))?.businessId === row.business_id;
@@ -225,6 +228,8 @@ async function briefFor(row: VoiceRow): Promise<{ brief: CallBrief; token: strin
   const view = token ? (await publicProposal(token, todayInMarket()))?.view : null;
   return {
     token: view ? token : null,
+    // The voice the business chose for its assistant, else the site's own (VAPI_VOICE_ID), else Vapi's default.
+    voice: caller.voice,
     brief: {
       mode: view ? "proposal" : "lead",
       assistant: caller.name,
@@ -247,7 +252,7 @@ async function placeCall(s: VoiceSettings, row: VoiceRow, window: { from: Date; 
     await finish(row.id, "stopped", { stop_reason: "no calling hours in the next fortnight" });
     return false;
   }
-  const { brief } = await briefFor(row);
+  const { brief, voice } = await briefFor(row);
   const scheduled = window.from.getTime() > Date.now() + 60_000;
   const body = {
     phoneNumberId: s.phoneNumberId,
@@ -259,7 +264,7 @@ async function placeCall(s: VoiceSettings, row: VoiceRow, window: { from: Date; 
       serverUrl: `${s.site}/api/voice/vapi?ref=${encodeURIComponent(row.id)}`,
       secret: s.secret,
       model: s.model,
-      voice: s.voice,
+      voice: voice ?? s.voice,
       transferNumber: s.transferNumber,
     }),
     ...(scheduled ? { schedulePlan: { earliestAt: window.from.toISOString(), latestAt: window.until.toISOString() } } : {}),
@@ -588,7 +593,7 @@ export async function answerInbound(e: VapiEvent): Promise<InboundAnswer> {
   try {
     const row = await inboundRow(s, crm.businessId, mobile, e.callId);
     if (!row) return closed();
-    const { brief } = await briefFor(row);
+    const { brief, voice } = await briefFor(row);
     const today = todayInMarket();
     return {
       assistant: assistantConfig({
@@ -597,7 +602,7 @@ export async function answerInbound(e: VapiEvent): Promise<InboundAnswer> {
         serverUrl: `${s.site}/api/voice/vapi?ref=${encodeURIComponent(row.id)}`,
         secret: s.secret,
         model: s.model,
-        voice: s.voice,
+        voice: voice ?? s.voice,
         transferNumber: s.transferNumber,
       }),
     };
@@ -677,4 +682,53 @@ async function inboundRow(s: VoiceSettings, businessId: string, mobile: string, 
     ],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * Settings → Phone assistant's "Ring me to hear it": a short call to the member's own mobile in the business's chosen
+ * voice, saying its opening words and ending. Only where calls are on for the business; never tied to a deal, nothing
+ * kept but Vapi's own log.
+ */
+export async function ringToHearVoice(businessId: string, mobile: string | null): Promise<"placed" | "off" | "no-number" | "failed"> {
+  const s = voiceSettings();
+  if (!s || !(await voiceOnFor(businessId).catch(() => false))) return "off";
+  const m = normaliseMobile(mobile ?? "");
+  if (!m) return "no-number";
+  try {
+    const caller = await callerOf(businessId);
+    const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [businessId]);
+    const brand = await loadBrand(businessId, biz[0]?.name ?? "");
+    const voice = caller.voice ?? s.voice;
+    const res = await fetch(`${VAPI}/call`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${s.key}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        phoneNumberId: s.phoneNumberId,
+        customer: { number: m },
+        name: "Voice test",
+        assistant: {
+          name: caller.name,
+          firstMessage: testCallWords(caller.name, brand.name || biz[0]?.name || ""),
+          firstMessageMode: "assistant-speaks-first",
+          model: {
+            provider: "anthropic",
+            model: s.model,
+            messages: [{ role: "system", content: "You have just said a short test message. Say nothing more and end the call at once." }],
+            tools: [{ type: "endCall" }],
+          },
+          ...(voice ? { voice } : {}),
+          transcriber: { provider: "deepgram", model: "nova-2", language: "en-AU" },
+          maxDurationSeconds: 40,
+        },
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (res.ok) return "placed";
+    const json = (await res.json().catch(() => ({}))) as { message?: unknown };
+    console.error("voice test not placed", `Vapi ${res.status}: ${String(json.message ?? "").slice(0, 200)}`);
+    return "failed";
+  } catch (e) {
+    console.error("voice test not placed", e instanceof Error ? e.message : e);
+    return "failed";
+  }
 }

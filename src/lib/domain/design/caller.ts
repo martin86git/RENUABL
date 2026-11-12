@@ -35,5 +35,67 @@ export function callerIntro(name: string, business: string): string {
   return `"Hi, is that Sam? It's ${speakableName(name) || DEFAULT_CALLER}, ${business.trim() || "your business"}'s automated assistant, calling about the solar enquiry you made on our website. This call is recorded."`;
 }
 
+/** A voice for the phone assistant, as Vapi takes it on a call (`voice: { provider, voiceId }`). */
+export interface CallerVoice {
+  provider: "vapi" | "11labs";
+  voiceId: string;
+}
+
+export interface VoiceChoice extends CallerVoice {
+  label: string;
+  /** How it sounds, as the voice's maker describes it. */
+  words: string;
+  sex: "female" | "male";
+}
+
+/**
+ * The voices offered (12 Nov 2026, Martin: a picker, so the voice can suit the name). Vapi's own voices as listed on
+ * docs.vapi.ai/providers/voice/vapi-voices (read 12 Nov 2026; none is Australian), and ElevenLabs' Charlie, an
+ * Australian voice Vapi can use. VERIFY each on a test call before relying on it, and again when Vapi retires voices
+ * (it retired eight in 2026). Any other ElevenLabs or Vapi voice can be typed in by its ID.
+ */
+export const CALLER_VOICES: readonly VoiceChoice[] = [
+  { provider: "11labs", voiceId: "IKne3meq5aSn9XLyUdCD", label: "Charlie", words: "Australian, relaxed and natural", sex: "male" },
+  { provider: "vapi", voiceId: "Elliot", label: "Elliot", words: "Canadian, young and calm (Vapi's default)", sex: "male" },
+  { provider: "vapi", voiceId: "Dan", label: "Dan", words: "British", sex: "male" },
+  { provider: "vapi", voiceId: "Kai", label: "Kai", words: "American, adult", sex: "male" },
+  { provider: "vapi", voiceId: "Neil", label: "Neil", words: "American, young", sex: "male" },
+  { provider: "vapi", voiceId: "Clara", label: "Clara", words: "American, adult", sex: "female" },
+  { provider: "vapi", voiceId: "Emma", label: "Emma", words: "American, young", sex: "female" },
+  { provider: "vapi", voiceId: "Savannah", label: "Savannah", words: "American, young", sex: "female" },
+  { provider: "vapi", voiceId: "Layla", label: "Layla", words: "American, young", sex: "female" },
+  { provider: "vapi", voiceId: "Tara", label: "Tara", words: "American", sex: "female" },
+];
+
+export const VOICE_PROVIDERS: { id: CallerVoice["provider"]; label: string }[] = [
+  { id: "11labs", label: "ElevenLabs" },
+  { id: "vapi", label: "Vapi" },
+];
+
+/** A voice sent from the browser, checked: a known provider and an ID of letters and digits. Null is "the default". */
+export function cleanVoice(raw: unknown): CallerVoice | null | "bad" {
+  if (raw === null || raw === undefined || raw === "") return null;
+  const v = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const provider = v.provider === "vapi" || v.provider === "11labs" ? v.provider : null;
+  const voiceId = typeof v.voiceId === "string" ? v.voiceId.trim() : "";
+  if (!provider || !/^[A-Za-z0-9_-]{2,40}$/.test(voiceId)) return "bad";
+  return { provider, voiceId };
+}
+
+export const VOICE_BAD = "That isn't a voice ID we can use: letters and numbers only, as Vapi or ElevenLabs show it.";
+
+/** The voice's name for the page: one of ours by its name, else "ElevenLabs voice 21m00…". */
+export function voiceLabel(v: CallerVoice | null): string {
+  if (!v) return "Vapi's default voice";
+  const ours = CALLER_VOICES.find((c) => c.provider === v.provider && c.voiceId === v.voiceId);
+  if (ours) return ours.label;
+  return `${v.provider === "11labs" ? "ElevenLabs" : "Vapi"} voice ${v.voiceId.length > 12 ? `${v.voiceId.slice(0, 8)}…` : v.voiceId}`;
+}
+
+/** What the test call says, so the business hears the voice with its own name in it. */
+export function testCallWords(name: string, business: string): string {
+  return `Hi, it's ${speakableName(name) || DEFAULT_CALLER}, ${business.trim() || "your business"}'s automated assistant. This is a test, so you can hear how I'll sound on your calls. Bye for now.`;
+}
+
 /** The initial shown when there is no photo. */
 export const callerInitial = (name: string) => (speakableName(name).charAt(0) || "S").toUpperCase();

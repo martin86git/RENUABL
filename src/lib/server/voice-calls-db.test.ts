@@ -51,7 +51,9 @@ describe.skipIf(!url)("voice calls on deals (database)", () => {
     own = (await repo.createBusiness(OWN, "RENUABL", BUSINESS_TERMS_VERSION, "retailer")).businessId;
     other = (await repo.createBusiness(OTHER, "Other Solar", BUSINESS_TERMS_VERSION, "retailer")).businessId;
     // RENUABL named its phone assistant (Settings → Phone assistant); the other business left it as Sol.
-    await (await import("./design-caller-repo")).setCallerName(own, "Ella", OWN);
+    const callers = await import("./design-caller-repo");
+    await callers.setCallerName(own, "Ella", OWN);
+    await callers.setCallerVoice(own, { provider: "vapi", voiceId: "Clara" }, OWN);
     vi.stubGlobal("fetch", async (u: string, init?: RequestInit) => {
       sent.push({ url: String(u), method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : null });
       return new Response(JSON.stringify({ id: `call_${++n}` }), { status: 201 });
@@ -89,6 +91,8 @@ describe.skipIf(!url)("voice calls on deals (database)", () => {
     expect(body.customer).toEqual({ number: MOBILE, name: "Sam" });
     const assistant = body.assistant as { name: string; server: { url: string; headers: Record<string, string> } };
     expect(assistant.name).toBe("Ella");
+    // In the voice the business chose for it.
+    expect((assistant as { voice?: unknown }).voice).toEqual({ provider: "vapi", voiceId: "Clara" });
     expect(assistant.server.url).toBe(`https://www.renuabl.test/api/voice/vapi?ref=${row.id}`);
     expect(assistant.server.headers["x-renuabl-voice"]).toBe("a-test-secret-of-twenty-plus");
     // The same deal is never rung twice at once.

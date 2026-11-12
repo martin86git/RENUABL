@@ -5,11 +5,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DEFAULT_CALLER } from "@/lib/domain/design/caller";
+import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
 
 export interface CallerState {
   name: string;
   photoAt: string | null;
+  voice: CallerVoice | null;
 }
 
 type Answer<T> = ({ ok: true } & T) | { ok: false; message: string };
@@ -42,6 +43,20 @@ export async function saveCallerName(name: string) {
   return res;
 }
 
+/** The voice it speaks in; null goes back to the default. */
+export async function saveCallerVoice(voice: CallerVoice | null) {
+  const res = await ask<{ caller: CallerState }>("/api/design/caller", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ voice }),
+  });
+  if (res.ok) window.dispatchEvent(new CustomEvent(CHANGED, { detail: res.caller }));
+  return res;
+}
+
+/** Rings the member's own mobile so they hear the voice. */
+export const ringMeToHear = () => ask<object>("/api/design/caller/test", { method: "POST" });
+
 export async function uploadCallerPhoto(file: File) {
   const form = new FormData();
   form.set("file", file);
@@ -63,7 +78,7 @@ let shared: Promise<CallerState | null> | null = null;
 
 /** The assistant for this page (read once, shared by every place that shows it), or Sol while it loads. */
 export function useCaller(): CallerState {
-  const [caller, setCaller] = useState<CallerState>({ name: DEFAULT_CALLER, photoAt: null });
+  const [caller, setCaller] = useState<CallerState>({ name: DEFAULT_CALLER, photoAt: null, voice: null });
   useEffect(() => {
     let live = true;
     shared ??= loadCaller().then((r) => (r.ok ? r.caller : null));

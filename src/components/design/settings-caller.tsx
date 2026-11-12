@@ -2,9 +2,30 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Camera, Phone, Trash2 } from "lucide-react";
-import { CALLER_COPY, CALLER_NAME_MAX, callerInitial, callerIntro, cleanCallerName } from "@/lib/domain/design/caller";
-import { callerPhotoUrl, loadCaller, removeCallerPhoto, saveCallerName, uploadCallerPhoto, type CallerState } from "@/lib/services/caller";
+import { Camera, Check, Phone, PhoneCall, Trash2 } from "lucide-react";
+import {
+  CALLER_COPY,
+  CALLER_NAME_MAX,
+  CALLER_VOICES,
+  callerInitial,
+  callerIntro,
+  cleanCallerName,
+  cleanVoice,
+  VOICE_BAD,
+  VOICE_PROVIDERS,
+  voiceLabel,
+  type CallerVoice,
+} from "@/lib/domain/design/caller";
+import {
+  callerPhotoUrl,
+  loadCaller,
+  removeCallerPhoto,
+  ringMeToHear,
+  saveCallerName,
+  saveCallerVoice,
+  uploadCallerPhoto,
+  type CallerState,
+} from "@/lib/services/caller";
 import { ui } from "./design-shell";
 
 /** The phone assistant's face: its picture, else its initial on graphite. */
@@ -146,6 +167,8 @@ export function CallerSettings() {
               <p className="mt-2 text-xs text-muted">{CALLER_COPY.automated}</p>
             </div>
 
+            <VoicePicker caller={caller} callsOn={callsOn} onSaved={(c) => setCaller(c)} onStatus={setStatus} />
+
             <p className="text-xs text-muted">
               {callsOn
                 ? "Calls are switched on for your business."
@@ -156,6 +179,153 @@ export function CallerSettings() {
         </div>
       )}
       {!caller && status && <p className="mt-6 text-sm text-danger">{status.text}</p>}
+    </div>
+  );
+}
+
+const same = (a: CallerVoice | null, b: CallerVoice | null) => a?.provider === b?.provider && a?.voiceId === b?.voiceId;
+
+/**
+ * The voice it speaks in (12 Nov 2026, Martin: so the voice can suit the name): Vapi's own voices and an Australian
+ * one, or any voice by its ID; saved on a press, and heard on a short call to the member's own mobile.
+ */
+function VoicePicker({
+  caller,
+  callsOn,
+  onSaved,
+  onStatus,
+}: {
+  caller: CallerState;
+  callsOn: boolean;
+  onSaved: (c: CallerState) => void;
+  onStatus: (s: { ok: boolean; text: string }) => void;
+}) {
+  const ours = CALLER_VOICES.some((v) => same(v, caller.voice));
+  const [own, setOwn] = useState(Boolean(caller.voice && !ours));
+  const [provider, setProvider] = useState<CallerVoice["provider"]>(caller.voice?.provider ?? "11labs");
+  const [typedId, setTypedId] = useState(caller.voice && !ours ? caller.voice.voiceId : "");
+  const [busy, setBusy] = useState(false);
+
+  const choose = async (voice: CallerVoice | null) => {
+    setBusy(true);
+    const res = await saveCallerVoice(voice);
+    setBusy(false);
+    if (!res.ok) return onStatus({ ok: false, text: res.message });
+    onSaved(res.caller);
+    onStatus({ ok: true, text: `Voice saved: ${voiceLabel(res.caller.voice)}. Ring yourself to hear it.` });
+  };
+
+  const saveOwn = () => {
+    const v = cleanVoice({ provider, voiceId: typedId });
+    if (v === "bad" || !v) return onStatus({ ok: false, text: VOICE_BAD });
+    void choose(v);
+  };
+
+  const ring = async () => {
+    setBusy(true);
+    const res = await ringMeToHear();
+    setBusy(false);
+    onStatus(res.ok ? { ok: true, text: "Ringing your mobile now." } : { ok: false, text: res.message });
+  };
+
+  const row = (label: string, words: string, picked: boolean, onPick: () => void, key: string) => (
+    <button
+      key={key}
+      type="button"
+      disabled={busy}
+      onClick={onPick}
+      className={clsx(
+        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm ring-1",
+        picked ? "bg-surface-2 ring-ink" : "ring-line hover:ring-ink-2",
+      )}
+      aria-pressed={picked}
+    >
+      <span
+        className={clsx("grid size-4 shrink-0 place-items-center rounded-full ring-1", picked ? "bg-primary ring-primary" : "ring-line")}
+      >
+        {picked && <Check className="size-3 text-primary-ink" aria-hidden />}
+      </span>
+      <span className="font-medium text-ink">{label}</span>
+      <span className="truncate text-ink-2">{words}</span>
+    </button>
+  );
+
+  return (
+    <div className={clsx(ui.card, "p-4")}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[13px] font-medium text-ink">Its voice</p>
+        <button
+          type="button"
+          className={ui.quiet}
+          disabled={busy || !callsOn}
+          onClick={() => void ring()}
+          title={callsOn ? "" : "Once calls are on"}
+        >
+          <PhoneCall className="size-4" aria-hidden /> Ring me to hear it
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-muted">
+        Pick one that suits the name. The test call rings the mobile on your account, in the voice saved here.
+      </p>
+      {(["female", "male"] as const).map((sex) => (
+        <div key={sex} className="mt-3">
+          <p className={ui.eyebrow}>{sex === "female" ? "Female voices" : "Male voices"}</p>
+          <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+            {CALLER_VOICES.filter((v) => v.sex === sex).map((v) =>
+              row(
+                v.label,
+                v.words,
+                !own && same(v, caller.voice),
+                () => {
+                  setOwn(false);
+                  void choose({ provider: v.provider, voiceId: v.voiceId });
+                },
+                `${v.provider}:${v.voiceId}`,
+              ),
+            )}
+          </div>
+        </div>
+      ))}
+      <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+        {row(
+          "Default",
+          "The site's usual voice",
+          !own && !caller.voice,
+          () => {
+            setOwn(false);
+            void choose(null);
+          },
+          "default",
+        )}
+        {row("Another voice", "By its ID from Vapi or ElevenLabs", own, () => setOwn(true), "own")}
+      </div>
+      {own && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            className={clsx(ui.input, "w-auto")}
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as CallerVoice["provider"])}
+          >
+            {VOICE_PROVIDERS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <input
+            className={clsx(ui.input, "max-w-64")}
+            placeholder="Voice ID"
+            value={typedId}
+            onChange={(e) => setTypedId(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveOwn();
+            }}
+          />
+          <button type="button" className={ui.primary} disabled={busy || !typedId.trim()} onClick={saveOwn}>
+            Use this voice
+          </button>
+        </div>
+      )}
     </div>
   );
 }

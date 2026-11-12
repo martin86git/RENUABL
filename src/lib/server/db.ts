@@ -1329,6 +1329,9 @@ create table if not exists design_caller (
   updated_by text,
   updated_at timestamptz not null default now()
 );
+-- The voice it speaks in (Vapi's or ElevenLabs', by ID; none is the site's default).
+alter table design_caller add column if not exists voice_provider text;
+alter table design_caller add column if not exists voice_id text;
 -- (Kept after design_jobs, which both point at, so a new database is made in order.)
 -- Jobs a retailer sends to a connected installer (domain/design/job-shares.ts): one live a job at a time, opened in
 -- the installer's login through the job card's own installer link (token, installer id "biz:<business>").

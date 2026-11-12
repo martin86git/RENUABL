@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { CALLER_NAME_MAX, callerInitial, callerIntro, cleanCallerName, DEFAULT_CALLER } from "./caller";
+import {
+  CALLER_NAME_MAX,
+  CALLER_VOICES,
+  callerInitial,
+  callerIntro,
+  cleanCallerName,
+  cleanVoice,
+  DEFAULT_CALLER,
+  testCallWords,
+  voiceLabel,
+} from "./caller";
 
 describe("the phone assistant's name", () => {
   it("keeps a name that can be said out loud", () => {
@@ -30,5 +40,37 @@ describe("the phone assistant's name", () => {
   it("shows an initial with no picture", () => {
     expect(callerInitial("ella")).toBe("E");
     expect(callerInitial("")).toBe("S");
+  });
+});
+
+describe("the phone assistant's voice", () => {
+  it("offers voices of both kinds, each one it can keep", () => {
+    expect(CALLER_VOICES.some((v) => v.sex === "female")).toBe(true);
+    expect(CALLER_VOICES.some((v) => v.sex === "male")).toBe(true);
+    for (const v of CALLER_VOICES)
+      expect(cleanVoice({ provider: v.provider, voiceId: v.voiceId })).toEqual({ provider: v.provider, voiceId: v.voiceId });
+    expect(new Set(CALLER_VOICES.map((v) => v.label)).size).toBe(CALLER_VOICES.length);
+  });
+
+  it("takes another voice by its ID, and nothing else", () => {
+    expect(cleanVoice({ provider: "11labs", voiceId: " 21m00Tcm4TlvDq8ikWAM " })).toEqual({
+      provider: "11labs",
+      voiceId: "21m00Tcm4TlvDq8ikWAM",
+    });
+    expect(cleanVoice(null)).toBeNull();
+    expect(cleanVoice({ provider: "azure", voiceId: "abc" })).toBe("bad");
+    expect(cleanVoice({ provider: "vapi", voiceId: "<script>" })).toBe("bad");
+  });
+
+  it("names the voice for the page", () => {
+    expect(voiceLabel(null)).toBe("Vapi's default voice");
+    expect(voiceLabel({ provider: "vapi", voiceId: "Clara" })).toBe("Clara");
+    expect(voiceLabel({ provider: "11labs", voiceId: "21m00Tcm4TlvDq8ikWAM" })).toBe("ElevenLabs voice 21m00Tcm…");
+  });
+
+  it("says on the test call who it is, that it's automated, and that it's a test", () => {
+    const w = testCallWords("Ella", "RENUABL");
+    expect(w).toContain("it's Ella, RENUABL's automated assistant");
+    expect(w).toContain("test");
   });
 });

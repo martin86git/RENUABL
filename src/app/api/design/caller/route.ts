@@ -1,5 +1,5 @@
-import { cleanCallerName } from "@/lib/domain/design/caller";
-import { callerOf, setCallerName } from "@/lib/server/design-caller-repo";
+import { cleanCallerName, cleanVoice, VOICE_BAD } from "@/lib/domain/design/caller";
+import { callerOf, setCallerName, setCallerVoice } from "@/lib/server/design-caller-repo";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { query } from "@/lib/server/db";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
@@ -21,13 +21,18 @@ export async function GET() {
   });
 }
 
-/** PUT { name }: the name it gives on calls, for a member who may change settings. */
+/** PUT { name } or { voice }: the name it gives on calls, or the voice it speaks in (null: the default), for a member who may change settings. */
 export async function PUT(request: Request) {
   return answer(async () => {
     const who = await requireMember("prices");
     if ("refuse" in who) return who.refuse;
     const read = await readBody(request, 1_000);
     if ("refuse" in read) return read.refuse;
+    if ("voice" in read.body) {
+      const voice = cleanVoice(read.body.voice);
+      if (voice === "bad") return Response.json({ ok: false, message: VOICE_BAD }, { status: 422 });
+      return Response.json({ ok: true, caller: await setCallerVoice(who.member.businessId, voice, who.member.email) });
+    }
     const name = cleanCallerName(read.body.name);
     if (!name.ok) return Response.json({ ok: false, message: name.message }, { status: 422 });
     return Response.json({ ok: true, caller: await setCallerName(who.member.businessId, name.value, who.member.email) });
