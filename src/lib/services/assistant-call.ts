@@ -16,10 +16,31 @@ export interface Watched {
   message: string;
 }
 
-let watched: Watched | null = null;
+/** Kept for the tab, so a reload or a new page mid-call opens the window again (for up to `KEEP_MS`). */
+const KEY = "renuabl.design.watched-call";
+const KEEP_MS = 2 * 60 * 60 * 1000;
+
+function remembered(): Watched | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const kept = JSON.parse(window.sessionStorage.getItem(KEY) ?? "null") as (Watched & { at: number }) | null;
+    if (!kept || typeof kept.jobId !== "string" || Date.now() - kept.at > KEEP_MS) return null;
+    return { jobId: kept.jobId, name: String(kept.name ?? ""), message: String(kept.message ?? "") };
+  } catch {
+    return null;
+  }
+}
+
+let watched: Watched | null = remembered();
 const listeners = new Set<() => void>();
 const set = (next: Watched | null) => {
   watched = next;
+  try {
+    if (next) window.sessionStorage.setItem(KEY, JSON.stringify({ ...next, at: Date.now() }));
+    else window.sessionStorage.removeItem(KEY);
+  } catch {
+    // Not kept: the window still shows on this page.
+  }
   listeners.forEach((l) => l());
 };
 
