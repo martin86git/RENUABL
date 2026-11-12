@@ -4,16 +4,17 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import clsx from "clsx";
-import { NotebookPen, Phone, Settings, X } from "lucide-react";
+import { Headset, NotebookPen, Phone, Settings, X } from "lucide-react";
 import { askAssistantToCall, useCallerInfo } from "@/lib/services/caller";
+import { callFromComputer, useComputerCall, useComputerCallsOn } from "@/lib/services/computer-call";
 import { CallerAvatar } from "./settings-caller";
 
 const ROW = "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-surface-2";
 const SETTINGS = "/design/settings/calls";
 
 /**
- * Who makes the call (12 Nov 2026, Martin: Call anywhere on a deal or Today's feed lets me choose the caller): you on
- * your own phone, you with the note-taker, or the business's phone assistant. While the assistant isn't set up, an
+ * Who makes the call (12 Nov 2026, Martin: Call anywhere on a deal or Today's feed lets me choose the caller): you from
+ * this computer (where it is set up, `services/computer-call.ts`), you on your own phone, you with the note-taker, or the business's phone assistant. While the assistant isn't set up, an
  * admin (who may change settings) is sent to set it up; anyone else is told to ask one.
  */
 export function CallChoices(props: {
@@ -28,6 +29,9 @@ export function CallChoices(props: {
   const { caller, callsOn, mayChange, ready } = useCallerInfo();
   const [sending, setSending] = useState(false);
   const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
+  const fromComputer = useComputerCallsOn();
+  const onCall = useComputerCall();
+  const busy = !!onCall && onCall.phase !== "ended" && onCall.phase !== "failed";
   const dial = props.phone.replace(/\s/g, "");
   const who = props.name || "them";
 
@@ -42,6 +46,26 @@ export function CallChoices(props: {
   return (
     <div>
       <p className="px-3 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Who calls {who}?</p>
+      {dial && fromComputer && (
+        <button
+          role="menuitem"
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            props.onClose();
+            void callFromComputer(props.jobId, props.name);
+          }}
+          className={clsx(ROW, "disabled:hover:bg-transparent")}
+        >
+          <Headset className="size-4 text-ink-2" aria-hidden />
+          <span className={busy ? "text-muted" : ""}>
+            You, from this computer
+            <span className="block text-xs text-muted">
+              {busy ? "You're on a call already" : "Through your headset or the computer's microphone"}
+            </span>
+          </span>
+        </button>
+      )}
       {dial ? (
         <a role="menuitem" href={`tel:${dial}`} onClick={props.onClose} className={ROW}>
           <Phone className="size-4 text-ink-2" aria-hidden />

@@ -11,6 +11,7 @@ import { looksLikeHubspotToken } from "@/lib/domain/hubspot-token";
 import { smsConfigured } from "@/lib/server/sms";
 import { storageConfigured } from "@/lib/server/storage";
 import { voiceStatus } from "@/lib/server/voice-calls";
+import { browserCallStatus } from "@/lib/server/twilio-voice";
 
 const set = (v: string | undefined) => Boolean(v?.trim());
 
@@ -59,6 +60,8 @@ export async function GET() {
       sms: smsConfigured(),
       // Revo calling new leads (Vapi): switched on, and which settings are in.
       voiceCalls: voiceStatus(),
+      // Calling customers from the computer (Twilio's Voice SDK): which settings are in.
+      browserCalls: browserCallStatus(),
       // Staff mobiles texted about new leads to call now.
       leadTexts: staffMobiles(process.env.LEAD_ALERT_MOBILES || process.env.ALERT_MOBILES).length > 0,
       // Browser tags (public IDs): which are set, so missing ones are easy to spot.

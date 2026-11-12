@@ -4,6 +4,7 @@
  * assistant (Sol until the business names it) made through Vapi, each with what it came to, his summary and the transcript, and the calls the team logged on
  * a deal (the note-taker or a note of kind call). Above them, the calls Sol still has lined up. Pure, tested.
  */
+import { recordingOf } from "../browser-call";
 import { OUTCOME_WORDS, type CallOutcome } from "../voice-agent";
 
 /** How far back the log reaches. */
@@ -76,7 +77,7 @@ export function outcomeTone(outcome: CallOutcome | null): "good" | "needs" | "pl
  * the log keeps the first `max` characters.
  */
 export function loggedWords(text: string, max = 400): string {
-  const t = text.replace(/\s+/g, " ").trim();
+  const t = (recordingOf(text)?.text ?? text).replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 }
 

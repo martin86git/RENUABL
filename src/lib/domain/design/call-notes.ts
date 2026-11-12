@@ -132,10 +132,16 @@ export const CALL_NOTES_SCHEMA = {
   },
 } as const;
 
-export function callNotesPrompt(business: string, customer: string, transcript: string): string {
+/**
+ * `both`: the transcript is both sides of a call made from the computer (domain/browser-call.ts), each turn marked "Us:" or
+ * "<name> (customer):"; else what the note-taker's microphone heard of the salesperson's side alone.
+ */
+export function callNotesPrompt(business: string, customer: string, transcript: string, both = false): string {
   return [
     `You are taking notes for a salesperson at ${business || "a solar business"} (solar panels, batteries and EV chargers in Australia), on their call with ${customer || "a customer"}.`,
-    `Below is what a microphone heard of the salesperson's side of the call, as speech recognition wrote it: only their words, never the customer's, so infer what the customer said only from what the salesperson says back. Speech recognition gets numbers and names wrong: read "10 kilowatt", "ten kW" and "10 KW" as 10 kW, and a battery's size in kWh. Lines starting [Note] are general notes they added on purpose, and [Design note] are notes for the design: give both priority, and put each where it was meant.`,
+    both
+      ? 'Below is both sides of the call as speech recognition wrote them: each turn starts "Us:" (the salesperson) or with the customer\'s name. Speech recognition gets numbers and names wrong: read "10 kilowatt", "ten kW" and "10 KW" as 10 kW, and a battery\'s size in kWh. What the customer said themselves is the strongest evidence of what they want.'
+      : `Below is what a microphone heard of the salesperson's side of the call, as speech recognition wrote it: only their words, never the customer's, so infer what the customer said only from what the salesperson says back. Speech recognition gets numbers and names wrong: read "10 kilowatt", "ten kW" and "10 KW" as 10 kW, and a battery's size in kWh. Lines starting [Note] are general notes they added on purpose, and [Design note] are notes for the design: give both priority, and put each where it was meant.`,
     "The notes serve two people, so keep the two halves apart: first the conversation, for the follow-up email that recaps the call; then the work, arranged for whoever designs the system, writes the proposal and prices it.",
     "As short plain lines in Australian English:",
     "- summary: at most two sentences: what the customer wants and where it was left.",

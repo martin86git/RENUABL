@@ -1329,6 +1329,28 @@ create table if not exists design_caller (
   updated_by text,
   updated_at timestamptz not null default now()
 );
+-- Calls made from the computer through Twilio (server/browser-calls.ts): one row a call, its ticket the row's id.
+create table if not exists design_browser_calls (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  customer_id text not null,
+  customer_name text not null default '',
+  member_email text not null,
+  identity text not null,
+  number text not null,
+  status text not null default 'ready',
+  call_sid text,
+  call_end text,
+  seconds integer,
+  recording_sid text,
+  transcript_sid text,
+  created_at timestamptz not null default now(),
+  used_at timestamptz,
+  ended_at timestamptz,
+  written_at timestamptz
+);
+create index if not exists design_browser_calls_job on design_browser_calls(business_id, job_id);
 -- The voice it speaks in (Vapi's or ElevenLabs', by ID; none is the site's default).
 alter table design_caller add column if not exists voice_provider text;
 alter table design_caller add column if not exists voice_id text;

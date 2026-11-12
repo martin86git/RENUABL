@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { CalendarCheck, PhoneIncoming, PhoneMissed, PhoneOff } from "lucide-react";
 import { readCallLine, type CallOutcome } from "@/lib/domain/voice-agent";
+import { recordingOf } from "@/lib/domain/browser-call";
 import { outcomeTone } from "@/lib/domain/design/call-log";
 import { useCaller } from "@/lib/services/caller";
 import { CallerAvatar } from "./settings-caller";
@@ -20,9 +21,18 @@ const ICON: Partial<Record<CallOutcome, typeof CalendarCheck>> = {
  * the phone assistant's calls lead with what they came to, the time in bold when one was booked, then the summary.
  * Calls the team logged read as they were written.
  */
-export function CallEntryText({ text }: { text: string }) {
+export function CallEntryText({ text: whole }: { text: string }) {
+  const recorded = recordingOf(whole);
+  const text = recorded ? recorded.text : whole;
+  const player = recorded && <CallRecording callId={recorded.callId} />;
   const read = readCallLine(text);
-  if (!read) return <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{text}</p>;
+  if (!read)
+    return (
+      <>
+        <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{text}</p>
+        {player}
+      </>
+    );
   const tone = outcomeTone(read.outcome);
   const Icon = ICON[read.outcome] ?? PhoneIncoming;
   return (
@@ -42,7 +52,21 @@ export function CallEntryText({ text }: { text: string }) {
         {read.detail && <span className="font-semibold text-ink">{read.detail}</span>}
       </p>
       {read.rest && <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">{read.rest}</p>}
+      {player}
     </div>
+  );
+}
+
+/** A call made from the computer, played back on its deal (only for members who may see the deal). */
+function CallRecording({ callId }: { callId: string }) {
+  return (
+    <audio
+      controls
+      preload="none"
+      src={`/api/design/calls/browser/${callId}/recording`}
+      className="mt-2 h-9 w-full max-w-sm"
+      aria-label="The call's recording"
+    />
   );
 }
 
