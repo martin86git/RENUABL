@@ -508,7 +508,7 @@ export function SolBox({
           type="submit"
           disabled={asking || !ready}
           aria-label="Ask Sol"
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white disabled:bg-surface-2 disabled:text-muted"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
         >
           <ArrowUp className="size-4" aria-hidden />
         </button>

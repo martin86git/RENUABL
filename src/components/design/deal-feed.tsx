@@ -318,10 +318,10 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
             aria-expanded={props.adding}
             className={clsx(
               !ownerOfTeam && "ml-auto",
-              "inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line pl-2.5 pr-4 text-[13px] font-semibold text-white shadow-sm transition hover:brightness-105",
+              "inline-flex h-9 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-4 text-[13px] font-medium text-ink ring-1 ring-line transition hover:ring-ink-2",
             )}
           >
-            <Plus className={clsx("size-4 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden /> New lead
+            <Plus className={clsx("size-4 text-ink-2 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden /> New lead
           </button>
         </div>
         {data && parts.fresh.length === 0 ? (
@@ -481,7 +481,7 @@ function ArrivalCard(props: {
       <div className="mt-auto flex items-center gap-2 pt-1">
         <Link
           href={designAsk ? briefHref(d.jobId, designAsk.id) : `${PATHS.designer}?job=${encodeURIComponent(d.jobId)}`}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105"
+          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[12.5px] font-semibold text-primary-ink hover:brightness-125"
         >
           <PenTool className="size-3.5" aria-hidden /> Design
         </Link>
@@ -680,9 +680,7 @@ function DealCard(props: {
   // the deal's post); the chat drops under the deal on a narrow screen.
   return (
     <div className={clsx("grid items-stretch gap-3", pad && "lg:grid-cols-[minmax(0,1fr)_22rem]")}>
-      <article
-        className={clsx("relative flex min-w-0 flex-col rounded-2xl bg-surface p-4 ring-1 sm:p-5", need ? "ring-sun-line/50" : "ring-line")}
-      >
+      <article className={clsx("relative flex min-w-0 flex-col rounded-2xl bg-surface p-4 ring-1 sm:p-5", "ring-line")}>
         {cleared && (
           <div className="feed-cleared absolute inset-0 z-10 grid place-items-center rounded-2xl bg-surface/85" role="status">
             <span className="flex items-center gap-2 text-[15px] font-medium text-ink">
@@ -806,7 +804,7 @@ function DealCard(props: {
                 title="The proposal"
                 href={`${PATHS.deals}/${encodeURIComponent(d.jobId)}/proposal`}
               >
-                <FileText className={clsx("size-4", !move && "text-sun-line")} aria-hidden />
+                <FileText className="size-4" aria-hidden />
               </Tool>
             )}
             {!pad && !props.solo && (
@@ -913,13 +911,13 @@ const MOVE_ICONS: Record<MoveKind, React.ComponentType<{ className?: string }>> 
   deal: Handshake,
 };
 
-/** The one thing to do now, lit in the signal orange, with its countdown when it is Sol's email. */
+/** The one thing to do now, the card's one graphite button (orange is kept for signals, 12 Nov 2026, Martin), with its countdown when it is Sol's email. */
 function MoveButton(props: { deal: FeedDeal; move: NextMove; now: Date; reviewing: boolean; onReview: () => void; onCall: () => void }) {
   const { deal: d, move } = props;
   const Icon = MOVE_ICONS[move.kind];
   const look = clsx(
     "inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold transition",
-    props.reviewing ? "bg-primary text-primary-ink" : "bg-sun-line text-white hover:brightness-105",
+    props.reviewing ? "bg-ink text-canvas ring-2 ring-primary/30" : "bg-primary text-primary-ink hover:brightness-125",
   );
   const ask = d.team?.openAsks.find((a) => a.type === "design");
   const counting = Boolean(d.sol) && (d.sol?.state ?? (d.sol?.held ? "held" : "counting")) === "counting";
