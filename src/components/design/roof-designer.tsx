@@ -66,6 +66,7 @@ import {
   Plus,
   PlugZap,
   Redo2,
+  RotateCcw,
   Ruler,
   SquarePlus,
   Save,
@@ -4319,6 +4320,29 @@ export function RoofDesigner(props: {
     },
     onStop: () => setGuideOn(false),
   };
+  /**
+   * Start again (12 Nov 2026, Martin: a reset under the design's name, asked first): the open design back to
+   * nothing (no panels, inverter, battery, strings, marks or hand changes to its quote), the roof's confirmed faces
+   * kept, and Sol leading it from the start.
+   */
+  const [resetAsk, setResetAsk] = useState(false);
+  const resetDesign = () => {
+    const list = everyDesign();
+    list[active] = {
+      ...spot,
+      faces: faces.filter((f) => f.confirmed).map((f) => ({ ...f, off: panelPlaces(f, size).map((pl) => pl.index) })),
+      loose: [],
+    };
+    setQuotes(everyQuote().map((q, i) => (i === active ? { form: q.form, edits: {} } : q)));
+    show(list, active);
+    setSaved("changed");
+    setTray(null);
+    setTrayPreview(null);
+    setGuideAnswered([]);
+    setGuideTarget(null);
+    setGuideOn(!costsHidden);
+    setResetAsk(false);
+  };
   // Sol drives the designer (1 Nov 2026, Martin): a request typed or spoken in the command bar, read at once when it is
   // a common one (`parseCommand`), else read by Sol against the design described in words (`/api/design/command`),
   // and carried out here as one change that undoes like any other.
@@ -5551,6 +5575,49 @@ export function RoofDesigner(props: {
               <X className="size-4" aria-hidden />
             </button>
             {props.noDeal}
+          </div>
+        )}
+        {/* Start again, a small round out from under the design's name, asked first. */}
+        {props.tight && menu !== "designs" && (
+          <div className="absolute right-2 top-12 flex flex-col items-end gap-1.5">
+            <button
+              type="button"
+              onClick={() => setResetAsk(!resetAsk)}
+              aria-expanded={resetAsk}
+              aria-label="Start this design again"
+              title="Start this design again"
+              className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-ink shadow-lift ring-1 ring-white/10 transition duration-200 ease-out hover:brightness-125 starting:-translate-y-2 starting:scale-50 starting:opacity-0 motion-reduce:transition-none"
+            >
+              <RotateCcw className="size-3.5" aria-hidden />
+            </button>
+            {resetAsk && (
+              <div
+                role="alertdialog"
+                aria-label="Start again"
+                className="w-64 rounded-xl bg-primary/95 p-3 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md"
+              >
+                <p className="font-medium">Reset to default and start again?</p>
+                <p className="mt-1 text-white/70">
+                  Design {active + 1}&apos;s panels, inverter, battery and strings are taken off. The roof&apos;s confirmed faces stay.
+                </p>
+                <div className="mt-2.5 flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={resetDesign}
+                    className="rounded-full bg-sun-line px-3 py-1 text-[12.5px] font-medium text-white hover:brightness-110"
+                  >
+                    Yes, start again
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResetAsk(false)}
+                    className="rounded-full px-3 py-1 text-[12.5px] font-medium text-white/80 ring-1 ring-white/20 hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {props.tight && menu === "designs" && designsMenu}
