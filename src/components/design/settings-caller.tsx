@@ -201,18 +201,21 @@ const same = (a: CallerVoice | null, b: CallerVoice | null) => a?.provider === b
 
 /**
  * The voice it speaks in (12 Nov 2026, Martin: so the voice can suit the name): Vapi's own voices and an Australian
- * one, or any voice by its ID; saved on a press, and heard on a short call to the member's own mobile.
+ * one, or any voice by its ID; saved on a press, and heard on a short call to the member's own mobile. `compact` is the
+ * same picker in one column with no card, for the assistant's own chat (13 Nov 2026, Martin).
  */
-function VoicePicker({
+export function VoicePicker({
   caller,
   callsOn,
   onSaved,
   onStatus,
+  compact = false,
 }: {
   caller: CallerState;
   callsOn: boolean;
   onSaved: (c: CallerState) => void;
   onStatus: (s: { ok: boolean; text: string }) => void;
+  compact?: boolean;
 }) {
   const ours = CALLER_VOICES.some((v) => same(v, caller.voice));
   const [own, setOwn] = useState(Boolean(caller.voice && !ours));
@@ -265,9 +268,9 @@ function VoicePicker({
   );
 
   return (
-    <div className={clsx(ui.card, "p-4")}>
+    <div className={compact ? "" : clsx(ui.card, "p-4")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[13px] font-medium text-ink">Its voice</p>
+        {!compact && <p className="text-[13px] font-medium text-ink">Its voice</p>}
         <button
           type="button"
           className={ui.quiet}
@@ -278,13 +281,13 @@ function VoicePicker({
           <PhoneCall className="size-4" aria-hidden /> Ring me to hear it
         </button>
       </div>
-      <p className="mt-1 text-xs text-muted">
+      <p className={clsx("mt-1 text-xs text-muted", compact && "hidden")}>
         Pick one that suits the name. The test call rings the mobile on your account, in the voice saved here.
       </p>
       {(["female", "male"] as const).map((sex) => (
         <div key={sex} className="mt-3">
           <p className={ui.eyebrow}>{sex === "female" ? "Female voices" : "Male voices"}</p>
-          <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+          <div className={clsx("mt-1.5 grid gap-1.5", !compact && "sm:grid-cols-2")}>
             {CALLER_VOICES.filter((v) => v.sex === sex).map((v) =>
               row(
                 v.label,
@@ -300,7 +303,7 @@ function VoicePicker({
           </div>
         </div>
       ))}
-      <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
+      <div className={clsx("mt-3 grid gap-1.5", !compact && "sm:grid-cols-2")}>
         {row(
           "Default",
           "The site's usual voice",

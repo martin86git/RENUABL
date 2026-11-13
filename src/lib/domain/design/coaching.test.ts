@@ -58,6 +58,8 @@ describe("the assistant's answer to coaching", () => {
         add: ["Say RENUABL first", "say renuabl first"],
         remove: ["cn_bbbbbb"],
         change: [{ id: "cn_aaaaaa", text: "Give one time at a time" }],
+        rename: null,
+        voice: null,
       },
       { at: "t", by: "sam@x.com", from: "call", newId: () => `cn_new00${n++}` },
     );
@@ -70,7 +72,7 @@ describe("the assistant's answer to coaching", () => {
     const many = Array.from({ length: MAX_NOTES }, (_, i) => note(`cn_${String(i).padStart(6, "0")}`, `Note number ${i}`));
     const out = applyCoaching(
       many,
-      { reply: "ok", add: ["One more note"], remove: [], change: [] },
+      { reply: "ok", add: ["One more note"], remove: [], change: [], rename: null, voice: null },
       { at: "t", by: "b", from: "chat", newId: () => "cn_zzzzzz" },
     );
     expect(out.notes).toHaveLength(MAX_NOTES);

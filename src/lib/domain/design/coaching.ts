@@ -293,6 +293,8 @@ export const COACH_COPY = {
     `${name} hasn't been given any notes yet. Try "Mention we're a local Melbourne business" or "Slow down when you give the call times."`,
   hello: (name: string) =>
     `Hi, I'm ${name}. Tell me what to say on calls, how to say it, or what to leave out, and I'll keep it as a note for every call from then on. You can rename me or change my voice here too, and the pencil on my photo changes my picture.`,
+  script: (name: string) =>
+    `What ${name} has been told to say and how. Everything you tell ${name} in the chat is written here and used on every call.`,
   fixedTitle: "What never changes",
   callAbout: (name: string) => `What should ${name} have done differently on this call?`,
 } as const;
