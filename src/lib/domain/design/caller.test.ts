@@ -33,10 +33,10 @@ describe("the phone assistant's name", () => {
     expect(long.ok && long.value.length).toBeLessThanOrEqual(CALLER_NAME_MAX);
   });
 
-  it("opens a call with its name and the business, as automated and recorded", () => {
+  it("opens a call with its name and the business, as automated", () => {
     const words = callerIntro("Ella", "Sunrise Solar");
     expect(words).toContain("It's Ella, Sunrise Solar's automated assistant");
-    expect(words).toContain("recorded");
+    expect(words).not.toMatch(/record/i);
     expect(callerIntro("", "")).toContain(DEFAULT_CALLER);
   });
 

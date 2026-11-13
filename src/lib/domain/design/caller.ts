@@ -16,7 +16,7 @@ export const CALLER_COPY = {
   title: "Phone assistant",
   intro:
     "The assistant that rings your new leads and the customers who ask for a call, and answers people who ring your number back. Give it a name and a face: it introduces itself by the name on every call, and its calls are written on your deals under it.",
-  automated: "It always says it's an automated assistant and that the call is recorded. A name never changes that.",
+  automated: "It always says it's an automated assistant. A name never changes that.",
   photo: "A square photo or drawing works best. It's shown beside its calls on your deals and in Today's Calls tab.",
 } as const;
 
@@ -32,7 +32,7 @@ export function cleanCallerName(raw: unknown): { ok: true; value: string } | { o
 
 /** The opening words with this name, for the business to hear in its head before saving. */
 export function callerIntro(name: string, business: string): string {
-  return `"Hi, is that Sam? It's ${speakableName(name) || DEFAULT_CALLER}, ${business.trim() || "your business"}'s automated assistant, calling about the solar enquiry you made on our website. This call is recorded."`;
+  return `"Hi, is that Sam? It's ${speakableName(name) || DEFAULT_CALLER}, ${business.trim() || "your business"}'s automated assistant, calling about the solar enquiry you made on our website."`;
 }
 
 /** A voice for the phone assistant, as Vapi takes it on a call (`voice: { provider, voiceId }`). */

@@ -6,6 +6,7 @@ import { jobById } from "@/lib/server/design-crm-repo";
 import { query } from "@/lib/server/db";
 import { callerOf } from "@/lib/server/design-caller-repo";
 import { queueCall } from "@/lib/server/voice-calls";
+import { saidNoToCalls } from "@/lib/server/design-call-consent";
 import { allow } from "@/lib/server/rate-limit";
 
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
@@ -55,6 +56,13 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       });
       if (refusal) return Response.json({ ok: false, message: INSTALL_REFUSAL_WORDS[refusal] }, { status: 422 });
     }
+
+    // They said no by email to a call from the assistant (domain/design/call-consent.ts): it doesn't ring them.
+    if (!book && (await saidNoToCalls(who.member.businessId, id).catch(() => false)))
+      return Response.json(
+        { ok: false, message: `They said no to a call from ${caller.name}. Call them yourself or follow up another way.` },
+        { status: 409 },
+      );
 
     const out = book
       ? []

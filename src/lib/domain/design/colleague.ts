@@ -7,7 +7,7 @@
  * member's own mobile and a spoken PIN), and it only reads: the deals that member may see, as Sol does. It never calls,
  * emails, texts or changes anything for a customer. Pure, tested.
  */
-import { speakableName, transcriberFor, VOICE_SECRET_HEADER } from "../voice-agent";
+import { NO_AUDIO, speakableName, transcriberFor, VOICE_SECRET_HEADER } from "../voice-agent";
 import { CALLER_VOICES } from "./caller";
 
 /** What it is called until the business names it. */
@@ -242,6 +242,7 @@ export function colleagueAssistantConfig(o: {
     ...(o.voice ? { voice: o.voice } : {}),
     transcriber: transcriberFor([b.name ?? "", b.business, b.firstName ?? ""]),
     endCallMessage: "Talk soon.",
+    artifactPlan: NO_AUDIO,
     maxDurationSeconds: MAX_COLLEAGUE_SECONDS,
     serverMessages: ["tool-calls", "end-of-call-report"],
     server: { url: o.serverUrl, headers: { [VOICE_SECRET_HEADER]: o.secret } },

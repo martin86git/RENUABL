@@ -32,7 +32,7 @@ export function CallMe({ token, assistant }: { token: string; assistant: string 
         {done ?? (
           <>
             Questions? {assistant}, our automated assistant, can call you to go through it.
-            <span className="block text-[12.5px] text-muted">On the mobile we have for you. Calls are recorded.</span>
+            <span className="block text-[12.5px] text-muted">On the mobile we have for you.</span>
           </>
         )}
         {error && <span className="block text-[13px] text-danger">{error}</span>}

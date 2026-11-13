@@ -48,6 +48,7 @@ import {
   type CallOutcome,
   MAX_ASKED_ATTEMPTS,
   MAX_ATTEMPTS,
+  NO_AUDIO,
   missedCallSms,
   nextAttemptAt,
   nextCallWindow,
@@ -163,6 +164,8 @@ export async function queueCall(o: {
   mode: CallMode;
   asked: boolean;
   source?: string;
+  /** What is written on the deal for a call they asked for (else the proposal page's Call me). */
+  askedNote?: string;
 }): Promise<QueueResult> {
   const s = voiceSettings();
   if (!s || !(await voiceOnFor(o.businessId))) return { result: "off" };
@@ -204,7 +207,7 @@ export async function queueCall(o: {
     if (o.asked)
       await onDeal(
         { ...rows[0], lead: { ...rows[0].lead, assistant: (await callMeFor(o.businessId))?.assistant } },
-        "They asked for a call about their proposal (Call me on the proposal page).",
+        o.askedNote ?? "They asked for a call about their proposal (Call me on the proposal page).",
       );
     const window = nextCallWindow(new Date());
     if (!(await placeCall(s, rows[0], window)) || !window) return { result: "failed" };
@@ -827,6 +830,7 @@ export async function ringToHearVoice(
           },
           ...(voice ? { voice } : {}),
           transcriber: transcriberFor([caller.name]),
+          artifactPlan: NO_AUDIO,
           maxDurationSeconds: 40,
         },
       }),

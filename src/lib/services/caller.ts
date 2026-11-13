@@ -150,6 +150,10 @@ export function useCallerInfo(): CallerInfo {
 /** The assistant for this page, or Sol while it loads. */
 export const useCaller = (): CallerState => useCallerInfo().caller;
 
+/** Emails the deal's customer to ask whether they'd like the assistant's call; it rings after a yes (call-consent.ts). */
+export const askByEmailFirst = (jobId: string) =>
+  ask<{ message: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call/ask`, { method: "POST" });
+
 /** The phone assistant rings this deal's customer (in calling hours). Answers what to tell the member. */
 export const askAssistantToCall = (jobId: string) =>
   ask<{ message: string; already?: boolean }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call`, { method: "POST" });

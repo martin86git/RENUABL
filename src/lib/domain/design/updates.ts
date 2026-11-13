@@ -16,6 +16,16 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-13",
     area: "Calls",
+    words: "Your phone assistant's calls keep a transcript but no audio, so it no longer says calls are recorded.",
+  },
+  {
+    day: "2026-11-13",
+    area: "Calls",
+    words: "Ask by email first: the customer chooses yes or no, and your assistant rings only after a yes.",
+  },
+  {
+    day: "2026-11-13",
+    area: "Calls",
     words: "A second phone assistant, for admin: from a sold deal it rings the customer and pencils in their install day.",
   },
   {
@@ -32,7 +42,8 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-13",
     area: "Calls",
-    words: "Your chief of staff always speaks in a different voice from your phone assistant, and can't take its name, so nobody takes the two for the same person.",
+    words:
+      "Your chief of staff always speaks in a different voice from your phone assistant, and can't take its name, so nobody takes the two for the same person.",
   },
   {
     day: "2026-11-13",
@@ -42,7 +53,8 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-13",
     area: "Calls",
-    words: "Your team's own voice assistant, a chief of staff: call it from the app (or ring the team line with your PIN) and ask about your deals. Customers never reach it.",
+    words:
+      "Your team's own voice assistant, a chief of staff: call it from the app (or ring the team line with your PIN) and ask about your deals. Customers never reach it.",
   },
   {
     day: "2026-11-13",

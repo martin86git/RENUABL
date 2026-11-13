@@ -251,17 +251,23 @@ const plain = (raw: string | null | undefined, max: number) =>
 
 const who = (b: CallBrief) => `${plain(b.assistant, 20) || "Sol"}, ${plain(b.business, 60) || "the team"}'s automated assistant`;
 
-/** The first words. Always says who is calling, that it's automated and that the call is recorded. */
+/**
+ * The first words. Always says who is calling and that it's automated. Audio isn't recorded (13 Nov 2026, Martin: only
+ * the transcript is kept, `NO_AUDIO`), so it no longer says the call is recorded.
+ */
 export function firstMessage(b: CallBrief): string {
   const name = speakableName(b.firstName);
   if (b.mode === "install") return installFirstMessage(b);
   if (b.inbound)
-    return `Hi${name ? ` ${name}` : ""}, thanks for calling ${plain(b.business, 60) || "us"}. It's ${plain(b.assistant, 20) || "Sol"}, the automated assistant. This call is recorded. How can I help?`;
+    return `Hi${name ? ` ${name}` : ""}, thanks for calling ${plain(b.business, 60) || "us"}. It's ${plain(b.assistant, 20) || "Sol"}, the automated assistant. How can I help?`;
   if (b.mode === "proposal" && b.asked)
-    return `Hi${name ? ` ${name}` : ""}, it's ${who(b)}. You asked us to give you a call about your proposal. This call is recorded. What would you like to go through?`;
+    return `Hi${name ? ` ${name}` : ""}, it's ${who(b)}. You asked us to give you a call about your proposal. What would you like to go through?`;
   if (b.mode === "proposal")
-    return `Hi${name ? `, is that ${name}` : ""}? It's ${who(b)}, calling about the solar proposal we sent you. This call is recorded. Have you got a few minutes?`;
-  return `Hi${name ? `, is that ${name}` : ""}? It's ${who(b)}, calling about the solar enquiry you made on our website. This call is recorded. Have you got a few minutes?`;
+    return `Hi${name ? `, is that ${name}` : ""}? It's ${who(b)}, calling about the solar proposal we sent you. Have you got a few minutes?`;
+  // They said yes by email to a call (domain/design/call-consent.ts): short, they know who is ringing.
+  if (b.asked)
+    return `Hi${name ? ` ${name}` : ""}, it's ${who(b)}. You said yes to a call about your solar enquiry. Have you got a minute?`;
+  return `Hi${name ? `, is that ${name}` : ""}? It's ${who(b)}, calling about the solar enquiry you made on our website. Have you got a few minutes?`;
 }
 
 /**
@@ -543,6 +549,8 @@ export function assistantConfig(o: {
     transcriber: transcriberFor([b.assistant, b.business, b.firstName ?? ""]),
     // A control address for the call, so the team can tell the assistant something while it's on (live-call.ts).
     monitorPlan: { controlEnabled: true },
+    // No audio is kept, only the words (13 Nov 2026, Martin): the opening says it's automated, not that it's recorded.
+    artifactPlan: NO_AUDIO,
     ...(b.inbound ? {} : { voicemailMessage: voicemailMessage(b) }),
     endCallMessage: "Thanks, bye for now.",
     maxDurationSeconds: b.inbound ? MAX_INBOUND_SECONDS : MAX_CALL_SECONDS[b.mode],
@@ -593,6 +601,9 @@ export const VOICE_SECRET_HEADER = "x-renuabl-voice";
  * The assistant for a call that came in when it can't be answered properly (calling is off, or the caller couldn't be
  * put on a deal): it says so kindly and ends. No tools, no server: nothing to keep.
  */
+/** Vapi keeps no recording of the call's sound; the transcript is still sent (VERIFY on a call that none appears in Vapi). */
+export const NO_AUDIO = { recordingEnabled: false } as const;
+
 export function closedAssistant(o: { business: string; model: string }) {
   const business = plain(o.business, 60) || "us";
   return {
@@ -606,6 +617,7 @@ export function closedAssistant(o: { business: string; model: string }) {
       tools: [{ type: "endCall" }],
     },
     transcriber: transcriberFor([o.business]),
+    artifactPlan: NO_AUDIO,
     maxDurationSeconds: 60,
   };
 }

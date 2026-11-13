@@ -181,11 +181,12 @@ describe("booking", () => {
 });
 
 describe("what it says", () => {
-  it("opens by saying who it is, that it's automated and recorded", () => {
+  it("opens by saying who it is and that it's automated, never that it's recorded", () => {
     const m = firstMessage(lead);
     expect(m).toContain("is that Sam");
     expect(m).toContain("Ella, RENUABL's automated assistant");
-    expect(m).toContain("recorded");
+    expect(m).not.toMatch(/record/i);
+    expect(firstMessage({ ...lead, asked: true })).toContain("You said yes to a call");
     expect(m).not.toMatch(/\bAI\b|<script/);
     expect(firstMessage(asked)).toContain("You asked us to give you a call about your proposal");
     expect(firstMessage(asked)).toContain("Sol, Sunrise Solar's automated assistant");
@@ -318,13 +319,14 @@ describe("Vapi messages", () => {
 
 describe("calls that come in", () => {
   const rang = { ...lead, inbound: true, asked: true };
-  it("thanks them for calling, says who it is, automated and recorded, and leaves no voicemail", () => {
+  it("thanks them for calling, says who it is and that it's automated, and leaves no voicemail", () => {
     const m = firstMessage(rang);
     expect(m).toContain("thanks for calling RENUABL");
     expect(m).toContain("Ella, the automated assistant");
-    expect(m).toContain("recorded");
+    expect(m).not.toMatch(/record/i);
     const a = assistantConfig({ brief: rang, slots: [], serverUrl: "u", secret: "s", model: "m" });
     expect(a).not.toHaveProperty("voicemailMessage");
+    expect(a.artifactPlan).toEqual({ recordingEnabled: false });
     expect(a.maxDurationSeconds).toBe(1200);
     expect(a.model.messages[0].content).toContain("rang RENUABL's number themselves");
     expect(a.model.messages[0].content).not.toContain("leave this message");

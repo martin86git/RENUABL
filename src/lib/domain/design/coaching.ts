@@ -111,7 +111,7 @@ export function cleanTurns(raw: unknown): CoachTurn[] {
  * in the window so nobody spends a note on them.
  */
 export const FIXED_RULES = [
-  "Says it's your automated assistant and that the call is recorded",
+  "Says it's your automated assistant",
   "Never gives, changes or discounts a price, or promises a date, rebate or saving",
   "No pressure: no made-up deadlines, and asks for the go-ahead at most once",
   "Never asks for card, bank or ID details",

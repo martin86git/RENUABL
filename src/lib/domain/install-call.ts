@@ -109,10 +109,10 @@ const firstNameOf = (raw: string | null | undefined) =>
 const whoIs = (b: Pick<CallBrief, "assistant" | "business">) =>
   `${plain(b.assistant, 20) || "Sol"}, ${plain(b.business, 60) || "the team"}'s automated assistant`;
 
-/** The first words. Always who is calling, that it's automated and that the call is recorded. */
+/** The first words. Always who is calling and that it's automated (no audio is recorded: voice-agent.ts `NO_AUDIO`). */
 export function installFirstMessage(b: Pick<CallBrief, "assistant" | "business" | "firstName">): string {
   const name = firstNameOf(b.firstName);
-  return `Hi${name ? `, is that ${name}` : ""}? It's ${whoIs(b)}, ${ROLE_WORDS.admin.opens}. This call is recorded. Have you got a couple of minutes?`;
+  return `Hi${name ? `, is that ${name}` : ""}? It's ${whoIs(b)}, ${ROLE_WORDS.admin.opens}. Have you got a couple of minutes?`;
 }
 
 export function installVoicemail(b: Pick<CallBrief, "assistant" | "business" | "firstName">): string {

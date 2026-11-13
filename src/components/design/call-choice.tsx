@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import clsx from "clsx";
-import { CalendarCheck, Headset, NotebookPen, Phone, PhoneForwarded, Settings, X } from "lucide-react";
-import { askAssistantToBook, askAssistantToCall, useCallerInfo } from "@/lib/services/caller";
+import { CalendarCheck, Headset, MailQuestion, NotebookPen, Phone, PhoneForwarded, Settings, X } from "lucide-react";
+import { askAssistantToBook, askAssistantToCall, askByEmailFirst, useCallerInfo } from "@/lib/services/caller";
 import { watchAssistantCall } from "@/lib/services/assistant-call";
 import { callFromComputer, useComputerCall, useComputerCallsOn } from "@/lib/services/computer-call";
 import { CallerAvatar } from "./settings-caller";
@@ -39,6 +39,8 @@ export function CallChoices(props: {
   const [booking, setBooking] = useState(false);
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [asked, setAsked] = useState<string | null>(null);
   const fromComputer = useComputerCallsOn();
   const onCall = useComputerCall();
   const busy = !!onCall && onCall.phase !== "ended" && onCall.phase !== "failed";
@@ -54,6 +56,16 @@ export function CallChoices(props: {
     if (!res.ok) return setFailed(res.message);
     watchAssistantCall({ jobId: props.jobId, name: props.name, message: res.message });
     props.onClose();
+  };
+
+  // Ask by email first (domain/design/call-consent.ts): the assistant rings once they say yes.
+  const askFirst = async () => {
+    setAsking(true);
+    setFailed(null);
+    const res = await askByEmailFirst(props.jobId);
+    setAsking(false);
+    if (!res.ok) return setFailed(res.message);
+    setAsked(res.message);
   };
 
   const book = async () => {
@@ -145,6 +157,23 @@ export function CallChoices(props: {
             </span>
           </span>
           {canHand && <PhoneForwarded className="size-4 shrink-0 opacity-60" aria-hidden />}
+        </button>
+      )}
+      {ready && caller.named && canHand && (
+        <button
+          role="menuitem"
+          type="button"
+          disabled={asking || Boolean(asked)}
+          onClick={() => void askFirst()}
+          className={clsx(ROW, "mt-1")}
+        >
+          <MailQuestion className="size-4 text-ink-2" aria-hidden />
+          <span>
+            Ask {who} by email first
+            <span className="block text-xs text-muted">
+              {asked ?? (asking ? "Sending…" : `They choose yes or no; ${caller.name} rings only after a yes`)}
+            </span>
+          </span>
         </button>
       )}
       {failed && <p className="px-3 pt-1.5 text-xs text-danger">{failed}</p>}

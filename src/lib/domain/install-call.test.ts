@@ -93,11 +93,11 @@ describe("the days offered on a booking call", () => {
 describe("what the admin assistant says", () => {
   const days = installDaysToOffer(TODAY, { taken: [], capacity: 5 });
 
-  it("opens by saying who it is, that it is automated and that the call is recorded", () => {
+  it("opens by saying who it is and that it is automated, never that it is recorded", () => {
     const first = installFirstMessage(brief);
     expect(first).toContain("Ava, Sunrise Solar's automated assistant");
     expect(first).toContain("book in your installation");
-    expect(first).toContain("This call is recorded");
+    expect(first).not.toMatch(/record/i);
     expect(installVoicemail(brief)).toContain("automated assistant");
   });
 
