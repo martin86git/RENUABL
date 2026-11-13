@@ -9,8 +9,13 @@ import {
   CHAT_COPY,
   CHAT_STEPS,
   COLLEAGUE_CHAT_TOOLS,
+  COLLEAGUE_REPLY,
+  COLLEAGUE_REPLY_TOOL,
+  cleanChatAnswer,
+  shortSay,
   chatMessages,
   colleagueChatPrompt,
+  type ChatCard,
   type ChatLine,
 } from "@/lib/domain/design/colleague-chat";
 import { COLLEAGUE_TOOLS } from "@/lib/domain/design/colleague";
@@ -34,7 +39,7 @@ export async function chatWithColleague(
   member: Member,
   text: string,
   history: readonly ChatLine[],
-): Promise<{ ok: true; text: string } | { ok: false; status: number; message: string }> {
+): Promise<{ ok: true; text: string; cards: ChatCard[] } | { ok: false; status: number; message: string }> {
   const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) return { ok: false, status: 409, message: CHAT_COPY.noClaude };
   if (!(await colleagueReady(member.businessId)).on) return { ok: false, status: 409, message: CHAT_COPY.off };
@@ -68,23 +73,31 @@ export async function chatWithColleague(
 
   try {
     for (let step = 0; step < CHAT_STEPS; step++) {
-      // On the last step it has no tools, so it must answer in words.
+      // It answers with its own tool (the words for the chat, and what sits beside them); on the last step that is
+      // the only tool it has, so it must answer.
       const last = step === CHAT_STEPS - 1;
       const m = await client.messages.create({
         model,
         max_tokens: 1500,
         system,
         messages,
-        ...(last ? {} : { tools: COLLEAGUE_CHAT_TOOLS }),
+        tools: last ? [COLLEAGUE_REPLY] : [...COLLEAGUE_CHAT_TOOLS, COLLEAGUE_REPLY],
+        ...(last ? { tool_choice: { type: "tool" as const, name: COLLEAGUE_REPLY_TOOL } } : {}),
       });
       const uses = m.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+      const reply = uses.find((u) => u.name === COLLEAGUE_REPLY_TOOL);
+      if (reply) {
+        const got = cleanChatAnswer(reply.input);
+        return got ? { ok: true, ...got } : { ok: false, status: 502, message: CHAT_COPY.failed };
+      }
       if (m.stop_reason !== "tool_use" || !uses.length) {
+        // Words with no tool: kept, cut to what the chat holds.
         const said = m.content
           .filter((b): b is Anthropic.TextBlock => b.type === "text")
           .map((b) => b.text)
           .join("\n")
           .trim();
-        return said ? { ok: true, text: said.slice(0, 6000) } : { ok: false, status: 502, message: CHAT_COPY.failed };
+        return said ? { ok: true, text: shortSay(said, 600), cards: [] } : { ok: false, status: 502, message: CHAT_COPY.failed };
       }
       messages.push({ role: "assistant", content: m.content });
       const results: Anthropic.ToolResultBlockParam[] = [];

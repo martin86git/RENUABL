@@ -4,7 +4,7 @@
  * work only: the deals it has rung, has a call lined up for or is on a call with now. The rest of the pipeline is not
  * its business. Where each deal stands is read by rule from its calls, with no AI. Pure, tested.
  */
-import { CALL_HEADLINES, type CallOutcome } from "../voice-agent";
+import { CALL_HEADLINES, type CallOutcome } from "../call-headlines";
 
 export const ASSISTANT_DEAL_DAYS = 60;
 export const ASSISTANT_DEALS_MAX = 60;

@@ -5,6 +5,9 @@ import { INSTALL_TOOL, installFirstMessage, installSystemPrompt, installVoicemai
 import { LAUNCH_MARKET, marketDateTime, todayInMarket } from "./market";
 import { addDays, fromISODate, HOLIDAYS_LISTED_UNTIL, toISODate, VIC_PUBLIC_HOLIDAYS } from "./scheduling";
 import type { ISODate } from "./types";
+import { CALL_HEADLINES, type CallOutcome } from "./call-headlines";
+
+export { CALL_HEADLINES, type CallOutcome };
 
 /**
  * The assistant on the phone (Vapi, vapi.ai), for a deal in the CRM. Two kinds of call:
@@ -109,9 +112,6 @@ export function nextAttemptAt(attemptsMade: number, endedAt: Date, max: number =
   return nextCallWindow(new Date(endedAt.getTime() + gap * 3_600_000));
 }
 
-export type CallOutcome =
-  "booked" | "pencilled" | "callback" | "link-sent" | "no-more-calls" | "transferred" | "talked" | "no-answer" | "voicemail" | "failed";
-
 /** What a call came to, from Vapi's `endedReason` and what the assistant did during it (the strongest wins). */
 export function outcomeOf(endedReason: string, did: CallOutcome | null): CallOutcome {
   if (did) return did;
@@ -136,23 +136,6 @@ export function strongerOutcome(had: CallOutcome | null, now: CallOutcome): Call
 export function shouldRetry(o: CallOutcome): boolean {
   return o === "no-answer" || o === "voicemail" || o === "failed";
 }
-
-/**
- * What a call came to, as the first line of its entry on the deal's record (12 Nov 2026, Martin: a booked call didn't
- * read as booked). `readCallLine` reads it back for the timeline.
- */
-export const CALL_HEADLINES: Record<CallOutcome, string> = {
-  booked: "15-minute call booked",
-  pencilled: "Install day pencilled in",
-  callback: "Wants a call back from the team",
-  "link-sent": "Proposal link sent",
-  "no-more-calls": "Asked not to be called again",
-  transferred: "Put through to the team",
-  talked: "Spoke to them, nothing booked",
-  "no-answer": "No answer",
-  voicemail: "Left a voicemail",
-  failed: "Call didn't connect",
-};
 
 export const OUTCOME_WORDS: Record<CallOutcome, string> = {
   booked: "Booked a 15-minute call",
