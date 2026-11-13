@@ -89,6 +89,8 @@ const BLOCKED: readonly RegExp[] = [
   /^\/api\/design\/customers\/group-email$/,
   /^\/api\/design\/orders\/[^/]+\/email$/,
   /^\/api\/design\/sol-agents$/,
+  // Asking RENUABL for a phone number for an agent.
+  /^\/api\/design\/agents$/,
   /^\/api\/design\/inbox$/,
   // Other businesses: the feed every business reads, connections, the Marketplace, jobs passed on.
   /^\/api\/design\/(posts|connections|marketplace|trade|installer-jobs|inspections)(\/|$)/,

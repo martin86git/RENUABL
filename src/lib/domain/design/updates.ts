@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-13",
     area: "Calls",
+    words: "Add an agent from the plus on the rail. It says first what the agent needs, including when a new phone number is needed.",
+  },
+  {
+    day: "2026-11-13",
+    area: "Calls",
     words: "Chat to your chief of staff in writing: open it from the rail and ask about a deal. It reads your deals only.",
   },
   {
