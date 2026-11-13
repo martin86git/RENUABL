@@ -183,7 +183,8 @@ describe.skipIf(!url)("voice calls on deals (database)", () => {
     const row = await rowFor(own);
     expect(row).toMatchObject({ asked: true, mobile: "+61491570156" });
     // With no proposal out, it falls back to a lead call: nothing to read out.
-    expect(String((calls()[0].body!.assistant as { firstMessage: string }).firstMessage)).toContain("Ali");
+    // A call we place has no first message (it waits for them to speak); the opening is in its instructions.
+    expect(JSON.stringify(calls()[0].body!.assistant)).toContain("is that Ali");
     const record = await db.query<{ text: string }>(
       `select text from design_activity where business_id = $1 and job_id = $2 and kind = 'call'`,
       [own, asked.job.id],

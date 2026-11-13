@@ -7,6 +7,8 @@ import {
   readCallLine,
   type CallBrief,
   firstMessage,
+  openingBlock,
+  screeningAnswer,
   mayCallNow,
   MAX_ATTEMPTS,
   missedCallSms,
@@ -243,6 +245,29 @@ describe("what it says", () => {
     expect(JSON.stringify(b.model.tools)).toContain("send_proposal_link");
     expect(JSON.stringify(b.model.tools)).not.toContain("book_call");
     expect(JSON.stringify(b.model.tools)).toContain("+61400111222");
+  });
+
+  it("waits for the other end to speak on a call it placed, and tells a call screener only who and why", () => {
+    const a = assistantConfig({ brief: lead, slots: [], serverUrl: "u", secret: "s", model: "m" });
+    expect(a).not.toHaveProperty("firstMessage");
+    expect(a.firstMessageMode).toBe("assistant-waits-for-user");
+    expect(JSON.stringify(a)).toContain("customer.speech.timeout");
+    const said = screeningAnswer(lead);
+    expect(said).toMatch(/^It's Ella, RENUABL's automated assistant, calling for Sam.* about their solar enquiry.$/);
+    expect(said.length).toBeLessThan(firstMessage(lead).length);
+    expect(screeningAnswer(asked)).toContain("the call they asked for");
+    const p = voiceSystemPrompt(lead, [], { canTransfer: false });
+    expect(p).toContain("How this call starts");
+    expect(p).toContain(firstMessage(lead));
+    expect(p).toContain(said);
+    expect(p).toContain("start from the top with your opening");
+    expect(openingBlock(lead)).toContain("Never leave it for a call screener");
+    // A call that came in is answered straight away, as before.
+    const rang = { ...lead, inbound: true };
+    const inb = assistantConfig({ brief: rang, slots: [], serverUrl: "u", secret: "s", model: "m" });
+    expect(JSON.stringify(inb)).toContain("thanks for calling");
+    expect(inb.firstMessageMode).toBe("assistant-speaks-first");
+    expect(voiceSystemPrompt(rang, [], { canTransfer: false })).not.toContain("How this call starts");
   });
 
   it("leaves a voicemail fitting the call", () => {
