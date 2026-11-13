@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-13",
     area: "Calls",
+    words: "Search a contact at the top of your assistant's chat, then call them or send them a text from there.",
+  },
+  {
+    day: "2026-11-13",
+    area: "Calls",
     words: "Your team's own voice assistant, a chief of staff: call it from the app (or ring the team line with your PIN) and ask about your deals. Customers never reach it.",
   },
   {

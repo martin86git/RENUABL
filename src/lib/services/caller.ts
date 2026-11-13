@@ -33,7 +33,7 @@ async function ask<T>(path: string, init?: RequestInit): Promise<Answer<T>> {
 /** Heard by every `useCaller` on the page when Settings changes the assistant. */
 const CHANGED = "renuabl:caller";
 
-export const loadCaller = () => ask<{ caller: CallerState; callsOn: boolean; mayChange: boolean; business: string }>("/api/design/caller");
+export const loadCaller = () => ask<{ caller: CallerState; callsOn: boolean; textsOn?: boolean; mayChange: boolean; business: string }>("/api/design/caller");
 
 export async function saveCallerName(name: string) {
   const res = await ask<{ caller: CallerState }>("/api/design/caller", {
@@ -83,6 +83,8 @@ export const callerPhotoUrl = (c: CallerState) => (c.photoAt ? `/api/design/call
 export interface CallerInfo {
   caller: CallerState;
   callsOn: boolean;
+  /** Whether a text can be sent to a customer from here. */
+  textsOn: boolean;
   mayChange: boolean;
   /** False until the server has answered. */
   ready: boolean;
@@ -91,6 +93,7 @@ export interface CallerInfo {
 const START: CallerInfo = {
   caller: { name: DEFAULT_CALLER, photoAt: null, voice: null, named: false },
   callsOn: false,
+  textsOn: false,
   mayChange: false,
   ready: false,
 };
@@ -102,7 +105,7 @@ export function useCallerInfo(): CallerInfo {
   const [info, setInfo] = useState<CallerInfo>(START);
   useEffect(() => {
     let live = true;
-    shared ??= loadCaller().then((r) => (r.ok ? { caller: r.caller, callsOn: r.callsOn, mayChange: r.mayChange, ready: true } : null));
+    shared ??= loadCaller().then((r) => (r.ok ? { caller: r.caller, callsOn: r.callsOn, textsOn: r.textsOn === true, mayChange: r.mayChange, ready: true } : null));
     void shared.then((i) => {
       if (live && i) setInfo(i);
     });
@@ -129,3 +132,11 @@ export const useCaller = (): CallerState => useCallerInfo().caller;
 /** The phone assistant rings this deal's customer (in calling hours). Answers what to tell the member. */
 export const askAssistantToCall = (jobId: string) =>
   ask<{ message: string; already?: boolean }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call`, { method: "POST" });
+
+/** A text to this deal's customer, on the mobile on their record. Answers what to tell the member. */
+export const textCustomer = (jobId: string, text: string) =>
+  ask<{ message: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/text`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text }),
+  });

@@ -33,6 +33,7 @@ import {
   useCoachOpen,
 } from "@/lib/services/coaching";
 import { CallerAvatar, VoicePicker } from "./settings-caller";
+import { ContactReach } from "./coach-contacts";
 
 /** The pause between one packet of an answer and the next. */
 const PACKET_GAP_MS = 650;
@@ -150,6 +151,8 @@ export function CoachWindow() {
   const [settings, setSettings] = useState(readSettingsOpen);
   // Folded to its header bar (13 Nov 2026, Martin: minimise it, so what is behind it can be reached).
   const [small, setSmall] = useState(false);
+  // Searching a contact to call or text: the contacts take the chat's place (13 Nov 2026, Martin).
+  const [reaching, setReaching] = useState(false);
   // The assistant's call window sits bottom right too: while one is open, this window stands beside it, not on it.
   const watching = useWatchedCall();
   const [fresh, setFresh] = useState<Set<string>>(() => new Set());
@@ -303,7 +306,8 @@ export function CoachWindow() {
           />
         )}
         <div className={clsx("flex min-w-0 flex-1 flex-col", settings && "hidden sm:flex")}>
-          {!settings && (
+          <ContactReach open={reaching} onOpen={setReaching} />
+          {!settings && !reaching && (
             <button
               type="button"
               onClick={() => toggleSettings(true)}
@@ -316,7 +320,7 @@ export function CoachWindow() {
               <span className="text-xs font-medium text-ink">Open</span>
             </button>
           )}
-          <div ref={list} className="min-h-40 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+          <div ref={list} className={clsx("min-h-40 flex-1 space-y-3 overflow-y-auto px-4 py-3", reaching && "hidden")}>
             {loaded && turns.length === 0 && (
               <div className="flex items-start gap-2">
                 <CallerAvatar caller={caller} size={28} />
@@ -354,7 +358,7 @@ export function CoachWindow() {
             )}
           </div>
 
-          <div className="border-t border-line p-3">
+          <div className={clsx("border-t border-line p-3", reaching && "hidden")}>
             {state.call && (
               <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
                 <PhoneCall className="size-3.5 text-sun-line" aria-hidden />

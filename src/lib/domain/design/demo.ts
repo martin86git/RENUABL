@@ -84,8 +84,8 @@ export const DEMO_REFUSAL = "That's switched off in the demo. Everything else is
  * touches money. Reading is always allowed.
  */
 const BLOCKED: readonly RegExp[] = [
-  // Emails and calls to customers, installers and wholesalers.
-  /^\/api\/design\/jobs\/[^/]+\/(email|call|share|inspection)$/,
+  // Emails, calls and texts to customers, installers and wholesalers.
+  /^\/api\/design\/jobs\/[^/]+\/(email|call|text|share|inspection)$/,
   /^\/api\/design\/customers\/group-email$/,
   /^\/api\/design\/orders\/[^/]+\/email$/,
   /^\/api\/design\/sol-agents$/,

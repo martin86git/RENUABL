@@ -4,6 +4,7 @@ import { callerOf, setCallerName, setCallerVoice } from "@/lib/server/design-cal
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { query } from "@/lib/server/db";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
+import { textsOnFor } from "@/lib/server/design-texts";
 import { voiceOnFor } from "@/lib/server/voice-calls";
 
 /** GET: the business's phone assistant (its name, whether it has a picture), the name it speaks for, and whether its calls are on. */
@@ -13,14 +14,15 @@ export async function GET() {
     if ("refuse" in who) return who.refuse;
     const id = who.member.businessId;
     const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [id]);
-    const [caller, callsOn, brand] = await Promise.all([
+    const [caller, callsOn, textsOn, brand] = await Promise.all([
       callerOf(id),
       voiceOnFor(id).catch(() => false),
+      textsOnFor(id).catch(() => false),
       loadBrand(id, biz[0]?.name ?? ""),
     ]);
     // Setting it up is for an admin: whoever may change the business's settings.
     const mayChange = can(who.member.role, "prices", who.member.permissions);
-    return Response.json({ ok: true, caller, callsOn, mayChange, business: brand.name || biz[0]?.name || "" });
+    return Response.json({ ok: true, caller, callsOn, textsOn, mayChange, business: brand.name || biz[0]?.name || "" });
   });
 }
 
