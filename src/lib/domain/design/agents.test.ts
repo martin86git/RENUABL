@@ -3,19 +3,20 @@ import {
   AGENT_KINDS,
   AGENT_WORDS,
   NEED_SETTINGS,
+  NUMBER_MONTHLY_CENTS,
   agentNeeds,
   agentStanding,
   cleanAgentKind,
   kindsToAdd,
   needsNewNumber,
+  numberPriceWords,
   numberRequestNote,
   type AgentStatus,
 } from "./agents";
+import { COLLEAGUE_CALLS } from "./colleague-chat";
 
 const status = (over: Partial<AgentStatus> = {}): AgentStatus => ({
   callsOn: true,
-  browserCalls: true,
-  teamLine: true,
   chat: true,
   made: { sales: false, admin: false, colleague: false },
   ...over,
@@ -29,42 +30,53 @@ describe("the kinds of agent", () => {
   });
   it("each say whether a number is needed before they are made", () => {
     for (const k of AGENT_KINDS) expect(AGENT_WORDS[k].number).toMatch(/number/);
-    expect(AGENT_WORDS.sales.ownNumber).toBe(false);
-    expect(AGENT_WORDS.admin.ownNumber).toBe(false);
-    expect(AGENT_WORDS.colleague.ownNumber).toBe(true);
-    expect(AGENT_WORDS.colleague.number).toContain("new phone number of its own");
+  });
+  it("share one business number between the phone agents, and the chief of staff uses none", () => {
+    expect(AGENT_WORDS.sales.usesNumber).toBe(true);
+    expect(AGENT_WORDS.admin.usesNumber).toBe(true);
+    expect(AGENT_WORDS.admin.number).toContain("the same one your sales assistant uses");
+    expect(AGENT_WORDS.colleague.usesNumber).toBe(false);
+    expect(AGENT_WORDS.colleague.number).toContain("needs no phone number");
+  });
+  it("never offer a call to the chief of staff while its calls are off", () => {
+    expect(COLLEAGUE_CALLS).toBe(false);
+    expect(AGENT_WORDS.colleague.does).not.toMatch(/call/i);
   });
 });
 
 describe("what an agent needs", () => {
-  it("a phone assistant needs only the customer number, already there once calls are on", () => {
-    expect(agentNeeds("sales", status())).toEqual([expect.objectContaining({ key: "customer-number", state: "ready" })]);
+  it("a phone agent needs only the business number, already there once it is set up", () => {
+    expect(agentNeeds("sales", status())).toEqual([expect.objectContaining({ key: "business-number", state: "ready" })]);
     expect(needsNewNumber("admin", status())).toBe(false);
+    expect(agentStanding("sales", status())).toEqual({ ready: true, words: "Ready" });
   });
-  it("a phone assistant needs a number while calls are off", () => {
-    expect(needsNewNumber("sales", status({ callsOn: false }))).toBe(true);
-    expect(agentStanding("sales", status({ callsOn: false }))).toEqual({ ready: false, words: "Needs a phone number" });
+  it("a phone agent can't ring until the business has bought its number", () => {
+    const s = status({ callsOn: false });
+    expect(needsNewNumber("sales", s)).toBe(true);
+    expect(needsNewNumber("admin", s)).toBe(true);
+    expect(agentStanding("admin", s)).toEqual({ ready: false, words: "Needs your business phone number" });
   });
-  it("the chief of staff needs a new number of its own to be rung from a phone", () => {
-    const s = status({ teamLine: false });
-    expect(needsNewNumber("colleague", s)).toBe(true);
-    const own = agentNeeds("colleague", s).find((n) => n.key === "own-number");
-    expect(own).toMatchObject({ state: "missing", optional: true, needsNumber: true });
-    expect(own?.words).toContain("can't share the number your customers ring");
-  });
-  it("the chief of staff still works without its number, and says so", () => {
-    expect(agentStanding("colleague", status({ teamLine: false }))).toEqual({
-      ready: true,
-      words: "Ready to chat · needs its own number to be rung from a phone",
-    });
-    expect(agentStanding("colleague", status({ browserCalls: false })).words).toContain("calling from this computer");
-    expect(agentStanding("colleague", status())).toEqual({ ready: true, words: "Ready" });
-  });
-  it("the chief of staff isn't ready while it can't even be chatted to", () => {
-    expect(agentStanding("colleague", status({ chat: false, teamLine: false })).ready).toBe(false);
+  it("the chief of staff never needs a number", () => {
+    for (const callsOn of [true, false]) {
+      expect(needsNewNumber("colleague", status({ callsOn }))).toBe(false);
+      expect(agentStanding("colleague", status({ callsOn }))).toEqual({ ready: true, words: "Ready to chat" });
+    }
+    expect(agentStanding("colleague", status({ chat: false }))).toEqual({ ready: false, words: "Not switched on yet" });
   });
   it("has a setting named for every need, for staff", () => {
     for (const k of AGENT_KINDS) for (const n of agentNeeds(k, status())) expect(NEED_SETTINGS[n.key]).toBeTruthy();
+  });
+});
+
+describe("the number's price", () => {
+  it("isn't shown or charged until it is set", () => {
+    expect(NUMBER_MONTHLY_CENTS).toBeNull();
+    expect(numberPriceWords(null)).toContain("confirm the price with you before anything is charged");
+    expect(numberPriceWords(null)).not.toMatch(/\$/);
+  });
+  it("is said as a monthly extra on the plan once set", () => {
+    expect(numberPriceWords(1900)).toBe("It adds $19 a month to your plan, including GST.");
+    expect(numberPriceWords(1950)).toBe("It adds $19.50 a month to your plan, including GST.");
   });
 });
 
@@ -75,17 +87,18 @@ describe("adding one", () => {
   });
 });
 
-describe("asking RENUABL for a number", () => {
-  it("says who asked and why, and nothing of customers", () => {
+describe("asking RENUABL for the business number", () => {
+  it("says who asked, that the price comes first, and nothing of customers", () => {
     const note = numberRequestNote({
       business: "Sunrise Solar (example)",
       by: "sam@sunrise-solar.example",
-      kind: "colleague",
-      agentName: "Tim",
+      kind: "admin",
+      agentName: "Alex",
     });
-    expect(note.subject).toBe("A phone number is wanted for Sunrise Solar (example)'s chief of staff");
-    expect(note.text).toContain("Chief of staff (Tim)");
+    expect(note.subject).toBe("Sunrise Solar (example) wants its business phone number");
+    expect(note.text).toContain("Admin assistant (Alex)");
     expect(note.text).toContain("sam@sunrise-solar.example");
+    expect(note.text).toContain("Confirm the price with them before anything is charged");
     expect(note.text).not.toMatch(/customer['’]?s? (name|phone|email)/i);
   });
 });

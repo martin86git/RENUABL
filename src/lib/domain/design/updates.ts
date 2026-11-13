@@ -14,6 +14,11 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-14",
+    area: "Calls",
+    words: "One phone number for your whole business: every phone agent rings from it. Your chief of staff is chat only for now.",
+  },
+  {
     day: "2026-11-13",
     area: "Calls",
     words: "Add an agent from the plus on the rail. It says first what the agent needs, including when a new phone number is needed.",

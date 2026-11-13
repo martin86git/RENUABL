@@ -131,3 +131,13 @@ export function chatMessages(history: readonly ChatLine[], text: string): { role
     { role: "user", content: text },
   ];
 }
+
+/**
+ * Whether the chief of staff can be called (14 Nov 2026, Martin: "let's skip the ability to call the chief of staff at
+ * this stage… keep it down to the one phone number"). Off: it is chatted to in writing only, so it needs no number of
+ * its own and no call is offered anywhere. The calling code stays for when it comes back.
+ */
+export const COLLEAGUE_CALLS = false;
+
+/** What its window says where the chat can't be had and there is no call to offer. */
+export const CHAT_ONLY_OFF = "Your chief of staff isn't switched on for this business yet.";

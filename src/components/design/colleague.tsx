@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { ArrowUp, Headset, Loader2, Mic, MicOff, Phone, PhoneOff, X } from "lucide-react";
+import { ArrowUp, Headset, Loader2, MessageSquare, Mic, MicOff, Phone, PhoneOff, X } from "lucide-react";
 import { CALLER_VOICES, type CallerVoice } from "@/lib/domain/design/caller";
 import { COLLEAGUE_COPY, COLLEAGUE_ROLE, PIN_MAX, PIN_MIN } from "@/lib/domain/design/colleague";
-import { CHAT_COPY, CHAT_TEXT_MAX } from "@/lib/domain/design/colleague-chat";
+import { CHAT_COPY, CHAT_ONLY_OFF, CHAT_TEXT_MAX, COLLEAGUE_CALLS } from "@/lib/domain/design/colleague-chat";
 import { clockWords } from "@/lib/domain/live-call";
 import {
   askColleague,
@@ -55,7 +55,7 @@ export function ColleagueButton() {
         className="absolute -bottom-0.5 -right-0.5 grid size-[18px] place-items-center rounded-full bg-sun-line text-white ring-2 ring-surface"
         aria-hidden
       >
-        <Phone className="size-2.5" />
+        {COLLEAGUE_CALLS ? <Phone className="size-2.5" /> : <MessageSquare className="size-2.5" />}
       </span>
     </button>
   );
@@ -159,7 +159,7 @@ export function ColleagueWindow() {
                 view === v ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-muted hover:text-ink",
               )}
             >
-              {v === "chat" ? "Chat" : "Call and settings"}
+              {v === "chat" ? "Chat" : COLLEAGUE_CALLS ? "Call and settings" : "Settings"}
             </button>
           ))}
         </div>
@@ -170,8 +170,10 @@ export function ColleagueWindow() {
           <p className="px-4 py-6 text-center text-sm text-muted">{problem ?? "Just a moment…"}</p>
         ) : (
           <>
-            <CallPanel state={state} list={list} />
-            <PhonePanel state={state} onChanged={reload} />
+            {/* Calling it is off for now: it is chatted to in writing, and needs no number of its own. */}
+            {COLLEAGUE_CALLS && <CallPanel state={state} list={list} />}
+            {COLLEAGUE_CALLS && <PhonePanel state={state} onChanged={reload} />}
+            {!COLLEAGUE_CALLS && !state.chatOn && <p className="px-4 py-6 text-center text-sm text-muted">{CHAT_ONLY_OFF}</p>}
             {state.mayChange && <SettingsPanel state={state} onSaved={setState} />}
             <PastCalls state={state} />
           </>
@@ -423,9 +425,9 @@ function SettingsPanel({ state, onSaved }: { state: ColleagueState; onSaved: (s:
   };
   return (
     <details className="border-b border-line px-4 py-3">
-      <summary className="cursor-pointer text-sm font-semibold text-ink">Name and voice</summary>
+      <summary className="cursor-pointer text-sm font-semibold text-ink">{COLLEAGUE_CALLS ? "Name and voice" : "Its name"}</summary>
       <label className="mt-2 block text-xs text-muted">
-        Its name (said out loud, and not your phone assistant&apos;s; leave empty for &ldquo;your chief of staff&rdquo;)
+        Its name (letters only, and not your phone assistant&apos;s; leave empty for &ldquo;your chief of staff&rdquo;)
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -433,7 +435,8 @@ function SettingsPanel({ state, onSaved }: { state: ColleagueState; onSaved: (s:
           className="mt-1 block w-full rounded-lg bg-surface-2 px-3 py-1.5 text-sm text-ink ring-1 ring-line outline-none focus:ring-sun-line"
         />
       </label>
-      <label className="mt-2 block text-xs text-muted">
+      {/* Its voice is for calls, which are off for now. */}
+      <label className={COLLEAGUE_CALLS ? "mt-2 block text-xs text-muted" : "hidden"}>
         Its voice (never your phone assistant&apos;s, so nobody takes the two for the same person)
         <select
           value={voice}

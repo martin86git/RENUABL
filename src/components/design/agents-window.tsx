@@ -13,6 +13,7 @@ import {
   agentStanding,
   kindsToAdd,
   needsNewNumber,
+  numberPriceWords,
   type AgentKind,
   type AgentNeed,
 } from "@/lib/domain/design/agents";
@@ -206,7 +207,7 @@ export function AgentsWindow() {
                       <span className="mt-0.5 block text-xs text-ink-2">{w.does}</span>
                       <span className={clsx("mt-1.5 flex items-start gap-1.5 text-xs", number ? "text-warning" : "text-muted")}>
                         <Phone className="mt-0.5 size-3 shrink-0" aria-hidden />
-                        {number ? "Needs a new phone number. " : ""}
+                        {number ? "Needs your business phone number, an extra on your plan. " : ""}
                         {w.number}
                       </span>
                     </button>
@@ -334,7 +335,7 @@ function AddForm({ kind, state, onMade }: { kind: AgentKind; state: AgentsState;
     if (number && askToo) {
       const asked = await askForNumber(kind);
       message += ` ${asked.ok ? AGENT_COPY.asked : `The number wasn't asked for: ${asked.message}`}`;
-    } else if (number) message += " It still needs its phone number: ask for one here when you're ready.";
+    } else if (number) message += " It can't ring anyone until your business has its number: ask for it here when you're ready.";
     setBusy(false);
     onMade(message);
   };
@@ -355,8 +356,8 @@ function AddForm({ kind, state, onMade }: { kind: AgentKind; state: AgentsState;
             <Phone className="size-4 text-sun-line" aria-hidden />
             {AGENT_COPY.numberHead}
           </p>
-          <p className="mt-1 text-xs text-ink-2">{w.number}</p>
           <p className="mt-1 text-xs text-ink-2">{AGENT_COPY.numberWhy}</p>
+          <p className="mt-1 text-xs font-medium text-ink">{numberPriceWords()}</p>
           <label className="mt-2 flex items-center gap-2 text-xs font-medium text-ink">
             <input
               type="checkbox"
@@ -382,7 +383,8 @@ function AddForm({ kind, state, onMade }: { kind: AgentKind; state: AgentsState;
         <span className="mt-1 block text-xs font-normal text-muted">{AGENT_COPY.nameHint}</span>
       </label>
 
-      <label className="block text-sm font-semibold text-ink">
+      {/* A voice is for an agent that rings people: the chief of staff is chatted to in writing. */}
+      <label className={w.usesNumber ? "block text-sm font-semibold text-ink" : "hidden"}>
         Its voice
         <select
           value={voice}
