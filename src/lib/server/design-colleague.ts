@@ -10,6 +10,10 @@ import { canvasFacts } from "@/lib/domain/design/canvas";
 import type { CallerVoice } from "@/lib/domain/design/caller";
 import {
   colleagueAssistantConfig,
+  colleagueVoice,
+  customerVoices,
+  isAssistantName,
+  type AnyVoice,
   COLLEAGUE_TICKET_MINUTES,
   COLLEAGUE_TOOLS,
   linesOfTranscript,
@@ -39,6 +43,33 @@ const hashOf = (ref: string) => createHash("sha256").update(ref).digest("hex");
 export interface ColleagueSettings {
   name: string | null;
   voice: CallerVoice | null;
+}
+
+/**
+ * What the business's customers hear on its phone assistants (every one it has set up): their names and voices, so
+ * the chief of staff never sounds like or is called the same as one of them.
+ */
+export async function customerSide(businessId: string): Promise<{ names: string[]; voices: AnyVoice[] }> {
+  const s = voiceSettings();
+  const rows = dbConfigured()
+    ? await query<{ name: string | null; voice_provider: string | null; voice_id: string | null }>(
+        `select name, voice_provider, voice_id from design_caller where business_id = $1`,
+        [businessId],
+      )
+    : [];
+  return {
+    names: ["Sol", ...rows.map((r) => r.name ?? "").filter(Boolean)],
+    voices: customerVoices(
+      rows.map((r) => (r.voice_provider && r.voice_id ? { provider: r.voice_provider, voiceId: r.voice_id } : null)),
+      s?.voice ?? null,
+    ),
+  };
+}
+
+/** Its name and voice as a call uses them: never a phone assistant's. */
+export async function colleagueOnCall(businessId: string): Promise<{ name: string | null; voice: AnyVoice }> {
+  const [saved, side] = await Promise.all([colleagueOf(businessId), customerSide(businessId)]);
+  return { name: isAssistantName(saved.name, side.names) ? null : saved.name, voice: colleagueVoice(saved.voice, side.voices) };
 }
 
 export async function colleagueOf(businessId: string): Promise<ColleagueSettings> {
@@ -133,7 +164,7 @@ export async function startWebCall(
   const ready = await colleagueReady(member.businessId);
   if (!s || !ready.on) return { ok: false, message: "Calls aren't switched on for this business yet." };
   if (!publicKey) return { ok: false, message: "Calls from the browser aren't set up yet (Vapi's public key)." };
-  const settings = await colleagueOf(member.businessId);
+  const settings = await colleagueOnCall(member.businessId);
   const ref = randomToken(24);
   const id = newId("cc");
   await query(
@@ -152,7 +183,7 @@ export async function startWebCall(
     serverUrl: serverUrl(s.site, ref),
     secret: s.secret,
     model: s.model,
-    voice: settings.voice ?? s.voice,
+    voice: settings.voice,
   });
   try {
     const res = await fetch(`${VAPI}/assistant`, {
@@ -194,7 +225,7 @@ export async function answerTeamLine(e: VapiEvent): Promise<{ assistant: unknown
     [crm.businessId, mobile],
   );
   if (!people.length) return closed;
-  const settings = await colleagueOf(crm.businessId);
+  const settings = await colleagueOnCall(crm.businessId);
   const ref = randomToken(24);
   await query(
     `insert into design_colleague_calls (id, business_id, channel, ref_hash, candidates, vapi_call_id) values ($1, $2, 'phone', $3, $4, $5)`,
@@ -206,7 +237,7 @@ export async function answerTeamLine(e: VapiEvent): Promise<{ assistant: unknown
       serverUrl: serverUrl(s.site, ref),
       secret: s.secret,
       model,
-      voice: settings.voice ?? s.voice,
+      voice: settings.voice,
     }),
   };
 }

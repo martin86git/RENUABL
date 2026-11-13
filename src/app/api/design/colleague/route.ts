@@ -1,7 +1,8 @@
 import { cleanCallerName, cleanVoice, VOICE_BAD } from "@/lib/domain/design/caller";
 import { can } from "@/lib/domain/design/account";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
-import { colleagueOf, colleagueReady, hasPin, myColleagueCalls, setColleague } from "@/lib/server/design-colleague";
+import { colleagueVoice, isAssistantName, isCustomerVoice, NAME_TAKEN, VOICE_TAKEN } from "@/lib/domain/design/colleague";
+import { colleagueOf, colleagueReady, customerSide, hasPin, myColleagueCalls, setColleague } from "@/lib/server/design-colleague";
 import { query } from "@/lib/server/db";
 
 /**
@@ -14,8 +15,9 @@ export async function GET() {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const { businessId, email, role, permissions } = who.member;
-    const [settings, ready, pin, calls, mobile] = await Promise.all([
+    const [settings, side, ready, pin, calls, mobile] = await Promise.all([
       colleagueOf(businessId),
+      customerSide(businessId),
       colleagueReady(businessId),
       hasPin(businessId, email),
       myColleagueCalls(businessId, email),
@@ -27,7 +29,11 @@ export async function GET() {
     return Response.json(
       {
         ok: true,
-        ...settings,
+        name: isAssistantName(settings.name, side.names) ? null : settings.name,
+        // The voice it speaks in (never one customers hear), and the voices and names it may not take.
+        voice: colleagueVoice(settings.voice, side.voices),
+        takenVoices: side.voices,
+        takenNames: side.names,
         ready,
         pinSet: pin,
         hasMobile: Boolean(mobile[0]?.mobile),
@@ -55,7 +61,10 @@ export async function PUT(request: Request) {
     }
     const voice = cleanVoice(read.body.voice);
     if (voice === "bad") return Response.json({ ok: false, message: VOICE_BAD }, { status: 400 });
+    const side = await customerSide(who.member.businessId);
+    if (isAssistantName(name, side.names)) return Response.json({ ok: false, message: NAME_TAKEN }, { status: 400 });
+    if (voice && isCustomerVoice(voice, side.voices)) return Response.json({ ok: false, message: VOICE_TAKEN }, { status: 400 });
     const saved = await setColleague(who.member.businessId, { name, voice }, who.member.email);
-    return Response.json({ ok: true, ...saved });
+    return Response.json({ ok: true, name: saved.name, voice: colleagueVoice(saved.voice, side.voices) });
   });
 }

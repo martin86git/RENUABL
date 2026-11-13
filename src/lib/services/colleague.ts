@@ -21,7 +21,10 @@ export interface ColleagueCall {
 
 export interface ColleagueState {
   name: string | null;
-  voice: CallerVoice | null;
+  /** The voice it speaks in: never one the business's customers hear. */
+  voice: { provider: string; voiceId: string };
+  takenVoices: { provider: string; voiceId: string }[];
+  takenNames: string[];
   ready: { on: boolean; web: boolean; teamNumber: string | null };
   pinSet: boolean;
   hasMobile: boolean;
@@ -69,7 +72,7 @@ const json = (method: string, body: unknown): RequestInit => ({
 
 export const loadColleague = () => ask<ColleagueState>("/api/design/colleague");
 export const saveColleague = (name: string, voice: CallerVoice | null) =>
-  ask<{ name: string | null; voice: CallerVoice | null }>("/api/design/colleague", json("PUT", { name, voice }));
+  ask<{ name: string | null; voice: { provider: string; voiceId: string } }>("/api/design/colleague", json("PUT", { name, voice }));
 export const savePin = (pin: string) => ask<object>("/api/design/colleague/pin", json("PUT", { pin }));
 export const removePin = () => ask<object>("/api/design/colleague/pin", { method: "DELETE" });
 

@@ -293,7 +293,10 @@ function PhonePanel({ state, onChanged }: { state: ColleagueState; onChanged: ()
 
 function SettingsPanel({ state, onSaved }: { state: ColleagueState; onSaved: (s: ColleagueState) => void }) {
   const [name, setName] = useState(state.name ?? "");
-  const [voice, setVoice] = useState(state.voice ? `${state.voice.provider}:${state.voice.voiceId}` : "");
+  const [voice, setVoice] = useState(`${state.voice.provider}:${state.voice.voiceId}`);
+  // The phone assistants' voices are shown but can't be picked: nobody should take the two for the same person.
+  const taken = (v: { provider: string; voiceId: string }) =>
+    state.takenVoices.some((t) => t.provider === v.provider && t.voiceId === v.voiceId);
   const [note, setNote] = useState<string | null>(null);
   const save = async () => {
     const [provider, voiceId] = voice.split(":");
@@ -306,7 +309,7 @@ function SettingsPanel({ state, onSaved }: { state: ColleagueState; onSaved: (s:
     <details className="border-b border-line px-4 py-3">
       <summary className="cursor-pointer text-sm font-semibold text-ink">Name and voice</summary>
       <label className="mt-2 block text-xs text-muted">
-        Its name (said out loud; leave empty for &ldquo;your chief of staff&rdquo;)
+        Its name (said out loud, and not your phone assistant&apos;s; leave empty for &ldquo;your chief of staff&rdquo;)
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -315,16 +318,16 @@ function SettingsPanel({ state, onSaved }: { state: ColleagueState; onSaved: (s:
         />
       </label>
       <label className="mt-2 block text-xs text-muted">
-        Its voice
+        Its voice (never your phone assistant&apos;s, so nobody takes the two for the same person)
         <select
           value={voice}
           onChange={(e) => setVoice(e.target.value)}
           className="mt-1 block w-full rounded-lg bg-surface-2 px-3 py-1.5 text-sm text-ink ring-1 ring-line"
         >
-          <option value="">The site&apos;s default</option>
           {CALLER_VOICES.map((v) => (
-            <option key={`${v.provider}:${v.voiceId}`} value={`${v.provider}:${v.voiceId}`}>
+            <option key={`${v.provider}:${v.voiceId}`} value={`${v.provider}:${v.voiceId}`} disabled={taken(v)}>
               {v.label} · {v.words}
+              {taken(v) ? " (your phone assistant's)" : ""}
             </option>
           ))}
         </select>

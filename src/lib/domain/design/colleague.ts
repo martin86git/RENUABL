@@ -8,6 +8,7 @@
  * emails, texts or changes anything for a customer. Pure, tested.
  */
 import { speakableName, transcriberFor, VOICE_SECRET_HEADER } from "../voice-agent";
+import { CALLER_VOICES } from "./caller";
 
 /** What it is called until the business names it. */
 export const COLLEAGUE_ROLE = "Chief of staff";
@@ -41,6 +42,61 @@ export const COLLEAGUE_COPY = {
   noMobile: "Add your mobile in Your account first: the team line only answers the mobile on your profile.",
   notOn: "Calls aren't switched on for this business yet.",
 } as const;
+
+// ── Never the phone assistant's voice or name (13 Nov 2026, Martin: "I want a different voice, that way a customer
+// doesn't feel like they are speaking to the same person") ─────────────────────────────────────────────────────
+
+export interface AnyVoice {
+  provider: string;
+  voiceId: string;
+}
+
+/** Vapi's own default voice, what a call with no voice set speaks in. */
+export const VAPI_DEFAULT_VOICE: AnyVoice = { provider: "vapi", voiceId: "Elliot" };
+
+const sameVoice = (a: AnyVoice | null | undefined, b: AnyVoice | null | undefined) =>
+  Boolean(a && b && a.provider === b.provider && a.voiceId === b.voiceId);
+
+/**
+ * The voices the business's customers hear: each phone assistant's own, and for one with none set, the site's
+ * (VAPI_VOICE_ID), else Vapi's default. With no phone assistant set up at all, the site's or Vapi's default too.
+ */
+export function customerVoices(assistants: readonly (AnyVoice | null)[], site: AnyVoice | null): AnyVoice[] {
+  const fallback = site ?? VAPI_DEFAULT_VOICE;
+  const list = assistants.length ? assistants.map((v) => v ?? fallback) : [fallback];
+  return list.filter((v, i) => list.findIndex((w) => sameVoice(v, w)) === i);
+}
+
+/** Whether a voice is one the business's customers hear. */
+export const isCustomerVoice = (v: AnyVoice | null, taken: readonly AnyVoice[]) => taken.some((t) => sameVoice(t, v));
+
+/** The voices it starts from, in order: Vapi's women's voices first, so it rarely sounds like a phone assistant named Charlie. */
+const DEFAULT_ORDER = ["Clara", "Savannah", "Emma", "Layla", "Tara", "Dan", "Kai", "Neil", "Elliot", "IKne3meq5aSn9XLyUdCD"];
+
+/**
+ * The voice it speaks in: the one chosen for it, unless customers hear that voice; else the first of its defaults that
+ * no customer hears, the other sex from the phone assistant's where that is known. Always a voice of its own, never
+ * left to the site's default (which a phone assistant may be using).
+ */
+export function colleagueVoice(chosen: AnyVoice | null, taken: readonly AnyVoice[]): AnyVoice {
+  if (chosen && !isCustomerVoice(chosen, taken)) return chosen;
+  const ordered = [...CALLER_VOICES].sort((a, b) => DEFAULT_ORDER.indexOf(a.voiceId) - DEFAULT_ORDER.indexOf(b.voiceId));
+  const free = ordered.filter((v) => !isCustomerVoice(v, taken));
+  const theirs = CALLER_VOICES.find((v) => taken.some((t) => sameVoice(t, v)))?.sex;
+  const pick = (theirs && free.find((v) => v.sex !== theirs)) || free[0];
+  return pick ? { provider: pick.provider, voiceId: pick.voiceId } : { provider: "vapi", voiceId: "Clara" };
+}
+
+/** Said when the voice picked is one customers hear. */
+export const VOICE_TAKEN = "That's your phone assistant's voice. Pick another, so nobody takes the two for the same person.";
+/** Said when the name picked is a phone assistant's. */
+export const NAME_TAKEN = "That's your phone assistant's name. Give it a name of its own, so nobody takes the two for the same person.";
+
+/** Whether a name is one of the phone assistants' (letters only, any case). */
+export const isAssistantName = (name: string | null, assistants: readonly string[]) => {
+  const key = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
+  return Boolean(name && assistants.some((a) => key(a) === key(name)));
+};
 
 /** How it is said out loud: the name the business gave it, else "your chief of staff". */
 export function colleagueSpoken(name: string | null): string {

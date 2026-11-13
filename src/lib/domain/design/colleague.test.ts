@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanNewPin,
+  colleagueVoice,
+  customerVoices,
+  isAssistantName,
+  isCustomerVoice,
+  VAPI_DEFAULT_VOICE,
   colleagueAssistantConfig,
   colleagueFirstMessage,
   colleagueSpoken,
@@ -13,6 +18,7 @@ import {
   teamLineClosed,
   type ColleagueBrief,
 } from "./colleague";
+import { CALLER_VOICES } from "./caller";
 
 const brief: ColleagueBrief = {
   name: "Morgan",
@@ -111,5 +117,44 @@ describe("a call's transcript", () => {
       { role: "you", text: "Where's the Smith deal at?" },
       { role: "assistant", text: "Proposal sent, last Tuesday." },
     ]);
+  });
+});
+
+describe("never the phone assistant's voice or name", () => {
+  const charlie = { provider: "11labs", voiceId: "IKne3meq5aSn9XLyUdCD" };
+  const clara = { provider: "vapi", voiceId: "Clara" };
+
+  it("counts what customers hear: each assistant's voice, else the site's, else Vapi's default", () => {
+    expect(customerVoices([charlie, null], clara)).toEqual([charlie, clara]);
+    expect(customerVoices([null], null)).toEqual([VAPI_DEFAULT_VOICE]);
+    expect(customerVoices([], null)).toEqual([VAPI_DEFAULT_VOICE]);
+  });
+
+  it("keeps the voice chosen for it unless customers hear it", () => {
+    expect(colleagueVoice({ provider: "vapi", voiceId: "Dan" }, [charlie])).toEqual({ provider: "vapi", voiceId: "Dan" });
+    expect(colleagueVoice(charlie, [charlie])).not.toEqual(charlie);
+  });
+
+  it("starts on a voice of the other sex from the assistant's, never the one the site would fall back to", () => {
+    expect(colleagueVoice(null, [charlie])).toEqual(clara);
+    expect(colleagueVoice(null, [clara])).toMatchObject({ voiceId: "Dan" });
+    expect(colleagueVoice(null, [VAPI_DEFAULT_VOICE])).toEqual(clara);
+  });
+
+  it("can never be the same as any voice customers hear, whatever is chosen or taken", () => {
+    const all = [null, ...CALLER_VOICES.map((v) => ({ provider: v.provider, voiceId: v.voiceId }))];
+    for (const chosen of all)
+      for (let i = 0; i < CALLER_VOICES.length; i++) {
+        const taken = CALLER_VOICES.slice(0, i + 1).map((v) => ({ provider: v.provider, voiceId: v.voiceId }));
+        if (taken.length === CALLER_VOICES.length) continue;
+        expect(isCustomerVoice(colleagueVoice(chosen, taken), taken)).toBe(false);
+      }
+  });
+
+  it("knows a phone assistant's name in any case or spacing", () => {
+    expect(isAssistantName("charlie", ["Charlie"])).toBe(true);
+    expect(isAssistantName("Char-lie", ["Charlie"])).toBe(true);
+    expect(isAssistantName("Morgan", ["Charlie", "Sol"])).toBe(false);
+    expect(isAssistantName(null, ["Charlie"])).toBe(false);
   });
 });
