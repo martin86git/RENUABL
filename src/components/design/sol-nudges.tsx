@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { ChevronRight, X } from "lucide-react";
 import { useState } from "react";
 import { NUDGE_KIND_WORDS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
+import { BatteryWallPicture } from "./battery-wall-picture";
 import { SolIcon } from "./sol-icon";
 
 /**
@@ -42,8 +43,13 @@ export function SolNudges({
             {NUDGE_KIND_WORDS[n.kind]}
             {nudges.length > 1 && ` · ${i + 1} of ${nudges.length}`}
           </p>
-          <p className="mt-0.5 text-[14px] leading-snug text-white/95">{n.words}</p>
-          {n.why && <p className="mt-0.5 text-[12px] leading-snug text-white/55">{n.why}</p>}
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="mt-0.5 text-[14px] leading-snug text-white/95">{n.words}</p>
+              {n.why && <p className="mt-0.5 text-[12px] leading-snug text-white/55">{n.why}</p>}
+            </div>
+            {n.picture && <BatteryWallPicture kind={n.picture} />}
+          </div>
           {n.options && n.options.length > 0 && (
             <>
               <p className="mt-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/50">Your options</p>

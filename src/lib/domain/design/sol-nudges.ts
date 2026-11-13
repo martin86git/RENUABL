@@ -31,6 +31,9 @@ export interface NudgeAction {
   line?: string;
 }
 
+/** The battery's surroundings a question is about, drawn beside it. */
+export type BatteryPicture = "bollard" | "fire-sheeting" | "awning";
+
 export interface Nudge {
   /** The same nudge keeps its id while it still applies, so putting it aside holds. */
   id: string;
@@ -38,6 +41,11 @@ export interface Nudge {
   words: string;
   /** One line on why, when it helps. */
   why?: string;
+  /**
+   * A small drawing beside the words (14 Nov 2026, Martin: asked about a bollard or fire sheeting, the roof is no help;
+   * show a battery on a wall and what the thing is).
+   */
+  picture?: BatteryPicture;
   /** The ways open to the designer, said only: Sol can't do them himself (12 Nov 2026, Martin). */
   options?: string[];
   actions: NudgeAction[];
@@ -89,16 +97,17 @@ const SELF_USE = 0.4;
 const USABLE = 0.9;
 
 /** The question each cost decided on each job is asked as. */
-const LINE_QUESTIONS: [RegExp, string, string][] = [
+const LINE_QUESTIONS: [RegExp, string, string, BatteryPicture?][] = [
   [/^Switchboard upgrade/i, "Does the switchboard need upgrading?", "Old fuses, or no room for the new breakers, mean it does."],
   [/^RCBO/i, "Does it need RCBOs (safety switches)?", "Usually yes when the board has none on the circuits."],
-  [/^Protective bollard/i, "Does the battery need a protective bollard?", "Where a car could reach it, in a garage or a drive."],
+  [/^Protective bollard/i, "Does the battery need a protective bollard?", "Where a car could reach it, in a garage or a drive.", "bollard"],
   [
     /^Fireproofing/i,
     "Does the wall behind the battery need fireproof sheeting?",
     "On a wall of a habitable room, or one that isn't fire rated.",
+    "fire-sheeting",
   ],
-  [/^Shade awning/i, "Does the battery need a shade awning?", "Outside in the sun, where its maker asks for shade."],
+  [/^Shade awning/i, "Does the battery need a shade awning?", "Outside in the sun, where its maker asks for shade.", "awning"],
 ];
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -148,6 +157,7 @@ export function nudgesFor(s: NudgeState): Nudge[] {
         kind: "question",
         words: q?.[1] ?? `Include “${label}”?`,
         ...(q ? { why: q[2] } : {}),
+        ...(q?.[3] ? { picture: q[3] } : {}),
         actions: [
           { label: "Yes, include it", act: "line-on", line: label },
           { label: "No", act: "line-off", line: label },
