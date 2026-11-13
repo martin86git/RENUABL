@@ -1379,6 +1379,41 @@ alter table design_caller add column if not exists voice_id text;
 -- the conversation in which it was coached.
 alter table design_caller add column if not exists coach_notes jsonb;
 alter table design_caller add column if not exists coach_chat jsonb;
+-- The team's own voice assistant, its chief of staff (domain/design/colleague.ts): its name and voice, each member's
+-- PIN for the team line (scrypt, never the PIN), and every call kept for the member who made it.
+create table if not exists design_colleague (
+  business_id text primary key references businesses(id) on delete cascade,
+  name text,
+  voice_provider text,
+  voice_id text,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+create table if not exists design_colleague_pins (
+  business_id text not null references businesses(id) on delete cascade,
+  email text not null,
+  pin_hash text not null,
+  set_at timestamptz not null default now(),
+  primary key (business_id, email)
+);
+create table if not exists design_colleague_calls (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  email text,
+  channel text not null,
+  ref_hash text not null unique,
+  candidates jsonb,
+  verified boolean not null default false,
+  pin_tries integer not null default 0,
+  vapi_call_id text,
+  assistant_id text,
+  created_at timestamptz not null default now(),
+  ended_at timestamptz,
+  ended_reason text,
+  summary text,
+  lines jsonb
+);
+create index if not exists design_colleague_calls_member on design_colleague_calls(business_id, email, created_at desc);
 -- (Kept after design_jobs, which both point at, so a new database is made in order.)
 -- Jobs a retailer sends to a connected installer (domain/design/job-shares.ts): one live a job at a time, opened in
 -- the installer's login through the job card's own installer link (token, installer id "biz:<business>").

@@ -20,6 +20,7 @@
     "@anthropic-ai/sdk": "^0.128.0",
     "@react-pdf/renderer": "^4.9.0",
     "@twilio/voice-sdk": "2.18.5",
+    "@vapi-ai/web": "3.0.1",
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.8.0",
     "clsx": "^2.1.1",
