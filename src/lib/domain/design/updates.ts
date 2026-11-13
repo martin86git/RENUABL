@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-14",
+    area: "Today",
+    words: "Today is calmer: cards sit centred at their own width, calls show as cards like New in, and the summary line that repeated them is gone.",
+  },
+  {
+    day: "2026-11-14",
     area: "Designer",
     words:
       "Asked about a bollard, fire sheeting or an awning, Sol shows a small drawing of the battery on its wall with that thing marked.",

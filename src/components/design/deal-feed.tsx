@@ -41,7 +41,6 @@ import {
   padLines,
   solLine,
   todayParts,
-  todaySummary,
   markHolds,
   markWords,
   caption,
@@ -226,23 +225,17 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
             "Looking over your deals…"
           )}
         </p>
+        {/* Sol's summary line went (14 Nov 2026, Martin: it said again what New in and Needs you say); his day stays a press away. */}
+        {data && props.onDay && (
+          <button
+            type="button"
+            onClick={props.onDay}
+            className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-ink-2"
+          >
+            <SolIcon className="size-4 text-sun-line" /> Show me my day
+          </button>
+        )}
       </div>
-      {/* Sol's line: what needs you, what he does next, what's been done (10 Nov 2026, Martin: Today in one page). */}
-      {data && (
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl bg-surface px-4 py-3 ring-1 ring-line">
-          <SolIcon className="size-4 shrink-0 text-sun-line" />
-          <p className="min-w-0 flex-1 text-[14px] text-ink">{todaySummary(parts, data.today ?? null, now)}</p>
-          {props.onDay && (
-            <button
-              type="button"
-              onClick={props.onDay}
-              className="text-[13px] font-medium text-ink-2 underline-offset-4 hover:text-ink hover:underline"
-            >
-              Show me my day
-            </button>
-          )}
-        </div>
-      )}
       {data?.examples !== null && data?.examples !== undefined && (
         <p className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] text-ink-2">
           {data.examples > 0
@@ -332,18 +325,24 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
           </button>
         </div>
         {data && parts.fresh.length === 0 ? (
-          <p className="rounded-2xl bg-surface px-5 py-5 text-[13.5px] text-ink-2 ring-1 ring-line">Every new lead has a design.</p>
+          <div className="flex justify-center">
+            <p className="rounded-2xl bg-surface px-5 py-5 text-center text-[13.5px] text-ink-2 ring-1 ring-line">
+              Every new lead has a design.
+            </p>
+          </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          // Pads of their own width, centred (14 Nov 2026, Martin): however many there are, they sit in the middle.
+          <div className="flex flex-wrap justify-center gap-3">
             {parts.fresh.map((d) => (
-              <ArrivalCard
-                key={d.jobId}
-                deal={d}
-                now={now}
-                team={solo ? null : [{ email: me, name: "You" }, ...(data?.team ?? [])]}
-                mayGive={data?.role === "owner"}
-                onChanged={load}
-              />
+              <div key={d.jobId} className={`grid ${PAD}`}>
+                <ArrivalCard
+                  deal={d}
+                  now={now}
+                  team={solo ? null : [{ email: me, name: "You" }, ...(data?.team ?? [])]}
+                  mayGive={data?.role === "owner"}
+                  onChanged={load}
+                />
+              </div>
             ))}
           </div>
         )}
@@ -352,32 +351,36 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
       <Part title="Needs you" count={data ? needs : null}>
         {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
         {data && needs === 0 && (
-          <div className="flex flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-8 text-center ring-1 ring-line">
-            <span className="grid size-11 place-items-center rounded-full bg-positive-soft text-positive">
-              <Check className="size-5" aria-hidden />
-            </span>
-            <p className="text-[16px] font-medium text-ink">{allClearWords(data.today ?? null)}</p>
-            <p className="text-[13px] text-ink-2">Nothing needs you right now. Sol has the rest in hand.</p>
+          <div className="flex justify-center">
+            <div className="flex w-full max-w-[31.5rem] flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-8 text-center ring-1 ring-line">
+              <span className="grid size-11 place-items-center rounded-full bg-positive-soft text-positive">
+                <Check className="size-5" aria-hidden />
+              </span>
+              <p className="text-[16px] font-medium text-ink">{allClearWords(data.today ?? null)}</p>
+              <p className="text-[13px] text-ink-2">Nothing needs you right now. Sol has the rest in hand.</p>
+            </div>
           </div>
         )}
-        {/* Cards half the page wide, two side by side on a wide screen (14 Nov 2026, Martin: they needn't be so wide). */}
+        {/* Cards at a width of their own, the one that suits a card (31.5rem: the need, the days and the email read
+            without crowding), centred, two side by side where they fit (14 Nov 2026, Martin: not tied to New in's row). */}
         {parts.needs.length > 0 && (
-          <div className="grid items-start gap-3 xl:grid-cols-2">
+          <div className="flex flex-wrap items-start justify-center gap-3">
             {parts.needs.map((d) => (
-              <DealCard
-                key={d.jobId}
-                deal={d}
-                now={now}
-                me={me}
-                callsOn={Boolean(data?.callsOn)}
-                team={data?.team ?? []}
-                solo={solo}
-                onChanged={load}
-                onMark={(mark) => setMark(d.jobId, mark)}
-                installDays={data?.installDays}
-                signOff={data?.signOff}
-                stacked
-              />
+              <div key={d.jobId} className="w-full max-w-[31.5rem]">
+                <DealCard
+                  deal={d}
+                  now={now}
+                  me={me}
+                  callsOn={Boolean(data?.callsOn)}
+                  team={data?.team ?? []}
+                  solo={solo}
+                  onChanged={load}
+                  onMark={(mark) => setMark(d.jobId, mark)}
+                  installDays={data?.installDays}
+                  signOff={data?.signOff}
+                  stacked
+                />
+              </div>
             ))}
           </div>
         )}
@@ -527,6 +530,9 @@ function ArrivalCard(props: {
     </article>
   );
 }
+
+/** A pad on Today (New in, Calls): one width for every pad, so a row of them centres whatever its count. */
+export const PAD = "w-full sm:w-[15rem]";
 
 /** How many deals In hand shows before "Show all". */
 const IN_HAND_SHOWN = 5;
