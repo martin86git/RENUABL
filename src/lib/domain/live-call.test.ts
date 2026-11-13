@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   cleanTeamNote,
   clockWords,
+  END_CALL_COMMAND,
   isControlUrl,
   joinRuns,
+  mayEndCall,
   livePhase,
   phaseWords,
   readLiveEvent,
@@ -128,6 +130,18 @@ describe("the team typing to the assistant mid-call", () => {
     expect(teamCommand({ text: "Hi Jo", say: true, business: "" })).toEqual({ type: "say", content: "Hi Jo", endCallAfterSpoken: false });
     expect(teamLineWords("team", "Charlie")).toBe("You told Charlie");
     expect(teamLineWords("team-say", "Charlie")).toBe("You had Charlie say");
+  });
+});
+
+describe("hanging up on the assistant's call", () => {
+  it("is Vapi's end-call, only while it rings or is on, with a control address", () => {
+    expect(END_CALL_COMMAND).toEqual({ type: "end-call" });
+    const url = "https://x.vapi.ai/c/control";
+    expect(mayEndCall({ controlUrl: url, liveStatus: "in-progress" })).toBe(true);
+    expect(mayEndCall({ controlUrl: url, liveStatus: "ringing" })).toBe(true);
+    expect(mayEndCall({ controlUrl: url, liveStatus: "ended" })).toBe(false);
+    expect(mayEndCall({ controlUrl: null, liveStatus: "in-progress" })).toBe(false);
+    expect(teamLineWords("team-end", "Charlie")).toBe("You ended the call");
   });
 });
 

@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { ArrowUp, ChevronDown, ChevronUp, X } from "lucide-react";
+import { ArrowUp, ChevronDown, ChevronUp, PhoneOff, X } from "lucide-react";
 import { clockWords, joinRuns, phaseWords, TEAM_NOTE_MAX, teamLineWords, type LiveLine } from "@/lib/domain/live-call";
 import { CALL_HEADLINES } from "@/lib/domain/voice-agent";
-import { stopWatching, tellAssistant, useLiveCall, useWatchedCall } from "@/lib/services/assistant-call";
+import { endAssistantCall, stopWatching, tellAssistant, useLiveCall, useWatchedCall } from "@/lib/services/assistant-call";
 import { useCaller } from "@/lib/services/caller";
 import { CallerAvatar } from "./settings-caller";
 
@@ -136,9 +136,9 @@ export function AssistantCallWindow() {
               </>
             )}
           </div>
-          {call?.canSteer ? (
-            <TellBox jobId={watched.jobId} assistant={caller.name} />
-          ) : (
+          {call?.canSteer && <TellBox jobId={watched.jobId} assistant={caller.name} />}
+          {call?.canEnd && <HangUp jobId={watched.jobId} assistant={caller.name} customer={customer} />}
+          {!call?.canSteer && (
             <p className="border-t border-line px-4 py-2 text-[11px] text-muted">
               {phase === "ended"
                 ? "The call and its summary are on the deal."
@@ -149,6 +149,47 @@ export function AssistantCallWindow() {
       )}
     </section>,
     document.body,
+  );
+}
+
+/**
+ * Hanging up on the assistant's call (13 Nov 2026, Martin: in case it says something I don't agree with). One press asks
+ * "End the call?", a second ends it; nothing more is tried on that run.
+ */
+function HangUp({ jobId, assistant, customer }: { jobId: string; assistant: string; customer: string }) {
+  const [sure, setSure] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sure) return;
+    const t = window.setTimeout(() => setSure(false), 5000);
+    return () => window.clearTimeout(t);
+  }, [sure]);
+  const end = async () => {
+    if (!sure) return setSure(true);
+    setEnding(true);
+    setProblem(null);
+    const res = await endAssistantCall(jobId);
+    setEnding(false);
+    setSure(false);
+    if (!res.ok) setProblem(res.message);
+  };
+  return (
+    <div className="border-t border-line px-3 py-2">
+      <button
+        type="button"
+        onClick={() => void end()}
+        disabled={ending}
+        className={clsx(
+          "flex w-full items-center justify-center gap-2 rounded-full py-2 text-sm font-semibold transition-colors",
+          sure ? "bg-danger text-white" : "bg-danger/10 text-danger hover:bg-danger/15",
+        )}
+      >
+        <PhoneOff className="size-4" aria-hidden />
+        {ending ? "Ending the call…" : sure ? `Yes, end ${assistant}'s call with ${customer}` : "Hang up"}
+      </button>
+      {problem && <p className="px-1 pt-1 text-[11px] text-danger">{problem}</p>}
+    </div>
   );
 }
 
@@ -211,7 +252,7 @@ function TellBox({ jobId, assistant }: { jobId: string; assistant: string }) {
 }
 
 function Bubble({ line, assistant, customer, saying }: { line: LiveLine; assistant: string; customer: string; saying?: boolean }) {
-  if (line.role === "team" || line.role === "team-say")
+  if (line.role === "team" || line.role === "team-say" || line.role === "team-end")
     return (
       <div className="flex flex-col items-center">
         <p className="max-w-[90%] rounded-xl bg-sun px-3 py-1.5 text-center text-xs leading-snug text-sun-ink">

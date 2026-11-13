@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-13",
     area: "Calls",
+    words: "Hang up on your assistant's call from its call window, if it says something you don't agree with.",
+  },
+  {
+    day: "2026-11-13",
+    area: "Calls",
     words: "Your assistant answers in short bubbles, one point each, and its chat can be minimised and sits beside its call window.",
   },
   {

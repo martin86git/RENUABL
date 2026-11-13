@@ -11,7 +11,7 @@ import type { CallOutcome } from "./voice-agent";
  * Who a line is from: the business's assistant, the customer, or the team typing to the assistant while the call is on
  * ("team": told it something to work in; "team-say": had it say these words).
  */
-export type LiveRole = "assistant" | "customer" | "team" | "team-say";
+export type LiveRole = "assistant" | "customer" | "team" | "team-say" | "team-end";
 
 export interface LiveLine {
   role: LiveRole;
@@ -96,7 +96,17 @@ export function teamCommand(o: { text: string; say: boolean; business: string })
 
 /** How the window labels the team's own lines. */
 export const teamLineWords = (role: LiveRole, assistant: string) =>
-  role === "team-say" ? `You had ${assistant} say` : `You told ${assistant}`;
+  role === "team-say" ? `You had ${assistant} say` : role === "team-end" ? "You ended the call" : `You told ${assistant}`;
+
+/**
+ * Hanging up on the assistant's call (13 Nov 2026, Martin: in case it says something I don't agree with). Sent to the
+ * same control address; the call is then closed on our side so it isn't tried again.
+ */
+export const END_CALL_COMMAND = { type: "end-call" } as const;
+
+/** Whether the team can hang up now: the call is ringing or on, and Vapi gave a control address. */
+export const mayEndCall = (o: { controlUrl: string | null; liveStatus: string | null }): boolean =>
+  Boolean(o.controlUrl) && (o.liveStatus === "ringing" || o.liveStatus === "in-progress" || o.liveStatus === "forwarding");
 
 /**
  * Whether Vapi's own word on a call (its `status` from GET /call/<id>) says it is over, so a call we still hold open
@@ -161,4 +171,6 @@ export interface LiveCallView {
   partial: LiveLine | null;
   /** The team can type to the assistant now (it is on the call and Vapi gave a control address). */
   canSteer: boolean;
+  /** The team can hang up now (ringing or on the call, with a control address). */
+  canEnd: boolean;
 }

@@ -1,6 +1,6 @@
 import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
-import { liveCallFor, steerCall } from "@/lib/server/voice-calls";
+import { endAssistantCall, liveCallFor, steerCall } from "@/lib/server/voice-calls";
 import { cleanTeamNote } from "@/lib/domain/live-call";
 import { allow } from "@/lib/server/rate-limit";
 
@@ -46,5 +46,29 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     const sent = await steerCall(who.member.businessId, id, { text, say: body?.say === true });
     if (sent === "sent") return Response.json({ ok: true });
     return Response.json({ ok: false, message: STEER_WORDS[sent] }, { status: sent === "not-on" ? 409 : 502 });
+  });
+}
+
+const END_WORDS = {
+  "not-on": "The call has already ended.",
+  failed: "The call couldn't be ended from here. Try again in a moment.",
+};
+
+/**
+ * DELETE → { ok }: the team hangs up on the assistant's call on this deal (13 Nov 2026, Martin: in case it says something
+ * I don't agree with). No more calls on that run. Members who may publish and see the deal.
+ */
+export async function DELETE(request: Request, ctx: RouteContext<"/api/design/jobs/[id]/call/live">) {
+  return answer(async () => {
+    const who = await requireMember("publish");
+    if ("refuse" in who) return who.refuse;
+    if (!allow(request, "design-call-end", 30)) return Response.json({ ok: false, message: "Try again in a minute." }, { status: 429 });
+    const { id } = await ctx.params;
+    if (!validId(id) || !(await jobById(who.member.businessId, id, viewerOf(who.member))))
+      return Response.json({ ok: false, message: "That deal isn't here." }, { status: 404 });
+    const name = who.member.firstName || who.member.email.split("@")[0];
+    const ended = await endAssistantCall(who.member.businessId, id, { email: who.member.email, name });
+    if (ended === "ended") return Response.json({ ok: true });
+    return Response.json({ ok: false, message: END_WORDS[ended] }, { status: ended === "not-on" ? 409 : 502 });
   });
 }

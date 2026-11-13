@@ -118,3 +118,15 @@ export function useLiveCall(jobId: string | null): { call: LiveCall | null; load
 
   return { call: state.call, loaded: state.loaded };
 }
+
+/** Hangs up on the assistant's call on this deal. */
+export async function endAssistantCall(jobId: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const res = await fetch(`/api/design/jobs/${encodeURIComponent(jobId)}/call/live`, { method: "DELETE" });
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
+    if (res.ok && json?.ok) return { ok: true };
+    return { ok: false, message: json?.message ?? "The call couldn't be ended from here. Try again in a moment." };
+  } catch {
+    return { ok: false, message: "We couldn't reach the server just now. Try again in a moment." };
+  }
+}

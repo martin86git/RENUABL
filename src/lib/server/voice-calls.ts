@@ -25,6 +25,8 @@ import {
   NEVER_PLACED_MS,
   livePhase,
   teamCommand,
+  END_CALL_COMMAND,
+  mayEndCall,
   vapiCallOver,
   type LiveCallView,
   type LiveEvent,
@@ -869,6 +871,7 @@ export async function liveCallFor(businessId: string, jobId: string): Promise<Li
     lines,
     partial: r.live_partial && (r.live_partial.role === "assistant" || r.live_partial.role === "customer") ? r.live_partial : null,
     canSteer: Boolean(r.live_control_url) && r.live_status === "in-progress",
+    canEnd: mayEndCall({ controlUrl: r.live_control_url, liveStatus: r.live_status }),
   };
 }
 
@@ -913,4 +916,57 @@ export async function steerCall(
     console.error("call note not sent", e instanceof Error ? e.message : e);
     return "failed";
   }
+}
+
+/**
+ * The team hangs up on the assistant's call on this deal (13 Nov 2026, Martin: in case it says something I don't agree
+ * with). Closed on our side first, so the call's end isn't taken as a reason to try again, then Vapi is told to end it
+ * through the call's control address; if Vapi can't be reached the call is put back as it was. Written on the deal by
+ * the member. Business id first; the caller has checked the member may see the deal.
+ */
+export async function endAssistantCall(
+  businessId: string,
+  jobId: string,
+  by: { email: string; name: string },
+): Promise<"ended" | "not-on" | "failed"> {
+  const rows = await query<VoiceRow & { live_vapi_id: string | null; live_control_url: string | null; live_status: string | null }>(
+    `select * from voice_calls
+      where business_id = $1 and job_id = $2 and status in ('waiting', 'calling') and live_control_url is not null
+      order by created_at desc limit 1`,
+    [businessId, jobId],
+  );
+  const r = rows[0];
+  if (!r || !mayEndCall({ controlUrl: r.live_control_url, liveStatus: r.live_status })) return "not-on";
+  const was = r.status;
+  await finish(r.id, "stopped", { stop_reason: `Ended by ${by.email}` });
+  try {
+    const res = await fetch(r.live_control_url!, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(END_CALL_COMMAND),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) throw new Error(`Vapi ${res.status}`);
+  } catch (e) {
+    console.error("call not ended", e instanceof Error ? e.message : e);
+    await query(`update voice_calls set status = $2, stop_reason = null where id = $1 and status = 'stopped'`, [r.id, was]).catch(
+      () => undefined,
+    );
+    return "failed";
+  }
+  await query(
+    `insert into voice_call_lines (voice_call_id, vapi_call_id, role, text)
+     select $1, $2, 'team-end', $3 where (select count(*) from voice_call_lines where voice_call_id = $1) < $4`,
+    [r.id, r.live_vapi_id, "Ended the call", MAX_LINES],
+  ).catch(() => undefined);
+  await transaction((q) =>
+    record(q, businessId, {
+      customerId: r.customer_id,
+      jobId,
+      kind: "note",
+      text: `${by.name} ended ${r.lead.assistant || "the assistant"}'s call partway. No more calls will be made on this run.`,
+      by: by.email,
+    }),
+  ).catch((e) => console.error("ended call not written on the deal", e instanceof Error ? e.message : e));
+  return "ended";
 }
