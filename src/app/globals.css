@@ -132,6 +132,14 @@
      signal orange in its mark and pale blue for the small RENUABL above its name. */
   --market: #1849a9;
   --market-ink: #b5d4f4;
+  /* The phone assistant's stand-in picture (13 Nov 2026, Martin): a sound wave on graphite, in a colour by its
+     name (callerTint), so callers with no photo can be told apart. --caller-2 is the signal orange. */
+  --caller-0: #3ec6b4;
+  --caller-1: #5aa9ff;
+  --caller-2: #ff5a1f;
+  --caller-3: #a78bfa;
+  --caller-4: #ff7aa8;
+  --caller-5: #f5c04a;
   --positive: #128a57;
   --positive-soft: #e3f4ec;
   --warning: #a15c00;

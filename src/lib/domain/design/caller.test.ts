@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   CALLER_NAME_MAX,
+  CALLER_TINTS,
   CALLER_VOICES,
   callerInitial,
+  callerTint,
   callerIntro,
   cleanCallerName,
   cleanVoice,
   DEFAULT_CALLER,
+  DEFAULT_TINT,
   testCallWords,
   voiceLabel,
 } from "./caller";
@@ -40,6 +43,14 @@ describe("the phone assistant's name", () => {
   it("shows an initial with no picture", () => {
     expect(callerInitial("ella")).toBe("E");
     expect(callerInitial("")).toBe("S");
+  });
+
+  it("gives each name a colour of its own that stays the same", () => {
+    expect(callerTint("Charlie")).toBe(callerTint("  charlie "));
+    expect(callerTint("")).toBe(DEFAULT_TINT);
+    const tints = ["Charlie", "Ella", "Ava", "Jack", "Mia", "Noah", "Zoë"].map(callerTint);
+    for (const t of tints) expect(t >= 0 && t < CALLER_TINTS && Number.isInteger(t)).toBe(true);
+    expect(new Set(tints).size).toBeGreaterThan(2);
   });
 });
 

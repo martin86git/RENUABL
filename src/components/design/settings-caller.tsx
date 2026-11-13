@@ -7,7 +7,7 @@ import {
   CALLER_COPY,
   CALLER_NAME_MAX,
   CALLER_VOICES,
-  callerInitial,
+  callerTint,
   callerIntro,
   cleanCallerName,
   cleanVoice,
@@ -46,11 +46,41 @@ export function CallerAvatar({ caller, size = 32, className }: { caller: CallerS
   ) : (
     <span
       aria-hidden
-      className={clsx("grid shrink-0 place-items-center rounded-full bg-primary font-semibold text-primary-ink", className)}
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
+      className={clsx("grid shrink-0 place-items-center rounded-full bg-primary", className)}
+      style={{ width: size, height: size }}
     >
-      {callerInitial(caller.name)}
+      <SoundWave size={size} tint={callerTint(caller.name)} />
     </span>
+  );
+}
+
+/** Bar heights of the stand-in's sound wave, of a 24-unit square: four bars, three where it is drawn small. */
+const WAVE = [7, 16, 11, 5];
+const WAVE_SMALL = [8, 16, 10];
+
+/**
+ * The stand-in picture with no photo (13 Nov 2026, Martin: a sound wave, not an initial; a colour by the name so
+ * several callers can be told apart): a voice, not a face, since the assistant says it is automated.
+ */
+function SoundWave({ size, tint }: { size: number; tint: number }) {
+  const bars = size < 24 ? WAVE_SMALL : WAVE;
+  const width = size < 24 ? 3 : 2.4;
+  const gap = size < 24 ? 2 : 1.8;
+  const left = 12 - (bars.length * width + (bars.length - 1) * gap) / 2;
+  return (
+    <svg viewBox="0 0 24 24" width={Math.round(size * 0.62)} height={Math.round(size * 0.62)}>
+      {bars.map((h, i) => (
+        <rect
+          key={i}
+          x={left + i * (width + gap)}
+          y={12 - h / 2}
+          width={width}
+          height={h}
+          rx={width / 2}
+          fill={`var(--caller-${tint}, var(--sun-line))`}
+        />
+      ))}
+    </svg>
   );
 }
 

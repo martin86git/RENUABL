@@ -97,5 +97,23 @@ export function testCallWords(name: string, business: string): string {
   return `Hi, it's ${speakableName(name) || DEFAULT_CALLER}, ${business.trim() || "your business"}'s automated assistant. This is a test, so you can hear how I'll sound on your calls. Bye for now.`;
 }
 
+/** How many colours the stand-in picture comes in (`--caller-0` … in globals.css). */
+export const CALLER_TINTS = 6;
+
+/** The signal orange's place among them: an assistant not yet named keeps it. */
+export const DEFAULT_TINT = 2;
+
+/**
+ * The colour of an assistant's stand-in picture, by its name, so two callers with no photo can be told apart
+ * and each keeps its colour wherever it shows. Upper and lower case count the same.
+ */
+export function callerTint(name: string): number {
+  const said = speakableName(name).toLowerCase();
+  if (!said) return DEFAULT_TINT;
+  let sum = 0;
+  for (const ch of said) sum += ch.codePointAt(0) ?? 0;
+  return sum % CALLER_TINTS;
+}
+
 /** The initial shown when there is no photo. */
 export const callerInitial = (name: string) => (speakableName(name).charAt(0) || "S").toUpperCase();
