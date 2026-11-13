@@ -7,6 +7,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { CoachNote, CoachTurn } from "@/lib/domain/design/coaching";
+import type { CallerState } from "./caller";
 
 export interface CoachCall {
   jobId: string;
@@ -61,7 +62,7 @@ const json = (method: string, body: unknown): RequestInit => ({
 export const loadCoaching = () => ask<{ notes: CoachNote[]; turns: CoachTurn[]; fixed: string[]; mayCoach: boolean }>(URL_);
 
 export const coachAssistant = (message: string, call: CoachCall | null) =>
-  ask<{ notes: CoachNote[]; turns: CoachTurn[] }>(
+  ask<{ notes: CoachNote[]; turns: CoachTurn[]; caller: CallerState }>(
     URL_,
     json("POST", { message, ...(call ? { call: { jobId: call.jobId, transcriptId: call.transcriptId } } : {}) }),
   );

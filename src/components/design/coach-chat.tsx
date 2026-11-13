@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { ArrowUp, Check, ChevronDown, Pencil, PhoneCall, Trash2, X } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, Loader2, Pencil, PhoneCall, Trash2, Volume2, X } from "lucide-react";
 import { COACH_COPY, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
-import { useCaller } from "@/lib/services/caller";
+import { callerChanged, ringMeToHear, uploadCallerPhoto, useCaller } from "@/lib/services/caller";
 import {
   clearCoachCall,
   closeCoach,
@@ -108,6 +108,7 @@ export function CoachWindow() {
     }
     setTurns(res.turns);
     setNotes(res.notes);
+    callerChanged(res.caller);
     clearCoachCall();
   };
 
@@ -118,11 +119,12 @@ export function CoachWindow() {
       className="fixed bottom-20 right-4 z-[86] flex max-h-[min(40rem,calc(100dvh-7rem))] w-[min(26rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-surface shadow-lift ring-1 ring-line lg:bottom-6 lg:right-20 print:hidden"
     >
       <header className="flex items-center gap-3 bg-primary px-4 py-3 text-white">
-        <CallerAvatar caller={caller} size={44} className="ring-2 ring-white/20" />
+        <AvatarEdit editable={mayCoach} onFailed={setFailed} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{COACH_COPY.title(name)}</p>
           <p className="truncate text-xs text-white/70">Your phone assistant · learns from what you tell it</p>
         </div>
+        <HearButton />
         <button
           type="button"
           onClick={closeCoach}
@@ -249,12 +251,98 @@ export function CoachWindow() {
   );
 }
 
+/**
+ * The assistant's face at the top of its chat (13 Nov 2026, Martin: hover it for a pencil and change the picture there,
+ * not in Settings). For an admin, pressing it picks a new picture, sent as Settings sends it (`uploadCallerPhoto`:
+ * checked by its own bytes and redrawn on the server).
+ */
+function AvatarEdit({ editable, onFailed }: { editable: boolean; onFailed: (m: string | null) => void }) {
+  const caller = useCaller();
+  const pick = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  if (!editable) return <CallerAvatar caller={caller} size={44} className="ring-2 ring-white/20" />;
+  const chosen = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    onFailed(null);
+    const res = await uploadCallerPhoto(file);
+    setBusy(false);
+    if (!res.ok) onFailed(res.message);
+  };
+  return (
+    <button
+      type="button"
+      onClick={() => pick.current?.click()}
+      disabled={busy}
+      aria-label={`Change ${caller.name}'s picture`}
+      title={`Change ${caller.name}'s picture`}
+      className="group relative shrink-0 rounded-full"
+    >
+      <CallerAvatar caller={caller} size={44} className="ring-2 ring-white/20" />
+      <span
+        className={clsx(
+          "absolute inset-0 grid place-items-center rounded-full bg-ink/60 text-white transition-opacity",
+          busy ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
+        )}
+        aria-hidden
+      >
+        {busy ? <Loader2 className="size-4 animate-spin" /> : <Pencil className="size-4" />}
+      </span>
+      <input
+        ref={pick}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="sr-only"
+        tabIndex={-1}
+        onChange={(e) => {
+          void chosen(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+    </button>
+  );
+}
+
+/** Ring the member's own mobile to hear the assistant's voice, from its chat (after changing it there). */
+function HearButton() {
+  const caller = useCaller();
+  const [said, setSaid] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const ring = async () => {
+    setBusy(true);
+    const res = await ringMeToHear();
+    setBusy(false);
+    setSaid(res.ok ? "Ringing your mobile now" : res.message);
+    window.setTimeout(() => setSaid(null), 6000);
+  };
+  return (
+    <span className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => void ring()}
+        disabled={busy}
+        aria-label={`Ring me to hear ${caller.name}`}
+        title={`Ring me to hear ${caller.name}`}
+        className="grid size-8 place-items-center rounded-full hover:bg-white/10 disabled:opacity-60"
+      >
+        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Volume2 className="size-4" aria-hidden />}
+      </button>
+      {said && (
+        <span className="absolute right-0 top-10 z-10 w-48 rounded-lg bg-surface px-3 py-2 text-xs text-ink shadow-lift ring-1 ring-line">
+          {said}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function Changes({ changes }: { changes?: CoachTurn["changes"] }) {
   if (!changes) return null;
   const rows = [
     ...changes.added.map((t) => ({ t, word: "Added" })),
     ...changes.changed.map((t) => ({ t, word: "Changed" })),
     ...changes.removed.map((t) => ({ t, word: "Removed" })),
+    ...(changes.settings ?? []).map((t) => ({ t, word: t.startsWith("Name not changed") ? "Not done" : "Updated" })),
   ];
   if (!rows.length) return null;
   return (
@@ -264,7 +352,11 @@ function Changes({ changes }: { changes?: CoachTurn["changes"] }) {
           <span
             className={clsx(
               "shrink-0 rounded px-1.5 py-0.5 font-medium",
-              r.word === "Removed" ? "bg-surface-2 text-muted line-through" : "bg-positive-soft text-positive",
+              r.word === "Removed"
+                ? "bg-surface-2 text-muted line-through"
+                : r.word === "Not done"
+                  ? "bg-warning-soft text-warning"
+                  : "bg-positive-soft text-positive",
             )}
           >
             {r.word}

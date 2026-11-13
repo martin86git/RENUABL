@@ -14,6 +14,16 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-13",
+    area: "Calls",
+    words: "Change your phone assistant's picture, name and voice from its chat: the pencil on its face, or just ask it.",
+  },
+  {
+    day: "2026-11-13",
+    area: "Everywhere",
+    words: "The round at the top right is now a settings cog, in place of your initials.",
+  },
+  {
     day: "2026-11-12",
     area: "Calls",
     words: "Talk to your phone assistant from its face on the rail: tell it what to say and how, and it keeps your notes for every call.",

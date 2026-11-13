@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     }
     const res = await coachAssistant({ businessId: who.member.businessId, by: who.member.email, message, call });
     if (!res.ok) return Response.json({ ok: false, message: res.message }, { status: res.status });
-    return Response.json({ ok: true, notes: res.notes, turns: res.turns }, { headers: PRIVATE });
+    return Response.json({ ok: true, notes: res.notes, turns: res.turns, caller: res.caller }, { headers: PRIVATE });
   });
 }
 

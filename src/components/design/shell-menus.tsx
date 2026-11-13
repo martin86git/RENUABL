@@ -17,6 +17,7 @@ import {
   MessageSquarePlus,
   Newspaper,
   Moon,
+  Settings,
   SlidersHorizontal,
   Sparkles,
   Sun,
@@ -338,14 +339,10 @@ function Heading({ label, href, more }: { label: string; href: string; more: str
   );
 }
 
-/** The two letters a profile round shows: the first of each part of the email's name, else its first two. */
-function initialsOf(email: string): string {
-  const name = email.split("@")[0] ?? "";
-  const parts = name.split(/[._-]+/).filter(Boolean);
-  return (parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2)).toUpperCase() || "?";
-}
-
-/** The profile round (3 Nov 2026, Martin: it replaced the gear): who is signed in, Settings, the account, and signing out. */
+/**
+ * The settings round (13 Nov 2026, Martin: the profile's initials, "MA", meant nothing; a cog says it plainly; it had
+ * replaced the gear on 3 Nov): who is signed in, Settings, the account, and signing out.
+ */
 export function ProfileMenu(props: {
   email: string;
   settings: string;
@@ -371,14 +368,14 @@ export function ProfileMenu(props: {
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-label="Your profile, settings and account"
-        title={props.email}
+        aria-label="Settings, your account and updates"
+        title="Settings"
         className={clsx(
           "relative flex size-9 items-center justify-center rounded-full text-[12px] font-semibold tracking-wide transition-colors",
           open || props.on ? "bg-ink text-white" : "bg-surface-2 text-ink hover:bg-line",
         )}
       >
-        {initialsOf(props.email)}
+        <Settings className="size-[18px]" aria-hidden />
         {props.unseen > 0 && (
           <span
             className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-sun-line ring-2 ring-surface"

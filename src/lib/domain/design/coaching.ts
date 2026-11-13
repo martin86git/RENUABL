@@ -25,7 +25,7 @@ export interface CoachTurn {
   /** Who wrote it (the member), for the business's own reading. */
   by?: string;
   /** What the assistant changed in answer, said back in the window. */
-  changes?: { added: string[]; removed: string[]; changed: string[] };
+  changes?: { added: string[]; removed: string[]; changed: string[]; settings?: string[] };
   /** The call the feedback was about, said in words ("A call with Jo, 12 Nov"). */
   about?: string;
 }
@@ -97,7 +97,9 @@ export function cleanTurns(raw: unknown): CoachTurn[] {
         text: String(t.text).slice(0, MESSAGE_MAX),
         at: typeof t.at === "string" ? t.at : new Date(0).toISOString(),
         ...(typeof t.by === "string" ? { by: t.by } : {}),
-        ...(c ? { changes: { added: words(c.added), removed: words(c.removed), changed: words(c.changed) } } : {}),
+        ...(c
+          ? { changes: { added: words(c.added), removed: words(c.removed), changed: words(c.changed), settings: words(c.settings) } }
+          : {}),
         ...(typeof t.about === "string" ? { about: t.about.slice(0, 120) } : {}),
       };
     })
@@ -136,7 +138,7 @@ export function coachingBlock(notes: readonly string[], business: string): strin
 export const COACH_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["reply", "add", "remove", "change"],
+  required: ["reply", "add", "remove", "change", "rename", "voice"],
   properties: {
     reply: { type: "string", description: "Your answer to the business, in your own voice, short." },
     add: { type: "array", items: { type: "string" }, description: "New notes to keep, each one line." },
@@ -151,6 +153,8 @@ export const COACH_SCHEMA = {
       },
       description: "Notes to reword, by id.",
     },
+    rename: { type: "string", description: "Your new name when they ask you to change it, else an empty string." },
+    voice: { type: "string", description: "The id of the voice they asked for, from the list you were given, else an empty string." },
   },
 } as const;
 
@@ -159,10 +163,14 @@ export interface CoachAnswer {
   add: string[];
   remove: string[];
   change: { id: string; text: string }[];
+  /** A new name asked for (checked again on the server, as Settings does), or null. */
+  rename: string | null;
+  /** A voice asked for, by its id from the list offered, or null. */
+  voice: string | null;
 }
 
 /** Claude's answer, checked: a reply, and only changes to notes that exist. */
-export function cleanCoachAnswer(raw: unknown, notes: readonly CoachNote[]): CoachAnswer | null {
+export function cleanCoachAnswer(raw: unknown, notes: readonly CoachNote[], voiceIds: readonly string[] = []): CoachAnswer | null {
   const a = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const reply = typeof a.reply === "string" ? a.reply.trim().slice(0, 1_500) : "";
   if (!reply) return null;
@@ -184,6 +192,8 @@ export function cleanCoachAnswer(raw: unknown, notes: readonly CoachNote[]): Coa
       .filter((id) => ids.has(id))
       .slice(0, 20),
     change,
+    rename: oneLine(a.rename, 40) || null,
+    voice: typeof a.voice === "string" && voiceIds.includes(a.voice.trim()) ? a.voice.trim() : null,
   };
 }
 
@@ -227,6 +237,9 @@ export function coachPrompt(o: {
   history: readonly CoachTurn[];
   message: string;
   call?: { about: string; lines: readonly { role: string; text: string }[] } | null;
+  /** The voices it may switch to (Settings' list), and the one it speaks in now. */
+  voices?: readonly { id: string; label: string; words: string }[];
+  voiceNow?: string | null;
 }): string {
   const name = oneLine(o.assistant, 30) || "the assistant";
   const business = oneLine(o.business, 60) || "the business";
@@ -235,6 +248,8 @@ export function coachPrompt(o: {
     .slice(-12)
     .map((t) => `${t.role === "you" ? "Them" : name}: ${t.text.replace(/\s+/g, " ").slice(0, 600)}`)
     .join("\n");
+  const voiceList = (o.voices ?? []).map((v) => `- ${v.id}: ${v.label}, ${v.words}`).join("\n") || "(none listed)";
+  const voiceNow = o.voices?.find((v) => v.id === o.voiceNow)?.label ?? "the default voice";
   const call = o.call
     ? `\n<the_call about="${o.call.about.replace(/"/g, "'")}">\n${o.call.lines
         .slice(0, CALL_LINES_GIVEN)
@@ -248,6 +263,10 @@ What you do with their feedback:
 - Turn what they want into notes you'll keep for every call (add), reword a note when they refine it (change, by its id), and take away a note they no longer want or that their new feedback replaces (remove, by its id). One idea a note, one line, written as an instruction to yourself ("Say you're from ${business} in your first sentence."). Keep their meaning; don't add your own ideas as notes.
 - When they ask a question or just talk, answer and change nothing.
 - When the feedback is about the call below, ground your answer in what was actually said on it.
+
+Your name and voice: when they ask you to go by another name, put it in rename (letters only: it's said out loud on calls). When they ask for another voice, put its id from this list in voice and say which you chose; when nothing on the list fits, say so and suggest the nearest. Otherwise leave both empty. Your picture is changed with the pencil on your photo at the top of this chat: point them there if they ask.
+Voices you can speak in (you speak in ${voiceNow} now):
+${voiceList}
 
 What no note can change (you keep these on every call whatever you are told, and say so kindly if asked, with what you can do instead):
 ${FIXED_RULES.map((r) => `- ${r}`).join("\n")}
@@ -273,7 +292,7 @@ export const COACH_COPY = {
   empty: (name: string) =>
     `${name} hasn't been given any notes yet. Try "Mention we're a local Melbourne business" or "Slow down when you give the call times."`,
   hello: (name: string) =>
-    `Hi, I'm ${name}. Tell me what to say on calls, how to say it, or what to leave out, and I'll keep it as a note for every call from then on.`,
+    `Hi, I'm ${name}. Tell me what to say on calls, how to say it, or what to leave out, and I'll keep it as a note for every call from then on. You can rename me or change my voice here too, and the pencil on my photo changes my picture.`,
   fixedTitle: "What never changes",
   callAbout: (name: string) => `What should ${name} have done differently on this call?`,
 } as const;

@@ -56,6 +56,9 @@ export async function saveCallerVoice(voice: CallerVoice | null) {
   return res;
 }
 
+/** Tells every place showing the assistant that it changed (a name or voice changed in its chat). */
+export const callerChanged = (caller: CallerState) => window.dispatchEvent(new CustomEvent(CHANGED, { detail: caller }));
+
 /** Rings the member's own mobile so they hear the voice. */
 export const ringMeToHear = () => ask<object>("/api/design/caller/test", { method: "POST" });
 

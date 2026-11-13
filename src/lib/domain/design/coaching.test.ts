@@ -45,7 +45,7 @@ describe("the assistant's answer to coaching", () => {
       },
       notes,
     );
-    expect(a).toEqual({ reply: "Got it.", add: ["Say RENUABL first"], remove: ["cn_bbbbbb"], change: [] });
+    expect(a).toEqual({ reply: "Got it.", add: ["Say RENUABL first"], remove: ["cn_bbbbbb"], change: [], rename: null, voice: null });
     expect(cleanCoachAnswer({ reply: "" }, notes)).toBeNull();
   });
 
@@ -75,6 +75,35 @@ describe("the assistant's answer to coaching", () => {
     );
     expect(out.notes).toHaveLength(MAX_NOTES);
     expect(out.notes.at(-1)?.text).toBe("One more note");
+  });
+});
+
+describe("a new name or voice asked for in the chat", () => {
+  it("keeps a name to check and only a voice on the list", () => {
+    const a = cleanCoachAnswer(
+      { reply: "Done.", add: [], remove: [], change: [], rename: "  Ella  ", voice: "Elliot" },
+      [],
+      ["Elliot", "Dan"],
+    );
+    expect(a?.rename).toBe("Ella");
+    expect(a?.voice).toBe("Elliot");
+    const b = cleanCoachAnswer({ reply: "Done.", add: [], remove: [], change: [], rename: "", voice: "made-up" }, [], ["Elliot"]);
+    expect(b?.rename).toBeNull();
+    expect(b?.voice).toBeNull();
+  });
+
+  it("is offered the voices, and told which it speaks in", () => {
+    const p = coachPrompt({
+      assistant: "Charlie",
+      business: "RENUABL",
+      notes: [],
+      history: [],
+      message: "Sound more Aussie",
+      voices: [{ id: "IKne3meq5aSn9XLyUdCD", label: "Charlie", words: "Australian, relaxed and natural" }],
+      voiceNow: "IKne3meq5aSn9XLyUdCD",
+    });
+    expect(p).toContain("- IKne3meq5aSn9XLyUdCD: Charlie, Australian, relaxed and natural");
+    expect(p).toContain("you speak in Charlie now");
   });
 });
 
