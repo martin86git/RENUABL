@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   FIXED_RULES,
   MAX_NOTES,
+  MAX_PACKETS,
+  packetsOf,
   applyCoaching,
   cleanCoachAnswer,
   cleanMessage,
@@ -77,6 +79,31 @@ describe("the assistant's answer to coaching", () => {
     );
     expect(out.notes).toHaveLength(MAX_NOTES);
     expect(out.notes.at(-1)?.text).toBe("One more note");
+  });
+});
+
+describe("an answer in packets", () => {
+  it("keeps each message its own packet", () => {
+    const a = cleanCoachAnswer({ messages: ["Got it, thanks!", " I'll open with RENUABL. ", ""], add: [], remove: [], change: [] }, []);
+    expect(a?.reply).toBe("Got it, thanks!\n\nI'll open with RENUABL.");
+    expect(packetsOf(a?.reply ?? "")).toEqual(["Got it, thanks!", "I'll open with RENUABL."]);
+  });
+
+  it("cuts an older answer at its sentences", () => {
+    expect(packetsOf("Got it! I'll slow down. Straight after the opening, I'll mention the call.")).toEqual([
+      "Got it!",
+      "I'll slow down.",
+      "Straight after the opening, I'll mention the call.",
+    ]);
+    expect(packetsOf("About 5.5 kW on the roof.")).toEqual(["About 5.5 kW on the roof."]);
+    expect(packetsOf("")).toEqual([]);
+  });
+
+  it("never shows more than the most packets", () => {
+    const many = Array.from({ length: MAX_PACKETS + 3 }, (_, i) => `Point ${i}.`).join(" ");
+    const out = packetsOf(many);
+    expect(out).toHaveLength(MAX_PACKETS);
+    expect(out.at(-1)).toContain(`Point ${MAX_PACKETS + 2}.`);
   });
 });
 

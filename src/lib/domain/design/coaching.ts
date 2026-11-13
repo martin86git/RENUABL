@@ -138,9 +138,13 @@ export function coachingBlock(notes: readonly string[], business: string): strin
 export const COACH_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["reply", "add", "remove", "change", "rename", "voice"],
+  required: ["messages", "add", "remove", "change", "rename", "voice"],
   properties: {
-    reply: { type: "string", description: "Your answer to the business, in your own voice, short." },
+    messages: {
+      type: "array",
+      items: { type: "string" },
+      description: "Your answer as short messages, like texts: one point each, in your own voice.",
+    },
     add: { type: "array", items: { type: "string" }, description: "New notes to keep, each one line." },
     remove: { type: "array", items: { type: "string" }, description: "Ids of notes to take away." },
     change: {
@@ -158,7 +162,35 @@ export const COACH_SCHEMA = {
   },
 } as const;
 
+/** The most messages an answer is shown as; anything past it joins the last. */
+export const MAX_PACKETS = 8;
+const PACKET_MAX = 400;
+
+const tidyPacket = (t: string) => t.replace(/\s+/g, " ").trim().slice(0, PACKET_MAX);
+
+/**
+ * An answer as the packets it is shown in (13 Nov 2026, Martin: not one blob of text; each point its own bubble): the
+ * messages the assistant wrote, kept apart by a blank line; an older answer written as one block is cut at its
+ * sentences. Never more than MAX_PACKETS: the rest join the last.
+ */
+export function packetsOf(text: string): string[] {
+  const parts = text
+    .split(/\n\s*\n/)
+    .map(tidyPacket)
+    .filter(Boolean);
+  const packets =
+    parts.length > 1
+      ? parts
+      : (parts[0] ?? "")
+          .split(/(?<=[.!?])\s+(?=["'“(]?[A-Z0-9])/)
+          .map(tidyPacket)
+          .filter(Boolean);
+  if (packets.length <= MAX_PACKETS) return packets;
+  return [...packets.slice(0, MAX_PACKETS - 1), packets.slice(MAX_PACKETS - 1).join(" ")];
+}
+
 export interface CoachAnswer {
+  /** The messages kept as one text, a blank line between them (read back by `packetsOf`). */
   reply: string;
   add: string[];
   remove: string[];
@@ -172,7 +204,10 @@ export interface CoachAnswer {
 /** Claude's answer, checked: a reply, and only changes to notes that exist. */
 export function cleanCoachAnswer(raw: unknown, notes: readonly CoachNote[], voiceIds: readonly string[] = []): CoachAnswer | null {
   const a = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const reply = typeof a.reply === "string" ? a.reply.trim().slice(0, 1_500) : "";
+  // The messages, else (an older answer) one reply cut into its points.
+  const sent = (Array.isArray(a.messages) ? a.messages : []).filter((m): m is string => typeof m === "string");
+  const packets = sent.length ? sent.map(tidyPacket).filter(Boolean) : packetsOf(typeof a.reply === "string" ? a.reply : "");
+  const reply = packetsOf(packets.join("\n\n")).join("\n\n");
   if (!reply) return null;
   const ids = new Set(notes.map((n) => n.id));
   const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
@@ -259,7 +294,7 @@ export function coachPrompt(o: {
   return `You are ${name}, ${business}'s phone assistant: an automated assistant that rings their leads and customers about solar and batteries, answers questions, meets worries and guides people towards the next step. Right now you are not on a call: someone from ${business} is coaching you on how you talk on calls.
 
 What you do with their feedback:
-- Answer them as yourself, warmly and briefly (two to four sentences), in Australian English. Say plainly what you'll do differently.
+- Answer them as yourself, warmly and briefly, in Australian English, as short messages like texts (two to five): a quick acknowledgement first ("Got it, thanks!"), then one message for each thing you'll do differently, each starting a new point. Never one long block.
 - Turn what they want into notes you'll keep for every call (add), reword a note when they refine it (change, by its id), and take away a note they no longer want or that their new feedback replaces (remove, by its id). One idea a note, one line, written as an instruction to yourself ("Say you're from ${business} in your first sentence."). Keep their meaning; don't add your own ideas as notes.
 - When they ask a question or just talk, answer and change nothing.
 - When the feedback is about the call below, ground your answer in what was actually said on it.

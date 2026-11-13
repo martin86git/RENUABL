@@ -3,8 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { ArrowLeft, ArrowUp, Check, ChevronDown, Loader2, Pencil, PhoneCall, Settings, Trash2, Volume2, X } from "lucide-react";
-import { COACH_COPY, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
+import {
+  ArrowLeft,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Minus,
+  Pencil,
+  PhoneCall,
+  Settings,
+  Trash2,
+  Volume2,
+  X,
+} from "lucide-react";
+import { useWatchedCall } from "@/lib/services/assistant-call";
+import { COACH_COPY, packetsOf, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { callerChanged, ringMeToHear, uploadCallerPhoto, useCaller, useCallerInfo } from "@/lib/services/caller";
 import { voiceLabel } from "@/lib/domain/design/caller";
 import {
@@ -18,6 +33,72 @@ import {
   useCoachOpen,
 } from "@/lib/services/coaching";
 import { CallerAvatar, VoicePicker } from "./settings-caller";
+
+/** The pause between one packet of an answer and the next. */
+const PACKET_GAP_MS = 650;
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+
+/** How far each packet steps across from the one before, and where the vine meets a bubble. */
+const STEP = 22;
+const ANCHOR = 18;
+
+/**
+ * An answer as packets climbing a beanstalk (13 Nov 2026, Martin: one point a bubble, appearing one after another, like
+ * climbing a beanstalk with a link between them): each bubble steps across from the last in a gentle zig-zag, and a fine
+ * vine with a leaf at its bend joins each to the next. While packets are still to come, three dots wait on the vine.
+ */
+function Beanstalk({ packets, shown, label }: { packets: string[]; shown: number; label: string }) {
+  const x = (i: number) => (i % 2 ? STEP : 0);
+  const visible = packets.slice(0, shown);
+  const waiting = shown < packets.length;
+  const vine = (i: number) => {
+    const from = x(i - 1) + ANCHOR;
+    const to = x(i) + ANCHOR;
+    const mid = (from + to) / 2;
+    return (
+      <svg aria-hidden width={STEP + ANCHOR * 2} height={16} className="block text-line-strong" viewBox={`0 0 ${STEP + ANCHOR * 2} 16`}>
+        <path d={`M ${from} 0 C ${from} 9, ${to} 7, ${to} 16`} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+        <ellipse
+          cx={mid + (to > from ? 4 : -4)}
+          cy={7}
+          rx={3.2}
+          ry={1.6}
+          transform={`rotate(${to > from ? -30 : 30} ${mid} 7)`}
+          className="fill-current"
+        />
+      </svg>
+    );
+  };
+  return (
+    <div aria-label={label}>
+      {visible.map((p, i) => (
+        <div key={i}>
+          {i > 0 && vine(i)}
+          <p
+            style={{ marginLeft: x(i) }}
+            className="w-fit max-w-[calc(100%-1.5rem)] whitespace-pre-wrap rounded-2xl bg-surface-2 px-3 py-2 text-sm leading-snug text-ink"
+          >
+            {p}
+          </p>
+        </div>
+      ))}
+      {waiting && (
+        <div>
+          {vine(visible.length)}
+          <span
+            style={{ marginLeft: x(visible.length) }}
+            className="inline-flex gap-1 rounded-2xl bg-surface-2 px-3 py-2.5"
+            aria-label="Typing"
+          >
+            {[0, 1, 2].map((d) => (
+              <span key={d} className="size-1.5 animate-pulse rounded-full bg-ink-2" style={{ animationDelay: `${d * 150}ms` }} />
+            ))}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Whether the settings beside the chat were left open, kept on the device. */
 const SETTINGS_KEY = "renuabl.design.coach-settings";
@@ -67,10 +148,19 @@ export function CoachWindow() {
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [settings, setSettings] = useState(readSettingsOpen);
+  // Folded to its header bar (13 Nov 2026, Martin: minimise it, so what is behind it can be reached).
+  const [small, setSmall] = useState(false);
+  // The assistant's call window sits bottom right too: while one is open, this window stands beside it, not on it.
+  const watching = useWatchedCall();
   const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  // The newest answer's packets come one after another (13 Nov 2026, Martin), none held back with reduced motion.
+  const [reveal, setReveal] = useState<{ turn: number; shown: number; of: number } | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const isOpen = Boolean(state);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- each open (a new state object) unfolds the window
+  useEffect(() => setSmall(false), [state]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -95,9 +185,15 @@ export function CoachWindow() {
   }, [isOpen]);
 
   useEffect(() => {
+    if (!reveal || reveal.shown >= reveal.of) return;
+    const t = window.setTimeout(() => setReveal((r) => (r ? { ...r, shown: r.shown + 1 } : r)), PACKET_GAP_MS);
+    return () => window.clearTimeout(t);
+  }, [reveal]);
+
+  useEffect(() => {
     const el = list.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [turns.length, sending, isOpen]);
+  }, [turns.length, sending, isOpen, reveal?.shown]);
 
   if (!state || typeof document === "undefined") return null;
   const name = caller.name;
@@ -127,6 +223,9 @@ export function CoachWindow() {
       return;
     }
     setTurns(res.turns);
+    const last = res.turns.length - 1;
+    const of = res.turns[last]?.role === "assistant" ? packetsOf(res.turns[last].text).length : 0;
+    setReveal(of > 1 && !reducedMotion() ? { turn: last, shown: 1, of } : null);
     const before = new Map(notes.map((n) => [n.id, n.text]));
     setFresh(new Set(res.notes.filter((n) => before.get(n.id) !== n.text).map((n) => n.id)));
     setNotes(res.notes);
@@ -139,20 +238,42 @@ export function CoachWindow() {
       role="dialog"
       aria-label={COACH_COPY.title(name)}
       className={clsx(
-        "fixed bottom-20 right-4 z-[86] flex h-[min(40rem,calc(100dvh-7rem))] flex-col overflow-hidden rounded-2xl bg-surface shadow-lift ring-1 ring-line transition-[width] duration-300 ease-out motion-reduce:transition-none lg:bottom-6 lg:right-20 print:hidden",
-        settings ? "w-[min(50rem,calc(100vw-2rem))]" : "w-[min(26rem,calc(100vw-2rem))]",
+        "fixed bottom-20 right-4 z-[86] flex flex-col overflow-hidden rounded-2xl bg-surface shadow-lift ring-1 ring-line transition-[width] duration-300 ease-out motion-reduce:transition-none lg:bottom-6 print:hidden",
+        watching ? "lg:right-[25.5rem]" : "lg:right-20",
+        small
+          ? "w-[min(19rem,calc(100vw-2rem))]"
+          : clsx("h-[min(40rem,calc(100dvh-7rem))]", settings ? "w-[min(50rem,calc(100vw-2rem))]" : "w-[min(26rem,calc(100vw-2rem))]"),
       )}
     >
-      <header className="flex items-center gap-3 bg-primary px-4 py-3 text-white">
-        <AvatarEdit editable={mayCoach} onFailed={setFailed} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{COACH_COPY.title(name)}</p>
-          <p className="truncate text-xs text-white/70">Your phone assistant · learns from what you tell it</p>
-        </div>
-        <HearButton />
+      <header className={clsx("flex items-center gap-3 bg-primary text-white", small ? "px-3 py-2" : "px-4 py-3")}>
+        {small ? (
+          <button type="button" onClick={() => setSmall(false)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+            <CallerAvatar caller={caller} size={30} className="ring-2 ring-white/20" />
+            <span className="truncate text-sm font-semibold">{COACH_COPY.title(name)}</span>
+          </button>
+        ) : (
+          <>
+            <AvatarEdit editable={mayCoach} onFailed={setFailed} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold">{COACH_COPY.title(name)}</p>
+              <p className="truncate text-xs text-white/70">Your phone assistant · learns from what you tell it</p>
+            </div>
+            <HearButton />
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => setSmall((v) => !v)}
+          aria-label={small ? `Open ${name}'s chat` : "Minimise"}
+          title={small ? "Open" : "Minimise"}
+          className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/10"
+        >
+          {small ? <ChevronUp className="size-4" aria-hidden /> : <Minus className="size-4" aria-hidden />}
+        </button>
         <button
           type="button"
           onClick={() => toggleSettings(!settings)}
+          hidden={small}
           aria-pressed={settings}
           aria-label={settings ? `Close ${name}'s settings` : `${name}'s settings: voice and script`}
           title={settings ? "Close settings" : "Voice and script"}
@@ -170,7 +291,7 @@ export function CoachWindow() {
         </button>
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      <div className={clsx("flex min-h-0 flex-1", small && "hidden")}>
         {settings && (
           <CoachSettings
             notes={notes}
@@ -218,9 +339,9 @@ export function CoachWindow() {
               ) : (
                 <div key={i} className="flex items-start gap-2">
                   <CallerAvatar caller={caller} size={28} />
-                  <div className="min-w-0 max-w-[85%]">
-                    <p className="whitespace-pre-wrap rounded-2xl bg-surface-2 px-3 py-2 text-sm leading-snug text-ink">{t.text}</p>
-                    <Changes changes={t.changes} />
+                  <div className="min-w-0 max-w-[88%] flex-1">
+                    <Beanstalk packets={packetsOf(t.text)} shown={reveal?.turn === i ? reveal.shown : Infinity} label={`${name} says`} />
+                    {(reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && <Changes changes={t.changes} />}
                   </div>
                 </div>
               ),
