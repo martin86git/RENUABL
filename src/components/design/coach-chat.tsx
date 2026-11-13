@@ -9,6 +9,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  LayoutList,
   Loader2,
   Minus,
   Pencil,
@@ -20,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useWatchedCall } from "@/lib/services/assistant-call";
+import type { AssistantDeal } from "@/lib/domain/design/assistant-deals";
 import { COACH_COPY, packetsOf, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { callerChanged, ringMeToHear, uploadCallerPhoto, useCaller, useCallerInfo } from "@/lib/services/caller";
 import { voiceLabel } from "@/lib/domain/design/caller";
@@ -35,6 +37,7 @@ import {
 } from "@/lib/services/coaching";
 import { CallerAvatar, VoicePicker } from "./settings-caller";
 import { ContactReach } from "./coach-contacts";
+import { CoachDeals } from "./coach-deals";
 
 /** The pause between one packet of an answer and the next. */
 const PACKET_GAP_MS = 650;
@@ -104,6 +107,17 @@ function Beanstalk({ packets, shown, label }: { packets: string[]; shown: number
 
 /** Whether the settings beside the chat were left open, kept on the device. */
 const SETTINGS_KEY = "renuabl.design.coach-settings";
+/** The deals pane beside the chat: open to start on a wide screen, then as the person left it on this device. */
+const DEALS_KEY = "renuabl.design.coach-deals";
+function readDealsOpen(): boolean {
+  try {
+    if (typeof window === "undefined") return false;
+    const kept = localStorage.getItem(DEALS_KEY);
+    return kept === null ? window.innerWidth >= 1024 : kept === "1";
+  } catch {
+    return false;
+  }
+}
 function readSettingsOpen(): boolean {
   try {
     return typeof window !== "undefined" && localStorage.getItem(SETTINGS_KEY) === "1";
@@ -156,7 +170,10 @@ export function CoachWindow() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
-  const [settings, setSettings] = useState(readSettingsOpen);
+  const [settings, setSettings] = useState(() => readSettingsOpen() && !readDealsOpen());
+  // Its deals beside the chat (14 Nov 2026, Martin: split screen, the deals wider, pick one and talk about it).
+  const [deals, setDeals] = useState(readDealsOpen);
+  const [picked, setPicked] = useState<AssistantDeal | null>(null);
   // Folded to its header bar (13 Nov 2026, Martin: minimise it, so what is behind it can be reached).
   const [small, setSmall] = useState(false);
   // Searching a contact to call or text: the contacts take the chat's place (13 Nov 2026, Martin).
@@ -208,14 +225,29 @@ export function CoachWindow() {
 
   if (!state || typeof document === "undefined") return null;
   const name = caller.name;
-  const toggleSettings = (open: boolean) => {
-    setSettings(open);
+  const keep = (key: string, open: boolean) => {
     try {
-      localStorage.setItem(SETTINGS_KEY, open ? "1" : "0");
+      localStorage.setItem(key, open ? "1" : "0");
     } catch {
-      // Private window: it opens closed next time.
+      // Private window: it opens as it would the first time.
     }
   };
+  // One pane beside the chat at a time: the deals or the settings.
+  const toggleSettings = (open: boolean) => {
+    setSettings(open);
+    keep(SETTINGS_KEY, open);
+    if (open && deals) toggleDeals(false);
+  };
+  const toggleDeals = (open: boolean) => {
+    setDeals(open);
+    keep(DEALS_KEY, open);
+    if (open && settings) {
+      setSettings(false);
+      keep(SETTINGS_KEY, false);
+    }
+  };
+  const about = state.call ? null : deals ? picked : null;
+  const aboutFirst = about ? about.customer.split(" ")[0] || about.customer : "";
 
   const send = async () => {
     const message = text.trim();
@@ -223,9 +255,12 @@ export function CoachWindow() {
     setSending(true);
     setFailed(null);
     const at = new Date().toISOString();
-    setTurns((t) => [...t, { role: "you", text: message, at, ...(state.call ? { about: state.call.about } : {}) }]);
+    setTurns((t) => [
+      ...t,
+      { role: "you", text: message, at, ...(state.call ? { about: state.call.about } : about ? { about: `${aboutFirst}'s deal` } : {}) },
+    ]);
     setText("");
-    const res = await coachAssistant(message, state.call);
+    const res = await coachAssistant(message, state.call, about?.jobId ?? null);
     setSending(false);
     if (!res.ok) {
       setFailed(res.message);
@@ -253,7 +288,14 @@ export function CoachWindow() {
         watching ? "lg:right-[25.5rem]" : "lg:right-20",
         small
           ? "w-[min(19rem,calc(100vw-2rem))]"
-          : clsx("h-[min(40rem,calc(100dvh-7rem))]", settings ? "w-[min(50rem,calc(100vw-2rem))]" : "w-[min(26rem,calc(100vw-2rem))]"),
+          : clsx(
+              "h-[min(40rem,calc(100dvh-7rem))]",
+              settings
+                ? "w-[min(50rem,calc(100vw-2rem))]"
+                : deals
+                  ? "w-[min(26rem,calc(100vw-2rem))] sm:w-[min(46rem,calc(100vw-2rem))] lg:w-[min(60rem,calc(100vw-7rem))]"
+                  : "w-[min(26rem,calc(100vw-2rem))]",
+            ),
       )}
     >
       <header className={clsx("flex items-center gap-3 bg-primary text-white", small ? "px-3 py-2" : "px-4 py-3")}>
@@ -280,6 +322,17 @@ export function CoachWindow() {
           className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/10"
         >
           {small ? <ChevronUp className="size-4" aria-hidden /> : <Minus className="size-4" aria-hidden />}
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleDeals(!deals)}
+          hidden={small}
+          aria-pressed={deals}
+          aria-label={deals ? `Close ${name}'s deals` : `${name}'s deals`}
+          title={deals ? "Close deals" : `${name}'s deals`}
+          className={clsx("grid size-8 shrink-0 place-items-center rounded-full", deals ? "bg-white text-ink" : "hover:bg-white/10")}
+        >
+          <LayoutList className="size-4" aria-hidden />
         </button>
         <button
           type="button"
@@ -313,7 +366,8 @@ export function CoachWindow() {
             onBack={() => toggleSettings(false)}
           />
         )}
-        <div className={clsx("flex min-w-0 flex-1 flex-col", settings && "hidden sm:flex")}>
+        {deals && !settings && <CoachDeals picked={picked} onPick={setPicked} onBack={() => toggleDeals(false)} />}
+        <div className={clsx("flex min-w-0 flex-1 flex-col", (settings || deals) && "hidden sm:flex")}>
           <ContactReach open={reaching} onOpen={setReaching} />
           {!settings && !reaching && (
             <button
@@ -340,7 +394,7 @@ export function CoachWindow() {
                 <div key={i} className="flex flex-col items-end">
                   {t.about && (
                     <span className="mb-0.5 inline-flex items-center gap-1 text-[11px] text-muted">
-                      <PhoneCall className="size-3" aria-hidden />
+                      {/deal$/.test(t.about) ? <LayoutList className="size-3" aria-hidden /> : <PhoneCall className="size-3" aria-hidden />}
                       {t.about}
                     </span>
                   )}
@@ -381,6 +435,20 @@ export function CoachWindow() {
                 </button>
               </p>
             )}
+            {about && (
+              <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
+                <LayoutList className="size-3.5 text-sun-line" aria-hidden />
+                About {aboutFirst}&apos;s deal
+                <button
+                  type="button"
+                  onClick={() => setPicked(null)}
+                  className="ml-auto text-muted hover:text-ink"
+                  aria-label="Not about this deal"
+                >
+                  <X className="size-3.5" aria-hidden />
+                </button>
+              </p>
+            )}
             {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
             {mayCoach ? (
               <div className="flex items-end gap-2">
@@ -396,7 +464,9 @@ export function CoachWindow() {
                   }}
                   rows={2}
                   maxLength={2000}
-                  placeholder={state.call ? COACH_COPY.callAbout(name) : `Tell ${name} what to change…`}
+                  placeholder={
+                    state.call ? COACH_COPY.callAbout(name) : about ? `Ask ${name} about ${aboutFirst}…` : `Tell ${name} what to change…`
+                  }
                   className="min-h-11 flex-1 resize-none rounded-2xl bg-canvas px-3 py-2 text-sm text-ink ring-1 ring-line placeholder:text-muted focus:outline-none focus:ring-sun-line"
                 />
                 <button

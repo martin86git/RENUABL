@@ -14,6 +14,7 @@ import {
   type CoachNote,
   type CoachTurn,
 } from "@/lib/domain/design/coaching";
+import type { DealForChat } from "@/lib/domain/design/assistant-deals";
 import { CALLER_VOICES, cleanCallerName } from "@/lib/domain/design/caller";
 import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { parseApiKey } from "./bill-reader";
@@ -35,6 +36,7 @@ export async function coachAssistant(o: {
   by: string;
   message: string;
   call?: { about: string; lines: { role: string; text: string }[] } | null;
+  deal?: DealForChat | null;
 }): Promise<CoachResult> {
   const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) return { ok: false, status: 503, message: "Coaching needs Claude, which isn't set up on this site yet." };
@@ -51,6 +53,7 @@ export async function coachAssistant(o: {
     history: coaching.turns,
     message: o.message,
     call: o.call ?? null,
+    deal: o.deal ?? null,
     voices: VOICES,
     voiceNow: caller.voice?.voiceId ?? null,
   });
@@ -94,7 +97,7 @@ export async function coachAssistant(o: {
   }
   const turns: CoachTurn[] = [
     ...coaching.turns,
-    { role: "you" as const, text: o.message, at, by: o.by, ...(o.call ? { about: o.call.about } : {}) },
+    { role: "you" as const, text: o.message, at, by: o.by, ...(o.call ? { about: o.call.about } : o.deal ? { about: o.deal.about } : {}) },
     { role: "assistant" as const, text: answer.reply, at, changes: { ...applied.changes, settings } },
   ].slice(-MAX_TURNS);
   await saveCoaching(o.businessId, { notes: applied.notes, turns }, o.by);

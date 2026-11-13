@@ -1,5 +1,9 @@
 import { can } from "@/lib/domain/design/account";
 import { CALL_LINES_GIVEN, FIXED_RULES, cleanMessage, cleanNoteText } from "@/lib/domain/design/coaching";
+import type { DealForChat } from "@/lib/domain/design/assistant-deals";
+import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { suburbOfAddress } from "@/lib/domain/design/deal-feed";
+import { assistantDealCalls, assistantDeals } from "@/lib/server/design-call-log-repo";
 import { callTranscriptsFor } from "@/lib/server/call-transcripts";
 import { coachAssistant } from "@/lib/server/design-caller-coach";
 import { coachingOf, saveCoaching } from "@/lib/server/design-caller-repo";
@@ -22,7 +26,7 @@ export async function GET() {
 }
 
 /**
- * POST { message, call?: { jobId, transcriptId } }: coach the assistant, for a member who may change settings. Feedback
+ * POST { message, call?: { jobId, transcriptId }, deal?: { jobId } }: coach the assistant, for a member who may change settings. Feedback
  * on a call carries that call's transcript, read on the server from a deal the member may see.
  */
 export async function POST(request: Request) {
@@ -45,7 +49,28 @@ export async function POST(request: Request) {
       const first = found.customer.name.split(" ")[0] || "a customer";
       call = { about: `A call with ${first}, ${day}`, lines: t.lines.slice(0, CALL_LINES_GIVEN) };
     }
-    const res = await coachAssistant({ businessId: who.member.businessId, by: who.member.email, message, call });
+    // A deal picked beside the chat: the assistant is given it, with its own calls on it, from a deal the member may see.
+    let deal: DealForChat | null = null;
+    const d = (read.body.deal && typeof read.body.deal === "object" ? read.body.deal : null) as Record<string, unknown> | null;
+    if (d && !call) {
+      const found = validJob(d.jobId) ? await jobById(who.member.businessId, d.jobId, viewerOf(who.member)) : null;
+      if (!found) return Response.json({ ok: false, message: "That deal isn't here." }, { status: 404 });
+      const [calls, across] = await Promise.all([
+        assistantDealCalls(who.member.businessId, found.job.id),
+        assistantDeals(who.member.businessId, viewerOf(who.member)),
+      ]);
+      const first = found.customer.name.split(" ")[0] || "This customer";
+      deal = {
+        about: `${first}'s deal`,
+        customer: found.customer.name,
+        deal: found.job.title,
+        stage: STAGE_LABELS[found.job.stage],
+        suburb: suburbOfAddress(found.job.address ?? ""),
+        standing: across.find((a) => a.jobId === found.job.id)?.standing ?? "spoke",
+        calls,
+      };
+    }
+    const res = await coachAssistant({ businessId: who.member.businessId, by: who.member.email, message, call, deal });
     if (!res.ok) return Response.json({ ok: false, message: res.message }, { status: res.status });
     return Response.json({ ok: true, notes: res.notes, turns: res.turns, caller: res.caller }, { headers: PRIVATE });
   });

@@ -178,7 +178,7 @@ const PILL =
  * customer, or talk the call over with the assistant. A call back is lined up as any call is (calling hours, the
  * number on the record), with what to ask written on the deal; this window then follows that call.
  */
-function AfterCall(p: {
+export function AfterCall(p: {
   jobId: string;
   customer: string;
   caller: CallerState;
@@ -187,6 +187,8 @@ function AfterCall(p: {
   callsOn: boolean;
   textsOn: boolean;
   transcriptId: string | null;
+  /** Told once a call back is lined up or a text has gone. */
+  onDone?: () => void;
 }) {
   const [doing, setDoing] = useState<"back" | "text" | null>(null);
   const [words, setWords] = useState("");
@@ -209,6 +211,7 @@ function AfterCall(p: {
     if (!res.ok) return;
     setWords("");
     setDoing(null);
+    p.onDone?.();
   };
   const off = doing === "back" ? !p.callsOn : doing === "text" ? !p.textsOn : false;
   return (

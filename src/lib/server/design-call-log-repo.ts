@@ -6,7 +6,18 @@
 import type { DealViewer } from "@/lib/domain/design/account";
 import { CALL_LOG_DAYS, CALL_LOG_MAX, loggedWords, type CallComing, type CallLogEntry } from "@/lib/domain/design/call-log";
 import { LIVE_NOW_MAX, liveNowOrder, livePhase, underWay, type LiveCallNow } from "@/lib/domain/live-call";
-import type { CallOutcome } from "@/lib/domain/voice-agent";
+import {
+  ASSISTANT_DEAL_DAYS,
+  ASSISTANT_DEALS_MAX,
+  dealOrder,
+  headlineOf,
+  standingOf,
+  type AssistantDeal,
+  type AssistantDealCall,
+} from "@/lib/domain/design/assistant-deals";
+import { STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
+import { CALL_HEADLINES, type CallOutcome } from "@/lib/domain/voice-agent";
+import { callTranscriptsFor } from "./call-transcripts";
 import { query } from "./db";
 import { seen, seenParams } from "./design-crm-repo";
 import { voiceOnFor } from "./voice-calls";
@@ -172,4 +183,97 @@ export async function callLog(businessId: string, viewer: DealViewer): Promise<C
     })),
     solOn: await voiceOnFor(businessId),
   };
+}
+
+/**
+ * The deals the sales phone assistant is across (domain/design/assistant-deals.ts): every deal this member may see with
+ * a call of its own in the last ASSISTANT_DEAL_DAYS, lined up, on now or ended, with where each stands. The admin
+ * assistant's booking calls are left out.
+ */
+export async function assistantDeals(businessId: string, viewer: DealViewer): Promise<AssistantDeal[]> {
+  const rows = await query<{
+    job_id: string;
+    customer: string;
+    deal: string;
+    stage: JobStage;
+    address: string | null;
+    status: string;
+    live_status: string | null;
+    attempts: number;
+    updated_at: Date;
+    outcome: string | null;
+    summary: string | null;
+    ended_at: Date | null;
+    calls: number;
+  }>(
+    `select j.id as job_id, cu.name as customer, j.title as deal, j.stage, j.address,
+            c.status, c.live_status, c.attempts, c.updated_at, e.outcome, e.summary, e.at as ended_at,
+            coalesce(n.calls, 0) as calls
+       from design_jobs j
+       join design_customers cu on cu.business_id = j.business_id and cu.id = j.customer_id
+       join lateral (
+         select status, live_status, attempts, updated_at from voice_calls
+          where business_id = j.business_id and job_id = j.id and mode <> 'install'
+          order by updated_at desc limit 1
+       ) c on true
+       left join lateral (
+         select ev.outcome, ev.summary, ev.at from voice_call_events ev
+           join voice_calls vc on vc.id = ev.voice_call_id
+          where vc.business_id = j.business_id and vc.job_id = j.id and vc.mode <> 'install' and ev.kind = 'ended'
+          order by ev.at desc limit 1
+       ) e on true
+       left join lateral (
+         select count(*)::int as calls from voice_call_events ev
+           join voice_calls vc on vc.id = ev.voice_call_id
+          where vc.business_id = j.business_id and vc.job_id = j.id and vc.mode <> 'install' and ev.kind = 'ended'
+       ) n on true
+      where j.business_id = $1 and c.updated_at > now() - make_interval(days => $2) and ${seen(viewer, 4)}
+      order by c.updated_at desc limit $3`,
+    [businessId, ASSISTANT_DEAL_DAYS, ASSISTANT_DEALS_MAX, ...seenParams(viewer)],
+  );
+  return dealOrder(
+    rows.map((r) => {
+      const open = r.status === "waiting" || r.status === "calling";
+      const phase = livePhase({ status: r.status, liveStatus: r.live_status });
+      const outcome = (r.outcome as CallOutcome | null) ?? null;
+      const standing = standingOf({ open, live: open && underWay(phase), outcome });
+      const at = [r.updated_at, r.ended_at].filter((d): d is Date => Boolean(d)).map((d) => new Date(d).getTime());
+      return {
+        jobId: r.job_id,
+        customer: r.customer,
+        deal: r.deal,
+        stage: STAGE_LABELS[r.stage] ?? r.stage,
+        address: r.address ?? "",
+        standing,
+        headline: headlineOf(standing, outcome, r.attempts),
+        words: r.summary ?? "",
+        calls: r.calls,
+        at: new Date(Math.max(...at)).toISOString(),
+      };
+    }),
+  );
+}
+
+/** The sales assistant's calls on one deal that have ended, newest first, each as it was said. The caller has checked the member may see the deal. */
+export async function assistantDealCalls(businessId: string, jobId: string): Promise<AssistantDealCall[]> {
+  const [ended, said] = await Promise.all([
+    query<{ id: string; at: Date; outcome: string | null; summary: string | null }>(
+      `select e.id, e.at, e.outcome, e.summary from voice_call_events e join voice_calls c on c.id = e.voice_call_id
+        where c.business_id = $1 and c.job_id = $2 and c.mode <> 'install' and e.kind = 'ended'
+        order by e.at desc limit 20`,
+      [businessId, jobId],
+    ),
+    callTranscriptsFor(businessId, jobId),
+  ]);
+  return ended.map((e) => {
+    const outcome = (e.outcome as CallOutcome | null) ?? "talked";
+    return {
+      id: e.id,
+      at: new Date(e.at).toISOString(),
+      outcome,
+      headline: CALL_HEADLINES[outcome] ?? "Called",
+      words: e.summary ?? "",
+      lines: said.find((t) => t.id === e.id)?.lines.map((l) => ({ role: l.role, text: l.text })) ?? [],
+    };
+  });
 }

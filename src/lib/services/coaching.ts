@@ -6,6 +6,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import type { AssistantDeal, AssistantDealCall } from "@/lib/domain/design/assistant-deals";
 import type { CoachNote, CoachTurn } from "@/lib/domain/design/coaching";
 import type { CallerState } from "./caller";
 
@@ -61,11 +62,21 @@ const json = (method: string, body: unknown): RequestInit => ({
 
 export const loadCoaching = () => ask<{ notes: CoachNote[]; turns: CoachTurn[]; fixed: string[]; mayCoach: boolean }>(URL_);
 
-export const coachAssistant = (message: string, call: CoachCall | null) =>
+/** With a deal picked beside the chat, the assistant is given that deal and its own calls on it. */
+export const coachAssistant = (message: string, call: CoachCall | null, dealJobId: string | null = null) =>
   ask<{ notes: CoachNote[]; turns: CoachTurn[]; caller: CallerState }>(
     URL_,
-    json("POST", { message, ...(call ? { call: { jobId: call.jobId, transcriptId: call.transcriptId } } : {}) }),
+    json("POST", {
+      message,
+      ...(call ? { call: { jobId: call.jobId, transcriptId: call.transcriptId } } : dealJobId ? { deal: { jobId: dealJobId } } : {}),
+    }),
   );
 
 export const rewordNote = (id: string, text: string) => ask<{ notes: CoachNote[] }>(URL_, json("PUT", { id, text }));
 export const removeNote = (id: string) => ask<{ notes: CoachNote[] }>(`${URL_}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+
+/** The deals the assistant is across: those it has rung, is on a call with or has a call lined up for. */
+export const loadAssistantDeals = () => ask<{ deals: AssistantDeal[] }>("/api/design/caller/deals");
+/** Its calls on one deal, as they were said. */
+export const loadDealCalls = (jobId: string) =>
+  ask<{ calls: AssistantDealCall[] }>(`/api/design/caller/deals?job=${encodeURIComponent(jobId)}`);
