@@ -5,6 +5,9 @@ import {
   END_CALL_COMMAND,
   isControlUrl,
   joinRuns,
+  liveNowOrder,
+  liveNowWords,
+  underWay,
   mayEndCall,
   livePhase,
   phaseWords,
@@ -159,5 +162,36 @@ describe("a call Vapi has finished", () => {
     expect(vapiCallOver("ended")).toBe(true);
     for (const s of ["scheduled", "queued", "ringing", "in-progress", "forwarding", undefined, null, 3])
       expect(vapiCallOver(s)).toBe(false);
+  });
+});
+
+describe("every call under way", () => {
+  it("counts only ringing and answered calls", () => {
+    expect(underWay("ringing")).toBe(true);
+    expect(underWay("on-call")).toBe(true);
+    expect(underWay("lined-up")).toBe(false);
+    expect(underWay("trying-again")).toBe(false);
+    expect(underWay("ended")).toBe(false);
+  });
+
+  it("puts calls on first, the longest running at the top, then those ringing", () => {
+    const order = liveNowOrder([
+      { id: "ringing", phase: "ringing" as const, startedAgo: null },
+      { id: "short", phase: "on-call" as const, startedAgo: 5_000 },
+      { id: "long", phase: "on-call" as const, startedAgo: 90_000 },
+    ]);
+    expect(order.map((c) => c.id)).toEqual(["long", "short", "ringing"]);
+  });
+
+  it("says one call by name and several by their count", () => {
+    expect(liveNowWords([])).toBe("No calls right now");
+    expect(liveNowWords([{ phase: "on-call", customer: "Jo Example", by: "Charlie" }])).toBe("Charlie is on a call with Jo");
+    expect(liveNowWords([{ phase: "ringing", customer: "", by: "Charlie" }])).toBe("Charlie is ringing a customer");
+    expect(
+      liveNowWords([
+        { phase: "on-call", customer: "Jo", by: "Charlie" },
+        { phase: "ringing", customer: "Sam", by: "Charlie" },
+      ]),
+    ).toBe("2 calls live");
   });
 });

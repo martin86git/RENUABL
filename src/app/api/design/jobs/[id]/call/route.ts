@@ -1,3 +1,6 @@
+import { gateOf } from "@/lib/domain/design/approvals";
+import { PRE_INSTALL_STAGES } from "@/lib/domain/design/crm";
+import { INSTALL_REFUSAL_WORDS, installCallRefusal } from "@/lib/domain/install-call";
 import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { query } from "@/lib/server/db";
@@ -17,9 +20,13 @@ const words = (name: string): Record<string, string> => ({
 });
 
 /**
- * POST → { message }: the business's phone assistant rings the deal's customer (voice-calls.ts), chosen from Call on the
- * deal or a card on Today. The number is always the one on the customer's record; calls start only in calling hours,
- * and only where calling is on for the business.
+ * POST → { message }: one of the business's phone assistants rings the deal's customer (voice-calls.ts), chosen from
+ * Call on the deal or a card on Today. The number is always the one on the customer's record; calls start only in
+ * calling hours, and only where calling is on for the business.
+ *
+ * `{ book: true }` hands it to the **admin** assistant to book the installation (domain/install-call.ts): only for a
+ * deal that is sold, through its approvals and has no install date, and only once the admin assistant is set up. The
+ * day the customer picks is pencilled in on the install calendar; the deal's install date is the team's to set.
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs/[id]/call">) {
   return answer(async () => {
@@ -28,22 +35,45 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if ("refuse" in who) return who.refuse;
     if (!allow(request, "design-feed-call", 20))
       return Response.json({ ok: false, message: "That's a lot of calls at once. Try again later." }, { status: 429 });
+    const body = (await request.json().catch(() => null)) as { book?: unknown } | null;
+    const book = body?.book === true;
     const found = validId(id) ? await jobById(who.member.businessId, id, viewerOf(who.member)) : null;
-    const caller = await callerOf(who.member.businessId);
+    const caller = await callerOf(who.member.businessId, book ? "admin" : "sales");
     const WORDS = words(caller.name);
     if (!found) return Response.json({ ok: false, message: WORDS.missing }, { status: 404 });
-    const out = await query<{ n: number }>(
-      `select count(*)::int as n from design_proposals where business_id = $1 and job_id = $2 and withdrawn_at is null`,
-      [who.member.businessId, id],
-    );
+
+    if (book) {
+      if (!caller.named)
+        return Response.json(
+          { ok: false, message: "Your admin assistant isn't set up yet. Give it a name in Settings, under Phone assistant." },
+          { status: 409 },
+        );
+      const refusal = installCallRefusal({
+        sold: PRE_INSTALL_STAGES.includes(found.job.stage),
+        installDate: found.job.installDate ?? null,
+        gate: gateOf(found.job),
+      });
+      if (refusal) return Response.json({ ok: false, message: INSTALL_REFUSAL_WORDS[refusal] }, { status: 422 });
+    }
+
+    const out = book
+      ? []
+      : await query<{ n: number }>(
+          `select count(*)::int as n from design_proposals where business_id = $1 and job_id = $2 and withdrawn_at is null`,
+          [who.member.businessId, id],
+        );
     const placed = await queueCall({
       businessId: who.member.businessId,
       jobId: id,
-      mode: out[0]?.n ? "proposal" : "lead",
+      mode: book ? "install" : out[0]?.n ? "proposal" : "lead",
       asked: false,
-      source: "Asked for by the team",
+      source: book ? undefined : "Asked for by the team",
     });
-    if (placed.result === "placed") return Response.json({ ok: true, message: `${caller.name} will call ${placed.when}.` });
+    if (placed.result === "placed")
+      return Response.json({
+        ok: true,
+        message: book ? `${caller.name} will call ${placed.when} to book the installation.` : `${caller.name} will call ${placed.when}.`,
+      });
     // A call already lined up: the window opens on it rather than failing.
     if (placed.result === "already") return Response.json({ ok: true, already: true, message: WORDS.already });
     return Response.json({ ok: false, message: WORDS[placed.result] }, { status: placed.result === "off" ? 409 : 422 });

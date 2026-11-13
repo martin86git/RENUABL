@@ -16,6 +16,17 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-13",
     area: "Calls",
+    words: "A second phone assistant, for admin: from a sold deal it rings the customer and pencils in their install day.",
+  },
+  {
+    day: "2026-11-13",
+    area: "Calls",
+    words:
+      "While your assistant is on calls, a pill at the bottom right says so on every page. Open any call live, or watch them all side by side.",
+  },
+  {
+    day: "2026-11-13",
+    area: "Calls",
     words: "Your assistant waits for the other end to speak, and tells a phone's call screening only who is calling and why.",
   },
   {

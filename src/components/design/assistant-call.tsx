@@ -7,7 +7,8 @@ import { ArrowUp, ChevronDown, ChevronUp, PhoneOff, X } from "lucide-react";
 import { clockWords, joinRuns, phaseWords, TEAM_NOTE_MAX, teamLineWords, type LiveLine } from "@/lib/domain/live-call";
 import { CALL_HEADLINES } from "@/lib/domain/voice-agent";
 import { endAssistantCall, stopWatching, tellAssistant, useLiveCall, useWatchedCall } from "@/lib/services/assistant-call";
-import { useCaller } from "@/lib/services/caller";
+import { useCallerInfo } from "@/lib/services/caller";
+import { OtherCallsStrip } from "./live-calls";
 import { CallerAvatar } from "./settings-caller";
 
 /**
@@ -19,8 +20,10 @@ import { CallerAvatar } from "./settings-caller";
  */
 export function AssistantCallWindow() {
   const watched = useWatchedCall();
-  const caller = useCaller();
+  const assistants = useCallerInfo();
   const { call, loaded } = useLiveCall(watched?.jobId ?? null);
+  // A booking call is the admin assistant's: its face and name, once the call (or the hand-over) says so.
+  const caller = (call?.role ?? watched?.role) === "admin" ? assistants.admin : assistants.caller;
   const [folded, setFolded] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const list = useRef<HTMLDivElement>(null);
@@ -111,6 +114,7 @@ export function AssistantCallWindow() {
 
       {!folded && (
         <>
+          <OtherCallsStrip jobId={watched.jobId} />
           {outcome && <p className="border-b border-line bg-surface-2 px-4 py-2 text-sm font-semibold text-ink">{outcome}</p>}
           <div ref={list} aria-live="polite" className="max-h-[min(20rem,45dvh)] min-h-24 space-y-2 overflow-y-auto px-4 py-3">
             {said === 0 ? (
@@ -251,7 +255,7 @@ function TellBox({ jobId, assistant }: { jobId: string; assistant: string }) {
   );
 }
 
-function Bubble({ line, assistant, customer, saying }: { line: LiveLine; assistant: string; customer: string; saying?: boolean }) {
+export function Bubble({ line, assistant, customer, saying }: { line: LiveLine; assistant: string; customer: string; saying?: boolean }) {
   if (line.role === "team" || line.role === "team-say" || line.role === "team-end")
     return (
       <div className="flex flex-col items-center">

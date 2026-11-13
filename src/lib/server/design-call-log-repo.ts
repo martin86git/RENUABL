@@ -5,7 +5,7 @@
  */
 import type { DealViewer } from "@/lib/domain/design/account";
 import { CALL_LOG_DAYS, CALL_LOG_MAX, loggedWords, type CallComing, type CallLogEntry } from "@/lib/domain/design/call-log";
-import { livePhase } from "@/lib/domain/live-call";
+import { LIVE_NOW_MAX, liveNowOrder, livePhase, underWay, type LiveCallNow } from "@/lib/domain/live-call";
 import type { CallOutcome } from "@/lib/domain/voice-agent";
 import { query } from "./db";
 import { seen, seenParams } from "./design-crm-repo";
@@ -16,6 +16,59 @@ export interface CallLog {
   coming: CallComing[];
   /** Whether Sol's phone calls are on for this business (voiceOnFor). */
   solOn: boolean;
+}
+
+/**
+ * Every call of the phone assistant's that is ringing or on right now, on the deals this member may see (13 Nov 2026,
+ * Martin: several customers called at once should be plain to see, each one a press away). An answered call older than
+ * two hours is taken as one whose end never reached us and left out.
+ */
+export async function liveCallsNow(businessId: string, viewer: DealViewer): Promise<LiveCallNow[]> {
+  const rows = await query<{
+    job_id: string;
+    customer: string;
+    deal: string;
+    status: string;
+    live_status: string | null;
+    live_started_at: Date | null;
+    by: string | null;
+    last_role: string | null;
+    last_text: string | null;
+    now: Date;
+  }>(
+    `select j.id as job_id, cu.name as customer, j.title as deal, c.status, c.live_status, c.live_started_at,
+            c.lead->>'assistant' as by, l.role as last_role, l.text as last_text, now() as now
+       from voice_calls c
+       join design_jobs j on j.business_id = c.business_id and j.id = c.job_id
+       join design_customers cu on cu.business_id = j.business_id and cu.id = j.customer_id
+       left join lateral (
+         select role, text from voice_call_lines
+          where voice_call_id = c.id and vapi_call_id = c.live_vapi_id and role in ('assistant', 'customer')
+          order by id desc limit 1
+       ) l on true
+      where c.business_id = $1 and c.status in ('waiting', 'calling')
+        and c.live_status in ('ringing', 'in-progress', 'forwarding')
+        and (c.live_started_at is null or c.live_started_at > now() - interval '2 hours')
+        and ${seen(viewer, 3)}
+      limit $2`,
+    [businessId, LIVE_NOW_MAX, ...seenParams(viewer)],
+  );
+  const calls: LiveCallNow[] = [];
+  for (const r of rows) {
+    const phase = livePhase({ status: r.status, liveStatus: r.live_status });
+    if (!underWay(phase)) continue;
+    const started = r.live_started_at ? new Date(r.live_started_at).getTime() : null;
+    calls.push({
+      jobId: r.job_id,
+      customer: r.customer,
+      deal: r.deal,
+      phase,
+      startedAgo: phase === "on-call" && started !== null ? new Date(r.now).getTime() - started : null,
+      by: r.by || "Sol",
+      last: r.last_text && (r.last_role === "assistant" || r.last_role === "customer") ? { role: r.last_role, text: r.last_text } : null,
+    });
+  }
+  return liveNowOrder(calls);
 }
 
 export async function callLog(businessId: string, viewer: DealViewer): Promise<CallLog> {

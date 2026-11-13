@@ -1379,6 +1379,18 @@ alter table design_caller add column if not exists voice_id text;
 -- the conversation in which it was coached.
 alter table design_caller add column if not exists coach_notes jsonb;
 alter table design_caller add column if not exists coach_chat jsonb;
+-- A business has two phone assistants (domain/install-call.ts CALLER_ROLES): 'sales' (every row made before) and
+-- 'admin', which rings sold customers to book their installation. One row a business a role.
+alter table design_caller add column if not exists role text not null default 'sales';
+do $$ begin
+  if exists (
+    select 1 from pg_constraint
+     where conname = 'design_caller_pkey' and conrelid = 'design_caller'::regclass and array_length(conkey, 1) = 1
+  ) then
+    alter table design_caller drop constraint design_caller_pkey;
+    alter table design_caller add primary key (business_id, role);
+  end if;
+end $$;
 -- The team's own voice assistant, its chief of staff (domain/design/colleague.ts): its name and voice, each member's
 -- PIN for the team line (scrypt, never the PIN), and every call kept for the member who made it.
 create table if not exists design_colleague (

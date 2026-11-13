@@ -156,6 +156,47 @@ export function joinRuns(lines: readonly LiveLine[]): LiveLine[] {
   return out;
 }
 
+// --- Every call under way, at a glance (13 Nov 2026, Martin: if it is calling several customers at once, I want to know
+// about them, and to open one, or all of them, and see the calls live).
+
+/** One call that is ringing or on right now, as the tray lists it. */
+export interface LiveCallNow {
+  jobId: string;
+  customer: string;
+  deal: string;
+  phase: "ringing" | "on-call";
+  /** How long ago it was answered, on the server's clock (ms); null while ringing. */
+  startedAgo: number | null;
+  /** The assistant's name on that call. */
+  by: string;
+  /** The last thing said in full, when anything has been. */
+  last: LiveLine | null;
+}
+
+/** How many calls the tray lists, and how many the wall shows side by side (each asks the server every moment or two). */
+export const LIVE_NOW_MAX = 12;
+export const WALL_MAX = 6;
+
+/** Whether a call counts as under way: ringing, or answered. */
+export const underWay = (phase: LivePhase): phase is "ringing" | "on-call" => phase === "ringing" || phase === "on-call";
+
+/** Calls on first, the longest running at the top, then those still ringing. */
+export function liveNowOrder<T extends Pick<LiveCallNow, "phase" | "startedAgo">>(calls: readonly T[]): T[] {
+  return [...calls].sort((a, b) => {
+    if (a.phase !== b.phase) return a.phase === "on-call" ? -1 : 1;
+    return (b.startedAgo ?? 0) - (a.startedAgo ?? 0);
+  });
+}
+
+/** The tray's words: "Charlie is on a call with Jo", "Charlie is ringing Jo", "3 calls live". */
+export function liveNowWords(calls: readonly Pick<LiveCallNow, "phase" | "customer" | "by">[]): string {
+  if (calls.length === 0) return "No calls right now";
+  if (calls.length > 1) return `${calls.length} calls live`;
+  const c = calls[0];
+  const who = c.customer.trim().split(/\s+/)[0] || "a customer";
+  return c.phase === "on-call" ? `${c.by} is on a call with ${who}` : `${c.by} is ringing ${who}`;
+}
+
 /** The call as the window gets it from the server. */
 export interface LiveCallView {
   phase: LivePhase;
@@ -169,6 +210,8 @@ export interface LiveCallView {
   ranFor: number | null;
   lines: LiveLine[];
   partial: LiveLine | null;
+  /** Which of the business's assistants is on the call (install-call.ts): admin for a booking call. */
+  role?: "sales" | "admin";
   /** The team can type to the assistant now (it is on the call and Vapi gave a control address). */
   canSteer: boolean;
   /** The team can hang up now (ringing or on the call, with a control address). */

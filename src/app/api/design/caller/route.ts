@@ -1,5 +1,6 @@
 import { can } from "@/lib/domain/design/account";
 import { cleanCallerName, cleanVoice, VOICE_BAD } from "@/lib/domain/design/caller";
+import { cleanCallerRole } from "@/lib/domain/install-call";
 import { callerOf, setCallerName, setCallerVoice } from "@/lib/server/design-caller-repo";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { query } from "@/lib/server/db";
@@ -14,32 +15,35 @@ export async function GET() {
     if ("refuse" in who) return who.refuse;
     const id = who.member.businessId;
     const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [id]);
-    const [caller, callsOn, textsOn, brand] = await Promise.all([
+    const [caller, admin, callsOn, textsOn, brand] = await Promise.all([
       callerOf(id),
+      // The admin assistant, which rings sold customers to book their installation (domain/install-call.ts).
+      callerOf(id, "admin"),
       voiceOnFor(id).catch(() => false),
       textsOnFor(id).catch(() => false),
       loadBrand(id, biz[0]?.name ?? ""),
     ]);
     // Setting it up is for an admin: whoever may change the business's settings.
     const mayChange = can(who.member.role, "prices", who.member.permissions);
-    return Response.json({ ok: true, caller, callsOn, textsOn, mayChange, business: brand.name || biz[0]?.name || "" });
+    return Response.json({ ok: true, caller, admin, callsOn, textsOn, mayChange, business: brand.name || biz[0]?.name || "" });
   });
 }
 
-/** PUT { name } or { voice }: the name it gives on calls, or the voice it speaks in (null: the default), for a member who may change settings. */
+/** PUT { name } or { voice }, with { role } for the admin assistant: the name it gives on calls, or the voice it speaks in (null: the default), for a member who may change settings. */
 export async function PUT(request: Request) {
   return answer(async () => {
     const who = await requireMember("prices");
     if ("refuse" in who) return who.refuse;
     const read = await readBody(request, 1_000);
     if ("refuse" in read) return read.refuse;
+    const role = cleanCallerRole(read.body.role);
     if ("voice" in read.body) {
       const voice = cleanVoice(read.body.voice);
       if (voice === "bad") return Response.json({ ok: false, message: VOICE_BAD }, { status: 422 });
-      return Response.json({ ok: true, caller: await setCallerVoice(who.member.businessId, voice, who.member.email) });
+      return Response.json({ ok: true, caller: await setCallerVoice(who.member.businessId, voice, who.member.email, role) });
     }
     const name = cleanCallerName(read.body.name);
     if (!name.ok) return Response.json({ ok: false, message: name.message }, { status: 422 });
-    return Response.json({ ok: true, caller: await setCallerName(who.member.businessId, name.value, who.member.email) });
+    return Response.json({ ok: true, caller: await setCallerName(who.member.businessId, name.value, who.member.email, role) });
   });
 }

@@ -1,6 +1,7 @@
 import { buildCallAvailability, formatCallTime, isBookableCallSlot } from "./booking";
 import { coachingBlock } from "./design/coaching";
 import { formatDate } from "./format";
+import { INSTALL_TOOL, installFirstMessage, installSystemPrompt, installVoicemail, type InstallDay } from "./install-call";
 import { LAUNCH_MARKET, marketDateTime, todayInMarket } from "./market";
 import { addDays, fromISODate, HOLIDAYS_LISTED_UNTIL, toISODate, VIC_PUBLIC_HOLIDAYS } from "./scheduling";
 import type { ISODate } from "./types";
@@ -38,7 +39,7 @@ export const MAX_ASKED_ATTEMPTS = 2;
 /** Hours after an attempt before the next: a few hours later, then the next day. */
 export const RETRY_AFTER_HOURS = [3, 20] as const;
 /** A call never runs longer than this (Vapi `maxDurationSeconds`): a proposal can take a while to talk through. */
-export const MAX_CALL_SECONDS = { lead: 600, proposal: 1200 } as const;
+export const MAX_CALL_SECONDS = { lead: 600, proposal: 1200, install: 480 } as const;
 /** Someone who rang in may want to go through a proposal: they get the longer limit. */
 export const MAX_INBOUND_SECONDS = 1200;
 /** Days of call times offered. */
@@ -109,7 +110,7 @@ export function nextAttemptAt(attemptsMade: number, endedAt: Date, max: number =
 }
 
 export type CallOutcome =
-  "booked" | "callback" | "link-sent" | "no-more-calls" | "transferred" | "talked" | "no-answer" | "voicemail" | "failed";
+  "booked" | "pencilled" | "callback" | "link-sent" | "no-more-calls" | "transferred" | "talked" | "no-answer" | "voicemail" | "failed";
 
 /** What a call came to, from Vapi's `endedReason` and what the assistant did during it (the strongest wins). */
 export function outcomeOf(endedReason: string, did: CallOutcome | null): CallOutcome {
@@ -123,7 +124,7 @@ export function outcomeOf(endedReason: string, did: CallOutcome | null): CallOut
 }
 
 /** Which of two things the assistant did during a call is kept as its outcome: a booking beats a link sent. */
-const RANK: CallOutcome[] = ["no-more-calls", "booked", "callback", "link-sent"];
+const RANK: CallOutcome[] = ["no-more-calls", "booked", "pencilled", "callback", "link-sent"];
 export function strongerOutcome(had: CallOutcome | null, now: CallOutcome): CallOutcome {
   if (!had) return now;
   const a = RANK.indexOf(had);
@@ -142,6 +143,7 @@ export function shouldRetry(o: CallOutcome): boolean {
  */
 export const CALL_HEADLINES: Record<CallOutcome, string> = {
   booked: "15-minute call booked",
+  pencilled: "Install day pencilled in",
   callback: "Wants a call back from the team",
   "link-sent": "Proposal link sent",
   "no-more-calls": "Asked not to be called again",
@@ -154,6 +156,7 @@ export const CALL_HEADLINES: Record<CallOutcome, string> = {
 
 export const OUTCOME_WORDS: Record<CallOutcome, string> = {
   booked: "Booked a 15-minute call",
+  pencilled: "Pencilled in an install day",
   callback: "Asked the team to call back",
   "link-sent": "Sent the proposal link",
   "no-more-calls": "Asked not to be called again",
@@ -202,7 +205,8 @@ export function toolWords(args: unknown, key: string, max = 200): string {
     : "";
 }
 
-export type CallMode = "lead" | "proposal";
+/** "install" is the admin assistant's call to book an installation (domain/install-call.ts). */
+export type CallMode = "lead" | "proposal" | "install";
 
 /** Everything the assistant is told about a call: who for, about what, and what it may do. */
 export interface CallBrief {
@@ -225,6 +229,8 @@ export interface CallBrief {
   hasEmail: boolean;
   /** They rang the business's number (not a call we placed). */
   inbound?: boolean;
+  /** A call to book an installation: the days that may be offered (install-call.ts `installDaysToOffer`). */
+  installDays?: InstallDay[];
   /** How the business has coached its assistant, a note a line (domain/design/coaching.ts), after every rule above. */
   coaching?: string[];
 }
@@ -248,6 +254,7 @@ const who = (b: CallBrief) => `${plain(b.assistant, 20) || "Sol"}, ${plain(b.bus
 /** The first words. Always says who is calling, that it's automated and that the call is recorded. */
 export function firstMessage(b: CallBrief): string {
   const name = speakableName(b.firstName);
+  if (b.mode === "install") return installFirstMessage(b);
   if (b.inbound)
     return `Hi${name ? ` ${name}` : ""}, thanks for calling ${plain(b.business, 60) || "us"}. It's ${plain(b.assistant, 20) || "Sol"}, the automated assistant. This call is recorded. How can I help?`;
   if (b.mode === "proposal" && b.asked)
@@ -264,11 +271,13 @@ export function firstMessage(b: CallBrief): string {
 export function screeningAnswer(b: CallBrief): string {
   const name = speakableName(b.firstName);
   const about =
-    b.mode === "proposal"
-      ? b.asked
-        ? "the call they asked for about their solar proposal"
-        : "their solar proposal"
-      : "their solar enquiry";
+    b.mode === "install"
+      ? "booking their installation"
+      : b.mode === "proposal"
+        ? b.asked
+          ? "the call they asked for about their solar proposal"
+          : "their solar proposal"
+        : "their solar enquiry";
   return `It's ${who(b)}, calling${name ? ` for ${name}` : ""} about ${about}.`;
 }
 
@@ -290,6 +299,7 @@ If you can't tell which it is, say only "Hello?" and listen again.`;
 }
 
 export function voicemailMessage(b: CallBrief): string {
+  if (b.mode === "install") return installVoicemail(b);
   const name = speakableName(b.firstName);
   const next =
     b.mode === "proposal"
@@ -345,6 +355,10 @@ export const OBJECTIONS: readonly { worry: string; approach: string }[] = [
 
 /** The assistant's instructions for the call: who it is, the rules, how to meet objections, and what it knows. */
 export function voiceSystemPrompt(b: CallBrief, slots: VoiceSlot[], o: { canTransfer: boolean }): string {
+  if (b.mode === "install") {
+    const script = installSystemPrompt(b, b.installDays ?? [], o);
+    return b.inbound ? script : `${script}\n\n${openingBlock(b)}`;
+  }
   const name = speakableName(b.firstName);
   const business = plain(b.business, 60) || "the business";
   const byDay = new Map<string, string[]>();
@@ -421,6 +435,7 @@ export const VOICE_TOOLS = {
   callback: "request_callback",
   link: "send_proposal_link",
   noMore: "no_more_calls",
+  pencil: INSTALL_TOOL,
 } as const;
 
 const fn = (
@@ -448,8 +463,19 @@ export function assistantConfig(o: {
   transferNumber?: string | null;
 }) {
   const b = o.brief;
+  const install = b.mode === "install";
   const tools: unknown[] = [
-    ...(b.canBook
+    ...(install && b.installDays?.length
+      ? [
+          fn(
+            VOICE_TOOLS.pencil,
+            "Pencils in the installation on a day from the list that the customer chose. The team confirms it afterwards.",
+            { date: { type: "string", description: "The day, as YYYY-MM-DD from the list." } },
+            ["date"],
+          ),
+        ]
+      : []),
+    ...(b.canBook && !install
       ? [
           fn(
             VOICE_TOOLS.book,
@@ -646,7 +672,7 @@ export function proposalLinkSms(o: { business: string; link: string }): string {
  * who): what it came to on the first line, with the time when a call was booked, then the summary.
  */
 export function callRecordLine(o: { outcome: CallOutcome; summary?: string; detail?: string | null; inbound?: boolean }): string {
-  const head = `${CALL_HEADLINES[o.outcome]}${o.outcome === "booked" && o.detail ? ` · ${plain(o.detail, 200)}` : ""}`;
+  const head = `${CALL_HEADLINES[o.outcome]}${(o.outcome === "booked" || o.outcome === "pencilled") && o.detail ? ` · ${plain(o.detail, 200)}` : ""}`;
   const body = [o.inbound ? "They rang in." : "", o.summary ? plain(o.summary, 900) : ""].filter(Boolean).join(" ");
   return body ? `${head}\n${body}` : head;
 }

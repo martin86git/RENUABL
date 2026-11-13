@@ -397,6 +397,22 @@ export function chatMessageEmail(o: { business: string; customer: string; title:
   });
 }
 
+/** To the business's own people when the admin assistant pencils in an installation on a call. Never to the customer. */
+export function installPencilledEmail(o: { assistant: string; customer: string; title: string; day: string; link: string }) {
+  const customer = plainText(o.customer, 120) || "A customer";
+  return simpleEmail({
+    subject: `Install pencilled in: ${customer}, ${plainText(o.day, 60)}`,
+    heading: `${customer}'s installation is pencilled in`,
+    lines: [
+      `On a call with ${plainText(o.assistant, 20) || "your assistant"} about "${plainText(o.title, 80) || "their job"}", they chose ${plainText(o.day, 60)}.`,
+      "It's on your install calendar as a tentative install. It isn't booked: the deal's install date hasn't changed.",
+      "They were told the team will confirm it. Confirm it with them, then set the install date on the deal.",
+    ],
+    button: { label: "Open the deal", href: o.link },
+    footer: "This message was sent by RENUABL for your business. It wasn't sent to the customer.",
+  });
+}
+
 /**
  * To a business's own people (never the customer): on a call with the business's automated assistant, the customer
  * asked for a person to call them back. Who, about what, when suits them, and the way to the deal; nothing else.

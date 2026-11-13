@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import clsx from "clsx";
-import { Headset, NotebookPen, Phone, PhoneForwarded, Settings, X } from "lucide-react";
-import { askAssistantToCall, useCallerInfo } from "@/lib/services/caller";
+import { CalendarCheck, Headset, NotebookPen, Phone, PhoneForwarded, Settings, X } from "lucide-react";
+import { askAssistantToBook, askAssistantToCall, useCallerInfo } from "@/lib/services/caller";
 import { watchAssistantCall } from "@/lib/services/assistant-call";
 import { callFromComputer, useComputerCall, useComputerCallsOn } from "@/lib/services/computer-call";
 import { CallerAvatar } from "./settings-caller";
@@ -20,6 +20,9 @@ const SETTINGS = "/design/settings/calls";
  * (`AssistantCallWindow`). Then you yourself: from this computer (where it is set up, `services/computer-call.ts`), on
  * your own phone, or with the note-taker. While the assistant isn't set up, an admin (who may change settings) is sent
  * to set it up; anyone else is told to ask one.
+ *
+ * A deal that is sold with no installation day (`toBook`) offers the **admin** assistant above it (13 Nov 2026, Martin:
+ * one assistant for sales, one for admin): it rings to book the installation and pencils the day in on the calendar.
  */
 export function CallChoices(props: {
   jobId: string;
@@ -28,9 +31,12 @@ export function CallChoices(props: {
   name: string;
   /** Opens the note-taker for this deal; left out where there is none. */
   onNotes?: () => void;
+  /** The deal is sold and has no installation day: the admin assistant can ring to book it. */
+  toBook?: boolean;
   onClose: () => void;
 }) {
-  const { caller, callsOn, mayChange, ready } = useCallerInfo();
+  const { caller, admin, callsOn, mayChange, ready } = useCallerInfo();
+  const [booking, setBooking] = useState(false);
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const fromComputer = useComputerCallsOn();
@@ -50,8 +56,54 @@ export function CallChoices(props: {
     props.onClose();
   };
 
+  const book = async () => {
+    setBooking(true);
+    setFailed(null);
+    const res = await askAssistantToBook(props.jobId);
+    setBooking(false);
+    if (!res.ok) return setFailed(res.message);
+    watchAssistantCall({ jobId: props.jobId, name: props.name, message: res.message, role: "admin" });
+    props.onClose();
+  };
+
   return (
     <div>
+      {ready && props.toBook && admin.named && (
+        <button
+          role="menuitem"
+          type="button"
+          disabled={!canHand || booking}
+          onClick={() => void book()}
+          className={clsx(
+            "group mb-1.5 flex w-full items-center gap-3 rounded-xl p-3 text-left ring-1 transition-colors",
+            canHand ? "bg-surface-2 ring-line hover:bg-primary hover:text-white hover:ring-primary" : "ring-line",
+          )}
+        >
+          <CallerAvatar caller={admin} size={44} />
+          <span className={clsx("min-w-0 flex-1", !canHand && "text-muted")}>
+            <span className="block text-[15px] font-semibold">Have {admin.name} book the install</span>
+            <span className={clsx("block text-xs", canHand ? "text-muted group-hover:text-white/70" : "text-muted")}>
+              {!callsOn
+                ? "Calls aren't switched on for your business yet"
+                : !dial
+                  ? "There's no mobile on this customer's record"
+                  : booking
+                    ? "Lining up the call…"
+                    : `${admin.name} rings ${who}, offers your free days and pencils one in`}
+            </span>
+          </span>
+          {canHand && <CalendarCheck className="size-4 shrink-0 opacity-60" aria-hidden />}
+        </button>
+      )}
+      {ready && props.toBook && !admin.named && mayChange && (
+        <Link role="menuitem" href={`${SETTINGS}?assistant=admin`} onClick={props.onClose} className={ROW}>
+          <CalendarCheck className="size-4 text-ink-2" aria-hidden />
+          <span>
+            Set up your admin assistant
+            <span className="block text-xs text-muted">It can ring {who} to book the installation for you</span>
+          </span>
+        </Link>
+      )}
       {!ready ? (
         <p className="px-3 py-3 text-xs text-muted">Looking up your phone assistant…</p>
       ) : !caller.named ? (
@@ -151,7 +203,14 @@ export function CallChoices(props: {
 }
 
 /** The same choices in a small window over the page, for a Call button with nowhere to hang a menu (Today's cards). */
-export function CallChooser(props: { jobId: string; phone: string; name: string; onNotes?: () => void; onClose: () => void }) {
+export function CallChooser(props: {
+  jobId: string;
+  phone: string;
+  name: string;
+  onNotes?: () => void;
+  toBook?: boolean;
+  onClose: () => void;
+}) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && props.onClose();
     window.addEventListener("keydown", key);

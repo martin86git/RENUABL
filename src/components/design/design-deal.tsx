@@ -978,6 +978,7 @@ function CallMenu({
   phone,
   name,
   onNotes,
+  toBook = false,
   rail = false,
   round,
 }: {
@@ -985,6 +986,8 @@ function CallMenu({
   phone: string;
   name: string;
   onNotes: () => void;
+  /** Sold and not yet installed: the admin assistant can ring to book the installation. */
+  toBook?: boolean;
   /** A round of the deal's menu: down the left ("rail", its choices to its right) or in the row ("row", below). */
   round?: "rail" | "row";
   /** As a line of the rail beside the page (its words shown, the menu opening to its left). */
@@ -1065,7 +1068,7 @@ function CallMenu({
             style={{ top: at.top, left: at.left }}
             className="fixed z-[70] w-72 rounded-xl bg-surface p-1.5 shadow-lift ring-1 ring-line"
           >
-            <CallChoices jobId={jobId} phone={phone} name={name} onNotes={onNotes} onClose={() => setAt(null)} />
+            <CallChoices jobId={jobId} phone={phone} name={name} onNotes={onNotes} toBook={toBook} onClose={() => setAt(null)} />
           </div>,
           document.body,
         )}
@@ -1183,7 +1186,14 @@ function DealMenu({
         </span>
       </RailRound>
       {line}
-      <CallMenu round={vertical ? "rail" : "row"} jobId={jobId} phone={phone} name={name} onNotes={onNotes} />
+      <CallMenu
+        round={vertical ? "rail" : "row"}
+        jobId={jobId}
+        phone={phone}
+        name={name}
+        onNotes={onNotes}
+        toBook={PRE_INSTALL_STAGES.includes(stage)}
+      />
       {page("email", "Email", `Email ${name || "the customer"}`, Mail)}
       <RailRound
         label="Notes"

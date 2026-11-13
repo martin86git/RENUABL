@@ -26,6 +26,7 @@ import {
   uploadCallerPhoto,
   type CallerState,
 } from "@/lib/services/caller";
+import { installFirstMessage, ROLE_WORDS, CALLER_ROLES, type CallerRole } from "@/lib/domain/install-call";
 import { ui } from "./design-shell";
 import { COACH_COPY } from "@/lib/domain/design/coaching";
 import { openCoach } from "@/lib/services/coaching";
@@ -89,6 +90,43 @@ function SoundWave({ size, tint }: { size: number; tint: number }) {
  * on calls and a picture, with how its opening words will sound.
  */
 export function CallerSettings() {
+  // Two assistants (13 Nov 2026, Martin: one for sales, one for admin), each with its own name, face and voice.
+  const [role, setRole] = useState<CallerRole>("sales");
+  useEffect(() => {
+    // A link from a deal's Call menu opens on the admin assistant.
+    if (new URLSearchParams(window.location.search).get("assistant") === "admin") queueMicrotask(() => setRole("admin"));
+  }, []);
+  return (
+    <div className={clsx(ui.page, "max-w-3xl")}>
+      <p className={ui.eyebrow}>Settings · Business</p>
+      <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">Phone assistants</h1>
+      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">
+        Two assistants ring for your business, each under its own name, face and voice: one for sales, one for admin.
+      </p>
+      <div role="tablist" aria-label="Which assistant" className="mt-5 inline-flex gap-0.5 rounded-full bg-surface-2 p-1 ring-1 ring-line">
+        {CALLER_ROLES.map((r) => (
+          <button
+            key={r}
+            type="button"
+            role="tab"
+            aria-selected={role === r}
+            onClick={() => setRole(r)}
+            className={clsx(
+              "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+              role === r ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:text-ink",
+            )}
+          >
+            {ROLE_WORDS[r].label}
+          </button>
+        ))}
+      </div>
+      <AssistantSettings key={role} role={role} />
+    </div>
+  );
+}
+
+/** One assistant's name, picture and voice. */
+function AssistantSettings({ role }: { role: CallerRole }) {
   const [caller, setCaller] = useState<CallerState | null>(null);
   const [business, setBusiness] = useState("");
   const [callsOn, setCallsOn] = useState(false);
@@ -100,31 +138,39 @@ export function CallerSettings() {
   useEffect(() => {
     void loadCaller().then((res) => {
       if (!res.ok) return setStatus({ ok: false, text: res.message });
-      setCaller(res.caller);
-      setName(res.caller.name);
+      const mine = role === "admin" ? (res.admin ?? { role, name: res.caller.name, photoAt: null, voice: null, named: false }) : res.caller;
+      setCaller(mine);
+      // An admin assistant not yet set up starts with an empty name, so it isn't given the sales assistant's by a stray Save.
+      setName(mine.named || role === "sales" ? mine.name : "");
       setCallsOn(res.callsOn);
       setBusiness(res.business);
     });
-  }, []);
+  }, [role]);
 
   const typed = cleanCallerName(name);
-  const changed = caller !== null && name.trim() !== caller.name;
+  const changed = caller !== null && name.trim() !== "" && (name.trim() !== caller.name || !caller.named);
 
   const save = async () => {
     if (!typed.ok) return setStatus({ ok: false, text: typed.message });
     setBusy(true);
-    const res = await saveCallerName(typed.value);
+    const res = await saveCallerName(typed.value, role);
     setBusy(false);
     if (!res.ok) return setStatus({ ok: false, text: res.message });
     setCaller(res.caller);
     setName(res.caller.name);
-    setStatus({ ok: true, text: `Saved. Your next calls will be from ${res.caller.name}.` });
+    setStatus({
+      ok: true,
+      text:
+        role === "admin"
+          ? `Saved. ${res.caller.name} can now ring to book installations.`
+          : `Saved. Your next calls will be from ${res.caller.name}.`,
+    });
   };
 
   const upload = async (f: File | undefined) => {
     if (!f) return;
     setBusy(true);
-    const res = await uploadCallerPhoto(f);
+    const res = await uploadCallerPhoto(f, role);
     setBusy(false);
     if (file.current) file.current.value = "";
     if (!res.ok) return setStatus({ ok: false, text: res.message });
@@ -134,7 +180,7 @@ export function CallerSettings() {
 
   const remove = async () => {
     setBusy(true);
-    const res = await removeCallerPhoto();
+    const res = await removeCallerPhoto(role);
     setBusy(false);
     if (!res.ok) return setStatus({ ok: false, text: res.message });
     setCaller(res.caller);
@@ -142,10 +188,11 @@ export function CallerSettings() {
   };
 
   return (
-    <div className={clsx(ui.page, "max-w-3xl")}>
-      <p className={ui.eyebrow}>Settings · Business</p>
-      <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">{CALLER_COPY.title}</h1>
-      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">{CALLER_COPY.intro}</p>
+    <div>
+      <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink-2">{ROLE_WORDS[role].does}</p>
+      {caller && role === "admin" && !caller.named && (
+        <p className="mt-2 max-w-2xl text-sm text-ink-2">It isn{"'"}t set up yet. Give it a name to switch it on.</p>
+      )}
 
       {caller && (
         <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start">
@@ -195,23 +242,29 @@ export function CallerSettings() {
               <p className="flex items-center gap-2 text-[13px] font-medium text-ink">
                 <Phone className="size-4 text-muted" aria-hidden /> How a call opens
               </p>
-              <p className="mt-2 text-sm leading-relaxed text-ink-2">{callerIntro(typed.ok ? typed.value : caller.name, business)}</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-2">
+                {role === "admin"
+                  ? `"${installFirstMessage({ assistant: typed.ok ? typed.value : caller.name, business, firstName: "Sam" })}"`
+                  : callerIntro(typed.ok ? typed.value : caller.name, business)}
+              </p>
               <p className="mt-2 text-xs text-muted">{CALLER_COPY.automated}</p>
             </div>
 
-            <VoicePicker caller={caller} callsOn={callsOn} onSaved={(c) => setCaller(c)} onStatus={setStatus} />
+            <VoicePicker caller={caller} callsOn={callsOn} onSaved={(c) => setCaller(c)} onStatus={setStatus} role={role} />
 
             {/* Coaching it (12 Nov 2026, Martin): talk to it in plain words; what it keeps is used on every call. */}
-            <div className="flex flex-wrap items-center gap-3 rounded-xl bg-surface-2 p-4">
-              <MessageCircle className="size-5 shrink-0 text-ink-2" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-ink">{COACH_COPY.title(caller.name)}</p>
-                <p className="text-xs text-muted">{COACH_COPY.intro(caller.name)}</p>
+            {role === "sales" && (
+              <div className="flex flex-wrap items-center gap-3 rounded-xl bg-surface-2 p-4">
+                <MessageCircle className="size-5 shrink-0 text-ink-2" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink">{COACH_COPY.title(caller.name)}</p>
+                  <p className="text-xs text-muted">{COACH_COPY.intro(caller.name)}</p>
+                </div>
+                <button type="button" className={ui.primary} onClick={() => openCoach(null)}>
+                  {COACH_COPY.title(caller.name)}
+                </button>
               </div>
-              <button type="button" className={ui.primary} onClick={() => openCoach(null)}>
-                {COACH_COPY.title(caller.name)}
-              </button>
-            </div>
+            )}
 
             <p className="text-xs text-muted">
               {callsOn
@@ -240,7 +293,10 @@ export function VoicePicker({
   onSaved,
   onStatus,
   compact = false,
+  role = "sales",
 }: {
+  /** Which assistant's voice it is (the admin assistant's from its own Settings tab). */
+  role?: CallerRole;
   caller: CallerState;
   callsOn: boolean;
   onSaved: (c: CallerState) => void;
@@ -255,7 +311,7 @@ export function VoicePicker({
 
   const choose = async (voice: CallerVoice | null) => {
     setBusy(true);
-    const res = await saveCallerVoice(voice);
+    const res = await saveCallerVoice(voice, role);
     setBusy(false);
     if (!res.ok) return onStatus({ ok: false, text: res.message });
     onSaved(res.caller);
@@ -270,7 +326,7 @@ export function VoicePicker({
 
   const ring = async () => {
     setBusy(true);
-    const res = await ringMeToHear();
+    const res = await ringMeToHear(role);
     setBusy(false);
     onStatus(res.ok ? { ok: true, text: "Ringing your mobile now." } : { ok: false, text: res.message });
   };

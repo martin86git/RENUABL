@@ -1,15 +1,19 @@
 import { IMAGE_LIMITS, IMAGE_TOO_BIG, IMAGE_WRONG } from "@/lib/domain/design/brand";
+import { cleanCallerRole } from "@/lib/domain/install-call";
 import { callerPhoto, setCallerPhoto } from "@/lib/server/design-caller-repo";
 import { answer, requireMember } from "@/lib/server/design-context";
 import { avatarImage, imageResponse } from "@/lib/server/design-images";
 import { allow } from "@/lib/server/rate-limit";
 
+/** Which assistant: `?role=admin` for the admin assistant, else the sales one. */
+const roleIn = (request: Request) => cleanCallerRole(new URL(request.url).searchParams.get("role"));
+
 /** GET: the phone assistant's picture, for the business's own members. */
-export async function GET() {
+export async function GET(request: Request) {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    const photo = await callerPhoto(who.member.businessId);
+    const photo = await callerPhoto(who.member.businessId, roleIn(request));
     return photo ? imageResponse(photo) : new Response("Not found", { status: 404 });
   });
 }
@@ -34,15 +38,15 @@ export async function POST(request: Request) {
     if (file.size > IMAGE_LIMITS.uploadBytes) return Response.json({ ok: false, message: IMAGE_TOO_BIG }, { status: 413 });
     const safe = await avatarImage(new Uint8Array(await file.arrayBuffer()));
     if ("problem" in safe) return Response.json({ ok: false, message: safe.problem }, { status: 422 });
-    return Response.json({ ok: true, caller: await setCallerPhoto(who.member.businessId, safe, who.member.email) });
+    return Response.json({ ok: true, caller: await setCallerPhoto(who.member.businessId, safe, who.member.email, roleIn(request)) });
   });
 }
 
 /** DELETE: takes the picture away (its initial is shown instead). */
-export async function DELETE() {
+export async function DELETE(request: Request) {
   return answer(async () => {
     const who = await requireMember("prices");
     if ("refuse" in who) return who.refuse;
-    return Response.json({ ok: true, caller: await setCallerPhoto(who.member.businessId, null, who.member.email) });
+    return Response.json({ ok: true, caller: await setCallerPhoto(who.member.businessId, null, who.member.email, roleIn(request)) });
   });
 }

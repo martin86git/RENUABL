@@ -1,6 +1,7 @@
 import { query } from "@/lib/server/db";
 import { answer, requireMember } from "@/lib/server/design-context";
 import { allow } from "@/lib/server/rate-limit";
+import { cleanCallerRole } from "@/lib/domain/install-call";
 import { ringToHearVoice } from "@/lib/server/voice-calls";
 
 const WORDS = {
@@ -20,7 +21,11 @@ export async function POST(request: Request) {
       `select mobile from business_members where business_id = $1 and lower(email) = lower($2)`,
       [who.member.businessId, who.member.email],
     );
-    const result = await ringToHearVoice(who.member.businessId, rows[0]?.mobile ?? null);
+    const result = await ringToHearVoice(
+      who.member.businessId,
+      rows[0]?.mobile ?? null,
+      cleanCallerRole(new URL(request.url).searchParams.get("role")),
+    );
     if (result === "placed") return Response.json({ ok: true });
     return Response.json({ ok: false, message: WORDS[result] }, { status: result === "failed" ? 502 : 409 });
   });

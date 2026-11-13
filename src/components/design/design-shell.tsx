@@ -41,6 +41,7 @@ import { SolDock, SolNavButton, SolRail } from "./sol-dock";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { ComputerCallBar } from "./computer-call";
 import { AssistantCallWindow } from "./assistant-call";
+import { LiveCallsTray } from "./live-calls";
 import { CoachButton, CoachWindow } from "./coach-chat";
 import { ColleagueButton, ColleagueWindow } from "./colleague";
 import { TeamChatButton } from "./team-chat";
@@ -336,6 +337,8 @@ function Shell({
       <ComputerCallBar />
       {/* The phone assistant's call as it happens, once a call is handed to it. */}
       <AssistantCallWindow />
+      {/* Every call it has under way: a pill while any is ringing or on, opening one, or all of them side by side. */}
+      {retail && <LiveCallsTray />}
       {/* Talking to the phone assistant to coach it, opened from its face on the rail, Settings or a call. */}
       <CoachWindow />
       <ColleagueWindow />

@@ -33,7 +33,7 @@ import {
   type LiveLine,
 } from "@/lib/domain/live-call";
 import { customerFacts } from "@/lib/domain/design/sol-customer";
-import { callbackRequestEmail, consultBookedEmail } from "@/lib/domain/emails";
+import { callbackRequestEmail, consultBookedEmail, installPencilledEmail } from "@/lib/domain/emails";
 import { todayInMarket } from "@/lib/domain/market";
 import { publicSiteUrl } from "@/lib/domain/site";
 import { siteUrl } from "@/lib/domain/sms";
@@ -71,6 +71,8 @@ import { emailProvider, sendEmail } from "./email";
 import { alertNewLead, textStaff } from "./lead-alert";
 import { testCallWords } from "@/lib/domain/design/caller";
 import { callerOf, coachingOf } from "./design-caller-repo";
+import { pencilledLine, PENCILLED_WORDS, readInstallDay, roleOfMode, type CallerRole } from "@/lib/domain/install-call";
+import { installDaysFor, pencilInstall } from "./design-install-call";
 import { addHomeLead, findCustomerByMobile, type HomeLead, renuablCrm } from "./renuabl-crm";
 import { sendSms, smsConfigured } from "./sms";
 
@@ -171,9 +173,11 @@ export async function queueCall(o: {
     const mobile = normaliseMobile(customer.phone);
     if (!mobile) return { result: "no-number" };
     const suburb = (job.address || customer.address).split(",").slice(-2, -1)[0]?.trim();
-    const about = [job.title && `Looking for: ${job.title}`, suburb && `Suburb: ${suburb}`, o.source && `Came from: ${o.source}`].filter(
-      (l): l is string => Boolean(l),
-    );
+    const about = [
+      job.title && `${o.mode === "install" ? "Their job" : "Looking for"}: ${job.title}`,
+      suburb && `Suburb: ${suburb}`,
+      o.source && `Came from: ${o.source}`,
+    ].filter((l): l is string => Boolean(l));
     const insert = () =>
       query<VoiceRow>(
         `insert into voice_calls (id, business_id, job_id, customer_id, mode, asked, first_name, mobile, email, lead)
@@ -239,9 +243,29 @@ async function briefFor(
   const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [row.business_id]);
   const brand = await loadBrand(row.business_id, biz[0]?.name ?? "");
   const own = (await renuablCrm().catch(() => null))?.businessId === row.business_id;
-  const caller = await callerOf(row.business_id);
+  // The admin assistant makes the booking calls, the sales assistant every other (install-call.ts).
+  const role = roleOfMode(row.mode);
+  const caller = await callerOf(row.business_id, role);
   // How the business has coached its assistant, read fresh for every call.
-  const coaching = (await coachingOf(row.business_id).catch(() => null))?.notes.map((n) => n.text) ?? [];
+  const coaching = (await coachingOf(row.business_id, role).catch(() => null))?.notes.map((n) => n.text) ?? [];
+  if (row.mode === "install")
+    return {
+      token: null,
+      voice: caller.voice,
+      brief: {
+        mode: "install",
+        assistant: caller.name,
+        business: brand.name || biz[0]?.name || "",
+        firstName: row.first_name,
+        about: row.lead.about ?? [],
+        asked: false,
+        canBook: false,
+        canSendLink: false,
+        hasEmail: Boolean(row.email),
+        installDays: await installDaysFor(row.business_id).catch(() => []),
+        coaching,
+      },
+    };
   // Someone ringing in may be ringing about their proposal: theirs is read whenever one is out.
   const token = row.mode === "proposal" || row.lead.inbound ? await tokenForJob(row.business_id, row.job_id) : null;
   const view = token ? (await publicProposal(token, todayInMarket()))?.view : null;
@@ -474,6 +498,34 @@ export async function handleToolCall(
     return `Booked for ${slot.label}.${row.email ? " A calendar invite is on its way by email." : ""}`;
   }
 
+  if (name === VOICE_TOOLS.pencil) {
+    if (row.mode !== "install") return "That tool isn't available on this call.";
+    const offered = await installDaysFor(row.business_id);
+    const day = readInstallDay(args, offered);
+    if (!day)
+      return offered.length
+        ? `That day can't be offered. Days you can offer: ${offered.map((d) => `${d.label} (date ${d.date})`).join("; ")}.`
+        : "There are no days to offer right now. Say the team will call them to find a day, and use request_callback.";
+    await pencilInstall({ businessId: row.business_id, jobId: row.job_id, day, assistant });
+    await said(row, "pencilled", { status: "booked", call_label: day.label });
+    await event(row, "booked", { outcome: "pencilled", summary: day.label });
+    await onDeal(row, pencilledLine(day.label));
+    later(async () => {
+      if (!emailProvider()) return;
+      const found = await jobById(row.business_id, row.job_id).catch(() => null);
+      const mail = installPencilledEmail({
+        assistant,
+        customer: found?.customer.name ?? row.first_name ?? "",
+        title: found?.job.title ?? "",
+        day: day.label,
+        link: `${site}/design/deals/${row.job_id}`,
+      });
+      for (const to of await teamOf(row.business_id).catch(() => [] as string[]))
+        await sendEmail({ to, ...mail }).catch(() => console.error("an install pencilled notice couldn't be sent"));
+    });
+    return `Done: ${day.label} is ${PENCILLED_WORDS}. Tell them exactly that, and that it isn't final until the team confirms.`;
+  }
+
   if (name === VOICE_TOOLS.callback) {
     const about = toolWords(args, "about");
     const when = toolWords(args, "when", 120);
@@ -563,7 +615,7 @@ export async function handleCallEnded(row: VoiceRow, e: VapiEvent): Promise<void
     await onDeal(row, `${assistant} couldn't reach them after ${row.attempts} ${row.attempts === 1 ? "call" : "calls"}. Over to the team.`);
     if (own)
       await textStaff(
-        `RENUABL: ${assistant} couldn't reach ${row.first_name || "a new lead"} (${row.mobile}) after ${row.attempts} calls. Please call them.`,
+        `RENUABL: ${assistant} couldn't reach ${row.first_name || (row.mode === "lead" ? "a new lead" : "a customer")} (${row.mobile}) after ${row.attempts} calls. Please call them.`,
       );
     return;
   }
@@ -742,13 +794,17 @@ async function inboundRow(s: VoiceSettings, businessId: string, mobile: string, 
  * voice, saying its opening words and ending. Only where calls are on for the business; never tied to a deal, nothing
  * kept but Vapi's own log.
  */
-export async function ringToHearVoice(businessId: string, mobile: string | null): Promise<"placed" | "off" | "no-number" | "failed"> {
+export async function ringToHearVoice(
+  businessId: string,
+  mobile: string | null,
+  role: CallerRole = "sales",
+): Promise<"placed" | "off" | "no-number" | "failed"> {
   const s = voiceSettings();
   if (!s || !(await voiceOnFor(businessId).catch(() => false))) return "off";
   const m = normaliseMobile(mobile ?? "");
   if (!m) return "no-number";
   try {
-    const caller = await callerOf(businessId);
+    const caller = await callerOf(businessId, role);
     const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [businessId]);
     const brand = await loadBrand(businessId, biz[0]?.name ?? "");
     const voice = caller.voice ?? s.voice;
@@ -864,7 +920,8 @@ export async function liveCallFor(businessId: string, jobId: string): Promise<Li
     phase: livePhase({ status: r.status, liveStatus: r.live_status }),
     customer: r.first_name ?? "",
     outcome: r.outcome,
-    booked: r.outcome === "booked" ? r.call_label : null,
+    booked: r.outcome === "booked" || r.outcome === "pencilled" ? r.call_label : null,
+    role: roleOfMode(r.mode),
     attempts: r.attempts,
     startedAgo: started === null ? null : now - started,
     ranFor: started !== null && ended !== null ? ended - started : null,
