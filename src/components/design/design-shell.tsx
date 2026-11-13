@@ -453,36 +453,43 @@ function Shell({
                 return (
                   <>
                     {link(sections[0])}
-                    {designsRoofs(kind) && (
-                      <Link
-                        href={PATHS.designer}
-                        aria-label="Design tool"
-                        title="Design tool"
-                        aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
-                        className={clsx(
-                          "-my-2 mx-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
-                          path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
-                        )}
-                      >
-                        <PenTool className="size-5" aria-hidden />
-                      </Link>
-                    )}
-                    {/* The proposal, the other tool (8 Nov 2026, Martin): its round beside the designer's, opening the
+                    {/* The two tools as two discs (13 Nov 2026, Martin): the proposal's half tucked under the
+                        designer's, sliding out from under it while the pointer is on them (or a key is on one, or a
+                        proposal page is open). */}
+                    <span className="group/tools flex shrink-0 items-center">
+                      {designsRoofs(kind) && (
+                        <Link
+                          href={PATHS.designer}
+                          aria-label="Design tool"
+                          title="Design tool"
+                          aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
+                          className={clsx(
+                            "relative z-10 -my-2 mx-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
+                            path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
+                          )}
+                        >
+                          <PenTool className="size-5" aria-hidden />
+                        </Link>
+                      )}
+                      {/* The proposal, the other tool (8 Nov 2026, Martin): its round beside the designer's, opening the
                         proposals; a deal's own proposal opens over the page like the designer. */}
-                    {retail && (
-                      <Link
-                        href={PATHS.proposalsSent}
-                        aria-label="Proposals"
-                        title="Proposals"
-                        aria-current={current.id === "proposals" ? "page" : undefined}
-                        className={clsx(
-                          "-my-2 mr-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_4px_14px_rgba(11,11,12,0.12)] ring-1 ring-line transition hover:text-ink",
-                          current.id === "proposals" && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
-                        )}
-                      >
-                        <FileText className="size-5" aria-hidden />
-                      </Link>
-                    )}
+                      {retail && (
+                        <Link
+                          href={PATHS.proposalsSent}
+                          aria-label="Proposals"
+                          title="Proposals"
+                          aria-current={current.id === "proposals" ? "page" : undefined}
+                          className={clsx(
+                            "-my-2 mr-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_4px_14px_rgba(11,11,12,0.12)] ring-1 ring-line transition-[margin,color,box-shadow] duration-300 ease-out hover:text-ink motion-reduce:transition-none",
+                            current.id === "proposals"
+                              ? "ml-1 ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface"
+                              : "-ml-7 group-focus-within/tools:ml-1 group-hover/tools:ml-1",
+                          )}
+                        >
+                          <FileText className="size-5" aria-hidden />
+                        </Link>
+                      )}
+                    </span>
                     {/* Every section in view again (10 Nov 2026, Martin: reveal the rest of the menu), CRM first. The
                         layers fold (section-fold.tsx) is no longer used here. */}
                     {foldable.map(link)}
