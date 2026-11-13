@@ -3,6 +3,7 @@ import { can } from "@/lib/domain/design/account";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { colleagueVoice, isAssistantName, isCustomerVoice, NAME_TAKEN, VOICE_TAKEN } from "@/lib/domain/design/colleague";
 import { colleagueOf, colleagueReady, customerSide, hasPin, myColleagueCalls, setColleague } from "@/lib/server/design-colleague";
+import { colleagueChatOn } from "@/lib/server/design-colleague-chat";
 import { query } from "@/lib/server/db";
 
 /**
@@ -15,10 +16,11 @@ export async function GET() {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const { businessId, email, role, permissions } = who.member;
-    const [settings, side, ready, pin, calls, mobile] = await Promise.all([
+    const [settings, side, ready, chatOn, pin, calls, mobile] = await Promise.all([
       colleagueOf(businessId),
       customerSide(businessId),
       colleagueReady(businessId),
+      colleagueChatOn(businessId).catch(() => false),
       hasPin(businessId, email),
       myColleagueCalls(businessId, email),
       query<{ mobile: string | null }>(`select mobile from business_members where business_id = $1 and email = $2`, [
@@ -35,6 +37,9 @@ export async function GET() {
         takenVoices: side.voices,
         takenNames: side.names,
         ready,
+        // Whether it can be chatted to in writing, and who is asking, for its hello.
+        chatOn,
+        firstName: who.member.firstName ?? null,
         pinSet: pin,
         hasMobile: Boolean(mobile[0]?.mobile),
         calls,

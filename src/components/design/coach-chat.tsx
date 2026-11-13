@@ -12,6 +12,7 @@ import {
   Loader2,
   Minus,
   Pencil,
+  Phone,
   PhoneCall,
   Settings,
   Trash2,
@@ -124,9 +125,16 @@ export function CoachButton() {
       onClick={() => openCoach(null)}
       title={COACH_COPY.title(caller.name)}
       aria-label={COACH_COPY.title(caller.name)}
-      className="relative grid size-10 place-items-center rounded-full ring-2 ring-transparent transition hover:ring-sun-line"
+      className="relative -mx-1 grid size-12 place-items-center rounded-full shadow-[0_4px_14px_rgba(20,22,26,0.18)] ring-2 ring-transparent transition hover:ring-sun-line"
     >
-      <CallerAvatar caller={caller} size={36} />
+      <CallerAvatar caller={caller} size={46} />
+      {/* Someone to call or text through, not a page (13 Nov 2026, Martin: the two assistants got lost among the rail's icons). */}
+      <span
+        className="absolute -bottom-0.5 -right-0.5 grid size-[18px] place-items-center rounded-full bg-sun-line text-white ring-2 ring-surface"
+        aria-hidden
+      >
+        <Phone className="size-2.5" />
+      </span>
     </button>
   );
 }

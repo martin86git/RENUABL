@@ -288,7 +288,14 @@ export function SolRail({
     >
       {team && <span className="team-bulb">{team}</span>}
       {/* The business's phone assistant, to talk to and coach (12 Nov 2026, Martin). */}
-      {assistant && <span className="mt-1">{assistant}</span>}
+      {/* Larger than the tools under them, with a rule after (13 Nov 2026, Martin: they got lost among the other icons). */}
+      {assistant && (
+        <>
+          <span className="peer mt-1.5">{assistant}</span>
+          {/* Only once an assistant is set up: nothing to rule off otherwise. */}
+          <span className="mb-0.5 mt-1.5 hidden h-px w-6 bg-line peer-has-[button]:block" aria-hidden />
+        </>
+      )}
       {/* The calculator under team chat (8 Nov 2026, Martin): an answer on the phone has to be instant. */}
       {calc && <span className="mt-1">{calc}</span>}
       {tools && (

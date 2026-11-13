@@ -9,6 +9,7 @@
 import { useSyncExternalStore } from "react";
 import type { CallerVoice } from "@/lib/domain/design/caller";
 import type { ColleagueLine } from "@/lib/domain/design/colleague";
+import { CHAT_HISTORY_MAX, cleanChatHistory, type ChatLine } from "@/lib/domain/design/colleague-chat";
 
 export interface ColleagueCall {
   id: string;
@@ -26,6 +27,10 @@ export interface ColleagueState {
   takenVoices: { provider: string; voiceId: string }[];
   takenNames: string[];
   ready: { on: boolean; web: boolean; teamNumber: string | null };
+  /** Whether it can be chatted to in writing. */
+  chatOn?: boolean;
+  /** The member's first name, for its hello. */
+  firstName?: string | null;
   pinSet: boolean;
   hasMobile: boolean;
   calls: ColleagueCall[];
@@ -160,3 +165,70 @@ export const resetTalk = () => {
   if (talk.phase !== "connecting" && talk.phase !== "on")
     setTalk({ phase: "idle", lines: [], partial: null, problem: null, startedAt: null });
 };
+
+// ── A chat in writing ──────────────────────────────────────────────────────────────────────────────────────────
+// The member's own conversation with it (13 Nov 2026, Martin: "I also should be able to chat to it"), kept in this
+// browser for the visit and sent back with each question (`/api/design/colleague/chat`); nothing is kept on the server.
+export interface ColleagueChat {
+  lines: ChatLine[];
+  sending: boolean;
+  problem: string | null;
+}
+
+const CHAT_KEY = "renuabl.design.colleague-chat";
+let chat: ColleagueChat = { lines: [], sending: false, problem: null };
+let chatRead = false;
+const chatListeners = new Set<() => void>();
+const setChat = (next: Partial<ColleagueChat>) => {
+  chat = { ...chat, ...next };
+  if (next.lines) {
+    try {
+      sessionStorage.setItem(CHAT_KEY, JSON.stringify(chat.lines.slice(-60)));
+    } catch {
+      // A private window: the conversation lasts until the page is left.
+    }
+  }
+  for (const l of chatListeners) l();
+};
+
+/** What was said earlier in this visit, read when the chat is first shown. */
+export function readColleagueChat(): void {
+  if (chatRead || typeof window === "undefined") return;
+  chatRead = true;
+  try {
+    const kept = cleanChatHistory(JSON.parse(sessionStorage.getItem(CHAT_KEY) ?? "[]"));
+    if (kept.length) setChat({ lines: kept });
+  } catch {
+    // Nothing kept, or it can't be read: start afresh.
+  }
+}
+
+export const useColleagueChat = () =>
+  useSyncExternalStore(
+    (l) => {
+      chatListeners.add(l);
+      return () => chatListeners.delete(l);
+    },
+    () => chat,
+    () => chat,
+  );
+
+/** Asks it a question in writing; its answer joins the conversation, or the question comes back with why not. */
+export async function askColleague(text: string): Promise<boolean> {
+  const words = text.trim();
+  if (!words || chat.sending) return false;
+  const before = chat.lines;
+  setChat({ lines: [...before, { role: "you", text: words }], sending: true, problem: null });
+  const got = await ask<{ text: string }>(
+    "/api/design/colleague/chat",
+    json("POST", { text: words, history: before.slice(-CHAT_HISTORY_MAX) }),
+  );
+  if (!got.ok) {
+    setChat({ lines: before, sending: false, problem: got.message });
+    return false;
+  }
+  setChat({ lines: [...chat.lines, { role: "assistant", text: got.text }], sending: false });
+  return true;
+}
+
+export const clearColleagueChat = () => setChat({ lines: [], problem: null });

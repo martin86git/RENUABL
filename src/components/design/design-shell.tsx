@@ -44,6 +44,7 @@ import { AssistantCallWindow } from "./assistant-call";
 import { LiveCallsTray } from "./live-calls";
 import { CoachButton, CoachWindow } from "./coach-chat";
 import { ColleagueButton, ColleagueWindow } from "./colleague";
+import { RailCalls } from "./rail-calls";
 import { TeamChatButton } from "./team-chat";
 import { DayWeather, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
@@ -816,6 +817,8 @@ function Shell({
             kind === "retailer" ? (
               <span className="flex flex-col items-center gap-2">
                 <CoachButton />
+                {/* Each call the phone assistant has under way, as a round of its own under its face. */}
+                <RailCalls />
                 <ColleagueButton />
               </span>
             ) : undefined

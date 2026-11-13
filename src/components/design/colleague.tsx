@@ -3,13 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { Headset, Loader2, Mic, MicOff, Phone, PhoneOff, X } from "lucide-react";
+import { ArrowUp, Headset, Loader2, Mic, MicOff, Phone, PhoneOff, X } from "lucide-react";
 import { CALLER_VOICES, type CallerVoice } from "@/lib/domain/design/caller";
 import { COLLEAGUE_COPY, COLLEAGUE_ROLE, PIN_MAX, PIN_MIN } from "@/lib/domain/design/colleague";
+import { CHAT_COPY, CHAT_TEXT_MAX } from "@/lib/domain/design/colleague-chat";
 import { clockWords } from "@/lib/domain/live-call";
 import {
+  askColleague,
   callColleague,
+  clearColleagueChat,
   closeColleague,
+  readColleagueChat,
+  useColleagueChat,
   hangUpColleague,
   loadColleague,
   muteColleague,
@@ -42,9 +47,16 @@ export function ColleagueButton() {
       onClick={openColleague}
       title={`${titleOf(state)}: your team's assistant`}
       aria-label={`Talk to ${titleOf(state)}`}
-      className="grid size-10 place-items-center rounded-full bg-primary text-white ring-2 ring-transparent transition hover:ring-sun-line"
+      className="relative -mx-1 grid size-12 place-items-center rounded-full bg-primary text-white shadow-[0_4px_14px_rgba(20,22,26,0.18)] ring-2 ring-transparent transition hover:ring-sun-line"
     >
-      <Headset className="size-[18px]" aria-hidden />
+      <Headset className="size-[22px]" aria-hidden />
+      {/* Someone to call or chat to, not a page (13 Nov 2026, Martin: the two assistants got lost among the rail's icons). */}
+      <span
+        className="absolute -bottom-0.5 -right-0.5 grid size-[18px] place-items-center rounded-full bg-sun-line text-white ring-2 ring-surface"
+        aria-hidden
+      >
+        <Phone className="size-2.5" />
+      </span>
     </button>
   );
 }
@@ -60,6 +72,8 @@ export function ColleagueWindow() {
   const [state, setState] = useState<ColleagueState | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  // Chat in writing, or call it and its settings (13 Nov 2026, Martin: "I also should be able to chat to it").
+  const [view, setView] = useState<"chat" | "call">("chat");
   const list = useRef<HTMLDivElement>(null);
 
   const reload = useCallback(() => {
@@ -95,12 +109,15 @@ export function ColleagueWindow() {
   const live = talk.phase === "connecting" || talk.phase === "on";
   if ((!isOpen && !live) || typeof document === "undefined") return null;
   const name = titleOf(state);
+  // A call under way is always shown; otherwise the view picked, the chat to start with where it can be had.
+  const chatting = !live && Boolean(state?.chatOn) && view === "chat";
 
   return createPortal(
     <section
       aria-label={name}
       className={clsx(
-        "fixed bottom-20 right-4 z-[87] flex max-h-[min(42rem,calc(100dvh-7rem))] w-[min(26rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-surface shadow-lift lg:bottom-6 lg:right-20 print:hidden",
+        "fixed bottom-20 right-4 z-[87] flex w-[min(26rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl bg-surface shadow-lift lg:bottom-6 lg:right-20 print:hidden",
+        chatting ? "h-[min(40rem,calc(100dvh-7rem))]" : "max-h-[min(42rem,calc(100dvh-7rem))]",
         talk.phase === "on" ? "ring-2 ring-sun-line" : "ring-1 ring-line",
       )}
     >
@@ -128,7 +145,27 @@ export function ColleagueWindow() {
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {state?.chatOn && !live && (
+        <div role="tablist" aria-label={`Chat with ${name} or call it`} className="flex gap-1 border-b border-line bg-surface-2 p-1.5">
+          {(["chat", "call"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              className={clsx(
+                "flex-1 rounded-full py-1.5 text-sm font-semibold transition-colors",
+                view === v ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-muted hover:text-ink",
+              )}
+            >
+              {v === "chat" ? "Chat" : "Call and settings"}
+            </button>
+          ))}
+        </div>
+      )}
+      {chatting && state && <ChatPanel state={state} />}
+      <div className={clsx("min-h-0 flex-1 overflow-y-auto", chatting && "hidden")}>
         {!state ? (
           <p className="px-4 py-6 text-center text-sm text-muted">{problem ?? "Just a moment…"}</p>
         ) : (
@@ -142,6 +179,85 @@ export function ColleagueWindow() {
       </div>
     </section>,
     document.body,
+  );
+}
+
+/**
+ * The chat in writing (13 Nov 2026, Martin): the member's questions on the right, its answers on the left, from their
+ * deals only. Kept in this browser for the visit; Enter sends, Shift+Enter is a new line.
+ */
+function ChatPanel({ state }: { state: ColleagueState }) {
+  const chat = useColleagueChat();
+  const [text, setText] = useState("");
+  const list = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const name = titleOf(state);
+
+  useEffect(() => {
+    readColleagueChat();
+    const t = window.setTimeout(() => box.current?.focus(), 50);
+    return () => window.clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    const el = list.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [chat.lines.length, chat.sending]);
+
+  const send = async () => {
+    const words = text.trim();
+    if (!words || chat.sending) return;
+    setText("");
+    if (!(await askColleague(words))) setText(words);
+  };
+
+  return (
+    <>
+      <div ref={list} aria-live="polite" className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
+        <Bubble you={false} text={CHAT_COPY.hello(state.name, state.firstName ?? null)} />
+        {chat.lines.map((l, i) => (
+          <Bubble key={i} you={l.role === "you"} text={l.text} />
+        ))}
+        {chat.sending && <p className="animate-pulse text-xs text-muted motion-reduce:animate-none">{name} is looking it up…</p>}
+      </div>
+      <div className="border-t border-line p-3">
+        {chat.problem && <p className="mb-2 text-xs text-danger">{chat.problem}</p>}
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={box}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            rows={2}
+            maxLength={CHAT_TEXT_MAX}
+            placeholder={CHAT_COPY.placeholder(name)}
+            aria-label={`Your question for ${name}`}
+            className="min-h-11 flex-1 resize-none rounded-2xl bg-canvas px-3 py-2 text-sm text-ink ring-1 ring-line placeholder:text-muted focus:outline-none focus:ring-sun-line"
+          />
+          <button
+            type="button"
+            onClick={() => void send()}
+            disabled={!text.trim() || chat.sending}
+            aria-label="Send"
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-line disabled:text-muted"
+          >
+            <ArrowUp className="size-4" aria-hidden />
+          </button>
+        </div>
+        <p className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-muted">
+          <span>{COLLEAGUE_COPY.readOnly}</span>
+          {chat.lines.length > 0 && !chat.sending && (
+            <button type="button" onClick={clearColleagueChat} className="shrink-0 underline hover:text-ink">
+              Start again
+            </button>
+          )}
+        </p>
+      </div>
+    </>
   );
 }
 
@@ -211,7 +327,7 @@ function Bubble({ you, text, faded }: { you: boolean; text: string; faded?: bool
     <div className={clsx("flex", you ? "justify-end" : "justify-start")}>
       <p
         className={clsx(
-          "max-w-[85%] rounded-2xl px-3 py-1.5 text-sm",
+          "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-1.5 text-sm",
           you ? "bg-primary text-white" : "bg-surface-2 text-ink",
           faded && "opacity-60",
         )}
