@@ -9,7 +9,7 @@
 import { useSyncExternalStore } from "react";
 import type { CallerVoice } from "@/lib/domain/design/caller";
 import type { ColleagueLine } from "@/lib/domain/design/colleague";
-import { CHAT_HISTORY_MAX, cleanChatHistory, type ChatLine } from "@/lib/domain/design/colleague-chat";
+import { CHAT_HISTORY_MAX, cleanChatHistory, type ChatCard, type ChatLine } from "@/lib/domain/design/colleague-chat";
 
 export interface ColleagueCall {
   id: string;
@@ -219,7 +219,7 @@ export async function askColleague(text: string): Promise<boolean> {
   if (!words || chat.sending) return false;
   const before = chat.lines;
   setChat({ lines: [...before, { role: "you", text: words }], sending: true, problem: null });
-  const got = await ask<{ text: string }>(
+  const got = await ask<{ text: string; cards?: ChatCard[] }>(
     "/api/design/colleague/chat",
     json("POST", { text: words, history: before.slice(-CHAT_HISTORY_MAX) }),
   );
@@ -227,7 +227,10 @@ export async function askColleague(text: string): Promise<boolean> {
     setChat({ lines: before, sending: false, problem: got.message });
     return false;
   }
-  setChat({ lines: [...chat.lines, { role: "assistant", text: got.text }], sending: false });
+  setChat({
+    lines: [...chat.lines, { role: "assistant", text: got.text, ...(got.cards?.length ? { cards: got.cards } : {}) }],
+    sending: false,
+  });
   return true;
 }
 
