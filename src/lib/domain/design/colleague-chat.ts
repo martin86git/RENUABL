@@ -9,31 +9,7 @@ import { COLLEAGUE_TOOLS, colleagueSpoken } from "./colleague";
 export interface ChatLine {
   role: "you" | "assistant";
   text: string;
-  /** What supports an answer, shown in the window beside the chat. Only ever on its own lines. */
-  cards?: ChatCard[];
 }
-
-/**
- * What supports an answer (14 Nov 2026, Martin: "he answers me directly, but then the contextual information he
- * provides appears in a side pop up window… text light, easy to read… something visual rather than text based but ONLY
- * where it's more efficient"). The chat keeps the answer itself, short; these sit in a window beside it. A deal is a
- * card of its facts, a count is a big figure, what happened in order is a timeline, a few numbers to compare are bars,
- * and anything else is a short note.
- */
-export type ChatCard =
-  | { kind: "deal"; title: string; jobId: string | null; stage: string; rows: { label: string; value: string }[]; text: string }
-  | { kind: "figures"; title: string; items: { label: string; value: string }[] }
-  | { kind: "timeline"; title: string; events: { when: string; what: string }[] }
-  | { kind: "bars"; title: string; bars: { label: string; value: number }[] }
-  | { kind: "note"; title: string; text: string };
-
-export const CARD_KINDS = ["deal", "figures", "timeline", "bars", "note"] as const;
-/** The longest answer kept in the chat itself, and how much may sit beside it. */
-export const SAY_MAX = 320;
-export const CARDS_MAX = 4;
-export const CARD_ROWS_MAX = 6;
-export const CARD_EVENTS_MAX = 8;
-export const CARD_TEXT_MAX = 400;
 
 /** The longest question taken, and the longest line kept from the conversation so far. */
 export const CHAT_TEXT_MAX = 2000;
@@ -83,9 +59,7 @@ export function cleanChatHistory(raw: unknown): ChatLine[] {
     const { role, text } = item as { role?: unknown; text?: unknown };
     if ((role !== "you" && role !== "assistant") || typeof text !== "string") continue;
     const words = plain(text).slice(0, CHAT_TEXT_MAX);
-    if (!words) continue;
-    const cards = role === "assistant" ? cleanCards((item as { cards?: unknown }).cards) : [];
-    lines.push(cards.length ? { role, text: words, cards } : { role, text: words });
+    if (words) lines.push({ role, text: words });
   }
   const latest = lines.slice(-CHAT_HISTORY_MAX);
   const from = latest.findIndex((l) => l.role === "you");
@@ -102,9 +76,6 @@ export interface ChatBrief {
   today: string;
 }
 
-/** The name of the tool it answers with. */
-export const COLLEAGUE_REPLY_TOOL = "show_answer";
-
 const fenced = (s: string) => s.replace(/<\/?facts>/gi, "");
 
 /** What it is told for a chat: the call's rules, written for reading rather than hearing. */
@@ -112,9 +83,7 @@ export function colleagueChatPrompt(b: ChatBrief): string {
   const me = colleagueSpoken(b.name);
   const who = b.firstName ? `${b.firstName}, who works at ${b.business}` : `someone from the ${b.business} team`;
   return [
-    `You are ${me}, the ${b.business} team's own assistant, chatting in writing with ${who}. Write as a colleague: short, plain, friendly, no jargon.`,
-    `How you answer: always by calling ${COLLEAGUE_REPLY_TOOL}, once you have looked up what you need. Its "say" is what appears in the chat: the answer itself, directly, in one or two short sentences (under 40 words), as you'd say it across a desk. No lists, no run-down of the record, no "here is what I found". Everything that backs it up goes in "cards", which show in a window beside the chat, and "say" never repeats what a card shows. Plain text everywhere: no asterisks, headings, tables or links.`,
-    `The cards: "deal" for one deal (title is the customer; stage; up to six rows of label and value, such as Value, System, Install day, Last call; text for one line worth knowing); "figures" for one to three counts or amounts that are the point (value "2", label "calls to Michelle"); "timeline" for what happened in order (when, what; newest last, a few words each); "bars" only to compare a few numbers at a glance, such as deals at each stage; "note" for anything else, kept short. Choose a figure, timeline or bars only where it is quicker to take in than a sentence; otherwise a deal card or a note. A simple answer needs no card at all. At most four cards, the most useful first. Put a deal's id in deal_id exactly as a tool gave it, so the deal can be opened.`,
+    `You are ${me}, the ${b.business} team's own assistant, chatting in writing with ${who}. Write as a colleague: short, plain, friendly, no jargon. Lead with the answer in a sentence or two; a short list only when they ask for several things. Plain text only: no headings, tables, bold or links.`,
     "You are an automated assistant. Say so if you're asked.",
     `Today is ${b.today}.`,
     `What you can do: answer questions about this person's deals, from the record only, with your tools (${COLLEAGUE_TOOLS.find}, ${COLLEAGUE_TOOLS.details}, ${COLLEAGUE_TOOLS.stage}, ${COLLEAGUE_TOOLS.day}). Look up before you answer; never guess or invent a figure, date, name, product or what a customer said. If the record doesn't say, say so.`,
@@ -155,137 +124,10 @@ export const COLLEAGUE_CHAT_TOOLS = [
   tool(COLLEAGUE_TOOLS.day, "Their deals in brief as of now: counts by stop, what was sold, each live deal in a line."),
 ];
 
-const pair = (a: string, b: string) => ({
-  type: "array" as const,
-  items: { type: "object" as const, properties: { [a]: { type: "string" }, [b]: { type: "string" } }, required: [a, b] },
-});
-
-/** The tool it answers with: the words for the chat, and what goes in the window beside it. */
-export const COLLEAGUE_REPLY = tool(
-  COLLEAGUE_REPLY_TOOL,
-  "Answer the person. Call this once, when you have what you need.",
-  {
-    say: { type: "string", description: "The answer itself for the chat: one or two short sentences, plain text." },
-    cards: {
-      type: "array",
-      description: "What backs the answer up, shown beside the chat. Leave empty for a simple answer.",
-      items: {
-        type: "object",
-        properties: {
-          kind: { type: "string", enum: [...CARD_KINDS] },
-          title: { type: "string" },
-          deal_id: { type: "string", description: "For a deal card: the deal's id as a tool gave it." },
-          stage: { type: "string" },
-          rows: pair("label", "value"),
-          items: pair("label", "value"),
-          events: pair("when", "what"),
-          bars: {
-            type: "array",
-            items: { type: "object", properties: { label: { type: "string" }, value: { type: "number" } }, required: ["label", "value"] },
-          },
-          text: { type: "string" },
-        },
-        required: ["kind", "title"],
-      },
-    },
-  },
-  ["say"],
-);
-
-/** One line of plain words: no markdown marks, no new lines, cut to length. */
-const oneLine = (raw: unknown, max: number) =>
-  typeof raw === "string"
-    ? plain(raw)
-        .replace(/\*\*|__|`/g, "")
-        .replace(/^#+\s*/gm, "")
-        .replace(/\s*\n\s*/g, " ")
-        .slice(0, max)
-        .trim()
-    : "";
-
-const objects = (raw: unknown, max: number): Record<string, unknown>[] =>
-  Array.isArray(raw) ? (raw.filter((x) => x && typeof x === "object") as Record<string, unknown>[]).slice(0, max) : [];
-
-const pairs = <A extends string, B extends string>(raw: unknown, a: A, b: B, max: number) =>
-  objects(raw, max)
-    .map((x) => ({ [a]: oneLine(x[a], 60), [b]: oneLine(x[b], 160) }) as Record<A | B, string>)
-    .filter((x) => x[a] && x[b]);
-
-/** What it asked to show beside the chat, as it is kept: only the kinds we draw, each whole, the rest dropped. */
-export function cleanCards(raw: unknown): ChatCard[] {
-  const cards: ChatCard[] = [];
-  for (const c of objects(raw, 12)) {
-    if (cards.length === CARDS_MAX) break;
-    const title = oneLine(c.title, 80);
-    if (!title) continue;
-    const text = oneLine(c.text, CARD_TEXT_MAX);
-    if (c.kind === "deal") {
-      const id = typeof c.deal_id === "string" ? c.deal_id : typeof c.jobId === "string" ? c.jobId : "";
-      const rows = pairs(c.rows, "label", "value", CARD_ROWS_MAX);
-      if (!rows.length && !text) continue;
-      cards.push({ kind: "deal", title, jobId: /^[A-Za-z0-9_-]{6,64}$/.test(id) ? id : null, stage: oneLine(c.stage, 40), rows, text });
-    } else if (c.kind === "figures") {
-      const items = pairs(c.items, "label", "value", 3).map((i) => ({ label: i.label, value: i.value.slice(0, 14) }));
-      if (items.length) cards.push({ kind: "figures", title, items });
-    } else if (c.kind === "timeline") {
-      const events = pairs(c.events, "when", "what", CARD_EVENTS_MAX);
-      if (events.length) cards.push({ kind: "timeline", title, events });
-    } else if (c.kind === "bars") {
-      const bars = objects(c.bars, 8)
-        .map((x) => ({
-          label: oneLine(x.label, 30),
-          value: typeof x.value === "number" && Number.isFinite(x.value) ? Math.max(0, x.value) : -1,
-        }))
-        .filter((x) => x.label && x.value >= 0);
-      // One bar compares nothing: a figure says it better.
-      if (bars.length > 1) cards.push({ kind: "bars", title, bars });
-    } else if (c.kind === "note" && text) {
-      cards.push({ kind: "note", title, text });
-    }
-  }
-  return cards;
-}
-
-/** The answer cut to what the chat keeps: whole sentences where it can be. */
-export function shortSay(raw: unknown, max = SAY_MAX): string {
-  const said = oneLine(raw, 4000);
-  if (said.length <= max) return said;
-  const cut = said.slice(0, max);
-  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("? "), cut.lastIndexOf("! "));
-  return end > max / 3 ? cut.slice(0, end + 1) : `${cut.slice(0, max - 1).trimEnd()}…`;
-}
-
-/** Its answer as the tool gave it: the words for the chat and what sits beside them. Null when it said nothing. */
-export function cleanChatAnswer(raw: unknown): { text: string; cards: ChatCard[] } | null {
-  if (!raw || typeof raw !== "object") return null;
-  const { say, cards } = raw as { say?: unknown; cards?: unknown };
-  const text = shortSay(say);
-  return text ? { text, cards: cleanCards(cards) } : null;
-}
-
-/** A card in a line of words, so a later question can lean on what was shown. */
-export function cardInWords(c: ChatCard): string {
-  const body =
-    c.kind === "deal"
-      ? [c.stage, ...c.rows.map((r) => `${r.label}: ${r.value}`), c.text]
-      : c.kind === "figures"
-        ? c.items.map((i) => `${i.value} ${i.label}`)
-        : c.kind === "timeline"
-          ? c.events.map((e) => `${e.when}: ${e.what}`)
-          : c.kind === "bars"
-            ? c.bars.map((b) => `${b.label}: ${b.value}`)
-            : [c.text];
-  return `${c.title}${c.kind === "deal" && c.jobId ? ` (deal id ${c.jobId})` : ""}: ${body.filter(Boolean).join("; ")}`;
-}
-
-/** An earlier answer as it goes back to Claude: what it said, then what it showed beside it. */
-export const lineForModel = (l: ChatLine): string =>
-  l.cards?.length ? `${l.text}\n\n(Shown beside the chat: ${l.cards.map(cardInWords).join(" | ")})` : l.text;
-
 /** What is sent to Claude: the conversation so far, then the question. */
 export function chatMessages(history: readonly ChatLine[], text: string): { role: "user" | "assistant"; content: string }[] {
   return [
-    ...history.map((l) => ({ role: l.role === "you" ? ("user" as const) : ("assistant" as const), content: lineForModel(l) })),
+    ...history.map((l) => ({ role: l.role === "you" ? ("user" as const) : ("assistant" as const), content: l.text })),
     { role: "user", content: text },
   ];
 }

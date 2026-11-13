@@ -4,7 +4,10 @@ import { fireDue } from "@/lib/server/design-sol-agents";
 import { solAsksForDesigns } from "@/lib/server/design-deal-team-repo";
 import { dayDone, dealFeed, exampleCount, feedExtras, markDeal, unmarkDeal } from "@/lib/server/design-feed";
 import { cleanLeadRule, type LaterChoice, type MarkKind } from "@/lib/domain/design/deal-feed";
-import { loadPrefs, savePrefs } from "@/lib/server/design-after-sale-repo";
+import { bookedJobs, loadPrefs, savePrefs } from "@/lib/server/design-after-sale-repo";
+import { installDayChoices } from "@/lib/domain/design/install-days";
+import { todayInMarket } from "@/lib/domain/market";
+import { addDaysISO } from "@/lib/domain/scheduling";
 
 /**
  * GET → { deals, callsOn, team }: the deal feed on Today (deal-feed.ts), every deal this member may see that is being
@@ -17,20 +20,35 @@ export async function GET() {
     // Sol looks over the deals not yet designed whose customers have said what they want, and asks for a design in
     // the deal's team chat (at most every few minutes a business; by rule, no credit).
     await solAsksForDesigns(who.member.businessId).catch((e) => console.error("sol's design requests", e instanceof Error ? e.message : e));
-    const [deals, extras, examples, today, prefs] = await Promise.all([
+    const day = todayInMarket();
+    const [deals, extras, examples, today, prefs, booked] = await Promise.all([
       dealFeed(who.member, viewerOf(who.member)),
       feedExtras(who.member.businessId, who.member.email),
       exampleCount(who.member.businessId).catch(() => null),
       dayDone(who.member.businessId, who.member.email).catch(() => null),
       loadPrefs(who.member.businessId).catch(() => null),
+      bookedJobs(who.member.businessId, day, addDaysISO(day, 80)).catch(() => []),
     ]);
+    // The days Sol offers for a signed deal's install (install-days.ts): free days in weeks not yet full, the whole team's.
+    const installDays = installDayChoices({ booked: booked.map((b) => b.date), perWeek: prefs?.weeklyCapacity ?? 5, today: day });
+    const signOff = { sender: who.member.firstName ?? "", business: who.member.businessName };
     // What has come due in Sol's outbox goes after the answer, as when the board is read (not while viewing as someone).
     if (!who.member.viewedBy) {
       const business = { id: who.member.businessId, name: who.member.businessName };
       after(() => fireDue(business).catch((e) => console.error("Sol's outbox couldn't send", e instanceof Error ? e.message : e)));
     }
     // Who is reading, so Today follows the team (10 Nov 2026): the owner opens on everyone's deals, others on their own.
-    return Response.json({ ok: true, deals, ...extras, examples, today, role: who.member.role, leadRule: prefs?.leadRule ?? "adder" });
+    return Response.json({
+      ok: true,
+      deals,
+      ...extras,
+      examples,
+      today,
+      role: who.member.role,
+      leadRule: prefs?.leadRule ?? "adder",
+      installDays,
+      signOff,
+    });
   });
 }
 

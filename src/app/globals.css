@@ -12,11 +12,6 @@
 :root,
 .theme-light,
 .theme-installer .theme-light {
-  /* The chief of staff's own colour (14 Nov 2026, Martin: the chat takes the colour of the agent): a deep teal,
-     dark enough for white words on it, so its window and round are never taken for Sol's or the phone assistant's.
-     Here, not in the studio theme, because its window is drawn on the page body, outside that theme. */
-  --colleague: #0f5f58;
-  --colleague-soft: #e2f1ef;
   --canvas: #faf9f6;
   --surface: #ffffff;
   --surface-2: #f0ece7;
@@ -523,8 +518,6 @@ html.sol-resizing .team-pop {
   --color-sun-line-ink: var(--sun-line-ink);
   --color-market: var(--market);
   --color-market-ink: var(--market-ink);
-  --color-colleague: var(--colleague);
-  --color-colleague-soft: var(--colleague-soft);
   --color-kind-install: var(--kind-install);
   --color-kind-install-soft: var(--kind-install-soft);
   --color-kind-message: var(--kind-message);

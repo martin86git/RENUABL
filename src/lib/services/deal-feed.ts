@@ -14,6 +14,10 @@ export interface FeedAnswer {
   role?: "owner" | "member" | "designer";
   /** Who the owner's new leads go to (deal-feed.ts `LeadRule`). */
   leadRule?: "adder" | "turns";
+  /** The days Sol offers for a signed deal's install, soonest first (install-days.ts). */
+  installDays?: string[];
+  /** Who an email from the card is signed by. */
+  signOff?: { sender: string; business: string };
 }
 
 /** Who the owner's new leads go to: whoever adds them, or the salespeople in turn (the owner only). */

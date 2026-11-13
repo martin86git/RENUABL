@@ -59,11 +59,12 @@ import {
 } from "@/lib/domain/design/deal-feed";
 import { OPEN_STAGES, STAGE_LABELS } from "@/lib/domain/design/crm";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
-import { emailDeal, listPipelines, setDealOwner } from "@/lib/services/crm";
+import { emailDeal, listPipelines, saveJob, setDealOwner } from "@/lib/services/crm";
+import { dayChip, installDayEmail } from "@/lib/domain/design/install-days";
 import { PIPELINES, type Pipeline } from "@/lib/domain/design/deal";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
 import { briefHref } from "@/lib/domain/design/deal-team";
-import { exampleDeals, loadFeed, markFeedDeal, saveLeadRule, writeWithSol, type FeedAnswer } from "@/lib/services/deal-feed";
+import { exampleDeals, loadFeed, markFeedDeal, saveLeadRule, type FeedAnswer } from "@/lib/services/deal-feed";
 import { DEAL_TEAM_CHANGED } from "@/lib/services/deal-team";
 import { AerialRoof, type AerialRoofSpec, type RoofFinish, type RoofForm } from "./aerial-roof";
 import { PATHS } from "./design-shell";
@@ -111,6 +112,8 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         today: r.today ?? null,
         role: r.role,
         leadRule: r.leadRule,
+        installDays: r.installDays,
+        signOff: r.signOff,
       });
       setProblem(null);
     } else setProblem(r.message);
@@ -357,19 +360,27 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
             <p className="text-[13px] text-ink-2">Nothing needs you right now. Sol has the rest in hand.</p>
           </div>
         )}
-        {parts.needs.map((d) => (
-          <DealCard
-            key={d.jobId}
-            deal={d}
-            now={now}
-            me={me}
-            callsOn={Boolean(data?.callsOn)}
-            team={data?.team ?? []}
-            solo={solo}
-            onChanged={load}
-            onMark={(mark) => setMark(d.jobId, mark)}
-          />
-        ))}
+        {/* Cards half the page wide, two side by side on a wide screen (14 Nov 2026, Martin: they needn't be so wide). */}
+        {parts.needs.length > 0 && (
+          <div className="grid items-start gap-3 xl:grid-cols-2">
+            {parts.needs.map((d) => (
+              <DealCard
+                key={d.jobId}
+                deal={d}
+                now={now}
+                me={me}
+                callsOn={Boolean(data?.callsOn)}
+                team={data?.team ?? []}
+                solo={solo}
+                onChanged={load}
+                onMark={(mark) => setMark(d.jobId, mark)}
+                installDays={data?.installDays}
+                signOff={data?.signOff}
+                stacked
+              />
+            ))}
+          </div>
+        )}
       </Part>
 
       {parts.coming.length > 0 && (
@@ -396,6 +407,8 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
                 solo={solo}
                 onChanged={load}
                 onMark={(mark) => setMark(d.jobId, mark)}
+                installDays={data?.installDays}
+                signOff={data?.signOff}
               />
             ))}
           </ul>
@@ -598,6 +611,11 @@ function DealRow(props: {
   solo?: boolean;
   onChanged: () => void;
   onMark: (mark: FeedMark | null) => void;
+  /** The days Sol offers for an install, and who an email is signed by (install-days.ts). */
+  installDays?: string[];
+  signOff?: { sender: string; business: string };
+  /** In a column of cards: the team chat goes under the deal, not beside it. */
+  stacked?: boolean;
 }) {
   const { deal: d, now } = props;
   const [open, setOpen] = useState(false);
@@ -644,6 +662,11 @@ function DealCard(props: {
   solo?: boolean;
   onChanged: () => void;
   onMark: (mark: FeedMark | null) => void;
+  /** The days Sol offers for an install, and who an email is signed by (install-days.ts). */
+  installDays?: string[];
+  signOff?: { sender: string; business: string };
+  /** In a column of cards: the team chat goes under the deal, not beside it. */
+  stacked?: boolean;
 }) {
   const { deal: d, now } = props;
   const need = needsYou(d, now);
@@ -683,7 +706,7 @@ function DealCard(props: {
   // The deal and its team chat as two cards side by side (8 Nov 2026, Martin: the chat wider and floating, not inside
   // the deal's post); the chat drops under the deal on a narrow screen.
   return (
-    <div className={clsx("grid items-stretch gap-3", pad && "lg:grid-cols-[minmax(0,1fr)_22rem]")}>
+    <div className={clsx("grid content-start items-stretch gap-3", pad && !props.stacked && "lg:grid-cols-[minmax(0,1fr)_22rem]")}>
       <article className={clsx("relative flex min-w-0 flex-col rounded-2xl bg-surface p-4 ring-1 sm:p-5", "ring-line")}>
         {cleared && (
           <div className="feed-cleared absolute inset-0 z-10 grid place-items-center rounded-2xl bg-surface/85" role="status">
@@ -696,7 +719,7 @@ function DealCard(props: {
           </div>
         )}
         <div className="flex gap-4">
-          <RoofThumb deal={d} />
+          <RoofThumb deal={d} mid={props.stacked} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <Link href={`${PATHS.deals}/${d.jobId}`} className="truncate text-[15px] font-semibold text-ink hover:underline">
@@ -704,11 +727,11 @@ function DealCard(props: {
               </Link>
               {d.suburb && <span className="text-[13px] text-muted">· {d.suburb}</span>}
               <HeatChip deal={d} />
-              <span className="ml-auto text-[12px] text-muted">{agoWords(d.events[0]?.at ?? d.createdAt, now)}</span>
             </div>
             <p className="mt-0.5 text-[13px] text-ink-2">
               {systemLine(d) || d.title || "Solar"} · <span className="text-ink">{STAGE_LABELS[d.stage]}</span>
               {d.clock && OPEN_STAGES.includes(d.stage) ? ` · ${d.clock}` : ""}
+              <span className="text-muted"> · {agoWords(d.events[0]?.at ?? d.createdAt, now)}</span>
             </p>
             {held && (
               <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] text-ink-2">
@@ -728,7 +751,30 @@ function DealCard(props: {
               </p>
             )}
           </div>
+          {/* What the deal needs, in the card's top right: the one call to action (14 Nov 2026, Martin). */}
+          <div className="hidden w-[38%] max-w-[14rem] shrink-0 sm:block">
+            <NeedCall deal={d} move={move} now={now} reviewing={reviewing} onReview={() => setReviewing((r) => !r)} onCall={call} />
+          </div>
         </div>
+        <div className="mt-3 sm:hidden">
+          <NeedCall deal={d} move={move} now={now} reviewing={reviewing} onReview={() => setReviewing((r) => !r)} onCall={call} />
+        </div>
+
+        {/* A signed deal: Sol's days to choose from, with the email that goes with the day (install-days.ts). */}
+        {move?.kind === "book" && (
+          <BookInstall deal={d} days={props.installDays ?? []} signOff={props.signOff} onBooked={props.onChanged} />
+        )}
+        {reviewing && d.sol?.id && (
+          <ReviewSol
+            deal={d}
+            now={now}
+            onClose={() => setReviewing(false)}
+            onDone={() => {
+              setReviewing(false);
+              props.onChanged();
+            }}
+          />
+        )}
 
         {d.events.length > 0 && (
           <ul className="mt-3 space-y-1.5 border-t border-line pt-3">
@@ -748,31 +794,10 @@ function DealCard(props: {
           </ul>
         )}
 
-        {/* Sol's line: why the next move is the next move, or where the deal is at when nothing is needed. */}
-        <div className="mt-3 flex items-start gap-2 rounded-xl bg-surface-2 px-3 py-2">
-          <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
-          <p className="whitespace-pre-line text-[13px] leading-snug text-ink">{solLine(d, now)}</p>
-        </div>
-
-        {/* The foot of the card, kept at the bottom however tall the chat beside it makes the row: tell Sol what to write,
-            then the one thing to do now, lit, with the deal's tools quiet beside it (8 Nov 2026, Martin). */}
+        {/* The foot of the card, kept at the bottom however tall the chat beside it makes the row: the deal's tools, quiet,
+            and Done / Later (14 Nov 2026, Martin: no box to type Sol an instruction; the next move is the top right). */}
         <div className="mt-auto pt-3">
-          <SolWrite deal={d} onSent={props.onChanged} />
-          {reviewing && d.sol?.id && (
-            <ReviewSol
-              deal={d}
-              now={now}
-              onClose={() => setReviewing(false)}
-              onDone={() => {
-                setReviewing(false);
-                props.onChanged();
-              }}
-            />
-          )}
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            {move && (
-              <MoveButton deal={d} move={move} now={now} reviewing={reviewing} onReview={() => setReviewing((r) => !r)} onCall={call} />
-            )}
+          <div className="flex flex-wrap items-center gap-1.5">
             {move?.kind !== "call" && (
               <Tool
                 quiet={Boolean(move)}
@@ -877,10 +902,6 @@ const field =
 const dark =
   "inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-[13px] font-medium text-primary-ink transition hover:brightness-110 disabled:bg-surface-2 disabled:text-muted";
 
-/**
- * Tell Sol what to write (8 Nov 2026, Martin: a field, not a Write button): the member says what to say, Sol writes the
- * email from the record (never a cost), and it opens under the field to change and send through the deal's own email.
- */
 /** One of the deal's tools: labelled while nothing needs doing; a quiet grey round while another is the next move. */
 function Tool(props: { quiet: boolean; label: string; title: string; href?: string; onClick?: () => void; children: React.ReactNode }) {
   const look = clsx(
@@ -1102,92 +1123,160 @@ function ReviewSol(props: { deal: FeedDeal; now: Date; onClose: () => void; onDo
   );
 }
 
-function SolWrite({ deal: d, onSent }: { deal: FeedDeal; onSent: () => void }) {
-  const first = d.customer.split(/\s+/)[0] || "them";
-  const [askText, setAskText] = useState("");
-  const [draft, setDraft] = useState<{ subject: string; body: string } | null>(null);
+/**
+ * What the deal needs, as the card's call to action (14 Nov 2026, Martin: the need is the most important thing on the
+ * card, so it sits in the top right and asks for attention): Sol's words on what is needed, and the button for it. A
+ * signed deal's button is its days, under the card's head (BookInstall).
+ */
+function NeedCall(props: {
+  deal: FeedDeal;
+  move: NextMove | null;
+  now: Date;
+  reviewing: boolean;
+  onReview: () => void;
+  onCall: () => void;
+}) {
+  const { deal: d, move, now } = props;
+  const words = solLine(d, now);
+  if (!move) return <p className="text-[13px] leading-snug text-ink-2 sm:text-right">{words}</p>;
+  return (
+    <div className="flex flex-col gap-2 sm:items-end sm:text-right">
+      <p className="text-[14.5px] font-semibold leading-snug text-ink">
+        <span className="mb-0.5 mr-2 inline-block size-2 rounded-full bg-sun-line align-middle" aria-hidden />
+        {words}
+      </p>
+      {move.kind !== "book" && (
+        <MoveButton deal={d} move={move} now={now} reviewing={props.reviewing} onReview={props.onReview} onCall={props.onCall} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Book the install with a click (14 Nov 2026, Martin: Sol surfaces dates to choose from, along with a proposed email):
+ * the days Sol found free (install-days.ts), the soonest picked, and the email offering it to the customer, worded for the
+ * day picked and opened to change. One press books the day on the deal and sends the email through the deal's own email.
+ */
+function BookInstall(props: { deal: FeedDeal; days: string[]; signOff?: { sender: string; business: string }; onBooked: () => void }) {
+  const { deal: d, days } = props;
+  const first = d.customer.trim().split(/\s+/)[0] || "them";
+  const [chosen, setDay] = useState<string | null>(null);
+  // The soonest day is picked until another is (and again if the one picked is no longer free).
+  const day = chosen && days.includes(chosen) ? chosen : (days[0] ?? null);
+  const [edits, setEdits] = useState<{ subject: string; body: string } | null>(null);
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const write = async () => {
+  const email = day
+    ? (edits ?? installDayEmail({ firstName: first, day, sender: props.signOff?.sender ?? "", business: props.signOff?.business ?? "" }))
+    : null;
+  const pick = (next: string) => {
+    setDay(next);
+    setEdits(null);
+  };
+  const book = async (send: boolean) => {
+    if (!day || busy) return;
     setBusy(true);
     setNote(null);
-    const r = await writeWithSol(d.jobId, askText);
+    const saved = await saveJob(d.jobId, { installDate: day });
+    if (!saved.ok) {
+      setBusy(false);
+      return setNote(saved.message);
+    }
+    if (send && email) {
+      const sent = await emailDeal(d.jobId, { subject: email.subject, body: email.body, toCustomer: true });
+      if (!sent.ok) {
+        setBusy(false);
+        setNote(`Booked for ${dayChip(day)}, but the email didn't go: ${sent.message}`);
+        return props.onBooked();
+      }
+    }
     setBusy(false);
-    if (r.ok) setDraft({ subject: r.subject, body: r.body });
-    else setNote(r.message);
+    props.onBooked();
   };
-  const send = async () => {
-    if (!draft) return;
-    setBusy(true);
-    const r = await emailDeal(d.jobId, { subject: draft.subject, body: draft.body, toCustomer: true });
-    setBusy(false);
-    if (!r.ok) return setNote(r.message);
-    setDraft(null);
-    setAskText("");
-    setNote(`Sent to ${first}.`);
-    onSent();
-  };
+  if (!days.length)
+    return (
+      <p className="mt-3 rounded-xl bg-surface-2 px-3.5 py-3 text-[13px] text-ink-2">
+        No free install days in the next ten weeks.{" "}
+        <Link href={`${PATHS.deals}/${d.jobId}?tab=details`} className="font-medium text-ink underline-offset-4 hover:underline">
+          Set a day on the deal
+        </Link>
+      </p>
+    );
   return (
-    <div>
-      {!draft && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (d.canEmail && askText.trim().length >= 3) void write();
-          }}
-          className="flex items-center gap-2 rounded-full bg-canvas py-1 pl-3 pr-1 ring-1 ring-line focus-within:ring-2 focus-within:ring-sun-line"
-        >
-          <SolIcon className="size-4 shrink-0 text-sun-line" />
-          <input
-            className="min-w-0 flex-1 bg-transparent py-1.5 text-[13.5px] text-ink placeholder:text-muted focus:outline-none"
-            value={askText}
-            onChange={(e) => setAskText(e.target.value)}
-            disabled={!d.canEmail || busy}
-            aria-label={`Tell Sol what to write to ${first}`}
-            placeholder={d.canEmail ? `Tell Sol what to write to ${first}…` : `Add an email to ${first}'s record to write from here`}
-          />
+    <div className="mt-4 rounded-2xl bg-canvas p-3.5 ring-1 ring-line">
+      <p className="flex items-center gap-1.5 text-[12px] font-medium text-ink-2">
+        <SolIcon className="size-3.5 text-sun-line" /> Sol found these days free
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Installation day">
+        {days.map((x) => (
           <button
-            type="submit"
-            aria-label="Write it"
-            disabled={!d.canEmail || busy || askText.trim().length < 3}
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-ink transition hover:brightness-110 disabled:bg-surface-2 disabled:text-muted"
+            key={x}
+            type="button"
+            role="radio"
+            aria-checked={x === day}
+            onClick={() => pick(x)}
+            className={clsx(
+              "inline-flex h-9 items-center rounded-full px-3.5 text-[13px] font-medium transition",
+              x === day ? "bg-primary text-primary-ink" : "bg-surface text-ink ring-1 ring-line hover:ring-ink-2",
+            )}
           >
-            {busy ? <span className="size-3 animate-pulse rounded-full bg-current" /> : <ArrowUp className="size-4" />}
+            {dayChip(x)}
           </button>
-        </form>
-      )}
-      {draft && (
-        <div className="space-y-2 rounded-xl bg-canvas p-3 ring-1 ring-line">
-          <div className="flex items-center justify-between">
-            <p className="text-[12.5px] font-semibold text-ink">Sol&apos;s email to {first}</p>
-            <button type="button" aria-label="Close" onClick={() => setDraft(null)} className="rounded-full p-1 text-muted hover:text-ink">
-              <X className="size-4" />
-            </button>
-          </div>
-          <input
-            className={field}
-            value={draft.subject}
-            onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
-            aria-label="Subject"
-          />
-          <textarea
-            className={`${field} min-h-40`}
-            value={draft.body}
-            onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-            aria-label="Email"
-          />
-          <div className="flex items-center gap-2">
-            <button type="button" className={dark} disabled={busy} onClick={() => void send()}>
-              <Mail className="size-4" /> {busy ? "Sending…" : `Send to ${first}`}
-            </button>
-            <button type="button" className="text-[13px] font-medium text-ink-2 hover:text-ink" onClick={() => setDraft(null)}>
-              Start again
-            </button>
-          </div>
+        ))}
+      </div>
+      {email && d.canEmail && (
+        <div className="mt-3 rounded-xl bg-surface ring-1 ring-line">
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
+          >
+            <Mail className="size-4 shrink-0 text-muted" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[13px] font-medium text-ink">{email.subject}</span>
+              {!open && <span className="block truncate text-[12px] text-muted">{email.body.split("\n\n")[1]}</span>}
+            </span>
+            <span className="shrink-0 text-[12px] font-medium text-ink-2">{open ? "Done" : "Edit"}</span>
+          </button>
+          {open && (
+            <div className="space-y-2 border-t border-line p-3">
+              <input
+                className={field}
+                value={email.subject}
+                onChange={(e) => setEdits({ ...email, subject: e.target.value })}
+                aria-label="Subject"
+              />
+              <textarea
+                className={`${field} min-h-44`}
+                value={email.body}
+                onChange={(e) => setEdits({ ...email, body: e.target.value })}
+                aria-label="Email"
+              />
+            </div>
+          )}
         </div>
       )}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <button type="button" className={dark} disabled={!day || busy} onClick={() => void book(d.canEmail)}>
+          <CalendarPlus className="size-4" aria-hidden />
+          {busy ? "Booking…" : day ? (d.canEmail ? `Book ${dayChip(day)} and email ${first}` : `Book ${dayChip(day)}`) : "Pick a day"}
+        </button>
+        {d.canEmail && (
+          <button
+            type="button"
+            disabled={!day || busy}
+            onClick={() => void book(false)}
+            className="text-[13px] font-medium text-ink-2 hover:text-ink disabled:text-muted"
+          >
+            Book without emailing
+          </button>
+        )}
+        {!d.canEmail && <span className="text-[12.5px] text-muted">No email on file for {first}.</span>}
+      </div>
       {note && (
-        <p className={clsx("mt-1.5 px-1 text-[12.5px]", note.startsWith("Sent") ? "text-positive" : "text-danger")} role="status">
+        <p className="mt-2 text-[12.5px] text-danger" role="status">
           {note}
         </p>
       )}
@@ -1303,10 +1392,12 @@ function DealChatSheet(props: { deal: FeedDeal; startText: string; onClose: () =
   );
 }
 
-function RoofThumb({ deal: d, small }: { deal: FeedDeal; small?: boolean }) {
+function RoofThumb({ deal: d, small, mid }: { deal: FeedDeal; small?: boolean; mid?: boolean }) {
   const frame = small
     ? "relative h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 ring-1 ring-line"
-    : "relative h-[84px] w-[112px] shrink-0 overflow-hidden rounded-xl bg-surface-2 ring-1 ring-line sm:h-[96px] sm:w-[128px]";
+    : mid
+      ? "relative h-[60px] w-[80px] shrink-0 overflow-hidden rounded-xl bg-surface-2 ring-1 ring-line"
+      : "relative h-[84px] w-[112px] shrink-0 overflow-hidden rounded-xl bg-surface-2 ring-1 ring-line sm:h-[96px] sm:w-[128px]";
   if (d.sample)
     return (
       <div className={frame}>
