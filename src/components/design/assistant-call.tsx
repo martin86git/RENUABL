@@ -3,11 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { ArrowUp, ChevronDown, ChevronUp, PhoneOff, X } from "lucide-react";
+import Link from "next/link";
+import { ArrowUp, ArrowUpRight, ChevronDown, ChevronUp, MessageSquare, PhoneOff, PhoneOutgoing, X } from "lucide-react";
+import { TEXT_MAX } from "@/lib/domain/design/contact-reach";
 import { clockWords, joinRuns, phaseWords, TEAM_NOTE_MAX, teamLineWords, type LiveLine } from "@/lib/domain/live-call";
-import { CALL_HEADLINES } from "@/lib/domain/voice-agent";
+import { CALL_HEADLINES, TEAM_ASK_MAX } from "@/lib/domain/voice-agent";
 import { endAssistantCall, stopWatching, tellAssistant, useLiveCall, useWatchedCall } from "@/lib/services/assistant-call";
-import { useCallerInfo } from "@/lib/services/caller";
+import { askAssistantToCallBack, textCustomer, useCallerInfo, type CallerState } from "@/lib/services/caller";
+import { openCoach } from "@/lib/services/coaching";
 import { OtherCallsStrip } from "./live-calls";
 import { CallerAvatar } from "./settings-caller";
 
@@ -142,17 +145,166 @@ export function AssistantCallWindow() {
           </div>
           {call?.canSteer && <TellBox jobId={watched.jobId} assistant={caller.name} />}
           {call?.canEnd && <HangUp jobId={watched.jobId} assistant={caller.name} customer={customer} />}
-          {!call?.canSteer && (
+          {!call?.canSteer && phase !== "ended" && (
             <p className="border-t border-line px-4 py-2 text-[11px] text-muted">
-              {phase === "ended"
-                ? "The call and its summary are on the deal."
-                : "Words appear as they're said, transcribed by machine. Closing this leaves the call going."}
+              Words appear as they&apos;re said, transcribed by machine. Closing this leaves the call going.
             </p>
           )}
+          <AfterCall
+            key={watched.jobId}
+            jobId={watched.jobId}
+            customer={customer}
+            caller={caller}
+            ended={phase === "ended"}
+            // Calling back and talking the call over are the sales assistant's, once it is set up.
+            sales={call?.role !== "admin" && assistants.caller.named}
+            callsOn={assistants.callsOn}
+            textsOn={assistants.textsOn}
+            transcriptId={call?.transcriptId ?? null}
+          />
         </>
       )}
     </section>,
     document.body,
+  );
+}
+
+const PILL =
+  "tap-area inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-ink ring-1 ring-line hover:ring-sun-line";
+
+/**
+ * What to do from a call (13 Nov 2026, Martin: a finished call was only a log, "pointless"): open its deal at any
+ * time, and once it is over, have the assistant ring back to ask or confirm the one thing it missed, text the
+ * customer, or talk the call over with the assistant. A call back is lined up as any call is (calling hours, the
+ * number on the record), with what to ask written on the deal; this window then follows that call.
+ */
+function AfterCall(p: {
+  jobId: string;
+  customer: string;
+  caller: CallerState;
+  ended: boolean;
+  sales: boolean;
+  callsOn: boolean;
+  textsOn: boolean;
+  transcriptId: string | null;
+}) {
+  const [doing, setDoing] = useState<"back" | "text" | null>(null);
+  const [words, setWords] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const name = p.caller.name;
+  const pick = (d: "back" | "text") => {
+    setDoing((now) => (now === d ? null : d));
+    setWords("");
+    setNote(null);
+  };
+  const send = async () => {
+    const t = words.trim();
+    if (!t || busy || !doing) return;
+    setBusy(true);
+    setNote(null);
+    const res = doing === "back" ? await askAssistantToCallBack(p.jobId, t) : await textCustomer(p.jobId, t);
+    setBusy(false);
+    setNote({ ok: res.ok, text: res.message });
+    if (!res.ok) return;
+    setWords("");
+    setDoing(null);
+  };
+  const off = doing === "back" ? !p.callsOn : doing === "text" ? !p.textsOn : false;
+  return (
+    <div className="border-t border-line px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        {p.ended && p.sales && (
+          <button
+            type="button"
+            onClick={() => pick("back")}
+            aria-expanded={doing === "back"}
+            className={clsx(PILL, doing === "back" ? "bg-sun" : "bg-surface")}
+          >
+            <PhoneOutgoing className="size-3.5" aria-hidden />
+            Call back to ask
+          </button>
+        )}
+        {p.ended && (
+          <button
+            type="button"
+            onClick={() => pick("text")}
+            aria-expanded={doing === "text"}
+            className={clsx(PILL, doing === "text" ? "bg-sun" : "bg-surface")}
+          >
+            <MessageSquare className="size-3.5" aria-hidden />
+            Text {p.customer}
+          </button>
+        )}
+        {p.ended && p.sales && p.transcriptId && (
+          <button
+            type="button"
+            onClick={() =>
+              openCoach({
+                jobId: p.jobId,
+                transcriptId: p.transcriptId!,
+                about: `The call with ${p.customer}, ${new Date().toLocaleDateString("en-AU", { day: "numeric", month: "short" })}`,
+              })
+            }
+            className={clsx(PILL, "bg-surface")}
+          >
+            <CallerAvatar caller={p.caller} size={16} />
+            Talk it over with {name}
+          </button>
+        )}
+        <Link href={`/design/deals/${encodeURIComponent(p.jobId)}`} className={clsx(PILL, "bg-surface-2")}>
+          Open deal
+          <ArrowUpRight className="size-3.5" aria-hidden />
+        </Link>
+      </div>
+      {doing && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send();
+          }}
+          className="mt-2"
+        >
+          <textarea
+            value={words}
+            onChange={(e) => setWords(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            rows={2}
+            autoFocus
+            disabled={off}
+            maxLength={doing === "back" ? TEAM_ASK_MAX : TEXT_MAX}
+            placeholder={doing === "back" ? `What should ${name} ask or confirm?` : `Your text to ${p.customer}…`}
+            aria-label={doing === "back" ? `What ${name} should ask on the call back` : `A text to ${p.customer}`}
+            className="w-full resize-none rounded-xl bg-surface-2 px-3 py-2 text-sm text-ink outline-none ring-1 ring-line placeholder:text-muted focus:ring-sun-line disabled:text-muted"
+          />
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <p className="text-[11px] text-muted">
+              {off
+                ? doing === "back"
+                  ? "Calls from your phone assistant aren't switched on yet."
+                  : "Texts aren't switched on yet."
+                : doing === "back"
+                  ? `${name} rings ${p.customer} back in calling hours, asks this and writes the answer on the deal.`
+                  : "It goes as typed, to the mobile on their record. Replies aren't read here yet."}
+            </p>
+            <button
+              type="submit"
+              disabled={off || busy || !words.trim()}
+              className="shrink-0 rounded-full bg-sun-line px-3.5 py-1.5 text-xs font-semibold text-white disabled:bg-line disabled:text-muted"
+            >
+              {busy ? "Sending…" : doing === "back" ? `Have ${name} call back` : "Send text"}
+            </button>
+          </div>
+        </form>
+      )}
+      {note && <p className={clsx("pt-1.5 text-[11px]", note.ok ? "text-positive" : "text-danger")}>{note.text}</p>}
+      {p.ended && !doing && !note && <p className="pt-1.5 text-[11px] text-muted">The call and its summary are on the deal.</p>}
+    </div>
   );
 }
 

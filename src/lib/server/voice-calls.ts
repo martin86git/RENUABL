@@ -140,7 +140,7 @@ export interface VoiceRow {
   first_name: string | null;
   mobile: string;
   email: string | null;
-  lead: { about?: string[]; source?: string; texted?: boolean; assistant?: string; inbound?: boolean };
+  lead: { about?: string[]; source?: string; texted?: boolean; assistant?: string; inbound?: boolean; teamAsk?: string };
   status: "waiting" | "calling" | "booked" | "done" | "stopped";
   attempts: number;
   vapi_call_id: string | null;
@@ -166,6 +166,8 @@ export async function queueCall(o: {
   source?: string;
   /** What is written on the deal for a call they asked for (else the proposal page's Call me). */
   askedNote?: string;
+  /** A call back the team asked for: the one thing to ask or confirm (`cleanTeamAsk`), and who asked. */
+  teamAsk?: { text: string; by: string };
 }): Promise<QueueResult> {
   const s = voiceSettings();
   if (!s || !(await voiceOnFor(o.businessId))) return { result: "off" };
@@ -197,7 +199,7 @@ export async function queueCall(o: {
           speakableName(customer.firstName || customer.name.split(" ")[0]) || null,
           mobile,
           customer.email || null,
-          JSON.stringify({ about, source: o.source }),
+          JSON.stringify({ about, source: o.source, ...(o.teamAsk ? { teamAsk: o.teamAsk.text } : {}) }),
         ],
       );
     let rows = await insert();
@@ -208,6 +210,11 @@ export async function queueCall(o: {
       await onDeal(
         { ...rows[0], lead: { ...rows[0].lead, assistant: (await callMeFor(o.businessId))?.assistant } },
         o.askedNote ?? "They asked for a call about their proposal (Call me on the proposal page).",
+      );
+    if (o.teamAsk)
+      await onDeal(
+        { ...rows[0], lead: { ...rows[0].lead, assistant: (await callerOf(o.businessId, roleOfMode(o.mode))).name } },
+        `${o.teamAsk.by} asked for a call back to ask: ${o.teamAsk.text}`,
       );
     const window = nextCallWindow(new Date());
     if (!(await placeCall(s, rows[0], window)) || !window) return { result: "failed" };
@@ -284,6 +291,7 @@ async function briefFor(
       about: row.lead.about ?? [],
       proposal: view ? customerFacts(view) : null,
       asked: row.asked,
+      teamAsk: row.lead.teamAsk ?? null,
       canBook: own && !view,
       canSendLink: Boolean(view) && smsConfigured(),
       hasEmail: Boolean(row.email),
@@ -917,6 +925,13 @@ export async function liveCallFor(businessId: string, jobId: string): Promise<Li
         r.live_vapi_id,
       ])
     : [];
+  // The same id the deal's transcripts go by (call-transcripts.ts), so the window can hand this call to the coach chat.
+  const written = r.live_vapi_id
+    ? await query<{ id: string }>(
+        `select id from voice_call_events where voice_call_id = $1 and vapi_call_id = $2 and kind = 'ended' order by at desc limit 1`,
+        [r.id, r.live_vapi_id],
+      )
+    : [];
   const now = new Date(r.now).getTime();
   const started = r.live_started_at ? new Date(r.live_started_at).getTime() : null;
   const ended = r.live_ended_at ? new Date(r.live_ended_at).getTime() : null;
@@ -933,6 +948,7 @@ export async function liveCallFor(businessId: string, jobId: string): Promise<Li
     partial: r.live_partial && (r.live_partial.role === "assistant" || r.live_partial.role === "customer") ? r.live_partial : null,
     canSteer: Boolean(r.live_control_url) && r.live_status === "in-progress",
     canEnd: mayEndCall({ controlUrl: r.live_control_url, liveStatus: r.live_status }),
+    transcriptId: written[0]?.id ?? null,
   };
 }
 

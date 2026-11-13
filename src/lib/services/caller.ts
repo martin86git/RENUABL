@@ -158,6 +158,14 @@ export const askByEmailFirst = (jobId: string) =>
 export const askAssistantToCall = (jobId: string) =>
   ask<{ message: string; already?: boolean }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call`, { method: "POST" });
 
+/** The phone assistant rings this deal's customer back to ask or confirm one thing the team typed. */
+export const askAssistantToCallBack = (jobId: string, what: string) =>
+  ask<{ message: string; already?: boolean }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ask: what }),
+  });
+
 /** The admin assistant rings this deal's customer to book their installation. Answers what to tell the member. */
 export const askAssistantToBook = (jobId: string) =>
   ask<{ message: string; already?: boolean }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call`, {

@@ -5,6 +5,7 @@ import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { query } from "@/lib/server/db";
 import { callerOf } from "@/lib/server/design-caller-repo";
+import { cleanTeamAsk } from "@/lib/domain/voice-agent";
 import { queueCall } from "@/lib/server/voice-calls";
 import { saidNoToCalls } from "@/lib/server/design-call-consent";
 import { allow } from "@/lib/server/rate-limit";
@@ -36,8 +37,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if ("refuse" in who) return who.refuse;
     if (!allow(request, "design-feed-call", 20))
       return Response.json({ ok: false, message: "That's a lot of calls at once. Try again later." }, { status: 429 });
-    const body = (await request.json().catch(() => null)) as { book?: unknown } | null;
+    const body = (await request.json().catch(() => null)) as { book?: unknown; ask?: unknown } | null;
     const book = body?.book === true;
+    // A call back to ask or confirm one thing (the finished call's window): the words go to the assistant as data.
+    const ask = book ? null : cleanTeamAsk(body?.ask);
+    if (body?.ask !== undefined && !book && !ask)
+      return Response.json({ ok: false, message: "Say what to ask or confirm on the call back." }, { status: 400 });
     const found = validId(id) ? await jobById(who.member.businessId, id, viewerOf(who.member)) : null;
     const caller = await callerOf(who.member.businessId, book ? "admin" : "sales");
     const WORDS = words(caller.name);
@@ -76,11 +81,16 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       mode: book ? "install" : out[0]?.n ? "proposal" : "lead",
       asked: false,
       source: book ? undefined : "Asked for by the team",
+      ...(ask ? { teamAsk: { text: ask, by: who.member.email.split("@")[0] } } : {}),
     });
     if (placed.result === "placed")
       return Response.json({
         ok: true,
-        message: book ? `${caller.name} will call ${placed.when} to book the installation.` : `${caller.name} will call ${placed.when}.`,
+        message: book
+          ? `${caller.name} will call ${placed.when} to book the installation.`
+          : ask
+            ? `${caller.name} will call back ${placed.when} to ask.`
+            : `${caller.name} will call ${placed.when}.`,
       });
     // A call already lined up: the window opens on it rather than failing.
     if (placed.result === "already") return Response.json({ ok: true, already: true, message: WORDS.already });

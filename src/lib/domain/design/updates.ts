@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-13",
     area: "Calls",
+    words: "From a finished call: have your assistant ring back to ask one thing, text the customer, talk it over, or open the deal.",
+  },
+  {
+    day: "2026-11-13",
+    area: "Calls",
     words: "Your phone assistant's calls keep a transcript but no audio, so it no longer says calls are recorded.",
   },
   {

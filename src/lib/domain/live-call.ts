@@ -216,4 +216,6 @@ export interface LiveCallView {
   canSteer: boolean;
   /** The team can hang up now (ringing or on the call, with a control address). */
   canEnd: boolean;
+  /** Once the call is over and written up: its transcript's id on the deal, to ask the assistant about this call. */
+  transcriptId?: string | null;
 }
