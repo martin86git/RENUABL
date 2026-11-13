@@ -8,6 +8,7 @@ import {
   phaseWords,
   readLiveEvent,
   TEAM_NOTE_MAX,
+  vapiCallOver,
   teamCommand,
   teamLineWords,
 } from "./live-call";
@@ -136,5 +137,13 @@ describe("the call's transcriber", () => {
     expect(t).toMatchObject({ provider: "deepgram", model: "nova-3", language: "en-AU" });
     expect(t.keyterm).toEqual(expect.arrayContaining(["Charlie", "Sunrise Solar", "Michelle", "inverter", "Solar Victoria"]));
     expect(t.keyterm.length).toBeLessThanOrEqual(50);
+  });
+});
+
+describe("a call Vapi has finished", () => {
+  it("is over only when Vapi says ended", () => {
+    expect(vapiCallOver("ended")).toBe(true);
+    for (const s of ["scheduled", "queued", "ringing", "in-progress", "forwarding", undefined, null, 3])
+      expect(vapiCallOver(s)).toBe(false);
   });
 });

@@ -20,7 +20,16 @@
  */
 import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
 import { normaliseMobile } from "@/lib/domain/contact";
-import { MAX_LINES, livePhase, teamCommand, type LiveCallView, type LiveEvent, type LiveLine } from "@/lib/domain/live-call";
+import {
+  MAX_LINES,
+  NEVER_PLACED_MS,
+  livePhase,
+  teamCommand,
+  vapiCallOver,
+  type LiveCallView,
+  type LiveEvent,
+  type LiveLine,
+} from "@/lib/domain/live-call";
 import { customerFacts } from "@/lib/domain/design/sol-customer";
 import { callbackRequestEmail, consultBookedEmail } from "@/lib/domain/emails";
 import { todayInMarket } from "@/lib/domain/market";
@@ -163,24 +172,28 @@ export async function queueCall(o: {
     const about = [job.title && `Looking for: ${job.title}`, suburb && `Suburb: ${suburb}`, o.source && `Came from: ${o.source}`].filter(
       (l): l is string => Boolean(l),
     );
-    const rows = await query<VoiceRow>(
-      `insert into voice_calls (id, business_id, job_id, customer_id, mode, asked, first_name, mobile, email, lead)
+    const insert = () =>
+      query<VoiceRow>(
+        `insert into voice_calls (id, business_id, job_id, customer_id, mode, asked, first_name, mobile, email, lead)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        on conflict (business_id, job_id) where status in ('waiting', 'calling') do nothing
        returning *`,
-      [
-        newId("vc"),
-        o.businessId,
-        o.jobId,
-        customer.id,
-        o.mode,
-        o.asked,
-        speakableName(customer.firstName || customer.name.split(" ")[0]) || null,
-        mobile,
-        customer.email || null,
-        JSON.stringify({ about, source: o.source }),
-      ],
-    );
+        [
+          newId("vc"),
+          o.businessId,
+          o.jobId,
+          customer.id,
+          o.mode,
+          o.asked,
+          speakableName(customer.firstName || customer.name.split(" ")[0]) || null,
+          mobile,
+          customer.email || null,
+          JSON.stringify({ about, source: o.source }),
+        ],
+      );
+    let rows = await insert();
+    // A call still held open on this deal may be one Vapi finished long ago: closed, a new one goes ahead.
+    if (!rows[0] && (await clearDeadCall(s, o.businessId, o.jobId).catch(() => false))) rows = await insert();
     if (!rows[0]) return { result: "already" };
     if (o.asked)
       await onDeal(
@@ -299,6 +312,39 @@ async function placeCall(s: VoiceSettings, row: VoiceRow, window: { from: Date; 
     await finish(row.id, "stopped", { stop_reason: "Vapi didn't answer" });
     return false;
   }
+}
+
+/**
+ * The call held open on this deal, checked with Vapi: closed when Vapi says it has ended (or doesn't know it), or when it
+ * was never placed at all. True when the deal is free for a new call. A call still lined up or under way is left be.
+ */
+async function clearDeadCall(s: VoiceSettings, businessId: string, jobId: string): Promise<boolean> {
+  const open = await query<VoiceRow>(
+    `select * from voice_calls where business_id = $1 and job_id = $2 and status in ('waiting', 'calling') limit 1`,
+    [businessId, jobId],
+  );
+  const r = open[0];
+  if (!r) return true;
+  if (!r.vapi_call_id) {
+    if (Date.now() - new Date(r.updated_at).getTime() < NEVER_PLACED_MS) return false;
+    await finish(r.id, "stopped", { stop_reason: "The call was never placed" });
+    return true;
+  }
+  const res = await fetch(`${VAPI}/call/${encodeURIComponent(r.vapi_call_id)}`, {
+    headers: { authorization: `Bearer ${s.key}` },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (res.status === 404) {
+    await finish(r.id, "stopped", { stop_reason: "Vapi has no record of the call" });
+    return true;
+  }
+  if (!res.ok) return false;
+  const json = (await res.json().catch(() => ({}))) as { status?: unknown; endedReason?: unknown };
+  if (!vapiCallOver(json.status)) return false;
+  const why = typeof json.endedReason === "string" ? `: ${json.endedReason.slice(0, 120)}` : "";
+  await finish(r.id, "stopped", { stop_reason: `Vapi's call ended without telling us${why}` });
+  await query(`update voice_calls set live_status = 'ended', live_ended_at = coalesce(live_ended_at, now()) where id = $1`, [r.id]);
+  return true;
 }
 
 async function finish(

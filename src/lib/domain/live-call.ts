@@ -98,6 +98,16 @@ export function teamCommand(o: { text: string; say: boolean; business: string })
 export const teamLineWords = (role: LiveRole, assistant: string) =>
   role === "team-say" ? `You had ${assistant} say` : `You told ${assistant}`;
 
+/**
+ * Whether Vapi's own word on a call (its `status` from GET /call/<id>) says it is over, so a call we still hold open
+ * can be closed (13 Nov 2026, Martin: "why isn't he calling": a call whose end never reached our webhook kept the deal
+ * "lined up" and turned every new Call away). Only "ended" is over; anything unknown is left alone.
+ */
+export const vapiCallOver = (status: unknown): boolean => status === "ended";
+
+/** How long a call held open with no Vapi call behind it is given before it is closed (it was never placed). */
+export const NEVER_PLACED_MS = 10 * 60_000;
+
 /** Where a call stands, for the window. */
 export type LivePhase = "lined-up" | "ringing" | "on-call" | "trying-again" | "ended";
 
