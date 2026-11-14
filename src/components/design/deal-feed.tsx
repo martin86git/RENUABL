@@ -1150,7 +1150,7 @@ function MoveButton(props: { deal: FeedDeal; move: NextMove; now: Date; reviewin
   const { deal: d, move } = props;
   const Icon = MOVE_ICONS[move.kind];
   const look = clsx(
-    "inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold transition",
+    "inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[13px] font-semibold transition",
     props.reviewing ? "bg-ink text-canvas ring-2 ring-primary/30" : "bg-primary text-primary-ink hover:brightness-125",
   );
   const ask = d.team?.openAsks.find((a) => a.type === "design");
@@ -1347,10 +1347,15 @@ function NeedCall(props: {
 }) {
   const { deal: d, move, now } = props;
   const words = solLine(d, now);
-  if (!move) return <p className="text-[13px] leading-snug text-ink-2 sm:text-right">{words}</p>;
+  if (!move)
+    return (
+      <p className="line-clamp-3 text-[13px] leading-snug text-ink-2 sm:text-right" title={words}>
+        {words}
+      </p>
+    );
   return (
     <div className="flex flex-col gap-2 sm:items-end sm:text-right">
-      <p className="text-[14.5px] font-semibold leading-snug text-ink">
+      <p className="line-clamp-3 text-[14px] font-semibold leading-snug text-ink" title={words}>
         <span className="mb-0.5 mr-2 inline-block size-2 rounded-full bg-sun-line align-middle" aria-hidden />
         {words}
       </p>
