@@ -14,6 +14,11 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-14",
+    area: "Today",
+    words: "Every news story shows the day it was published and how long ago, or says when the page gave no date.",
+  },
+  {
     day: "2026-11-12",
     area: "Designer",
     words: "When a panel is shaded, Sol lists your options: an optimiser on it, rewiring the string, moving it or taking it off.",

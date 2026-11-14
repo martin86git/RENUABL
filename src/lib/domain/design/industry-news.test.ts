@@ -4,6 +4,8 @@ import {
   cleanDay,
   cleanNewsItems,
   newsDayGroup,
+  storyDate,
+  daysAgoWords,
   newsDue,
   newsPrompt,
   namesMaker,
@@ -129,6 +131,23 @@ describe("the feed", () => {
     expect(newsDayGroup(item("x", "rules", "2026-11-09"), today)).toBe("Yesterday");
     expect(newsDayGroup(item("x", "rules", "2026-11-06"), today)).toBe("This week");
     expect(newsDayGroup(item("x", "rules", "2026-10-20"), today)).toBe("Earlier");
+  });
+
+  it("gives every story a date, saying when the page gave none", () => {
+    expect(storyDate({ publishedOn: "2026-11-08", foundAt: "2026-11-10T01:00:00Z" }, "2026-11-10")).toEqual({
+      day: "2026-11-08",
+      words: "Published 8 Nov 2026",
+      ago: "2 days ago",
+      given: true,
+    });
+    // Found at 11pm UTC on the 9th is the 10th in Melbourne.
+    const found = storyDate({ publishedOn: null, foundAt: "2026-11-09T23:00:00Z" }, "2026-11-10");
+    expect(found.words).toBe("No date on the page · found 10 Nov 2026");
+    expect(found.ago).toBe("Today");
+    expect(found.given).toBe(false);
+    expect(daysAgoWords("2026-11-09", "2026-11-10")).toBe("Yesterday");
+    expect(daysAgoWords("2026-10-20", "2026-11-10")).toBe("3 weeks ago");
+    expect(daysAgoWords("2026-07-01", "2026-11-10")).toBe("4 months ago");
   });
 
   it("asks for own words and real links, and lists what's already in", () => {

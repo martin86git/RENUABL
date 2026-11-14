@@ -374,6 +374,44 @@ export function newsDayGroup(n: Pick<NewsItem, "publishedOn" | "foundAt">, today
   return "Earlier";
 }
 
+/** A day as the reader sees it: "12 Nov 2026". */
+export const fullDayWords = (d: string) =>
+  new Intl.DateTimeFormat("en-AU", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" }).format(new Date(`${d}T12:00:00Z`));
+
+/** How long ago a day was, from today: "Today", "Yesterday", "3 days ago", "2 weeks ago", "4 months ago". */
+export function daysAgoWords(day: string, today: string): string {
+  const days = Math.round((dayNum(today) - dayNum(day)) / DAY_MS);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 14) return `${days} days ago`;
+  if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
+  return `${Math.floor(days / 30)} months ago`;
+}
+
+/** The day an instant falls on in Melbourne (YYYY-MM-DD). */
+const melbourneDay = (iso: string) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Melbourne", year: "numeric", month: "2-digit", day: "2-digit" }).format(
+    new Date(iso),
+  );
+
+/**
+ * The date every story carries (14 Nov 2026, Martin: the reader must know how recent a story is): the day its page says it
+ * was published, else, said plainly, the day Sol found it, since the page gave none.
+ */
+export function storyDate(
+  n: Pick<NewsItem, "publishedOn" | "foundAt">,
+  today: string,
+): { day: string; words: string; ago: string; given: boolean } {
+  const given = Boolean(n.publishedOn);
+  const day = n.publishedOn ?? melbourneDay(n.foundAt);
+  return {
+    day,
+    words: given ? `Published ${fullDayWords(day)}` : `No date on the page · found ${fullDayWords(day)}`,
+    ago: daysAgoWords(day, today),
+    given,
+  };
+}
+
 /** Words too general to stand for a maker on their own ("Solar Victoria" is fine; "Solar" alone is not). */
 const NOT_A_MAKER = new Set([
   "solar",

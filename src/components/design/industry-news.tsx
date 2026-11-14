@@ -19,6 +19,7 @@ import {
   TriangleAlert,
   UtilityPole,
   Wrench,
+  CalendarDays,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -27,6 +28,7 @@ import {
   type NewsStanding,
   NEWS_TOPIC_LABELS,
   newsDayGroup,
+  storyDate,
   newsShown,
   type NewsItem,
   type NewsTopic,
@@ -46,9 +48,6 @@ type Entry = FeedEntry | { kind: "prices"; note: PriceMovesNote; at: number };
 
 /** A story that touches this business: its products on the lists, or its customers' systems. */
 const touches = (n: NewsItem) => Boolean(n.lists || n.systems);
-
-const dayWords = (d: string) =>
-  new Intl.DateTimeFormat("en-AU", { timeZone: "UTC", day: "numeric", month: "short" }).format(new Date(`${d}T12:00:00Z`));
 
 const readWords = (iso: string) =>
   new Date(iso).toLocaleString("en-AU", { weekday: "long", hour: "numeric", minute: "2-digit", timeZone: "Australia/Melbourne" });
@@ -343,6 +342,7 @@ function StoryPicture({ item }: { item: NewsItem }) {
 function Story({ item }: { item: NewsItem }) {
   const [open, setOpen] = useState(false);
   const long = item.summary.length > 240;
+  const date = storyDate(item, todayInMarket());
   return (
     <li
       className={clsx(
@@ -359,7 +359,15 @@ function Story({ item }: { item: NewsItem }) {
       <div className="px-5 pb-4 pt-3.5">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
           <span className="font-medium text-ink-2">{item.site}</span>
-          {item.publishedOn && <span>· {dayWords(item.publishedOn)}</span>}
+          <time
+            dateTime={date.day}
+            title={date.given ? undefined : "The page gives no date: this is the day Sol found it"}
+            className={clsx("flex items-center gap-1", date.given ? "text-ink-2" : "text-muted")}
+          >
+            <CalendarDays className="size-3.5" aria-hidden />
+            {date.words}
+            <span className="text-muted">· {date.ago}</span>
+          </time>
           <span className="ml-auto flex flex-wrap items-center gap-1.5">
             {item.hasImage && (
               <span className="rounded-full bg-canvas px-2 py-0.5 text-ink-2 ring-1 ring-line">{NEWS_TOPIC_LABELS[item.topic]}</span>
