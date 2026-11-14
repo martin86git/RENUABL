@@ -1417,6 +1417,7 @@ alter table design_caller add column if not exists voice_id text;
 -- the conversation in which it was coached.
 alter table design_caller add column if not exists coach_notes jsonb;
 alter table design_caller add column if not exists coach_chat jsonb;
+alter table design_caller add column if not exists coach_past jsonb;
 -- A business has two phone assistants (domain/install-call.ts CALLER_ROLES): 'sales' (every row made before) and
 -- 'admin', which rings sold customers to book their installation. One row a business a role.
 alter table design_caller add column if not exists role text not null default 'sales';

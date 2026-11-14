@@ -15,19 +15,32 @@ import {
   type CoachTurn,
 } from "@/lib/domain/design/coaching";
 import type { DealForChat } from "@/lib/domain/design/assistant-deals";
+import { chatLines, fileChatAway, type CoachChatLine } from "@/lib/domain/design/coach-threads";
 import { CALLER_VOICES, cleanCallerName } from "@/lib/domain/design/caller";
 import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { parseApiKey } from "./bill-reader";
 import { readWithClaude } from "./claude-reader";
 import { query } from "./db";
-import { callerOf, coachingOf, saveCoaching, setCallerName, setCallerVoice, type Caller } from "./design-caller-repo";
+import {
+  callerOf,
+  coachChatsOf,
+  coachingOf,
+  saveCoachChats,
+  saveCoaching,
+  setCallerName,
+  setCallerVoice,
+  type Caller,
+} from "./design-caller-repo";
 import { loadBrand } from "./design-proposal-repo";
 import { withSolCredit } from "./sol-credits";
 
 const newNoteId = () => `cn_${randomBytes(6).toString("hex")}`;
 
 export type CoachResult =
-  { ok: true; turns: CoachTurn[]; notes: CoachNote[]; caller: Caller } | { ok: false; status: number; message: string };
+  | { ok: true; turns: CoachTurn[]; notes: CoachNote[]; caller: Caller; past: CoachChatLine[] }
+  | { ok: false; status: number; message: string };
+
+export const newChatId = () => `cc_${randomBytes(8).toString("hex")}`;
 
 const VOICES = CALLER_VOICES.map((v) => ({ id: v.voiceId, label: v.label, words: v.words }));
 
@@ -37,12 +50,15 @@ export async function coachAssistant(o: {
   message: string;
   call?: { about: string; lines: { role: string; text: string }[] } | null;
   deal?: DealForChat | null;
+  /** Start a new chat with this message: the one going is filed away with the earlier ones. */
+  fresh?: boolean;
 }): Promise<CoachResult> {
   const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) return { ok: false, status: 503, message: "Coaching needs Claude, which isn't set up on this site yet." };
-  const [caller, coaching, biz] = await Promise.all([
+  const [caller, coaching, chats, biz] = await Promise.all([
     callerOf(o.businessId),
     coachingOf(o.businessId),
+    coachChatsOf(o.businessId),
     query<{ name: string }>(`select name from businesses where id = $1`, [o.businessId]),
   ]);
   const brand = await loadBrand(o.businessId, biz[0]?.name ?? "");
@@ -50,7 +66,7 @@ export async function coachAssistant(o: {
     assistant: caller.name,
     business: brand.name || biz[0]?.name || "",
     notes: coaching.notes,
-    history: coaching.turns,
+    history: o.fresh ? [] : coaching.turns,
     message: o.message,
     call: o.call ?? null,
     deal: o.deal ?? null,
@@ -95,11 +111,13 @@ export async function coachAssistant(o: {
     now = await setCallerVoice(o.businessId, { provider: voice.provider, voiceId: voice.voiceId }, o.by);
     settings.push(`Voice: ${voice.label}, ${voice.words}`);
   }
+  const past = o.fresh ? fileChatAway(chats, coaching.turns, newChatId()) : chats;
   const turns: CoachTurn[] = [
-    ...coaching.turns,
+    ...(o.fresh ? [] : coaching.turns),
     { role: "you" as const, text: o.message, at, by: o.by, ...(o.call ? { about: o.call.about } : o.deal ? { about: o.deal.about } : {}) },
     { role: "assistant" as const, text: answer.reply, at, changes: { ...applied.changes, settings } },
   ].slice(-MAX_TURNS);
   await saveCoaching(o.businessId, { notes: applied.notes, turns }, o.by);
-  return { ok: true, turns, notes: applied.notes, caller: now };
+  if (o.fresh) await saveCoachChats(o.businessId, { turns, past }, o.by);
+  return { ok: true, turns, notes: applied.notes, caller: now, past: chatLines(past) };
 }

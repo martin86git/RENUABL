@@ -5,6 +5,7 @@
  */
 import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
 import type { CallerRole } from "@/lib/domain/install-call";
+import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
 import { cleanNotes, cleanTurns, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { dbConfigured, query } from "./db";
 
@@ -99,6 +100,26 @@ export async function coachingOf(businessId: string, role: CallerRole = "sales")
     [businessId, role],
   );
   return { notes: cleanNotes(rows[0]?.coach_notes), turns: cleanTurns(rows[0]?.coach_chat) };
+}
+
+/** The chats before the one going (domain/design/coach-threads.ts), newest first. */
+export async function coachChatsOf(businessId: string, role: CallerRole = "sales"): Promise<CoachChat[]> {
+  if (!dbConfigured()) return [];
+  const rows = await query<{ coach_past: unknown }>(`select coach_past from design_caller where business_id = $1 and role = $2`, [
+    businessId,
+    role,
+  ]);
+  return cleanCoachChats(rows[0]?.coach_past);
+}
+
+/** The chat going and the ones before it, kept together (a new chat, or an earlier one opened again). The notes stay. */
+export async function saveCoachChats(businessId: string, c: { turns: CoachTurn[]; past: CoachChat[] }, by: string): Promise<void> {
+  await query(
+    `insert into design_caller (business_id, name, coach_chat, coach_past, updated_by) values ($1, $2, $3, $4, $5)
+     on conflict (business_id, role) do update set coach_chat = excluded.coach_chat, coach_past = excluded.coach_past,
+       updated_by = excluded.updated_by, updated_at = now()`,
+    [businessId, DEFAULT_CALLER, JSON.stringify(cleanTurns(c.turns)), JSON.stringify(cleanCoachChats(c.past)), by],
+  );
 }
 
 /** The notes and conversation, already cleaned (cleanNotes, cleanTurns). */

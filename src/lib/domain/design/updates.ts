@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-14",
     area: "Agents",
+    words: "Typing to your phone assistant from its day starts a new chat and stays in it. Earlier chats are listed there to open again.",
+  },
+  {
+    day: "2026-11-14",
+    area: "Agents",
     words: "Your second phone assistant is now your post-sale voice agent, beside your sales one. The chief of staff moved under the plus.",
   },
   {

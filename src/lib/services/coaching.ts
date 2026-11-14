@@ -7,6 +7,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { AssistantDeal, AssistantDealCall } from "@/lib/domain/design/assistant-deals";
+import type { CoachChatLine } from "@/lib/domain/design/coach-threads";
 import type { CoachNote, CoachTurn } from "@/lib/domain/design/coaching";
 import type { CallerState } from "./caller";
 
@@ -26,7 +27,8 @@ const set = (next: typeof open) => {
 
 export const openCoach = (call: CoachCall | null = null) => set({ call });
 export const closeCoach = () => set(null);
-export const clearCoachCall = () => open && set({ call: null });
+// Only when a call is set: a new state object lands the window on the assistant's day again.
+export const clearCoachCall = () => open?.call && set({ call: null });
 
 export function useCoachOpen(): { call: CoachCall | null } | null {
   return useSyncExternalStore(
@@ -60,14 +62,23 @@ const json = (method: string, body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
-export const loadCoaching = () => ask<{ notes: CoachNote[]; turns: CoachTurn[]; fixed: string[]; mayCoach: boolean }>(URL_);
+export const loadCoaching = () =>
+  ask<{ notes: CoachNote[]; turns: CoachTurn[]; past: CoachChatLine[]; fixed: string[]; mayCoach: boolean }>(URL_);
+
+type Chats = { turns: CoachTurn[]; past: CoachChatLine[] };
+/** An earlier chat becomes the one going; the one that was going is filed away in its place. */
+export const openCoachChat = (id: string) => ask<Chats>(URL_, json("POST", { do: "open", id }));
+/** The chat going is filed away with the earlier ones, leaving an empty one. */
+export const newCoachChat = () => ask<Chats>(URL_, json("POST", { do: "new" }));
+export const forgetCoachChat = (id: string) => ask<Chats>(URL_, json("POST", { do: "forget", id }));
 
 /** With a deal picked beside the chat, the assistant is given that deal and its own calls on it. */
-export const coachAssistant = (message: string, call: CoachCall | null, dealJobId: string | null = null) =>
-  ask<{ notes: CoachNote[]; turns: CoachTurn[]; caller: CallerState }>(
+export const coachAssistant = (message: string, call: CoachCall | null, dealJobId: string | null = null, fresh = false) =>
+  ask<{ notes: CoachNote[]; turns: CoachTurn[]; caller: CallerState; past: CoachChatLine[] }>(
     URL_,
     json("POST", {
       message,
+      ...(fresh ? { fresh: true } : {}),
       ...(call ? { call: { jobId: call.jobId, transcriptId: call.transcriptId } } : dealJobId ? { deal: { jobId: dealJobId } } : {}),
     }),
   );

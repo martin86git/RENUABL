@@ -8,12 +8,14 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronUp,
   Loader2,
   Minus,
   Pencil,
   Phone,
   PhoneCall,
+  Plus,
   Settings,
   SquareKanban,
   Trash2,
@@ -31,6 +33,7 @@ import {
   type CoachPane,
   type CoachSizes,
 } from "@/lib/domain/design/coach-window";
+import { currentChatLine, type CoachChatLine } from "@/lib/domain/design/coach-threads";
 import { COACH_COPY, packetsOf, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { callerChanged, ringMeToHear, uploadCallerPhoto, useCaller, useCallerInfo } from "@/lib/services/caller";
 import { voiceLabel } from "@/lib/domain/design/caller";
@@ -38,8 +41,11 @@ import {
   clearCoachCall,
   closeCoach,
   coachAssistant,
+  forgetCoachChat,
   loadCoaching,
+  newCoachChat,
   openCoach,
+  openCoachChat,
   removeNote,
   rewordNote,
   useCoachOpen,
@@ -261,10 +267,21 @@ export function CoachWindow() {
   // Where it lands when opened (14 Nov 2026, Martin: a welcome with today's calls, not the last conversation; and the
   // deals beside it, not the settings). Opened about one call, it goes straight to the conversation about that call.
   const [landing, setLanding] = useState(true);
+  // The chats kept apart (14 Nov 2026, Martin: typing from the assistant's day carried on an old thread). What is typed
+  // from its day starts a new chat; Carry on, or an earlier chat opened, goes on in that one.
+  const [past, setPast] = useState<CoachChatLine[]>([]);
+  const [startNew, setStartNew] = useState(true);
+  const staying = useRef(false);
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- each open (a new state object) unfolds the window and lands it afresh */
     setSmall(false);
+    // An answer about a call lets the call go: the window stays in that chat.
+    if (staying.current) {
+      staying.current = false;
+      return;
+    }
     setLanding(!state?.call);
+    setStartNew(!state?.call);
     if (state && !state.call && window.innerWidth >= 1024) {
       setDeals(true);
       setSettings(false);
@@ -281,6 +298,7 @@ export function CoachWindow() {
       if (!res.ok) return setFailed(res.message);
       setNotes(res.notes);
       setTurns(res.turns);
+      setPast(res.past);
       setFixed(res.fixed);
       setMayCoach(res.mayCoach);
     });
@@ -351,30 +369,54 @@ export function CoachWindow() {
     if (!message || sending) return;
     setSending(true);
     setFailed(null);
+    // From the assistant's day it is a new chat: the one before is filed away with the earlier ones.
+    const fresh = startNew && !state.call && turns.length > 0;
+    const before = turns;
     setLanding(false);
+    setStartNew(false);
     const at = new Date().toISOString();
-    setTurns((t) => [
-      ...t,
+    setTurns([
+      ...(fresh ? [] : before),
       { role: "you", text: message, at, ...(state.call ? { about: state.call.about } : about ? { about: `${aboutFirst}'s deal` } : {}) },
     ]);
     setText("");
-    const res = await coachAssistant(message, state.call, about?.jobId ?? null);
+    const res = await coachAssistant(message, state.call, about?.jobId ?? null, fresh);
     setSending(false);
     if (!res.ok) {
       setFailed(res.message);
-      setTurns((t) => t.slice(0, -1));
+      setTurns(before);
+      setStartNew(fresh);
       setText(message);
       return;
     }
     setTurns(res.turns);
+    setPast(res.past);
     const last = res.turns.length - 1;
     const of = res.turns[last]?.role === "assistant" ? packetsOf(res.turns[last].text).length : 0;
     setReveal(of > 1 && !reducedMotion() ? { turn: last, shown: 1, of } : null);
-    const before = new Map(notes.map((n) => [n.id, n.text]));
-    setFresh(new Set(res.notes.filter((n) => before.get(n.id) !== n.text).map((n) => n.id)));
+    const was = new Map(notes.map((n) => [n.id, n.text]));
+    setFresh(new Set(res.notes.filter((n) => was.get(n.id) !== n.text).map((n) => n.id)));
     setNotes(res.notes);
     callerChanged(res.caller);
-    clearCoachCall();
+    if (state.call) {
+      staying.current = true;
+      clearCoachCall();
+    }
+  };
+
+  // The chats: an earlier one opened (it becomes the one going), a new one begun, or one forgotten.
+  const chats = async (res: ReturnType<typeof openCoachChat>, show: boolean) => {
+    setFailed(null);
+    const got = await res;
+    if (!got.ok) return setFailed(got.message);
+    setTurns(got.turns);
+    setPast(got.past);
+    setReveal(null);
+    if (show) {
+      setLanding(false);
+      setStartNew(false);
+      box.current?.focus();
+    }
   };
 
   return createPortal(
@@ -524,14 +566,45 @@ export function CoachWindow() {
               <div className="min-h-40 flex-1 overflow-y-auto px-4 py-3">
                 <CoachWelcome
                   caller={caller}
-                  hasTalk={turns.length > 0}
+                  current={currentChatLine(turns)}
+                  past={past}
+                  onOpenChat={(id) => void chats(openCoachChat(id), true)}
+                  onForgetChat={mayCoach ? (id) => void chats(forgetCoachChat(id), false) : undefined}
                   onPick={(d) => {
                     setPicked(d);
                     toggleDeals(true);
                   }}
                   onDeals={() => toggleDeals(true)}
-                  onTalk={() => setLanding(false)}
+                  onTalk={() => {
+                    setLanding(false);
+                    setStartNew(false);
+                  }}
                 />
+              </div>
+            )}
+            {!landing && !reaching && !state.call && (
+              <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLanding(true);
+                    setStartNew(true);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
+                >
+                  <ChevronLeft className="size-3.5" aria-hidden />
+                  {name}&apos;s day and chats
+                </button>
+                {mayCoach && turns.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void chats(newCoachChat(), true)}
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
+                  >
+                    <Plus className="size-3.5" aria-hidden />
+                    New chat
+                  </button>
+                )}
               </div>
             )}
             <div ref={list} className={clsx("min-h-40 flex-1 space-y-3 overflow-y-auto px-4 py-3", (reaching || landing) && "hidden")}>
@@ -621,7 +694,13 @@ export function CoachWindow() {
                     rows={2}
                     maxLength={2000}
                     placeholder={
-                      state.call ? COACH_COPY.callAbout(name) : about ? `Ask ${name} about ${aboutFirst}…` : `Tell ${name} what to change…`
+                      state.call
+                        ? COACH_COPY.callAbout(name)
+                        : about
+                          ? `Ask ${name} about ${aboutFirst}…`
+                          : landing && turns.length > 0
+                            ? `Start a new chat with ${name}…`
+                            : `Tell ${name} what to change…`
                     }
                     className="min-h-11 flex-1 resize-none rounded-2xl bg-canvas px-3 py-2 text-sm text-ink ring-1 ring-line placeholder:text-muted focus:outline-none focus:ring-sun-line"
                   />

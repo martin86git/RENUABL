@@ -5,8 +5,9 @@ import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { suburbOfAddress } from "@/lib/domain/design/deal-feed";
 import { assistantDealCalls, assistantDeals } from "@/lib/server/design-call-log-repo";
 import { callTranscriptsFor } from "@/lib/server/call-transcripts";
-import { coachAssistant } from "@/lib/server/design-caller-coach";
-import { coachingOf, saveCoaching } from "@/lib/server/design-caller-repo";
+import { chatLines, fileChatAway, forgetChat, isChatId, reopenChat } from "@/lib/domain/design/coach-threads";
+import { coachAssistant, newChatId } from "@/lib/server/design-caller-coach";
+import { coachChatsOf, coachingOf, saveCoachChats, saveCoaching } from "@/lib/server/design-caller-repo";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { allow } from "@/lib/server/rate-limit";
@@ -19,15 +20,17 @@ export async function GET() {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    const c = await coachingOf(who.member.businessId);
+    const [c, chats] = await Promise.all([coachingOf(who.member.businessId), coachChatsOf(who.member.businessId)]);
     const mayCoach = can(who.member.role, "prices", who.member.permissions);
-    return Response.json({ ok: true, ...c, fixed: FIXED_RULES, mayCoach }, { headers: PRIVATE });
+    return Response.json({ ok: true, ...c, past: chatLines(chats), fixed: FIXED_RULES, mayCoach }, { headers: PRIVATE });
   });
 }
 
 /**
  * POST { message, call?: { jobId, transcriptId }, deal?: { jobId } }: coach the assistant, for a member who may change settings. Feedback
- * on a call carries that call's transcript, read on the server from a deal the member may see.
+ * on a call carries that call's transcript, read on the server from a deal the member may see. With { fresh: true } the
+ * message starts a new chat. Or { do: "new" } (file the chat going away), { do: "open", id } (an earlier chat becomes the
+ * one going) or { do: "forget", id }: the chats kept apart (domain/design/coach-threads.ts).
  */
 export async function POST(request: Request) {
   return answer(async () => {
@@ -37,6 +40,17 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, message: "That's a lot of coaching at once. Try again in a little while." }, { status: 429 });
     const read = await readBody(request, 6_000);
     if ("refuse" in read) return read.refuse;
+    if (typeof read.body.do === "string") {
+      const id = who.member.businessId;
+      const [c, chats] = await Promise.all([coachingOf(id), coachChatsOf(id)]);
+      let next: { turns: typeof c.turns; past: typeof chats } | null = null;
+      if (read.body.do === "new") next = { turns: [], past: fileChatAway(chats, c.turns, newChatId()) };
+      else if (read.body.do === "open" && isChatId(read.body.id)) next = reopenChat(chats, c.turns, read.body.id, newChatId());
+      else if (read.body.do === "forget" && isChatId(read.body.id)) next = { turns: c.turns, past: forgetChat(chats, read.body.id) };
+      if (!next) return Response.json({ ok: false, message: "That chat isn't here any more." }, { status: 404 });
+      await saveCoachChats(id, next, who.member.email);
+      return Response.json({ ok: true, turns: next.turns, past: chatLines(next.past) }, { headers: PRIVATE });
+    }
     const message = cleanMessage(read.body.message);
     if (!message) return Response.json({ ok: false, message: "Say what you'd like changed." }, { status: 422 });
     let call: { about: string; lines: { role: string; text: string }[] } | null = null;
@@ -70,9 +84,16 @@ export async function POST(request: Request) {
         calls,
       };
     }
-    const res = await coachAssistant({ businessId: who.member.businessId, by: who.member.email, message, call, deal });
+    const res = await coachAssistant({
+      businessId: who.member.businessId,
+      by: who.member.email,
+      message,
+      call,
+      deal,
+      fresh: read.body.fresh === true,
+    });
     if (!res.ok) return Response.json({ ok: false, message: res.message }, { status: res.status });
-    return Response.json({ ok: true, notes: res.notes, turns: res.turns, caller: res.caller }, { headers: PRIVATE });
+    return Response.json({ ok: true, notes: res.notes, turns: res.turns, caller: res.caller, past: res.past }, { headers: PRIVATE });
   });
 }
 
