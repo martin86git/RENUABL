@@ -140,15 +140,16 @@ function MarketplaceButton({ href, lit, waiting }: { href: string; lit: boolean;
       href={href}
       aria-current={lit ? "true" : undefined}
       aria-label={`RENUABL Marketplace${marketplaceOpen() ? "" : ", coming soon"}`}
-      className="group flex shrink-0 items-center gap-2.5 rounded-full pr-1"
+      // A white pill like the sections menu beside it (14 Nov 2026, Martin: on the pad's edge it didn't sit nicely alone).
+      className="group flex shrink-0 items-center gap-2.5 rounded-full bg-surface p-1 shadow-[0_6px_24px_rgba(20,22,26,0.07)] ring-1 ring-line"
     >
       <span
         className={clsx(
-          "relative flex size-10 items-center justify-center rounded-full bg-market text-white shadow-[0_4px_14px_rgba(24,73,169,0.3)] transition group-hover:brightness-110",
-          lit && "ring-2 ring-market/40 ring-offset-2 ring-offset-canvas",
+          "relative flex size-8 items-center justify-center rounded-full bg-market text-white transition group-hover:brightness-110",
+          lit && "ring-2 ring-market/40 ring-offset-2 ring-offset-surface",
         )}
       >
-        <MarketplaceMark className="size-5" />
+        <MarketplaceMark className="size-4" />
         {waiting > 0 && (
           <span
             className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-sun-line ring-2 ring-canvas"
@@ -156,9 +157,9 @@ function MarketplaceButton({ href, lit, waiting }: { href: string; lit: boolean;
           />
         )}
       </span>
-      <span className="studio-market-words flex-col text-left leading-none">
+      <span className="studio-market-words flex-col pr-3 text-left leading-none">
         <span className="text-[9px] font-medium uppercase tracking-[0.26em] text-ink">RENUABL</span>
-        <span className="mt-1 flex items-baseline gap-1.5 text-[15px] font-semibold tracking-[-0.01em] text-sun-line">
+        <span className="mt-0.5 flex items-baseline gap-1.5 text-[14px] font-semibold tracking-[-0.01em] text-sun-line">
           Marketplace
           {!marketplaceOpen() && <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted">Soon</span>}
         </span>

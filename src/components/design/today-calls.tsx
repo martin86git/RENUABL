@@ -97,11 +97,14 @@ export function TodayCalls(props: { id?: string; className?: string; onSummary?:
 
   return (
     <section id={props.id} className={props.className ?? "mt-8"} aria-label="Calls today">
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <div className="mb-4 flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
           Calls<span className="ml-1.5 font-normal normal-case tracking-normal text-muted">{words ?? "none yet today"}</span>
         </h2>
-        <Link href="/design/calls" className="tap-area ml-auto text-[13px] font-medium text-ink-2 hover:text-ink">
+        <Link
+          href="/design/calls"
+          className="tap-area text-[12.5px] font-medium text-ink-2 underline-offset-4 hover:text-ink hover:underline"
+        >
           All calls
         </Link>
       </div>

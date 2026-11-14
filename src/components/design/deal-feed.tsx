@@ -218,7 +218,13 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
   const callsLive = (calls?.live ?? 0) > 0;
   const place = todayPlaces(callsLive);
   const tabs: StripTab[] = [
-    { id: TODAY_IDS.needs, label: "Needs you", count: data ? needs : null, signal: needs > 0 ? ("needs" as const) : null, order: 1 },
+    {
+      id: TODAY_IDS.needs,
+      label: "Needs you",
+      count: data ? needs : null,
+      signal: needs > 0 ? ("needs" as const) : data ? ("clear" as const) : null,
+      order: 1,
+    },
     { id: TODAY_IDS.newIn, label: "New in", count: data ? parts.fresh.length : null, order: 2 },
     ...(calls && (calls.on || calls.live + calls.lined + calls.done > 0)
       ? [
@@ -338,7 +344,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         {/* New in (12 Nov 2026, Martin): new leads that need a design, each with Design, so a quote goes out quickly;
           New lead adds one. */}
         <section id={TODAY_IDS.newIn} className={clsx(TRAY, place.newIn)} aria-label="New in">
-          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="mb-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
             <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
               New in
               <span className="ml-1.5 font-normal normal-case tracking-normal text-muted">
@@ -346,7 +352,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
               </span>
             </h2>
             {ownerOfTeam && (
-              <label className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
+              <label className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
                 Your new leads go to
                 <select
                   value={leadRule}
@@ -365,10 +371,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
               type="button"
               onClick={props.onNew}
               aria-expanded={props.adding}
-              className={clsx(
-                !ownerOfTeam && "ml-auto",
-                "inline-flex h-9 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-4 text-[13px] font-medium text-ink ring-1 ring-line transition hover:ring-ink-2",
-              )}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line transition hover:ring-ink-2"
             >
               <Plus className={clsx("size-4 text-ink-2 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden /> New lead
             </button>
@@ -400,15 +403,14 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         <Part id={TODAY_IDS.needs} className={place.needs} title="Needs you" count={data ? needs : null}>
           {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
           {data && needs === 0 && (
-            <div className="flex justify-center">
-              <div className="flex w-full max-w-[30rem] flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-8 text-center ring-1 ring-line">
-                <span className="grid size-11 place-items-center rounded-full bg-positive-soft text-positive">
-                  <Check className="size-5" aria-hidden />
-                </span>
-                <p className="text-[16px] font-medium text-ink">{allClearWords(data.today ?? null)}</p>
-                <p className="text-[13px] text-ink-2">Nothing needs you right now. Sol has the rest in hand.</p>
-              </div>
-            </div>
+            // One quiet line (14 Nov 2026, Martin): an empty Needs you shouldn't take the top of the page.
+            <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[13.5px] text-ink-2">
+              <span className="grid size-6 place-items-center rounded-full bg-positive-soft text-positive">
+                <Check className="size-3.5" aria-hidden />
+              </span>
+              <span className="font-medium text-ink">{allClearWords(data.today ?? null)}</span>
+              Nothing needs you right now. Sol has the rest in hand.
+            </p>
           )}
           {/* Cards at a width of their own, the one that suits a card (30rem: the need, the days and the email read
             without crowding), centred, two side by side where they fit (14 Nov 2026, Martin: not tied to New in's row). */}
@@ -631,7 +633,7 @@ interface StripTab {
   /** How many; null when there is nothing to count (or not read yet). */
   count: number | null;
   /** A dot beside the count: something waits on a person, or a call is live. */
-  signal?: "needs" | "live" | null;
+  signal?: "needs" | "live" | "clear" | null;
   order: number;
 }
 
@@ -668,7 +670,7 @@ function TodayStrip(props: {
                 )}
               >
                 <span className={clsx("whitespace-nowrap text-[11.5px] font-medium", on ? "text-ink" : "text-muted")}>{t.label}</span>
-                <span className="flex h-5 items-center gap-1 text-[15px] font-semibold tabular-nums text-ink">
+                <span className="flex h-5 items-center gap-1 text-[15px] font-semibold text-ink">
                   {t.signal === "live" && (
                     <span className="relative flex size-2" aria-label="A call is on now">
                       <span className="absolute inset-0 animate-ping rounded-full bg-positive/60 motion-reduce:hidden" />
@@ -676,7 +678,11 @@ function TodayStrip(props: {
                     </span>
                   )}
                   {t.signal === "needs" && <span className="size-1.5 rounded-full bg-sun-line" aria-hidden />}
-                  {t.count ?? <span className="text-[12px] font-normal text-muted">Latest</span>}
+                  {t.signal === "clear" ? (
+                    <Check className="size-4 text-positive" aria-label="All clear" />
+                  ) : (
+                    (t.count ?? <span className="text-[12px] font-normal text-muted">Latest</span>)
+                  )}
                 </span>
               </button>
             );
@@ -753,7 +759,8 @@ const IN_HAND_SHOWN = 5;
 function Part(props: { id?: string; className?: string; title: string; count?: number | null; note?: string; children: React.ReactNode }) {
   return (
     <section id={props.id} className={clsx(TRAY, props.className)}>
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      {/* The title over its cards, centred as they are (14 Nov 2026, Martin: three edges on one page looked messy). */}
+      <div className="mb-4 flex flex-col items-center gap-0.5 text-center">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
           {props.title}
           {props.count !== undefined && props.count !== null && <span className="ml-1.5 font-normal text-muted">{props.count}</span>}
