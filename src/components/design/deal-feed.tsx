@@ -262,7 +262,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
 
       {/* The owner of a team: a line for each salesperson, new this week, not yet contacted, in play. */}
       {ownerOfTeam && (
-        <section className="mt-8" aria-label="Your team">
+        <section className="mt-6 rounded-[28px] bg-surface/55 p-4 ring-1 ring-line/70 sm:p-6" aria-label="Your team">
           <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink">Your team</h2>
           <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
             <div className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 border-b border-line px-4 py-2 text-[11.5px] text-muted">
@@ -291,10 +291,13 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
 
       {/* New in (12 Nov 2026, Martin): new leads that need a design, each with Design, so a quote goes out quickly;
           New lead adds one. */}
-      <section className="mt-8" aria-label="New in">
+      <section className="mt-6 rounded-[28px] bg-surface/55 p-4 ring-1 ring-line/70 sm:p-6" aria-label="New in">
         <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
-            New in<span className="ml-1.5 tabular-nums text-muted">{data ? `${parts.fresh.length} to design` : ""}</span>
+            New in
+            <span className="ml-1.5 font-normal normal-case tracking-normal text-muted">
+              {data ? `${parts.fresh.length} to design` : ""}
+            </span>
           </h2>
           {ownerOfTeam && (
             <label className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
@@ -352,7 +355,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
         {data && needs === 0 && (
           <div className="flex justify-center">
-            <div className="flex w-full max-w-[31.5rem] flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-8 text-center ring-1 ring-line">
+            <div className="flex w-full max-w-[30rem] flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-8 text-center ring-1 ring-line">
               <span className="grid size-11 place-items-center rounded-full bg-positive-soft text-positive">
                 <Check className="size-5" aria-hidden />
               </span>
@@ -361,12 +364,12 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
             </div>
           </div>
         )}
-        {/* Cards at a width of their own, the one that suits a card (31.5rem: the need, the days and the email read
+        {/* Cards at a width of their own, the one that suits a card (30rem: the need, the days and the email read
             without crowding), centred, two side by side where they fit (14 Nov 2026, Martin: not tied to New in's row). */}
         {parts.needs.length > 0 && (
           <div className="flex flex-wrap items-start justify-center gap-3">
             {parts.needs.map((d) => (
-              <div key={d.jobId} className="w-full max-w-[31.5rem]">
+              <div key={d.jobId} className="w-full max-w-[30rem]">
                 <DealCard
                   deal={d}
                   now={now}
@@ -532,7 +535,7 @@ function ArrivalCard(props: {
 }
 
 /** A pad on Today (New in, Calls): one width for every pad, so a row of them centres whatever its count. */
-export const PAD = "w-full sm:w-[15rem]";
+export const PAD = "w-full sm:w-[14.25rem]";
 
 /** How many deals In hand shows before "Show all". */
 const IN_HAND_SHOWN = 5;
@@ -540,11 +543,11 @@ const IN_HAND_SHOWN = 5;
 /** A part of Today: its title, how many, a line on what it is. */
 function Part(props: { title: string; count?: number | null; note?: string; children: React.ReactNode }) {
   return (
-    <section className="mt-8">
+    <section className="mt-6 rounded-[28px] bg-surface/55 p-4 ring-1 ring-line/70 sm:p-6">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
           {props.title}
-          {props.count !== undefined && props.count !== null && <span className="ml-1.5 tabular-nums text-muted">{props.count}</span>}
+          {props.count !== undefined && props.count !== null && <span className="ml-1.5 font-normal text-muted">{props.count}</span>}
         </h2>
         {props.note && <p className="text-[12.5px] text-muted">{props.note}</p>}
       </div>

@@ -29,7 +29,7 @@ const QUIET_MS = 30_000;
 /** Today's calls shown before "All calls". */
 const DONE_SHOWN = 4;
 /** One width for every pad on Today (as New in's), so a row of them centres whatever its count. */
-const PAD = "w-full sm:w-[15rem]";
+const PAD = "w-full sm:w-[14.25rem]";
 const CARD = "flex flex-col gap-2 rounded-2xl bg-surface p-3.5 text-left ring-1 ring-line transition hover:ring-ink-2";
 
 const firstOf = (name: string) => name.trim().split(/\s+/)[0] || "them";
@@ -80,7 +80,7 @@ export function TodayCalls() {
   const rest = t.done.length - DONE_SHOWN;
 
   return (
-    <section className="mt-8" aria-label="Calls today">
+    <section className="mt-6 rounded-[28px] bg-surface/55 p-4 ring-1 ring-line/70 sm:p-6" aria-label="Calls today">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
           Calls<span className="ml-1.5 font-normal normal-case tracking-normal text-muted">{words ?? "none yet today"}</span>
