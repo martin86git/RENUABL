@@ -71,7 +71,7 @@ import { DealTeamChat } from "./deal-team-chat";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { CallChooser } from "./call-choice";
 import { SolIcon } from "./sol-icon";
-import { TodayCalls } from "./today-calls";
+import { TodayCalls, type CallsSummary } from "./today-calls";
 import { TodayNews } from "./today-news";
 
 const FEED_PICK_KEY = "renuabl.design.feed-pipeline";
@@ -98,6 +98,8 @@ const EVENT_ICONS: Record<FeedEventKind, React.ComponentType<{ className?: strin
 export function DealFeed(props: { me: string; onNew?: () => void; adding?: boolean; onDay?: () => void }) {
   const { me } = props;
   const [showAll, setShowAll] = useState(false);
+  // What the Calls part says, for the strip and for its place in the column.
+  const [calls, setCalls] = useState<CallsSummary | null>(null);
   const [data, setData] = useState<FeedAnswer | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const load = useCallback(async () => {
@@ -205,37 +207,70 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
     if (!r.ok) setRule(null);
   };
   const needs = parts.needs.length;
+  const callsLive = (calls?.live ?? 0) > 0;
+  const place = todayPlaces(callsLive);
+  const tabs: StripTab[] = [
+    { id: TODAY_IDS.needs, label: "Needs you", count: data ? needs : null, signal: needs > 0 ? ("needs" as const) : null, order: 1 },
+    { id: TODAY_IDS.newIn, label: "New in", count: data ? parts.fresh.length : null, order: 2 },
+    ...(calls && (calls.on || calls.live + calls.lined + calls.done > 0)
+      ? [
+          {
+            id: TODAY_IDS.calls,
+            label: "Calls",
+            count: calls.live + calls.lined + calls.done,
+            signal: callsLive ? ("live" as const) : null,
+            order: callsLive ? 0 : 3,
+          },
+        ]
+      : []),
+    ...(parts.coming.length ? [{ id: TODAY_IDS.coming, label: "Coming up", count: parts.coming.length, order: 4 }] : []),
+    ...(parts.inHand.length ? [{ id: TODAY_IDS.inHand, label: "In hand", count: parts.inHand.length, order: 5 }] : []),
+    { id: TODAY_IDS.news, label: "News", count: null, order: 7 },
+  ].sort((a, b) => a.order - b.order);
+  const [lit, go] = useScrollSpy(tabs.map((t) => t.id));
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <div className="flex flex-wrap items-center gap-3">
-        <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} solo={solo} />
-        <p className="text-[13px] text-ink-2">
-          {data ? (
-            <>
-              <span className="font-semibold text-ink">{open.length}</span> being sold
-              {openValue > 0 && (
+      {/* The overview strip, pinned under the top bar (14 Nov 2026, Martin): the pipeline picked, each part of Today with
+          how many, a press to go to it, and the part in view lit. */}
+      <TodayStrip
+        tabs={tabs}
+        lit={lit}
+        onGo={go}
+        left={
+          <>
+            <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} solo={solo} />
+            <p className="hidden whitespace-nowrap text-[13px] text-ink-2 xl:block">
+              {data ? (
                 <>
-                  {" "}
-                  · <span className="font-semibold text-ink">${Math.round(openValue / 1000).toLocaleString("en-AU")}k</span> in play
+                  <span className="font-semibold text-ink">{open.length}</span> being sold
+                  {openValue > 0 && (
+                    <>
+                      {" "}
+                      · <span className="font-semibold text-ink">${Math.round(openValue / 1000).toLocaleString("en-AU")}k</span>
+                    </>
+                  )}
                 </>
+              ) : (
+                "Looking over your deals…"
               )}
-            </>
-          ) : (
-            "Looking over your deals…"
-          )}
-        </p>
-        {/* Sol's summary line went (14 Nov 2026, Martin: it said again what New in and Needs you say); his day stays a press away. */}
-        {data && props.onDay && (
-          <button
-            type="button"
-            onClick={props.onDay}
-            className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-ink-2"
-          >
-            <SolIcon className="size-4 text-sun-line" /> Show me my day
-          </button>
-        )}
-      </div>
+            </p>
+          </>
+        }
+        right={
+          data && props.onDay ? (
+            <button
+              type="button"
+              onClick={props.onDay}
+              title="Show me my day"
+              aria-label="Show me my day"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-surface px-3 text-[13px] font-medium text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-ink-2"
+            >
+              <SolIcon className="size-4 text-sun-line" /> <span className="hidden 2xl:inline">My day</span>
+            </button>
+          ) : null
+        }
+      />
       {data?.examples !== null && data?.examples !== undefined && (
         <p className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] text-ink-2">
           {data.examples > 0
@@ -257,120 +292,168 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         </p>
       )}
 
-      {/* The phone assistant's calls: on now, lined up and done today (12 Nov 2026, Martin). */}
-      <TodayCalls />
+      {/* The parts of Today in one column, in the order of what needs a person (14 Nov 2026, Martin): Needs you, New in,
+          Calls, Coming up, In hand; Calls goes first while a call is ringing or on, the most live thing on the page. */}
+      <div className="flex flex-col">
+        {/* The phone assistant's calls: on now, lined up and done today (12 Nov 2026, Martin). */}
+        <TodayCalls id={TODAY_IDS.calls} className={clsx(TRAY, place.calls)} onSummary={setCalls} />
 
-      {/* The owner of a team: a line for each salesperson, new this week, not yet contacted, in play. */}
-      {ownerOfTeam && (
-        <section className="mt-6 rounded-[28px] bg-surface/55 p-4 ring-1 ring-line/70 sm:p-6" aria-label="Your team">
-          <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink">Your team</h2>
-          <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
-            <div className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 border-b border-line px-4 py-2 text-[11.5px] text-muted">
-              <span>Salesperson</span>
-              <span>New this week</span>
-              <span>Not contacted</span>
-              <span>In play</span>
-            </div>
-            {teamLines(data?.deals ?? [], sellers, now).map((l) => (
-              <div
-                key={l.email}
-                className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 px-4 py-2.5 text-[13.5px] text-ink"
-              >
-                <span className="truncate font-medium">{l.name}</span>
-                <span className="tabular-nums">{l.fresh}</span>
-                <span className={clsx("tabular-nums", l.waiting > 0 && "font-semibold text-sun-ink")}>{l.waiting}</span>
-                <span className="tabular-nums">
-                  {l.inPlay}
-                  {l.value > 0 && <span className="text-muted"> · ${Math.round(l.value / 1000).toLocaleString("en-AU")}k</span>}
-                </span>
+        {/* The owner of a team: a line for each salesperson, new this week, not yet contacted, in play. */}
+        {ownerOfTeam && (
+          <section className={clsx(TRAY, place.team)} aria-label="Your team">
+            <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink">Your team</h2>
+            <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+              <div className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 border-b border-line px-4 py-2 text-[11.5px] text-muted">
+                <span>Salesperson</span>
+                <span>New this week</span>
+                <span>Not contacted</span>
+                <span>In play</span>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+              {teamLines(data?.deals ?? [], sellers, now).map((l) => (
+                <div
+                  key={l.email}
+                  className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 px-4 py-2.5 text-[13.5px] text-ink"
+                >
+                  <span className="truncate font-medium">{l.name}</span>
+                  <span className="tabular-nums">{l.fresh}</span>
+                  <span className={clsx("tabular-nums", l.waiting > 0 && "font-semibold text-sun-ink")}>{l.waiting}</span>
+                  <span className="tabular-nums">
+                    {l.inPlay}
+                    {l.value > 0 && <span className="text-muted"> · ${Math.round(l.value / 1000).toLocaleString("en-AU")}k</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-      {/* New in (12 Nov 2026, Martin): new leads that need a design, each with Design, so a quote goes out quickly;
+        {/* New in (12 Nov 2026, Martin): new leads that need a design, each with Design, so a quote goes out quickly;
           New lead adds one. */}
-      <section className="mt-6 rounded-[28px] bg-surface/55 p-4 ring-1 ring-line/70 sm:p-6" aria-label="New in">
-        <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
-            New in
-            <span className="ml-1.5 font-normal normal-case tracking-normal text-muted">
-              {data ? `${parts.fresh.length} to design` : ""}
-            </span>
-          </h2>
-          {ownerOfTeam && (
-            <label className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
-              Your new leads go to
-              <select
-                value={leadRule}
-                onChange={(e) => void chooseRule(e.target.value as LeadRule)}
-                className="cursor-pointer rounded-full bg-surface px-2.5 py-1 text-[12.5px] font-medium text-ink ring-1 ring-line focus:outline-none"
-              >
-                {LEAD_RULES.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.id === "adder" ? "You" : r.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <button
-            type="button"
-            onClick={props.onNew}
-            aria-expanded={props.adding}
-            className={clsx(
-              !ownerOfTeam && "ml-auto",
-              "inline-flex h-9 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-4 text-[13px] font-medium text-ink ring-1 ring-line transition hover:ring-ink-2",
-            )}
-          >
-            <Plus className={clsx("size-4 text-ink-2 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden /> New lead
-          </button>
-        </div>
-        {data && parts.fresh.length === 0 ? (
-          <div className="flex justify-center">
-            <p className="rounded-2xl bg-surface px-5 py-5 text-center text-[13.5px] text-ink-2 ring-1 ring-line">
-              Every new lead has a design.
-            </p>
-          </div>
-        ) : (
-          // Pads of their own width, centred (14 Nov 2026, Martin): however many there are, they sit in the middle.
-          <div className="flex flex-wrap justify-center gap-3">
-            {parts.fresh.map((d) => (
-              <div key={d.jobId} className={`grid ${PAD}`}>
-                <ArrivalCard
-                  deal={d}
-                  now={now}
-                  team={solo ? null : [{ email: me, name: "You" }, ...(data?.team ?? [])]}
-                  mayGive={data?.role === "owner"}
-                  onChanged={load}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <Part title="Needs you" count={data ? needs : null}>
-        {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
-        {data && needs === 0 && (
-          <div className="flex justify-center">
-            <div className="flex w-full max-w-[30rem] flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-8 text-center ring-1 ring-line">
-              <span className="grid size-11 place-items-center rounded-full bg-positive-soft text-positive">
-                <Check className="size-5" aria-hidden />
+        <section id={TODAY_IDS.newIn} className={clsx(TRAY, place.newIn)} aria-label="New in">
+          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
+              New in
+              <span className="ml-1.5 font-normal normal-case tracking-normal text-muted">
+                {data ? `${parts.fresh.length} to design` : ""}
               </span>
-              <p className="text-[16px] font-medium text-ink">{allClearWords(data.today ?? null)}</p>
-              <p className="text-[13px] text-ink-2">Nothing needs you right now. Sol has the rest in hand.</p>
-            </div>
+            </h2>
+            {ownerOfTeam && (
+              <label className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
+                Your new leads go to
+                <select
+                  value={leadRule}
+                  onChange={(e) => void chooseRule(e.target.value as LeadRule)}
+                  className="cursor-pointer rounded-full bg-surface px-2.5 py-1 text-[12.5px] font-medium text-ink ring-1 ring-line focus:outline-none"
+                >
+                  {LEAD_RULES.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.id === "adder" ? "You" : r.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <button
+              type="button"
+              onClick={props.onNew}
+              aria-expanded={props.adding}
+              className={clsx(
+                !ownerOfTeam && "ml-auto",
+                "inline-flex h-9 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-4 text-[13px] font-medium text-ink ring-1 ring-line transition hover:ring-ink-2",
+              )}
+            >
+              <Plus className={clsx("size-4 text-ink-2 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden /> New lead
+            </button>
           </div>
-        )}
-        {/* Cards at a width of their own, the one that suits a card (30rem: the need, the days and the email read
+          {data && parts.fresh.length === 0 ? (
+            <div className="flex justify-center">
+              <p className="rounded-2xl bg-surface px-5 py-5 text-center text-[13.5px] text-ink-2 ring-1 ring-line">
+                Every new lead has a design.
+              </p>
+            </div>
+          ) : (
+            // Pads of their own width, centred (14 Nov 2026, Martin): however many there are, they sit in the middle.
+            <div className="flex flex-wrap justify-center gap-3">
+              {parts.fresh.map((d) => (
+                <div key={d.jobId} className={`grid ${PAD}`}>
+                  <ArrivalCard
+                    deal={d}
+                    now={now}
+                    team={solo ? null : [{ email: me, name: "You" }, ...(data?.team ?? [])]}
+                    mayGive={data?.role === "owner"}
+                    onChanged={load}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <Part id={TODAY_IDS.needs} className={place.needs} title="Needs you" count={data ? needs : null}>
+          {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
+          {data && needs === 0 && (
+            <div className="flex justify-center">
+              <div className="flex w-full max-w-[30rem] flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-8 text-center ring-1 ring-line">
+                <span className="grid size-11 place-items-center rounded-full bg-positive-soft text-positive">
+                  <Check className="size-5" aria-hidden />
+                </span>
+                <p className="text-[16px] font-medium text-ink">{allClearWords(data.today ?? null)}</p>
+                <p className="text-[13px] text-ink-2">Nothing needs you right now. Sol has the rest in hand.</p>
+              </div>
+            </div>
+          )}
+          {/* Cards at a width of their own, the one that suits a card (30rem: the need, the days and the email read
             without crowding), centred, two side by side where they fit (14 Nov 2026, Martin: not tied to New in's row). */}
-        {parts.needs.length > 0 && (
-          <div className="flex flex-wrap items-start justify-center gap-3">
-            {parts.needs.map((d) => (
-              <div key={d.jobId} className="w-full max-w-[30rem]">
-                <DealCard
+          {parts.needs.length > 0 && (
+            <div className="flex flex-wrap items-start justify-center gap-3">
+              {parts.needs.map((d) => (
+                <div key={d.jobId} className="w-full max-w-[30rem]">
+                  <DealCard
+                    deal={d}
+                    now={now}
+                    me={me}
+                    callsOn={Boolean(data?.callsOn)}
+                    team={data?.team ?? []}
+                    solo={solo}
+                    onChanged={load}
+                    onMark={(mark) => setMark(d.jobId, mark)}
+                    installDays={data?.installDays}
+                    signOff={data?.signOff}
+                    stacked
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </Part>
+
+        {parts.coming.length > 0 && (
+          <Part
+            id={TODAY_IDS.coming}
+            className={place.coming}
+            title="Coming up"
+            note="What Sol does next. Review one to change it, or let it go."
+          >
+            <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+              {parts.coming.map((d) => (
+                <ComingRow key={d.jobId} deal={d} now={now} onChanged={load} />
+              ))}
+            </ul>
+          </Part>
+        )}
+
+        {parts.inHand.length > 0 && (
+          <Part
+            id={TODAY_IDS.inHand}
+            className={place.inHand}
+            title="In hand"
+            count={parts.inHand.length}
+            note="Moving along. Nothing needs you on these."
+          >
+            <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+              {(showAll ? parts.inHand : parts.inHand.slice(0, IN_HAND_SHOWN)).map((d) => (
+                <DealRow
+                  key={d.jobId}
                   deal={d}
                   now={now}
                   me={me}
@@ -381,56 +464,25 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
                   onMark={(mark) => setMark(d.jobId, mark)}
                   installDays={data?.installDays}
                   signOff={data?.signOff}
-                  stacked
                 />
-              </div>
-            ))}
-          </div>
+              ))}
+            </ul>
+            {parts.inHand.length > IN_HAND_SHOWN && (
+              <button
+                type="button"
+                onClick={() => setShowAll((v) => !v)}
+                className="mt-2 text-[13px] font-medium text-ink-2 underline-offset-4 hover:text-ink hover:underline"
+              >
+                {showAll ? "Show fewer" : `Show all ${parts.inHand.length}`}
+              </button>
+            )}
+          </Part>
         )}
-      </Part>
 
-      {parts.coming.length > 0 && (
-        <Part title="Coming up" note="What Sol does next. Review one to change it, or let it go.">
-          <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
-            {parts.coming.map((d) => (
-              <ComingRow key={d.jobId} deal={d} now={now} onChanged={load} />
-            ))}
-          </ul>
-        </Part>
-      )}
-
-      {parts.inHand.length > 0 && (
-        <Part title="In hand" count={parts.inHand.length} note="Moving along. Nothing needs you on these.">
-          <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
-            {(showAll ? parts.inHand : parts.inHand.slice(0, IN_HAND_SHOWN)).map((d) => (
-              <DealRow
-                key={d.jobId}
-                deal={d}
-                now={now}
-                me={me}
-                callsOn={Boolean(data?.callsOn)}
-                team={data?.team ?? []}
-                solo={solo}
-                onChanged={load}
-                onMark={(mark) => setMark(d.jobId, mark)}
-                installDays={data?.installDays}
-                signOff={data?.signOff}
-              />
-            ))}
-          </ul>
-          {parts.inHand.length > IN_HAND_SHOWN && (
-            <button
-              type="button"
-              onClick={() => setShowAll((v) => !v)}
-              className="mt-2 text-[13px] font-medium text-ink-2 underline-offset-4 hover:text-ink hover:underline"
-            >
-              {showAll ? "Show fewer" : `Show all ${parts.inHand.length}`}
-            </button>
-          )}
-        </Part>
-      )}
-
-      <TodayNews />
+        <div id={TODAY_IDS.news} className={clsx("scroll-mt-44", place.news)}>
+          <TodayNews />
+        </div>
+      </div>
     </div>
   );
 }
@@ -534,6 +586,150 @@ function ArrivalCard(props: {
   );
 }
 
+/** A part of Today in its own panel, the title inside at the top (14 Nov 2026, Martin). */
+const TRAY = "mt-6 scroll-mt-44 rounded-[28px] bg-surface/55 p-4 ring-1 ring-line/70 sm:p-6";
+
+/** Where each part of Today sits on the page, for the strip to go to. */
+export const TODAY_IDS = {
+  needs: "today-needs",
+  newIn: "today-new",
+  calls: "today-calls",
+  coming: "today-coming",
+  inHand: "today-in-hand",
+  news: "today-news",
+} as const;
+
+/** The order of Today's parts: what needs a person first; Calls first while a call is ringing or on. */
+function todayPlaces(callsLive: boolean) {
+  return {
+    calls: callsLive ? "order-first" : "order-3",
+    needs: "order-1",
+    newIn: "order-2",
+    coming: "order-4",
+    inHand: "order-5",
+    team: "order-6",
+    news: "order-7",
+  };
+}
+
+interface StripTab {
+  id: string;
+  label: string;
+  /** How many; null when there is nothing to count (or not read yet). */
+  count: number | null;
+  /** A dot beside the count: something waits on a person, or a call is live. */
+  signal?: "needs" | "live" | null;
+  order: number;
+}
+
+/**
+ * The overview strip (14 Nov 2026, Martin: a small persistent bar that says what is on Today, each part with how many
+ * under it): pinned under the top bar, each part a press away, the part in view lit.
+ */
+function TodayStrip(props: {
+  tabs: StripTab[];
+  lit: string | null;
+  onGo: (id: string) => void;
+  left: React.ReactNode;
+  right: React.ReactNode;
+}) {
+  return (
+    <div className="sticky top-2 z-20 -mx-1 px-1 pb-1 pt-1 lg:top-[4.75rem]">
+      <nav
+        aria-label="Today at a glance"
+        className="flex items-center gap-2 rounded-2xl bg-surface/90 px-2 py-1.5 shadow-[0_6px_24px_rgba(11,11,12,0.06)] ring-1 ring-line backdrop-blur"
+      >
+        <div className="flex shrink-0 items-center gap-2">{props.left}</div>
+        <div className="staff-scroll flex min-w-0 flex-1 justify-center-safe gap-0.5 overflow-x-auto">
+          {props.tabs.map((t) => {
+            const on = props.lit === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => props.onGo(t.id)}
+                aria-current={on ? "true" : undefined}
+                className={clsx(
+                  "flex min-w-[4.75rem] shrink-0 flex-col items-center rounded-xl px-3 py-1 transition-colors",
+                  on ? "bg-canvas ring-1 ring-line" : "hover:bg-canvas",
+                )}
+              >
+                <span className={clsx("whitespace-nowrap text-[11.5px] font-medium", on ? "text-ink" : "text-muted")}>{t.label}</span>
+                <span className="flex h-5 items-center gap-1 text-[15px] font-semibold tabular-nums text-ink">
+                  {t.signal === "live" && (
+                    <span className="relative flex size-2" aria-label="A call is on now">
+                      <span className="absolute inset-0 animate-ping rounded-full bg-positive/60 motion-reduce:hidden" />
+                      <span className="relative size-2 rounded-full bg-positive" />
+                    </span>
+                  )}
+                  {t.signal === "needs" && <span className="size-1.5 rounded-full bg-sun-line" aria-hidden />}
+                  {t.count ?? <span className="text-[12px] font-normal text-muted">Latest</span>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex shrink-0 items-center">{props.right}</div>
+      </nav>
+    </div>
+  );
+}
+
+/** Which part of Today is in view, and a way to go to one. */
+function useScrollSpy(ids: readonly string[]): [string | null, (id: string) => void] {
+  const [lit, setLit] = useState<string | null>(null);
+  const key = ids.join(",");
+  useEffect(() => {
+    const list = key.split(",");
+    let frame = 0;
+    const look = () => {
+      frame = 0;
+      // The last part whose top has passed a line a little under the strip; the first before any has.
+      const line = 200;
+      let current: string | null = null;
+      let best = Infinity;
+      for (const id of list) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const top = el.getBoundingClientRect().top;
+        if (top <= line && line - top < best) {
+          best = line - top;
+          current = id;
+        }
+      }
+      if (!current) {
+        const first = list
+          .map((id) => document.getElementById(id))
+          .filter(Boolean)
+          .sort((a, b) => a!.getBoundingClientRect().top - b!.getBoundingClientRect().top)[0];
+        current = first?.id ?? null;
+      }
+      setLit(current);
+    };
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(look);
+    };
+    look();
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    window.addEventListener("resize", onScroll);
+    // A smooth scroll's last frame can come after its last scroll event: look again once it has stopped.
+    window.addEventListener("scrollend", look, { capture: true });
+    return () => {
+      window.removeEventListener("scrollend", look, { capture: true });
+      window.removeEventListener("scroll", onScroll, { capture: true });
+      window.removeEventListener("resize", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [key]);
+  const go = (id: string) => {
+    document
+      .getElementById(id)
+      ?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    setLit(id);
+  };
+  return [lit, go];
+}
+
 /** A pad on Today (New in, Calls): one width for every pad, so a row of them centres whatever its count. */
 export const PAD = "w-full sm:w-[14.25rem]";
 
@@ -541,9 +737,9 @@ export const PAD = "w-full sm:w-[14.25rem]";
 const IN_HAND_SHOWN = 5;
 
 /** A part of Today: its title, how many, a line on what it is. */
-function Part(props: { title: string; count?: number | null; note?: string; children: React.ReactNode }) {
+function Part(props: { id?: string; className?: string; title: string; count?: number | null; note?: string; children: React.ReactNode }) {
   return (
-    <section className="mt-6 rounded-[28px] bg-surface/55 p-4 ring-1 ring-line/70 sm:p-6">
+    <section id={props.id} className={clsx(TRAY, props.className)}>
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
           {props.title}

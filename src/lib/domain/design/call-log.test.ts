@@ -53,7 +53,7 @@ describe("call log", () => {
   it("keeps logged words short and says what is lined up", () => {
     expect(loggedWords("a  b\n c")).toBe("a b c");
     expect(loggedWords("x".repeat(500), 10)).toHaveLength(10);
-    expect(comingWords({ status: "calling", attempts: 1, mode: "lead" })).toBe("Ringing now");
+    expect(comingWords({ status: "calling", attempts: 1, mode: "lead" })).toBe("Placed, waiting to ring");
     expect(comingWords({ status: "waiting", attempts: 0, mode: "proposal" })).toBe("They asked for a call · next calling window");
     expect(comingWords({ status: "waiting", attempts: 2, mode: "lead" })).toContain("2 tries");
   });
@@ -103,6 +103,8 @@ describe("today's calls", () => {
   it("says what the assistant is doing, by its name and their first name", () => {
     expect(liveCallWords(coming({ phase: "on-call" }))).toBe("Charlie is on the call with Jo");
     expect(liveCallWords(coming({ phase: "ringing" }))).toBe("Charlie is ringing Jo…");
-    expect(liveCallWords(coming({ phase: "lined-up", by: "" }))).toBe("Sol will call Jo");
+    expect(liveCallWords(coming({ phase: "lined-up", by: "", status: "waiting" }))).toBe("Sol will call Jo");
+    // Handed to the phone line but not ringing yet: never "will call" beside "ringing".
+    expect(liveCallWords({ ...coming({ phase: "lined-up" }), status: "calling" })).toBe("Charlie is about to call Jo");
   });
 });

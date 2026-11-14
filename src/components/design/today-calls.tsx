@@ -32,6 +32,14 @@ const DONE_SHOWN = 4;
 const PAD = "w-full sm:w-[14.25rem]";
 const CARD = "flex flex-col gap-2 rounded-2xl bg-surface p-3.5 text-left ring-1 ring-line transition hover:ring-ink-2";
 
+/** What Calls holds, for Today's strip: whether calls are on, and how many are live, lined up and done today. */
+export interface CallsSummary {
+  on: boolean;
+  live: number;
+  lined: number;
+  done: number;
+}
+
 const firstOf = (name: string) => name.trim().split(/\s+/)[0] || "them";
 
 /**
@@ -40,7 +48,7 @@ const firstOf = (name: string) => name.trim().split(/\s+/)[0] || "them";
  * what each came to. Each call is a pad like New in's, centred (14 Nov 2026, Martin: not a long bar). A call of the
  * assistant's opens its window with what was said; one the team logged opens the deal.
  */
-export function TodayCalls() {
+export function TodayCalls(props: { id?: string; className?: string; onSummary?: (s: CallsSummary) => void } = {}) {
   const caller = useCaller();
   const [log, setLog] = useState<{ calls: CallLogEntry[]; coming: CallComing[]; solOn: boolean } | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -65,6 +73,14 @@ export function TodayCalls() {
     };
   }, []);
 
+  // Told to Today's strip each time the log is read.
+  const onSummary = props.onSummary;
+  useEffect(() => {
+    if (!log || !onSummary) return;
+    const day = todaysCalls(log);
+    onSummary({ on: log.solOn, live: day.live.length, lined: day.lined.length, done: day.done.length });
+  }, [log, onSummary]);
+
   // The clock on a call that is on, a second at a time.
   useEffect(() => {
     if (!live) return;
@@ -80,7 +96,7 @@ export function TodayCalls() {
   const rest = t.done.length - DONE_SHOWN;
 
   return (
-    <section className="mt-6 rounded-[28px] bg-surface/55 p-4 ring-1 ring-line/70 sm:p-6" aria-label="Calls today">
+    <section id={props.id} className={props.className ?? "mt-8"} aria-label="Calls today">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
           Calls<span className="ml-1.5 font-normal normal-case tracking-normal text-muted">{words ?? "none yet today"}</span>

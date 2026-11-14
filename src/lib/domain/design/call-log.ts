@@ -88,9 +88,12 @@ export function loggedWords(text: string, max = 400): string {
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 }
 
-/** "Waiting for calling hours", "Ringing now", "Trying again (2 tries so far)". */
+/**
+ * "Placed, waiting to ring", "New lead · next calling window", "Trying again (2 tries so far)". A call handed to the phone
+ * line isn't ringing until the line says so (14 Nov 2026, Martin: a card said "will call" and "Ringing now" at once).
+ */
 export function comingWords(c: Pick<CallComing, "status" | "attempts" | "mode">): string {
-  if (c.status === "calling") return "Ringing now";
+  if (c.status === "calling") return "Placed, waiting to ring";
   const why = c.mode === "proposal" ? "They asked for a call" : "New lead";
   return c.attempts > 0
     ? `${why} · trying again (${c.attempts} ${c.attempts === 1 ? "try" : "tries"} so far)`
@@ -138,13 +141,14 @@ export function todayCallsWords(t: TodayCalls): string | null {
   return parts.length ? parts.join(" · ") : null;
 }
 
-/** "Charlie is on the call with Jo", "Charlie is ringing Jo…", "Charlie will call Jo". */
-export function liveCallWords(c: Pick<CallComing, "phase" | "customer" | "by">): string {
+/** "Charlie is on the call with Jo", "Charlie is ringing Jo…", "Charlie is about to call Jo", "Charlie will call Jo". */
+export function liveCallWords(c: Pick<CallComing, "phase" | "customer" | "by"> & { status?: CallComing["status"] }): string {
   const who = c.customer.trim().split(/\s+/)[0] || "the customer";
   const name = c.by?.trim() || "Sol";
   if (c.phase === "on-call") return `${name} is on the call with ${who}`;
   if (c.phase === "ringing") return `${name} is ringing ${who}…`;
   if (c.phase === "trying-again") return `${name} couldn't reach ${who} and will try again`;
+  if (c.status === "calling") return `${name} is about to call ${who}`;
   return `${name} will call ${who}`;
 }
 
