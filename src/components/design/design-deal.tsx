@@ -10,12 +10,12 @@ import {
   ClipboardList,
   FileText,
   HardHat,
+  LayoutList,
   Mail,
   Phone,
   MessagesSquare,
   Paperclip,
   PenTool,
-  ScrollText,
   Search,
   Trash2,
   Wrench,
@@ -89,12 +89,15 @@ type Tab = "activities" | "team" | "email" | "chat" | "sol" | "files" | "service
  * record (8 Nov 2026, Martin: Overview folded into it); the team's chat and the files are their icons. Call sits beside
  * Email, and Sol is his own lit round after the row (10 Nov 2026, Martin: off the banner).
  */
-/** What Notes holds: the timeline first, then the two chats and the deal's details. */
+/**
+ * What Details holds (14 Nov 2026, Martin: Details is the button, and Notes is nested inside it): the deal's details
+ * first, then its notes (the whole record as a timeline) and the two chats.
+ */
 const NOTES_VIEWS = [
-  ["activities", "Timeline"],
+  ["details", "Details"],
+  ["activities", "Notes"],
   ["chat", "Customer chat"],
   ["team", "Team chat"],
-  ["details", "Details"],
 ] as const;
 const DEAL_TABS: { key: Exclude<Tab, "service">; label: string; icon?: (p: { className?: string }) => React.ReactNode }[] = [
   { key: "activities", label: "Activity" },
@@ -258,7 +261,10 @@ export function DealPage({ id }: { id: string }) {
                 ? "details"
                 : asked === "files"
                   ? "files"
-                  : "activities",
+                  : asked === "notes" || asked === "activities"
+                    ? "activities"
+                    : // A deal opens on its details (14 Nov 2026, Martin); its notes are a press away inside them.
+                      "details",
   );
   // The designer as a centred pop-up over the deal (8 Nov 2026, Martin: in the same space, the page's grey either side, so
   // it reads as quick); ?design=1 opens it. Kept loaded once opened, so closing never loses the work.
@@ -574,7 +580,7 @@ export function DealPage({ id }: { id: string }) {
           {NOTES_VIEWS.some(([key]) => key === tab) && (
             <div
               role="tablist"
-              aria-label="Notes"
+              aria-label="Details"
               className="mt-5 inline-flex flex-wrap gap-0.5 rounded-full bg-surface p-1 ring-1 ring-line"
             >
               {NOTES_VIEWS.map(([key, label]) => (
@@ -1117,9 +1123,10 @@ function useCentredRail() {
 
 /**
  * The deal's one menu (12 Nov 2026, Martin: the CRM straight to the point, the work to be done): the two tools, Design
- * and Proposal; then the ways of working the deal, Call, Email, Notes (the deal's whole record as a timeline) and Files;
- * then, only once it matters, the Job card (sold) and Service (installed); then Sol. Down the left on a wide screen,
- * floating in the middle of the window; a row under the banner narrower.
+ * and Proposal; then the ways of reaching the customer as one group, Call, Email and Files under it (14 Nov 2026,
+ * Martin: they should feel grouped, the files under Email); then Details, which opens the deal's details and holds its
+ * notes and chats; then, only once it matters, the Job card (sold) and Service (installed); then Sol. Down the left on
+ * a wide screen, floating in the middle of the window; a row under the banner narrower.
  */
 function DealMenu({
   vertical = false,
@@ -1186,26 +1193,37 @@ function DealMenu({
         </span>
       </RailRound>
       {line}
-      <CallMenu
-        round={vertical ? "rail" : "row"}
-        jobId={jobId}
-        phone={phone}
-        name={name}
-        onNotes={onNotes}
-        toBook={PRE_INSTALL_STAGES.includes(stage)}
-      />
-      {page("email", "Email", `Email ${name || "the customer"}`, Mail)}
+      {/* Reaching the customer, as one group on a plate of its own: ring them, write to them, and what was sent or kept. */}
+      <div
+        role="group"
+        aria-label="Reach the customer"
+        className={clsx(
+          "flex shrink-0 gap-3 rounded-[2.25rem] bg-surface/60 ring-1 ring-line",
+          vertical ? "flex-col items-center px-2.5 py-3" : "items-start px-3 py-2.5",
+        )}
+      >
+        <CallMenu
+          round={vertical ? "rail" : "row"}
+          jobId={jobId}
+          phone={phone}
+          name={name}
+          onNotes={onNotes}
+          toBook={PRE_INSTALL_STAGES.includes(stage)}
+        />
+        {page("email", "Email", `Email ${name || "the customer"}`, Mail)}
+        {page("files", "Files", "Files kept on this deal", Paperclip)}
+      </div>
+      {line}
       <RailRound
-        label="Notes"
-        title="Notes: the timeline, the chats and the deal's details"
-        onClick={() => onTab("activities")}
+        label="Details"
+        title="Details: the deal's details, with its notes and chats inside"
+        onClick={() => onTab("details")}
         on={NOTES_VIEWS.some(([key]) => key === tab)}
       >
         <span className={round(NOTES_VIEWS.some(([key]) => key === tab))}>
-          <ScrollText className="size-5" aria-hidden />
+          <LayoutList className="size-5" aria-hidden />
         </span>
       </RailRound>
-      {page("files", "Files", "Files kept on this deal", Paperclip)}
       {(sold || installed) && line}
       {sold && (
         <RailRound label="Job card" title="Job card: what the installers take to the job" onClick={onCard}>
