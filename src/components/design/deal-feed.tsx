@@ -1605,7 +1605,7 @@ function DealsPanel(props: {
   const [search, setSearch] = useState("");
   const rows = panelDeals(props.deals, tab, search);
   return (
-    <aside aria-label="Deals" className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+5rem)]">
+    <aside aria-label="Deals" className="mt-9">
       <div className="flex items-center gap-2.5">
         <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-ink">Deals</h2>
         {props.onNew && (
@@ -1659,7 +1659,7 @@ function DealsPanel(props: {
           className="min-w-0 flex-1 bg-transparent text-[14px] text-ink placeholder:text-muted focus:outline-none"
         />
       </label>
-      <ul className="staff-scroll mt-3 max-h-[calc(100dvh-24rem)] space-y-1.5 overflow-y-auto pr-0.5">
+      <ul className="mt-3 space-y-1.5">
         {rows.map((d) => {
           const mark = panelMark(d);
           const on = props.picked === d.jobId;
