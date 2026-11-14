@@ -11,6 +11,8 @@ import {
   MAX_SECONDS,
   cleanCues,
   isWalkthroughPath,
+  isWatchToken,
+  WATCH_PATH,
   lengthWords,
   videoType,
   type Cue,
@@ -39,10 +41,11 @@ interface Row {
   shown: boolean;
   createdAt: Date | string;
   createdBy: string;
+  shareToken: string | null;
 }
 
 const COLS = `id, blob_path as "blobPath", content_type as "contentType", seconds, cues, shown,
-  created_at as "createdAt", created_by as "createdBy"`;
+  created_at as "createdAt", created_by as "createdBy", share_token as "shareToken"`;
 
 const asWalkthrough = (r: Row): Walkthrough => ({
   id: r.id,
@@ -51,6 +54,7 @@ const asWalkthrough = (r: Row): Walkthrough => ({
   shown: r.shown,
   createdAt: new Date(r.createdAt).toISOString(),
   createdBy: r.createdBy,
+  link: r.shareToken ? `${WATCH_PATH}${r.shareToken}` : null,
 });
 
 /** Blob credentials: the token when there is one (client uploads need it). */
@@ -91,9 +95,9 @@ export async function keepWalkthrough(
   const cues = cleanCues(input.cues, seconds);
   const id = `wt_${randomBytes(9).toString("hex")}`;
   const rows = await query<Row>(
-    `insert into design_walkthroughs (id, business_id, job_id, blob_path, content_type, seconds, cues, created_by)
-     values ($1, $2, $3, $4, $5, $6, $7, $8) returning ${COLS}`,
-    [id, businessId, jobId, input.path, type, seconds, JSON.stringify(cues), by],
+    `insert into design_walkthroughs (id, business_id, job_id, blob_path, content_type, seconds, cues, created_by, share_token)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning ${COLS}`,
+    [id, businessId, jobId, input.path, type, seconds, JSON.stringify(cues), by, randomBytes(20).toString("hex")],
   );
   await addActivity(
     businessId,
@@ -102,6 +106,62 @@ export async function keepWalkthrough(
     by,
   ).catch(() => undefined);
   return asWalkthrough(rows[0]);
+}
+
+/** One walkthrough's private link token, made now if it has none (one recorded before links). Null for no such one. */
+export async function watchToken(businessId: string, jobId: string, id: string): Promise<string | null> {
+  const rows = await query<{ token: string }>(
+    `update design_walkthroughs set share_token = coalesce(share_token, $4)
+      where business_id = $1 and job_id = $2 and id = $3 returning share_token as token`,
+    [businessId, jobId, id, randomBytes(20).toString("hex")],
+  );
+  return rows[0]?.token ?? null;
+}
+
+/**
+ * What a walkthrough's own link opens: the business's name, the customer's first name, the video and its subtitles,
+ * and the proposal's link when one is out. Null for a link we never made. No sign-in: the token is the key.
+ */
+export async function watchByToken(token: string): Promise<{
+  business: string;
+  firstName: string;
+  seconds: number;
+  cues: Cue[];
+  file: { blobPath: string; contentType: string };
+  proposal: string | null;
+} | null> {
+  if (!isWatchToken(token)) return null;
+  const rows = await query<{
+    business: string;
+    first: string | null;
+    name: string;
+    seconds: string;
+    cues: Cue[];
+    blobPath: string;
+    contentType: string;
+    proposal: string | null;
+  }>(
+    `select b.name as business, c.first_name as first, c.name, w.seconds, w.cues, w.blob_path as "blobPath",
+            w.content_type as "contentType",
+            (select p.token from design_proposals p
+              where p.business_id = w.business_id and p.job_id = w.job_id and p.withdrawn_at is null limit 1) as proposal
+       from design_walkthroughs w
+       join businesses b on b.id = w.business_id
+       join design_jobs j on j.business_id = w.business_id and j.id = w.job_id
+       join design_customers c on c.business_id = j.business_id and c.id = j.customer_id
+      where w.share_token = $1`,
+    [token],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    business: r.business,
+    firstName: (r.first || r.name || "").trim().split(/s+/)[0] ?? "",
+    seconds: Number(r.seconds),
+    cues: r.cues ?? [],
+    file: { blobPath: r.blobPath, contentType: r.contentType },
+    proposal: r.proposal,
+  };
 }
 
 /** Shows or hides one on the customer's page. */

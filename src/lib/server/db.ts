@@ -464,6 +464,8 @@ create table if not exists design_walkthroughs (
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
 create index if not exists design_walkthroughs_job on design_walkthroughs (business_id, job_id, created_at desc);
+-- Each walkthrough's own private link (/w/<token>), what a text to the customer carries.
+alter table design_walkthroughs add column if not exists share_token text unique;
 -- The private link to a job's pickup slip (domain/design/pickup-slip.ts): what the installer shows at the wholesaler's
 -- counter. One a job, for good; no sign-in, the token is the key.
 create table if not exists design_pickup_links (

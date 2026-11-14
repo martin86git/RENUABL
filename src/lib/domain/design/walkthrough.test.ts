@@ -56,3 +56,15 @@ describe("a recorded walkthrough", () => {
     expect(applyTidy(cues, { lines: ["only one"] })).toEqual(cues);
   });
 });
+
+describe("sending a walkthrough by text", () => {
+  it("starts from a plain message and puts the link on a line of its own", async () => {
+    const { walkthroughText, textWithLink, isWatchToken } = await import("./walkthrough");
+    expect(walkthroughText("Jo", "Sunrise Solar")).toBe(
+      "Hi Jo, here's a short video from Sunrise Solar walking you through your solar design:",
+    );
+    expect(textWithLink(" Hi ", "https://x.test/w/abc")).toBe("Hi\nhttps://x.test/w/abc");
+    expect(isWatchToken("a".repeat(40))).toBe(true);
+    expect(isWatchToken("a".repeat(48))).toBe(false);
+  });
+});

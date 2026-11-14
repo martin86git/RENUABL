@@ -26,6 +26,8 @@ export interface Walkthrough {
   createdBy: string;
   /** Shown on the customer's proposal page (the newest shown one is the one they see). */
   shown: boolean;
+  /** Its own private link, `/w/<token>`, once it has one. */
+  link: string | null;
 }
 
 /** The longest a recording may run: a walkthrough, not a webinar. */
@@ -175,3 +177,27 @@ export const RECORDING_NOTE =
 
 /** Under the video on the customer's page. */
 export const WALKTHROUGH_NOTE = "A recorded walkthrough of your design. Subtitles are made automatically from what was said.";
+
+/** A walkthrough's own private link, `/w/<40 hex>`: what a text or an email to the customer carries. */
+export const WATCH_PATH = "/w/";
+export function isWatchToken(token: unknown): token is string {
+  return typeof token === "string" && /^[a-f0-9]{40}$/.test(token);
+}
+
+/** The longest message a member may put ahead of the link in a text. */
+export const TEXT_WORDS_MAX = 320;
+
+/** The text offered to start from: who it's from and what it is. The link goes after it, added on the server. */
+export function walkthroughText(firstName: string, business: string): string {
+  const hi = firstName.trim() ? `Hi ${firstName.trim()}, ` : "Hi, ";
+  return `${hi}here's a short video from ${business} walking you through your solar design:`;
+}
+
+/** The text as it goes: their words, then the link on a line of its own. */
+export function textWithLink(words: string, link: string): string {
+  return `${words.trim()}\n${link}`;
+}
+
+/** Said when a recording can't be sent here, so the greyed button isn't a mystery. */
+export const NO_STORAGE =
+  "Sending needs storage for recordings, which isn't set up on this site yet (BLOB_READ_WRITE_TOKEN in Vercel). Download the recording so it isn't lost.";

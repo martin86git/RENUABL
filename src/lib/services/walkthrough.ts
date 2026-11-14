@@ -25,7 +25,9 @@ async function call<T>(url: string, init?: RequestInit): Promise<Answer<T>> {
 const base = (jobId: string) => `/api/design/jobs/${encodeURIComponent(jobId)}/walkthrough`;
 
 export function loadWalkthroughs(jobId: string) {
-  return call<{ walkthroughs: Walkthrough[]; storage: boolean; prefix: string }>(base(jobId));
+  return call<{ walkthroughs: Walkthrough[]; storage: boolean; prefix: string; texts: boolean; mobile: boolean; business: string }>(
+    base(jobId),
+  );
 }
 
 /** Sol tidies the captions (times kept); on any trouble they come back as they were. */
@@ -80,6 +82,15 @@ export function showWalkthroughOnProposal(jobId: string, id: string, shown: bool
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ do: "show", walkthrough: id, shown }),
+  });
+}
+
+/** Texts the customer the walkthrough's own link after the member's words (the link is added on the server). */
+export function textWalkthrough(jobId: string, id: string, words: string) {
+  return call<{ message: string }>(base(jobId), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ do: "text", walkthrough: id, words }),
   });
 }
 

@@ -1,11 +1,31 @@
 "use client";
 
 import clsx from "clsx";
-import { Camera, CameraOff, Check, Circle, EyeOff, Eye, Loader2, RotateCcw, Send, Square, Trash2, Video, X } from "lucide-react";
+import {
+  Camera,
+  CameraOff,
+  Check,
+  Copy,
+  Download,
+  MessageSquare,
+  Circle,
+  EyeOff,
+  Eye,
+  Loader2,
+  RotateCcw,
+  Send,
+  Square,
+  Trash2,
+  Video,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   MAX_SECONDS,
+  NO_STORAGE,
+  TEXT_WORDS_MAX,
+  walkthroughText,
   RECORDING_NOTE,
   VIDEO_BITS_PER_SECOND,
   cleanCues,
@@ -23,6 +43,7 @@ import {
   showWalkthroughOnProposal,
   tidyCaptions,
   walkthroughVideoUrl,
+  textWalkthrough,
 } from "@/lib/services/walkthrough";
 import { recognitionClass, type Recognition } from "./speech";
 import { SolIcon } from "./sol-icon";
@@ -56,6 +77,15 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [earlier, setEarlier] = useState<Walkthrough[]>([]);
   const [storage, setStorage] = useState(true);
+  // Texting it to the customer once it is saved (14 Nov 2026, Martin): only where texts are on and they have a mobile.
+  const [texts, setTexts] = useState(false);
+  const [businessName, setBusinessName] = useState("");
+  const [mobile, setMobile] = useState(false);
+  const [kept, setKept] = useState<Walkthrough | null>(null);
+  const [words, setWords] = useState("");
+  const [texting, setTexting] = useState(false);
+  const [texted, setTexted] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [prefix, setPrefix] = useState<string | null>(null);
   // Your face in a corner bubble (14 Nov 2026, Martin): the camera drawn over the page, so the tab's recording carries
   // it. On or off before and during the recording; the choice is kept on this device.
@@ -124,6 +154,9 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
       if (!res.ok) return;
       setEarlier(res.walkthroughs);
       setStorage(res.storage);
+      setTexts(res.texts);
+      setBusinessName(res.business);
+      setMobile(res.mobile);
       setPrefix(res.prefix);
     });
   useEffect(refresh, [jobId]);
@@ -262,6 +295,26 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
     setPhase("ready");
   };
 
+  const sendText = async () => {
+    if (!kept) return;
+    setTexting(true);
+    setProblem(null);
+    const res = await textWalkthrough(jobId, kept.id, words);
+    setTexting(false);
+    if (!res.ok) return setProblem(res.message);
+    setTexted(res.message);
+  };
+  const copyLink = async () => {
+    if (!kept?.link) return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${kept.link}`);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setProblem("The link couldn't be copied.");
+    }
+  };
+
   const send = async () => {
     if (!video || !prefix) return;
     setPhase("sending");
@@ -272,6 +325,9 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
       setPhase("review");
       return;
     }
+    setKept(res.walkthrough);
+    setWords(walkthroughText(customer.split(/\s+/)[0] ?? "", businessName));
+    setTexted(null);
     setPhase("sent");
     refresh();
   };
@@ -448,8 +504,18 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
                   className="inline-flex items-center gap-2 rounded-full bg-sun-line px-5 py-2.5 text-[14px] font-medium text-white hover:brightness-110 disabled:bg-line disabled:text-muted"
                 >
                   {phase === "sending" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Send className="size-4" aria-hidden />}
-                  {phase === "sending" ? `Sending ${Math.round(progress * 100)}%` : `Send to ${customer}'s proposal`}
+                  {phase === "sending" ? `Saving ${Math.round(progress * 100)}%` : `Save and share with ${customer}`}
                 </button>
+                {video && videoUrl && (
+                  <a
+                    href={videoUrl}
+                    download={`walkthrough-${customer.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()}.${video.type.includes("mp4") ? "mp4" : "webm"}`}
+                    className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] text-ink-2 ring-1 ring-line hover:text-ink"
+                  >
+                    <Download className="size-3.5" aria-hidden />
+                    Download
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={again}
@@ -460,14 +526,62 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
                   Record again
                 </button>
               </div>
+              {/* Why Save can't be pressed, said where it is (14 Nov 2026, Martin: it was greyed out with no reason). */}
+              {!storage && <p className="mt-3 text-[13px] text-warning">{NO_STORAGE}</p>}
             </>
           )}
 
+          {phase === "sent" && (
+            <div className="mt-4 rounded-[16px] bg-canvas p-4">
+              <p className="flex items-center gap-2 text-[14px] font-medium text-ink">
+                <MessageSquare className="size-4" aria-hidden />
+                Text {customer} the video
+              </p>
+              {texts && mobile ? (
+                <>
+                  <textarea
+                    value={words}
+                    onChange={(e) => setWords(e.target.value.slice(0, TEXT_WORDS_MAX))}
+                    rows={3}
+                    className="mt-2 w-full resize-none rounded-[12px] border border-line bg-surface px-3 py-2 text-[14px] text-ink"
+                  />
+                  <p className="mt-1 text-[12px] text-muted">The link to the video goes on its own line after your words.</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void sendText()}
+                      disabled={texting || Boolean(texted)}
+                      className="inline-flex items-center gap-2 rounded-full bg-sun-line px-4 py-2 text-[13px] font-medium text-white hover:brightness-110 disabled:bg-line disabled:text-muted"
+                    >
+                      {texting ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Send className="size-3.5" aria-hidden />}
+                      {texted ? "Texted" : "Send the text"}
+                    </button>
+                    {texted && <span className="text-[13px] text-positive">{texted}</span>}
+                  </div>
+                </>
+              ) : (
+                <p className="mt-1 text-[13px] text-muted">
+                  {!texts
+                    ? "Texts aren't switched on for your business yet. Copy the link below and send it yourself."
+                    : `There's no mobile on ${customer}'s record. Copy the link below and send it yourself.`}
+                </p>
+              )}
+            </div>
+          )}
           {phase === "sent" && (
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-positive/10 px-3 py-1.5 text-[13px] text-positive">
                 <Check className="size-3.5" aria-hidden /> On the proposal
               </span>
+              {kept?.link && (
+                <button
+                  type="button"
+                  onClick={() => void copyLink()}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] text-ink-2 ring-1 ring-line hover:text-ink"
+                >
+                  <Copy className="size-3.5" aria-hidden /> {copied ? "Copied" : "Copy the link"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={again}
