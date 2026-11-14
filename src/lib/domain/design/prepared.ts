@@ -16,7 +16,8 @@ import type { DetailKey } from "./crm";
 import { FOLLOW_UP_WORDS } from "./proposal-lists";
 import { nextWorkingDay } from "./today-pad";
 
-export type PreparedKind = "follow-up" | "recap";
+/** A follow-up, a call's recap, or an install day handed to Sol to book and tell the customer (14 Nov 2026). */
+export type PreparedKind = "follow-up" | "recap" | "install-day";
 /** Preparing while Sol writes it; ready to send; then sent or put aside; stale once the reason for it has gone. */
 export type PreparedStatus = "preparing" | "ready" | "sent" | "dismissed" | "stale";
 
@@ -42,10 +43,14 @@ export interface PreparedItem {
   by: "sol" | "plain";
   status: PreparedStatus;
   createdAt: string;
+  /** An install-day email: the day it books on the deal as it goes (YYYY-MM-DD). */
+  installDay?: string;
 }
 
 /** Each follow-up once: a newer version of the proposal, or the next follow-up day, is a new one. */
 export const followUpKey = (jobId: string, version: number, day: number) => `follow-up:${jobId}:${version}:${day}`;
+/** An install day handed to Sol: one for each time it is handed. */
+export const installDayKey = (jobId: string, at: string) => `install-day:${jobId}:${at}`;
 /** A recap belongs to the call it came from. */
 export const recapKey = (jobId: string, at: string) => `recap:${jobId}:${at}`;
 

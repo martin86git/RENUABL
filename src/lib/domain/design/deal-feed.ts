@@ -65,6 +65,12 @@ export interface FeedDeal {
     readyAt?: string;
     held: boolean;
     state?: OutboxState;
+    /** Which kind of email: a follow-up, a call's recap, or an install day handed to Sol (prepared.ts). */
+    kind?: string;
+    /** A person picked when it goes (Hand to Sol, In an hour, Tomorrow at 9): it goes then, whatever his agents. */
+    handed?: boolean;
+    /** The day an install-day email books (YYYY-MM-DD). */
+    installDay?: string;
   } | null;
   canCall: boolean;
   canEmail: boolean;
@@ -98,12 +104,56 @@ export function lastAt(d: FeedDeal): string {
   return d.events[0]?.at ?? d.createdAt;
 }
 
+/** Sol has it in hand himself: an email of his counting down (his agent is on, or a person handed it to him). */
+export function solHasIt(d: Pick<FeedDeal, "sol">): boolean {
+  if (!d.sol) return false;
+  return (d.sol.state ?? (d.sol.held ? "held" : "counting")) === "counting";
+}
+
+/** A draft of Sol's that waits on a person: his agent is off, or someone held it. */
+export function solDraftWaits(d: Pick<FeedDeal, "sol">): boolean {
+  if (!d.sol || solHasIt(d)) return false;
+  return (d.sol.state ?? (d.sol.held ? "held" : "counting")) !== "no-email";
+}
+
+/** How long Sol waits after something is handed to him, so it can be taken back (14 Nov 2026, Martin: 30 minutes). */
+export const HAND_MINUTES = 30;
+
+/**
+ * What a person can hand to Sol on a deal (14 Nov 2026, Martin: "Sol's feed is a list of things I'm delegating to
+ * him"): his draft email, to send in `HAND_MINUTES`; or, for a signed deal with no day, booking the install (he picks
+ * the soonest free day and emails the customer). Never while the customer is waiting on a reply: that is a person's.
+ */
+export type HandKind = "send" | "book";
+export function handable(d: FeedDeal, now = new Date()): HandKind | null {
+  if (markHolds(d, now) || d.events[0]?.kind === "message") return null;
+  if (solDraftWaits(d)) return "send";
+  if (!d.sol && d.stage === "won" && !d.installDate && d.canEmail) return "book";
+  return null;
+}
+
+/** What Sol is doing on a deal, for his lane: "Books Fri 20 Nov and emails Casey", "Emails Casey: Your proposal". */
+export function solDoesWords(d: Pick<FeedDeal, "sol" | "customer">): string {
+  const name = first(d.customer);
+  if (!d.sol) return "";
+  if (d.sol.kind === "install-day" && d.sol.installDay) {
+    const day = new Date(`${d.sol.installDay}T12:00:00Z`)
+      .toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
+      .replace(",", "");
+    return `Books ${day} and emails ${name}`;
+  }
+  return d.sol.subject ? `Emails ${name}: ${d.sol.subject}` : `Emails ${name}`;
+}
+
 /** Why this deal needs a person now, in words, or null when Sol and the record have it in hand. */
 export function needsYou(d: FeedDeal, now = new Date()): string | null {
   if (markHolds(d, now)) return null;
   const latest = d.events[0];
   const name = first(d.customer);
   if (latest?.kind === "message") return `${name} is waiting on a reply`;
+  // Sol has it: nothing for a person until it goes (or someone takes it back).
+  if (solHasIt(d)) return null;
+  if (solDraftWaits(d)) return `Sol drafted an email to ${name}: yours to send or hand back`;
   // A request Sol left in the deal's team chat, still open.
   const ask = d.team?.openAsks[0];
   if (ask) return askNeedWords(ask);
@@ -164,6 +214,7 @@ export function nextMove(d: FeedDeal, now = new Date()): NextMove | null {
   const name = first(d.customer);
   if (d.events[0]?.kind === "message")
     return { kind: "reply", label: `Reply to ${name}`, why: `${name} asked something and is waiting on a reply.` };
+  if (solHasIt(d)) return null;
   if (d.sol) {
     const state = d.sol.state ?? (d.sol.held ? "held" : "counting");
     const what = d.sol.subject ? `: "${d.sol.subject}"` : "";
@@ -366,6 +417,9 @@ export interface TodayParts {
   /** New leads waiting for a design, newest first (New in). */
   fresh: FeedDeal[];
   needs: FeedDeal[];
+  /** What Sol has in hand himself, soonest first (his lane). */
+  sols: FeedDeal[];
+  /** Kept for older readers: Sol's lane now holds what was Coming up. */
   coming: FeedDeal[];
   inHand: FeedDeal[];
 }
@@ -374,16 +428,20 @@ export function todayParts(deals: readonly FeedDeal[], now = new Date()): TodayP
   const isFresh = new Set(fresh.map((d) => d.jobId));
   // Needs you is for everything after the proposal has gone out (12 Nov 2026, Martin): before that, the work is the
   // design and the quote, which New in carries.
-  const needs = feedOf(deals, "needs", now).filter((d) => AFTER_PROPOSAL(d.stage) && !isFresh.has(d.jobId));
+  // A draft of Sol's waiting on a person is always theirs, whatever the stage.
+  const needs = feedOf(deals, "needs", now).filter((d) => (AFTER_PROPOSAL(d.stage) || solDraftWaits(d)) && !isFresh.has(d.jobId));
   const needing = new Set(needs.map((d) => d.jobId));
-  const rest = deals.filter((d) => !needing.has(d.jobId) && !isFresh.has(d.jobId));
+  // Sol's lane (14 Nov 2026, Martin): what he has in hand himself, soonest first.
+  const sols = deals.filter((d) => solHasIt(d) && !needing.has(d.jobId)).sort((a, b) => a.sol!.firesAt.localeCompare(b.sol!.firesAt));
+  const his = new Set(sols.map((d) => d.jobId));
+  const rest = deals.filter((d) => !needing.has(d.jobId) && !isFresh.has(d.jobId) && !his.has(d.jobId));
   const coming = rest.filter((d) => d.sol).sort((a, b) => a.sol!.firesAt.localeCompare(b.sol!.firesAt));
   const inHand = feedOf(
     rest.filter((d) => !d.sol),
     "all",
     now,
   );
-  return { fresh, needs, coming, inHand };
+  return { fresh, needs, sols, coming, inHand };
 }
 
 /** The open request of Sol's on the deal, as its line in the team chat (its words carry the brief), when there is one. */
@@ -414,7 +472,7 @@ export function todaySummary(parts: TodayParts, done: DayDone | null, now = new 
   const first = n === 0 ? "Nothing needs you right now." : `${n === 1 ? "One deal needs" : `${n} deals need`} you.`;
   const fresh = parts.fresh.length;
   const toContact = fresh ? `${fresh === 1 ? "One new lead" : `${fresh} new leads`} to design.` : null;
-  const next = parts.coming.find((d) => d.sol && (d.sol.state ?? (d.sol.held ? "held" : "counting")) === "counting");
+  const next = [...parts.sols, ...parts.coming].find((d) => solHasIt(d));
   const coming = next?.sol ? `I email ${first_(next.customer)} ${countdownWords(next.sol.firesAt, now)}.` : null;
   const did = [done && done.mine > 0 ? `${done.mine} done by you today` : null, done && done.sol > 0 ? `I sent ${done.sol}` : null]
     .filter(Boolean)

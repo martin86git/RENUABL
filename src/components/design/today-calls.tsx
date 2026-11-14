@@ -29,7 +29,7 @@ const QUIET_MS = 30_000;
 /** Today's calls shown before "All calls". */
 const DONE_SHOWN = 4;
 /** One width for every pad on Today (as New in's), so a row of them centres whatever its count. */
-const PAD = "w-full sm:w-[14.25rem]";
+const WIDE = "w-full sm:w-[14.25rem]";
 const CARD = "flex flex-col gap-2 rounded-2xl bg-surface p-3.5 text-left ring-1 ring-line transition hover:ring-ink-2";
 
 /** What Calls holds, for Today's strip: whether calls are on, and how many are live, lined up and done today. */
@@ -48,7 +48,9 @@ const firstOf = (name: string) => name.trim().split(/\s+/)[0] || "them";
  * what each came to. Each call is a pad like New in's, centred (14 Nov 2026, Martin: not a long bar). A call of the
  * assistant's opens its window with what was said; one the team logged opens the deal.
  */
-export function TodayCalls(props: { id?: string; className?: string; onSummary?: (s: CallsSummary) => void } = {}) {
+export function TodayCalls(props: { id?: string; className?: string; onSummary?: (s: CallsSummary) => void; compact?: boolean } = {}) {
+  // In Sol's lane (14 Nov 2026): the cards one under another, the width of the lane.
+  const PAD = props.compact ? "w-full" : WIDE;
   const caller = useCaller();
   const [log, setLog] = useState<{ calls: CallLogEntry[]; coming: CallComing[]; solOn: boolean } | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -96,7 +98,7 @@ export function TodayCalls(props: { id?: string; className?: string; onSummary?:
   const rest = t.done.length - DONE_SHOWN;
 
   return (
-    <section id={props.id} className={props.className ?? "mt-8"} aria-label="Calls today">
+    <section id={props.id} className={props.compact ? "mt-4" : (props.className ?? "mt-8")} aria-label="Calls today">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
           Calls<span className="ml-1.5 font-normal normal-case tracking-normal text-muted">{words ?? "none yet today"}</span>
@@ -105,7 +107,7 @@ export function TodayCalls(props: { id?: string; className?: string; onSummary?:
           All calls
         </Link>
       </div>
-      <div className="flex flex-wrap justify-center gap-3">
+      <div className={props.compact ? "flex flex-col gap-2" : "flex flex-wrap justify-center gap-3"}>
         {t.live.map((c) => {
           const ran = c.phase === "on-call" && c.startedAt ? clockWords(now.getTime() - Date.parse(c.startedAt)) : null;
           return (
@@ -192,7 +194,7 @@ export function TodayCalls(props: { id?: string; className?: string; onSummary?:
           </Link>
         )}
         {!words && (
-          <p className="max-w-[31.5rem] rounded-2xl bg-surface px-5 py-4 text-center text-[13px] leading-snug text-ink-2 ring-1 ring-line">
+          <p className="max-w-[31.5rem] rounded-2xl bg-surface px-4 py-3.5 text-center text-[13px] leading-snug text-ink-2 ring-1 ring-line">
             No calls yet today. {caller.name} rings new leads and customers who ask, in calling hours, and each call shows here.
           </p>
         )}

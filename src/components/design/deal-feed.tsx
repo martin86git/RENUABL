@@ -40,6 +40,9 @@ import {
   openAskLine,
   padLines,
   solLine,
+  handable,
+  solDoesWords,
+  HAND_MINUTES,
   todayParts,
   markHolds,
   markWords,
@@ -63,7 +66,7 @@ import { dayChip, installDayEmail } from "@/lib/domain/design/install-days";
 import { PIPELINES, type Pipeline } from "@/lib/domain/design/deal";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
 import { briefHref } from "@/lib/domain/design/deal-team";
-import { exampleDeals, loadFeed, markFeedDeal, saveLeadRule, type FeedAnswer } from "@/lib/services/deal-feed";
+import { exampleDeals, handToSol, loadFeed, markFeedDeal, saveLeadRule, takeBackFromSol, type FeedAnswer } from "@/lib/services/deal-feed";
 import { DEAL_TEAM_CHANGED } from "@/lib/services/deal-team";
 import { AerialRoof, type AerialRoofSpec, type RoofFinish, type RoofForm } from "./aerial-roof";
 import { PATHS } from "./design-shell";
@@ -209,28 +212,29 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
   const needs = parts.needs.length;
   const callsLive = (calls?.live ?? 0) > 0;
   const place = todayPlaces(callsLive);
+  // Sol's lane on the strip: what he has in hand himself and the calls lined up or on (14 Nov 2026, Martin).
+  const solCount = parts.sols.length + (calls ? calls.live + calls.lined : 0);
   const tabs: StripTab[] = [
     { id: TODAY_IDS.needs, label: "Needs you", count: data ? needs : null, signal: needs > 0 ? ("needs" as const) : null, order: 1 },
     { id: TODAY_IDS.newIn, label: "New in", count: data ? parts.fresh.length : null, order: 2 },
-    ...(calls && (calls.on || calls.live + calls.lined + calls.done > 0)
-      ? [
-          {
-            id: TODAY_IDS.calls,
-            label: "Calls",
-            count: calls.live + calls.lined + calls.done,
-            signal: callsLive ? ("live" as const) : null,
-            order: callsLive ? 0 : 3,
-          },
-        ]
-      : []),
+    { id: TODAY_IDS.sol, label: "Sol's", count: data ? solCount : null, signal: callsLive ? ("live" as const) : null, order: 3 },
     ...(parts.coming.length ? [{ id: TODAY_IDS.coming, label: "Coming up", count: parts.coming.length, order: 4 }] : []),
     ...(parts.inHand.length ? [{ id: TODAY_IDS.inHand, label: "In hand", count: parts.inHand.length, order: 5 }] : []),
     { id: TODAY_IDS.news, label: "News", count: null, order: 7 },
   ].sort((a, b) => a.order - b.order);
-  const [lit, go] = useScrollSpy(tabs.map((t) => t.id));
+  const [lit, goTo] = useScrollSpy(tabs.map((t) => t.id));
+  // On a phone the lanes show one at a time: going to a part in the other lane switches to it first.
+  const [lane, setLane] = useState<"yours" | "sol">("yours");
+  const go = (id: string) => {
+    const want = id === TODAY_IDS.sol ? "sol" : id === TODAY_IDS.needs || id === TODAY_IDS.newIn ? "yours" : lane;
+    if (want !== lane) {
+      setLane(want);
+      window.setTimeout(() => goTo(id), 0);
+    } else goTo(id);
+  };
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-5xl lg:max-w-[80rem]">
       {/* The overview strip, pinned under the top bar (14 Nov 2026, Martin): the pipeline picked, each part of Today with
           how many, a press to go to it, and the part in view lit. */}
       <TodayStrip
@@ -294,139 +298,171 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
 
       {/* The parts of Today in one column, in the order of what needs a person (14 Nov 2026, Martin): Needs you, New in,
           Calls, Coming up, In hand; Calls goes first while a call is ringing or on, the most live thing on the page. */}
-      <div className="flex flex-col">
-        {/* The phone assistant's calls: on now, lined up and done today (12 Nov 2026, Martin). */}
-        <TodayCalls id={TODAY_IDS.calls} className={clsx(TRAY, place.calls)} onSummary={setCalls} />
-
-        {/* The owner of a team: a line for each salesperson, new this week, not yet contacted, in play. */}
-        {ownerOfTeam && (
-          <section className={clsx(TRAY, place.team)} aria-label="Your team">
-            <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink">Your team</h2>
-            <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
-              <div className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 border-b border-line px-4 py-2 text-[11.5px] text-muted">
-                <span>Salesperson</span>
-                <span>New this week</span>
-                <span>Not contacted</span>
-                <span>In play</span>
-              </div>
-              {teamLines(data?.deals ?? [], sellers, now).map((l) => (
-                <div
-                  key={l.email}
-                  className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 px-4 py-2.5 text-[13.5px] text-ink"
-                >
-                  <span className="truncate font-medium">{l.name}</span>
-                  <span className="tabular-nums">{l.fresh}</span>
-                  <span className={clsx("tabular-nums", l.waiting > 0 && "font-semibold text-sun-ink")}>{l.waiting}</span>
-                  <span className="tabular-nums">
-                    {l.inPlay}
-                    {l.value > 0 && <span className="text-muted"> · ${Math.round(l.value / 1000).toLocaleString("en-AU")}k</span>}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* New in (12 Nov 2026, Martin): new leads that need a design, each with Design, so a quote goes out quickly;
-          New lead adds one. */}
-        <section id={TODAY_IDS.newIn} className={clsx(TRAY, place.newIn)} aria-label="New in">
-          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
-              New in
-              <span className="ml-1.5 font-normal normal-case tracking-normal text-muted">
-                {data ? `${parts.fresh.length} to design` : ""}
-              </span>
-            </h2>
-            {ownerOfTeam && (
-              <label className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
-                Your new leads go to
-                <select
-                  value={leadRule}
-                  onChange={(e) => void chooseRule(e.target.value as LeadRule)}
-                  className="cursor-pointer rounded-full bg-surface px-2.5 py-1 text-[12.5px] font-medium text-ink ring-1 ring-line focus:outline-none"
-                >
-                  {LEAD_RULES.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.id === "adder" ? "You" : r.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+      {/* Two lanes (14 Nov 2026, Martin: "my feed and Sol's feed"): yours, what needs a person, and Sol's, what he has in
+          hand himself with when it goes, and the calls. On a phone one at a time, switched at the top. */}
+      <div className="mt-4 flex justify-center lg:hidden">
+        <div className="inline-flex rounded-full bg-surface p-1 ring-1 ring-line" role="tablist" aria-label="Whose work">
+          {(["yours", "sol"] as const).map((l) => (
             <button
+              key={l}
               type="button"
-              onClick={props.onNew}
-              aria-expanded={props.adding}
+              role="tab"
+              aria-selected={lane === l}
+              onClick={() => setLane(l)}
               className={clsx(
-                !ownerOfTeam && "ml-auto",
-                "inline-flex h-9 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-4 text-[13px] font-medium text-ink ring-1 ring-line transition hover:ring-ink-2",
+                "inline-flex h-8 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition",
+                lane === l ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
               )}
             >
-              <Plus className={clsx("size-4 text-ink-2 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden /> New lead
+              {l === "sol" && <SolIcon className="size-3.5 text-sun-line" />}
+              {l === "yours" ? "Yours" : "Sol's"}
             </button>
-          </div>
-          {data && parts.fresh.length === 0 ? (
-            <div className="flex justify-center">
-              <p className="rounded-2xl bg-surface px-5 py-5 text-center text-[13.5px] text-ink-2 ring-1 ring-line">
-                Every new lead has a design.
-              </p>
-            </div>
-          ) : (
-            // Pads of their own width, centred (14 Nov 2026, Martin): however many there are, they sit in the middle.
-            <div className="flex flex-wrap justify-center gap-3">
-              {parts.fresh.map((d) => (
-                <div key={d.jobId} className={`grid ${PAD}`}>
-                  <ArrivalCard
-                    deal={d}
-                    now={now}
-                    team={solo ? null : [{ email: me, name: "You" }, ...(data?.team ?? [])]}
-                    mayGive={data?.role === "owner"}
-                    onChanged={load}
-                  />
+          ))}
+        </div>
+      </div>
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-x-6">
+        <div className={clsx("flex min-w-0 flex-col", lane === "sol" && "hidden lg:flex")}>
+          <Part id={TODAY_IDS.needs} className={place.needs} title="Needs you" count={data ? needs : null}>
+            {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
+            {data && needs === 0 && (
+              <div className="flex justify-center">
+                <div className="flex w-full max-w-[30rem] flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-8 text-center ring-1 ring-line">
+                  <span className="grid size-11 place-items-center rounded-full bg-positive-soft text-positive">
+                    <Check className="size-5" aria-hidden />
+                  </span>
+                  <p className="text-[16px] font-medium text-ink">{allClearWords(data.today ?? null)}</p>
+                  <p className="text-[13px] text-ink-2">Nothing needs you right now. Sol has the rest in hand.</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <Part id={TODAY_IDS.needs} className={place.needs} title="Needs you" count={data ? needs : null}>
-          {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
-          {data && needs === 0 && (
-            <div className="flex justify-center">
-              <div className="flex w-full max-w-[30rem] flex-col items-center gap-2 rounded-2xl bg-surface px-5 py-8 text-center ring-1 ring-line">
-                <span className="grid size-11 place-items-center rounded-full bg-positive-soft text-positive">
-                  <Check className="size-5" aria-hidden />
-                </span>
-                <p className="text-[16px] font-medium text-ink">{allClearWords(data.today ?? null)}</p>
-                <p className="text-[13px] text-ink-2">Nothing needs you right now. Sol has the rest in hand.</p>
               </div>
-            </div>
-          )}
-          {/* Cards at a width of their own, the one that suits a card (30rem: the need, the days and the email read
+            )}
+            {/* Cards at a width of their own, the one that suits a card (30rem: the need, the days and the email read
             without crowding), centred, two side by side where they fit (14 Nov 2026, Martin: not tied to New in's row). */}
-          {parts.needs.length > 0 && (
-            <div className="flex flex-wrap items-start justify-center gap-3">
-              {parts.needs.map((d) => (
-                <div key={d.jobId} className="w-full max-w-[30rem]">
-                  <DealCard
-                    deal={d}
-                    now={now}
-                    me={me}
-                    callsOn={Boolean(data?.callsOn)}
-                    team={data?.team ?? []}
-                    solo={solo}
-                    onChanged={load}
-                    onMark={(mark) => setMark(d.jobId, mark)}
-                    installDays={data?.installDays}
-                    signOff={data?.signOff}
-                    stacked
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </Part>
+            {parts.needs.length > 0 && (
+              <div className="flex flex-wrap items-start justify-center gap-3">
+                {parts.needs.map((d) => (
+                  <div key={d.jobId} className="w-full max-w-[30rem]">
+                    <DealCard
+                      deal={d}
+                      now={now}
+                      me={me}
+                      callsOn={Boolean(data?.callsOn)}
+                      team={data?.team ?? []}
+                      solo={solo}
+                      onChanged={load}
+                      onMark={(mark) => setMark(d.jobId, mark)}
+                      installDays={data?.installDays}
+                      signOff={data?.signOff}
+                      stacked
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </Part>
 
+          {/* New in (12 Nov 2026, Martin): new leads that need a design, each with Design, so a quote goes out quickly;
+          New lead adds one. */}
+          <section id={TODAY_IDS.newIn} className={clsx(TRAY, place.newIn)} aria-label="New in">
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
+                New in
+                <span className="ml-1.5 font-normal normal-case tracking-normal text-muted">
+                  {data ? `${parts.fresh.length} to design` : ""}
+                </span>
+              </h2>
+              {ownerOfTeam && (
+                <label className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
+                  Your new leads go to
+                  <select
+                    value={leadRule}
+                    onChange={(e) => void chooseRule(e.target.value as LeadRule)}
+                    className="cursor-pointer rounded-full bg-surface px-2.5 py-1 text-[12.5px] font-medium text-ink ring-1 ring-line focus:outline-none"
+                  >
+                    {LEAD_RULES.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.id === "adder" ? "You" : r.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <button
+                type="button"
+                onClick={props.onNew}
+                aria-expanded={props.adding}
+                className={clsx(
+                  !ownerOfTeam && "ml-auto",
+                  "inline-flex h-9 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-4 text-[13px] font-medium text-ink ring-1 ring-line transition hover:ring-ink-2",
+                )}
+              >
+                <Plus className={clsx("size-4 text-ink-2 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden /> New
+                lead
+              </button>
+            </div>
+            {data && parts.fresh.length === 0 ? (
+              <div className="flex justify-center">
+                <p className="rounded-2xl bg-surface px-5 py-5 text-center text-[13.5px] text-ink-2 ring-1 ring-line">
+                  Every new lead has a design.
+                </p>
+              </div>
+            ) : (
+              // Pads of their own width, centred (14 Nov 2026, Martin): however many there are, they sit in the middle.
+              <div className="flex flex-wrap justify-center gap-3">
+                {parts.fresh.map((d) => (
+                  <div key={d.jobId} className={`grid ${PAD}`}>
+                    <ArrivalCard
+                      deal={d}
+                      now={now}
+                      team={solo ? null : [{ email: me, name: "You" }, ...(data?.team ?? [])]}
+                      mayGive={data?.role === "owner"}
+                      onChanged={load}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* The owner of a team: a line for each salesperson, new this week, not yet contacted, in play. */}
+          {ownerOfTeam && (
+            <section className={clsx(TRAY, place.team)} aria-label="Your team">
+              <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink">Your team</h2>
+              <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+                <div className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 border-b border-line px-4 py-2 text-[11.5px] text-muted">
+                  <span>Salesperson</span>
+                  <span>New this week</span>
+                  <span>Not contacted</span>
+                  <span>In play</span>
+                </div>
+                {teamLines(data?.deals ?? [], sellers, now).map((l) => (
+                  <div
+                    key={l.email}
+                    className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 px-4 py-2.5 text-[13.5px] text-ink"
+                  >
+                    <span className="truncate font-medium">{l.name}</span>
+                    <span className="tabular-nums">{l.fresh}</span>
+                    <span className={clsx("tabular-nums", l.waiting > 0 && "font-semibold text-sun-ink")}>{l.waiting}</span>
+                    <span className="tabular-nums">
+                      {l.inPlay}
+                      {l.value > 0 && <span className="text-muted"> · ${Math.round(l.value / 1000).toLocaleString("en-AU")}k</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+        <SolLane
+          id={TODAY_IDS.sol}
+          className={clsx(lane === "yours" && "hidden lg:block")}
+          deals={parts.sols}
+          now={now}
+          callsLive={callsLive}
+          calls={<TodayCalls compact onSummary={setCalls} />}
+          onChanged={load}
+        />
+      </div>
+      <div className="flex flex-col">
         {parts.coming.length > 0 && (
           <Part
             id={TODAY_IDS.coming}
@@ -479,7 +515,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
           </Part>
         )}
 
-        <div id={TODAY_IDS.news} className={clsx("scroll-mt-44", place.news)}>
+        <div id={TODAY_IDS.news} className="scroll-mt-44">
           <TodayNews />
         </div>
       </div>
@@ -594,6 +630,7 @@ export const TODAY_IDS = {
   needs: "today-needs",
   newIn: "today-new",
   calls: "today-calls",
+  sol: "today-sol",
   coming: "today-coming",
   inHand: "today-in-hand",
   news: "today-news",
@@ -663,7 +700,7 @@ function TodayStrip(props: {
                     </span>
                   )}
                   {t.signal === "needs" && <span className="size-1.5 rounded-full bg-sun-line" aria-hidden />}
-                  {t.count ?? <span className="text-[12px] font-normal text-muted">Latest</span>}
+                  {t.count ?? <span className="text-[12px] font-normal text-muted">{t.id === TODAY_IDS.news ? "Latest" : "–"}</span>}
                 </span>
               </button>
             );
@@ -735,6 +772,110 @@ export const PAD = "w-full sm:w-[14.25rem]";
 
 /** How many deals In hand shows before "Show all". */
 const IN_HAND_SHOWN = 5;
+
+/**
+ * Sol's lane (14 Nov 2026, Martin: "Sol's feed is a list of things I'm delegating to him, or it shows if he's already
+ * handling something on a deal"): what he has in hand himself, each with what he will do and when, to review or take
+ * back, and the calls. A live call goes first.
+ */
+function SolLane(props: {
+  id: string;
+  className?: string;
+  deals: FeedDeal[];
+  now: Date;
+  callsLive: boolean;
+  calls: React.ReactNode;
+  onChanged: () => void;
+}) {
+  return (
+    <aside
+      id={props.id}
+      aria-label="Sol's work"
+      className={clsx(TRAY, "lg:sticky lg:top-[9.25rem] lg:max-h-[calc(100dvh-10.5rem)] lg:overflow-y-auto", props.className)}
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <SolIcon className="size-4 text-sun-line" />
+        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
+          Sol&apos;s<span className="ml-1.5 font-normal normal-case tracking-normal text-muted">{props.deals.length} in hand</span>
+        </h2>
+      </div>
+      {props.callsLive && props.calls}
+      {props.deals.length > 0 ? (
+        <ul className="space-y-2">
+          {props.deals.map((d) => (
+            <SolRow key={d.jobId} deal={d} now={props.now} onChanged={props.onChanged} />
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-2xl bg-surface px-4 py-3.5 text-[13px] leading-snug text-ink-2 ring-1 ring-line">
+          Nothing handed to Sol yet. Press <span className="font-medium text-ink">Hand to Sol</span> on a card: he takes it from there after{" "}
+          {HAND_MINUTES} minutes, and you can take it back until then.
+        </p>
+      )}
+      {!props.callsLive && props.calls}
+    </aside>
+  );
+}
+
+/** One thing Sol has in hand: the deal, what he will do, when it goes, Review and (for what was handed) Take back. */
+function SolRow({ deal: d, now, onChanged }: { deal: FeedDeal; now: Date; onChanged: () => void }) {
+  const [reviewing, setReviewing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const back = async () => {
+    setBusy(true);
+    const r = await takeBackFromSol(d.jobId);
+    setBusy(false);
+    if (r.ok) onChanged();
+  };
+  const sol = d.sol!;
+  return (
+    <li className="rounded-2xl bg-surface p-3 ring-1 ring-line">
+      <div className="flex items-start gap-2.5">
+        <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-sun text-sun-ink">
+          <Countdown sol={sol} now={now} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <Link href={`${PATHS.deals}/${d.jobId}`} className="block truncate text-[13.5px] font-semibold text-ink hover:underline">
+            {d.customer}
+          </Link>
+          <p className="text-[12.5px] leading-snug text-ink-2">{solDoesWords(d)}</p>
+          <p className="mt-0.5 text-[11.5px] text-muted">Goes {countdownWords(sol.firesAt, now)}</p>
+        </div>
+      </div>
+      <div className="mt-2 flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setReviewing((r) => !r)}
+          aria-expanded={reviewing}
+          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-surface px-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:ring-ink-2"
+        >
+          <Mail className="size-3.5" aria-hidden /> Review
+        </button>
+        {sol.handed && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void back()}
+            className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium text-ink-2 hover:text-ink disabled:text-muted"
+          >
+            <Undo2 className="size-3.5" aria-hidden /> Take back
+          </button>
+        )}
+      </div>
+      {reviewing && sol.id && (
+        <ReviewSol
+          deal={d}
+          now={now}
+          onClose={() => setReviewing(false)}
+          onDone={() => {
+            setReviewing(false);
+            onChanged();
+          }}
+        />
+      )}
+    </li>
+  );
+}
 
 /** A part of Today: its title, how many, a line on what it is. */
 function Part(props: { id?: string; className?: string; title: string; count?: number | null; note?: string; children: React.ReactNode }) {
@@ -897,6 +1038,24 @@ function DealCard(props: {
     const r = await markFeedDeal(d.jobId, "undo");
     if (r.ok) props.onMark(null);
   };
+  // Hand to Sol (14 Nov 2026, Martin): he takes the next piece of work in HAND_MINUTES, unless taken back.
+  const hand = handable(d, now);
+  const first = d.customer.trim().split(/\s+/)[0] || "them";
+  const [handing, setHanding] = useState(false);
+  const [handNote, setHandNote] = useState<string | null>(null);
+  const handOver = async () => {
+    if (handing) return;
+    setHanding(true);
+    setHandNote(null);
+    const r = await handToSol(d.jobId);
+    setHanding(false);
+    if (!r.ok) return setHandNote(r.message);
+    setCleared("Handed to Sol");
+    window.setTimeout(() => {
+      setCleared(null);
+      props.onChanged();
+    }, 650);
+  };
   // The deal's chat opened over the page from its glance (null: closed), with what was typed in the glance's box.
   const [chat, setChat] = useState<string | null>(null);
   // The pad beside the card only when the team has said something there (10 Nov 2026, Martin): Sol's open request is
@@ -1049,12 +1208,32 @@ function DealCard(props: {
             <Tool quiet={Boolean(move)} label="Deal" title={`${d.customer}'s deal`} href={`${PATHS.deals}/${d.jobId}`}>
               <Handshake className="size-4" aria-hidden />
             </Tool>
-            {need && (
-              <span className="ml-auto">
-                <MarkButtons busy={marking} onDone={() => void mark("done")} onLater={(c) => void mark("later", c)} />
+            {(need || hand) && (
+              <span className="ml-auto flex items-center gap-1.5">
+                {hand && (
+                  <button
+                    type="button"
+                    disabled={handing}
+                    onClick={() => void handOver()}
+                    title={
+                      hand === "book"
+                        ? `Sol picks the soonest free day and emails ${first} in ${HAND_MINUTES} minutes, unless you take it back`
+                        : `Sol sends his email in ${HAND_MINUTES} minutes, unless you take it back`
+                    }
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full bg-surface px-3 text-[12.5px] font-medium text-ink ring-1 ring-line transition hover:ring-ink-2 disabled:text-muted"
+                  >
+                    <SolIcon className="size-3.5 text-sun-line" /> Hand to Sol
+                  </button>
+                )}
+                {need && <MarkButtons busy={marking} onDone={() => void mark("done")} onLater={(c) => void mark("later", c)} />}
               </span>
             )}
           </div>
+          {handNote && (
+            <p className="mt-1.5 text-right text-[12.5px] text-danger" role="status">
+              {handNote}
+            </p>
+          )}
         </div>
         <CallNotetaker handle={notetaker} button={false} jobId={d.jobId} customerId="" phone={d.phone ?? ""} onAdded={props.onChanged} />
         {calling && (

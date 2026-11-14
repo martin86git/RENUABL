@@ -6,6 +6,7 @@ import { dayDone, dealFeed, exampleCount, feedExtras, markDeal, unmarkDeal } fro
 import { cleanLeadRule, type LaterChoice, type MarkKind } from "@/lib/domain/design/deal-feed";
 import { bookedJobs, loadPrefs, savePrefs } from "@/lib/server/design-after-sale-repo";
 import { installDayChoices } from "@/lib/domain/design/install-days";
+import { heldInstallDays } from "@/lib/server/design-handover";
 import { todayInMarket } from "@/lib/domain/market";
 import { addDaysISO } from "@/lib/domain/scheduling";
 
@@ -21,16 +22,21 @@ export async function GET() {
     // the deal's team chat (at most every few minutes a business; by rule, no credit).
     await solAsksForDesigns(who.member.businessId).catch((e) => console.error("sol's design requests", e instanceof Error ? e.message : e));
     const day = todayInMarket();
-    const [deals, extras, examples, today, prefs, booked] = await Promise.all([
+    const [deals, extras, examples, today, prefs, booked, held] = await Promise.all([
       dealFeed(who.member, viewerOf(who.member)),
       feedExtras(who.member.businessId, who.member.email),
       exampleCount(who.member.businessId).catch(() => null),
       dayDone(who.member.businessId, who.member.email).catch(() => null),
       loadPrefs(who.member.businessId).catch(() => null),
       bookedJobs(who.member.businessId, day, addDaysISO(day, 80)).catch(() => []),
+      heldInstallDays(who.member.businessId).catch(() => [] as string[]),
     ]);
     // The days Sol offers for a signed deal's install (install-days.ts): free days in weeks not yet full, the whole team's.
-    const installDays = installDayChoices({ booked: booked.map((b) => b.date), perWeek: prefs?.weeklyCapacity ?? 5, today: day });
+    const installDays = installDayChoices({
+      booked: [...booked.map((b) => b.date), ...held],
+      perWeek: prefs?.weeklyCapacity ?? 5,
+      today: day,
+    });
     const signOff = { sender: who.member.firstName ?? "", business: who.member.businessName };
     // What has come due in Sol's outbox goes after the answer, as when the board is read (not while viewing as someone).
     if (!who.member.viewedBy) {
