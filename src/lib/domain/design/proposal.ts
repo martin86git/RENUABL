@@ -138,6 +138,11 @@ export interface ProposalView {
      * order, for the home's day. Left out on a proposal published before the day was shown.
      */
     aspects?: number[][];
+    /**
+     * The Nearmap capture (its survey) the design was drawn on, when the roof used one: the proposal shows that picture,
+     * so the panels sit where they were placed. Left out for Google's picture and on older proposals.
+     */
+    picture?: string;
   };
   /** What the system is estimated to make, kWh. Null where we have no sunshine record for the home's state. */
   production: { monthlyKwh: number[]; yearKwh: number } | null;
@@ -552,6 +557,8 @@ export interface ProposalInputs {
   customer: Pick<Customer, "name" | "address">;
   /** The job's saved roof. */
   project: { address: string; lat: number; lng: number; version: number; set: DesignSet; extras: DesignExtras };
+  /** The Nearmap capture in use on the roof, else none (Google's picture). */
+  picture?: string | null;
   workspace: Workspace;
   rates: RebateRates;
   brand: BrandKit;
@@ -659,6 +666,7 @@ export function buildProposal(given: ProposalInputs): Built {
       lng: project.lng,
       panels: roofPanels(design),
       aspects: roofAspects(design),
+      ...(input.picture ? { picture: input.picture } : {}),
     },
     production: monthlyKwh ? { monthlyKwh, yearKwh: monthlyKwh.reduce((n, m) => n + m, 0) } : null,
     bill: finance

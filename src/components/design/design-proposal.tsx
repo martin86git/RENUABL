@@ -446,7 +446,12 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
               {latest.deposit && <DepositLine jobId={jobId} deposit={latest.deposit} mayMark={mayMark} onChange={setVersions} />}
               {out && (
                 <>
-                  <button type="button" className={clsx(ui.primary, "w-full")} onClick={() => setSending(true)}>
+                  {/* The signal orange (Martin: the graphite one was easy to skip past; it's the step that reaches the customer). */}
+                  <button
+                    type="button"
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-sun-line px-4 text-sm font-semibold text-white shadow-[0_6px_18px_rgba(255,90,31,0.28)] hover:brightness-105"
+                    onClick={() => setSending(true)}
+                  >
                     <Send className="size-4" aria-hidden /> Send to customer
                   </button>
                   <CopyLink path={latest.path} className={clsx(ui.quiet, "w-full")} />
@@ -486,7 +491,9 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
               accepted={null}
               urls={{
                 image: brandImageUrl,
-                roof: `/api/design/roof?lat=${view.roof.lat.toFixed(6)}&lng=${view.roof.lng.toFixed(6)}`,
+                roof: view.roof.picture
+                  ? `/api/design/roof/nearmap/picture?lat=${view.roof.lat.toFixed(6)}&lng=${view.roof.lng.toFixed(6)}&survey=${encodeURIComponent(view.roof.picture)}`
+                  : `/api/design/roof?lat=${view.roof.lat.toFixed(6)}&lng=${view.roof.lng.toFixed(6)}`,
                 pdf: null,
                 terms: BRAND_TERMS_URL,
               }}

@@ -9,6 +9,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import { buildProposal, cleanChoice, type Built, type ProposalChoice } from "@/lib/domain/design/proposal";
 import { NO_DESIGN, proposalVersions, savedFor, type Saved } from "./design-proposal-repo";
 import type { Member } from "./design-repo";
+import { roofImagery } from "./design-nearmap-repo";
 import { getRebateRates } from "./rebate-rates";
 
 export interface WorkedOut {
@@ -28,6 +29,8 @@ export async function workOutProposal(member: Member, jobId: string, choice: unk
   const usual = latest ? latest.indicative : saved.job.stage === "lead" || saved.job.stage === "designed";
   const chosen = cleanChoice(choice, saved.brand, usual);
   const { rates } = await getRebateRates();
+  // The picture the design was drawn on: a Nearmap capture lines the panels up where Google's leaning photo doesn't.
+  const imagery = await roofImagery(member.businessId, saved.project.lat, saved.project.lng).catch(() => null);
   const built = buildProposal({
     now: now.toISOString(),
     today: todayInMarket(now),
@@ -35,6 +38,7 @@ export async function workOutProposal(member: Member, jobId: string, choice: unk
     job: saved.job,
     customer: saved.customer,
     project: saved.project,
+    picture: imagery && imagery.use !== "google" ? imagery.use : null,
     workspace: saved.workspace,
     rates,
     brand: saved.brand,

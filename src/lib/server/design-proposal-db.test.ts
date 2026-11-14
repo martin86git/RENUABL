@@ -187,7 +187,7 @@ describe.skipIf(!url)("roof designer proposals (database)", () => {
       expect(await proposals.publicRoof(bad)).toBeNull();
       expect(await proposals.publicPdfParts(bad)).toBeNull();
     }
-    expect(await proposals.publicRoof(token)).toEqual(PLACE);
+    expect(await proposals.publicRoof(token)).toMatchObject({ ...PLACE, picture: null });
   });
 
   it("serves a link only the pictures its proposal was sent with", async () => {

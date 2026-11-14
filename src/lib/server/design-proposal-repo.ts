@@ -616,9 +616,11 @@ export async function publicPdfParts(
 }
 
 /** Where the roof behind a link is, for its picture from above. Null once withdrawn. */
-export async function publicRoof(token: string): Promise<{ lat: number; lng: number } | null> {
+export async function publicRoof(token: string): Promise<{ lat: number; lng: number; businessId: string; picture: string | null } | null> {
   const row = await behind(query, token);
-  return row && !row.withdrawn ? { lat: row.view.roof.lat, lng: row.view.roof.lng } : null;
+  return row && !row.withdrawn
+    ? { lat: row.view.roof.lat, lng: row.view.roof.lng, businessId: row.businessId, picture: row.view.roof.picture ?? null }
+    : null;
 }
 
 /** The first time a customer opens their proposal is written on their record, once for each version. */
