@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
 import type { CallerRole } from "@/lib/domain/install-call";
+import { PRACTICE_ID } from "@/lib/domain/design/practice-call";
+import { watchAssistantCall } from "./assistant-call";
 
 export interface CallerState {
   /** Which of the business's two assistants it is: sales (when left out) or admin. */
@@ -66,7 +68,15 @@ export async function saveCallerVoice(voice: CallerVoice | null, role: CallerRol
 export const callerChanged = (caller: CallerState) => window.dispatchEvent(new CustomEvent(CHANGED, { detail: caller }));
 
 /** Rings the member's own mobile so they hear the voice. */
-export const ringMeToHear = (role: CallerRole = "sales") => ask<object>(`/api/design/caller/test?role=${role}`, { method: "POST" });
+/**
+ * A practice call (domain/design/practice-call.ts): the assistant rings the member's own mobile and talks to them as a
+ * customer; the live call window opens on it, with its clock, transcript and Hang up.
+ */
+export async function ringMeToHear(role: CallerRole = "sales") {
+  const res = await ask<{ message: string }>(`/api/design/caller/test?role=${role}`, { method: "POST" });
+  if (res.ok) watchAssistantCall({ jobId: PRACTICE_ID, name: "you", message: res.message, role });
+  return res;
+}
 
 export async function uploadCallerPhoto(file: File, role: CallerRole = "sales") {
   const form = new FormData();

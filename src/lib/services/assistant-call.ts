@@ -7,6 +7,11 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { LiveCallNow, LiveCallView } from "@/lib/domain/live-call";
+import { PRACTICE_ID } from "@/lib/domain/design/practice-call";
+
+/** Where a watched call is asked about: a deal's call, or the member's own practice call. */
+const liveUrl = (jobId: string) =>
+  jobId === PRACTICE_ID ? "/api/design/caller/test/live" : `/api/design/jobs/${encodeURIComponent(jobId)}/call/live`;
 
 export interface Watched {
   jobId: string;
@@ -68,7 +73,7 @@ export function useWatchedCall(): Watched | null {
 /** Tells the assistant something while it's on the call (say: it says the words as typed). */
 export async function tellAssistant(jobId: string, text: string, say: boolean): Promise<{ ok: true } | { ok: false; message: string }> {
   try {
-    const res = await fetch(`/api/design/jobs/${encodeURIComponent(jobId)}/call/live`, {
+    const res = await fetch(liveUrl(jobId), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ text, say }),
@@ -105,7 +110,7 @@ export function useLiveCall(jobId: string | null): { call: LiveCall | null; load
     const ask = async () => {
       let next: LiveCall | null = null;
       try {
-        const res = await fetch(`/api/design/jobs/${encodeURIComponent(jobId)}/call/live`, { cache: "no-store" });
+        const res = await fetch(liveUrl(jobId), { cache: "no-store" });
         const json = (await res.json().catch(() => null)) as { ok?: boolean; call?: LiveCallView | null } | null;
         if (json?.ok && json.call) next = { ...json.call, receivedAt: Date.now() };
       } catch {
@@ -129,7 +134,7 @@ export function useLiveCall(jobId: string | null): { call: LiveCall | null; load
 /** Hangs up on the assistant's call on this deal. */
 export async function endAssistantCall(jobId: string): Promise<{ ok: true } | { ok: false; message: string }> {
   try {
-    const res = await fetch(`/api/design/jobs/${encodeURIComponent(jobId)}/call/live`, { method: "DELETE" });
+    const res = await fetch(liveUrl(jobId), { method: "DELETE" });
     const json = (await res.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
     if (res.ok && json?.ok) return { ok: true };
     return { ok: false, message: json?.message ?? "The call couldn't be ended from here. Try again in a moment." };

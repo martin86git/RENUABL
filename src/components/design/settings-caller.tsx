@@ -328,7 +328,7 @@ export function VoicePicker({
     setBusy(true);
     const res = await ringMeToHear(role);
     setBusy(false);
-    onStatus(res.ok ? { ok: true, text: "Ringing your mobile now." } : { ok: false, text: res.message });
+    onStatus(res.ok ? { ok: true, text: res.message } : { ok: false, text: res.message });
   };
 
   const row = (label: string, words: string, picked: boolean, onPick: () => void, key: string) => (
@@ -364,7 +364,7 @@ export function VoicePicker({
           onClick={() => void ring()}
           title={callsOn ? "" : "Once calls are on"}
         >
-          <PhoneCall className="size-4" aria-hidden /> Ring me to hear it
+          <PhoneCall className="size-4" aria-hidden /> Practice a call
         </button>
       </div>
       <p className={clsx("mt-1 text-xs text-muted", compact && "hidden")}>

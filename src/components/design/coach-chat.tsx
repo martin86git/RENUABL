@@ -17,7 +17,6 @@ import {
   PhoneCall,
   Settings,
   Trash2,
-  Volume2,
   X,
 } from "lucide-react";
 import { useWatchedCall } from "@/lib/services/assistant-call";
@@ -634,7 +633,7 @@ function AvatarEdit({ editable, onFailed }: { editable: boolean; onFailed: (m: s
   );
 }
 
-/** Ring the member's own mobile to hear the assistant's voice, from its chat (after changing it there). */
+/** A practice call: the assistant rings the member's own mobile and talks to them as a customer (practice-call.ts). */
 function HearButton() {
   const caller = useCaller();
   const [said, setSaid] = useState<string | null>(null);
@@ -643,7 +642,7 @@ function HearButton() {
     setBusy(true);
     const res = await ringMeToHear();
     setBusy(false);
-    setSaid(res.ok ? "Ringing your mobile now" : res.message);
+    setSaid(res.ok ? null : res.message);
     window.setTimeout(() => setSaid(null), 6000);
   };
   return (
@@ -652,11 +651,11 @@ function HearButton() {
         type="button"
         onClick={() => void ring()}
         disabled={busy}
-        aria-label={`Ring me to hear ${caller.name}`}
-        title={`Ring me to hear ${caller.name}`}
+        aria-label={`Practice a call with ${caller.name}`}
+        title={`Practice a call with ${caller.name}: ${caller.name} rings your mobile`}
         className="grid size-8 place-items-center rounded-full hover:bg-white/10 disabled:opacity-60"
       >
-        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Volume2 className="size-4" aria-hidden />}
+        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <PhoneCall className="size-4" aria-hidden />}
       </button>
       {said && (
         <span className="absolute right-0 top-10 z-10 w-48 rounded-lg bg-surface px-3 py-2 text-xs text-ink shadow-lift ring-1 ring-line">

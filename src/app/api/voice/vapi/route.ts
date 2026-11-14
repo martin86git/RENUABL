@@ -3,6 +3,8 @@ import { after } from "next/server";
 import { readVapiEvent, VOICE_SECRET_HEADER } from "@/lib/domain/voice-agent";
 import { readLiveEvent } from "@/lib/domain/live-call";
 import { answerInbound, handleCallEnded, handleToolCall, keepLive, voiceCallByRef, voiceSettings } from "@/lib/server/voice-calls";
+import { isPracticeRef } from "@/lib/domain/design/practice-call";
+import { keepPracticeLive } from "@/lib/server/design-practice-call";
 
 function sameSecret(given: string | null, expected: string): boolean {
   if (!given) return false;
@@ -32,6 +34,17 @@ export async function POST(request: Request) {
   const event = readVapiEvent(body);
 
   if (event.type === "assistant-request") return Response.json(await answerInbound(event));
+
+  // A practice call with the member's own assistant: only what is said is kept, and no tool is connected.
+  if (isPracticeRef(ref)) {
+    const live = readLiveEvent(body);
+    if (live) await keepPracticeLive(ref, live);
+    if (event.type === "tool-calls")
+      return Response.json({
+        results: event.toolCalls.map((t) => ({ toolCallId: t.id, result: "This is a practice call: nothing is booked or sent." })),
+      });
+    return Response.json({});
+  }
 
   const row = await voiceCallByRef(ref).catch(() => null);
 

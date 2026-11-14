@@ -16,12 +16,18 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-14",
     area: "Calls",
+    words: "Practice a call: your assistant rings your mobile and talks to you as a customer, shown live with a timer and Hang up.",
+  },
+  {
+    day: "2026-11-14",
+    area: "Calls",
     words: "Your chief of staff answers in a line or two, with the deal, figures and timeline in a window beside the chat.",
   },
   {
     day: "2026-11-14",
     area: "Today",
-    words: "Today is calmer: cards sit centred at their own width, calls show as cards like New in, and the summary line that repeated them is gone.",
+    words:
+      "Today is calmer: cards sit centred at their own width, calls show as cards like New in, and the summary line that repeated them is gone.",
   },
   {
     day: "2026-11-14",

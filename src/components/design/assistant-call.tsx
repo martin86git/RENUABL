@@ -12,6 +12,7 @@ import { endAssistantCall, stopWatching, tellAssistant, useLiveCall, useWatchedC
 import { askAssistantToCallBack, textCustomer, useCallerInfo, type CallerState } from "@/lib/services/caller";
 import { openCoach } from "@/lib/services/coaching";
 import { OtherCallsStrip } from "./live-calls";
+import { PRACTICE_ID } from "@/lib/domain/design/practice-call";
 import { CallerAvatar } from "./settings-caller";
 
 /**
@@ -52,6 +53,8 @@ export function AssistantCallWindow() {
 
   if (!watched || typeof document === "undefined") return null;
 
+  // A practice call with the member themself (domain/design/practice-call.ts): no deal, so nothing to do after it.
+  const practice = watched.jobId === PRACTICE_ID;
   const customer = call?.customer || watched.name || "the customer";
   const phase = call?.phase ?? "lined-up";
   const live = phase === "ringing" || phase === "on-call";
@@ -117,7 +120,7 @@ export function AssistantCallWindow() {
 
       {!folded && (
         <>
-          <OtherCallsStrip jobId={watched.jobId} />
+          {!practice && <OtherCallsStrip jobId={watched.jobId} />}
           {outcome && <p className="border-b border-line bg-surface-2 px-4 py-2 text-sm font-semibold text-ink">{outcome}</p>}
           <div ref={list} aria-live="polite" className="max-h-[min(20rem,45dvh)] min-h-24 space-y-2 overflow-y-auto px-4 py-3">
             {said === 0 ? (
@@ -150,18 +153,20 @@ export function AssistantCallWindow() {
               Words appear as they&apos;re said, transcribed by machine. Closing this leaves the call going.
             </p>
           )}
-          <AfterCall
-            key={watched.jobId}
-            jobId={watched.jobId}
-            customer={customer}
-            caller={caller}
-            ended={phase === "ended"}
-            // Calling back and talking the call over are the sales assistant's, once it is set up.
-            sales={call?.role !== "admin" && assistants.caller.named}
-            callsOn={assistants.callsOn}
-            textsOn={assistants.textsOn}
-            transcriptId={call?.transcriptId ?? null}
-          />
+          {!practice && (
+            <AfterCall
+              key={watched.jobId}
+              jobId={watched.jobId}
+              customer={customer}
+              caller={caller}
+              ended={phase === "ended"}
+              // Calling back and talking the call over are the sales assistant's, once it is set up.
+              sales={call?.role !== "admin" && assistants.caller.named}
+              callsOn={assistants.callsOn}
+              textsOn={assistants.textsOn}
+              transcriptId={call?.transcriptId ?? null}
+            />
+          )}
         </>
       )}
     </section>,

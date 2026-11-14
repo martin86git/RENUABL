@@ -1315,6 +1315,23 @@ alter table voice_calls add column if not exists live_partial jsonb;
 -- Vapi's control address for the attempt now on, so the team can type to the assistant mid-call. Never sent to a browser.
 alter table voice_calls add column if not exists live_control_url text;
 -- Asking a customer by email before the phone assistant calls (domain/design/call-consent.ts): the words they agreed to.
+-- A practice call with the phone assistant (domain/design/practice-call.ts): the member's own, never on a deal.
+create table if not exists design_practice_calls (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  member_email text not null,
+  first_name text,
+  role text not null default 'sales',
+  vapi_call_id text,
+  control_url text,
+  live_status text,
+  started_at timestamptz,
+  ended_at timestamptz,
+  partial jsonb,
+  lines jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists design_practice_calls_member on design_practice_calls (business_id, member_email, created_at desc);
 create table if not exists design_call_consent (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,
