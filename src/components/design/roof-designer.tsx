@@ -81,7 +81,6 @@ import {
   Sunrise,
   LayoutGrid,
   Radio,
-  Clapperboard,
   Send,
   ThumbsUp,
   Trash2,
@@ -5924,19 +5923,6 @@ export function RoofDesigner(props: {
             </button>
             {liveOpen && !props.tight && liveBox}
           </div>
-          {/* Record a walkthrough (14 Nov 2026, Martin: Loom-style, narrated, Sol writing the subtitles as you speak): it
-              plays at the top of the customer's proposal. */}
-          {props.jobId && !props.sitesOnly && (
-            <button
-              type="button"
-              onClick={() => setRecordOpen(true)}
-              title="Record a walkthrough: talk the customer through their design, with Sol's subtitles"
-              aria-label="Record a walkthrough of this design for the customer"
-              className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line transition hover:text-ink"
-            >
-              <Clapperboard className="size-4" aria-hidden />
-            </button>
-          )}
           {recordOpen && props.jobId && (
             <WalkthroughRecorder
               jobId={props.jobId}
@@ -9514,6 +9500,26 @@ export function RoofDesigner(props: {
                   props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen) ? "z-[55]" : "z-10",
                 )}
               >
+                {/* Record a walkthrough, floating beside Ask Sol (14 Nov 2026, Martin: in sight, not in the bar): talk the
+                    customer through their design, with Sol's subtitles; it plays on their proposal. */}
+                {props.jobId && !props.sitesOnly && (
+                  <button
+                    type="button"
+                    onClick={() => setRecordOpen(true)}
+                    data-popup
+                    title="Record a walkthrough: talk the customer through their design, with Sol's subtitles"
+                    aria-label="Record a walkthrough of this design for the customer"
+                    className={clsx(
+                      "pointer-events-auto absolute bottom-0 flex items-center gap-2 rounded-full bg-surface pl-3 pr-4 text-[14px] font-medium text-ink shadow-[0_12px_32px_rgba(11,11,12,0.25)] ring-1 ring-line transition hover:-translate-y-0.5 motion-reduce:transition-none",
+                      props.tight ? "left-[calc(50%+6.75rem)] h-14" : "left-[calc(50%+9rem)] h-12",
+                    )}
+                  >
+                    <span className="relative flex size-3">
+                      <span className="relative m-auto size-3 rounded-full bg-[#ef4444]" />
+                    </span>
+                    Record
+                  </button>
+                )}
                 {/* In the pop-up the foot of the picture is Sol alone (8 Nov 2026, Martin): ask him to change the design. */}
                 {props.tight ? (
                   <button
