@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-14",
+    area: "Calls",
+    words: "The floating bar on the right is back, with just team chat and your agents. The calculator and email stay at the top.",
+  },
+  {
+    day: "2026-11-14",
     area: "Today",
     words: "Today has more contrast: a deeper grey ground with white cards straight on it, so what needs you stands out.",
   },

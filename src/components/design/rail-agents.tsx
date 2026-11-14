@@ -8,7 +8,6 @@ import { COLLEAGUE_ROLE } from "@/lib/domain/design/colleague";
 import { useCallerInfo } from "@/lib/services/caller";
 import { openCoach } from "@/lib/services/coaching";
 import { loadColleague, openColleague, type ColleagueState } from "@/lib/services/colleague";
-import { AgentsButton } from "./agents-window";
 import { RailCalls } from "./rail-calls";
 import { CallerAvatar } from "./settings-caller";
 
@@ -19,8 +18,7 @@ const ROUND =
 function AgentLabel({ name, kind }: { name: string; kind: AgentKind }) {
   return (
     // A little wider than the round's column, so the job reads whole; a longer one takes a second line.
-    // On a soft plate of its own: the rounds float over the page now, with no bar behind them.
-    <span className="-mx-2 mt-1 block w-[4.25rem] rounded-lg bg-surface/90 px-1 py-0.5 text-center leading-[1.15] shadow-[0_2px_8px_rgba(20,22,26,0.08)] ring-1 ring-line backdrop-blur">
+    <span className="-mx-2 mt-1 block w-[3.75rem] text-center leading-[1.15]">
       <span className="block truncate text-[11px] font-semibold text-ink">{name}</span>
       <span className="block text-[9.5px] text-muted">{AGENT_WORDS[kind].job}</span>
     </span>
@@ -35,7 +33,7 @@ const titleOf = (name: string, kind: AgentKind) => `${name}: ${AGENT_WORDS[kind]
  * aren't people, it's not easy to remember what each is for"; was Charlie for sales calls also the one who books
  * installs?). The two that ring customers look alike (their own face or sound wave on graphite): **sales calls** and
  * **books installs**. The one that only writes to the team is its own teal with a question bubble: **answers you**.
- * Under the sales assistant, a round for each call it has under way. Then the plus, to add one.
+ * Under the sales assistant, a round for each call it has under way.
  */
 export function RailAgents() {
   const { caller, admin } = useCallerInfo();
@@ -50,7 +48,7 @@ export function RailAgents() {
   const tim = colleague?.ready.on ? colleague.name || COLLEAGUE_ROLE : null;
 
   return (
-    <span className="flex w-full flex-col items-center gap-2">
+    <span className="flex w-full flex-col items-center gap-1.5 pb-1">
       {caller.named && (
         <button type="button" onClick={() => openCoach(null)} title={titleOf(caller.name, "sales")} className={SHELL}>
           <span className={ROUND}>
@@ -77,8 +75,6 @@ export function RailAgents() {
           <AgentLabel name={colleague?.name || "Chief of staff"} kind="colleague" />
         </button>
       )}
-      {/* Your agents, and adding one: it says first whether the new one needs the business's phone number. */}
-      <AgentsButton />
     </span>
   );
 }

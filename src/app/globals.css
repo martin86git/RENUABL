@@ -296,8 +296,7 @@ html.sol-resizing .team-pop {
 .team-bulb > button {
   width: 3.75rem;
   height: 3.75rem;
-  /* It floats by itself now, no bar to stand out of (14 Nov 2026, Martin). */
-  margin: 0;
+  margin: -0.875rem -0.75rem 0.125rem;
 }
 .team-bulb > button:not([aria-pressed="true"]) {
   background: radial-gradient(circle at 30% 25%, var(--surface) 55%, var(--sun));

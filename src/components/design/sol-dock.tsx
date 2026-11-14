@@ -258,14 +258,14 @@ export function SolNavButton({ phone = false }: { phone?: boolean }) {
  */
 export function SolRail({ team, assistant }: { team?: React.ReactNode; assistant?: React.ReactNode }) {
   if (!team && !assistant) return null;
-  // No bar at all (14 Nov 2026, Martin: one bar, then two, read as the left-hand nav the product set out to lose, moved
-  // to the right). Only who you talk to floats here, loose, in the bottom corner: team chat and the business's agents.
-  // The tools that sat under them each have a home already: the calculator and email in the top card, the proposals in
-  // the CRM's pages.
+  // The floating bar, half way down the right, as it was (14 Nov 2026, Martin: the loose rounds in the corner were
+  // tried the same day and he didn't like them: "I want the old look and positioning of the floating bar… with just
+  // the chat and the 2 agents"). It holds only who you talk to: team chat and the business's agents. The tools that
+  // used to sit under them stay where they went: the calculator and email in the top card, the proposals in the CRM.
   return (
     <aside
       aria-label="Who you talk to: your team and your agents"
-      className="sol-rail fixed bottom-6 right-4 z-30 hidden w-16 flex-col items-center gap-2.5 print:hidden lg:flex"
+      className="sol-rail fixed right-4 top-1/2 z-30 hidden w-16 -translate-y-1/2 flex-col items-center gap-1.5 rounded-[2rem] bg-surface p-1.5 shadow-[0_8px_30px_rgba(20,22,26,0.10)] ring-1 ring-line print:hidden lg:flex"
     >
       {team && <span className="team-bulb">{team}</span>}
       {/* The business's agents, each with its name and its job under it (rail-agents.tsx). */}
