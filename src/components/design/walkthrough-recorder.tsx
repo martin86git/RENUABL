@@ -29,7 +29,8 @@ import {
   RECORDING_NOTE,
   VIDEO_BITS_PER_SECOND,
   cleanCues,
-  cuesFor,
+  cuesFromWords,
+  stampWords,
   lengthWords,
   toVtt,
   type Cue,
@@ -147,6 +148,7 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
   const recognition = useRef<Recognition | null>(null);
   const listening = useRef(false);
   const phraseStart = useRef<number | null>(null);
+  const wordTimes = useRef<Record<number, number[]>>({});
   const tick = useRef<number | null>(null);
 
   const refresh = () =>
@@ -168,6 +170,7 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
     const Rec = recognitionClass();
     if (!Rec || !listening.current) return;
     const rec = new Rec();
+    wordTimes.current = {};
     rec.continuous = true;
     rec.interimResults = true;
     rec.lang = "en-AU";
@@ -176,12 +179,15 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];
         const text = r[0].transcript;
-        if (phraseStart.current === null) phraseStart.current = Math.max(0, now() - 1);
+        // Each word is timed by when its first guess came in, so the subtitles keep pace with the speaker.
+        const times = stampWords(wordTimes.current[i] ?? [], text, now());
+        wordTimes.current[i] = times;
+        if (phraseStart.current === null) phraseStart.current = times[0] ?? Math.max(0, now() - 1);
         if (r.isFinal) {
-          const made = cuesFor(text, phraseStart.current, Math.max(now(), phraseStart.current + 0.8));
-          heard.current = [...heard.current, ...made];
+          heard.current = [...heard.current, ...cuesFromWords(text, times, now())];
           setCues(heard.current);
           phraseStart.current = null;
+          delete wordTimes.current[i];
         } else interim += text;
       }
       setHearing(interim);
@@ -265,7 +271,10 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
     const rec = recorder.current;
     if (!rec || rec.state === "inactive") return;
     // A phrase still being said when it stopped is kept as it was heard.
-    if (hearing.trim() && phraseStart.current !== null) heard.current = [...heard.current, ...cuesFor(hearing, phraseStart.current, now())];
+    if (hearing.trim() && phraseStart.current !== null) {
+      const times = Object.values(wordTimes.current).flat();
+      heard.current = [...heard.current, ...cuesFromWords(hearing, times, now())];
+    }
     rec.stop();
   };
 
@@ -373,9 +382,14 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
           <span className="flex min-w-0 items-center gap-1.5 text-[13px] text-white/80">
             <SolIcon className="size-3.5 shrink-0 text-sun-line" />
             <span className="truncate">
+              {/* Never the words themselves: the bar is in the recording, and the customer sees the subtitles once, as captions. */}
               {phase === "starting"
                 ? "Choose this tab to record…"
-                : hearing || cues[cues.length - 1]?.text || "Sol is listening for the subtitles…"}
+                : hearing
+                  ? "Sol is writing the subtitles…"
+                  : cues.length
+                    ? `Sol has subtitled ${cues.length} line${cues.length === 1 ? "" : "s"}`
+                    : "Sol is listening for the subtitles…"}
             </span>
           </span>
           <button

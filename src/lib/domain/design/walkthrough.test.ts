@@ -68,3 +68,26 @@ describe("sending a walkthrough by text", () => {
     expect(isWatchToken("a".repeat(48))).toBe(false);
   });
 });
+
+describe("subtitles timed by their words", () => {
+  it("keeps each word's first time as the guesses grow", async () => {
+    const { stampWords, HEARING_LAG } = await import("./walkthrough");
+    let t = stampWords([], "here's", 2);
+    t = stampWords(t, "here's your", 2.4);
+    t = stampWords(t, "here's your roof", 3);
+    expect(t).toEqual([2 - HEARING_LAG, 2.4 - HEARING_LAG, 3 - HEARING_LAG].map((n) => Math.round(n * 100) / 100));
+  });
+
+  it("starts each caption when its first word was said, in short pieces", async () => {
+    const { cuesFromWords, CUE_WORDS } = await import("./walkthrough");
+    const text = "so here's your roof, and these twelve panels face north to catch the morning sun all year";
+    const times = text.split(" ").map((_, i) => 1 + i * 0.3);
+    const cues = cuesFromWords(text, times, 6);
+    expect(cues.length).toBeGreaterThan(1);
+    expect(cues[0]).toMatchObject({ start: 1, text: "so here's your roof," });
+    for (const c of cues) expect(c.text.split(" ").length).toBeLessThanOrEqual(CUE_WORDS);
+    expect(cues[1].start).toBeCloseTo(1 + 4 * 0.3);
+    expect(cues.map((c) => c.text).join(" ")).toBe(text);
+    for (let i = 1; i < cues.length; i++) expect(cues[i].start).toBeGreaterThanOrEqual(cues[i - 1].end - 0.001);
+  });
+});

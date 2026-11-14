@@ -119,6 +119,70 @@ export function cuesFor(text: string, start: number, end: number): Cue[] {
   return out;
 }
 
+/** A word heard, with when it was first heard (seconds into the recording, the recogniser's lag taken off). */
+export type HeardWord = { text: string; at: number };
+
+/** How far behind the speaker the recogniser's first guess at a word comes (Chrome's, roughly). */
+export const HEARING_LAG = 0.45;
+/** A caption holds at most this many words, characters or seconds, so it follows the speaker closely. */
+export const CUE_WORDS = 8;
+export const CUE_CHARS = 48;
+export const CUE_SECONDS = 3.5;
+
+/**
+ * Stamps the words of a phrase as the recogniser's guesses grow: the words it already had keep their time, each new
+ * one gets `at`. Guesses are rewritten as it goes, so this is by position: a word the guess changed keeps its slot's time.
+ */
+export function stampWords(times: readonly number[], transcript: string, at: number): number[] {
+  const count = tidyText(transcript).split(" ").filter(Boolean).length;
+  const out = times.slice(0, count);
+  while (out.length < count) out.push(round(Math.max(0, at - HEARING_LAG)));
+  return out;
+}
+
+/**
+ * A finished phrase as captions timed by its words: the final words are laid on the times their guesses came in (by
+ * share when the final has a different count), then cut into short captions, at a full stop or comma when one is near,
+ * each shown from its first word until the next begins (or a moment after its last word).
+ */
+export function cuesFromWords(text: string, times: readonly number[], end: number): Cue[] {
+  const words = tidyText(text).split(" ").filter(Boolean);
+  if (!words.length) return [];
+  const known = times.length ? times : [Math.max(0, end - words.length * 0.35)];
+  const timeOf = (i: number) => {
+    if (known.length === words.length) return known[i];
+    const at = (i / words.length) * known.length;
+    const lo = Math.min(known.length - 1, Math.floor(at));
+    const hi = Math.min(known.length - 1, lo + 1);
+    const next = hi === lo ? end : known[hi];
+    return known[lo] + (next - known[lo]) * (at - Math.floor(at));
+  };
+  const heard: HeardWord[] = words.map((w, i) => ({ text: w, at: timeOf(i) }));
+  const groups: HeardWord[][] = [];
+  let group: HeardWord[] = [];
+  for (const w of heard) {
+    const chars = [...group, w].map((g) => g.text).join(" ").length;
+    if (group.length && (group.length >= CUE_WORDS || chars > CUE_CHARS || w.at - group[0].at > CUE_SECONDS)) {
+      groups.push(group);
+      group = [];
+    }
+    group.push(w);
+    // A sentence or clause ending after a few words closes the caption there.
+    if (group.length >= 3 && /[.,?!;:]$/.test(w.text)) {
+      groups.push(group);
+      group = [];
+    }
+  }
+  if (group.length) groups.push(group);
+  return groups.map((g, i) => {
+    const start = g[0].at;
+    const next = groups[i + 1]?.[0].at;
+    const last = g[g.length - 1].at + 0.9;
+    const stop = next !== undefined ? Math.min(next, Math.max(last, start + 1)) : Math.min(Math.max(end, start + 1), last + 1.5);
+    return { start: round(start), end: round(Math.max(stop, start + 0.6)), text: g.map((w) => w.text).join(" ") };
+  });
+}
+
 const vttTime = (s: number) => {
   const ms = Math.round(s * 1000);
   const h = Math.floor(ms / 3_600_000);
