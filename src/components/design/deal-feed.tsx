@@ -1605,7 +1605,10 @@ function DealsPanel(props: {
   const [search, setSearch] = useState("");
   const rows = panelDeals(props.deals, tab, search);
   return (
-    <aside aria-label="Deals" className="mt-9">
+    <aside
+      aria-label="Deals"
+      className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+4.5rem)] lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-6rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
+    >
       <div className="flex items-center gap-2.5">
         <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-ink">Deals</h2>
         {props.onNew && (
@@ -1659,7 +1662,8 @@ function DealsPanel(props: {
           className="min-w-0 flex-1 bg-transparent text-[14px] text-ink placeholder:text-muted focus:outline-none"
         />
       </label>
-      <ul className="mt-3 space-y-1.5">
+      {/* The deals stay put beside the scrolling feed, their own list scrolling in the room left on screen (14 Nov 2026, Martin). */}
+      <ul className="staff-scroll mt-3 min-h-0 space-y-1.5 pr-0.5 lg:flex-1 lg:overflow-y-auto">
         {rows.map((d) => {
           const mark = panelMark(d);
           const on = props.picked === d.jobId;
