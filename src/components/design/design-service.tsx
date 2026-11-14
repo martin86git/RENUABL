@@ -390,7 +390,8 @@ export function ServicePlanner() {
       </section>
 
       {/* The cases. */}
-      <aside className="order-1 min-w-0 lg:order-2" aria-label="Service cases">
+      {/* On a wide screen the cases start level with Sol's greeting, not hard against the top (14 Nov 2026, Martin). */}
+      <aside className="order-1 min-w-0 lg:order-2 lg:pt-[clamp(1.5rem,22dvh-4rem,12rem)]" aria-label="Service cases">
         <div className="lg:sticky lg:top-4 lg:flex lg:max-h-[calc(100dvh-9rem)] lg:flex-col">
           <div className="flex flex-wrap items-center justify-between gap-x-2">
             <h2 className="flex items-center gap-2 text-[15px] font-semibold text-ink">
