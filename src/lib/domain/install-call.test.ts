@@ -152,3 +152,18 @@ describe("which deals may be rung to book", () => {
     expect(installCallRefusal({ sold: true, installDate: null, gate: "solarvic" })).toBe("approvals");
   });
 });
+
+describe("more than one sales agent", () => {
+  it("keeps each by a key, and only keys it knows", async () => {
+    const { cleanCallerKey, roleOfKey, nextSalesKey, SALES_KEYS, MAX_SALES_AGENTS } = await import("./install-call");
+    expect(SALES_KEYS).toHaveLength(MAX_SALES_AGENTS);
+    expect(cleanCallerKey("admin")).toBe("admin");
+    expect(cleanCallerKey("sales-3")).toBe("sales-3");
+    for (const bad of ["sales-9", "sales-2' or 1=1", "", null, 2]) expect(cleanCallerKey(bad)).toBe("sales");
+    expect(roleOfKey("sales-2")).toBe("sales");
+    expect(roleOfKey("admin")).toBe("admin");
+    expect(nextSalesKey([])).toBe("sales");
+    expect(nextSalesKey(["sales", "sales-2"])).toBe("sales-3");
+    expect(nextSalesKey([...SALES_KEYS])).toBeNull();
+  });
+});

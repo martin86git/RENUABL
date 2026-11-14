@@ -1,6 +1,6 @@
 import { gateOf } from "@/lib/domain/design/approvals";
 import { PRE_INSTALL_STAGES } from "@/lib/domain/design/crm";
-import { INSTALL_REFUSAL_WORDS, installCallRefusal } from "@/lib/domain/install-call";
+import { INSTALL_REFUSAL_WORDS, cleanCallerKey, installCallRefusal, roleOfKey } from "@/lib/domain/install-call";
 import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { query } from "@/lib/server/db";
@@ -37,17 +37,22 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if ("refuse" in who) return who.refuse;
     if (!allow(request, "design-feed-call", 20))
       return Response.json({ ok: false, message: "That's a lot of calls at once. Try again later." }, { status: 429 });
-    const body = (await request.json().catch(() => null)) as { book?: unknown; ask?: unknown } | null;
+    const body = (await request.json().catch(() => null)) as { book?: unknown; ask?: unknown; agent?: unknown } | null;
     const book = body?.book === true;
     // A call back to ask or confirm one thing (the finished call's window): the words go to the assistant as data.
     const ask = book ? null : cleanTeamAsk(body?.ask);
     if (body?.ask !== undefined && !book && !ask)
       return Response.json({ ok: false, message: "Say what to ask or confirm on the call back." }, { status: 400 });
     const found = validId(id) ? await jobById(who.member.businessId, id, viewerOf(who.member)) : null;
-    const caller = await callerOf(who.member.businessId, book ? "admin" : "sales");
+    // `{ agent }`: which sales agent it is handed to (its key), when the business has more than one.
+    const asked = cleanCallerKey(body?.agent);
+    const agent = !book && roleOfKey(asked) === "sales" ? asked : "sales";
+    const caller = await callerOf(who.member.businessId, book ? "admin" : agent);
     const WORDS = words(caller.name);
     if (!found) return Response.json({ ok: false, message: WORDS.missing }, { status: 404 });
 
+    if (!book && agent !== "sales" && !caller.named)
+      return Response.json({ ok: false, message: "That agent isn't here any more." }, { status: 404 });
     if (book) {
       if (!caller.named)
         return Response.json(
@@ -81,6 +86,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       mode: book ? "install" : out[0]?.n ? "proposal" : "lead",
       asked: false,
       source: book ? undefined : "Asked for by the team",
+      ...(book ? {} : { agent }),
       ...(ask ? { teamAsk: { text: ask, by: who.member.email.split("@")[0] } } : {}),
     });
     if (placed.result === "placed")

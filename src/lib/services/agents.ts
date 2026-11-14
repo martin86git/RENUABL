@@ -7,10 +7,13 @@
 import { useSyncExternalStore } from "react";
 import type { AgentKind, AgentStatus } from "@/lib/domain/design/agents";
 import type { CallerVoice } from "@/lib/domain/design/caller";
+import type { CallerKey } from "@/lib/domain/install-call";
 import { callerChanged, type CallerState } from "./caller";
 
 export interface AgentLine {
   kind: AgentKind;
+  /** A voice agent's key: which sales agent it is. */
+  key?: CallerKey;
   name: string | null;
   made: boolean;
 }
@@ -18,6 +21,8 @@ export interface AgentLine {
 export interface AgentsState {
   status: AgentStatus;
   agents: AgentLine[];
+  /** The key a new sales agent takes, or null when no more can be added. */
+  nextSales: CallerKey | null;
   mayChange: boolean;
   staff: boolean;
 }
@@ -47,26 +52,38 @@ export const askForNumber = (kind: AgentKind) => ask<{ message: string }>("/api/
 export const AGENTS_CHANGED = "renuabl:agents";
 
 /**
- * Makes the agent: a phone assistant by its role (its name, then its voice when one was picked), the chief of staff by
- * its own settings. The server checks the name and voice as Settings does.
+ * Makes the agent: a voice agent by its key (its name, then its voice when one was picked, then its instructions,
+ * which go straight into its script as written), the chief of staff by its own settings. The server checks the name
+ * and voice as Settings does. Answers how many instructions were kept.
  */
-export async function addAgent(kind: AgentKind, name: string, voice: CallerVoice | null): Promise<Answer<object>> {
+export async function addAgent(
+  kind: AgentKind,
+  name: string,
+  voice: CallerVoice | null,
+  o: { key?: CallerKey; instructions?: string } = {},
+): Promise<Answer<{ lines: number }>> {
   if (kind === "colleague") {
     const made = await ask<object>("/api/design/colleague", json("PUT", { name, voice }));
     if (made.ok) window.dispatchEvent(new Event(AGENTS_CHANGED));
-    return made;
+    return made.ok ? { ok: true, lines: 0 } : made;
   }
-  const named = await ask<{ caller: CallerState }>("/api/design/caller", json("PUT", { name, role: kind }));
+  const key: CallerKey = kind === "admin" ? "admin" : (o.key ?? "sales");
+  const named = await ask<{ caller: CallerState }>("/api/design/caller", json("PUT", { name, role: key }));
   if (!named.ok) return named;
   let caller = named.caller;
   if (voice) {
-    const voiced = await ask<{ caller: CallerState }>("/api/design/caller", json("PUT", { voice, role: kind }));
+    const voiced = await ask<{ caller: CallerState }>("/api/design/caller", json("PUT", { voice, role: key }));
     // The agent is made either way: a voice that didn't take can be picked again in its settings.
     if (voiced.ok) caller = voiced.caller;
   }
+  let lines = 0;
+  if (o.instructions?.trim()) {
+    const kept = await ask<{ added: number }>(`/api/design/caller/coach?role=${key}`, json("POST", { do: "script", text: o.instructions }));
+    if (kept.ok) lines = kept.added;
+  }
   callerChanged(caller);
   window.dispatchEvent(new Event(AGENTS_CHANGED));
-  return { ok: true };
+  return { ok: true, lines };
 }
 
 // ── The window, open or shut ───────────────────────────────────────────────────────────────────────────────────

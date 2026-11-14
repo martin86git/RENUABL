@@ -4,14 +4,14 @@
  * installations: domain/install-call.ts), business id first as everywhere; no row is Sol with no picture. The picture is only ever kept as redrawn by `avatarImage`.
  */
 import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
-import type { CallerRole } from "@/lib/domain/install-call";
+import { SALES_KEYS, type CallerKey } from "@/lib/domain/install-call";
 import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
 import { cleanNotes, cleanTurns, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { dbConfigured, query } from "./db";
 
 export interface Caller {
-  /** Which of the business's two assistants it is (domain/install-call.ts). */
-  role: CallerRole;
+  /** Which of the business's voice agents it is, by its key (domain/install-call.ts). */
+  role: CallerKey;
   name: string;
   /** When the picture was last changed (for the browser's copy), or null when there is none. */
   photoAt: string | null;
@@ -22,7 +22,7 @@ export interface Caller {
 }
 
 /** The business's phone assistant: its name (Sol until named) and whether it has a picture. */
-export async function callerOf(businessId: string, role: CallerRole = "sales"): Promise<Caller> {
+export async function callerOf(businessId: string, role: CallerKey = "sales"): Promise<Caller> {
   if (!dbConfigured()) return { role, name: DEFAULT_CALLER, photoAt: null, voice: null, named: false };
   const rows = await query<{ name: string; photo_at: Date | null; voice_provider: string | null; voice_id: string | null }>(
     `select name, photo_at, voice_provider, voice_id from design_caller where business_id = $1 and role = $2`,
@@ -39,8 +39,16 @@ export async function callerOf(businessId: string, role: CallerRole = "sales"): 
   };
 }
 
+/** The business's sales agents past the first (keys sales-2 …), in order, only those that have been made. */
+export async function moreSalesAgents(businessId: string): Promise<Caller[]> {
+  if (!dbConfigured()) return [];
+  const rows = await query<{ role: string }>(`select role from design_caller where business_id = $1 and role like 'sales-%'`, [businessId]);
+  const keys = SALES_KEYS.filter((k) => k !== "sales" && rows.some((r) => r.role === k));
+  return Promise.all(keys.map((k) => callerOf(businessId, k)));
+}
+
 /** The assistant's name, already cleaned (cleanCallerName). */
-export async function setCallerName(businessId: string, name: string, by: string, role: CallerRole = "sales"): Promise<Caller> {
+export async function setCallerName(businessId: string, name: string, by: string, role: CallerKey = "sales"): Promise<Caller> {
   await query(
     `insert into design_caller (business_id, name, updated_by, role) values ($1, $2, $3, $4)
      on conflict (business_id, role) do update set name = excluded.name, updated_by = excluded.updated_by, updated_at = now()`,
@@ -54,7 +62,7 @@ export async function setCallerVoice(
   businessId: string,
   voice: CallerVoice | null,
   by: string,
-  role: CallerRole = "sales",
+  role: CallerKey = "sales",
 ): Promise<Caller> {
   await query(
     `insert into design_caller (business_id, name, voice_provider, voice_id, updated_by, role) values ($1, $2, $3, $4, $5, $6)
@@ -70,7 +78,7 @@ export async function setCallerPhoto(
   businessId: string,
   photo: { bytes: Buffer; contentType: string } | null,
   by: string,
-  role: CallerRole = "sales",
+  role: CallerKey = "sales",
 ): Promise<Caller> {
   await query(
     `insert into design_caller (business_id, name, photo, photo_type, photo_at, updated_by, role)
@@ -83,7 +91,7 @@ export async function setCallerPhoto(
 }
 
 /** The picture itself, for the business's own members. */
-export async function callerPhoto(businessId: string, role: CallerRole = "sales"): Promise<{ bytes: Buffer; contentType: string } | null> {
+export async function callerPhoto(businessId: string, role: CallerKey = "sales"): Promise<{ bytes: Buffer; contentType: string } | null> {
   const rows = await query<{ photo: Buffer | null; photo_type: string | null }>(
     `select photo, photo_type from design_caller where business_id = $1 and role = $2`,
     [businessId, role],
@@ -93,7 +101,7 @@ export async function callerPhoto(businessId: string, role: CallerRole = "sales"
 }
 
 /** How the business has coached its assistant: the notes it keeps for every call, and the conversation so far. */
-export async function coachingOf(businessId: string, role: CallerRole = "sales"): Promise<{ notes: CoachNote[]; turns: CoachTurn[] }> {
+export async function coachingOf(businessId: string, role: CallerKey = "sales"): Promise<{ notes: CoachNote[]; turns: CoachTurn[] }> {
   if (!dbConfigured()) return { notes: [], turns: [] };
   const rows = await query<{ coach_notes: unknown; coach_chat: unknown }>(
     `select coach_notes, coach_chat from design_caller where business_id = $1 and role = $2`,
@@ -103,7 +111,7 @@ export async function coachingOf(businessId: string, role: CallerRole = "sales")
 }
 
 /** The chats before the one going (domain/design/coach-threads.ts), newest first. */
-export async function coachChatsOf(businessId: string, role: CallerRole = "sales"): Promise<CoachChat[]> {
+export async function coachChatsOf(businessId: string, role: CallerKey = "sales"): Promise<CoachChat[]> {
   if (!dbConfigured()) return [];
   const rows = await query<{ coach_past: unknown }>(`select coach_past from design_caller where business_id = $1 and role = $2`, [
     businessId,
@@ -117,7 +125,7 @@ export async function saveCoachChats(
   businessId: string,
   c: { turns: CoachTurn[]; past: CoachChat[] },
   by: string,
-  role: CallerRole = "sales",
+  role: CallerKey = "sales",
 ): Promise<void> {
   await query(
     `insert into design_caller (business_id, name, coach_chat, coach_past, updated_by, role) values ($1, $2, $3, $4, $5, $6)
@@ -132,7 +140,7 @@ export async function saveCoaching(
   businessId: string,
   c: { notes: CoachNote[]; turns: CoachTurn[] },
   by: string,
-  role: CallerRole = "sales",
+  role: CallerKey = "sales",
 ): Promise<void> {
   await query(
     `insert into design_caller (business_id, name, coach_notes, coach_chat, updated_by, role) values ($1, $2, $3, $4, $5, $6)

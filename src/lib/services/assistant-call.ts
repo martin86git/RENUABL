@@ -6,6 +6,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { cleanCallerKey, type CallerKey } from "@/lib/domain/install-call";
 import type { LiveCallNow, LiveCallView } from "@/lib/domain/live-call";
 import { PRACTICE_ID } from "@/lib/domain/design/practice-call";
 
@@ -18,7 +19,7 @@ export interface Watched {
   /** The customer's first name, until the server says. */
   name: string;
   /** Which assistant it was handed to, until the server says: admin for a call to book an installation. */
-  role?: "sales" | "admin";
+  role?: CallerKey;
   /** What the server said when the call was handed over ("Charlie will call now."). */
   message: string;
 }
@@ -36,7 +37,7 @@ function remembered(): Watched | null {
       jobId: kept.jobId,
       name: String(kept.name ?? ""),
       message: String(kept.message ?? ""),
-      role: kept.role === "admin" ? "admin" : undefined,
+      role: kept.role ? cleanCallerKey(kept.role) : undefined,
     };
   } catch {
     return null;

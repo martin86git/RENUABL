@@ -9,7 +9,7 @@ import { cleanTeamNote, END_CALL_COMMAND, isControlUrl, livePhase, mayEndCall, M
 import type { LiveCallView, LiveEvent, LiveLine } from "@/lib/domain/live-call";
 import { PRACTICE_SECONDS, PRACTICE_STALE_MINUTES, practiceBlock, practiceBrief } from "@/lib/domain/design/practice-call";
 import { assistantConfig } from "@/lib/domain/voice-agent";
-import type { CallerRole } from "@/lib/domain/install-call";
+import { cleanCallerKey, type CallerKey } from "@/lib/domain/install-call";
 import { newId, query } from "./db";
 import { callerOf, coachingOf } from "./design-caller-repo";
 import { loadBrand } from "./design-proposal-repo";
@@ -42,7 +42,7 @@ type Model = { messages: { role: string; content: string }[]; tools: { type?: st
  */
 export async function startPracticeCall(
   member: { businessId: string; email: string },
-  role: CallerRole = "sales",
+  role: CallerKey = "sales",
 ): Promise<{ result: "placed"; assistant: string } | { result: "off" | "no-number" | "failed" }> {
   const s = voiceSettings();
   if (!s || !(await voiceOnFor(member.businessId).catch(() => false))) return { result: "off" };
@@ -164,7 +164,7 @@ export async function practiceLive(businessId: string, email: string): Promise<L
     customer: "you",
     outcome: null,
     booked: null,
-    role: r.role === "admin" ? "admin" : "sales",
+    role: cleanCallerKey(r.role),
     attempts: 1,
     startedAgo: started === null ? null : now - started,
     ranFor: started !== null && ended !== null ? ended - started : null,

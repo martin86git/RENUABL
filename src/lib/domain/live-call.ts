@@ -211,7 +211,7 @@ export interface LiveCallView {
   lines: LiveLine[];
   partial: LiveLine | null;
   /** Which of the business's assistants is on the call (install-call.ts): admin for a booking call. */
-  role?: "sales" | "admin";
+  role?: import("./install-call").CallerKey;
   /** The team can type to the assistant now (it is on the call and Vapi gave a control address). */
   canSteer: boolean;
   /** The team can hang up now (ringing or on the call, with a control address). */

@@ -26,7 +26,7 @@ import {
   uploadCallerPhoto,
   type CallerState,
 } from "@/lib/services/caller";
-import { installFirstMessage, ROLE_WORDS, CALLER_ROLES, type CallerRole } from "@/lib/domain/install-call";
+import { installFirstMessage, ROLE_WORDS, CALLER_ROLES, type CallerKey, type CallerRole } from "@/lib/domain/install-call";
 import { ui } from "./design-shell";
 import { COACH_COPY } from "@/lib/domain/design/coaching";
 import { openCoach } from "@/lib/services/coaching";
@@ -296,7 +296,7 @@ export function VoicePicker({
   role = "sales",
 }: {
   /** Which assistant's voice it is (the admin assistant's from its own Settings tab). */
-  role?: CallerRole;
+  role?: CallerKey;
   caller: CallerState;
   callsOn: boolean;
   onSaved: (c: CallerState) => void;

@@ -1,12 +1,12 @@
 import { IMAGE_LIMITS, IMAGE_TOO_BIG, IMAGE_WRONG } from "@/lib/domain/design/brand";
-import { cleanCallerRole } from "@/lib/domain/install-call";
+import { cleanCallerKey } from "@/lib/domain/install-call";
 import { callerPhoto, setCallerPhoto } from "@/lib/server/design-caller-repo";
 import { answer, requireMember } from "@/lib/server/design-context";
 import { avatarImage, imageResponse } from "@/lib/server/design-images";
 import { allow } from "@/lib/server/rate-limit";
 
 /** Which assistant: `?role=admin` for the admin assistant, else the sales one. */
-const roleIn = (request: Request) => cleanCallerRole(new URL(request.url).searchParams.get("role"));
+const roleIn = (request: Request) => cleanCallerKey(new URL(request.url).searchParams.get("role"));
 
 /** GET: the phone assistant's picture, for the business's own members. */
 export async function GET(request: Request) {

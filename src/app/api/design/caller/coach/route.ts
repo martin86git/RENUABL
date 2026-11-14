@@ -1,21 +1,28 @@
 import { can } from "@/lib/domain/design/account";
-import { CALL_LINES_GIVEN, FIXED_RULES, cleanMessage, cleanNoteText } from "@/lib/domain/design/coaching";
+import {
+  CALL_LINES_GIVEN,
+  FIXED_RULES,
+  addInstructions,
+  cleanMessage,
+  cleanNoteText,
+  instructionLines,
+} from "@/lib/domain/design/coaching";
 import type { DealForChat } from "@/lib/domain/design/assistant-deals";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { suburbOfAddress } from "@/lib/domain/design/deal-feed";
 import { assistantDealCalls, assistantDeals } from "@/lib/server/design-call-log-repo";
 import { callTranscriptsFor } from "@/lib/server/call-transcripts";
 import { chatLines, fileChatAway, forgetChat, isChatId, reopenChat } from "@/lib/domain/design/coach-threads";
-import { coachAssistant, newChatId } from "@/lib/server/design-caller-coach";
+import { coachAssistant, newChatId, newNoteId } from "@/lib/server/design-caller-coach";
 import { coachChatsOf, coachingOf, saveCoachChats, saveCoaching } from "@/lib/server/design-caller-repo";
-import { ADMIN_FIXED_RULES, cleanCallerRole } from "@/lib/domain/install-call";
+import { ADMIN_FIXED_RULES, cleanCallerKey } from "@/lib/domain/install-call";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { allow } from "@/lib/server/rate-limit";
 
 const PRIVATE = { "cache-control": "private, no-store" };
 /** Which assistant: `?role=admin` for the post-sale assistant, which keeps its own notes and chats; else the sales one. */
-const roleIn = (request: Request) => cleanCallerRole(new URL(request.url).searchParams.get("role"));
+const roleIn = (request: Request) => cleanCallerKey(new URL(request.url).searchParams.get("role"));
 const validJob = (id: unknown): id is string => typeof id === "string" && /^job_[a-f0-9]{8,64}$/.test(id);
 
 /** GET: how the business has coached its phone assistant (its notes and the conversation), and what never changes. */
@@ -48,6 +55,15 @@ export async function POST(request: Request) {
     const read = await readBody(request, 6_000);
     if ("refuse" in read) return read.refuse;
     const role = roleIn(request);
+    // The instructions typed as an agent is made: straight into its script as written, no answer spent.
+    if (read.body.do === "script") {
+      const lines = instructionLines(read.body.text);
+      if (lines.length === 0) return Response.json({ ok: false, message: "Write an instruction or two, one a line." }, { status: 422 });
+      const c = await coachingOf(who.member.businessId, role);
+      const next = addInstructions(c.notes, lines, { at: new Date().toISOString(), by: who.member.email, newId: newNoteId });
+      await saveCoaching(who.member.businessId, { notes: next.notes, turns: c.turns }, who.member.email, role);
+      return Response.json({ ok: true, notes: next.notes, added: next.added.length }, { headers: PRIVATE });
+    }
     if (typeof read.body.do === "string") {
       const id = who.member.businessId;
       const [c, chats] = await Promise.all([coachingOf(id, role), coachChatsOf(id, role)]);

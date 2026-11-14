@@ -56,6 +56,44 @@ export function cleanNoteText(raw: unknown): string | null {
   return text.length >= 3 ? text : null;
 }
 
+/** The most lines taken from the instructions typed when an agent is made, and the most typed. */
+export const INSTRUCTION_LINES_MAX = 20;
+export const INSTRUCTIONS_MAX = 4_000;
+
+/**
+ * The instructions typed for a new agent (14 Nov 2026, Martin: "add an agent, enter its name and its purpose… then give
+ * it a set of instructions. then ready to use"), as lines for its script: one instruction a line, a line too long for a
+ * note cut at its sentences, each cleaned as any note is, none twice. Taken as written: no AI rewords them.
+ */
+export function instructionLines(raw: unknown): string[] {
+  if (typeof raw !== "string") return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const take = (piece: string) => {
+    const text = cleanNoteText(piece.replace(/^\s*\d{1,2}[.)]\s+/, ""));
+    if (!text || seen.has(text.toLowerCase()) || out.length >= INSTRUCTION_LINES_MAX) return;
+    seen.add(text.toLowerCase());
+    out.push(text);
+  };
+  for (const line of raw.slice(0, INSTRUCTIONS_MAX).split(/\r?\n/)) {
+    if (line.trim().length <= NOTE_MAX) take(line);
+    else for (const sentence of line.match(/[^.!?]+[.!?]*/g) ?? [line]) take(sentence);
+  }
+  return out;
+}
+
+/** Those lines added to the agent's notes, leaving out any it already has. */
+export function addInstructions(
+  notes: readonly CoachNote[],
+  lines: readonly string[],
+  o: { at: string; by: string; newId: () => string },
+): { notes: CoachNote[]; added: string[] } {
+  const have = new Set(notes.map((n) => n.text.toLowerCase()));
+  const added = lines.filter((l) => !have.has(l.toLowerCase()));
+  const next = [...notes, ...added.map((text) => ({ id: o.newId(), text, at: o.at, by: o.by, from: "chat" as const }))];
+  return { notes: next.slice(-MAX_NOTES), added };
+}
+
 /** What the business typed to its assistant, as it is kept and sent on. */
 export function cleanMessage(raw: unknown): string | null {
   if (typeof raw !== "string") return null;

@@ -18,7 +18,7 @@ import {
 import { STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
 import { CALL_HEADLINES, type CallOutcome } from "@/lib/domain/voice-agent";
 import { callTranscriptsFor } from "./call-transcripts";
-import type { CallerRole } from "@/lib/domain/install-call";
+import { cleanCallerKey, type CallerKey } from "@/lib/domain/install-call";
 import { query } from "./db";
 import { seen, seenParams } from "./design-crm-repo";
 import { voiceOnFor } from "./voice-calls";
@@ -191,9 +191,16 @@ export async function callLog(businessId: string, viewer: DealViewer): Promise<C
  * a call of its own in the last ASSISTANT_DEAL_DAYS, lined up, on now or ended, with where each stands. The admin
  * assistant's booking calls are left out.
  */
-export async function assistantDeals(businessId: string, viewer: DealViewer, role: CallerRole = "sales"): Promise<AssistantDeal[]> {
+/**
+ * Whose calls: booking calls are the post-sale agent's; every other call is the sales agent's it was handed to (the
+ * first when none is named). `t` is the voice_calls alias with its dot. The key is from cleanCallerKey's fixed list.
+ */
+const callsOf = (role: CallerKey, t: string) =>
+  role === "admin" ? "= 'install'" : `<> 'install' and coalesce(${t}lead->>'agent', 'sales') = '${cleanCallerKey(role)}'`;
+
+export async function assistantDeals(businessId: string, viewer: DealViewer, role: CallerKey = "sales"): Promise<AssistantDeal[]> {
   // Each assistant's own calls: booking calls are the post-sale assistant's, every other the sales assistant's.
-  const mine = role === "admin" ? "= 'install'" : "<> 'install'";
+  const mine = (t: string) => callsOf(role, t);
   const rows = await query<{
     job_id: string;
     customer: string;
@@ -217,19 +224,19 @@ export async function assistantDeals(businessId: string, viewer: DealViewer, rol
        join design_customers cu on cu.business_id = j.business_id and cu.id = j.customer_id
        join lateral (
          select status, live_status, attempts, updated_at, due_at from voice_calls
-          where business_id = j.business_id and job_id = j.id and mode ${mine}
+          where business_id = j.business_id and job_id = j.id and mode ${mine("")}
           order by updated_at desc limit 1
        ) c on true
        left join lateral (
          select ev.outcome, ev.summary, ev.at from voice_call_events ev
            join voice_calls vc on vc.id = ev.voice_call_id
-          where vc.business_id = j.business_id and vc.job_id = j.id and vc.mode ${mine} and ev.kind = 'ended'
+          where vc.business_id = j.business_id and vc.job_id = j.id and vc.mode ${mine("vc.")} and ev.kind = 'ended'
           order by ev.at desc limit 1
        ) e on true
        left join lateral (
          select count(*)::int as calls from voice_call_events ev
            join voice_calls vc on vc.id = ev.voice_call_id
-          where vc.business_id = j.business_id and vc.job_id = j.id and vc.mode ${mine} and ev.kind = 'ended'
+          where vc.business_id = j.business_id and vc.job_id = j.id and vc.mode ${mine("vc.")} and ev.kind = 'ended'
        ) n on true
       where j.business_id = $1 and c.updated_at > now() - make_interval(days => $2) and ${seen(viewer, 4)}
       order by c.updated_at desc limit $3`,
@@ -260,12 +267,12 @@ export async function assistantDeals(businessId: string, viewer: DealViewer, rol
 }
 
 /** The sales assistant's calls on one deal that have ended, newest first, each as it was said. The caller has checked the member may see the deal. */
-export async function assistantDealCalls(businessId: string, jobId: string, role: CallerRole = "sales"): Promise<AssistantDealCall[]> {
-  const mine = role === "admin" ? "= 'install'" : "<> 'install'";
+export async function assistantDealCalls(businessId: string, jobId: string, role: CallerKey = "sales"): Promise<AssistantDealCall[]> {
+  const mine = (t: string) => callsOf(role, t);
   const [ended, said] = await Promise.all([
     query<{ id: string; at: Date; outcome: string | null; summary: string | null }>(
       `select e.id, e.at, e.outcome, e.summary from voice_call_events e join voice_calls c on c.id = e.voice_call_id
-        where c.business_id = $1 and c.job_id = $2 and c.mode ${mine} and e.kind = 'ended'
+        where c.business_id = $1 and c.job_id = $2 and c.mode ${mine("c.")} and e.kind = 'ended'
         order by e.at desc limit 20`,
       [businessId, jobId],
     ),

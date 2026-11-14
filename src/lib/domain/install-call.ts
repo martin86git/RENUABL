@@ -19,6 +19,21 @@ export type CallerRole = (typeof CALLER_ROLES)[number];
 
 export const cleanCallerRole = (raw: unknown): CallerRole => (raw === "admin" ? "admin" : "sales");
 
+/**
+ * More than one sales agent (14 Nov 2026, Martin: "should allow someone to add more sales agents"). Each voice agent has
+ * a **key**: the first sales agent is `sales` and the post-sale one `admin`, as before; further sales agents are
+ * `sales-2` … up to MAX_SALES_AGENTS. A key's role is what it does (sales, or post sale); everything kept for an agent
+ * (name, picture, voice, script, chats) is kept by its key.
+ */
+export const MAX_SALES_AGENTS = 5;
+export const SALES_KEYS = ["sales", "sales-2", "sales-3", "sales-4", "sales-5"] as const;
+export type CallerKey = CallerRole | (typeof SALES_KEYS)[number];
+export const cleanCallerKey = (raw: unknown): CallerKey =>
+  raw === "admin" ? "admin" : (SALES_KEYS as readonly unknown[]).includes(raw) ? (raw as CallerKey) : "sales";
+export const roleOfKey = (key: CallerKey): CallerRole => (key === "admin" ? "admin" : "sales");
+/** The first sales key not taken, or null when the business has as many sales agents as it may. */
+export const nextSalesKey = (taken: readonly string[]): CallerKey | null => SALES_KEYS.find((k) => !taken.includes(k)) ?? null;
+
 /** Each assistant as Settings names it and says what it is for. */
 export const ROLE_WORDS: Record<CallerRole, { label: string; does: string; opens: string }> = {
   sales: {

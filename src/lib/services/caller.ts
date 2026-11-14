@@ -6,13 +6,13 @@
 
 import { useEffect, useState } from "react";
 import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
-import type { CallerRole } from "@/lib/domain/install-call";
+import type { CallerKey } from "@/lib/domain/install-call";
 import { PRACTICE_ID } from "@/lib/domain/design/practice-call";
 import { watchAssistantCall } from "./assistant-call";
 
 export interface CallerState {
-  /** Which of the business's two assistants it is: sales (when left out) or admin. */
-  role?: CallerRole;
+  /** Which of the business's voice agents it is, by its key: the first sales agent when left out. */
+  role?: CallerKey;
   name: string;
   photoAt: string | null;
   voice: CallerVoice | null;
@@ -39,11 +39,17 @@ async function ask<T>(path: string, init?: RequestInit): Promise<Answer<T>> {
 const CHANGED = "renuabl:caller";
 
 export const loadCaller = () =>
-  ask<{ caller: CallerState; admin?: CallerState; callsOn: boolean; textsOn?: boolean; mayChange: boolean; business: string }>(
-    "/api/design/caller",
-  );
+  ask<{
+    caller: CallerState;
+    admin?: CallerState;
+    more?: CallerState[];
+    callsOn: boolean;
+    textsOn?: boolean;
+    mayChange: boolean;
+    business: string;
+  }>("/api/design/caller");
 
-export async function saveCallerName(name: string, role: CallerRole = "sales") {
+export async function saveCallerName(name: string, role: CallerKey = "sales") {
   const res = await ask<{ caller: CallerState }>("/api/design/caller", {
     method: "PUT",
     headers: { "content-type": "application/json" },
@@ -54,7 +60,7 @@ export async function saveCallerName(name: string, role: CallerRole = "sales") {
 }
 
 /** The voice it speaks in; null goes back to the default. */
-export async function saveCallerVoice(voice: CallerVoice | null, role: CallerRole = "sales") {
+export async function saveCallerVoice(voice: CallerVoice | null, role: CallerKey = "sales") {
   const res = await ask<{ caller: CallerState }>("/api/design/caller", {
     method: "PUT",
     headers: { "content-type": "application/json" },
@@ -72,13 +78,13 @@ export const callerChanged = (caller: CallerState) => window.dispatchEvent(new C
  * A practice call (domain/design/practice-call.ts): the assistant rings the member's own mobile and talks to them as a
  * customer; the live call window opens on it, with its clock, transcript and Hang up.
  */
-export async function ringMeToHear(role: CallerRole = "sales") {
+export async function ringMeToHear(role: CallerKey = "sales") {
   const res = await ask<{ message: string }>(`/api/design/caller/test?role=${role}`, { method: "POST" });
   if (res.ok) watchAssistantCall({ jobId: PRACTICE_ID, name: "you", message: res.message, role });
   return res;
 }
 
-export async function uploadCallerPhoto(file: File, role: CallerRole = "sales") {
+export async function uploadCallerPhoto(file: File, role: CallerKey = "sales") {
   const form = new FormData();
   form.set("file", file);
   const res = await ask<{ caller: CallerState }>(`/api/design/caller/photo?role=${role}`, { method: "POST", body: form });
@@ -86,7 +92,7 @@ export async function uploadCallerPhoto(file: File, role: CallerRole = "sales") 
   return res;
 }
 
-export async function removeCallerPhoto(role: CallerRole = "sales") {
+export async function removeCallerPhoto(role: CallerKey = "sales") {
   const res = await ask<{ caller: CallerState }>(`/api/design/caller/photo?role=${role}`, { method: "DELETE" });
   if (res.ok) window.dispatchEvent(new CustomEvent(CHANGED, { detail: res.caller }));
   return res;
@@ -101,6 +107,8 @@ export interface CallerInfo {
   caller: CallerState;
   /** The admin assistant, which rings sold customers to book their installation. */
   admin: CallerState;
+  /** The sales agents past the first, in order. */
+  more: CallerState[];
   callsOn: boolean;
   /** Whether a text can be sent to a customer from here. */
   textsOn: boolean;
@@ -112,6 +120,7 @@ export interface CallerInfo {
 const START: CallerInfo = {
   caller: { name: DEFAULT_CALLER, photoAt: null, voice: null, named: false },
   admin: { role: "admin", name: DEFAULT_CALLER, photoAt: null, voice: null, named: false },
+  more: [],
   callsOn: false,
   textsOn: false,
   mayChange: false,
@@ -130,6 +139,7 @@ export function useCallerInfo(): CallerInfo {
         ? {
             caller: r.caller,
             admin: r.admin ?? START.admin,
+            more: r.more ?? [],
             callsOn: r.callsOn,
             textsOn: r.textsOn === true,
             mayChange: r.mayChange,
@@ -143,7 +153,16 @@ export function useCallerInfo(): CallerInfo {
     const heard = (e: Event) => {
       const caller = (e as CustomEvent<CallerState>).detail;
       setInfo((i) => {
-        const next = caller.role === "admin" ? { ...i, admin: caller } : { ...i, caller };
+        const key = caller.role ?? "sales";
+        const next =
+          key === "admin"
+            ? { ...i, admin: caller }
+            : key === "sales"
+              ? { ...i, caller }
+              : {
+                  ...i,
+                  more: [...i.more.filter((m) => m.role !== key), caller].sort((a, b) => (a.role ?? "").localeCompare(b.role ?? "")),
+                };
         shared = Promise.resolve(next);
         return next;
       });
@@ -157,6 +176,13 @@ export function useCallerInfo(): CallerInfo {
   return info;
 }
 
+/** One of the business's voice agents by its key (the first sales agent when it isn't known). */
+export const callerFor = (info: CallerInfo, key: CallerKey | undefined | null): CallerState =>
+  key === "admin" ? info.admin : (info.more.find((m) => m.role === key) ?? info.caller);
+
+/** The business's sales agents that have been made, the first first. */
+export const salesAgents = (info: CallerInfo): CallerState[] => [info.caller, ...info.more].filter((c) => c.named);
+
 /** The assistant for this page, or Sol while it loads. */
 export const useCaller = (): CallerState => useCallerInfo().caller;
 
@@ -165,8 +191,12 @@ export const askByEmailFirst = (jobId: string) =>
   ask<{ message: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call/ask`, { method: "POST" });
 
 /** The phone assistant rings this deal's customer (in calling hours). Answers what to tell the member. */
-export const askAssistantToCall = (jobId: string) =>
-  ask<{ message: string; already?: boolean }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call`, { method: "POST" });
+export const askAssistantToCall = (jobId: string, agent: CallerKey = "sales") =>
+  ask<{ message: string; already?: boolean }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ agent }),
+  });
 
 /** The phone assistant rings this deal's customer back to ask or confirm one thing the team typed. */
 export const askAssistantToCallBack = (jobId: string, what: string) =>

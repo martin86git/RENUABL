@@ -9,8 +9,8 @@ import { useSyncExternalStore } from "react";
 import type { AssistantDeal, AssistantDealCall } from "@/lib/domain/design/assistant-deals";
 import type { CoachChatLine } from "@/lib/domain/design/coach-threads";
 import type { CoachNote, CoachTurn } from "@/lib/domain/design/coaching";
-import type { CallerRole } from "@/lib/domain/install-call";
-import { useCallerInfo, type CallerState } from "./caller";
+import type { CallerKey } from "@/lib/domain/install-call";
+import { callerFor, useCallerInfo, type CallerState } from "./caller";
 
 export interface CoachCall {
   jobId: string;
@@ -20,28 +20,28 @@ export interface CoachCall {
 }
 
 /** `role`: which of the business's two voice agents the window is talking to (left out: the sales one). */
-let open: { call: CoachCall | null; role?: CallerRole } | null = null;
+let open: { call: CoachCall | null; role?: CallerKey } | null = null;
 const listeners = new Set<() => void>();
 const set = (next: typeof open) => {
   open = next;
   listeners.forEach((l) => l());
 };
 
-export const openCoach = (call: CoachCall | null = null, role: CallerRole = "sales") => set({ call, role });
+export const openCoach = (call: CoachCall | null = null, role: CallerKey = "sales") => set({ call, role });
 export const closeCoach = () => set(null);
 // Only when a call is set: a new state object lands the window on the assistant's day again.
 export const clearCoachCall = () => open?.call && set({ call: null, role: open.role });
 
 /** The assistant the window is open on (the sales one while it is shut). */
-export const coachRole = (): CallerRole => open?.role ?? "sales";
+export const coachRole = (): CallerKey => open?.role ?? "sales";
 
 /** The assistant the window is talking to, as a page shows it: its name, face and voice. */
 export function useCoachCaller(): CallerState {
   const info = useCallerInfo();
-  return useCoachOpen()?.role === "admin" ? info.admin : info.caller;
+  return callerFor(info, useCoachOpen()?.role);
 }
 
-export function useCoachOpen(): { call: CoachCall | null; role?: CallerRole } | null {
+export function useCoachOpen(): { call: CoachCall | null; role?: CallerKey } | null {
   return useSyncExternalStore(
     (l) => {
       listeners.add(l);

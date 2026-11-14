@@ -6,6 +6,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import { CalendarCheck, Headset, MailQuestion, NotebookPen, Phone, PhoneForwarded, Settings, X } from "lucide-react";
 import { askAssistantToBook, askAssistantToCall, askByEmailFirst, useCallerInfo } from "@/lib/services/caller";
+import type { CallerKey } from "@/lib/domain/install-call";
 import { watchAssistantCall } from "@/lib/services/assistant-call";
 import { callFromComputer, useComputerCall, useComputerCallsOn } from "@/lib/services/computer-call";
 import { CallerAvatar } from "./settings-caller";
@@ -35,7 +36,7 @@ export function CallChoices(props: {
   toBook?: boolean;
   onClose: () => void;
 }) {
-  const { caller, admin, callsOn, mayChange, ready } = useCallerInfo();
+  const { caller, admin, more, callsOn, mayChange, ready } = useCallerInfo();
   const [booking, setBooking] = useState(false);
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
@@ -48,13 +49,13 @@ export function CallChoices(props: {
   const who = props.name || "them";
   const canHand = callsOn && Boolean(dial);
 
-  const handOver = async () => {
+  const handOver = async (agent: CallerKey = "sales") => {
     setSending(true);
     setFailed(null);
-    const res = await askAssistantToCall(props.jobId);
+    const res = await askAssistantToCall(props.jobId, agent);
     setSending(false);
     if (!res.ok) return setFailed(res.message);
-    watchAssistantCall({ jobId: props.jobId, name: props.name, message: res.message });
+    watchAssistantCall({ jobId: props.jobId, name: props.name, message: res.message, role: agent });
     props.onClose();
   };
 
@@ -159,6 +160,27 @@ export function CallChoices(props: {
           {canHand && <PhoneForwarded className="size-4 shrink-0 opacity-60" aria-hidden />}
         </button>
       )}
+      {/* The business's other sales agents (14 Nov 2026, Martin: more than one): the call can be handed to any of them. */}
+      {ready &&
+        caller.named &&
+        more
+          .filter((m) => m.named)
+          .map((m) => (
+            <button
+              key={m.role}
+              role="menuitem"
+              type="button"
+              disabled={!canHand || sending}
+              onClick={() => void handOver(m.role)}
+              className={clsx(ROW, "mt-1", !canHand && "text-muted")}
+            >
+              <CallerAvatar caller={m} size={28} />
+              <span>
+                Hand it to {m.name}
+                <span className="block text-xs text-muted">{`${m.name} rings ${who} and you watch the call here`}</span>
+              </span>
+            </button>
+          ))}
       {ready && caller.named && canHand && (
         <button
           role="menuitem"

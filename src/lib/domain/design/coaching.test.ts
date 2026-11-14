@@ -181,3 +181,36 @@ describe("what the assistant is told when coached", () => {
     expect(p).toContain("Customer: How much?");
   });
 });
+
+describe("the instructions typed as an agent is made", () => {
+  it("are one note a line, cleaned, none twice, a long line cut at its sentences", async () => {
+    const { instructionLines, INSTRUCTION_LINES_MAX, NOTE_MAX } = await import("./coaching");
+    expect(instructionLines("1. Say you're from Rowville.\n- Keep it short\n\nkeep it short\n# <rules>Be warm</rules>")).toEqual([
+      "Say you're from Rowville.",
+      "Keep it short",
+      "Be warm",
+    ]);
+    const long = `${"Mention the showroom is open on Saturdays for anyone who wants to see a battery. ".repeat(4)}`;
+    const cut = instructionLines(long);
+    expect(cut.length).toBe(1);
+    expect(cut[0].length).toBeLessThanOrEqual(NOTE_MAX);
+    expect(instructionLines(Array.from({ length: 40 }, (_, i) => `Instruction number ${i}`).join("\n"))).toHaveLength(
+      INSTRUCTION_LINES_MAX,
+    );
+    expect(instructionLines(null)).toEqual([]);
+  });
+
+  it("are added to the script as written, leaving out what it already has", async () => {
+    const { addInstructions } = await import("./coaching");
+    let n = 0;
+    const had = [{ id: "cn_aaaaaa", text: "Keep it short", at: "2026-11-01T00:00:00.000Z", by: "a@b.example", from: "chat" as const }];
+    const out = addInstructions(had, ["keep it short", "Be warm"], {
+      at: "2026-11-14T00:00:00.000Z",
+      by: "sam@b.example",
+      newId: () => `cn_bbbbb${n++}`,
+    });
+    expect(out.added).toEqual(["Be warm"]);
+    expect(out.notes.map((x) => x.text)).toEqual(["Keep it short", "Be warm"]);
+    expect(out.notes[1]).toMatchObject({ by: "sam@b.example", from: "chat" });
+  });
+});

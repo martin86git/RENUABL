@@ -72,7 +72,7 @@ import { emailProvider, sendEmail } from "./email";
 import { alertNewLead, textStaff } from "./lead-alert";
 import { testCallWords } from "@/lib/domain/design/caller";
 import { callerOf, coachingOf } from "./design-caller-repo";
-import { pencilledLine, PENCILLED_WORDS, readInstallDay, roleOfMode, type CallerRole } from "@/lib/domain/install-call";
+import { pencilledLine, PENCILLED_WORDS, readInstallDay, cleanCallerKey, roleOfMode, type CallerKey } from "@/lib/domain/install-call";
 import { installDaysFor, pencilInstall } from "./design-install-call";
 import { addHomeLead, findCustomerByMobile, type HomeLead, renuablCrm } from "./renuabl-crm";
 import { sendSms, smsConfigured } from "./sms";
@@ -140,7 +140,7 @@ export interface VoiceRow {
   first_name: string | null;
   mobile: string;
   email: string | null;
-  lead: { about?: string[]; source?: string; texted?: boolean; assistant?: string; inbound?: boolean; teamAsk?: string };
+  lead: { about?: string[]; source?: string; texted?: boolean; assistant?: string; inbound?: boolean; teamAsk?: string; agent?: string };
   status: "waiting" | "calling" | "booked" | "done" | "stopped";
   attempts: number;
   vapi_call_id: string | null;
@@ -168,6 +168,8 @@ export async function queueCall(o: {
   askedNote?: string;
   /** A call back the team asked for: the one thing to ask or confirm (`cleanTeamAsk`), and who asked. */
   teamAsk?: { text: string; by: string };
+  /** Which sales agent it was handed to (its key), when not the first. */
+  agent?: CallerKey;
 }): Promise<QueueResult> {
   const s = voiceSettings();
   if (!s || !(await voiceOnFor(o.businessId))) return { result: "off" };
@@ -199,7 +201,12 @@ export async function queueCall(o: {
           speakableName(customer.firstName || customer.name.split(" ")[0]) || null,
           mobile,
           customer.email || null,
-          JSON.stringify({ about, source: o.source, ...(o.teamAsk ? { teamAsk: o.teamAsk.text } : {}) }),
+          JSON.stringify({
+            about,
+            source: o.source,
+            ...(o.teamAsk ? { teamAsk: o.teamAsk.text } : {}),
+            ...(o.agent && o.agent !== "sales" && o.mode !== "install" ? { agent: o.agent } : {}),
+          }),
         ],
       );
     let rows = await insert();
@@ -213,7 +220,7 @@ export async function queueCall(o: {
       );
     if (o.teamAsk)
       await onDeal(
-        { ...rows[0], lead: { ...rows[0].lead, assistant: (await callerOf(o.businessId, roleOfMode(o.mode))).name } },
+        { ...rows[0], lead: { ...rows[0].lead, assistant: (await callerOf(o.businessId, keyOfCall(rows[0]))).name } },
         `${o.teamAsk.by} asked for a call back to ask: ${o.teamAsk.text}`,
       );
     const window = nextCallWindow(new Date());
@@ -240,6 +247,10 @@ export async function takeHomeLead(lead: HomeLead, call: boolean): Promise<void>
   }
 }
 
+/** The voice agent a call is made by: the post-sale one for a booking call, else the sales agent it was handed to. */
+const keyOfCall = (row: Pick<VoiceRow, "mode" | "lead">): CallerKey =>
+  roleOfMode(row.mode) === "admin" ? "admin" : cleanCallerKey(row.lead?.agent);
+
 /** For the customer's proposal page: whether "Call me" is offered, and who would call. Null when it isn't. */
 export async function callMeFor(businessId: string): Promise<{ assistant: string } | null> {
   if (!(await voiceOnFor(businessId).catch(() => false))) return null;
@@ -254,7 +265,7 @@ async function briefFor(
   const brand = await loadBrand(row.business_id, biz[0]?.name ?? "");
   const own = (await renuablCrm().catch(() => null))?.businessId === row.business_id;
   // The admin assistant makes the booking calls, the sales assistant every other (install-call.ts).
-  const role = roleOfMode(row.mode);
+  const role = keyOfCall(row);
   const caller = await callerOf(row.business_id, role);
   // How the business has coached its assistant, read fresh for every call.
   const coaching = (await coachingOf(row.business_id, role).catch(() => null))?.notes.map((n) => n.text) ?? [];
@@ -808,7 +819,7 @@ async function inboundRow(s: VoiceSettings, businessId: string, mobile: string, 
 export async function ringToHearVoice(
   businessId: string,
   mobile: string | null,
-  role: CallerRole = "sales",
+  role: CallerKey = "sales",
 ): Promise<"placed" | "off" | "no-number" | "failed"> {
   const s = voiceSettings();
   if (!s || !(await voiceOnFor(businessId).catch(() => false))) return "off";
@@ -940,7 +951,7 @@ export async function liveCallFor(businessId: string, jobId: string): Promise<Li
     customer: r.first_name ?? "",
     outcome: r.outcome,
     booked: r.outcome === "booked" || r.outcome === "pencilled" ? r.call_label : null,
-    role: roleOfMode(r.mode),
+    role: keyOfCall(r),
     attempts: r.attempts,
     startedAgo: started === null ? null : now - started,
     ranFor: started !== null && ended !== null ? ended - started : null,

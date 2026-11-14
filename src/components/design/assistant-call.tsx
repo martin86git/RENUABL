@@ -9,7 +9,7 @@ import { TEXT_MAX } from "@/lib/domain/design/contact-reach";
 import { clockWords, joinRuns, phaseWords, TEAM_NOTE_MAX, teamLineWords, type LiveLine } from "@/lib/domain/live-call";
 import { CALL_HEADLINES, TEAM_ASK_MAX } from "@/lib/domain/voice-agent";
 import { endAssistantCall, stopWatching, tellAssistant, useLiveCall, useWatchedCall } from "@/lib/services/assistant-call";
-import { askAssistantToCallBack, textCustomer, useCallerInfo, type CallerState } from "@/lib/services/caller";
+import { askAssistantToCallBack, textCustomer, useCallerInfo, type CallerState, callerFor } from "@/lib/services/caller";
 import { openCoach } from "@/lib/services/coaching";
 import { OtherCallsStrip } from "./live-calls";
 import { PRACTICE_ID } from "@/lib/domain/design/practice-call";
@@ -27,7 +27,7 @@ export function AssistantCallWindow() {
   const assistants = useCallerInfo();
   const { call, loaded } = useLiveCall(watched?.jobId ?? null);
   // A booking call is the admin assistant's: its face and name, once the call (or the hand-over) says so.
-  const caller = (call?.role ?? watched?.role) === "admin" ? assistants.admin : assistants.caller;
+  const caller = callerFor(assistants, call?.role ?? watched?.role);
   const [folded, setFolded] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const list = useRef<HTMLDivElement>(null);
@@ -163,7 +163,7 @@ export function AssistantCallWindow() {
                 caller={caller}
                 ended={phase === "ended"}
                 // Calling back and talking the call over are the sales assistant's, once it is set up.
-                sales={call?.role !== "admin" && assistants.caller.named}
+                sales={(call?.role ?? "sales") === "sales" && assistants.caller.named}
                 callsOn={assistants.callsOn}
                 textsOn={assistants.textsOn}
                 transcriptId={call?.transcriptId ?? null}
@@ -196,7 +196,7 @@ export function CallInPane({
 }) {
   const assistants = useCallerInfo();
   const { call, loaded } = useLiveCall(jobId);
-  const caller = call?.role === "admin" ? assistants.admin : assistants.caller;
+  const caller = callerFor(assistants, call?.role);
   const [elapsed, setElapsed] = useState(0);
   const list = useRef<HTMLDivElement>(null);
 

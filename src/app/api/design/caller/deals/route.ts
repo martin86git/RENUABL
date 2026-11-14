@@ -1,4 +1,4 @@
-import { cleanCallerRole } from "@/lib/domain/install-call";
+import { cleanCallerKey } from "@/lib/domain/install-call";
 import { assistantDealCalls, assistantDeals } from "@/lib/server/design-call-log-repo";
 import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     if ("refuse" in who) return who.refuse;
     const job = new URL(request.url).searchParams.get("job");
     // `?role=admin`: the post-sale assistant's own calls (booking installs), else the sales assistant's.
-    const role = cleanCallerRole(new URL(request.url).searchParams.get("role"));
+    const role = cleanCallerKey(new URL(request.url).searchParams.get("role"));
     if (job === null) {
       const deals = await assistantDeals(who.member.businessId, viewerOf(who.member), role);
       return Response.json({ ok: true, deals }, { headers: PRIVATE });

@@ -35,7 +35,7 @@ const titleOf = (name: string, kind: AgentKind) => `${name}: ${AGENT_WORDS[kind]
  * Under the sales assistant, a round for each call it has under way. Then the plus, to add one.
  */
 export function RailAgents() {
-  const { caller, admin } = useCallerInfo();
+  const { caller, admin, more } = useCallerInfo();
 
   return (
     <span className="flex w-full flex-col items-center gap-2.5">
@@ -49,6 +49,17 @@ export function RailAgents() {
       )}
       {/* Each call the sales assistant has under way, as a round of its own under its face. */}
       <RailCalls />
+      {/* The sales agents past the first, each opening its own chat. */}
+      {more
+        .filter((m) => m.named)
+        .map((m) => (
+          <button key={m.role} type="button" onClick={() => openCoach(null, m.role)} title={titleOf(m.name, "sales")} className={SHELL}>
+            <span className={ROUND}>
+              <CallerAvatar caller={m} size={44} />
+            </span>
+            <AgentLabel name={m.name} />
+          </button>
+        ))}
       {admin.named && (
         <button type="button" onClick={() => openCoach(null, "admin")} title={titleOf(admin.name, "admin")} className={SHELL}>
           <span className={ROUND}>

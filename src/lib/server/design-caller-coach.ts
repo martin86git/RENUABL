@@ -17,7 +17,7 @@ import {
 import type { DealForChat } from "@/lib/domain/design/assistant-deals";
 import { chatLines, fileChatAway, type CoachChatLine } from "@/lib/domain/design/coach-threads";
 import { CALLER_VOICES, cleanCallerName } from "@/lib/domain/design/caller";
-import { ADMIN_COACH_JOB, ADMIN_FIXED_RULES, type CallerRole } from "@/lib/domain/install-call";
+import { ADMIN_COACH_JOB, ADMIN_FIXED_RULES, type CallerKey } from "@/lib/domain/install-call";
 import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { parseApiKey } from "./bill-reader";
 import { readWithClaude } from "./claude-reader";
@@ -35,7 +35,7 @@ import {
 import { loadBrand } from "./design-proposal-repo";
 import { withSolCredit } from "./sol-credits";
 
-const newNoteId = () => `cn_${randomBytes(6).toString("hex")}`;
+export const newNoteId = () => `cn_${randomBytes(6).toString("hex")}`;
 
 export type CoachResult =
   | { ok: true; turns: CoachTurn[]; notes: CoachNote[]; caller: Caller; past: CoachChatLine[] }
@@ -54,7 +54,7 @@ export async function coachAssistant(o: {
   /** Start a new chat with this message: the one going is filed away with the earlier ones. */
   fresh?: boolean;
   /** Which of the business's two assistants is being talked to (the post-sale one keeps its own notes and chats). */
-  role?: CallerRole;
+  role?: CallerKey;
 }): Promise<CoachResult> {
   const role = o.role ?? "sales";
   const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);

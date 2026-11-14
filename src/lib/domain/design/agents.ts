@@ -85,6 +85,8 @@ export interface AgentStatus {
   chat: boolean;
   /** Which kinds the business has made. */
   made: Record<AgentKind, boolean>;
+  /** Whether another sales agent can be added (install-call.ts MAX_SALES_AGENTS); left out, only the first. */
+  moreSales?: boolean;
 }
 
 export type NeedState = "ready" | "missing";
@@ -134,14 +136,35 @@ export function agentStanding(kind: AgentKind, s: AgentStatus): { ready: boolean
   return { ready: false, words: missing.needsNumber ? "Needs your business phone number" : "Not switched on yet" };
 }
 
-/** The kinds a business can still add: each is made once. */
-export const kindsToAdd = (s: AgentStatus): AgentKind[] => AGENT_KINDS.filter((k) => !s.made[k]);
+/**
+ * The kinds a business can still add: the post-sale assistant and the chief of staff are made once; a sales agent can
+ * be added again until the business has as many as it may (14 Nov 2026, Martin: "allow someone to add more sales agents").
+ */
+export const kindsToAdd = (s: AgentStatus): AgentKind[] => AGENT_KINDS.filter((k) => !s.made[k] || (k === "sales" && s.moreSales === true));
+
+/** What a new agent is for, as the form asks it: two words, then a line. */
+export const PURPOSE_WORDS: Record<AgentKind, { label: string; line: string }> = {
+  sales: { label: "Sales", line: "Rings leads and customers with a proposal out, and answers their questions." },
+  admin: { label: "Post sale", line: "Rings customers who have signed, to book their installation." },
+  colleague: { label: "Your team", line: "Answers your team's questions about your deals, in writing. Never rings anyone." },
+};
 
 export const AGENT_COPY = {
   title: "Your agents",
   add: "Add an agent",
   none: "You have no agents yet. Add one to have it ring customers, or answer your team.",
-  allMade: "You have one of each kind. More kinds will come.",
+  allMade: "You have every agent you can add for now.",
+  sub: "Each has its own name, voice and instructions.",
+  voiceHead: "Voice agents",
+  voiceSub: "They ring your customers",
+  teamHead: "For your team",
+  teamSub: "Customers never reach it",
+  purpose: "What is it for?",
+  instructions: "Its instructions",
+  instructionsHint:
+    "One instruction a line, in your own words. They go straight into its script, and you can change them any time by chatting to it.",
+  instructionsNote: "It always says it's automated, and never agrees a price or promises a date, whatever its instructions say.",
+  made: (name: string) => `${name} is ready.`,
   pickKind: "What should it do?",
   nameIt: "Give it a name",
   nameHint: "Letters only, since a phone agent says it out loud. You can change it later.",

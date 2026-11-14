@@ -84,6 +84,9 @@ describe("adding one", () => {
   it("offers each kind once", () => {
     expect(kindsToAdd(status())).toEqual(["sales", "admin", "colleague"]);
     expect(kindsToAdd(status({ made: { sales: true, admin: false, colleague: true } }))).toEqual(["admin"]);
+    // Another sales agent while the business may have more.
+    expect(kindsToAdd(status({ made: { sales: true, admin: true, colleague: true }, moreSales: true }))).toEqual(["sales"]);
+    expect(kindsToAdd(status({ made: { sales: true, admin: true, colleague: true }, moreSales: false }))).toEqual([]);
   });
 });
 

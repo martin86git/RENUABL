@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-14",
     area: "Agents",
+    words: "Add an agent in one step: its name, what it's for and its instructions. You can now have more than one sales agent.",
+  },
+  {
+    day: "2026-11-14",
+    area: "Agents",
     words: "Your phone assistant's window sits level with the agents bar, with one search, its day in the header and the mic in the box.",
   },
   {
