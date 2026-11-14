@@ -292,6 +292,15 @@ function Shell({
     if (away) router.replace("/design");
   }, [away, router]);
   const [searching, setSearching] = useState(false);
+  // Once the pad's top has scrolled under the top bar, the gap behind the lowered menu is filled with the pad's own
+  // ground, so the page never shows through around it (14 Nov 2026, Martin).
+  const [underBar, setUnderBar] = useState(false);
+  useEffect(() => {
+    const look = () => setUnderBar(window.scrollY > MENU_DROP_PX - 20);
+    look();
+    window.addEventListener("scroll", look, { passive: true });
+    return () => window.removeEventListener("scroll", look);
+  }, []);
   const [more, setMore] = useState(false);
   // Ctrl K or ⌘K opens the search from anywhere.
   useEffect(() => {
@@ -668,6 +677,17 @@ function Shell({
       ) : (
         <div className="px-3 pb-20 pt-2 sm:px-6 lg:px-14 lg:pt-9">
           <div data-tour="pad" data-sol-page className={PAD}>
+            <div
+              aria-hidden
+              className={clsx("pointer-events-none sticky z-30 -mx-6 -mt-10 hidden bg-canvas lg:block", !underBar && "invisible")}
+              // From the bar's foot to just under the menu, taking no room: it starts at the pad's edge (over its 2.5rem top
+              // padding, lg:pt-10) and gives that padding back.
+              style={{
+                top: `calc(var(--studio-head, 0px) - ${MENU_DROP_PX}px)`,
+                height: MENU_DROP_PX + 8,
+                marginBottom: 40 - (MENU_DROP_PX + 8),
+              }}
+            />
             {/* Inside the Marketplace, its own menu at the top of the pad, from its blue home, once it is open; until then
                 the launch page's demo carries it. */}
             {current.id === "marketplace" && marketplaceOpen() && (

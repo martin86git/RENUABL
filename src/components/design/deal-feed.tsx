@@ -241,7 +241,20 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
     ...(parts.inHand.length ? [{ id: TODAY_IDS.inHand, label: "In hand", count: parts.inHand.length, order: 5 }] : []),
     { id: TODAY_IDS.news, label: "News", count: null, order: 7 },
   ].sort((a, b) => a.order - b.order);
-  const [lit, go] = useScrollSpy(tabs.map((t) => t.id));
+  // One part of Today at a time (14 Nov 2026, Martin: "revealing", one thing at a time with the edge of the next): the
+  // strip chooses it; it opens on the first part with something in it, and the next one peeks in under it, faded, with
+  // Next. Each part stays drawn, only hidden, so what it has loaded is kept.
+  const [chosen, setChosen] = useState<string | null>(null);
+  const shown =
+    chosen && tabs.some((t) => t.id === chosen)
+      ? chosen
+      : (tabs.find((t) => t.id !== TODAY_IDS.news && (t.count ?? 0) > 0)?.id ?? TODAY_IDS.needs);
+  const next = tabs.slice(tabs.findIndex((t) => t.id === shown) + 1).find((t) => t.id === TODAY_IDS.news || (t.count ?? 0) > 0) ?? null;
+  const view = (id: string) => (id === shown ? "" : id === next?.id ? PEEK : "hidden");
+  const go = (id: string) => {
+    setChosen(id);
+    window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  };
 
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -249,7 +262,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
           how many, a press to go to it, and the part in view lit. */}
       <TodayStrip
         tabs={tabs}
-        lit={lit}
+        lit={shown}
         onGo={go}
         left={
           <>
@@ -310,11 +323,11 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
           Calls, Coming up, In hand; Calls goes first while a call is ringing or on, the most live thing on the page. */}
       <div className="flex flex-col">
         {/* The phone assistant's calls: on now, lined up and done today (12 Nov 2026, Martin). */}
-        <TodayCalls id={TODAY_IDS.calls} className={clsx(TRAY, place.calls)} onSummary={setCalls} />
+        <TodayCalls id={TODAY_IDS.calls} className={clsx(TRAY, place.calls, view(TODAY_IDS.calls))} onSummary={setCalls} />
 
         {/* The owner of a team: a line for each salesperson, new this week, not yet contacted, in play. */}
         {ownerOfTeam && (
-          <section className={clsx(TRAY, place.team)} aria-label="Your team">
+          <section className={clsx(TRAY, place.team, shown !== TODAY_IDS.inHand && "hidden")} aria-label="Your team">
             <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink">Your team</h2>
             <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
               <div className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 border-b border-line px-4 py-2 text-[11.5px] text-muted">
@@ -343,7 +356,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
 
         {/* New in (12 Nov 2026, Martin): new leads that need a design, each with Design, so a quote goes out quickly;
           New lead adds one. */}
-        <section id={TODAY_IDS.newIn} className={clsx(TRAY, place.newIn)} aria-label="New in">
+        <section id={TODAY_IDS.newIn} className={clsx(TRAY, place.newIn, view(TODAY_IDS.newIn))} aria-label="New in">
           <div className="mb-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
             <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
               New in
@@ -400,7 +413,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
           )}
         </section>
 
-        <Part id={TODAY_IDS.needs} className={place.needs} title="Needs you" count={data ? needs : null}>
+        <Part id={TODAY_IDS.needs} className={clsx(place.needs, view(TODAY_IDS.needs))} title="Needs you" count={data ? needs : null}>
           {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
           {data && needs === 0 && (
             // One quiet line (14 Nov 2026, Martin): an empty Needs you shouldn't take the top of the page.
@@ -440,7 +453,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         {parts.coming.length > 0 && (
           <Part
             id={TODAY_IDS.coming}
-            className={place.coming}
+            className={clsx(place.coming, view(TODAY_IDS.coming))}
             title="Coming up"
             note="What Sol does next. Review one to change it, or let it go."
           >
@@ -455,7 +468,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         {parts.inHand.length > 0 && (
           <Part
             id={TODAY_IDS.inHand}
-            className={place.inHand}
+            className={clsx(place.inHand, view(TODAY_IDS.inHand))}
             title="In hand"
             count={parts.inHand.length}
             note="Moving along. Nothing needs you on these."
@@ -489,9 +502,23 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
           </Part>
         )}
 
-        <div id={TODAY_IDS.news} className={clsx("scroll-mt-44", place.news)}>
+        <div id={TODAY_IDS.news} className={clsx("mt-9", place.news, view(TODAY_IDS.news))}>
           <TodayNews />
         </div>
+        {/* The next part, a press away under the edge of it. */}
+        {next && (
+          <div className="order-last -mt-10 flex justify-center">
+            <button
+              type="button"
+              onClick={() => go(next.id)}
+              className="relative z-10 inline-flex h-10 items-center gap-2 rounded-full bg-surface px-5 text-[13.5px] font-medium text-ink shadow-[0_6px_24px_rgba(20,22,26,0.08)] ring-1 ring-line transition hover:ring-ink-2"
+            >
+              Next: {next.label}
+              {next.count ? <span className="text-muted">· {next.count}</span> : null}
+              <ChevronDown className="size-4 text-ink-2" aria-hidden />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -604,6 +631,10 @@ function ArrivalCard(props: {
  */
 const TRAY = "mt-9 scroll-mt-44";
 
+/** The next part of Today, peeking in under the one shown: its top only, faded and soft, not to be used until chosen. */
+const PEEK =
+  "pointer-events-none max-h-52 select-none overflow-hidden opacity-60 blur-[1.5px] [mask-image:linear-gradient(to_bottom,black_25%,transparent)]";
+
 /** Where each part of Today sits on the page, for the strip to go to. */
 export const TODAY_IDS = {
   needs: "today-needs",
@@ -692,61 +723,6 @@ function TodayStrip(props: {
       </nav>
     </div>
   );
-}
-
-/** Which part of Today is in view, and a way to go to one. */
-function useScrollSpy(ids: readonly string[]): [string | null, (id: string) => void] {
-  const [lit, setLit] = useState<string | null>(null);
-  const key = ids.join(",");
-  useEffect(() => {
-    const list = key.split(",");
-    let frame = 0;
-    const look = () => {
-      frame = 0;
-      // The last part whose top has passed a line a little under the strip; the first before any has.
-      const line = 200;
-      let current: string | null = null;
-      let best = Infinity;
-      for (const id of list) {
-        const el = document.getElementById(id);
-        if (!el) continue;
-        const top = el.getBoundingClientRect().top;
-        if (top <= line && line - top < best) {
-          best = line - top;
-          current = id;
-        }
-      }
-      if (!current) {
-        const first = list
-          .map((id) => document.getElementById(id))
-          .filter(Boolean)
-          .sort((a, b) => a!.getBoundingClientRect().top - b!.getBoundingClientRect().top)[0];
-        current = first?.id ?? null;
-      }
-      setLit(current);
-    };
-    const onScroll = () => {
-      if (!frame) frame = window.requestAnimationFrame(look);
-    };
-    look();
-    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
-    window.addEventListener("resize", onScroll);
-    // A smooth scroll's last frame can come after its last scroll event: look again once it has stopped.
-    window.addEventListener("scrollend", look, { capture: true });
-    return () => {
-      window.removeEventListener("scrollend", look, { capture: true });
-      window.removeEventListener("scroll", onScroll, { capture: true });
-      window.removeEventListener("resize", onScroll);
-      if (frame) window.cancelAnimationFrame(frame);
-    };
-  }, [key]);
-  const go = (id: string) => {
-    document
-      .getElementById(id)
-      ?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-    setLit(id);
-  };
-  return [lit, go];
 }
 
 /** A pad on Today (New in, Calls): one width for every pad, so a row of them centres whatever its count. */
