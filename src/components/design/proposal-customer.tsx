@@ -11,6 +11,7 @@ import { PayDeposit } from "./deposit-panel";
 import { PaySchedule } from "./pay-schedule";
 import type { PublicPayments } from "@/lib/services/proposals";
 import { ProposalPage } from "./proposal-view";
+import { WalkthroughPlayer } from "./walkthrough-player";
 
 /**
  * The customer's own proposal, at their private link: the page itself, with
@@ -73,6 +74,11 @@ export function CustomerProposal(props: {
       onOpenChat={() => chat.show(true)}
       greeting={
         <>
+          {state !== "withdrawn" && (
+            <div className="mb-4">
+              <WalkthroughPlayer token={token} business={view.business.name} />
+            </div>
+          )}
           <ChatGreeting chat={chat} />
           {props.callMe && state !== "withdrawn" && (
             <div className="mt-4">

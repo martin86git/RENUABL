@@ -117,7 +117,7 @@ const DETAILS_FIRST_ANY: readonly RegExp[] = [/^\/api\/design\/roof(\/|$)/];
 const DETAILS_FIRST_WRITE: readonly RegExp[] = [
   /^\/api\/design\/(sol|command|bill|switchboard|live|projects|datasheets|draft)(\/|$)/,
   /^\/api\/design\/invoices\/read$/,
-  /^\/api\/design\/jobs\/[^/]+\/(proposal|write|usage|call-notes|chat\/draft)(\/|$)/,
+  /^\/api\/design\/jobs\/[^/]+\/(proposal|write|usage|call-notes|chat\/draft|walkthrough)(\/|$)/,
 ];
 
 /**

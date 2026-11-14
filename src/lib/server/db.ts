@@ -448,6 +448,22 @@ create table if not exists design_orders (
   primary key (business_id, job_id),
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
+-- Recorded walkthroughs of a deal's design (domain/design/walkthrough.ts): the video in private Blob storage, the
+-- captions here. The newest one shown is played at the top of the customer's proposal page.
+create table if not exists design_walkthroughs (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  blob_path text not null,
+  content_type text not null,
+  seconds numeric not null,
+  cues jsonb not null default '[]',
+  shown boolean not null default true,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create index if not exists design_walkthroughs_job on design_walkthroughs (business_id, job_id, created_at desc);
 -- The private link to a job's pickup slip (domain/design/pickup-slip.ts): what the installer shows at the wholesaler's
 -- counter. One a job, for good; no sign-in, the token is the key.
 create table if not exists design_pickup_links (

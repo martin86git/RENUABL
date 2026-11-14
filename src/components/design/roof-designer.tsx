@@ -16,6 +16,8 @@ import {
   type GuideTarget,
 } from "@/lib/domain/design/sol-guide";
 import { SolNudges } from "./sol-nudges";
+import { WalkthroughRecorder } from "./walkthrough-recorder";
+import { PRESENTING_EVENT } from "@/lib/services/walkthrough";
 import { nudgesFor, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
 import { SideViewsButton } from "./side-views";
 import { batteryFill } from "@/lib/domain/design/battery-fill";
@@ -79,6 +81,7 @@ import {
   Sunrise,
   LayoutGrid,
   Radio,
+  Clapperboard,
   Send,
   ThumbsUp,
   Trash2,
@@ -1259,7 +1262,16 @@ export function RoofDesigner(props: {
       // Storage is off: the full quote shows.
     }
   }, []);
-  const shown: SideView | null = side === "quote" && costsHidden ? "designer" : side;
+  // While a walkthrough records (walkthrough-recorder.tsx), the quote's costs and margin are put away: the recording
+  // goes to the customer.
+  const [presenting, setPresenting] = useState(false);
+  useEffect(() => {
+    const on = (e: Event) => setPresenting(Boolean((e as CustomEvent<boolean>).detail));
+    window.addEventListener(PRESENTING_EVENT, on);
+    return () => window.removeEventListener(PRESENTING_EVENT, on);
+  }, []);
+  const [recordOpen, setRecordOpen] = useState(false);
+  const shown: SideView | null = side === "quote" && (costsHidden || presenting) ? "designer" : side;
   const shortQuote = (next: boolean) => {
     setQuoteShort(next);
     try {
@@ -5912,6 +5924,26 @@ export function RoofDesigner(props: {
             </button>
             {liveOpen && !props.tight && liveBox}
           </div>
+          {/* Record a walkthrough (14 Nov 2026, Martin: Loom-style, narrated, Sol writing the subtitles as you speak): it
+              plays at the top of the customer's proposal. */}
+          {props.jobId && !props.sitesOnly && (
+            <button
+              type="button"
+              onClick={() => setRecordOpen(true)}
+              title="Record a walkthrough: talk the customer through their design, with Sol's subtitles"
+              aria-label="Record a walkthrough of this design for the customer"
+              className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line transition hover:text-ink"
+            >
+              <Clapperboard className="size-4" aria-hidden />
+            </button>
+          )}
+          {recordOpen && props.jobId && (
+            <WalkthroughRecorder
+              jobId={props.jobId}
+              customer={props.customerName?.trim() || "the customer"}
+              onClose={() => setRecordOpen(false)}
+            />
+          )}
           {/* The customer's chat (as Primero's): a round that lights orange with a count while they wait, opening the Proposal view. */}
           {props.jobId && (
             <button
