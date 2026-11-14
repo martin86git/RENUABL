@@ -776,7 +776,7 @@ function TodayStrip(props: {
   right: React.ReactNode;
 }) {
   return (
-    <div className="sticky top-2 z-20 -mx-1 px-1 pb-1 pt-1 lg:top-[calc(var(--studio-head,4.5rem)+0.25rem)]">
+    <div className="sticky top-2 z-20 -mx-1 px-1 pb-1 pt-1 lg:top-[calc(var(--studio-head,4.5rem)+1.75rem)]">
       <nav
         aria-label="Today at a glance"
         className="flex items-center gap-2 rounded-2xl bg-surface/90 px-2 py-1.5 shadow-[0_6px_24px_rgba(11,11,12,0.06)] ring-1 ring-line backdrop-blur"
@@ -1607,7 +1607,7 @@ function DealsPanel(props: {
   return (
     <aside
       aria-label="Deals"
-      className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+4.5rem)] lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-6rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
+      className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+6.5rem)] lg:mt-2 lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-8rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
     >
       <div className="flex items-center gap-2.5">
         <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-ink">Deals</h2>

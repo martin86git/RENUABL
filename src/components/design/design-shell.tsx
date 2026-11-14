@@ -656,7 +656,7 @@ function Shell({
           <div
             aria-hidden
             className={clsx("pointer-events-none absolute inset-x-0 top-full -z-10 bg-canvas/90 backdrop-blur", !underBar && "hidden")}
-            style={{ height: MENU_DROP_PX + 8 }}
+            style={{ height: MENU_DROP_PX + 32 }}
           />
         )}
         {/* The section's own pages sit in the bar only on the designer, which has no pad; elsewhere they head the pad. */}
