@@ -571,7 +571,11 @@ function Shell({
               const market = sections.find((s) => s.id === "marketplace");
               const waiting = market ? market.pages.reduce((n, p) => n + count(p.id), 0) : 0;
               return (
-                <div className="flex min-w-0 flex-1 justify-center">
+                // It drops with the sections menu onto the pad's edge (14 Nov 2026, Martin): its row sits 2px higher.
+                <div
+                  className="flex min-w-0 flex-1 justify-center"
+                  style={tool ? undefined : { transform: `translateY(${MENU_DROP_PX + 2}px)` }}
+                >
                   {market && <MarketplaceButton href={market.pages[0].href} lit={market.id === current.id} waiting={waiting} />}
                 </div>
               );
