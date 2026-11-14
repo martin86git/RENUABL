@@ -447,6 +447,14 @@ html.sol-resizing .team-pop {
     box-shadow: 0 0 0 6px rgb(255 90 31 / 0);
   }
 }
+/* The ground Sol's conversation sits on (14 Nov 2026, Martin: "a darker contrast in the sol chat drawer"): the deeper
+   grey Today's pad uses, with its lines and quiet type darkened to match, so his answers stand off it as white cards. */
+.sol-ground {
+  --canvas: #eaeaed;
+  --line: #dddde2;
+  --muted: #6b6d75;
+  background: var(--canvas);
+}
 /* Where Sol stands (sol-dock.tsx `SolNavButton`, and every place that draws him): no round behind him since
    14 Nov 2026 (Martin: "remove the black ring… standalone sun"), so the box is only his place and he fills it. A soft
    warm shadow sits him on the page; it warms on hover. */

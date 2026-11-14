@@ -475,7 +475,7 @@ export function SolChat({
           </ul>
         </div>
       )}
-      <div className={clsx("staff-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 text-sm", history && "hidden")}>
+      <div className={clsx("sol-ground staff-scroll min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 py-4 text-sm", history && "hidden")}>
         {!state && !problem && <SolThinking say="Opening your conversation…" />}
         {state && turns.length === 0 && !pending && (
           <div className="space-y-2 text-ink-2">
@@ -491,7 +491,7 @@ export function SolChat({
                   setText(s);
                   box.current?.focus();
                 }}
-                className="block w-full rounded-2xl bg-canvas px-3 py-2 text-left text-ink hover:bg-surface-2"
+                className="block w-full rounded-2xl bg-surface px-3 py-2 text-left text-ink ring-1 ring-line hover:ring-sun-line"
               >
                 {s}
               </button>
@@ -896,12 +896,13 @@ function Bubble({
     <div className={clsx("flex flex-col", you ? "items-end" : "items-start")}>
       <div
         className={clsx(
-          "rounded-2xl px-3 py-2 [overflow-wrap:anywhere]",
+          "rounded-2xl [overflow-wrap:anywhere]",
           // Theirs a notch smaller, in the pale sun with a fine warm edge, so his answers read first (5 Nov 2026, Martin).
           you
-            ? "max-w-[75%] whitespace-pre-wrap rounded-br-md bg-sun text-[13px] leading-[1.5] text-ink"
-            : "max-w-[85%] bg-canvas text-ink",
-          pinned ? "ring-2 ring-sun-line/50" : you && "ring-1 ring-sun-line/25",
+            ? "max-w-[75%] whitespace-pre-wrap rounded-br-md bg-sun px-3 py-2 text-[13px] leading-[1.5] text-ink"
+            : // His answers are white cards on the deeper ground (14 Nov 2026, Martin: more contrast in his drawer).
+              "max-w-[92%] rounded-bl-md bg-surface px-4 py-3.5 text-[14px] leading-[1.6] text-ink shadow-[0_1px_2px_rgba(20,22,26,0.05),0_6px_18px_rgba(20,22,26,0.05)]",
+          pinned ? "ring-2 ring-sun-line/50" : you ? "ring-1 ring-sun-line/30" : "ring-1 ring-line",
         )}
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}

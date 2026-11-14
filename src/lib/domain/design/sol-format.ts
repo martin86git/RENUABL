@@ -136,6 +136,57 @@ function withChoices(blocks: SolBlock[]): SolBlock[] {
   return out;
 }
 
+/** A run of one line of Sol's: plain words, or something worth setting apart. */
+export type SolRun =
+  | { kind: "text"; text: string }
+  /** Words he marked as mattering (**like this**). */
+  | { kind: "strong"; text: string }
+  /** A figure with its unit, or a dollar amount: the thing the eye is looking for. */
+  | { kind: "figure"; text: string }
+  /** A phone number to ring, with the digits to dial. */
+  | { kind: "phone"; text: string; dial: string }
+  | { kind: "email"; text: string };
+
+const RUNS = new RegExp(
+  [
+    String.raw`\*\*([^*\n]{1,200})\*\*`,
+    String.raw`([\w.+-]+@[\w-]+(?:\.[\w-]+)+)`,
+    String.raw`((?<![\d-])(?:1[38]00 ?\d{3} ?\d{3}|13 ?\d{2} ?\d{2}|0[2-478](?: ?\d){8})(?![\d-]))`,
+    String.raw`(\$\d[\d,]*(?:\.\d+)?|(?<![\w.])\d[\d,]*(?:\.\d+)?(?:–\d[\d,]*(?:\.\d+)?)? ?(?:kWh|kW|kVA|MW|mm|cm|m²|GHz|Hz|%|°C|°)(?![A-Za-z]))`,
+  ].join("|"),
+  "g",
+);
+
+/**
+ * One line of Sol's as runs to draw (14 Nov 2026, Martin: "we can do better with the text formatting"): the figures a
+ * reader is looking for (600 mm, 13.5 kWh, $1,200), the words he marked, and a phone number or email as something to
+ * press. Everything else is plain. Nothing is reworded: joined back together the runs are his words (less the ** marks).
+ */
+export function solRuns(text: string): SolRun[] {
+  const out: SolRun[] = [];
+  let at = 0;
+  for (const m of text.matchAll(RUNS)) {
+    const i = m.index ?? 0;
+    if (i > at) out.push({ kind: "text", text: text.slice(at, i) });
+    if (m[1] !== undefined) out.push({ kind: "strong", text: m[1] });
+    else if (m[2] !== undefined) out.push({ kind: "email", text: m[2].replace(/\.$/, "") });
+    else if (m[3] !== undefined) out.push({ kind: "phone", text: m[3], dial: m[3].replace(/\s+/g, "") });
+    else out.push({ kind: "figure", text: m[4] });
+    at = i + m[0].length;
+    // An address that ended a sentence gives its full stop back.
+    if (m[2] !== undefined && m[2].endsWith(".")) out.push({ kind: "text", text: "." });
+  }
+  if (at < text.length) out.push({ kind: "text", text: text.slice(at) });
+  return out;
+}
+
+/** A list item that opens with a short name and a colon ("Voc: the open-circuit voltage"), as the name and the rest. */
+export function namedItem(item: string): { name: string; rest: string } | null {
+  const m = /^(?:\*\*)?([^:*\n]{2,36}?)(?:\*\*)?:\s+(\S.*)$/.exec(item);
+  if (!m || /\d$/.test(m[1]) || m[1].split(/\s+/).length > 5) return null;
+  return { name: m[1].trim(), rest: m[2] };
+}
+
 /** Sol's words without the layout marks, for copying, quoting and team chat. */
 export function solPlain(text: string): string {
   return text

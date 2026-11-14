@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CircleHelp, CornerUpLeft, Lightbulb, PencilLine, X } from "lucide-react";
-import { isYesNoQuestion, solBlocks, type SolBlock, type SolOption } from "@/lib/domain/design/sol-format";
+import { isYesNoQuestion, namedItem, solBlocks, solRuns, type SolBlock, type SolOption } from "@/lib/domain/design/sol-format";
 
 /**
  * Answering one of Sol's questions from his message (8 Nov 2026, Martin): `answer` is the words to send at once (Yes,
@@ -21,37 +21,122 @@ export function SolText({ text, tail, onAnswer }: { text: string; tail?: React.R
   return (
     <div className="space-y-3">
       {blocks.map((b, i) => (
-        <Block key={i} block={b} tail={i === blocks.length - 1 ? tail : null} onAnswer={tail ? undefined : onAnswer} />
+        <Block
+          key={i}
+          block={b}
+          tail={i === blocks.length - 1 ? tail : null}
+          onAnswer={tail ? undefined : onAnswer}
+          // The answer comes first and reads first; a line that only introduces the list under it sits close to it.
+          lead={i === 0 && blocks.length > 1}
+          intro={b.kind === "para" && b.text.trimEnd().endsWith(":") && blocks[i + 1]?.kind === "list"}
+        />
       ))}
     </div>
   );
 }
 
-function Block({ block, tail, onAnswer }: { block: SolBlock; tail: React.ReactNode; onAnswer?: OnAnswer }) {
+/**
+ * One line of his words with what matters set apart (sol-format.ts `solRuns`): figures and marked words a weight
+ * heavier and never broken across lines, a phone number or an email as something to press.
+ */
+function Runs({ text }: { text: string }) {
+  return (
+    <>
+      {solRuns(text).map((r, i) => {
+        if (r.kind === "strong")
+          return (
+            <strong key={i} className="font-semibold text-ink">
+              {r.text}
+            </strong>
+          );
+        if (r.kind === "figure")
+          return (
+            <span key={i} className="whitespace-nowrap font-semibold text-ink">
+              {r.text}
+            </span>
+          );
+        if (r.kind === "phone")
+          return (
+            <a
+              key={i}
+              href={`tel:${r.dial}`}
+              className="whitespace-nowrap font-semibold text-ink underline decoration-sun-line/60 underline-offset-2 hover:decoration-sun-line"
+            >
+              {r.text}
+            </a>
+          );
+        if (r.kind === "email")
+          return (
+            <a
+              key={i}
+              href={`mailto:${r.text}`}
+              className="font-semibold text-ink underline decoration-sun-line/60 underline-offset-2 hover:decoration-sun-line"
+            >
+              {r.text}
+            </a>
+          );
+        return <span key={i}>{r.text}</span>;
+      })}
+    </>
+  );
+}
+
+function Block({
+  block,
+  tail,
+  onAnswer,
+  lead = false,
+  intro = false,
+}: {
+  block: SolBlock;
+  tail: React.ReactNode;
+  onAnswer?: OnAnswer;
+  lead?: boolean;
+  intro?: boolean;
+}) {
   switch (block.kind) {
     case "list":
       return (
-        <ul className="space-y-1.5">
-          {block.items.map((item, i) => (
-            <li key={i} className="flex gap-2.5">
-              <span className="mt-[0.6em] size-1.5 shrink-0 rounded-full bg-ink/55" aria-hidden />
-              <span className="min-w-0">
-                {item}
-                {i === block.items.length - 1 && tail}
-              </span>
-            </li>
-          ))}
+        <ul className="space-y-2">
+          {block.items.map((item, i) => {
+            const named = namedItem(item);
+            return (
+              <li key={i} className="flex gap-2.5">
+                <span className="mt-[0.62em] size-1.5 shrink-0 rounded-full bg-sun-line" aria-hidden />
+                <span className="min-w-0">
+                  {named ? (
+                    <>
+                      <strong className="font-semibold text-ink">{named.name}</strong>
+                      <span className="text-muted"> · </span>
+                      <Runs text={named.rest} />
+                    </>
+                  ) : (
+                    <Runs text={item} />
+                  )}
+                  {i === block.items.length - 1 && tail}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       );
     case "key":
       return (
-        <p className="flex gap-2.5 rounded-xl border-l-[3px] border-sun-line bg-sun/70 px-3 py-2.5 font-medium text-ink">
-          <Lightbulb className="mt-[0.2em] size-4 shrink-0 text-sun-line" aria-hidden />
-          <span className="min-w-0">
-            {block.text}
+        // The point that matters most, as a card of its own (14 Nov 2026, Martin: "do a better job of making them look
+        // like a feature"): named, on the warm sun, its words larger and heavier than anything round it.
+        <div className="relative overflow-hidden rounded-2xl bg-sun px-4 pb-3.5 pt-3 ring-1 ring-sun-line/30">
+          <span className="absolute inset-y-0 left-0 w-1 bg-sun-line" aria-hidden />
+          <p className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-sun-line">
+            <span className="grid size-5 place-items-center rounded-full bg-sun-line text-white">
+              <Lightbulb className="size-3" aria-hidden />
+            </span>
+            Key point
+          </p>
+          <p className="mt-1.5 text-[1.07em] font-semibold leading-snug text-ink">
+            <Runs text={block.text} />
             {tail}
-          </span>
-        </p>
+          </p>
+        </div>
       );
     case "ask":
       return (
@@ -106,8 +191,13 @@ function Block({ block, tail, onAnswer }: { block: SolBlock; tail: React.ReactNo
       );
     default:
       return (
-        <p className="whitespace-pre-line">
-          {block.text}
+        <p
+          className={
+            "whitespace-pre-line " +
+            (intro ? "-mb-1 text-[0.93em] font-semibold text-ink" : lead ? "text-[1.04em] font-medium leading-snug text-ink" : "text-ink-2")
+          }
+        >
+          <Runs text={block.text} />
           {tail}
         </p>
       );

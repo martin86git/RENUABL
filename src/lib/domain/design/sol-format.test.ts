@@ -119,3 +119,27 @@ describe("a question with options", () => {
     expect(solBlocks(sentences).map((b) => b.kind)).toEqual(["ask", "list"]);
   });
 });
+
+describe("what in a line of Sol's is set apart", () => {
+  it("finds figures, marked words, phone numbers and emails, and changes no words", async () => {
+    const { solRuns } = await import("./sol-format");
+    const line =
+      "At least 600 mm from a window, **never** below it. Ring 1800 786 476 or service@example.com.au. A 13.5 kWh battery is $1,200 and 90% usable.";
+    const runs = solRuns(line);
+    expect(runs.map((r) => r.text).join("")).toBe(line.replace(/\*\*/g, ""));
+    expect(runs.filter((r) => r.kind === "figure").map((r) => r.text)).toEqual(["600 mm", "13.5 kWh", "$1,200", "90%"]);
+    expect(runs.find((r) => r.kind === "strong")?.text).toBe("never");
+    expect(runs.find((r) => r.kind === "phone")).toMatchObject({ text: "1800 786 476", dial: "1800786476" });
+    expect(runs.find((r) => r.kind === "email")?.text).toBe("service@example.com.au");
+  });
+
+  it("leaves plain words, years and bare numbers alone", async () => {
+    const { solRuns, namedItem } = await import("./sol-format");
+    expect(solRuns("Amendment 1 (2025) changed a few things in AS/NZS 5139:2019.")).toEqual([
+      { kind: "text", text: "Amendment 1 (2025) changed a few things in AS/NZS 5139:2019." },
+    ]);
+    expect(namedItem("Voc: the open-circuit voltage")).toEqual({ name: "Voc", rest: "the open-circuit voltage" });
+    expect(namedItem("It explains more clearly how windows are treated: see the figures")).toBeNull();
+    expect(namedItem("A plain item")).toBeNull();
+  });
+});
