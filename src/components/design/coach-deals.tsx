@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowLeft, ChevronDown, Radio, Search } from "lucide-react";
+import { ArrowLeft, ChevronDown, Search, SquareKanban } from "lucide-react";
 import {
   STANDING_WORDS,
   dealGroups,
@@ -12,10 +12,9 @@ import {
   type AssistantDealCall,
   type DealStanding,
 } from "@/lib/domain/design/assistant-deals";
-import { watchAssistantCall } from "@/lib/services/assistant-call";
 import { useCallerInfo } from "@/lib/services/caller";
 import { loadAssistantDeals, loadDealCalls } from "@/lib/services/coaching";
-import { AfterCall } from "./assistant-call";
+import { AfterCall, CallInPane } from "./assistant-call";
 
 const POLL_MS = 20_000;
 const DEALS_CHANGED = "renuabl:assistant-deals";
@@ -76,10 +75,7 @@ export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: As
   const shown = searchDeals(deals ?? [], typed);
 
   return (
-    <aside
-      aria-label={`${name}'s deals`}
-      className="flex w-full shrink-0 flex-col border-line bg-canvas sm:w-[20rem] sm:border-r lg:w-[34rem]"
-    >
+    <aside aria-label={`${name}'s deals`} className="flex w-full shrink-0 flex-col bg-canvas sm:w-[var(--coach-pane)]">
       <button
         type="button"
         onClick={props.onBack}
@@ -108,12 +104,15 @@ export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: As
         />
       ) : (
         <>
-          <div className="border-b border-line px-4 py-3">
-            <p className="text-sm font-semibold text-ink">{name}&apos;s deals</p>
+          <div className="border-b border-line bg-surface px-4 py-3">
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <SquareKanban className="size-4 text-sun-line" aria-hidden />
+              {name}&apos;s deals
+            </p>
             <p className="text-xs text-muted">
               {deals ? dealsSummary(deals) : "Loading…"} · the customers {name} has rung or is about to
             </p>
-            <label className="mt-2.5 flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 ring-1 ring-line focus-within:ring-sun-line">
+            <label className="mt-2.5 flex items-center gap-2 rounded-full bg-canvas px-3 py-1.5 ring-1 ring-line focus-within:ring-sun-line">
               <Search className="size-3.5 shrink-0 text-muted" aria-hidden />
               <input
                 value={typed}
@@ -196,7 +195,7 @@ function DealOpen({ deal, onBack, actions }: { deal: AssistantDeal; onBack: () =
   const calling = deal.standing === "live" || deal.standing === "lined-up";
   return (
     <>
-      <div className="border-b border-line px-4 py-3">
+      <div className="border-b border-line bg-surface px-4 py-3">
         <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs font-medium text-ink-2 hover:text-ink">
           <ArrowLeft className="size-3.5" aria-hidden /> All of {name}&apos;s deals
         </button>
@@ -213,19 +212,21 @@ function DealOpen({ deal, onBack, actions }: { deal: AssistantDeal; onBack: () =
           <span className={clsx("size-2 rounded-full", DOT[deal.standing])} aria-hidden />
           {STANDING_WORDS[deal.standing]} · {deal.headline}
         </p>
-        {calling && (
-          <button
-            type="button"
-            onClick={() => watchAssistantCall({ jobId: deal.jobId, name: deal.customer, message: deal.headline })}
-            className="tap-area mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-ink ring-1 ring-line hover:ring-sun-line"
-          >
-            <Radio className="size-3.5 text-sun-line" aria-hidden />
-            {deal.standing === "live" ? "Watch the call live" : "Open the call's window"}
-          </button>
-        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        {/* The call on now or lined up, here in the pane (Martin: part of the chat, not a window of its own). */}
+        {calling && (
+          <CallInPane
+            jobId={deal.jobId}
+            customer={first}
+            waiting={`${name} ${deal.headline.charAt(0).toLowerCase()}${deal.headline.slice(1)} · in calling hours`}
+            onEnded={() => window.dispatchEvent(new Event(DEALS_CHANGED))}
+          />
+        )}
+        {calls && calls.length > 0 && (
+          <p className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-ink-2">Earlier calls</p>
+        )}
         {failed && <p className="px-1 text-xs text-danger">{failed}</p>}
         {!calls && !failed && <p className="px-1 text-xs text-muted">Loading {name}&apos;s calls…</p>}
         {calls && calls.length === 0 && (
@@ -278,7 +279,7 @@ function DealOpen({ deal, onBack, actions }: { deal: AssistantDeal; onBack: () =
           ))}
         </ul>
       </div>
-      <div className="bg-surface">{actions}</div>
+      <div className="border-t border-line bg-surface">{actions}</div>
     </>
   );
 }
