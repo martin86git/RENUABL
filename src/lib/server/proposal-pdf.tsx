@@ -397,6 +397,9 @@ function ProposalDocument({
     "custom-1": () => null,
     "custom-2": () => null,
     "custom-3": () => null,
+    "custom-4": () => null,
+    "custom-5": () => null,
+    "custom-6": () => null,
     accept: () => (
       <View wrap={false}>
         {accepted ? (

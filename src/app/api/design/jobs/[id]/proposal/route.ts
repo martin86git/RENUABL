@@ -3,6 +3,8 @@ import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-c
 import { jobById } from "@/lib/server/design-crm-repo";
 import { workOutProposal } from "@/lib/server/design-proposal";
 import { NO_DESIGN, proposalVersions, publishProposal, withdrawProposal } from "@/lib/server/design-proposal-repo";
+import { CUSTOM_NEEDS_ADD_ON } from "@/lib/domain/design/custom-proposals";
+import { customProposalsAllowed } from "@/lib/server/design-addons";
 
 // Each option on offer is priced in full; with several out, leave room (Primero, 5 Nov 2026: a third wouldn't publish).
 export const maxDuration = 60;
@@ -46,6 +48,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
         { ok: false, message: "The design has been saved again since this preview. Look at the new preview before sending it." },
         { status: 409 },
       );
+    // A design of the business's own is the paid add-on (once it is priced and billing is enforced).
+    if (worked.saved.brand.design === "custom" && !(await customProposalsAllowed(who.member.businessId)))
+      return Response.json({ ok: false, message: CUSTOM_NEEDS_ADD_ON }, { status: 402 });
     const kept = await publishProposal(who.member.businessId, id, worked.built, who.member.email);
     if (!kept) return notFound();
     if (kept === "raced")

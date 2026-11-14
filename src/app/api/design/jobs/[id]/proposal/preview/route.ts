@@ -1,6 +1,7 @@
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { workOutProposal } from "@/lib/server/design-proposal";
 import { NO_DESIGN } from "@/lib/server/design-proposal-repo";
+import { customProposalsAllowed } from "@/lib/server/design-addons";
 
 /**
  * POST { template, validDays, note }: the proposal as it would go out now,
@@ -26,6 +27,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       problems: built.ok ? [] : built.problems,
       choice,
       projectVersion: saved.project.version,
+      // Whether a custom design may be published now (the builder says so before anyone publishes).
+      customAllowed: await customProposalsAllowed(who.member.businessId),
       // Whether Sol answers this business's customers: the indicative message says so when he does.
       assistant: saved.brand.solAnswers,
     });

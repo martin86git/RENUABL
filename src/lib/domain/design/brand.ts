@@ -7,7 +7,7 @@
  * A proposal goes to the business's customer under the business's name, not
  * RENUABL's. Nothing here is RENUABL's brand.
  */
-import { cleanBlocks, defaultBlocks, type BlockSetting } from "./blocks";
+import { blocksAreUsual, cleanBlocks, defaultBlocks, type BlockSetting } from "./blocks";
 import type { Cleaned } from "./crm";
 
 // ---------------------------------------------------------------------------
@@ -250,6 +250,22 @@ export function themeVars(theme: Pick<BrandKit, "palette" | "primary" | "accent"
   };
 }
 
+/**
+ * A block on the dark ground (`BlockTone` "dark"): the page's own ink as its ground, its words in the page's light,
+ * so a dark block belongs to the business's palette. The same tokens, set again inside the block.
+ */
+export function darkGroundVars(theme: Pick<BrandKit, "palette">): Record<string, string> {
+  const page = PALETTES.find((p) => p.id === theme.palette) ?? PALETTES[0];
+  return {
+    "--block-ground": page.ink,
+    "--ink": page.surface,
+    "--ink-2": page.surface,
+    "--muted": "rgba(255, 255, 255, 0.68)",
+    "--line": "rgba(255, 255, 255, 0.16)",
+    "--surface": "rgba(255, 255, 255, 0.06)",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // The brand kit
 // ---------------------------------------------------------------------------
@@ -312,12 +328,20 @@ export interface BrandKit {
   netccApproved: boolean;
   /** The proposal's blocks: which show, in what order, with what heading, words and picture. */
   blocks: BlockSetting[];
+  /**
+   * Which design its proposals are published with (15 Nov 2026, Martin): the standard one (the template, the logo, the
+   * cover photo and colours, every block in its usual place) or its own, built in the proposal builder (`blocks`).
+   */
+  design: ProposalDesign;
   template: TemplateId;
   palette: PaletteId;
   primary: string;
   accent: string;
   validDays: (typeof VALID_DAYS)[number];
 }
+
+export const PROPOSAL_DESIGNS = ["standard", "custom"] as const;
+export type ProposalDesign = (typeof PROPOSAL_DESIGNS)[number];
 
 /** What a business starts with: its account's name, and plain colours until it picks its own. */
 export function defaultBrand(businessName: string): BrandKit {
@@ -352,6 +376,7 @@ export function defaultBrand(businessName: string): BrandKit {
     chart: "bars",
     netccApproved: false,
     blocks: defaultBlocks(),
+    design: "standard",
     template: "classic",
     palette: "paper",
     primary: "#16181d",
@@ -625,6 +650,7 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
       chart: CHART_STYLES.some((c) => c.id === r.chart) ? (r.chart as ChartStyle) : current.chart,
       netccApproved: typeof r.netccApproved === "boolean" ? r.netccApproved : current.netccApproved,
       blocks: sent("blocks") ? cleanBlocks(r.blocks) : current.blocks,
+      design: PROPOSAL_DESIGNS.includes(r.design as ProposalDesign) ? (r.design as ProposalDesign) : current.design,
       template: TEMPLATES.some((t) => t.id === r.template) ? (r.template as TemplateId) : current.template,
       palette: PALETTES.some((p) => p.id === r.palette) ? (r.palette as PaletteId) : current.palette,
       primary,
@@ -646,7 +672,10 @@ export function readBrandKit(saved: unknown, businessName: string): BrandKit {
   const cleaned = cleanBrandKit(!ownTerms && bag.terms === "own" ? { ...bag, terms: "standard" } : saved, start);
   if (!cleaned.ok) return start;
   // A kit saved before blocks could be arranged has none: it gets the usual ones (`cleanBlocks` fills in any that are missing).
-  return { ...cleaned.value, blocks: cleanBlocks(cleaned.value.blocks) };
+  const blocks = cleanBlocks(cleaned.value.blocks);
+  // A kit saved before the builder, with blocks arranged in the old customiser, keeps its arrangement as its own design.
+  const design = bag.design === undefined && !blocksAreUsual(blocks) ? "custom" : cleaned.value.design;
+  return { ...cleaned.value, blocks, design };
 }
 
 // ---------------------------------------------------------------------------

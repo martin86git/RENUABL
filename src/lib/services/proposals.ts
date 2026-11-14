@@ -89,10 +89,14 @@ export const loadProposal = (jobId: string) => ask<{ versions: ProposalStatus[] 
  * `publishProposal`, so exactly what was previewed is what is published.
  */
 export const previewProposal = (jobId: string, choice: Partial<ProposalChoice>) =>
-  ask<{ view: ProposalView | null; problems: string[]; choice: ProposalChoice | null; projectVersion: number | null; assistant?: boolean }>(
-    `${jobProposal(jobId)}/preview`,
-    { method: "POST", body: choice },
-  );
+  ask<{
+    view: ProposalView | null;
+    problems: string[];
+    choice: ProposalChoice | null;
+    projectVersion: number | null;
+    assistant?: boolean;
+    customAllowed?: boolean;
+  }>(`${jobProposal(jobId)}/preview`, { method: "POST", body: choice });
 
 export const publishProposal = (jobId: string, choice: Partial<ProposalChoice> & { projectVersion: number }) =>
   ask<{ proposal: ProposalStatus; versions: ProposalStatus[]; job: Job }>(jobProposal(jobId), { method: "POST", body: choice });

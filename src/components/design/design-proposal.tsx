@@ -39,6 +39,7 @@ import { useDesignAccount } from "./design-account";
 import { DepositLine } from "./deposit-panel";
 import { ChartThumb, TemplateThumb } from "./proposal-thumbs";
 import { ProposalPage } from "./proposal-view";
+import { BuilderPanel, useProposalBuilder } from "./proposal-builder";
 
 const STATE_WORDS: Record<ProposalState, string> = {
   live: "With the customer",
@@ -222,6 +223,9 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   const mayMark = Boolean(account?.signedIn && (account.may?.publish ?? true));
   const [sending, setSending] = useState(false);
   const [assistant, setAssistant] = useState(false);
+  // The builder (15 Nov 2026, Martin): off until turned on, since a proposal is usually sent as it is.
+  const [building, setBuilding] = useState(false);
+  const [customAllowed, setCustomAllowed] = useState(true);
   // The preview's conversation: empty, taking nothing, so the business sees where its message will show.
   const previewChat = useCustomerChat({ business: view?.business.name ?? "", phone: view?.business.phone });
 
@@ -238,6 +242,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
       setProblems(res.problems);
       setProjectVersion(res.projectVersion);
       setAssistant(Boolean(res.assistant));
+      setCustomAllowed(res.customAllowed !== false);
       if (res.choice) setChoice((current) => ({ ...res.choice, ...current }));
     },
     [jobId],
@@ -277,6 +282,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
     setStatus({ text: "Withdrawn." });
   };
   const out = latest && latest.state !== "withdrawn";
+  const builder = useProposalBuilder(building, view, setView, () => void refresh(choice));
 
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
@@ -287,9 +293,13 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
           </Link>
           <div>
             <p className={ui.eyebrow}>Proposal</p>
-            <h1 className="mt-1 text-[20px] leading-snug tracking-tight text-ink">Preview and send</h1>
+            <h1 className="mt-1 text-[20px] leading-snug tracking-tight text-ink">
+              {building ? "Build your proposal" : "Preview and send"}
+            </h1>
             <p className="mt-1.5 text-xs leading-relaxed text-muted">
-              Worked out from the saved design, the customer&apos;s bill and your prices. Your costs and margin are never in it.
+              {building
+                ? "Changes are saved for your proposals from now on. A proposal already sent stays as it was until you publish again."
+                : "Worked out from the saved design, the customer's bill and your prices. Your costs and margin are never in it."}
             </p>
           </div>
 
@@ -315,123 +325,129 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
             </div>
           )}
 
-          <fieldset>
-            <legend className={ui.label}>What it is</legend>
-            <div className="mt-1.5 space-y-1.5" role="radiogroup">
-              {[
-                {
-                  on: true,
-                  name: "Indicative",
-                  blurb: "For a new lead: the systems to compare, their thoughts in the chat, then a site visit. It can't be accepted.",
-                },
-                {
-                  on: false,
-                  name: "Final",
-                  blurb: "After the site visit: the customer can accept it, with your payment terms and conditions.",
-                },
-              ].map((kind) => (
-                <label
-                  key={kind.name}
-                  className={clsx(
-                    "flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2.5",
-                    Boolean(choice.indicative) === kind.on ? "border-ink bg-surface-2" : "border-line hover:border-line-strong",
-                  )}
+          {building ? (
+            <BuilderPanel builder={builder} customAllowed={customAllowed} />
+          ) : (
+            <>
+              <fieldset>
+                <legend className={ui.label}>What it is</legend>
+                <div className="mt-1.5 space-y-1.5" role="radiogroup">
+                  {[
+                    {
+                      on: true,
+                      name: "Indicative",
+                      blurb: "For a new lead: the systems to compare, their thoughts in the chat, then a site visit. It can't be accepted.",
+                    },
+                    {
+                      on: false,
+                      name: "Final",
+                      blurb: "After the site visit: the customer can accept it, with your payment terms and conditions.",
+                    },
+                  ].map((kind) => (
+                    <label
+                      key={kind.name}
+                      className={clsx(
+                        "flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2.5",
+                        Boolean(choice.indicative) === kind.on ? "border-ink bg-surface-2" : "border-line hover:border-line-strong",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="kind"
+                        className="mt-1 accent-[var(--primary)]"
+                        checked={Boolean(choice.indicative) === kind.on}
+                        onChange={() => change({ indicative: kind.on })}
+                      />
+                      <span>
+                        <span className="block text-sm font-medium text-ink">{kind.name}</span>
+                        <span className="block text-xs text-muted">{kind.blurb}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend className={ui.label}>Template</legend>
+                <div className="mt-1.5 space-y-1.5">
+                  {TEMPLATES.map((t) => (
+                    <label
+                      key={t.id}
+                      className={clsx(
+                        "flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2.5",
+                        choice.template === t.id ? "border-ink bg-surface-2" : "border-line hover:border-line-strong",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="template"
+                        className="sr-only"
+                        checked={choice.template === t.id}
+                        onChange={() => change({ template: t.id })}
+                      />
+                      {view && (
+                        <span className="w-12 shrink-0">
+                          <TemplateThumb template={t.id} theme={view.theme} />
+                        </span>
+                      )}
+                      <span>
+                        <span className="block text-sm font-medium text-ink">{t.name}</span>
+                        <span className="block text-xs text-muted">{t.blurb}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <label className={ui.label}>
+                The price stands for
+                <select
+                  className={clsx(ui.input, "mt-1.5 appearance-auto")}
+                  value={choice.validDays ?? ""}
+                  onChange={(e) => change({ validDays: Number(e.target.value) as ProposalChoice["validDays"] })}
                 >
-                  <input
-                    type="radio"
-                    name="kind"
-                    className="mt-1 accent-[var(--primary)]"
-                    checked={Boolean(choice.indicative) === kind.on}
-                    onChange={() => change({ indicative: kind.on })}
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-ink">{kind.name}</span>
-                    <span className="block text-xs text-muted">{kind.blurb}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+                  {VALID_DAYS.map((d) => (
+                    <option key={d} value={d}>
+                      {d} days
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          <fieldset>
-            <legend className={ui.label}>Template</legend>
-            <div className="mt-1.5 space-y-1.5">
-              {TEMPLATES.map((t) => (
-                <label
-                  key={t.id}
-                  className={clsx(
-                    "flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-2.5",
-                    choice.template === t.id ? "border-ink bg-surface-2" : "border-line hover:border-line-strong",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="template"
-                    className="sr-only"
-                    checked={choice.template === t.id}
-                    onChange={() => change({ template: t.id })}
-                  />
-                  {view && (
-                    <span className="w-12 shrink-0">
-                      <TemplateThumb template={t.id} theme={view.theme} />
-                    </span>
-                  )}
-                  <span>
-                    <span className="block text-sm font-medium text-ink">{t.name}</span>
-                    <span className="block text-xs text-muted">{t.blurb}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+              <label className={ui.label}>
+                A note to the customer (optional)
+                <textarea
+                  className={clsx(ui.input, "mt-1.5 min-h-24 py-2")}
+                  maxLength={1200}
+                  value={choice.note ?? ""}
+                  onChange={(e) => change({ note: e.target.value })}
+                />
+              </label>
 
-          <label className={ui.label}>
-            The price stands for
-            <select
-              className={clsx(ui.input, "mt-1.5 appearance-auto")}
-              value={choice.validDays ?? ""}
-              onChange={(e) => change({ validDays: Number(e.target.value) as ProposalChoice["validDays"] })}
-            >
-              {VALID_DAYS.map((d) => (
-                <option key={d} value={d}>
-                  {d} days
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className={ui.label}>
-            A note to the customer (optional)
-            <textarea
-              className={clsx(ui.input, "mt-1.5 min-h-24 py-2")}
-              maxLength={1200}
-              value={choice.note ?? ""}
-              onChange={(e) => change({ note: e.target.value })}
-            />
-          </label>
-
-          <button
-            type="button"
-            className={clsx(ui.primary, "w-full")}
-            disabled={busy || !view || projectVersion === null}
-            onClick={() => void publish()}
-          >
-            {busy
-              ? "Publishing…"
-              : out
-                ? latest.openedAt || latest.acceptedAt
-                  ? "Publish a new version"
-                  : "Publish these changes"
-                : "Publish"}
-          </button>
-          <p className="text-xs leading-relaxed text-muted">
-            Publishing keeps a fixed copy at a private link. Nothing goes to the customer until you press Send to customer. Colours, logo
-            and wording come from{" "}
-            <Link href={PATHS.brand} className={ui.link}>
-              your proposal branding
-            </Link>
-            .
-          </p>
+              <button
+                type="button"
+                className={clsx(ui.primary, "w-full")}
+                disabled={busy || !view || projectVersion === null}
+                onClick={() => void publish()}
+              >
+                {busy
+                  ? "Publishing…"
+                  : out
+                    ? latest.openedAt || latest.acceptedAt
+                      ? "Publish a new version"
+                      : "Publish these changes"
+                    : "Publish"}
+              </button>
+              <p className="text-xs leading-relaxed text-muted">
+                Publishing keeps a fixed copy at a private link. Nothing goes to the customer until you press Send to customer. Colours,
+                logo and wording come from{" "}
+                <Link href={PATHS.brand} className={ui.link}>
+                  your proposal branding
+                </Link>
+                .
+              </p>
+            </>
+          )}
 
           {latest && (
             <div className="space-y-2.5 border-t border-line pt-4">
@@ -483,9 +499,38 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
       </aside>
 
       <div className="min-w-0 flex-1 bg-surface-2 p-3 sm:p-6">
+        {/* Preview or Builder: the builder is turned on, never on by itself. */}
+        <div className="sticky top-3 z-40 mx-auto mb-4 flex w-fit items-center gap-1 rounded-full bg-surface p-1 shadow-[var(--shadow-lift)] ring-1 ring-line">
+          {(
+            [
+              [false, "Preview"],
+              [true, "Builder"],
+            ] as const
+          ).map(([on, name]) => (
+            <button
+              key={name}
+              type="button"
+              aria-pressed={building === on}
+              onClick={() => setBuilding(on)}
+              className={clsx(
+                "rounded-full px-4 py-1.5 text-sm font-medium",
+                building === on ? (on ? "bg-sun-line text-white" : "bg-ink text-white") : "text-ink-2 hover:text-ink",
+              )}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
         {view ? (
-          <div className="mx-auto max-w-4xl overflow-hidden rounded-lg shadow-[var(--shadow-lift)] ring-1 ring-line">
+          <div
+            className={clsx(
+              "mx-auto max-w-4xl rounded-lg shadow-[var(--shadow-lift)] ring-1",
+              // The builder's tools sit just outside each block, so the page doesn't clip them; and it is ringed in the signal colour.
+              building ? "ring-2 ring-sun-line/50" : "overflow-hidden ring-line",
+            )}
+          >
             <ProposalPage
+              build={building && builder.ready ? builder.hooks : undefined}
               view={view}
               state="live"
               accepted={null}

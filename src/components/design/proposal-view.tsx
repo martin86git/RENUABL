@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Download, FileText } from "lucide-react";
-import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
-import { lookOf, lookVars, shownAbn, shownBsb, shownWebsite, themeVars, type ChartStyle } from "@/lib/domain/design/brand";
+import { blockHeading, isCustom, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
+import { darkGroundVars, lookOf, lookVars, shownAbn, shownBsb, shownWebsite, themeVars, type ChartStyle } from "@/lib/domain/design/brand";
 import {
   BANK_NOTE,
   FEEDBACK_MISSING,
@@ -695,6 +695,18 @@ export interface ProposalPageProps {
   choice?: { chosen: OptionKey | null; onChoose?: (goal: OptionKey) => void };
   /** Opens the chat dock: the thank you after an indicative proposal's thoughts are sent offers it. */
   onOpenChat?: () => void;
+  /**
+   * The proposal builder (the business's preview with Builder on): each block, the cover and the logo handed to it to
+   * be framed with its tools and drop zones, and an own block with nothing in it yet shown as a place to fill.
+   */
+  build?: BuildHooks;
+}
+
+/** What the proposal builder wraps round the page's parts. */
+export interface BuildHooks {
+  block: (block: ViewBlock, node: React.ReactNode) => React.ReactNode;
+  cover: (node: React.ReactNode) => React.ReactNode;
+  logo: (node: React.ReactNode) => React.ReactNode;
 }
 
 /**
@@ -715,7 +727,19 @@ export interface ProposalPageProps {
  * the design tool's monospace face, and the preview must look as the
  * customer's page does.
  */
-export function ProposalPage({ view, state, accepted, urls, actions, greeting, chat, deposit, choice, onOpenChat }: ProposalPageProps) {
+export function ProposalPage({
+  view,
+  state,
+  accepted,
+  urls,
+  actions,
+  greeting,
+  chat,
+  deposit,
+  choice,
+  onOpenChat,
+  build,
+}: ProposalPageProps) {
   const b = view.business;
   const look = lookOf(view.template);
   const bold = look.cover === "colour";
@@ -961,6 +985,9 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
     "custom-1": () => null,
     "custom-2": () => null,
     "custom-3": () => null,
+    "custom-4": () => null,
+    "custom-5": () => null,
+    "custom-6": () => null,
     accept: () => (
       <>
         {view.indicative ? (
@@ -1040,16 +1067,42 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
   };
 
   const cover = blocks.find((block) => block.id === "cover");
-  /** A block's own words and picture, as the business set them in the customiser. */
-  const own = (block: ViewBlock) => (
-    <>
-      {block.words && <p className="max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-ink">{block.words}</p>}
-      {block.image && (
-        // eslint-disable-next-line @next/next/no-img-element -- as above
-        <img src={urls.image(block.image.id)} alt="" loading="lazy" className="mt-4 max-h-[26rem] w-full rounded-xl object-cover" />
-      )}
-    </>
-  );
+  /**
+   * A block's own words and picture, as the business set them: the picture across the block under the words, or beside
+   * them on the left or the right (above them on a phone). In the builder an own block with nothing yet is a place to fill.
+   */
+  const own = (block: ViewBlock) => {
+    const words = block.words && <p className="max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-ink">{block.words}</p>;
+    const picture = block.image && (
+      // eslint-disable-next-line @next/next/no-img-element -- as above
+      <img
+        src={urls.image(block.image.id)}
+        alt=""
+        loading="lazy"
+        className={clsx("w-full rounded-xl object-cover", block.layout && block.layout !== "stack" ? "aspect-[4/3]" : "max-h-[26rem]")}
+      />
+    );
+    if (!words && !picture)
+      return build && isCustom(block.id) ? (
+        <p className="rounded-xl border border-dashed border-line px-5 py-10 text-center text-[14px] text-muted">
+          Write something here, or drop a picture on it.
+        </p>
+      ) : null;
+    if (words && picture && block.layout && block.layout !== "stack")
+      return (
+        <div className="grid items-center gap-5 sm:grid-cols-2 sm:gap-8">
+          <div className={clsx(block.layout === "right" && "sm:order-2")}>{picture}</div>
+          <div>{words}</div>
+        </div>
+      );
+    return (
+      <>
+        {words}
+        {picture && <div className={words ? "mt-4" : undefined}>{picture}</div>}
+      </>
+    );
+  };
+  const framed = (block: ViewBlock, node: React.ReactNode) => (build ? build.block(block, node) : node);
 
   return (
     <div
@@ -1057,74 +1110,78 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
       className="min-h-dvh bg-canvas text-ink [color-scheme:light]"
     >
       <header className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-5 sm:px-8">
-        {b.logo ? (
-          // eslint-disable-next-line @next/next/no-img-element -- the business's own picture, served by our own route at the size it was kept
-          <img src={urls.image(b.logo.id)} alt={b.name} className="h-10 w-auto max-w-[200px] object-contain object-left" />
-        ) : (
-          <span className="text-[18px] font-semibold tracking-tight text-ink">{b.name}</span>
+        {(build ? build.logo : (node: React.ReactNode) => node)(
+          b.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- the business's own picture, served by our own route at the size it was kept
+            <img src={urls.image(b.logo.id)} alt={b.name} className="h-10 w-auto max-w-[200px] object-contain object-left" />
+          ) : (
+            <span className="text-[18px] font-semibold tracking-tight text-ink">{b.name}</span>
+          ),
         )}
         <span className="text-[13px] text-muted">{contact.join(" · ")}</span>
       </header>
 
       <main className="mx-auto w-full max-w-4xl space-y-12 px-5 pb-20 sm:px-8">
         {/* How it opens: the one place the templates differ. Always first, whatever order the rest is in. */}
-        <section aria-label="Proposal">
-          {look.cover === "colour" ? (
-            <div className="rounded-2xl bg-primary px-6 py-12 sm:px-10 sm:py-16">{title}</div>
-          ) : look.cover === "split" ? (
-            // The photo (or a block of the main colour without one) beside the title, side by side on a wide screen.
-            <div className="grid items-stretch gap-6 sm:grid-cols-2 sm:gap-10">
-              {b.cover ? (
-                // eslint-disable-next-line @next/next/no-img-element -- as above
-                <img
-                  src={urls.image(b.cover.id)}
-                  alt=""
-                  className="aspect-[4/3] h-full w-full rounded-2xl object-cover sm:aspect-auto sm:min-h-72"
-                />
-              ) : (
-                <div className="aspect-[4/3] rounded-2xl bg-primary sm:aspect-auto sm:min-h-72" aria-hidden />
-              )}
-              <div className="flex flex-col justify-center">{title}</div>
-            </div>
-          ) : look.cover === "plain" ? (
-            <div className="border-b border-line pb-10 pt-6 sm:pt-12">{title}</div>
-          ) : (
-            <>
-              {look.cover === "photo" && b.cover && (
-                // eslint-disable-next-line @next/next/no-img-element -- as above
-                <img src={urls.image(b.cover.id)} alt="" className="mb-8 aspect-[21/9] w-full rounded-2xl object-cover" />
-              )}
-              {title}
-            </>
-          )}
-          {b.tagline && !bold && <p className="mt-2 text-[15px] text-ink">{b.tagline}</p>}
-          {greeting && <div className="mt-6">{greeting}</div>}
-          {view.note && <p className="mt-6 max-w-2xl whitespace-pre-line text-[16px] leading-relaxed text-ink">{view.note}</p>}
-          {cover && (cover.words || cover.image) && <div className="mt-6">{own(cover)}</div>}
-          {hero && <div className="mt-8">{hero.kind === "roof" ? roofPicture(hero) : <BatteryDay hero={hero} />}</div>}
-          {view.indicative && (
-            <div className="mt-8">
-              <p className="max-w-2xl text-[16px] leading-relaxed text-ink">{INDICATIVE_INTRO}</p>
-              <div className="mt-4">
-                <HowWeWork />
+        {(build ? build.cover : (node: React.ReactNode) => node)(
+          <section aria-label="Proposal">
+            {look.cover === "colour" ? (
+              <div className="rounded-2xl bg-primary px-6 py-12 sm:px-10 sm:py-16">{title}</div>
+            ) : look.cover === "split" ? (
+              // The photo (or a block of the main colour without one) beside the title, side by side on a wide screen.
+              <div className="grid items-stretch gap-6 sm:grid-cols-2 sm:gap-10">
+                {b.cover ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- as above
+                  <img
+                    src={urls.image(b.cover.id)}
+                    alt=""
+                    className="aspect-[4/3] h-full w-full rounded-2xl object-cover sm:aspect-auto sm:min-h-72"
+                  />
+                ) : (
+                  <div className="aspect-[4/3] rounded-2xl bg-primary sm:aspect-auto sm:min-h-72" aria-hidden />
+                )}
+                <div className="flex flex-col justify-center">{title}</div>
               </div>
-            </div>
-          )}
-          <div className="mt-8">
-            <Headline view={view} />
-          </div>
-          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-            <p className={fine}>The price stands until {day(view.validUntil)}.</p>
-            {urls.pdf && (
-              <a
-                href={urls.pdf}
-                className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-ink underline underline-offset-4"
-              >
-                <Download className="size-4" aria-hidden /> Download as a PDF
-              </a>
+            ) : look.cover === "plain" ? (
+              <div className="border-b border-line pb-10 pt-6 sm:pt-12">{title}</div>
+            ) : (
+              <>
+                {look.cover === "photo" && b.cover && (
+                  // eslint-disable-next-line @next/next/no-img-element -- as above
+                  <img src={urls.image(b.cover.id)} alt="" className="mb-8 aspect-[21/9] w-full rounded-2xl object-cover" />
+                )}
+                {title}
+              </>
             )}
-          </div>
-        </section>
+            {b.tagline && !bold && <p className="mt-2 text-[15px] text-ink">{b.tagline}</p>}
+            {greeting && <div className="mt-6">{greeting}</div>}
+            {view.note && <p className="mt-6 max-w-2xl whitespace-pre-line text-[16px] leading-relaxed text-ink">{view.note}</p>}
+            {cover && (cover.words || cover.image) && <div className="mt-6">{own(cover)}</div>}
+            {hero && <div className="mt-8">{hero.kind === "roof" ? roofPicture(hero) : <BatteryDay hero={hero} />}</div>}
+            {view.indicative && (
+              <div className="mt-8">
+                <p className="max-w-2xl text-[16px] leading-relaxed text-ink">{INDICATIVE_INTRO}</p>
+                <div className="mt-4">
+                  <HowWeWork />
+                </div>
+              </div>
+            )}
+            <div className="mt-8">
+              <Headline view={view} />
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+              <p className={fine}>The price stands until {day(view.validUntil)}.</p>
+              {urls.pdf && (
+                <a
+                  href={urls.pdf}
+                  className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-ink underline underline-offset-4"
+                >
+                  <Download className="size-4" aria-hidden /> Download as a PDF
+                </a>
+              )}
+            </div>
+          </section>,
+        )}
 
         {/* With a choice of systems: the options side by side, the one chosen showing below. */}
         {view.options && view.options.length > 1 && <ChooseSystem view={view} choice={choice} locked={state === "accepted"} />}
@@ -1133,7 +1190,7 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
         {blocks
           .filter((block) => block.id !== "cover")
           .map((block) => ({ block, inner: content[block.id](), hasOwn: Boolean(block.words || block.image) }))
-          .filter(({ inner, hasOwn }) => inner || hasOwn)
+          .filter(({ block, inner, hasOwn }) => inner || hasOwn || (build && isCustom(block.id)))
           .map(({ block, inner, hasOwn }, i) => {
             // On an indicative proposal the business's "going ahead" block asks for their thoughts instead.
             const heading =
@@ -1141,11 +1198,17 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
                 ? "Your thoughts"
                 : blockHeading(block, block.id === "about" ? `About ${b.name}` : "");
             const side = look.headings === "side";
-            return (
+            const dark = block.tone === "dark";
+            return framed(
+              block,
               <section
                 key={block.id}
                 aria-label={heading || undefined}
-                className={clsx(side && "sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-8")}
+                style={dark ? ({ ...darkGroundVars(view.theme), background: "var(--block-ground)" } as React.CSSProperties) : undefined}
+                className={clsx(
+                  side && "sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-8",
+                  dark && "rounded-2xl px-6 py-8 sm:px-10 sm:py-12",
+                )}
               >
                 {heading && (
                   <h2 className={clsx(h2, side && "sm:sticky sm:top-6 sm:self-start sm:text-[20px]")}>
@@ -1158,10 +1221,10 @@ export function ProposalPage({ view, state, accepted, urls, actions, greeting, c
                   </h2>
                 )}
                 <div className={clsx(heading && !side && "mt-4", heading && side && "mt-4 sm:mt-0")}>
-                  {hasOwn && own(block)}
+                  {own(block)}
                   {inner && <div className={hasOwn ? "mt-4" : undefined}>{inner}</div>}
                 </div>
-              </section>
+              </section>,
             );
           })}
       </main>

@@ -464,6 +464,14 @@ create table if not exists design_walkthroughs (
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
 create index if not exists design_walkthroughs_job on design_walkthroughs (business_id, job_id, created_at desc);
+-- The add-ons a business has on its plan (custom proposals first): one row an add-on, ended rather than deleted.
+create table if not exists design_addons (
+  business_id text not null references businesses(id) on delete cascade,
+  add_on text not null,
+  since timestamptz not null default now(),
+  ended_at timestamptz,
+  primary key (business_id, add_on)
+);
 -- Each walkthrough's own private link (/w/<token>), what a text to the customer carries.
 alter table design_walkthroughs add column if not exists share_token text unique;
 -- The private link to a job's pickup slip (domain/design/pickup-slip.ts): what the installer shows at the wholesaler's

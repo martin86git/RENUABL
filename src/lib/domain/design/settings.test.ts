@@ -207,7 +207,7 @@ describe("the proposal's blocks", () => {
   it("start as the usual ones on, in the usual order, the business's own three off", () => {
     const blocks = defaultBlocks();
     expect(blocks.map((b) => b.id)).toEqual(BLOCKS.map((b) => b.id));
-    expect(blocks.filter((b) => !b.on).map((b) => b.id)).toEqual(["custom-1", "custom-2", "custom-3"]);
+    expect(blocks.filter((b) => !b.on).map((b) => b.id)).toEqual(["custom-1", "custom-2", "custom-3", "custom-4", "custom-5", "custom-6"]);
     expect(blocks[0].id).toBe("cover");
   });
   it("are always made whole: each block once, the cover first, the ones a customer must see always on", () => {
@@ -226,7 +226,15 @@ describe("the proposal's blocks", () => {
     expect(blocks).toHaveLength(BLOCKS.length);
     expect(new Set(blocks.map((b) => b.id)).size).toBe(BLOCKS.length);
     expect(blocks[0]).toMatchObject({ id: "cover", on: true });
-    expect(blocks[1]).toEqual({ id: "price", on: true, heading: "The investment", words: "Line one\n\nLine two", image: null });
+    expect(blocks[1]).toEqual({
+      id: "price",
+      on: true,
+      heading: "The investment",
+      words: "Line one\n\nLine two",
+      image: null,
+      layout: "stack",
+      tone: "light",
+    });
     for (const id of ["price", "accept", "conditions", "cover"] as const) expect(blocks.find((b) => b.id === id)?.on).toBe(true);
     expect(blocks.find((b) => b.id === "system")).toMatchObject({ on: false, image: "img_0000000000000000000000aa" });
     expect(blocks.find((b) => b.id === "roof")).toMatchObject({ on: true, image: null });
@@ -321,7 +329,8 @@ describe("a proposal with the business's terms and blocks", () => {
       // A picture that isn't one of the business's block pictures (here, its logo) isn't carried.
       { id: "system", image: SAMPLE_IMAGES[0].id },
     ]);
-    const { view } = built({ blocks }, [...SAMPLE_IMAGES, picture]);
+    // The business's own arrangement is its custom design (the standard one keeps every block in its usual place).
+    const { view } = built({ blocks, design: "custom" }, [...SAMPLE_IMAGES, picture]);
     const ids = view.blocks!.map((b) => b.id);
     expect(ids.slice(0, 4)).toEqual(["cover", "price", "custom-1", "system"]);
     expect(ids).not.toContain("roof");

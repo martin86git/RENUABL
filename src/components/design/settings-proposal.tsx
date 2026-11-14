@@ -65,7 +65,7 @@ const TITLES: Record<ProposalPart, { title: string; intro: string }> = {
   customiser: {
     title: "Proposal customiser",
     intro:
-      "The blocks your proposals are made of. Switch a block on or off, move it up or down, and give it your own heading, words and a picture. The page your customer opens and the PDF both follow this.",
+      "The blocks your proposals are made of. Switch a block on or off, move it up or down, and give it your own heading, words and a picture. Changing them here gives your proposals a custom design. The easier way is the Builder on any deal's proposal, where you drag and drop on the page itself.",
   },
 };
 
@@ -757,7 +757,7 @@ function Customiser({
   const file = useRef<HTMLInputElement>(null);
   const target = useRef<string | null>(null);
   const change = (id: string, patch: Partial<BlockSetting>) =>
-    void save({ blocks: blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) });
+    void save({ design: "custom", blocks: blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) });
 
   const upload = async (picked: File) => {
     const id = target.current;
@@ -828,7 +828,7 @@ function Customiser({
                     className="flex size-9 items-center justify-center rounded-md text-ink-2 hover:bg-surface-2 disabled:text-line-strong disabled:hover:bg-transparent"
                     aria-label={`Move ${kind.name} up`}
                     disabled={i <= 1 || isFixed(block.id)}
-                    onClick={() => void save({ blocks: moveBlock(blocks, block.id, -1) })}
+                    onClick={() => void save({ design: "custom", blocks: moveBlock(blocks, block.id, -1) })}
                   >
                     <ArrowUp className="size-4" aria-hidden />
                   </button>
@@ -837,7 +837,7 @@ function Customiser({
                     className="flex size-9 items-center justify-center rounded-md text-ink-2 hover:bg-surface-2 disabled:text-line-strong disabled:hover:bg-transparent"
                     aria-label={`Move ${kind.name} down`}
                     disabled={i === 0 || i === blocks.length - 1 || isFixed(block.id) || isFixed(blocks[i + 1].id)}
-                    onClick={() => void save({ blocks: moveBlock(blocks, block.id, 1) })}
+                    onClick={() => void save({ design: "custom", blocks: moveBlock(blocks, block.id, 1) })}
                   >
                     <ArrowDown className="size-4" aria-hidden />
                   </button>

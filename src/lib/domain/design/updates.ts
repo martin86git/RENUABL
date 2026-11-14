@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-15",
+    area: "Proposals",
+    words: "A Builder switch on the proposal: drop your logo and cover photo on the page, and in a custom design drag blocks about.",
+  },
+  {
+    day: "2026-11-15",
+    area: "Proposals",
+    words: "Proposals now show the Nearmap picture the design was drawn on, so the panels sit on the roof where you placed them.",
+  },
+  {
+    day: "2026-11-15",
     area: "Sol",
     words: "Sol's answers come in numbered sections of rows, amounts at the right. Press a row's arrow to work on it with him.",
   },

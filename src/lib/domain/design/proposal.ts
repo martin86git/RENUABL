@@ -20,7 +20,7 @@
  */
 import type { ISODate } from "../types";
 import type { RebateRates } from "../rebates";
-import type { ViewBlock } from "./blocks";
+import { blocksForView, type ViewBlock } from "./blocks";
 import {
   INSTALL_TIMES,
   TEMPLATES,
@@ -716,14 +716,7 @@ export function buildProposal(given: ProposalInputs): Built {
           }
         : null,
     ...(variations.length ? { variations } : {}),
-    blocks: brand.blocks
-      .filter((block) => block.on)
-      .map((block) => ({
-        id: block.id,
-        heading: block.heading,
-        words: block.words,
-        image: (block.image && input.images.find((i) => i.id === block.image && i.kind === "block")) || null,
-      })),
+    blocks: blocksForView(brand.design, brand.blocks, input.images),
     ...(worked.length
       ? {
           options: worked.map(({ goal, at, out, name, promise }) => {

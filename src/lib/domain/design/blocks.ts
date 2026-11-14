@@ -53,6 +53,9 @@ export const BLOCKS = [
   { id: "custom-1", name: "Your own block 1", heading: "", about: "A heading, words and a picture of your own.", custom: true },
   { id: "custom-2", name: "Your own block 2", heading: "", about: "A heading, words and a picture of your own.", custom: true },
   { id: "custom-3", name: "Your own block 3", heading: "", about: "A heading, words and a picture of your own.", custom: true },
+  { id: "custom-4", name: "Your own block 4", heading: "", about: "A heading, words and a picture of your own.", custom: true },
+  { id: "custom-5", name: "Your own block 5", heading: "", about: "A heading, words and a picture of your own.", custom: true },
+  { id: "custom-6", name: "Your own block 6", heading: "", about: "A heading, words and a picture of your own.", custom: true },
   { id: "accept", name: "Going ahead", heading: "", about: "Where the customer goes ahead or asks a question.", locked: true },
   {
     id: "conditions",
@@ -93,6 +96,30 @@ export const isFixed = (id: BlockId) => Boolean(kind(id).fixed);
 /** Whether a block is one of the business's own (shown only when it has something in it). */
 export const isCustom = (id: BlockId) => Boolean(kind(id).custom);
 
+/**
+ * Where a block's own picture sits: across the block above its words, or beside them on the left or the right (on a
+ * phone it always sits above).
+ */
+export const BLOCK_LAYOUTS = [
+  { id: "stack", name: "Picture across" },
+  { id: "left", name: "Picture left" },
+  { id: "right", name: "Picture right" },
+] as const;
+export type BlockLayout = (typeof BLOCK_LAYOUTS)[number]["id"];
+
+/**
+ * A block's ground. Dark only for the blocks made of the business's own words (its own blocks and About you): the
+ * blocks that carry figures keep the page's ground, so prices and estimates always read the same way.
+ */
+export const BLOCK_TONES = [
+  { id: "light", name: "Light" },
+  { id: "dark", name: "Dark" },
+] as const;
+export type BlockTone = (typeof BLOCK_TONES)[number]["id"];
+
+/** Whether a block may take the dark ground: only the blocks of the business's own words. */
+export const mayGoDark = (id: BlockId) => isCustom(id) || id === "about";
+
 /** One block as a business has set it. */
 export interface BlockSetting {
   id: BlockId;
@@ -104,11 +131,23 @@ export interface BlockSetting {
   words: string;
   /** One picture (a `design_files` id), or none. */
   image: string | null;
+  /** Where its picture sits. */
+  layout: BlockLayout;
+  /** Its ground (`mayGoDark`). */
+  tone: BlockTone;
 }
 
 /** The blocks as every business starts: all the usual ones on, in the usual order, its own three off. */
 export function defaultBlocks(): BlockSetting[] {
-  const all: BlockSetting[] = BLOCKS.map((b) => ({ id: b.id, on: !("custom" in b), heading: "", words: "", image: null }));
+  const all: BlockSetting[] = BLOCKS.map((b) => ({
+    id: b.id,
+    on: !("custom" in b),
+    heading: "",
+    words: "",
+    image: null,
+    layout: "stack",
+    tone: "light",
+  }));
   // The standard terms close the proposal.
   return [...all.filter((b) => !isFixed(b.id)), ...all.filter((b) => isFixed(b.id))];
 }
@@ -146,12 +185,33 @@ export function cleanBlocks(raw: unknown): BlockSetting[] {
       heading: isFixed(e.id) ? "" : text(e.heading, 80, false),
       words: isFixed(e.id) ? "" : text(e.words, 1500, true),
       image: !isFixed(e.id) && typeof e.image === "string" && /^img_[a-f0-9]{8,64}$/.test(e.image) ? e.image : null,
+      layout: BLOCK_LAYOUTS.some((l) => l.id === e.layout) && !isFixed(e.id) ? (e.layout as BlockLayout) : "stack",
+      tone: e.tone === "dark" && mayGoDark(e.id) ? "dark" : "light",
     });
   }
   for (const block of defaultBlocks()) if (!seen.has(block.id)) out.push(block);
   // The cover opens the proposal and the standard terms close it, whatever order was sent.
   const middle = out.filter((b) => b.id !== "cover" && !isFixed(b.id));
   return [...out.filter((b) => b.id === "cover"), ...middle, ...out.filter((b) => isFixed(b.id))];
+}
+
+/**
+ * The list with one block put at another place (the builder's drag), before the block now at `to`. The cover stays
+ * first and the standard terms last: a drop past either lands next to it.
+ */
+export function placeBlock(blocks: readonly BlockSetting[], id: BlockId, to: number): BlockSetting[] {
+  const moving = blocks.find((b) => b.id === id);
+  if (!moving || moving.id === "cover" || isFixed(moving.id)) return [...blocks];
+  const rest = blocks.filter((b) => b.id !== id);
+  const first = rest.findIndex((b) => b.id !== "cover");
+  const last = rest.findIndex((b) => isFixed(b.id));
+  const at = Math.min(Math.max(to - (blocks.indexOf(moving) < to ? 1 : 0), first < 0 ? 0 : first), last < 0 ? rest.length : last);
+  return [...rest.slice(0, at), moving, ...rest.slice(at)];
+}
+
+/** The business's next own block not yet shown, or null when all six are in. */
+export function nextOwnBlock(blocks: readonly BlockSetting[]): BlockId | null {
+  return blocks.find((b) => isCustom(b.id) && !b.on)?.id ?? null;
 }
 
 /** The list with one block moved a place up or down. The cover stays first and the standard terms last: nothing moves past either. */
@@ -170,6 +230,42 @@ export interface ViewBlock {
   heading: string;
   words: string;
   image: { id: string; kind: string; width: number; height: number } | null;
+  /** Where its picture sits and its ground (left out on a proposal published before they could be chosen). */
+  layout?: BlockLayout;
+  tone?: BlockTone;
+}
+
+/**
+ * The blocks a proposal is published with: the business's own arrangement when it has chosen a custom design, else the
+ * usual ones (the standard design). Only the ones shown, with their pictures as kept.
+ */
+export function blocksForView(
+  design: "standard" | "custom",
+  blocks: readonly BlockSetting[],
+  images: readonly { id: string; kind: string; width: number; height: number }[],
+): ViewBlock[] {
+  return (design === "custom" ? blocks : defaultBlocks())
+    .filter((block) => block.on)
+    .map((block) => ({
+      id: block.id,
+      heading: block.heading,
+      words: block.words,
+      image: (block.image && images.find((i) => i.id === block.image && i.kind === "block")) || null,
+      ...(block.layout !== "stack" ? { layout: block.layout } : {}),
+      ...(block.tone === "dark" ? { tone: block.tone } : {}),
+    }));
+}
+
+/** Whether a kit's blocks are the usual ones, as the standard design shows them (a kit saved before the builder). */
+export function blocksAreUsual(blocks: readonly BlockSetting[]): boolean {
+  const usual = defaultBlocks();
+  return (
+    blocks.length === usual.length &&
+    blocks.every(
+      (b, i) =>
+        b.id === usual[i].id && b.on === usual[i].on && !b.heading && !b.words && !b.image && b.layout === "stack" && b.tone === "light",
+    )
+  );
 }
 
 /** The usual blocks, for a proposal published before blocks could be arranged. */

@@ -113,7 +113,15 @@ describe("the standard terms and conditions on a proposal", () => {
       { id: "terms", on: false, heading: "Our own contract", words: "Ignore the rest.", image: "img_0000000000000000000000aa" },
       { id: "price" },
     ]);
-    expect(blocks[blocks.length - 1]).toEqual({ id: "terms", on: true, heading: "", words: "", image: null });
+    expect(blocks[blocks.length - 1]).toEqual({
+      id: "terms",
+      on: true,
+      heading: "",
+      words: "",
+      image: null,
+      layout: "stack",
+      tone: "light",
+    });
     // On the proposal the block is there; what it shows is the fixed copy's terms, or nothing when they are off.
     expect(built().view.blocks!.at(-1)).toEqual({ id: "terms", heading: "", words: "", image: null });
     expect(built({ standardTerms: false }).view.contract).toBeNull();
