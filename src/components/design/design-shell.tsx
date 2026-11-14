@@ -349,6 +349,36 @@ function Shell({
   const count = (pageId: string) => counts[pageId] ?? 0;
   const settingsOn = path.startsWith(PATHS.settings) || path.startsWith(PATHS.account);
 
+  // The section's own pages, quiet: only the one you are on stands out. Today has none over it. Since the sections menu
+  // sits on the pad's edge (14 Nov 2026, Martin), they head the pad under it, so the top bar is one height on every page.
+  const sectionPages =
+    current.id !== "marketplace" && current.pages.length > 1 ? (
+      <nav aria-label={current.label} className="flex justify-center gap-5 overflow-x-auto px-5 pb-2 pt-2.5">
+        {current.pages.map((p) => {
+          const lit = here?.page.id === p.id;
+          const n = count(p.id);
+          return (
+            <Link
+              key={p.id}
+              href={p.href}
+              aria-current={lit ? "page" : undefined}
+              className={clsx(
+                "flex shrink-0 items-center gap-1.5 border-b-2 pb-1 text-[13px] transition-colors",
+                lit ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink",
+              )}
+            >
+              {p.label}
+              {n > 0 && (
+                <span className="relative inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold leading-4 text-white">
+                  {!lit && <span className="absolute inset-0 animate-ping rounded-full bg-sun-line/50 motion-reduce:hidden" aria-hidden />}
+                  <span className="relative">{n}</span>
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+    ) : null;
   return (
     <div className="theme-studio studio-frame min-h-dvh pb-24 lg:pb-0">
       {/* The design tool slides over whatever page this is, never a page of its own. */}
@@ -621,36 +651,16 @@ function Shell({
             </div>
           </div>
         </div>
-        {/* The section's own pages, quiet: only the one you are on stands out. Today has none over it. */}
-        {current.id !== "marketplace" && current.pages.length > 1 && (
-          <nav aria-label={current.label} className="flex justify-center gap-5 overflow-x-auto px-5 pb-2 pt-2.5">
-            {current.pages.map((p) => {
-              const lit = here?.page.id === p.id;
-              const n = count(p.id);
-              return (
-                <Link
-                  key={p.id}
-                  href={p.href}
-                  aria-current={lit ? "page" : undefined}
-                  className={clsx(
-                    "flex shrink-0 items-center gap-1.5 border-b-2 pb-1 text-[13px] transition-colors",
-                    lit ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink",
-                  )}
-                >
-                  {p.label}
-                  {n > 0 && (
-                    <span className="relative inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold leading-4 text-white">
-                      {!lit && (
-                        <span className="absolute inset-0 animate-ping rounded-full bg-sun-line/50 motion-reduce:hidden" aria-hidden />
-                      )}
-                      <span className="relative">{n}</span>
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
+        {/* Once the page scrolls, the bar's frosted ground reaches down behind the lowered menu, so nothing shows round it. */}
+        {!tool && (
+          <div
+            aria-hidden
+            className={clsx("pointer-events-none absolute inset-x-0 top-full -z-10 bg-canvas/90 backdrop-blur", !underBar && "hidden")}
+            style={{ height: MENU_DROP_PX + 8 }}
+          />
         )}
+        {/* The section's own pages sit in the bar only on the designer, which has no pad; elsewhere they head the pad. */}
+        {tool && sectionPages}
       </header>
 
       {/* On a phone: the wordmark, Search and the day across the top. */}
@@ -677,19 +687,9 @@ function Shell({
       ) : (
         <div className="px-3 pb-20 pt-2 sm:px-6 lg:px-14 lg:pt-9">
           <div data-tour="pad" data-sol-page className={PAD}>
-            <div
-              aria-hidden
-              className={clsx("pointer-events-none sticky z-30 -mx-6 -mt-10 hidden bg-canvas lg:block", !underBar && "invisible")}
-              // From the bar's foot to just under the menu, taking no room: it starts at the pad's edge (over its 2.5rem top
-              // padding, lg:pt-10) and gives that padding back.
-              style={{
-                top: `calc(var(--studio-head, 0px) - ${MENU_DROP_PX}px)`,
-                height: MENU_DROP_PX + 8,
-                marginBottom: 40 - (MENU_DROP_PX + 8),
-              }}
-            />
             {/* Inside the Marketplace, its own menu at the top of the pad, from its blue home, once it is open; until then
                 the launch page's demo carries it. */}
+            {sectionPages && <div className="studio-pages -mt-2 mb-5 hidden lg:block">{sectionPages}</div>}
             {current.id === "marketplace" && marketplaceOpen() && (
               <MarketplaceMenu className="-mt-1 mb-6 border-b border-line pb-3" pages={current.pages} lit={here?.page.id} count={count} />
             )}

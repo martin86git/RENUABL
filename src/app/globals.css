@@ -223,6 +223,11 @@
     padding: 0;
     min-height: 0;
   }
+  /* With no padding there, the section's pages keep clear of the sections menu on the pad's edge (14 Nov 2026). */
+  .studio-frame .studio-pad:has(> [data-rails-out]) > .studio-pages {
+    margin-top: 0;
+    padding-top: 3rem;
+  }
 }
 .studio-frame ::-webkit-scrollbar {
   width: 10px;
