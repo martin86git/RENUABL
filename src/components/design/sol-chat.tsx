@@ -483,7 +483,7 @@ export function SolChat({
           </ul>
         </div>
       )}
-      <div className={clsx("sol-ground staff-scroll min-h-0 flex-1 space-y-3.5 overflow-y-auto px-4 py-4 text-sm", history && "hidden")}>
+      <div className={clsx("sol-ground staff-scroll min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6 text-sm", history && "hidden")}>
         {!state && !problem && <SolThinking say="Opening your conversation…" />}
         {state && turns.length === 0 && !pending && (
           <div className="space-y-2 text-ink-2">
@@ -905,23 +905,27 @@ function Bubble({
   const [copied, setCopied] = useState(false);
   if (!text) return null;
   return (
-    <div className={clsx("flex flex-col", you ? "items-end" : "items-start")}>
+    <div className={clsx("flex flex-col", you ? "items-end" : "items-stretch")}>
+      {/* Black and white (15 Nov 2026, Martin: "add outlines to discern my message from sols… think apple"): the
+          member's words sit right in a fine black outline; Sol's answer is not boxed at all, only named, and reads
+          across the column like a page. */}
+      {!you && (
+        <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
+          <SolMark className="size-3.5" glow={false} /> Sol
+        </p>
+      )}
       <div
         className={clsx(
-          "rounded-2xl [overflow-wrap:anywhere]",
-          // Theirs a notch smaller, in graphite on his warm ground (15 Nov 2026, Martin: the chat's colours blended;
-          // the pale sun of 5 Nov was lost on it), so the two sides are told apart at a glance.
+          "[overflow-wrap:anywhere]",
           you
-            ? "max-w-[75%] whitespace-pre-wrap rounded-br-md bg-primary px-3 py-2 text-[13px] leading-[1.5] text-primary-ink"
-            : // His answers are white cards on the ground (14 Nov 2026, Martin: more contrast in his drawer), in his
-              // quieter type (`.sol-prose`).
-              "sol-prose max-w-[92%] rounded-bl-md bg-surface px-4 py-3.5 shadow-[0_1px_2px_rgba(60,40,10,0.06),0_6px_18px_rgba(60,40,10,0.07)]",
-          pinned ? "ring-2 ring-sun-line/50" : you ? "" : "ring-1 ring-line",
+            ? "max-w-[80%] whitespace-pre-wrap rounded-[1.25rem] rounded-br-md border border-ink bg-surface px-4 py-2.5 text-[14px] leading-[1.5] tracking-[-0.011em] text-ink"
+            : "sol-prose",
+          pinned && (you ? "ring-2 ring-sun-line/50" : "rounded-2xl p-4 ring-2 ring-sun-line/50"),
         )}
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
         {you ? text : <SolText text={text} onAnswer={onAnswer} onPick={onPick} />}
-        {at && <span className={clsx("mt-1 block text-[10px]", you ? "text-primary-ink/60" : "text-muted")}>{when(at)}</span>}
+        {at && <span className={clsx("block text-[10.5px] text-muted", you ? "mt-1" : "mt-3")}>{when(at)}</span>}
       </div>
       {at && (
         <div

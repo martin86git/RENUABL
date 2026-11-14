@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, CircleHelp, CornerUpLeft, Lightbulb, PencilLine, X } from "lucide-react";
+import { ArrowRight, CircleHelp, CornerUpLeft, PencilLine, X } from "lucide-react";
 import {
   isYesNoQuestion,
   namedItem,
@@ -36,7 +36,7 @@ export function SolText({ text, tail, onAnswer, onPick }: { text: string; tail?:
   const sections = blocks.filter((b) => b.kind === "section").length;
   let nth = 0;
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-4">
       {blocks.map((b, i) =>
         b.kind === "section" ? (
           <Section
@@ -79,24 +79,21 @@ function Section({
   onPick?: OnPick;
 }) {
   return (
-    <section>
-      <h4 className="flex items-center gap-2 text-ink">
+    <section className="pt-1">
+      <h4 className="flex items-baseline gap-3 border-b border-ink pb-2 text-ink">
         {number !== null && (
-          <span
-            className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-ink"
-            aria-hidden
-          >
-            {number}
+          <span className="shrink-0 text-[11px] font-medium tabular-nums text-muted" aria-hidden>
+            {String(number).padStart(2, "0")}
           </span>
         )}
-        <span className="min-w-0 font-semibold">{section.title}</span>
-        <span className="ml-auto shrink-0 pl-2 text-[11px] font-normal text-muted">{section.items.length}</span>
+        <span className="min-w-0 text-[1.03em] font-semibold tracking-[-0.014em]">{section.title}</span>
+        <span className="ml-auto shrink-0 pl-2 text-[11px] font-normal tabular-nums text-muted">{section.items.length}</span>
       </h4>
-      <ul className="mt-2 divide-y divide-line overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
+      <ul className="divide-y divide-line">
         {section.items.map((item, i) => {
           const row = solRow(item);
           return (
-            <li key={i} className="group/row flex items-start gap-2 px-3 py-2.5">
+            <li key={i} className="group/row flex items-start gap-3 py-3">
               <div className="min-w-0 flex-1">
                 {row.name && (
                   <p className="flex items-baseline gap-3">
@@ -104,7 +101,7 @@ function Section({
                     {row.amount && <span className="ml-auto shrink-0 font-medium tabular-nums text-ink">{row.amount}</span>}
                   </p>
                 )}
-                <p className={row.name ? "mt-0.5 text-[0.94em] text-ink-2" : "text-ink"}>
+                <p className={row.name ? "mt-0.5 text-[0.93em] leading-[1.5] text-muted" : "text-ink"}>
                   <Runs text={row.name ? row.detail.charAt(0).toUpperCase() + row.detail.slice(1) : row.detail} />
                   {i === section.items.length - 1 && tail}
                 </p>
@@ -115,9 +112,9 @@ function Section({
                   onClick={() => onPick(item.replace(/\*\*/g, ""))}
                   title="Work on this one with Sol"
                   aria-label={`Work on this one with Sol: ${row.name ?? row.detail}`}
-                  className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-surface text-ink-2 ring-1 ring-line transition hover:bg-sun-line hover:text-white hover:ring-sun-line"
+                  className="-mr-1 grid size-7 shrink-0 place-items-center rounded-full text-muted/60 transition hover:bg-ink hover:text-white group-hover/row:text-ink group-hover/row:hover:text-white"
                 >
-                  <ArrowRight className="size-3.5" aria-hidden />
+                  <ArrowRight className="size-4" aria-hidden />
                 </button>
               )}
             </li>
@@ -153,7 +150,7 @@ function Runs({ text }: { text: string }) {
             <a
               key={i}
               href={`tel:${r.dial}`}
-              className="whitespace-nowrap font-medium text-ink underline decoration-sun-line/60 underline-offset-2 hover:decoration-sun-line"
+              className="whitespace-nowrap font-medium text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
             >
               {r.text}
             </a>
@@ -163,7 +160,7 @@ function Runs({ text }: { text: string }) {
             <a
               key={i}
               href={`mailto:${r.text}`}
-              className="font-medium text-ink underline decoration-sun-line/60 underline-offset-2 hover:decoration-sun-line"
+              className="font-medium text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
             >
               {r.text}
             </a>
@@ -178,12 +175,12 @@ function Block({ block, tail, onAnswer, lead = false }: { block: SolBlock; tail:
   switch (block.kind) {
     case "list":
       return (
-        <ul className="space-y-2">
+        <ul className="space-y-2.5">
           {block.items.map((item, i) => {
             const named = namedItem(item);
             return (
-              <li key={i} className="flex gap-2.5">
-                <span className="mt-[0.62em] size-1.5 shrink-0 rounded-full bg-sun-line" aria-hidden />
+              <li key={i} className="flex gap-3">
+                <span className="mt-[0.68em] size-1 shrink-0 rounded-full bg-ink" aria-hidden />
                 <span className="min-w-0">
                   {named ? (
                     <>
@@ -203,17 +200,12 @@ function Block({ block, tail, onAnswer, lead = false }: { block: SolBlock; tail:
       );
     case "key":
       return (
-        // The point that matters most, as a card of its own (14 Nov 2026, Martin: "do a better job of making them look
-        // like a feature"): named, on the warm sun, its words larger and heavier than anything round it.
-        <div className="relative overflow-hidden rounded-2xl bg-sun px-4 pb-3.5 pt-3 ring-1 ring-sun-line/30">
-          <span className="absolute inset-y-0 left-0 w-1 bg-sun-line" aria-hidden />
-          <p className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-sun-line">
-            <span className="grid size-5 place-items-center rounded-full bg-sun-line text-white">
-              <Lightbulb className="size-3" aria-hidden />
-            </span>
-            Key point
-          </p>
-          <p className="mt-1.5 font-medium leading-snug text-ink">
+        // The point that matters most is the conversation's one highlight (15 Nov 2026, Martin: "default to black and
+        // white. and add highlights. which will make key points stand out"): a wash of the signal colour, named in it,
+        // its words a size up. Nothing else in his answer is coloured.
+        <div className="sol-key rounded-2xl px-4 py-3.5">
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-sun-line">Key point</p>
+          <p className="mt-1.5 text-[1.07em] font-medium leading-[1.45] tracking-[-0.014em] text-ink">
             <Runs text={block.text} />
             {tail}
           </p>
@@ -221,9 +213,9 @@ function Block({ block, tail, onAnswer, lead = false }: { block: SolBlock; tail:
       );
     case "ask":
       return (
-        <div className="rounded-xl bg-surface px-3 py-2.5 font-medium text-ink ring-2 ring-sun-line/60">
+        <div className="rounded-2xl bg-surface px-4 py-3 font-medium text-ink ring-1 ring-line">
           <p className="flex gap-2.5">
-            <CircleHelp className="mt-[0.2em] size-4 shrink-0 text-sun-line" aria-label="A question for you" />
+            <CircleHelp className="mt-[0.2em] size-4 shrink-0 text-ink" aria-label="A question for you" />
             <span className="min-w-0">
               {block.text}
               {tail}
@@ -272,7 +264,7 @@ function Block({ block, tail, onAnswer, lead = false }: { block: SolBlock; tail:
       );
     default:
       return (
-        <p className={"whitespace-pre-line " + (lead ? "text-ink" : "")}>
+        <p className={"whitespace-pre-line " + (lead ? "text-[1.14em] leading-[1.42] tracking-[-0.017em] text-ink" : "")}>
           <Runs text={block.text} />
           {tail}
         </p>
@@ -376,7 +368,7 @@ function ChoiceCard({
             if (own.trim()) choose(own.trim());
           }}
         >
-          <PencilLine className="size-4 shrink-0 text-sun-line" aria-hidden />
+          <PencilLine className="size-4 shrink-0 text-muted" aria-hidden />
           <input
             value={own}
             onChange={(e) => setOwn(e.target.value)}

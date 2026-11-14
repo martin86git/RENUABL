@@ -443,29 +443,27 @@ html.sol-resizing .team-pop {
     box-shadow: 0 0 0 6px rgb(255 90 31 / 0);
   }
 }
-/* The ground Sol's conversation sits on. A warm ground of his own (15 Nov 2026, Martin: the deeper grey tried the day
-   before "blend[ed] in too much with the rest of the screen", which is that same cool grey), with its lines and quiet
-   type warmed to match, so the drawer reads as his place and his answers stand off it as white cards. */
+/* Sol's conversation is black and white (15 Nov 2026, Martin: "this could be black and white, and still look
+   beautiful… default to black and white. and add highlights… think apple. think tesla"; the grey and then the warm
+   ground tried before it are gone). White ground, near-black type, hairlines; the one colour is the key point's. */
 .sol-ground {
-  --canvas: #f4ede3;
-  --line: #e6dccd;
-  --muted: #7a7166;
-  background: var(--canvas);
+  --canvas: #f5f5f7;
+  --line: #e3e3e8;
+  --muted: #6e6e73;
+  background: #fff;
 }
-/* His answers' type (15 Nov 2026, Martin: "a different font type thats easier on the eyes. less loud"; smaller too): the
-   reader's own system face (Segoe UI, San Francisco), softer and rounder than the interface's Inter, in a softer ink. */
+/* His answers' type: the interface's own face (the system face tried on 15 Nov read no better), set to be read: a
+   touch tighter, a generous line, near-black. Weight and size do the work that colour did. */
 .sol-prose {
-  font-family:
-    "Segoe UI Variable Text",
-    "Segoe UI",
-    -apple-system,
-    BlinkMacSystemFont,
-    "SF Pro Text",
-    system-ui,
-    sans-serif;
-  font-size: 13.5px;
-  line-height: 1.6;
-  color: #3a3d44;
+  font-size: 14.5px;
+  line-height: 1.62;
+  letter-spacing: -0.011em;
+  color: #1d1d1f;
+  -webkit-font-smoothing: antialiased;
+}
+/* The key point: the conversation's one highlight, a wash of the signal colour. */
+.sol-key {
+  background: color-mix(in srgb, var(--sun-line) 9%, #fff);
 }
 /* Where Sol stands (sol-dock.tsx `SolNavButton`, and every place that draws him): no round behind him since
    14 Nov 2026 (Martin: "remove the black ring… standalone sun"), so the box is only his place and he fills it. A soft
