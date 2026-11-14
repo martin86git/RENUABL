@@ -251,20 +251,25 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
 
     { id: TODAY_IDS.news, label: "News", count: null, order: 7 },
   ].sort((a, b) => a.order - b.order);
-  // One part of Today at a time (14 Nov 2026, Martin: "revealing", one thing at a time with the edge of the next): the
-  // strip chooses it; it opens on the first part with something in it, and the next one peeks in under it, faded, with
-  // Next. Each part stays drawn, only hidden, so what it has loaded is kept.
-  const [chosen, setChosen] = useState<string | null>(null);
-  const shown =
-    chosen && tabs.some((t) => t.id === chosen)
-      ? chosen
-      : (tabs.find((t) => t.id !== TODAY_IDS.news && (t.count ?? 0) > 0)?.id ?? TODAY_IDS.needs);
-  const next = tabs.slice(tabs.findIndex((t) => t.id === shown) + 1).find((t) => t.id === TODAY_IDS.news || (t.count ?? 0) > 0) ?? null;
-  const view = (id: string) => (id === shown ? "" : id === next?.id ? PEEK : "hidden");
+  // Today scrolls (14 Nov 2026, Martin: not locked to one part, but keep the revealing): each part below the fold is
+  // soft until it comes into view, then sharpens and stays so. The strip goes to a part and lights the one on screen.
+  const [lit, seen] = useInView(
+    tabs.map((t) => t.id),
+    Boolean(data),
+  );
+  // The first part is never soft: it is what the page opens on.
+  const first = tabs.find((t) => t.id !== TODAY_IDS.newIn && t.id !== TODAY_IDS.inHand)?.id;
+  const view = (id: string) =>
+    id === TODAY_IDS.newIn || id === TODAY_IDS.inHand ? "hidden" : clsx(REVEAL, id !== first && !seen.has(id) && UNSEEN);
   const go = (id: string) => {
-    setChosen(id);
     setPicked(null);
-    window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    window.setTimeout(
+      () =>
+        document
+          .getElementById(id)
+          ?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }),
+      0,
+    );
   };
 
   return (
@@ -273,7 +278,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
           how many, a press to go to it, and the part in view lit. */}
       <TodayStrip
         tabs={tabs}
-        lit={shown}
+        lit={lit}
         onGo={go}
         left={
           <>
@@ -370,7 +375,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
 
               {/* The owner of a team: a line for each salesperson, new this week, not yet contacted, in play. */}
               {ownerOfTeam && (
-                <section className={clsx(TRAY, place.team, shown !== TODAY_IDS.needs && "hidden")} aria-label="Your team">
+                <section className={clsx(TRAY, place.team)} aria-label="Your team">
                   <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink">Your team</h2>
                   <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
                     <div className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 border-b border-line px-4 py-2 text-[11.5px] text-muted">
@@ -549,20 +554,6 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
               <div id={TODAY_IDS.news} className={clsx("mt-9", place.news, view(TODAY_IDS.news))}>
                 <TodayNews />
               </div>
-              {/* The next part, a press away under the edge of it. */}
-              {next && (
-                <div className="order-last -mt-10 flex">
-                  <button
-                    type="button"
-                    onClick={() => go(next.id)}
-                    className="relative z-10 inline-flex h-10 items-center gap-2 rounded-full bg-surface px-5 text-[13.5px] font-medium text-ink shadow-[0_6px_24px_rgba(20,22,26,0.08)] ring-1 ring-line transition hover:ring-ink-2"
-                  >
-                    Next: {next.label}
-                    {next.count ? <span className="text-muted">· {next.count}</span> : null}
-                    <ChevronDown className="size-4 text-ink-2" aria-hidden />
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -689,9 +680,56 @@ function ArrivalCard(props: {
  */
 const TRAY = "mt-9 scroll-mt-44";
 
-/** The next part of Today, peeking in under the one shown: its top only, faded and soft, not to be used until chosen. */
-const PEEK =
-  "pointer-events-none max-h-52 select-none overflow-hidden opacity-60 blur-[1.5px] [mask-image:linear-gradient(to_bottom,black_25%,transparent)]";
+/** A part of Today below the fold: soft until it comes into view, then it sharpens (the revealing, 14 Nov 2026). */
+const REVEAL = "transition-[opacity,filter] duration-700 ease-out motion-reduce:transition-none";
+const UNSEEN = "opacity-50 blur-[2px]";
+
+/**
+ * Which part of Today is on screen (the last whose top has passed a line under the strip; the first before any has),
+ * and which parts have come into view at least once (their top inside the lower 85% of the window).
+ */
+function useInView(ids: readonly string[], ready: boolean): [string | null, Set<string>] {
+  const [lit, setLit] = useState<string | null>(null);
+  const [seen, setSeen] = useState<Set<string>>(() => new Set());
+  const key = ids.join(",");
+  const look = useCallback(() => {
+    // Not before the feed has loaded: until then every part sits near the top and would count as seen.
+    if (!ready) return;
+    const parts = key
+      .split(",")
+      .map((id) => document.getElementById(id))
+      .filter((e): e is HTMLElement => Boolean(e) && e!.offsetParent !== null);
+    const tops = parts.map((e) => [e.id, e.getBoundingClientRect().top] as const);
+    const passed = tops.filter(([, top]) => top <= 220);
+    const now = (passed.length ? passed[passed.length - 1] : tops[0])?.[0] ?? null;
+    setLit((was) => (was === now ? was : now));
+    const inView = tops.filter(([, top]) => top < window.innerHeight * 0.85).map(([id]) => id);
+    setSeen((was) => (inView.every((id) => was.has(id)) ? was : new Set([...was, ...inView])));
+  }, [key, ready]);
+  // After each draw (parts come and go as the feed loads), and on scroll and resize.
+  useEffect(() => {
+    const t = window.setTimeout(look, 0);
+    return () => window.clearTimeout(t);
+  });
+  useEffect(() => {
+    let frame = 0;
+    const onScroll = () => {
+      if (!frame)
+        frame = window.requestAnimationFrame(() => {
+          frame = 0;
+          look();
+        });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [look]);
+  return [lit, seen];
+}
 
 /** Where each part of Today sits on the page, for the strip to go to. */
 export const TODAY_IDS = {
@@ -1604,6 +1642,13 @@ function DealsPanel(props: {
           </button>
         ))}
       </div>
+      {/* The whole pipeline, a press away (14 Nov 2026, Martin). */}
+      <Link
+        href="/design/sales/pipelines"
+        className="mt-2 inline-flex items-center gap-1 text-[12.5px] font-medium text-ink-2 underline-offset-4 hover:text-ink hover:underline"
+      >
+        See the pipeline <ArrowRight className="size-3.5" aria-hidden />
+      </Link>
       <label className="mt-3 flex h-11 items-center gap-2.5 rounded-2xl bg-surface px-3.5 ring-1 ring-line focus-within:ring-2 focus-within:ring-sun-line">
         <Search className="size-4 shrink-0 text-muted" aria-hidden />
         <input

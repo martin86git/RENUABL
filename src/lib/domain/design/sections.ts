@@ -38,6 +38,19 @@ export const MARKETPLACE_PAGES: readonly SectionPage[] = [
 
 export const SECTIONS: readonly Section[] = [
   { id: "today", label: "Today", pages: [{ id: "home", label: "Today", href: "/design" }] },
+  // Sales (14 Nov 2026, Martin: the CRM's pipeline had gone from the menu): the deals board by stage, the proposals
+  // open and closed, and the calls. A word in the menu, and the proposal round beside the designer's opens it too.
+  {
+    id: "proposals",
+    label: "Sales",
+    pages: [
+      { id: "pipeline", label: "Pipeline", href: "/design/sales/pipelines" },
+      { id: "sent", label: "Proposals open", href: "/design/sales/proposals" },
+      { id: "signed", label: "Proposals closed", href: "/design/sales/signed" },
+      // The call log (8 Nov 2026), a tab on Today until Today became one page.
+      { id: "calls", label: "Calls", href: "/design/calls" },
+    ],
+  },
   // CRM, Procurement and Installation folded into one, Jobs (10 Nov 2026, Martin): every job by where it is in its
   // life (jobs-view.ts). The pages they held are views and filters of it now, or the few pages of their own below.
   {
@@ -66,18 +79,6 @@ export const SECTIONS: readonly Section[] = [
       { id: "invoices", label: "Installer invoices", href: "/design/installations/invoices" },
       // The installers and inspectors this retailer works with (connections.ts).
       { id: "connections", label: "Connections", href: "/design/connections" },
-    ],
-  },
-  // The proposal round's own menu (10 Nov 2026, Martin): what was sent, what was signed, and the calls. Drawn as the
-  // round beside the designer's, never as a word in the pill.
-  {
-    id: "proposals",
-    label: "Proposals",
-    pages: [
-      { id: "sent", label: "Proposals sent", href: "/design/sales/proposals" },
-      { id: "signed", label: "Proposals signed", href: "/design/sales/signed" },
-      // The call log (8 Nov 2026), a tab on Today until Today became one page.
-      { id: "calls", label: "Calls", href: "/design/calls" },
     ],
   },
   // People are looked up by name, not by job, so they keep a word of their own.

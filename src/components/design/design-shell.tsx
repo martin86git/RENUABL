@@ -489,7 +489,7 @@ function Shell({
                 // (section-fold.tsx, 8 Nov 2026, Martin): Today, the designer and Sol are the surface; the sections are
                 // the engine, opened on hover, kept open inside one of them, or pinned. Only where there are enough of
                 // them to be worth folding (a retailer's); an installer's or inspector's few stay as they are.
-                const foldable = sections.filter((s, i) => i > 0 && s.id !== "marketplace" && s.id !== "proposals");
+                const foldable = sections.filter((s, i) => i > 0 && s.id !== "marketplace");
                 if (foldable.length < 3) return null;
                 const link = (sec: (typeof sections)[number]) => {
                   const lit = sec.id === current.id;
@@ -555,7 +555,7 @@ function Shell({
                   </>
                 );
               })()}
-              {sections.filter((s, i) => i > 0 && s.id !== "marketplace" && s.id !== "proposals").length < 3 &&
+              {sections.filter((s, i) => i > 0 && s.id !== "marketplace").length < 3 &&
                 sections.map((sec, i) => {
                   const lit = sec.id === current.id;
                   const waiting = sec.pages.reduce((n, p) => n + count(p.id), 0);
