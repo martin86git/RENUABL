@@ -55,26 +55,44 @@ export function SolBadge({ className }: { className?: string }) {
 }
 
 /**
- * Sol's sun at its fullest, for his graphite round and his panel's head: one large disc lit from gold at its top to
- * the signal orange, no rays (3 Nov 2026, Martin), a soft glow round it. Sized by its box; the colours are its own.
+ * Sol himself: a standalone sun (14 Nov 2026, Martin: "remove the black ring from around Sol. so he'll be standalone
+ * sun… a little bit bigger… a little more ai tech. but still fundamentally the sun"). One disc, lit like a glass orb:
+ * a hot pale core high and to the left, gold through the signal orange to a deeper rim, a fine highlight along its
+ * top; and round it one hair-thin orbit with a small bright node travelling it, the only "machine" in the mark. No
+ * rays, no dark round behind him. Sized by its box, which it fills; the colours are its own. `glow` adds the soft halo.
  */
 export function SolMark({ className, glow = true }: { className?: string; glow?: boolean }) {
   const id = useId().replace(/:/g, "");
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+    <svg viewBox="0 0 24 24" fill="none" className={className ? `sol-sun ${className}` : "sol-sun"} aria-hidden>
       <defs>
-        <linearGradient id={`${id}-sun`} x1="12" y1="4" x2="12" y2="20" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#FFD27A" />
-          <stop offset="0.55" stopColor="#FF8A3D" />
-          <stop offset="1" stopColor="#FF5A1F" />
-        </linearGradient>
-        <radialGradient id={`${id}-glow`} cx="12" cy="12" r="11.5" gradientUnits="userSpaceOnUse">
-          <stop offset="0.6" stopColor="#FF8A3D" stopOpacity="0.4" />
+        <radialGradient id={`${id}-sun`} cx="9.4" cy="8.2" r="13.5" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#FFF1C2" />
+          <stop offset="0.22" stopColor="#FFD27A" />
+          <stop offset="0.58" stopColor="#FF8A3D" />
+          <stop offset="0.9" stopColor="#FF5A1F" />
+          <stop offset="1" stopColor="#E8480F" />
+        </radialGradient>
+        <radialGradient id={`${id}-glow`} cx="12" cy="12" r="12" gradientUnits="userSpaceOnUse">
+          <stop offset="0.72" stopColor="#FF8A3D" stopOpacity="0.38" />
           <stop offset="1" stopColor="#FF5A1F" stopOpacity="0" />
         </radialGradient>
+        <linearGradient id={`${id}-orbit`} x1="2" y1="20" x2="22" y2="4" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#FF5A1F" stopOpacity="0" />
+          <stop offset="0.55" stopColor="#FF8A3D" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#FFD27A" />
+        </linearGradient>
       </defs>
-      {glow && <circle cx="12" cy="12" r="11.5" fill={`url(#${id}-glow)`} />}
-      <circle cx="12" cy="12" r="8" fill={`url(#${id}-sun)`} />
+      {glow && <circle cx="12" cy="12" r="12" fill={`url(#${id}-glow)`} />}
+      <circle cx="12" cy="12" r="9" fill={`url(#${id}-sun)`} />
+      {/* The light along his top edge. */}
+      <path d="M5.9 8.6A7.2 7.2 0 0 1 13.4 4.9" stroke="#fff" strokeOpacity="0.55" strokeWidth="0.7" strokeLinecap="round" />
+      {/* His orbit: most of a ring, fading in from nothing, a small bright node at its head. It turns slowly. */}
+      <g className="sol-orbit">
+        <path d="M4.07 19.93A11.2 11.2 0 1 1 19.93 4.07" stroke={`url(#${id}-orbit)`} strokeWidth="0.55" strokeLinecap="round" />
+        <circle cx="19.93" cy="4.07" r="1.15" fill="#FFD27A" />
+        <circle cx="19.93" cy="4.07" r="0.5" fill="#fff" />
+      </g>
     </svg>
   );
 }

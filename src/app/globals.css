@@ -447,19 +447,37 @@ html.sol-resizing .team-pop {
     box-shadow: 0 0 0 6px rgb(255 90 31 / 0);
   }
 }
-/* Sol's round in the nav (sol-dock.tsx `SolNavButton`): graphite lit from above, his mark breathing slowly inside,
-   warming to the signal orange on hover. The design tool's round is the orange one; his is the dark one. */
+/* Where Sol stands (sol-dock.tsx `SolNavButton`, and every place that draws him): no round behind him since
+   14 Nov 2026 (Martin: "remove the black ring… standalone sun"), so the box is only his place and he fills it. A soft
+   warm shadow sits him on the page; it warms on hover. */
 .sol-orb {
-  background: radial-gradient(circle at 50% 30%, #3b3e45 0%, #1d1f23 68%, #141518 100%);
-  box-shadow:
-    0 4px 14px rgb(20 22 26 / 0.28),
-    inset 0 1px 0 rgb(255 255 255 / 0.1);
+  background: none;
 }
-.sol-orb:hover,
-.sol-orb:focus-visible {
-  box-shadow:
-    0 4px 20px rgb(255 90 31 / 0.4),
-    inset 0 1px 0 rgb(255 255 255 / 0.1);
+.sol-orb .sol-heartbeat {
+  width: 100%;
+  height: 100%;
+}
+.sol-orb .sol-sun {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 3px 6px rgb(255 90 31 / 0.28));
+  transition: filter 0.3s ease;
+}
+.sol-orb:hover .sol-sun,
+.sol-orb:focus-visible .sol-sun {
+  filter: drop-shadow(0 4px 12px rgb(255 90 31 / 0.5));
+}
+/* His orbit turns slowly round him. */
+@keyframes sol-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.sol-orbit {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: sol-orbit 14s linear infinite;
 }
 @keyframes sol-breathe {
   0%,
@@ -504,6 +522,7 @@ html.sol-resizing .team-pop {
 @media (prefers-reduced-motion: reduce) {
   .sol-breathe,
   .sol-glow,
+  .sol-orbit,
   .sol-heartbeat {
     animation: none;
   }
