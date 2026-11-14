@@ -201,18 +201,19 @@ export async function assistantDeals(businessId: string, viewer: DealViewer): Pr
     live_status: string | null;
     attempts: number;
     updated_at: Date;
+    due_at: Date | null;
     outcome: string | null;
     summary: string | null;
     ended_at: Date | null;
     calls: number;
   }>(
     `select j.id as job_id, cu.name as customer, j.title as deal, j.stage, j.address,
-            c.status, c.live_status, c.attempts, c.updated_at, e.outcome, e.summary, e.at as ended_at,
+            c.status, c.live_status, c.attempts, c.updated_at, c.due_at, e.outcome, e.summary, e.at as ended_at,
             coalesce(n.calls, 0) as calls
        from design_jobs j
        join design_customers cu on cu.business_id = j.business_id and cu.id = j.customer_id
        join lateral (
-         select status, live_status, attempts, updated_at from voice_calls
+         select status, live_status, attempts, updated_at, due_at from voice_calls
           where business_id = j.business_id and job_id = j.id and mode <> 'install'
           order by updated_at desc limit 1
        ) c on true
@@ -249,6 +250,7 @@ export async function assistantDeals(businessId: string, viewer: DealViewer): Pr
         words: r.summary ?? "",
         calls: r.calls,
         at: new Date(Math.max(...at)).toISOString(),
+        dueAt: open && r.due_at ? new Date(r.due_at).toISOString() : null,
       };
     }),
   );

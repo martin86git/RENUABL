@@ -40,8 +40,11 @@ const when = (iso: string) => {
  * The deals the phone assistant is across, beside its chat (14 Nov 2026, Martin: a side window to the left of the
  * assistant's interface, split screen, wider than the chat, so a deal can be picked and talked about with it
  * directly). The list is its own work only: deals it has rung, is on a call with or has a call lined up for, by where
- * each stands. Picking one opens it in the pane (its calls as they were said, call back to ask, text, open the deal)
- * and the chat beside it is then about that deal. On a phone the pane takes the window's place.
+ * each stands. **A plain list to scroll through** (Martin, the same day: "it should just list the deals without all
+ * the context until you click on it and then the context opens"): each deal is one line, its customer and where it
+ * stands; pressing it drops its context open under it (the deal, its calls as they were said, call back to ask, text,
+ * open the deal) and the chat beside it is then about that deal; pressing it again folds it. On a phone the pane takes
+ * the window's place.
  */
 export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: AssistantDeal | null) => void; onBack: () => void }) {
   const { caller, callsOn, textsOn } = useCallerInfo();
@@ -70,8 +73,6 @@ export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: As
     };
   }, []);
 
-  // The deal picked, as the list has it now (a call lined up since it was picked shows at once).
-  const now = picked ? (deals?.find((d) => d.jobId === picked.jobId) ?? picked) : null;
   const shown = searchDeals(deals ?? [], typed);
 
   return (
@@ -83,94 +84,85 @@ export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: As
       >
         <ArrowLeft className="size-3.5" aria-hidden /> Back to the chat
       </button>
-      {now ? (
-        <DealOpen
-          key={now.jobId}
-          deal={now}
-          onBack={() => onPick(null)}
-          actions={
-            <AfterCall
-              jobId={now.jobId}
-              customer={now.customer.split(" ")[0] || now.customer}
-              caller={caller}
-              ended
-              sales
-              callsOn={callsOn}
-              textsOn={textsOn}
-              transcriptId={null}
-              onDone={() => window.dispatchEvent(new Event(DEALS_CHANGED))}
-            />
-          }
-        />
-      ) : (
-        <>
-          <div className="border-b border-line bg-surface px-4 py-3">
-            <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <SquareKanban className="size-4 text-sun-line" aria-hidden />
-              {name}&apos;s deals
-            </p>
-            <p className="text-xs text-muted">
-              {deals ? dealsSummary(deals) : "Loading…"} · the customers {name} has rung or is about to
-            </p>
-            <label className="mt-2.5 flex items-center gap-2 rounded-full bg-canvas px-3 py-1.5 ring-1 ring-line focus-within:ring-sun-line">
-              <Search className="size-3.5 shrink-0 text-muted" aria-hidden />
-              <input
-                value={typed}
-                onChange={(e) => setTyped(e.target.value)}
-                placeholder="Find a customer or address"
-                aria-label={`Search ${name}'s deals`}
-                className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
-              />
-            </label>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {failed && <p className="px-4 py-3 text-xs text-danger">{failed}</p>}
-            {deals && deals.length === 0 && (
-              <p className="px-4 py-6 text-sm text-ink-2">
-                {name} hasn&apos;t rung anyone yet. Hand a deal&apos;s call to {name} and it shows here with what came of it.
-              </p>
-            )}
-            {deals && deals.length > 0 && shown.length === 0 && <p className="px-4 py-6 text-sm text-ink-2">No deal matches that.</p>}
-            {dealGroups(shown).map((g) => (
-              <section key={g.standing} aria-label={STANDING_WORDS[g.standing]}>
-                <h3 className="sticky top-0 z-[1] flex items-center gap-2 bg-canvas px-4 pb-1.5 pt-3 text-[11px] font-semibold uppercase tracking-wide text-ink-2">
-                  <span className={clsx("size-2 rounded-full", DOT[g.standing])} aria-hidden />
-                  {STANDING_WORDS[g.standing]}
-                  <span className="font-normal text-muted">{g.deals.length}</span>
-                </h3>
-                <ul className="space-y-1.5 px-3 pb-2">
-                  {g.deals.map((d) => (
-                    <li key={d.jobId}>
-                      <button
-                        type="button"
-                        onClick={() => onPick(d)}
-                        className="block w-full rounded-xl bg-surface px-3 py-2.5 text-left ring-1 ring-line transition hover:ring-sun-line"
-                      >
-                        <span className="flex items-baseline justify-between gap-3">
-                          <span className="truncate text-sm font-semibold text-ink">{d.customer}</span>
-                          <span className="shrink-0 text-[11px] tabular-nums text-muted">{when(d.at)}</span>
-                        </span>
-                        <span className="block truncate text-xs text-ink-2">
-                          {d.deal} · {d.stage}
-                          {d.address ? ` · ${d.address}` : ""}
-                        </span>
-                        <span className="mt-1 block text-xs font-medium text-ink">{d.headline}</span>
-                        {d.words && <span className="mt-0.5 line-clamp-2 block text-xs leading-snug text-ink-2">{d.words}</span>}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        </>
-      )}
+      <div className="border-b border-line bg-surface px-4 py-3">
+        <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <SquareKanban className="size-4 text-sun-line" aria-hidden />
+          {name}&apos;s deals
+          <span className="ml-auto text-xs font-normal text-muted">{deals ? dealsSummary(deals) : "Loading…"}</span>
+        </p>
+        <label className="mt-2.5 flex items-center gap-2 rounded-full bg-canvas px-3 py-1.5 ring-1 ring-line focus-within:ring-sun-line">
+          <Search className="size-3.5 shrink-0 text-muted" aria-hidden />
+          <input
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder="Find a customer or address"
+            aria-label={`Search ${name}'s deals`}
+            className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+          />
+        </label>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {failed && <p className="px-4 py-3 text-xs text-danger">{failed}</p>}
+        {deals && deals.length === 0 && (
+          <p className="px-4 py-6 text-sm text-ink-2">
+            {name} hasn&apos;t rung anyone yet. Hand a deal&apos;s call to {name} and it shows here with what came of it.
+          </p>
+        )}
+        {deals && deals.length > 0 && shown.length === 0 && <p className="px-4 py-6 text-sm text-ink-2">No deal matches that.</p>}
+        {dealGroups(shown).map((g) => (
+          <section key={g.standing} aria-label={STANDING_WORDS[g.standing]}>
+            <h3 className="sticky top-0 z-[1] flex items-center gap-2 bg-canvas px-4 pb-1.5 pt-3 text-[11px] font-semibold uppercase tracking-wide text-ink-2">
+              <span className={clsx("size-2 rounded-full", DOT[g.standing])} aria-hidden />
+              {STANDING_WORDS[g.standing]}
+              <span className="font-normal text-muted">{g.deals.length}</span>
+            </h3>
+            <ul className="space-y-1 px-3 pb-2">
+              {g.deals.map((d) => {
+                const open = picked?.jobId === d.jobId;
+                return (
+                  <li key={d.jobId} className={clsx("rounded-xl bg-surface ring-1 transition", open ? "ring-sun-line" : "ring-line")}>
+                    <button
+                      type="button"
+                      onClick={() => onPick(open ? null : d)}
+                      aria-expanded={open}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-surface-2"
+                    >
+                      <span className={clsx("size-2 shrink-0 rounded-full", DOT[d.standing])} aria-hidden />
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{d.customer}</span>
+                      <span className="shrink-0 text-[11px] tabular-nums text-muted">{when(d.dueAt ?? d.at)}</span>
+                      <ChevronDown className={clsx("size-4 shrink-0 text-ink-2 transition-transform", open && "rotate-180")} aria-hidden />
+                    </button>
+                    {open && (
+                      <DealContext
+                        deal={d}
+                        actions={
+                          <AfterCall
+                            jobId={d.jobId}
+                            customer={d.customer.split(" ")[0] || d.customer}
+                            caller={caller}
+                            ended
+                            sales
+                            callsOn={callsOn}
+                            textsOn={textsOn}
+                            transcriptId={null}
+                            onDone={() => window.dispatchEvent(new Event(DEALS_CHANGED))}
+                          />
+                        }
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
     </aside>
   );
 }
 
-/** One deal open in the pane: where it stands, the assistant's calls on it as they were said, and what to do next. */
-function DealOpen({ deal, onBack, actions }: { deal: AssistantDeal; onBack: () => void; actions: React.ReactNode }) {
+/** One deal's context, dropped open under its line: where it stands, the assistant's calls on it as they were said, and what to do next. */
+function DealContext({ deal, actions }: { deal: AssistantDeal; actions: React.ReactNode }) {
   const { caller } = useCallerInfo();
   const [calls, setCalls] = useState<AssistantDealCall[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -184,7 +176,6 @@ function DealOpen({ deal, onBack, actions }: { deal: AssistantDeal; onBack: () =
       if (!live) return;
       if (!res.ok) return setFailed(res.message);
       setCalls(res.calls);
-      setOpen(res.calls[0]?.lines.length ? res.calls[0].id : null);
     });
     return () => {
       live = false;
@@ -194,27 +185,16 @@ function DealOpen({ deal, onBack, actions }: { deal: AssistantDeal; onBack: () =
 
   const calling = deal.standing === "live" || deal.standing === "lined-up";
   return (
-    <>
-      <div className="border-b border-line bg-surface px-4 py-3">
-        <button type="button" onClick={onBack} className="flex items-center gap-1.5 text-xs font-medium text-ink-2 hover:text-ink">
-          <ArrowLeft className="size-3.5" aria-hidden /> All of {name}&apos;s deals
-        </button>
-        <div className="mt-2 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate text-base font-semibold text-ink">{deal.customer}</p>
-            <p className="truncate text-xs text-ink-2">
-              {deal.deal} · {deal.stage}
-            </p>
-            {deal.address && <p className="truncate text-xs text-muted">{deal.address}</p>}
-          </div>
-        </div>
-        <p className="mt-2 flex items-center gap-2 text-xs font-medium text-ink">
-          <span className={clsx("size-2 rounded-full", DOT[deal.standing])} aria-hidden />
-          {STANDING_WORDS[deal.standing]} · {deal.headline}
+    <div className="border-t border-line">
+      <div className="px-3 py-2.5">
+        <p className="text-xs text-ink-2">
+          {deal.deal} · {deal.stage}
         </p>
+        {deal.address && <p className="text-xs text-muted">{deal.address}</p>}
+        <p className="mt-1.5 text-xs font-medium text-ink">{deal.headline}</p>
+        {deal.words && <p className="mt-0.5 text-xs leading-snug text-ink-2">{deal.words}</p>}
       </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      <div className="px-3 pb-2.5">
         {/* The call on now or lined up, here in the pane (Martin: part of the chat, not a window of its own). */}
         {calling && (
           <CallInPane
@@ -225,32 +205,33 @@ function DealOpen({ deal, onBack, actions }: { deal: AssistantDeal; onBack: () =
           />
         )}
         {calls && calls.length > 0 && (
-          <p className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-ink-2">Earlier calls</p>
+          <p className="mb-1.5 mt-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-ink-2">
+            {calls.length === 1 ? "Its call" : `Its ${calls.length} calls`}
+          </p>
         )}
         {failed && <p className="px-1 text-xs text-danger">{failed}</p>}
         {!calls && !failed && <p className="px-1 text-xs text-muted">Loading {name}&apos;s calls…</p>}
-        {calls && calls.length === 0 && (
-          <p className="px-1 text-sm text-ink-2">
+        {calls && calls.length === 0 && !calling && (
+          <p className="px-1 text-xs text-ink-2">
             {name} hasn&apos;t spoken to {first} yet.
           </p>
         )}
-        <ul className="space-y-2">
+        <ul className="space-y-1.5">
           {(calls ?? []).map((c) => (
-            <li key={c.id} className="rounded-xl bg-surface ring-1 ring-line">
+            <li key={c.id} className="rounded-lg bg-canvas ring-1 ring-line">
               <button
                 type="button"
                 onClick={() => setOpen((o) => (o === c.id ? null : c.id))}
                 aria-expanded={open === c.id}
                 disabled={!c.lines.length}
-                className="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left"
+                className="flex w-full items-start justify-between gap-3 px-3 py-2 text-left"
               >
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-ink">{c.headline}</span>
+                  <span className="block text-xs font-semibold text-ink">{c.headline}</span>
                   <span className="block text-[11px] text-muted">
                     {new Date(c.at).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
-                    {c.lines.length ? "" : " · no transcript"}
+                    {c.lines.length ? " · transcript" : " · no transcript"}
                   </span>
-                  {c.words && <span className="mt-1 block text-xs leading-snug text-ink-2">{c.words}</span>}
                 </span>
                 {c.lines.length > 0 && (
                   <ChevronDown
@@ -261,6 +242,7 @@ function DealOpen({ deal, onBack, actions }: { deal: AssistantDeal; onBack: () =
               </button>
               {open === c.id && c.lines.length > 0 && (
                 <div className="space-y-1.5 border-t border-line px-3 py-2.5">
+                  {c.words && <p className="pb-1 text-xs leading-snug text-ink-2">{c.words}</p>}
                   {c.lines.map((l, i) => (
                     <p
                       key={i}
@@ -279,7 +261,7 @@ function DealOpen({ deal, onBack, actions }: { deal: AssistantDeal; onBack: () =
           ))}
         </ul>
       </div>
-      <div className="border-t border-line bg-surface">{actions}</div>
-    </>
+      <div className="border-t border-line">{actions}</div>
+    </div>
   );
 }

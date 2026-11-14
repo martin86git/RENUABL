@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   DEAL_CHAT_RULES,
+  callsToday,
+  callsTodayWords,
   dealBlock,
   dealGroups,
   dealsSummary,
@@ -121,5 +123,26 @@ describe("the deal as the assistant is given it", () => {
   it("keeps the assistant to its own calls and off prices", () => {
     expect(DEAL_CHAT_RULES).toContain("Never make up what a customer said");
     expect(DEAL_CHAT_RULES).toContain("the deal page or Sol has it");
+  });
+});
+
+describe("the calls on for today", () => {
+  const dayOf = (at: Date) => at.toISOString().slice(0, 10);
+  const now = new Date("2026-11-14T01:00:00.000Z");
+  const deals = [
+    deal({ jobId: "a", customer: "Zed", standing: "lined-up", dueAt: "2026-11-14T05:30:00.000Z" }),
+    deal({ jobId: "b", customer: "Amy", standing: "lined-up", dueAt: "2026-11-14T03:00:00.000Z" }),
+    deal({ jobId: "c", customer: "Tomorrow", standing: "lined-up", dueAt: "2026-11-15T03:00:00.000Z" }),
+    deal({ jobId: "d", customer: "Live", standing: "live" }),
+    deal({ jobId: "e", customer: "No time", standing: "lined-up", dueAt: null }),
+    deal({ jobId: "f", customer: "Done", standing: "spoke" }),
+  ];
+  it("are the one on now, then today's in the order they ring, never tomorrow's or ended ones", () => {
+    expect(callsToday(deals, now, dayOf).map((d) => d.customer)).toEqual(["Live", "Amy", "Zed", "No time"]);
+  });
+  it("are said in a line, or not at all", () => {
+    expect(callsTodayWords(callsToday(deals, now, dayOf))).toBe("4 calls today · 1 on now");
+    expect(callsTodayWords([deal({ standing: "lined-up" })])).toBe("1 call today");
+    expect(callsTodayWords([])).toBeNull();
   });
 });

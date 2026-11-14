@@ -47,6 +47,7 @@ import {
 import { CallerAvatar, VoicePicker } from "./settings-caller";
 import { ContactReach } from "./coach-contacts";
 import { CoachDeals } from "./coach-deals";
+import { CoachWelcome } from "./coach-welcome";
 
 /** The pause between one packet of an answer and the next. */
 const PACKET_GAP_MS = 650;
@@ -257,8 +258,19 @@ export function CoachWindow() {
   const box = useRef<HTMLTextAreaElement>(null);
   const isOpen = Boolean(state);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- each open (a new state object) unfolds the window
-  useEffect(() => setSmall(false), [state]);
+  // Where it lands when opened (14 Nov 2026, Martin: a welcome with today's calls, not the last conversation; and the
+  // deals beside it, not the settings). Opened about one call, it goes straight to the conversation about that call.
+  const [landing, setLanding] = useState(true);
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- each open (a new state object) unfolds the window and lands it afresh */
+    setSmall(false);
+    setLanding(!state?.call);
+    if (state && !state.call && window.innerWidth >= 1024) {
+      setDeals(true);
+      setSettings(false);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [state]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -291,7 +303,7 @@ export function CoachWindow() {
   useEffect(() => {
     const el = list.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [turns.length, sending, isOpen, reveal?.shown]);
+  }, [turns.length, sending, isOpen, reveal?.shown, landing]);
 
   if (!state || typeof document === "undefined") return null;
   const name = caller.name;
@@ -339,6 +351,7 @@ export function CoachWindow() {
     if (!message || sending) return;
     setSending(true);
     setFailed(null);
+    setLanding(false);
     const at = new Date().toISOString();
     setTurns((t) => [
       ...t,
@@ -507,7 +520,21 @@ export function CoachWindow() {
                 <span className="text-xs font-medium text-ink">Open</span>
               </button>
             )}
-            <div ref={list} className={clsx("min-h-40 flex-1 space-y-3 overflow-y-auto px-4 py-3", reaching && "hidden")}>
+            {landing && !reaching && (
+              <div className="min-h-40 flex-1 overflow-y-auto px-4 py-3">
+                <CoachWelcome
+                  caller={caller}
+                  hasTalk={turns.length > 0}
+                  onPick={(d) => {
+                    setPicked(d);
+                    toggleDeals(true);
+                  }}
+                  onDeals={() => toggleDeals(true)}
+                  onTalk={() => setLanding(false)}
+                />
+              </div>
+            )}
+            <div ref={list} className={clsx("min-h-40 flex-1 space-y-3 overflow-y-auto px-4 py-3", (reaching || landing) && "hidden")}>
               {loaded && turns.length === 0 && (
                 <div className="flex items-start gap-2">
                   <CallerAvatar caller={caller} size={28} />

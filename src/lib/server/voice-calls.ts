@@ -339,9 +339,9 @@ async function placeCall(s: VoiceSettings, row: VoiceRow, window: { from: Date; 
       return false;
     }
     await query(
-      `update voice_calls set status = 'calling', attempts = attempts + 1, vapi_call_id = $2,
+      `update voice_calls set status = 'calling', attempts = attempts + 1, vapi_call_id = $2, due_at = $4,
          lead = lead || jsonb_build_object('assistant', $3::text), updated_at = now() where id = $1`,
-      [row.id, json.id, brief.assistant],
+      [row.id, json.id, brief.assistant, window.from],
     );
     return true;
   } catch (e) {

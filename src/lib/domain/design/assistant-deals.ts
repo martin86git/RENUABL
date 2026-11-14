@@ -40,6 +40,8 @@ export interface AssistantDeal {
   calls: number;
   /** When the latest thing happened (ISO). */
   at: string;
+  /** When the call lined up is due to ring (ISO), where that was kept: the start of its calling window. */
+  dueAt?: string | null;
 }
 
 /** A call the assistant made on a deal, as the pane shows it under the deal picked. */
@@ -71,9 +73,36 @@ export function headlineOf(standing: DealStanding, outcome: CallOutcome | null, 
   return outcome ? CALL_HEADLINES[outcome] : "Called";
 }
 
+/**
+ * The calls the assistant has on for today, in the order they ring (14 Nov 2026, Martin: opening the assistant should
+ * land on "scheduled calls for today… in chronological order of time", not on the last conversation). A call on now
+ * comes first, then those lined up for today by their time; one lined up with no time kept is taken as today's and
+ * goes last. `dayOf` gives a time's day in the market (market.ts), so "today" is the business's, not the browser's.
+ */
+export function callsToday(deals: readonly AssistantDeal[], now: Date, dayOf: (at: Date) => string): AssistantDeal[] {
+  const today = dayOf(now);
+  const rank = (d: AssistantDeal) => (d.standing === "live" ? "0" : d.dueAt ? `1${d.dueAt}` : "2");
+  return deals
+    .filter((d) => d.standing === "live" || (d.standing === "lined-up" && (!d.dueAt || dayOf(new Date(d.dueAt)) <= today)))
+    .sort((a, b) => rank(a).localeCompare(rank(b)) || a.customer.localeCompare(b.customer));
+}
+
+/** "2 calls today · 1 on now", over the welcome's list; null when there are none. */
+export function callsTodayWords(calls: readonly AssistantDeal[]): string | null {
+  if (!calls.length) return null;
+  const live = calls.filter((c) => c.standing === "live").length;
+  const count = `${calls.length} ${calls.length === 1 ? "call" : "calls"} today`;
+  return live ? `${count} · ${live} on now` : count;
+}
+
 /** The deals in the pane's order: by standing (what needs a person first), the latest first within each. */
 export function dealOrder(deals: readonly AssistantDeal[]): AssistantDeal[] {
-  return [...deals].sort((a, b) => DEAL_STANDINGS.indexOf(a.standing) - DEAL_STANDINGS.indexOf(b.standing) || b.at.localeCompare(a.at));
+  // Calls lined up run in the order they ring; everything else, the latest first.
+  const soonest = (a: AssistantDeal, b: AssistantDeal) =>
+    a.standing === "lined-up" && a.dueAt && b.dueAt ? a.dueAt.localeCompare(b.dueAt) : 0;
+  return [...deals].sort(
+    (a, b) => DEAL_STANDINGS.indexOf(a.standing) - DEAL_STANDINGS.indexOf(b.standing) || soonest(a, b) || b.at.localeCompare(a.at),
+  );
 }
 
 /** The deals under each standing that has any, in order. */

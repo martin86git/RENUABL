@@ -1314,6 +1314,8 @@ alter table voice_calls add column if not exists live_ended_at timestamptz;
 alter table voice_calls add column if not exists live_partial jsonb;
 -- Vapi's control address for the attempt now on, so the team can type to the assistant mid-call. Never sent to a browser.
 alter table voice_calls add column if not exists live_control_url text;
+-- When the call lined up is due to ring: the start of the calling window Vapi was given (the assistant's welcome lists today's).
+alter table voice_calls add column if not exists due_at timestamptz;
 -- Asking a customer by email before the phone assistant calls (domain/design/call-consent.ts): the words they agreed to.
 -- A practice call with the phone assistant (domain/design/practice-call.ts): the member's own, never on a deal.
 create table if not exists design_practice_calls (
