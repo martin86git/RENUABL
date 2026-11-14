@@ -58,13 +58,13 @@ export const AGENT_WORDS: Record<AgentKind, AgentKindWords> = {
     jobLine: "rings leads and customers about their proposal",
   },
   admin: {
-    title: "Admin assistant",
+    title: "Post-sale assistant",
     talksTo: "Your customers",
-    does: "Rings customers who have signed to pencil in their installation day.",
+    does: "Looks after customers once they have signed. Today it rings them to pencil in their installation day.",
     number: "It rings from your business phone number, the same one your sales assistant uses.",
     usesNumber: true,
-    job: "Books installs",
-    jobLine: "rings customers who have signed to book their installation day",
+    job: "Post sale",
+    jobLine: "your post-sale voice agent: rings customers who have signed to book their installation day",
   },
   colleague: {
     title: "Chief of staff",

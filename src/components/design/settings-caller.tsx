@@ -101,7 +101,7 @@ export function CallerSettings() {
       <p className={ui.eyebrow}>Settings · Business</p>
       <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">Phone assistants</h1>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-2">
-        Two assistants ring for your business, each under its own name, face and voice: one for sales, one for admin.
+        Two assistants ring for your business, each under its own name, face and voice: one for sales, one for after the sale.
       </p>
       <div role="tablist" aria-label="Which assistant" className="mt-5 inline-flex gap-0.5 rounded-full bg-surface-2 p-1 ring-1 ring-line">
         {CALLER_ROLES.map((r) => (

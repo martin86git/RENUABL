@@ -111,7 +111,7 @@ export function CallChoices(props: {
         <Link role="menuitem" href={`${SETTINGS}?assistant=admin`} onClick={props.onClose} className={ROW}>
           <CalendarCheck className="size-4 text-ink-2" aria-hidden />
           <span>
-            Set up your admin assistant
+            Set up your post-sale assistant
             <span className="block text-xs text-muted">It can ring {who} to book the installation for you</span>
           </span>
         </Link>

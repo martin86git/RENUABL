@@ -51,7 +51,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if (book) {
       if (!caller.named)
         return Response.json(
-          { ok: false, message: "Your admin assistant isn't set up yet. Give it a name in Settings, under Phone assistant." },
+          { ok: false, message: "Your post-sale assistant isn't set up yet. Give it a name in Settings, under Phone assistants." },
           { status: 409 },
         );
       const refusal = installCallRefusal({

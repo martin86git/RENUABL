@@ -96,7 +96,7 @@ describe("asking RENUABL for the business number", () => {
       agentName: "Alex",
     });
     expect(note.subject).toBe("Sunrise Solar (example) wants its business phone number");
-    expect(note.text).toContain("Admin assistant (Alex)");
+    expect(note.text).toContain("Post-sale assistant (Alex)");
     expect(note.text).toContain("sam@sunrise-solar.example");
     expect(note.text).toContain("Confirm the price with them before anything is charged");
     expect(note.text).not.toMatch(/customer['’]?s? (name|phone|email)/i);
@@ -109,7 +109,8 @@ describe("each agent's job on the rail", () => {
     expect(new Set(jobs).size).toBe(jobs.length);
     for (const j of jobs) expect(j.length).toBeLessThanOrEqual(14);
     expect(AGENT_WORDS.sales.job).toMatch(/calls/i);
-    expect(AGENT_WORDS.admin.job).toMatch(/install/i);
+    expect(AGENT_WORDS.admin.job).toMatch(/post sale/i);
+    expect(AGENT_WORDS.admin.jobLine).toMatch(/install/i);
     expect(AGENT_WORDS.colleague.job).not.toMatch(/call/i);
     expect(AGENT_WORDS.colleague.jobLine).toContain("in writing");
   });

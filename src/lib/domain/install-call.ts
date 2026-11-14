@@ -27,8 +27,8 @@ export const ROLE_WORDS: Record<CallerRole, { label: string; does: string; opens
     opens: "calling about the solar enquiry you made on our website",
   },
   admin: {
-    label: "Admin",
-    does: "Rings customers whose job is sold and approved to book their installation. The day they pick is pencilled in on your install calendar for you to confirm.",
+    label: "Post sale",
+    does: "Your voice agent for after the sale. Rings customers whose job is sold and approved to book their installation. The day they pick is pencilled in on your install calendar for you to confirm.",
     opens: "calling to book in your installation",
   },
 };

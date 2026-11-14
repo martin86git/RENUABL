@@ -1,13 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MessageCircleQuestion } from "lucide-react";
 import { AGENT_WORDS, type AgentKind } from "@/lib/domain/design/agents";
-import { COLLEAGUE_ROLE } from "@/lib/domain/design/colleague";
 import { useCallerInfo } from "@/lib/services/caller";
 import { openCoach } from "@/lib/services/coaching";
-import { loadColleague, openColleague, type ColleagueState } from "@/lib/services/colleague";
 import { AgentsButton } from "./agents-window";
 import { RailCalls } from "./rail-calls";
 import { CallerAvatar } from "./settings-caller";
@@ -34,21 +30,13 @@ const titleOf = (name: string, kind: AgentKind) => `${name}: ${AGENT_WORDS[kind]
 /**
  * The business's agents on the bar, each with its name under it (its job says itself on hover) (14 Nov 2026, Martin: "because they
  * aren't people, it's not easy to remember what each is for"; was Charlie for sales calls also the one who books
- * installs?). The two that ring customers look alike (their own face or sound wave on graphite): **sales calls** and
- * **books installs**. The one that only writes to the team is its own teal with a question bubble: **answers you**.
+ * installs?). Two voice agents, alike (their own face or sound wave on graphite): **sales calls** and **post sale**
+ * (14 Nov 2026, Martin: "tim should be a second voice agent. he would be for post sale. so he should have the same audio
+ * icon"). The chief of staff, which only writes to the team, is off the bar: it is reached from the plus (Your agents).
  * Under the sales assistant, a round for each call it has under way. Then the plus, to add one.
  */
 export function RailAgents() {
   const { caller, admin } = useCallerInfo();
-  const [colleague, setColleague] = useState<ColleagueState | null>(null);
-  useEffect(() => {
-    let live = true;
-    void loadColleague().then((r) => live && r.ok && setColleague(r));
-    return () => {
-      live = false;
-    };
-  }, []);
-  const tim = colleague?.ready.on ? colleague.name || COLLEAGUE_ROLE : null;
 
   return (
     <span className="flex w-full flex-col items-center gap-2.5">
@@ -69,14 +57,6 @@ export function RailAgents() {
           </span>
           <AgentLabel name={admin.name} />
         </Link>
-      )}
-      {tim && (
-        <button type="button" onClick={openColleague} title={titleOf(tim, "colleague")} className={SHELL}>
-          <span className={`${ROUND} bg-colleague text-white`}>
-            <MessageCircleQuestion className="size-5" aria-hidden />
-          </span>
-          <AgentLabel name={colleague?.name || "Chief"} />
-        </button>
       )}
       {/* Your agents, and adding one, after a fine rule: it says first whether the new one needs the business's number. */}
       <span className="flex flex-col items-center gap-2.5 [&:not(:has(button))]:hidden">
