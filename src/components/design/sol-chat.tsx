@@ -204,6 +204,14 @@ export function SolChat({
     setSeenPath(path);
     setSeePage(true);
   }
+  // While he can see the page beside his chat, one orange frame runs round both (15 Nov 2026, Martin: the "Looking at
+  // This page" label didn't say it meant the page beside the chat; "an orange highlight should border the sol chat and
+  // that adjacent window"): `html.sol-seeing`, drawn in globals.css only while his panel is open.
+  useEffect(() => {
+    if (!side || !seePage) return;
+    document.documentElement.classList.add("sol-seeing");
+    return () => document.documentElement.classList.remove("sol-seeing");
+  }, [side, seePage]);
   const seeing = side ? lookingAt({ title: about?.title || pageName, about: about?.about ?? "" }) : null;
   const hits =
     dealAt && jobs && dealAt.query.trim().length >= 2
@@ -361,11 +369,13 @@ export function SolChat({
   const chat = (
     <section
       className={clsx(
-        "flex min-h-0 flex-col bg-surface",
-        side ? "h-full" : "h-[calc(100dvh-13rem)] min-h-[28rem] rounded-2xl ring-1 ring-line",
+        // The charcoal runs end to end (15 Nov 2026, Martin: "the charcoal should extend end to end. i dont like the
+        // text field at the bottom feels sectioned out"): header, conversation and box are one ground, no rules between.
+        "sol-ground flex min-h-0 flex-col",
+        side ? "h-full" : "h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-2xl",
       )}
     >
-      <div className="flex items-center gap-3 border-b border-line px-5 py-3">
+      <div className="flex items-center gap-3 px-5 py-3">
         <p className="flex items-center gap-2 text-sm font-semibold text-ink">
           <span className="sol-orb inline-flex size-8 items-center justify-center rounded-full">
             <SolMark className="size-5" glow={false} />
@@ -373,6 +383,26 @@ export function SolChat({
           Sol {!side && <span className="font-normal text-muted">· your conversation is yours alone</span>}
         </p>
         <span className="ml-auto" />
+        {seeing && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={seePage}
+            aria-label="Sol can see the page beside this chat"
+            onClick={() => setSeePage(!seePage)}
+            title={
+              seePage
+                ? `Sol can see the page beside this chat (${seeing}), shown by the orange frame. Press to ask without it.`
+                : "Sol can't see the page beside this chat. Press to let him."
+            }
+            className={clsx(
+              "inline-flex size-7 items-center justify-center rounded-full transition-colors hover:bg-canvas",
+              seePage ? "text-sun-line" : "text-muted hover:text-ink",
+            )}
+          >
+            {seePage ? <Eye className="size-4" aria-hidden /> : <EyeOff className="size-4" aria-hidden />}
+          </button>
+        )}
         {/* A new chat in one press (8 Nov 2026, Martin): the current one is filed away under Past conversations. */}
         <button
           type="button"
@@ -483,7 +513,7 @@ export function SolChat({
           </ul>
         </div>
       )}
-      <div className={clsx("sol-ground staff-scroll min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6 text-sm", history && "hidden")}>
+      <div className={clsx("staff-scroll min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6 text-sm", history && "hidden")}>
         {!state && !problem && <SolThinking say="Opening your conversation…" />}
         {state && turns.length === 0 && !pending && (
           <div className="space-y-2 text-ink-2">
@@ -638,7 +668,7 @@ export function SolChat({
           e.preventDefault();
           void send();
         }}
-        className={clsx("border-t border-line p-3", history && "hidden")}
+        className={clsx("px-4 pb-4 pt-2", history && "hidden")}
       >
         {(files.length > 0 || fileProblem) && (
           <div className="mb-2 flex flex-wrap items-center gap-1.5 px-1">
@@ -660,25 +690,6 @@ export function SolChat({
               </span>
             ))}
             {fileProblem && <span className="text-xs text-danger">{fileProblem}</span>}
-          </div>
-        )}
-        {seeing && (
-          <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px]">
-            <button
-              type="button"
-              onClick={() => setSeePage(!seePage)}
-              aria-pressed={seePage}
-              title={
-                seePage ? "Sol sees this page with your question. Press to ask without it." : "Sol won't see this page. Press to let him."
-              }
-              className={clsx(
-                "inline-flex h-6 min-w-0 items-center gap-1.5 rounded-full px-2.5 ring-1 transition",
-                seePage ? "bg-sun text-sun-ink ring-sun-line/30" : "bg-surface text-muted ring-line line-through",
-              )}
-            >
-              {seePage ? <Eye className="size-3 shrink-0" aria-hidden /> : <EyeOff className="size-3 shrink-0" aria-hidden />}
-              <span className="truncate">{seePage ? `Looking at ${seeing}` : seeing}</span>
-            </button>
           </div>
         )}
         {replyTo && (
@@ -720,7 +731,7 @@ export function SolChat({
               )}
             </div>
           )}
-          <div className="flex items-center gap-1.5 rounded-2xl bg-canvas px-1.5 ring-1 ring-line focus-within:ring-sun-line">
+          <div className="flex items-center gap-1.5 rounded-2xl px-1.5 ring-1 ring-line-strong focus-within:ring-sun-line">
             <input
               ref={picker}
               type="file"

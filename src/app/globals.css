@@ -485,6 +485,31 @@ html.sol-resizing .team-pop {
   background: rgb(255 90 31 / 0.14);
   box-shadow: inset 0 0 0 1px rgb(255 90 31 / 0.38);
 }
+/* While Sol can see the page beside his chat, one orange frame runs round the two of them (sol-chat.tsx sets
+   `html.sol-seeing`; `sol-docked` is his panel open): a fine line round the page's part of the window and round his
+   panel, meeting on the edge they share. Wide screens only, where the two sit side by side. */
+@media (min-width: 1024px) {
+  html.sol-docked.sol-seeing body::after {
+    content: "";
+    position: fixed;
+    inset: 0 var(--sol-w) 0 0;
+    z-index: 60;
+    pointer-events: none;
+    border: 1.5px solid rgb(255 90 31 / 0.85);
+    border-right-width: 0;
+    box-shadow: inset 0 0 22px rgb(255 90 31 / 0.1);
+  }
+  /* Drawn over his chat, which fills the panel and would cover a shadow of the panel itself. */
+  html.sol-docked.sol-seeing aside[aria-label="Sol"]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    border: 1.5px solid rgb(255 90 31 / 0.85);
+    box-shadow: inset 0 0 22px rgb(255 90 31 / 0.1);
+  }
+}
 /* A block that follows on from the one before it is joined to it by a fine elbow (sol-text.tsx `Follows`). */
 .sol-follows {
   position: relative;
