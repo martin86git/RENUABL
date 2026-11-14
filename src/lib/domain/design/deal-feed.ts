@@ -527,3 +527,25 @@ export function teamLines(deals: readonly FeedDeal[], people: readonly { email: 
     };
   });
 }
+
+/** The colour family a stage's pill takes, from the kinds To action uses (`--kind-*` in globals.css). */
+export type StageTone = "lead" | "message" | "follow-up" | "order" | "approvals" | "date" | "install";
+
+/**
+ * Where a deal is, as a pill in its own colour with its own icon, as To action's kinds are (14 Nov 2026, Martin: "the new
+ * lead has an icon and blue colour, this should be the same on the feed", and something like it for each stage).
+ */
+const STAGE_PILLS: Partial<Record<JobStage, { words: string; tone: StageTone }>> = {
+  lead: { words: "New lead", tone: "lead" },
+  designed: { words: "Designed", tone: "message" },
+  proposal: { words: "Proposal sent", tone: "follow-up" },
+  won: { words: "Sold", tone: "order" },
+  ordered: { words: "Ordered", tone: "approvals" },
+  scheduled: { words: "Booked in", tone: "date" },
+  installed: { words: "Installed", tone: "install" },
+};
+
+/** A stage's pill: its words and colour; a stage without one of its own reads as its label, in the quiet grey. */
+export function stagePill(stage: JobStage): { words: string; tone: StageTone } {
+  return STAGE_PILLS[stage] ?? { words: STAGE_LABELS[stage], tone: "approvals" };
+}

@@ -26,6 +26,12 @@ import {
   Plus,
   Undo2,
   X,
+  UserPlus,
+  Truck,
+  CalendarCheck,
+  HardHat,
+  Stamp,
+  type LucideIcon,
 } from "lucide-react";
 import {
   LATER_CHOICES,
@@ -40,6 +46,8 @@ import {
   openAskLine,
   padLines,
   solLine,
+  stagePill,
+  type StageTone,
   todayParts,
   markHolds,
   markWords,
@@ -56,7 +64,7 @@ import {
   type FeedMark,
   type LaterChoice,
 } from "@/lib/domain/design/deal-feed";
-import { OPEN_STAGES, STAGE_LABELS } from "@/lib/domain/design/crm";
+import { OPEN_STAGES, STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { emailDeal, listPipelines, saveJob, setDealOwner } from "@/lib/services/crm";
 import { dayChip, installDayEmail } from "@/lib/domain/design/install-days";
@@ -523,6 +531,7 @@ function ArrivalCard(props: {
             {d.customer}
           </Link>
           <p className="truncate text-[12px] text-muted">{d.suburb || d.title || "No address yet"}</p>
+          <StagePill stage={d.stage} className="mt-1" />
         </div>
       </div>
       <p className="text-[12px] text-ink-2">{[d.source || null, agoWords(d.createdAt, now)].filter(Boolean).join(" · ")}</p>
@@ -841,12 +850,11 @@ function DealRow(props: {
           <span className="flex flex-wrap items-center gap-x-2">
             <span className="text-[14px] font-medium text-ink">{d.customer}</span>
             {d.suburb && <span className="text-[12.5px] text-muted">· {d.suburb}</span>}
+            <StagePill stage={d.stage} />
             <HeatChip deal={d} />
           </span>
           <span className="block truncate text-[12.5px] text-ink-2">
-            {[systemLine(d) || d.title || "Solar", STAGE_LABELS[d.stage], caption(d, now)]
-              .filter((w, i, all) => all.indexOf(w) === i)
-              .join(" · ")}
+            {[systemLine(d) || d.title || "Solar", caption(d, now)].filter((w, i, all) => all.indexOf(w) === i).join(" · ")}
           </span>
         </span>
         <span className="shrink-0 text-[12px] text-muted">{agoWords(lastAt(d), now)}</span>
@@ -935,10 +943,11 @@ function DealCard(props: {
                 {d.customer}
               </Link>
               {d.suburb && <span className="text-[13px] text-muted">· {d.suburb}</span>}
+              <StagePill stage={d.stage} />
               <HeatChip deal={d} />
             </div>
             <p className="mt-0.5 text-[13px] text-ink-2">
-              {systemLine(d) || d.title || "Solar"} · <span className="text-ink">{STAGE_LABELS[d.stage]}</span>
+              {systemLine(d) || d.title || "Solar"}
               {d.clock && OPEN_STAGES.includes(d.stage) ? ` · ${d.clock}` : ""}
               <span className="text-muted"> · {agoWords(d.events[0]?.at ?? d.createdAt, now)}</span>
             </p>
@@ -1495,6 +1504,47 @@ function BookInstall(props: { deal: FeedDeal; days: string[]; signOff?: { sender
         </p>
       )}
     </div>
+  );
+}
+
+const STAGE_ICONS: Partial<Record<JobStage, LucideIcon>> = {
+  lead: UserPlus,
+  designed: PenTool,
+  proposal: FileText,
+  won: Handshake,
+  ordered: Truck,
+  scheduled: CalendarCheck,
+  installed: HardHat,
+};
+
+const STAGE_TONES: Record<StageTone, string> = {
+  lead: "bg-kind-lead-soft text-kind-lead",
+  message: "bg-kind-message-soft text-kind-message",
+  "follow-up": "bg-kind-follow-up-soft text-kind-follow-up",
+  order: "bg-kind-order-soft text-kind-order",
+  approvals: "bg-kind-approvals-soft text-kind-approvals",
+  date: "bg-kind-date-soft text-kind-date",
+  install: "bg-kind-install-soft text-kind-install",
+};
+
+/**
+ * Where a deal is, as a pill in its stage's colour with its icon, as To action's kinds are (14 Nov 2026, Martin: the New
+ * lead pill, blue with its icon, on the feed too, and the same for each stage).
+ */
+function StagePill({ stage, className }: { stage: JobStage; className?: string }) {
+  const pill = stagePill(stage);
+  const Icon = STAGE_ICONS[stage] ?? Stamp;
+  return (
+    <span
+      className={clsx(
+        "inline-flex h-5 w-fit shrink-0 items-center gap-1 rounded-full px-2 text-[10px] font-semibold uppercase tracking-[0.08em]",
+        STAGE_TONES[pill.tone],
+        className,
+      )}
+    >
+      <Icon className="size-3" aria-hidden />
+      {pill.words}
+    </span>
   );
 }
 
