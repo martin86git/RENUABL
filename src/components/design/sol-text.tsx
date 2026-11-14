@@ -8,6 +8,7 @@ import {
   solBlocks,
   solRow,
   solRuns,
+  threadDepths,
   withSections,
   type SolBlock,
   type SolOption,
@@ -33,18 +34,19 @@ export function SolText({
   tail,
   onAnswer,
   onPick,
-  pads = false,
+  threads = false,
 }: {
   text: string;
   tail?: React.ReactNode;
   onAnswer?: OnAnswer;
   onPick?: OnPick;
   /**
-   * Each block of his answer in a pad of its own (15 Nov 2026, Martin: "keep the pads for each block of text. similar
-   * to how we designed the charlie chat"): a paragraph or a list in a pad as wide as its words, a section in one across
-   * the column. His own chat asks for it; a place that already draws his answer in a bubble doesn't.
+   * His own chat's layout (15 Nov 2026, Martin: no pads, white text, "blocks that maintain the same distance between
+   * blocks of text as if an invisible pad existed", and mini threads): blocks sit further apart, and one that follows
+   * on from the block before is stepped in and joined to it (`threadDepths`). A place that draws his answer inside a
+   * bubble of its own doesn't ask for it.
    */
-  pads?: boolean;
+  threads?: boolean;
 }) {
   // A heading and the list under it are one section, numbered when there are several, so the eye has landmarks to
   // come back to (15 Nov 2026, Martin: the headings and bullets ran into one).
@@ -52,22 +54,40 @@ export function SolText({
   if (!blocks.length) return tail ? <>{tail}</> : null;
   const sections = blocks.filter((b) => b.kind === "section").length;
   let nth = 0;
+  const depths = threads ? threadDepths(blocks) : [];
   return (
-    <div className={pads ? "space-y-2" : "space-y-4"}>
+    <div className={threads ? "space-y-6" : "space-y-4"}>
       {blocks.map((b, i) =>
         b.kind === "section" ? (
           <Section
             key={i}
-            pad={pads}
             section={b}
             number={sections > 1 ? ++nth : null}
             tail={i === blocks.length - 1 ? tail : null}
             onPick={tail ? undefined : onPick}
           />
         ) : (
-          <Block key={i} block={b} tail={i === blocks.length - 1 ? tail : null} onAnswer={tail ? undefined : onAnswer} pad={pads} />
+          <Follows key={i} depth={depths[i] ?? 0}>
+            <Block block={b} tail={i === blocks.length - 1 ? tail : null} onAnswer={tail ? undefined : onAnswer} />
+          </Follows>
         ),
       )}
+    </div>
+  );
+}
+
+/** How far each step of a thread sits in from the one before, in rem. */
+const THREAD_STEP = 1.5;
+
+/**
+ * A block in its place in a thread: one that follows on is stepped in by its depth and joined to the block before it
+ * by a fine elbow (`.sol-follows` in globals.css), so related blocks read as one small thread without a pad.
+ */
+function Follows({ depth, children }: { depth: number; children: React.ReactNode }) {
+  if (depth <= 0) return <>{children}</>;
+  return (
+    <div className="sol-follows" style={{ marginLeft: `${depth * THREAD_STEP}rem` }}>
+      {children}
     </div>
   );
 }
@@ -83,16 +103,14 @@ function Section({
   number,
   tail,
   onPick,
-  pad = false,
 }: {
-  pad?: boolean;
   section: SolSection;
   number: number | null;
   tail: React.ReactNode;
   onPick?: OnPick;
 }) {
   return (
-    <section className={pad ? "sol-pad rounded-2xl bg-canvas px-3.5 pb-0.5 pt-3" : ""}>
+    <section>
       <h4 className="flex items-baseline gap-2.5 border-b border-ink/80 pb-2 text-ink">
         {number !== null && (
           <span className="shrink-0 text-[10.5px] tabular-nums text-muted" aria-hidden>
@@ -102,7 +120,7 @@ function Section({
         <span className="min-w-0 font-[560]">{section.title}</span>
         <span className="ml-auto shrink-0 pl-2 text-[10.5px] font-normal tabular-nums text-muted">{section.items.length}</span>
       </h4>
-      <ul className="divide-y divide-black/[0.08]">
+      <ul className="divide-y divide-line">
         {section.items.map((item, i) => {
           const row = solRow(item);
           return (
@@ -125,7 +143,7 @@ function Section({
                   onClick={() => onPick(item.replace(/\*\*/g, ""))}
                   title="Work on this one with Sol"
                   aria-label={`Work on this one with Sol: ${row.name ?? row.detail}`}
-                  className="-mr-1 grid size-7 shrink-0 place-items-center rounded-full text-muted/60 transition hover:bg-ink hover:text-white group-hover/row:text-ink group-hover/row:hover:text-white"
+                  className="-mr-1 grid size-7 shrink-0 place-items-center rounded-full text-muted/70 transition hover:bg-ink hover:text-surface group-hover/row:text-ink group-hover/row:hover:text-surface"
                 >
                   <ArrowRight className="size-3.5" aria-hidden />
                 </button>
@@ -184,14 +202,11 @@ function Runs({ text }: { text: string }) {
   );
 }
 
-/** A pad as wide as its words, for a paragraph or a list of his. */
-const PAD = "sol-pad w-fit max-w-full rounded-2xl bg-canvas px-3.5 py-2.5";
-
-function Block({ block, tail, onAnswer, pad = false }: { block: SolBlock; tail: React.ReactNode; onAnswer?: OnAnswer; pad?: boolean }) {
+function Block({ block, tail, onAnswer }: { block: SolBlock; tail: React.ReactNode; onAnswer?: OnAnswer }) {
   switch (block.kind) {
     case "list":
       return (
-        <ul className={"space-y-2 " + (pad ? PAD : "")}>
+        <ul className="space-y-2">
           {block.items.map((item, i) => {
             const named = namedItem(item);
             return (
@@ -219,9 +234,9 @@ function Block({ block, tail, onAnswer, pad = false }: { block: SolBlock; tail: 
         // The point that matters most is the conversation's one highlight (15 Nov 2026, Martin: "default to black and
         // white. and add highlights. which will make key points stand out"): a wash of the signal colour, named in it,
         // its words a size up. Nothing else in his answer is coloured.
-        <div className="sol-pad sol-key rounded-2xl px-4 py-3">
+        <div className="sol-key rounded-2xl px-4 py-3">
           <p className="text-[10px] font-[560] uppercase tracking-[0.18em] text-sun-line">Key point</p>
-          <p className="sol-key-words mt-1">
+          <p className="mt-1 font-[520] leading-[1.5] text-ink">
             <Runs text={block.text} />
             {tail}
           </p>
@@ -229,7 +244,7 @@ function Block({ block, tail, onAnswer, pad = false }: { block: SolBlock; tail: 
       );
     case "ask":
       return (
-        <div className="sol-pad rounded-2xl bg-surface px-3.5 py-3 font-[520] text-ink ring-1 ring-line">
+        <div className="rounded-2xl bg-surface px-3.5 py-3 font-[520] text-ink ring-1 ring-line-strong">
           <p className="flex gap-2.5">
             <CircleHelp className="mt-[0.2em] size-4 shrink-0 text-ink" aria-label="A question for you" />
             <span className="min-w-0">
@@ -273,14 +288,14 @@ function Block({ block, tail, onAnswer, pad = false }: { block: SolBlock; tail: 
       return <ChoiceCard question={block.text} options={block.options} onAnswer={onAnswer} tail={tail} />;
     case "more":
       return (
-        <p className={"text-[0.95em] text-muted " + (pad ? "px-1 pt-1" : "")}>
+        <p className="text-[0.95em] text-muted">
           {block.text}
           {tail}
         </p>
       );
     default:
       return (
-        <p className={"whitespace-pre-line " + (pad ? PAD : "")}>
+        <p className="whitespace-pre-line">
           <Runs text={block.text} />
           {tail}
         </p>
@@ -322,7 +337,7 @@ function ChoiceCard({
     );
   return (
     <div
-      className="sol-pad overflow-hidden rounded-2xl bg-surface font-normal text-ink ring-1 ring-line"
+      className="overflow-hidden rounded-2xl bg-surface font-normal text-ink ring-1 ring-line-strong"
       onKeyDown={(e) => {
         const n = Number(e.key);
         if (live && n >= 1 && n <= options.length && !(e.target instanceof HTMLInputElement)) choose(options[n - 1].label);

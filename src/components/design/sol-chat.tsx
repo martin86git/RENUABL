@@ -906,9 +906,10 @@ function Bubble({
   if (!text) return null;
   return (
     <div className={clsx("flex flex-col", you ? "items-end" : "items-stretch")}>
-      {/* Black and white (15 Nov 2026, Martin: "add outlines to discern my message from sols… think apple"): the
-          member's words sit right in a fine black outline; Sol's answer is named, then each block of it sits in a
-          quiet pad of its own (sol-text.tsx `pads`), as the phone assistant's chat sets its answers. */}
+      {/* No pads for what is written (15 Nov 2026, Martin: "remove the pads for text you and i write and just make
+          the text white"): the member's words sit right, white on the charcoal, with one fine rule down their right
+          side so the two sides are told apart; Sol's answer is named and reads across the column in mini threads
+          (sol-text.tsx `threads`). */}
       {!you && (
         <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
           <SolMark className="size-3.5" glow={false} /> Sol
@@ -918,13 +919,13 @@ function Bubble({
         className={clsx(
           "[overflow-wrap:anywhere]",
           you
-            ? "max-w-[80%] whitespace-pre-wrap font-[380] rounded-[1.25rem] rounded-br-md border border-ink/80 px-3.5 py-2 text-[13px] leading-[1.5] tracking-[-0.006em] text-ink"
+            ? "max-w-[80%] whitespace-pre-wrap border-r border-ink/70 py-0.5 pr-3.5 text-[13px] font-[380] leading-[1.6] tracking-[-0.004em] text-ink"
             : "sol-prose",
           pinned && (you ? "ring-2 ring-sun-line/50" : "rounded-2xl p-4 ring-2 ring-sun-line/50"),
         )}
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
-        {you ? text : <SolText text={text} onAnswer={onAnswer} onPick={onPick} pads />}
+        {you ? text : <SolText text={text} onAnswer={onAnswer} onPick={onPick} threads />}
         {at && <span className={clsx("block text-[10.5px] text-muted", you ? "mt-1" : "mt-3")}>{when(at)}</span>}
       </div>
       {at && (

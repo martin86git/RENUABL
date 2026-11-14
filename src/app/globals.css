@@ -445,9 +445,9 @@ html.sol-resizing .team-pop {
 }
 /* Sol's conversation is black and white (15 Nov 2026, Martin: "this could be black and white, and still look
    beautiful… think apple. think tesla"; then "perhaps the background is the charcoal from the theme"). The ground is
-   the studio's charcoal with light type and fine light lines; each block of his answer is a white pad on it
-   (`.sol-pad`, which puts the light colours back for what is inside); the member's message is a white outline. The
-   one colour is the key point's. */
+   the studio's charcoal with white type and fine light lines, and nothing written is in a pad any more: his words and
+   the member's sit straight on it, blocks apart by the room a pad would take, a block that follows on stepped in and
+   joined to the one before. The one colour, and the one pad, is the key point's. */
 .sol-ground {
   --canvas: #45484f;
   --surface: #3a3d43;
@@ -464,49 +464,41 @@ html.sol-resizing .team-pop {
   background: #3a3d43;
   color: var(--ink);
 }
-.sol-ground .sol-pad {
-  --canvas: #f5f5f7;
-  --surface: #ffffff;
-  --surface-2: #ebebed;
-  --ink: #1d1d1f;
-  --ink-2: #3c3d41;
-  --muted: #6e6e73;
-  --line: #e3e3e8;
-  --line-strong: #cdced3;
-  --primary: #3a3d43;
-  --primary-ink: #ffffff;
-  --sun: #fff0e6;
-  --sun-ink: #b53c00;
-  background: #ffffff;
-  color: #1d1d1f;
-}
-/* His answers' type (15 Nov 2026, Martin: "the font is too thick - and the font is too big"): the interface's own
-   face a size down and lighter than the interface sets it (Inter is a variable face, so 380 is a real weight, between
-   light and regular), near-black, with a generous line. Names and headings step up from it in weight, not in size. */
+/* His answers' type (15 Nov 2026, Martin: "the font is too thick - and the font is too big"; then "remove the pads
+   for text you and i write and just make the text white"): the interface's own face a size down and lighter than the
+   interface sets it (Inter is a variable face, so 380 is a real weight), white on the charcoal, with a generous line.
+   Names and headings step up from it in weight, not in size. */
 .sol-prose {
   font-size: 13px;
   font-weight: 380;
   line-height: 1.6;
-  letter-spacing: -0.006em;
-  color: #1d1d1f;
+  letter-spacing: -0.004em;
+  color: #f2f2f4;
   -webkit-font-smoothing: antialiased;
 }
-/* The key point: the conversation's one highlight, and a pad of a different kind from the rest (Martin: "must also be
-   different aside from just the color highlight. perhaps make it italic"): a wash of the signal colour, and its words
-   in an italic serif, as a pulled quote is set. The serif is the reader's own (Iowan on a Mac, Palatino on Windows,
-   Georgia anywhere) because each carries a true italic; the site's own faces would only be slanted by the browser. */
-.sol-key,
-.sol-ground .sol-pad.sol-key {
-  background: color-mix(in srgb, var(--sun-line) 13%, #fff);
+/* The key point: the conversation's one highlight and its only pad (no italics: Martin, 15 Nov 2026). A wash of the
+   signal colour; on the charcoal it is a tint with a fine orange edge. */
+.sol-key {
+  background: color-mix(in srgb, var(--sun-line) 9%, #fff);
 }
-.sol-key-words {
-  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  font-style: italic;
-  font-weight: 400;
-  font-size: 1.14em;
-  line-height: 1.45;
-  letter-spacing: 0;
-  color: #1d1d1f;
+.sol-ground .sol-key {
+  background: rgb(255 90 31 / 0.14);
+  box-shadow: inset 0 0 0 1px rgb(255 90 31 / 0.38);
+}
+/* A block that follows on from the one before it is joined to it by a fine elbow (sol-text.tsx `Follows`). */
+.sol-follows {
+  position: relative;
+}
+.sol-follows::before {
+  content: "";
+  position: absolute;
+  left: -0.8rem;
+  top: -1rem;
+  width: 0.55rem;
+  height: calc(1rem + 0.85em);
+  border-left: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+  border-bottom-left-radius: 0.45rem;
 }
 /* Where Sol stands (sol-dock.tsx `SolNavButton`, and every place that draws him): no round behind him since
    14 Nov 2026 (Martin: "remove the black ring… standalone sun"), so the box is only his place and he fills it. A soft

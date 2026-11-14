@@ -1,3 +1,4 @@
+import { threadDepths } from "./sol-format";
 import { solRow, withSections } from "./sol-format";
 import { describe, expect, it } from "vitest";
 import { LONG_PARAGRAPH, MAX_OPTIONS, answerFor, brokenUp, isYesNoQuestion, solBlocks, solPlain } from "./sol-format";
@@ -176,5 +177,23 @@ describe("sections and rows", () => {
       amount: null,
       detail: "No owner or installer is assigned to the deal.",
     });
+  });
+});
+
+describe("mini threads", () => {
+  it("steps each block that follows on, and starts again at a new subject", () => {
+    const blocks = [
+      { kind: "para", text: "Casey's install is booked for the 23rd." },
+      { kind: "para", text: "The pre-approval isn't lodged yet." },
+      { kind: "list" },
+      { kind: "para", text: "Last, two new leads have had no change." },
+      { kind: "para", text: "Both are on Hanwell Court." },
+    ];
+    expect(threadDepths(blocks)).toEqual([0, 1, 2, 0, 1]);
+  });
+  it("stands a section, key point or question alone and never steps past the limit", () => {
+    expect(threadDepths([{ kind: "para", text: "One." }, { kind: "key" }, { kind: "para", text: "Two." }])).toEqual([0, 0, 0]);
+    const many = Array.from({ length: 6 }, () => ({ kind: "para", text: "More of the same." }));
+    expect(threadDepths(many)).toEqual([0, 1, 2, 3, 3, 3]);
   });
 });

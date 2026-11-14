@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-15",
     area: "Sol",
+    words: "Sol's chat has no pads now: white text on charcoal, with points that follow on stepped in and joined by a fine line.",
+  },
+  {
+    day: "2026-11-15",
+    area: "Sol",
     words: "Sol's chat sits on charcoal with a white pad for each part of his answer, lighter type, and key points in italics.",
   },
   {

@@ -216,6 +216,38 @@ export function withSections(blocks: SolBlock[]): (SolBlock | SolSection)[] {
   return out;
 }
 
+/** How far a thread steps in before it holds its line (the chat is a narrow column). */
+export const THREAD_DEPTH_MAX = 3;
+
+/** Words that open a new subject: a paragraph starting with one begins a thread of its own. */
+const NEW_SUBJECT =
+  /^(?:last(?:ly)?|finally|next|after that|then|separately|also|another|on another note|one more thing|other than that|meanwhile|second(?:ly)?|third(?:ly)?|on the other hand|as for|apart from that)\b/i;
+
+/**
+ * How each block sits in the mini threads of a long answer (15 Nov 2026, Martin: "any block of text that is
+ * complimentary to the one before it… should show some sort of relationship. this could be text block staggering…
+ * mini threads in long text responses without using pads"): 0 starts a thread, 1 and up follow on from the block
+ * before, a step further in each time up to `THREAD_DEPTH_MAX`. Read by rule, no AI: only paragraphs and plain lists
+ * thread; a paragraph follows on unless it opens with a word that turns to a new subject; a section, key point,
+ * question or choice stands alone and ends the thread before it.
+ */
+export function threadDepths(blocks: { kind: string; text?: string }[]): number[] {
+  const out: number[] = [];
+  let depth = -1;
+  for (const b of blocks) {
+    const threads = b.kind === "para" || b.kind === "list";
+    if (!threads) {
+      depth = -1;
+      out.push(0);
+      continue;
+    }
+    const turns = b.kind === "para" && NEW_SUBJECT.test((b.text ?? "").trim());
+    depth = depth < 0 || turns ? 0 : Math.min(depth + 1, THREAD_DEPTH_MAX);
+    out.push(depth);
+  }
+  return out;
+}
+
 /** One item of a list as a row: who or what it is about, an amount when it leads with one, and the rest. */
 export interface SolRow {
   name: string | null;
