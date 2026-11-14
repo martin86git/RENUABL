@@ -21,6 +21,38 @@ export const TEAM_CHANNELS = [
 export type TeamChannel = (typeof TEAM_CHANNELS)[number]["id"];
 const CHANNEL_IDS = new Set<string>(TEAM_CHANNELS.map((c) => c.id));
 
+/**
+ * A channel a business adds itself (14 Nov 2026, Martin: "I need to be able to add channels"): its own name, read by
+ * the whole business like the four it starts with. Its id is made on the server.
+ */
+export interface OwnChannel {
+  id: string;
+  label: string;
+}
+export const OWN_CHANNELS_MAX = 20;
+export const CHANNEL_NAME_MAX = 32;
+const OWN_ID = /^ch_[a-f0-9]{12}$/;
+export const isOwnChannelId = (room: string) => OWN_ID.test(room);
+
+/** A channel's name as typed: no leading #, one line, letters, digits and a few marks, to `CHANNEL_NAME_MAX`. */
+export function cleanChannelName(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw
+    .replace(/[^\p{L}\p{N} &'+/-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, CHANNEL_NAME_MAX)
+    .trim();
+}
+
+/** Why a channel of this (cleaned) name can't be added beside the business's own, or null when it can. */
+export function channelNameProblem(name: string, own: readonly OwnChannel[]): string | null {
+  if (name.length < 2) return "Give the channel a name of two letters or more.";
+  if (own.length >= OWN_CHANNELS_MAX) return `A business can add up to ${OWN_CHANNELS_MAX} channels.`;
+  const taken = [...TEAM_CHANNELS, ...own].some((c) => c.label.toLowerCase() === name.toLowerCase());
+  return taken ? "There's already a channel with that name." : null;
+}
+
 /** Who Sol's lines are written by. Never a member's email (it has no "@"). */
 export const SOL_BY = "sol";
 export const TEAM_LINE_MAX = 2000;
@@ -215,14 +247,16 @@ export function dmWith(room: string, me: string): string | null {
   return pair[0] === self ? pair[1] : pair[0];
 }
 
-export const isChannel = (room: string) => CHANNEL_IDS.has(room);
+/** A channel the whole business reads: one of the four it starts with, or one it added (by the shape of its id). */
+export const isChannel = (room: string) => CHANNEL_IDS.has(room) || OWN_ID.test(room);
 
 /**
- * Whether this member may read and write in a room: any channel, or a direct conversation with another member of the
- * same business (`members`: the business's emails).
+ * Whether this member may read and write in a room: any channel (one the business added only while it is among
+ * `own`, its ids), or a direct conversation with another member of the same business (`members`: its emails).
  */
-export function mayUseRoom(room: string, me: string, members: readonly string[]): boolean {
+export function mayUseRoom(room: string, me: string, members: readonly string[], own: readonly string[] = []): boolean {
   if (CHANNEL_IDS.has(room)) return true;
+  if (OWN_ID.test(room)) return own.includes(room);
   const other = dmWith(room, me);
   return other !== null && members.map((m) => m.toLowerCase()).includes(other);
 }
@@ -230,13 +264,13 @@ export function mayUseRoom(room: string, me: string, members: readonly string[])
 /** A room as sent from the browser, or null: a channel's id, or a direct conversation's. */
 export function cleanRoom(raw: unknown): string | null {
   const room = typeof raw === "string" ? raw.trim().toLowerCase().slice(0, 420) : "";
-  if (CHANNEL_IDS.has(room)) return room;
+  if (CHANNEL_IDS.has(room) || OWN_ID.test(room)) return room;
   return /^dm:[^,\s]+@[^,\s]+,[^,\s]+@[^,\s]+$/.test(room) ? room : null;
 }
 
 /** A room's name as shown: the channel's label, or the other person's name. */
-export function roomLabel(room: string, me: string): string {
-  const channel = TEAM_CHANNELS.find((c) => c.id === room);
+export function roomLabel(room: string, me: string, own: readonly OwnChannel[] = []): string {
+  const channel = TEAM_CHANNELS.find((c) => c.id === room) ?? own.find((c) => c.id === room);
   if (channel) return channel.label;
   const other = dmWith(room, me);
   return other ? nameOf(other) : "Conversation";

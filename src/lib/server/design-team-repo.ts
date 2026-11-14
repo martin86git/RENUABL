@@ -11,6 +11,9 @@ import {
   SOL_BY,
   TEAM_CHANNELS,
   TEAM_LINES_SHOWN,
+  channelNameProblem,
+  cleanChannelName,
+  isOwnChannelId,
   cleanDeals,
   cleanFiles,
   cleanReactions,
@@ -27,6 +30,7 @@ import {
   toggledReaction,
   unreadByRoom,
   TEAM_FILE_TYPES,
+  type OwnChannel,
   type TeamDeal,
   type TeamFile,
   type TeamLine,
@@ -54,10 +58,68 @@ async function membersOf(businessId: string): Promise<string[]> {
   );
 }
 
+/** The channels this business has added itself, oldest first. */
+async function ownChannels(businessId: string): Promise<OwnChannel[]> {
+  return query<OwnChannel>(`select id, label from design_team_channels where business_id = $1 order by at, id`, [businessId]);
+}
+
+/** A channel's name for this business (one it starts with, or one it added), or null when the room isn't a channel of its. */
+export async function teamChannelLabel(businessId: string, room: string): Promise<string | null> {
+  const fixed = TEAM_CHANNELS.find((c) => c.id === room);
+  if (fixed) return fixed.label;
+  if (!isOwnChannelId(room)) return null;
+  const rows = await query<{ label: string }>(`select label from design_team_channels where business_id = $1 and id = $2`, [
+    businessId,
+    room,
+  ]);
+  return rows[0]?.label ?? null;
+}
+
 async function allowed(me: TeamMe, room: string): Promise<string[]> {
   const members = await membersOf(me.businessId);
-  if (!mayUseRoom(room, me.email, members)) throw new TeamChatRefusal("That conversation isn't yours.");
+  // A channel the business added is its own only while it is still there (a removed one, or another business's id, isn't).
+  const own = isOwnChannelId(room) ? (await ownChannels(me.businessId)).map((c) => c.id) : [];
+  if (!mayUseRoom(room, me.email, members, own)) throw new TeamChatRefusal("That conversation isn't yours.");
   return members;
+}
+
+/** Adds a channel for the whole business, by a member; its name cleaned and not one already there. */
+export async function addTeamChannel(me: TeamMe, raw: unknown): Promise<OwnChannel> {
+  const label = cleanChannelName(raw);
+  return transaction(async (q) => {
+    await q(`select pg_advisory_xact_lock(hashtext($1))`, [`team-channels:${me.businessId}`]);
+    const own = await q<OwnChannel>(`select id, label from design_team_channels where business_id = $1`, [me.businessId]);
+    const problem = channelNameProblem(label, own);
+    if (problem) throw new TeamChatRefusal(problem);
+    const id = `ch_${randomToken(6)}`;
+    await q(`insert into design_team_channels (business_id, id, label, by_email) values ($1, $2, $3, $4)`, [
+      me.businessId,
+      id,
+      label,
+      me.email.toLowerCase(),
+    ]);
+    return { id, label };
+  });
+}
+
+/** Takes away a channel the business added, with everything said in it and the files sent there. */
+export async function removeTeamChannel(me: TeamMe, room: string): Promise<boolean> {
+  if (!isOwnChannelId(room)) return false;
+  return transaction(async (q) => {
+    const gone = await q<{ id: string }>(`delete from design_team_channels where business_id = $1 and id = $2 returning id`, [
+      me.businessId,
+      room,
+    ]);
+    if (!gone.length) return false;
+    const lines = await q<{ files: unknown }>(`delete from design_team_lines where business_id = $1 and room = $2 returning files`, [
+      me.businessId,
+      room,
+    ]);
+    const files = lines.flatMap((l) => cleanFiles(l.files).map((f) => f.id));
+    if (files.length) await q(`delete from design_team_files where business_id = $1 and id = any($2)`, [me.businessId, files]);
+    await q(`delete from design_team_seen where business_id = $1 and room = $2`, [me.businessId, room]);
+    return true;
+  });
 }
 
 interface Row {
@@ -133,7 +195,9 @@ async function dealSight(me: TeamMe): Promise<(id: string) => boolean> {
 async function roomsFor(me: TeamMe, members: string[]) {
   const self = me.email.toLowerCase();
   const others = members.filter((m) => m !== self);
-  const rooms = [...TEAM_CHANNELS.map((c) => c.id as string), ...others.map((o) => `dm:${[self, o].sort().join(",")}`)];
+  const own = await ownChannels(me.businessId);
+  const channels: { id: string; label: string; own?: true }[] = [...TEAM_CHANNELS, ...own.map((c) => ({ ...c, own: true as const }))];
+  const rooms = [...channels.map((c) => c.id), ...others.map((o) => `dm:${[self, o].sort().join(",")}`)];
   const [recent, seenRows] = await Promise.all([
     query<{ room: string; by: string; at: string }>(
       `select room, by_email as by, ${moment("at")} as at from design_team_lines
@@ -150,7 +214,7 @@ async function roomsFor(me: TeamMe, members: string[]) {
   const last: Record<string, string> = {};
   for (const r of recent) last[r.room] ??= r.at;
   return {
-    channels: TEAM_CHANNELS.map((c) => ({ room: c.id as string, label: c.label, unread: unread[c.id] ?? 0 })),
+    channels: channels.map((c) => ({ room: c.id, label: c.label, unread: unread[c.id] ?? 0, ...(c.own ? { own: true } : {}) })),
     people: others
       .map((o) => {
         const room = `dm:${[self, o].sort().join(",")}`;
@@ -269,7 +333,7 @@ async function tellTagged(me: TeamMe, room: string, text: string, members: strin
   const site = siteUrl();
   if (!emailProvider() || !site) return;
   const to = members.filter((m) => m !== me.email.toLowerCase() && tags(text, m));
-  const channel = TEAM_CHANNELS.find((c) => c.id === room)?.label ?? "the team chat";
+  const channel = (await teamChannelLabel(me.businessId, room)) ?? "the team chat";
   for (const address of to)
     await sendEmail({
       to: address,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  CHANNEL_NAME_MAX,
+  OWN_CHANNELS_MAX,
+  channelNameProblem,
+  cleanChannelName,
+  isChannel,
+  isOwnChannelId,
   SOL_BY,
   asksSol,
   cleanDealIds,
@@ -47,6 +53,8 @@ describe("the team chat's rooms", () => {
     expect(cleanRoom(" Deals ")).toBe("deals");
     expect(cleanRoom("dm:a@x.example,b@x.example")).toBe("dm:a@x.example,b@x.example");
     expect(cleanRoom("general")).toBeNull();
+    expect(cleanRoom("ch_0123456789ab")).toBe("ch_0123456789ab");
+    expect(cleanRoom("ch_xyz")).toBeNull();
     expect(roomLabel("service", sam)).toBe("Service");
     expect(roomLabel(dmRoom(sam, ash), ash)).toBe("Sam Lee");
     expect(nameOf(SOL_BY)).toBe("Sol");
@@ -120,5 +128,35 @@ describe("tags and unread", () => {
     expect(e.subject).toBe("Sam Lee tagged you in Deals");
     expect(e.html).toContain("&lt;Casey&gt;");
     expect(e.text).not.toContain(sam);
+  });
+});
+
+describe("channels a business adds itself", () => {
+  const own = [{ id: "ch_0123456789ab", label: "Warranty" }];
+
+  it("cleans a typed name to one plain line", () => {
+    expect(cleanChannelName("  #Stock   &  orders ")).toBe("Stock & orders");
+    expect(cleanChannelName("<b>Hi</b>\nthere")).toBe("b Hi /b there");
+    expect(cleanChannelName("x".repeat(80))).toHaveLength(CHANNEL_NAME_MAX);
+    expect(cleanChannelName(12)).toBe("");
+  });
+
+  it("refuses a name too short, already there, or past the limit", () => {
+    expect(channelNameProblem("Stock", own)).toBeNull();
+    expect(channelNameProblem("S", own)).toMatch(/two letters/);
+    expect(channelNameProblem("warranty", own)).toMatch(/already/);
+    expect(channelNameProblem("DEALS", own)).toMatch(/already/);
+    const full = Array.from({ length: OWN_CHANNELS_MAX }, (_, i) => ({ id: `ch_${String(i).padStart(12, "0")}`, label: `C${i}` }));
+    expect(channelNameProblem("Stock", full)).toMatch(/up to/);
+  });
+
+  it("is a channel only for the business that has it", () => {
+    expect(isChannel("ch_0123456789ab")).toBe(true);
+    expect(isOwnChannelId("deals")).toBe(false);
+    expect(mayUseRoom("ch_0123456789ab", "sam@x.example", [], ["ch_0123456789ab"])).toBe(true);
+    expect(mayUseRoom("ch_0123456789ab", "sam@x.example", [])).toBe(false);
+    expect(mayUseRoom("ch_ffffffffffff", "sam@x.example", [], ["ch_0123456789ab"])).toBe(false);
+    expect(roomLabel("ch_0123456789ab", "sam@x.example", own)).toBe("Warranty");
+    expect(asksSol("ch_0123456789ab", "@Sol what's the claim window?")).toBe(true);
   });
 });

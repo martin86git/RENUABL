@@ -761,6 +761,15 @@ create table if not exists design_team_files (
   at timestamptz not null default now(),
   primary key (business_id, id)
 );
+-- Channels a business adds to its team chat beside the ones it starts with (their lines are design_team_lines, by id).
+create table if not exists design_team_channels (
+  business_id text not null references businesses(id) on delete cascade,
+  id text not null,
+  label text not null,
+  by_email text not null,
+  at timestamptz not null default now(),
+  primary key (business_id, id)
+);
 create table if not exists design_team_seen (
   business_id text not null references businesses(id) on delete cascade,
   email text not null,

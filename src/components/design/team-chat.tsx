@@ -5,7 +5,21 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { AtSign, Check, FileText, Hash, MessagesSquare, Paperclip, Pencil, Reply, SmilePlus, SquareKanban, Trash2, X } from "lucide-react";
+import {
+  AtSign,
+  Check,
+  FileText,
+  Hash,
+  MessagesSquare,
+  Paperclip,
+  Pencil,
+  Plus,
+  Reply,
+  SmilePlus,
+  SquareKanban,
+  Trash2,
+  X,
+} from "lucide-react";
 import { cleanKind } from "@/lib/domain/design/business-kind";
 import {
   CATCH_UP_MIN,
@@ -21,6 +35,7 @@ import { matches } from "@/lib/domain/design/find";
 import { handleOf } from "@/lib/domain/design/mentions";
 import {
   SOL_BY,
+  CHANNEL_NAME_MAX,
   TEAM_CHANNELS,
   TEAM_DEALS_MAX,
   TEAM_EMOJIS,
@@ -29,6 +44,8 @@ import {
   TEAM_POLL_MS,
   TEAM_QUICK_REACTIONS,
   asksSol,
+  cleanChannelName,
+  dmRoom,
   dmWith,
   initialsOf,
   isTeamPicture,
@@ -49,6 +66,8 @@ import {
   ROOM_KEY,
   TEAM_CHANGED,
   TEAM_OPEN,
+  addTeamChannel,
+  removeTeamChannel,
   teamUnreadCount,
   deleteTeamLine,
   editTeamLine,
@@ -63,6 +82,8 @@ import {
 } from "@/lib/services/team-chat";
 import { dealRoom, jobOfRoom, writerName, type DealChatLine } from "@/lib/domain/design/deal-team";
 import { DEAL_TEAM_CHANGED, openDealChat } from "@/lib/services/deal-team";
+import { TEAM_LEVELS, levelPermissions, type TeamLevel } from "@/lib/domain/design/welcome";
+import { addMember, setMemberPermissions } from "@/lib/services/design-account";
 import { DealTeamChat } from "./deal-team-chat";
 import { useDesignAccount } from "./design-account";
 import { DictateButton, withSpoken } from "./dictate";
@@ -115,6 +136,8 @@ export function TeamChatPanel({
   });
   const [view, setView] = useState<TeamRoomView | null>(null);
   const [error, setError] = useState("");
+  /** Which plus in the list is open: a new channel, or someone new to message. */
+  const [adding, setAdding] = useState<"channel" | "person" | null>(null);
   // The list down the left is dragged wider or narrower by its edge (12 Nov 2026, Martin: the deals' names were cut off).
   const panelRef = useRef<HTMLDivElement>(null);
   const [listW, setListW] = useState<number>(() => {
@@ -241,7 +264,8 @@ export function TeamChatPanel({
   }, [load]);
 
   const members = view?.members ?? [];
-  const channel = TEAM_CHANNELS.find((c) => c.id === room);
+  const ownChannel = view?.channels.find((c) => c.room === room);
+  const channel = TEAM_CHANNELS.find((c) => c.id === room) ?? (ownChannel ? { id: ownChannel.room, label: ownChannel.label } : undefined);
   const dealJob = jobOfRoom(room);
   const dealOpen = dealJob ? (view?.dealChats?.find((d) => d.jobId === dealJob) ?? null) : null;
   const elsewhere = solOpen || dealJob !== null;
@@ -409,14 +433,64 @@ export function TeamChatPanel({
           jobs={jobs}
           needJobs={() => jobs === null && void listJobs().then((r) => setJobs(r.ok ? r.jobs : []))}
         />
-        <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Channels</p>
-        {(view?.channels ?? TEAM_CHANNELS.map((c) => ({ room: c.id as string, label: c.label, unread: 0 }))).map((c) => (
-          <RoomButton key={c.room} on={room === c.room} unread={c.unread} onClick={() => setRoom(c.room)}>
-            <Hash className="size-3.5 shrink-0 text-muted" aria-hidden />
-            <span className="truncate">{c.label}</span>
-          </RoomButton>
+        <ListHead
+          label="Channels"
+          plus="Add a channel"
+          on={adding === "channel"}
+          onPlus={() => setAdding((a) => (a === "channel" ? null : "channel"))}
+        />
+        {adding === "channel" && (
+          <AddChannel
+            onAdded={(id) => {
+              setAdding(null);
+              setRoom(id);
+              void load();
+            }}
+            onClose={() => setAdding(null)}
+          />
+        )}
+        {(view?.channels ?? TEAM_CHANNELS.map((c) => ({ room: c.id as string, label: c.label, unread: 0, own: false }))).map((c) => (
+          <div key={c.room} className="group relative">
+            <RoomButton on={room === c.room} unread={c.unread} onClick={() => setRoom(c.room)}>
+              <Hash className="size-3.5 shrink-0 text-muted" aria-hidden />
+              <span className="truncate">{c.label}</span>
+            </RoomButton>
+            {c.own && view?.mayRemoveChannels && (
+              <button
+                type="button"
+                title={`Remove ${c.label}`}
+                aria-label={`Remove the channel ${c.label}`}
+                onClick={async () => {
+                  if (!window.confirm(`Remove the channel ${c.label} for everyone? What was said in it goes too.`)) return;
+                  const r = await removeTeamChannel(c.room);
+                  if (!r.ok) return setError(r.message);
+                  if (room === c.room) setRoom("deals");
+                  void load();
+                }}
+                className="absolute right-2.5 top-1/2 hidden size-6 -translate-y-1/2 place-items-center rounded-full bg-surface text-muted ring-1 ring-line hover:text-danger group-focus-within:grid group-hover:grid"
+              >
+                <X className="size-3" aria-hidden />
+              </button>
+            )}
+          </div>
         ))}
-        <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Direct messages</p>
+        <ListHead
+          label="Direct messages"
+          plus="Message someone new"
+          on={adding === "person"}
+          onPlus={() => setAdding((a) => (a === "person" ? null : "person"))}
+        />
+        {adding === "person" && (
+          <AddPerson
+            mayAdd={view?.mayAddPeople === true}
+            onAdded={(email) => {
+              setAdding(null);
+              setRoom(dmRoom(me, email));
+              void load();
+            }}
+            onClose={() => setAdding(null)}
+          />
+        )}
         <div className="staff-scroll min-h-0 flex-1 overflow-y-auto pb-2">
           {hasSol && (
             <RoomButton on={solOpen} unread={0} onClick={() => setRoom(SOL_ROOM)} title="Your own conversation with Sol">
@@ -425,7 +499,7 @@ export function TeamChatPanel({
             </RoomButton>
           )}
           {view && view.people.length === 0 && (
-            <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Add people under Your account.</p>
+            <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Press + to add someone.</p>
           )}
           {view?.people.map((p) => (
             <RoomButton key={p.room} on={room === p.room} unread={p.unread} onClick={() => setRoom(p.room)} title={p.email}>
@@ -494,7 +568,7 @@ export function TeamChatPanel({
           <div className="min-w-0">
             <p className="flex items-center gap-1 truncate text-sm font-semibold">
               {channel && <Hash className="size-3.5 text-muted" aria-hidden />}
-              {roomLabel(room, me)}
+              {channel ? channel.label : roomLabel(room, me)}
             </p>
             <p className="truncate text-[11px] text-muted">
               {channel ? "Everyone in the business" : "Just the two of you"} · never seen by customers
@@ -1127,6 +1201,146 @@ function Round({ email, small = false }: { email: string; small?: boolean }) {
     >
       {email === SOL_BY ? <SolBadge className={small ? "size-3.5" : "size-[18px]"} /> : initialsOf(email)}
     </span>
+  );
+}
+
+/** A heading in the list of conversations with a plus at its end (14 Nov 2026, Martin: "add channels + and dm +"). */
+function ListHead(props: { label: string; plus: string; on: boolean; onPlus: () => void }) {
+  return (
+    <p className="flex items-center justify-between px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+      {props.label}
+      <button
+        type="button"
+        title={props.plus}
+        aria-label={props.plus}
+        aria-expanded={props.on}
+        onClick={props.onPlus}
+        className={clsx(
+          "rounded-full p-0.5 normal-case tracking-normal hover:bg-surface-2 hover:text-ink",
+          props.on ? "bg-surface-2 text-ink" : "text-ink-2",
+        )}
+      >
+        <Plus className="size-3.5" aria-hidden />
+      </button>
+    </p>
+  );
+}
+
+const ADD_BOX =
+  "w-full rounded-lg bg-surface px-2 py-1 text-[12.5px] text-ink ring-1 ring-line focus:outline-none focus:ring-2 focus:ring-sun-line";
+const ADD_GO = "rounded-lg bg-primary px-2.5 py-1 text-[12px] font-medium text-white disabled:bg-surface-2 disabled:text-muted";
+
+/** A new channel for the whole business: its name, then Add. */
+function AddChannel(props: { onAdded: (id: string) => void; onClose: () => void }) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  const clean = cleanChannelName(name);
+  const add = async () => {
+    if (clean.length < 2 || busy) return;
+    setBusy(true);
+    const r = await addTeamChannel(clean);
+    setBusy(false);
+    if (!r.ok) return setProblem(r.message);
+    props.onAdded(r.channel.id);
+  };
+  return (
+    <div className="px-2 pb-1.5">
+      <div className="flex items-center gap-1.5">
+        <input
+          autoFocus
+          value={name}
+          maxLength={CHANNEL_NAME_MAX + 8}
+          onChange={(e) => {
+            setName(e.target.value);
+            setProblem("");
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") props.onClose();
+            if (e.key === "Enter") void add();
+          }}
+          aria-label="The new channel's name"
+          placeholder="Channel name"
+          className={ADD_BOX}
+        />
+        <button type="button" onClick={() => void add()} disabled={clean.length < 2 || busy} className={ADD_GO}>
+          Add
+        </button>
+      </div>
+      <p className={clsx("px-1 pt-1 text-[11px]", problem ? "text-danger" : "text-muted")}>
+        {problem || "Everyone in your business can read and write in it."}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Someone new to message: everyone already in the business is listed under Direct messages, so this adds a person to
+ * the business (the owner's to do, as on Your account), then opens the conversation with them.
+ */
+function AddPerson(props: { mayAdd: boolean; onAdded: (email: string) => void; onClose: () => void }) {
+  const [email, setEmail] = useState("");
+  const [level, setLevel] = useState<TeamLevel>("user");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  const who = email.trim().toLowerCase();
+  const valid = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(who);
+  if (!props.mayAdd)
+    return (
+      <p className="px-3 pb-1.5 text-xs text-muted">
+        Everyone in your business is listed here. Only the owner can add someone new, under Your account.
+      </p>
+    );
+  const add = async () => {
+    if (!valid || busy) return;
+    setBusy(true);
+    const made = await addMember(who);
+    const set = made.problem ? made : await setMemberPermissions(who, levelPermissions(level));
+    setBusy(false);
+    if (made.problem) return setProblem(made.problem);
+    if (set.problem) setProblem(set.problem);
+    props.onAdded(who);
+  };
+  return (
+    <div className="px-2 pb-1.5">
+      <input
+        autoFocus
+        type="email"
+        value={email}
+        onChange={(e) => {
+          setEmail(e.target.value);
+          setProblem("");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") props.onClose();
+          if (e.key === "Enter") void add();
+        }}
+        aria-label="Their email address"
+        placeholder="Their email"
+        className={ADD_BOX}
+      />
+      <div className="mt-1.5 flex items-center gap-1.5">
+        <select
+          value={level}
+          onChange={(e) => setLevel(e.target.value as TeamLevel)}
+          aria-label="What they can do"
+          title={TEAM_LEVELS.find((l) => l.level === level)?.about}
+          className={clsx(ADD_BOX, "min-w-0 flex-1")}
+        >
+          {TEAM_LEVELS.map((l) => (
+            <option key={l.level} value={l.level}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+        <button type="button" onClick={() => void add()} disabled={!valid || busy} className={ADD_GO}>
+          {busy ? "Adding…" : "Add"}
+        </button>
+      </div>
+      <p className={clsx("px-1 pt-1 text-[11px]", problem ? "text-danger" : "text-muted")}>
+        {problem || "Adds them to your business as a user on your plan. They sign in with this email; nothing is sent to them."}
+      </p>
+    </div>
   );
 }
 

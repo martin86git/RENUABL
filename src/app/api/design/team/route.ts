@@ -10,10 +10,12 @@ import { solStepsIn } from "@/lib/server/design-sol-joins";
 import { catchUp, pressAction, solOffersWork } from "@/lib/server/design-sol-work";
 import {
   TeamChatRefusal,
+  addTeamChannel,
   deleteTeamLine,
   editTeamLine,
   markTeamSeen,
   reactToTeamLine,
+  removeTeamChannel,
   sayInTeam,
   teamRoom,
   teamUnread,
@@ -68,7 +70,8 @@ function solHears(member: Member, room: string, text: string, lineId: string) {
 /**
  * The team chat (domain/design/team-chat.ts). GET ?room= → the room as this member sees it (Deals when left out);
  * GET ?count=1 → only how many lines are unread (with the deal chats followed); GET ?deals=1 → those deal chats. POST JSON { room, text, deals } says something, { room, seen: true }
- * marks it read, { edit: id, text }, { delete: id }, { react: id, emoji }; POST a form (room, text, deal…, file…) sends
+ * marks it read, { edit: id, text }, { delete: id }, { react: id, emoji }, { addChannel: name } (any member) and
+ * { removeChannel: id } (who may change settings; what was said in it goes too); POST a form (room, text, deal…, file…) sends
  * files with the words.
  */
 export async function GET(request: Request) {
@@ -93,6 +96,9 @@ export async function GET(request: Request) {
         dealChats: deals.deals,
         solJoinsIn: prefs.solJoinsIn,
         maySwitchSol: can(m.role, "prices", m.permissions),
+        // Taking a channel the business added away is a setting; adding a person is the owner's (the members route checks).
+        mayRemoveChannels: can(m.role, "prices", m.permissions),
+        mayAddPeople: can(m.role, "members", m.permissions),
         // Whether Sol's order cards are theirs to answer (the server checks again on the press).
         seesCosts: can(m.role, "costs", m.permissions),
       });
@@ -142,6 +148,18 @@ export async function POST(request: Request) {
       if (id(b.react)) {
         await reactToTeamLine(me, id(b.react), typeof b.emoji === "string" ? b.emoji : "");
         return Response.json({ ok: true });
+      }
+      if (typeof b.addChannel === "string") {
+        if (!allow(request, "design-team-channels", 30))
+          return Response.json({ ok: false, message: "That's a lot of channels this hour: try again shortly." }, { status: 429 });
+        return Response.json({ ok: true, channel: await addTeamChannel(me, b.addChannel) });
+      }
+      if (typeof b.removeChannel === "string") {
+        const m = who.member;
+        if (!can(m.role, "prices", m.permissions))
+          return Response.json({ ok: false, message: "Only someone who changes the settings can remove a channel." }, { status: 403 });
+        const gone = await removeTeamChannel(me, b.removeChannel.slice(0, 40));
+        return gone ? Response.json({ ok: true }) : Response.json({ ok: false, message: "There's no such channel." }, { status: 404 });
       }
       // A press on Sol's card: do what it offers, or set it aside.
       if (id(b.apply)) {

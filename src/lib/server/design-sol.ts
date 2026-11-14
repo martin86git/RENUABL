@@ -74,7 +74,7 @@ import { addSolCredits, giveBackSolCredit, keepCost, modelFor, takeSolCredit } f
 import { RESEARCH_CREDITS, THINK_DEEPER_TOOL, TIER_CREDITS, routeQuestion, type SolTier } from "@/lib/domain/design/sol-routing";
 import { usageOf, type AiUsage } from "@/lib/domain/ai-costs";
 import { SOL_OUT, type SolUse } from "@/lib/domain/design/sol-credits";
-import { channelContext, solSaysInTeam } from "./design-team-repo";
+import { channelContext, solSaysInTeam, teamChannelLabel } from "./design-team-repo";
 import { query } from "./db";
 import { dealTeamContext, solPostsOnDeal } from "./design-deal-team-repo";
 import { listSheets } from "./design-datasheets-repo";
@@ -102,7 +102,7 @@ import {
 } from "@/lib/domain/design/sol-knowledge";
 import { recall, saveKnowledge } from "./design-sol-knowledge-repo";
 import { pageContextBlock, type PageContext } from "@/lib/domain/design/page-context";
-import { TEAM_CHANNELS, nameOf } from "@/lib/domain/design/team-chat";
+import { nameOf } from "@/lib/domain/design/team-chat";
 
 const STEPS = 6;
 /** Searches that end a step early (pause_turn) carry on; this many at most, so a long search can't loop. */
@@ -931,8 +931,9 @@ export async function chooseReminderTime(member: Member, id: string, choice: Whe
  * answer also land in that member's own conversation with him, where any email he writes waits as a card.
  */
 export async function solAnswersInChannel(member: Member, room: string, asked: string, apiKey: string | null): Promise<void> {
-  const channel = TEAM_CHANNELS.find((c) => c.id === room);
-  if (!channel) return;
+  const label = await teamChannelLabel(member.businessId, room);
+  if (!label) return;
+  const channel = { label };
   const before = (await channelContext(member.businessId, room)).filter((l) => l.text !== asked);
   const context = before.map((l) => `${nameOf(l.by)}: ${l.text}`).join("\n");
   const prompt =

@@ -9,7 +9,7 @@ import { canvasFacts } from "@/lib/domain/design/canvas";
 import { solSystem } from "@/lib/domain/design/sol";
 import { SOL_JOIN_WAIT_SECONDS, mayStepIn, readStepIn, stepInPrompt, stillHisToTake } from "@/lib/domain/design/sol-joins-in";
 import { handOffLine, whoAnswers } from "@/lib/domain/design/sol-chat-work";
-import { SOL_BY, TEAM_CHANNELS, nameOf } from "@/lib/domain/design/team-chat";
+import { SOL_BY, nameOf } from "@/lib/domain/design/team-chat";
 import { handleOf } from "@/lib/domain/design/mentions";
 import { todayInMarket } from "@/lib/domain/market";
 import { redactSecrets } from "./bill-reader";
@@ -20,7 +20,7 @@ import { query } from "./db";
 import type { Member } from "./design-repo";
 import { casesToResolve } from "./design-service-repo";
 import { modelFor } from "./sol-credits";
-import { channelContext, roomHistory, solSaysInTeam, tellTaggedBySol } from "./design-team-repo";
+import { channelContext, roomHistory, solSaysInTeam, teamChannelLabel, tellTaggedBySol } from "./design-team-repo";
 
 /** Unasked and often not his to answer: the quick model, and no credit (sol-routing.ts). */
 const MODEL = () => modelFor("quick");
@@ -28,9 +28,11 @@ const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** After `member` said `text` (line `lineId`) in `room`: Sol answers it there if nobody has and it is his to take. */
 export async function solStepsIn(member: Member, room: string, lineId: string, text: string, apiKey: string | null): Promise<void> {
-  const channel = TEAM_CHANNELS.find((c) => c.id === room);
-  if (!apiKey || !channel || !mayStepIn(room, text)) return;
+  if (!apiKey || !mayStepIn(room, text)) return;
   const { businessId } = member;
+  const label = await teamChannelLabel(businessId, room);
+  if (!label) return;
+  const channel = { label };
   if (!(await loadPrefs(businessId)).solJoinsIn) return;
   await pause(SOL_JOIN_WAIT_SECONDS * 1000);
 

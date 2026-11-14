@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-14",
+    area: "Team chat",
+    words: "In team chat, the plus by Channels adds a channel of your own, and the plus by Direct messages adds someone.",
+  },
+  {
+    day: "2026-11-14",
     area: "Today",
     words: "Every news story shows the day it was published and how long ago, or says when the page gave no date.",
   },

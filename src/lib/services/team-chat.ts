@@ -11,7 +11,8 @@ export interface TeamRoomView {
   room: string;
   lines: TeamLine[];
   members: string[];
-  channels: { room: string; label: string; unread: number }[];
+  /** `own`: a channel the business added itself (it can be removed). */
+  channels: { room: string; label: string; unread: number; own?: boolean }[];
   people: { room: string; email: string; label: string; unread: number; last: string }[];
   /** With the deal chats followed (deal-team.ts). */
   unread: number;
@@ -20,6 +21,9 @@ export interface TeamRoomView {
   /** Whether Sol answers a channel's questions nobody has, without being tagged; and whether this member may switch it. */
   solJoinsIn?: boolean;
   maySwitchSol?: boolean;
+  /** Whether this member may take a channel the business added away, and add a person to the business. */
+  mayRemoveChannels?: boolean;
+  mayAddPeople?: boolean;
   /** Whether this member sees costs, so Sol's order cards are theirs to answer. */
   seesCosts?: boolean;
 }
@@ -34,6 +38,10 @@ export const editTeamLine = (id: string, text: string) => post({ edit: id, text 
 export const deleteTeamLine = (id: string) => post({ delete: id });
 export const reactToTeamLine = (id: string, emoji: string) => post({ react: id, emoji });
 export const setSolJoinsIn = (on: boolean) => post<{ solJoinsIn: boolean }>({ solJoinsIn: on });
+/** Adds a channel for the whole business; its name is cleaned on the server. */
+export const addTeamChannel = (name: string) => post<{ channel: { id: string; label: string } }>({ addChannel: name });
+/** Takes a channel the business added away, with what was said in it. */
+export const removeTeamChannel = (id: string) => post({ removeChannel: id });
 /** Presses Sol's card on one of his lines: does what it offers, or sets it aside. */
 export const pressSolAction = (lineId: string, how: "do" | "dismiss") => post<{ words: string }>({ apply: lineId, how });
 /** What happened in a channel since the member was last there (the lines unread when they opened it). */

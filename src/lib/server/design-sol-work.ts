@@ -26,7 +26,7 @@ import {
   type CatchUp,
   type ChatAction,
 } from "@/lib/domain/design/sol-chat-work";
-import { SOL_BY, TEAM_CHANNELS, asksSol, isChannel, nameOf } from "@/lib/domain/design/team-chat";
+import { SOL_BY, asksSol, isChannel, nameOf } from "@/lib/domain/design/team-chat";
 import { todayInMarket } from "@/lib/domain/market";
 import { readWithClaude } from "./claude-reader";
 import { viewerOf } from "./design-context";
@@ -34,7 +34,15 @@ import { jobOrder, loadPrefs, saveOrder } from "./design-after-sale-repo";
 import { addActivity, jobById, listJobs, updateJob } from "./design-crm-repo";
 import { loadLists, type Member } from "./design-repo";
 import { newSolId, withSol } from "./design-sol-repo";
-import { channelContext, latestFromOthers, offeredAction, settleAction, solSaysInTeam, type TeamMe } from "./design-team-repo";
+import {
+  channelContext,
+  latestFromOthers,
+  offeredAction,
+  settleAction,
+  solSaysInTeam,
+  teamChannelLabel,
+  type TeamMe,
+} from "./design-team-repo";
 import { withSolCredit } from "./sol-credits";
 
 const meOf = (member: Member): TeamMe => ({ businessId: member.businessId, email: member.email, viewer: viewerOf(member) });
@@ -192,8 +200,9 @@ export async function pressAction(member: Member, lineId: string, how: "do" | "d
 
 /** Catches a member up on a channel: the `unread` lines from others since they were last there, in three short parts. */
 export async function catchUp(member: Member, room: string, unread: number, apiKey: string | null): Promise<CatchUp | "out" | null> {
-  const channel = TEAM_CHANNELS.find((c) => c.id === room);
-  if (!channel) return null;
+  const label = await teamChannelLabel(member.businessId, room);
+  if (!label) return null;
+  const channel = { label };
   const n = Math.max(1, Math.min(CATCH_UP_MAX, Math.round(unread) || 0));
   const lines = await latestFromOthers(meOf(member), room, n);
   if (lines.length < CATCH_UP_MIN)
