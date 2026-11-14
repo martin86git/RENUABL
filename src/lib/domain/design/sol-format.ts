@@ -187,6 +187,57 @@ export function namedItem(item: string): { name: string; rest: string } | null {
   return { name: m[1].trim(), rest: m[2] };
 }
 
+/** A heading over its list: what Sol wrote as a line ending in a colon with a list straight under it. */
+export interface SolSection {
+  kind: "section";
+  title: string;
+  items: string[];
+}
+
+/** A section's heading is one short line; anything longer is a paragraph that happens to end in a colon. */
+export const SECTION_TITLE_MAX = 110;
+
+/**
+ * His blocks with each heading and its list joined as one section (15 Nov 2026, Martin: "i cant tell the headers
+ * from the rest of the text"), so the page can draw the heading as a heading and its items as that section's rows.
+ * Nothing is reworded: only the heading's closing colon is left off.
+ */
+export function withSections(blocks: SolBlock[]): (SolBlock | SolSection)[] {
+  const out: (SolBlock | SolSection)[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    const next = blocks[i + 1];
+    const title = b.kind === "para" ? b.text.trim() : "";
+    if (title.endsWith(":") && !title.includes("\n") && title.length <= SECTION_TITLE_MAX && next?.kind === "list") {
+      out.push({ kind: "section", title: title.slice(0, -1).trimEnd(), items: next.items });
+      i++;
+    } else out.push(b);
+  }
+  return out;
+}
+
+/** One item of a list as a row: who or what it is about, an amount when it leads with one, and the rest. */
+export interface SolRow {
+  name: string | null;
+  amount: string | null;
+  detail: string;
+}
+
+/**
+ * A list item read as a row ("Taylor Test, $18,400: sent 10 days ago" is Taylor Test, $18,400 and the rest; "Grid
+ * pre-approval: no sign it's been lodged" a name and the rest). An item with no short opening before a colon is all
+ * detail. The words are his; only where each is drawn changes.
+ */
+export function solRow(item: string): SolRow {
+  const m = /^(?:\*\*)?([^:\n]{2,60}?)(?:\*\*)?:\s+(\S.*)$/.exec(item);
+  if (!m) return { name: null, amount: null, detail: item };
+  const head = m[1].replace(/\*\*/g, "").trim();
+  const money = /^(.+?),?\s+(\$[\d,]+(?:\.\d+)?k?)$/.exec(head);
+  if (money && money[1].split(/\s+/).length <= 6) return { name: money[1].trim(), amount: money[2], detail: m[2] };
+  if (/\d$/.test(head) || head.split(/\s+/).length > 7) return { name: null, amount: null, detail: item };
+  return { name: head, amount: null, detail: m[2] };
+}
+
 /** Sol's words without the layout marks, for copying, quoting and team chat. */
 export function solPlain(text: string): string {
   return text

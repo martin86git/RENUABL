@@ -73,7 +73,7 @@ import { SolThinking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
 import { SolDesignView } from "./sol-design-view";
-import { SolText, type OnAnswer } from "./sol-text";
+import { SolText, type OnAnswer, type OnPick } from "./sol-text";
 import { answerFor, solPlain } from "@/lib/domain/design/sol-format";
 
 /** The last message the member chose to carry on from after a while away (sessionStorage). */
@@ -513,6 +513,8 @@ export function SolChat({
               text={t.shown || t.text}
               at={t.at}
               onAnswer={t.role === "sol" && !busy ? answer : undefined}
+              // A row of his answer taken up in one press (15 Nov 2026, Martin: "be able to click for an outcome").
+              onPick={t.role === "sol" && !busy ? (item) => void send(`Let's work on this one: ${item}`) : undefined}
               pinned={t.pinned}
               onPin={() => void run(pinTurn(t.at, t.role, !t.pinned))}
             />
@@ -890,6 +892,7 @@ function Bubble({
   pinned,
   onPin,
   onAnswer,
+  onPick,
 }: {
   you: boolean;
   text: string;
@@ -897,6 +900,7 @@ function Bubble({
   pinned?: boolean;
   onPin?: () => void;
   onAnswer?: OnAnswer;
+  onPick?: OnPick;
 }) {
   const [copied, setCopied] = useState(false);
   if (!text) return null;
@@ -916,7 +920,7 @@ function Bubble({
         )}
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
-        {you ? text : <SolText text={text} onAnswer={onAnswer} />}
+        {you ? text : <SolText text={text} onAnswer={onAnswer} onPick={onPick} />}
         {at && <span className={clsx("mt-1 block text-[10px]", you ? "text-primary-ink/60" : "text-muted")}>{when(at)}</span>}
       </div>
       {at && (

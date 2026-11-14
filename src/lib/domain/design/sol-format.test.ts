@@ -1,3 +1,4 @@
+import { solRow, withSections } from "./sol-format";
 import { describe, expect, it } from "vitest";
 import { LONG_PARAGRAPH, MAX_OPTIONS, answerFor, brokenUp, isYesNoQuestion, solBlocks, solPlain } from "./sol-format";
 import { MORE_DETAIL } from "./sol-charts";
@@ -141,5 +142,39 @@ describe("what in a line of Sol's is set apart", () => {
     expect(namedItem("Voc: the open-circuit voltage")).toEqual({ name: "Voc", rest: "the open-circuit voltage" });
     expect(namedItem("It explains more clearly how windows are treated: see the figures")).toBeNull();
     expect(namedItem("A plain item")).toBeNull();
+  });
+});
+
+describe("sections and rows", () => {
+  it("joins a heading and the list under it", () => {
+    const blocks = withSections(
+      solBlocks(
+        "Here is your day.\n\nNext, the proposals that have gone quiet:\n- Taylor Test, $18,400: sent 10 days ago.\n- Laura Az, $11,030: 5 days ago.\n\nLast, two leads.",
+      ),
+    );
+    expect(blocks.map((b) => b.kind)).toEqual(["para", "section", "para"]);
+    const section = blocks[1];
+    expect(section.kind === "section" && section.title).toBe("Next, the proposals that have gone quiet");
+    expect(section.kind === "section" && section.items).toHaveLength(2);
+  });
+  it("leaves a list with no heading as a list", () => {
+    expect(withSections(solBlocks("Two things.\n\n- One\n- Two")).map((b) => b.kind)).toEqual(["para", "list"]);
+  });
+  it("reads a row's name, amount and the rest", () => {
+    expect(solRow("Taylor Test, $18,400: sent 10 days ago with no change.")).toEqual({
+      name: "Taylor Test",
+      amount: "$18,400",
+      detail: "sent 10 days ago with no change.",
+    });
+    expect(solRow("**Grid pre-approval**: there's no sign it's been lodged.")).toEqual({
+      name: "Grid pre-approval",
+      amount: null,
+      detail: "there's no sign it's been lodged.",
+    });
+    expect(solRow("No owner or installer is assigned to the deal.")).toEqual({
+      name: null,
+      amount: null,
+      detail: "No owner or installer is assigned to the deal.",
+    });
   });
 });
