@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, Circle, EyeOff, Eye, Loader2, RotateCcw, Send, Square, Trash2, Video, X } from "lucide-react";
+import { Camera, CameraOff, Check, Circle, EyeOff, Eye, Loader2, RotateCcw, Send, Square, Trash2, Video, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -26,6 +26,9 @@ import {
 } from "@/lib/services/walkthrough";
 import { recognitionClass, type Recognition } from "./speech";
 import { SolIcon } from "./sol-icon";
+
+/** Whether the face bubble was last on, kept on this device. */
+const FACE_KEY = "renuabl.design.walkthrough-face";
 
 /** The recording's clock, in milliseconds. */
 const clock = () => performance.now();
@@ -54,6 +57,57 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
   const [earlier, setEarlier] = useState<Walkthrough[]>([]);
   const [storage, setStorage] = useState(true);
   const [prefix, setPrefix] = useState<string | null>(null);
+  // Your face in a corner bubble (14 Nov 2026, Martin): the camera drawn over the page, so the tab's recording carries
+  // it. On or off before and during the recording; the choice is kept on this device.
+  const [face, setFace] = useState(false);
+  const [camera, setCamera] = useState<MediaStream | null>(null);
+  const cameraRef = useRef<MediaStream | null>(null);
+  useEffect(() => {
+    try {
+      // Read once the page is in the browser.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (window.localStorage.getItem(FACE_KEY) === "1") setFace(true);
+    } catch {
+      // Storage is off: the bubble starts off.
+    }
+  }, []);
+  const cameraOff = () => {
+    for (const t of cameraRef.current?.getTracks() ?? []) t.stop();
+    cameraRef.current = null;
+    setCamera(null);
+  };
+  const cameraOn = async () => {
+    if (cameraRef.current) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 480 } },
+        audio: false,
+      });
+      cameraRef.current = stream;
+      setCamera(stream);
+    } catch {
+      setFace(false);
+      setProblem("The camera didn't start. Allow it when the browser asks, or record without your face.");
+    }
+  };
+  const toggleFace = (on: boolean) => {
+    setFace(on);
+    try {
+      window.localStorage.setItem(FACE_KEY, on ? "1" : "0");
+    } catch {
+      // Nothing to do: it still changes for this recording.
+    }
+  };
+  // The camera runs only while the bubble is wanted and there is something to record; never during playback.
+  const wantsCamera = face && (phase === "ready" || phase === "starting" || phase === "recording");
+  useEffect(() => {
+    // The camera is a device outside React: started and stopped as the bubble is wanted.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (wantsCamera) void cameraOn();
+    else cameraOff();
+  }, [wantsCamera]);
+  useEffect(() => () => cameraOff(), []);
+  const bubble = face && camera ? <FaceBubble stream={camera} /> : null;
 
   const recorder = useRef<MediaRecorder | null>(null);
   const streams = useRef<MediaStream[]>([]);
@@ -250,6 +304,7 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
   if (phase === "recording" || phase === "starting")
     return createPortal(
       <div className="theme-studio contents">
+        {bubble}
         <div
           data-popup
           className="fixed bottom-4 left-1/2 z-[80] flex max-w-[min(42rem,calc(100vw-2rem))] -translate-x-1/2 items-center gap-3 rounded-full bg-primary py-2 pr-2 pl-4 text-white shadow-[0_14px_40px_rgba(11,11,12,0.35)] ring-1 ring-white/10"
@@ -269,6 +324,16 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
           </span>
           <button
             type="button"
+            onClick={() => toggleFace(!face)}
+            title={face ? "Hide your face" : "Show your face in a corner bubble"}
+            aria-label={face ? "Hide your face" : "Show your face in a corner bubble"}
+            aria-pressed={face}
+            className="flex size-8 shrink-0 items-center justify-center rounded-full text-white/80 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+          >
+            {face ? <CameraOff className="size-3.5" aria-hidden /> : <Camera className="size-3.5" aria-hidden />}
+          </button>
+          <button
+            type="button"
             onClick={stop}
             disabled={phase !== "recording"}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-[13px] font-medium text-ink disabled:bg-white/40"
@@ -283,6 +348,7 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
 
   return createPortal(
     <div className="theme-studio contents">
+      {phase === "ready" && bubble}
       <div
         className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/40 p-4"
         onMouseDown={(e) => e.target === e.currentTarget && close()}
@@ -322,6 +388,22 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
               {!storage && (
                 <p className="mt-3 text-[13px] text-warning">Recordings can&apos;t be kept here yet: storage for them isn&apos;t set up.</p>
               )}
+              <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-[14px] bg-canvas px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={face}
+                  onChange={(e) => toggleFace(e.target.checked)}
+                  className="size-4 accent-[color:var(--sun-line)]"
+                />
+                <span className="text-[13px] text-ink">
+                  Show my face in a corner bubble
+                  <span className="block text-[12px] text-muted">
+                    {face
+                      ? "That's you, bottom left: press it to move it to the other side. Turn it off any time while recording."
+                      : "Your camera, in a round over the page, so they see who is talking."}
+                  </span>
+                </span>
+              </label>
               <button
                 type="button"
                 onClick={() => void start()}
@@ -401,6 +483,32 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * Your face in a round over the page while recording: the camera, mirrored as a mirror is, bottom left. A press moves
+ * it to the other side, out of the way of what you are showing. It is part of the page, so it is in the recording.
+ */
+function FaceBubble({ stream }: { stream: MediaStream }) {
+  const video = useRef<HTMLVideoElement | null>(null);
+  const [right, setRight] = useState(false);
+  useEffect(() => {
+    if (video.current) video.current.srcObject = stream;
+  }, [stream]);
+  return (
+    <button
+      type="button"
+      onClick={() => setRight((r) => !r)}
+      title="Move it to the other side"
+      aria-label="Your camera. Press to move it to the other side"
+      className={clsx(
+        "fixed bottom-20 z-[85] size-40 overflow-hidden rounded-full bg-ink shadow-[0_14px_40px_rgba(11,11,12,0.35)] ring-4 ring-white transition-[left,right] duration-300 motion-reduce:transition-none",
+        right ? "right-4" : "left-4",
+      )}
+    >
+      <video ref={video} autoPlay muted playsInline className="size-full scale-x-[-1] object-cover" />
+    </button>
   );
 }
 
