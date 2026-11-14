@@ -1242,8 +1242,9 @@ function DealChatsList(props: {
       ? props.jobs.filter((j) => matches({ words: [j.customerName, j.title, j.address] }, words)).slice(0, 6)
       : [];
   return (
-    <div className="border-b border-line pb-2">
-      <p className="flex items-center justify-between px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+    // The deals on a shade of their own, padded apart from the channels and direct messages (14 Nov 2026, Martin).
+    <div className="mx-2 mt-3 rounded-2xl bg-ink/[0.045] pb-2">
+      <p className="flex items-center justify-between px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
         Deals
         <button
           type="button"
@@ -1308,6 +1309,10 @@ function DealChatsList(props: {
             onClick={() => props.onPick(d.jobId)}
             title={d.last ? `${writerName(d.last.by)}: ${d.last.text}` : undefined}
           >
+            {/* The deal mark, as the chat's header has it, so a deal reads apart from a person (14 Nov 2026, Martin). */}
+            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface text-sun-line ring-1 ring-line" aria-hidden>
+              <SquareKanban className="size-3.5" />
+            </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate">{d.customer}</span>
               <span className="block truncate text-[11px] font-normal text-muted">

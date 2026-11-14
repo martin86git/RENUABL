@@ -255,9 +255,10 @@ function AskCard(props: { line: DealLine; jobId: string; pad?: boolean; onSettle
   return (
     <li
       className={clsx(
-        "min-w-0 rounded-xl ring-1",
+        // A border, not a ring: a ring is drawn outside the card and the scrolling list cut it off (14 Nov 2026, Martin).
+        "min-w-0 rounded-xl border",
         pad ? "p-2.5 text-[12.5px]" : "p-3.5 text-[13.5px]",
-        done ? "bg-surface-2 ring-line" : "bg-surface ring-sun-line/60",
+        done ? "border-line bg-surface-2" : "border-sun-line/60 bg-surface",
       )}
     >
       <p className="flex flex-wrap items-center gap-1.5">
