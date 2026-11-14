@@ -19,7 +19,8 @@ const ROUND =
 function AgentLabel({ name, kind }: { name: string; kind: AgentKind }) {
   return (
     // A little wider than the round's column, so the job reads whole; a longer one takes a second line.
-    <span className="-mx-2 mt-1 block w-[3.75rem] text-center leading-[1.15]">
+    // On a soft plate of its own: the rounds float over the page now, with no bar behind them.
+    <span className="-mx-2 mt-1 block w-[4.25rem] rounded-lg bg-surface/90 px-1 py-0.5 text-center leading-[1.15] shadow-[0_2px_8px_rgba(20,22,26,0.08)] ring-1 ring-line backdrop-blur">
       <span className="block truncate text-[11px] font-semibold text-ink">{name}</span>
       <span className="block text-[9.5px] text-muted">{AGENT_WORDS[kind].job}</span>
     </span>
@@ -49,7 +50,7 @@ export function RailAgents() {
   const tim = colleague?.ready.on ? colleague.name || COLLEAGUE_ROLE : null;
 
   return (
-    <span className="flex w-full flex-col items-center gap-1.5">
+    <span className="flex w-full flex-col items-center gap-2">
       {caller.named && (
         <button type="button" onClick={() => openCoach(null)} title={titleOf(caller.name, "sales")} className={SHELL}>
           <span className={ROUND}>

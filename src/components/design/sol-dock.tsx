@@ -1,10 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { FileCheck, Send, TrendingUp, type LucideIcon } from "lucide-react";
 import type { SolState } from "@/lib/domain/design/sol";
 import { SOL_ASK, SOL_CHANGED, SOL_STATE, SOL_TOGGLE, loadSol, type SolAsk } from "@/lib/services/sol";
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
@@ -259,53 +256,20 @@ export function SolNavButton({ phone = false }: { phone?: boolean }) {
  * (3 Nov 2026, Martin: the focus point), then notifications and email (moved from the top bar), then the sales at a
  * glance. Sol left it for his round in the nav (1 Nov 2026). Wide screens only.
  */
-export function SolRail({
-  team,
-  assistant,
-  calc,
-  tools,
-}: {
-  team?: React.ReactNode;
-  assistant?: React.ReactNode;
-  calc?: React.ReactNode;
-  tools?: React.ReactNode;
-}) {
-  const path = usePathname() ?? "";
-  const round = (on: boolean) =>
-    clsx(
-      "relative flex size-10 items-center justify-center rounded-full transition-colors",
-      on ? "bg-ink text-sun-line" : "text-ink-2 hover:bg-canvas hover:text-ink",
-    );
-  const link = (href: string, label: string, Icon: LucideIcon, on: boolean) => (
-    <Link href={href} title={label} aria-label={label} aria-current={on ? "page" : undefined} className={round(on)}>
-      <Icon className="size-[18px]" aria-hidden />
-    </Link>
-  );
-  const bar = "flex flex-col items-center gap-1.5 bg-surface p-1.5 shadow-[0_8px_30px_rgba(20,22,26,0.10)] ring-1 ring-line";
-  // Two bars, not one (14 Nov 2026, Martin: chat, agents and tools were mixed in one place): who you talk to, your team
-  // and your agents, in the first; the tools and the numbers in a slimmer one under it.
+export function SolRail({ team, assistant }: { team?: React.ReactNode; assistant?: React.ReactNode }) {
+  if (!team && !assistant) return null;
+  // No bar at all (14 Nov 2026, Martin: one bar, then two, read as the left-hand nav the product set out to lose, moved
+  // to the right). Only who you talk to floats here, loose, in the bottom corner: team chat and the business's agents.
+  // The tools that sat under them each have a home already: the calculator and email in the top card, the proposals in
+  // the CRM's pages.
   return (
     <aside
-      aria-label="Team chat, your agents, and the tools"
-      className="sol-rail fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 flex-col items-end gap-3 print:hidden lg:flex"
+      aria-label="Who you talk to: your team and your agents"
+      className="sol-rail fixed bottom-6 right-4 z-30 hidden w-16 flex-col items-center gap-2.5 print:hidden lg:flex"
     >
-      {(team || assistant) && (
-        <div role="group" aria-label="Who you talk to: your team and your agents" className={clsx(bar, "w-16 rounded-[2rem]")}>
-          {team && <span className="team-bulb">{team}</span>}
-          {/* The business's agents, each with its name and its job under it (rail-agents.tsx). */}
-          {assistant}
-        </div>
-      )}
-      <div role="group" aria-label="Tools and the numbers" className={clsx(bar, "rounded-full")}>
-        {/* The calculator (8 Nov 2026, Martin): an answer on the phone has to be instant. */}
-        {calc}
-        {tools}
-        {(calc || tools) && <span className="my-1 h-px w-6 bg-line" aria-hidden />}
-        {link("/design?view=sales", "Sales this month", TrendingUp, false)}
-        {/* The proposals out and those signed (8 Nov 2026, Martin): a paper plane for sent, the proposal's page with a tick for sold. */}
-        {link("/design/sales/proposals", "Proposals sent", Send, path.startsWith("/design/sales/proposals"))}
-        {link("/design/sales/signed", "Proposals signed", FileCheck, path.startsWith("/design/sales/signed"))}
-      </div>
+      {team && <span className="team-bulb">{team}</span>}
+      {/* The business's agents, each with its name and its job under it (rail-agents.tsx). */}
+      {assistant}
     </aside>
   );
 }

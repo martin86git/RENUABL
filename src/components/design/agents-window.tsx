@@ -37,7 +37,7 @@ export function AgentsButton() {
       onClick={openAgents}
       title={`${AGENT_COPY.title}: add one`}
       aria-label={`${AGENT_COPY.title}: add one`}
-      className="grid size-8 place-items-center rounded-full border border-dashed border-muted text-muted transition-colors hover:border-sun-line hover:text-sun-line"
+      className="grid size-8 place-items-center rounded-full border border-dashed border-muted bg-surface text-muted shadow-[0_2px_8px_rgba(20,22,26,0.08)] transition-colors hover:border-sun-line hover:text-sun-line"
     >
       <Plus className="size-4" aria-hidden />
     </button>

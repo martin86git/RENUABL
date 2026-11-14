@@ -47,7 +47,7 @@ import { ColleagueWindow } from "./colleague";
 import { RailAgents } from "./rail-agents";
 import { AgentsWindow } from "./agents-window";
 import { TeamChatButton } from "./team-chat";
-import { DayWeather, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
+import { DayWeather, ProfileMenu, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
 import { QuickCalc } from "./quick-calc";
 
@@ -565,21 +565,17 @@ function Shell({
                 </div>
               );
             })()}
-            {/* The calculator lives on the rail (8 Nov 2026, Martin); here only where there is no rail: the design tool, and
-                an installer's login. */}
-            {designsRoofs(kind) && (!retail || tool) && <QuickCalc />}
+            {/* The calculator, beside the top card on every page (14 Nov 2026, Martin: no bar of tools down the right). */}
+            {designsRoofs(kind) && <QuickCalc />}
             <div
               data-tour="icons"
               className="flex shrink-0 items-center gap-0.5 rounded-full bg-surface p-1 shadow-[0_8px_30px_rgba(11,11,12,0.08)] ring-1 ring-line"
             >
               <DayWeather />
-              {/* On the design tool the rail is put away for the roof, so notifications and email come up here. */}
-              {retail && tool && (
-                <>
-                  <TeamChatButton me={account.email} customers={unread + mentions} />
-                  <TopIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />
-                </>
-              )}
+              {/* On the design tool the floating rounds are put away for the roof, so team chat comes up here. */}
+              {retail && tool && <TeamChatButton me={account.email} customers={unread + mentions} />}
+              {/* Email, with its unread count, on every page. */}
+              {retail && <TopIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />}
               {!retail && <TopIcon href={PATHS.team} label="Team chat" icon={MessagesSquare} on={path.startsWith(PATHS.team)} badge={0} />}
               <ProfileMenu
                 email={account.email}
@@ -810,18 +806,12 @@ function Shell({
           deal={(id) => `${PATHS.deals}/${id}`}
         />
       )}
-      {/* The rail down the right (team chat, notifications, email and the numbers; not over the design tool, which needs the
+      {/* Who you talk to, floating bottom right (team chat and the agents; not over the design tool, which needs the
           room) and Sol's panel. */}
       {retail && !tool && (
         <SolRail
           team={<TeamChatButton me={account.email} customers={unread + mentions} />}
           assistant={kind === "retailer" ? <RailAgents /> : undefined}
-          calc={designsRoofs(kind) ? <QuickCalc place="rail" /> : undefined}
-          tools={
-            <>
-              <RailIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />
-            </>
-          }
         />
       )}
       {retail && <SolDock />}
