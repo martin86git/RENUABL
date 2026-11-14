@@ -70,7 +70,7 @@ export function openDesigner(href: string, router: { push: (href: string) => voi
 }
 
 /** The drawer is told by the designer inside it (same site only). */
-type News = { saved?: boolean; unsaved?: boolean; fold?: boolean; go?: string };
+type News = { saved?: boolean; unsaved?: boolean; fold?: boolean; go?: string; proposal?: boolean };
 function tell(news: News) {
   if (inDrawer()) window.parent.postMessage({ renuablDesign: news }, window.location.origin);
 }
@@ -106,10 +106,12 @@ export function DesignDrawer(props: {
   const [loaded, setLoaded] = useState(false);
   const [unsaved, setUnsaved] = useState(false);
   const frameEl = useRef<HTMLIFrameElement>(null);
-  const heard = useRef({ onSaved, onFold, onGo });
+  // The designer's "Proceed to proposal" (15 Nov 2026, Martin): it saves, then asks for the deal's proposal in this window.
+  const onProposal = tool.job && onSwitch ? () => onSwitch(proposalHref(tool.job!)) : undefined;
+  const heard = useRef({ onSaved, onFold, onGo, onProposal });
   useEffect(() => {
-    heard.current = { onSaved, onFold, onGo };
-  }, [onSaved, onFold, onGo]);
+    heard.current = { onSaved, onFold, onGo, onProposal };
+  });
   useEffect(() => {
     // Opening it is what loads it; from then on it stays.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -121,6 +123,7 @@ export function DesignDrawer(props: {
       const news = (e.data as { renuablDesign?: News } | null)?.renuablDesign;
       if (!news) return;
       if (news.fold) heard.current.onFold();
+      if (news.proposal) heard.current.onProposal?.();
       if (typeof news.go === "string" && news.go.startsWith("/")) {
         heard.current.onFold();
         heard.current.onGo?.(news.go);

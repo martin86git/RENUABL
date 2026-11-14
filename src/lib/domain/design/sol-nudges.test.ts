@@ -52,6 +52,14 @@ describe("Sol beside the design", () => {
     expect(pics).toEqual(["bollard", "fire-sheeting", "awning", undefined]);
   });
 
+  it("leads on to finalising the quote last, once the panels are on an inverter and strung", () => {
+    const list = ids({ phase: "single", kw: 6, battery: { kwh: 8, backup: true } });
+    expect(list[list.length - 1]).toBe("finalise");
+    expect(ids({ unstrung: 3 })).not.toContain("finalise");
+    expect(ids({ inverters: 0 })).not.toContain("finalise");
+    expect(ids({ costsHidden: true })).not.toContain("finalise");
+  });
+
   it("asks about backup once, only with a battery", () => {
     expect(ids({ battery: { kwh: 9.6 } })).toContain("backup");
     expect(ids({ battery: { kwh: 9.6 }, backupAnswered: true })).not.toContain("backup");

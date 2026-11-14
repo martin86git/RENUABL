@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Workspace } from "@/lib/domain/design/pricing";
@@ -63,6 +63,11 @@ export function DesignQuote(props: {
   onCompact?: (compact: boolean) => void;
   /** The home's roof, storeys and phase are shown elsewhere (the design tool's Designer view), so not here. */
   homeless?: boolean;
+  /**
+   * The next step once the quote is right (15 Nov 2026, Martin: the designer leads on from the quote to the proposal).
+   * Shown under the totals; held back while a cost decided on each job is still to decide.
+   */
+  onProceed?: () => void;
 }) {
   const { form, edits } = props.value;
   const { spec, workspace, rates } = props;
@@ -81,6 +86,28 @@ export function DesignQuote(props: {
   const undecided = undecidedLines(all, edits);
   const missing = lines.filter((l) => l.missing).length;
   const net = empty ? null : totals.priceIncGst - stc;
+  const proceedBox = props.onProceed && !empty && (
+    <div className="mt-3 border-t border-line pt-3">
+      <button
+        type="button"
+        onClick={props.onProceed}
+        disabled={undecided.length > 0}
+        className={clsx(
+          "flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold",
+          undecided.length > 0
+            ? "bg-surface-2 text-muted"
+            : "bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] hover:brightness-105",
+        )}
+      >
+        Proceed to proposal <ArrowRight className="size-4" aria-hidden />
+      </button>
+      <p className="mt-1.5 text-center text-[11px] text-muted">
+        {undecided.length > 0
+          ? `Decide on ${undecided.length === 1 ? "the cost" : `the ${undecided.length} costs`} above first.`
+          : "Saves the design, then opens the proposal to check and send."}
+      </p>
+    </div>
+  );
   // Solar Victoria, when it has been put on this quote: always "if approved".
   const solarVic = empty ? null : solarVicFor(form, costing.panels, totals.priceIncGst, stc, rates);
   const solarVicOff = solarVicBar(form, costing.panels, rates);
@@ -574,6 +601,7 @@ export function DesignQuote(props: {
               </p>
             )}
             {totalsBox}
+            {proceedBox}
             {solarVicBlock}
             {changedBox}
           </aside>
@@ -651,6 +679,7 @@ export function DesignQuote(props: {
           {totalsBox}
           {solarVicBlock}
           {footBox}
+          {proceedBox}
         </div>
       )}
     </section>

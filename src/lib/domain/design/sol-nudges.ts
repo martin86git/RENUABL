@@ -22,7 +22,8 @@ export type NudgeAct =
   | "backup-yes"
   | "backup-no"
   | "line-on"
-  | "line-off";
+  | "line-off"
+  | "finalise";
 
 export interface NudgeAction {
   label: string;
@@ -37,7 +38,7 @@ export type BatteryPicture = "bollard" | "fire-sheeting" | "awning";
 export interface Nudge {
   /** The same nudge keeps its id while it still applies, so putting it aside holds. */
   id: string;
-  kind: "needed" | "question" | "option";
+  kind: "needed" | "question" | "option" | "next";
   words: string;
   /** One line on why, when it helps. */
   why?: string;
@@ -208,6 +209,16 @@ export function nudgesFor(s: NudgeState): Nudge[] {
       words: `Over ${SINGLE_PHASE_KW} kW on single phase: the network's pre-approval or export limiting is likely needed.`,
       actions: [],
     });
+  // The way on (15 Nov 2026, Martin: once the panels are laid and the battery added, Sol leads on to the quote, then the
+  // proposal): last, once the panels are on an inverter and all strung.
+  if (!s.costsHidden && s.panels > 0 && s.inverters > 0 && s.unstrung === 0)
+    out.push({
+      id: "finalise",
+      kind: "next",
+      words: "The design is ready. Let's finalise the quote.",
+      why: "Check the lines and decide what's still open, then on to the proposal.",
+      actions: [{ label: "Finalise the quote", act: "finalise" }],
+    });
   return out;
 }
 
@@ -244,4 +255,5 @@ export const NUDGE_KIND_WORDS: Record<Nudge["kind"], string> = {
   needed: "Needed",
   question: "For the quote",
   option: "An option",
+  next: "Next step",
 };

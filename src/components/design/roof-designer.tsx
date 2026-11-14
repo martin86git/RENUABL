@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { accessColour, shadeHint, shadeReport, type ShadeReport } from "@/lib/domain/design/shade";
 import { loadTerrain, type Heights } from "@/lib/services/terrain";
 import { loadRoofCheck } from "@/lib/services/roof-check";
@@ -1059,6 +1060,7 @@ export function RoofDesigner(props: {
   /** The deal this roof is on: Sol can look through its file for the customer's usage. */
   jobId?: string;
 }) {
+  const router = useRouter();
   // The design being worked on is held in the states below; the others wait in `designs`, whose entry for the
   // one being worked on is out of date until it is put away again (`everyDesign`).
   const first = props.set.designs[props.set.primary] ?? props.set.designs[0];
@@ -4087,6 +4089,16 @@ export function RoofDesigner(props: {
         })
       : null;
   /** What a press on one of Sol's suggestions or questions does (`SolNudges`). */
+  /**
+   * On from the quote to the proposal (15 Nov 2026, Martin): saved first (the proposal reads the saved design), then the
+   * deal's proposal opens in the same window, or on its own page; a site with no deal shows why there is none yet.
+   */
+  const toProposal = async () => {
+    if (!props.jobId) return showSide("proposal");
+    if (!(await saveNow.current())) return;
+    if (window.parent !== window) window.parent.postMessage({ renuablDesign: { proposal: true } }, window.location.origin);
+    else router.push(`/design/deals/${encodeURIComponent(props.jobId)}/proposal`);
+  };
   const actOnNudge = (nudge: Nudge, action: NudgeAction) => {
     const aside = () => setNudgesAside((list) => [...list, nudge.id]);
     switch (action.act) {
@@ -4119,6 +4131,9 @@ export function RoofDesigner(props: {
       case "backup-no":
         setBackupAnswered(true);
         return;
+      case "finalise":
+        if (quoteShort) shortQuote(false);
+        return showSide("quote");
       case "line-on":
       case "line-off": {
         const line = costSystem(spec, quoteNow.form, props.workspace).lines.find((l) => l.label === action.line);
@@ -10204,6 +10219,7 @@ export function RoofDesigner(props: {
                 wide={shown === "quote" && !quoteShort}
                 onCompact={shortQuote}
                 homeless
+                onProceed={props.sitesOnly ? undefined : () => void toProposal()}
               />
             </div>
             <div className={clsx("space-y-3", shown !== "proposal" && "hidden")}>
