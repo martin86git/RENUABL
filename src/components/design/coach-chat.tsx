@@ -54,6 +54,7 @@ import { CallerAvatar, VoicePicker } from "./settings-caller";
 import { ContactReach } from "./coach-contacts";
 import { CoachDeals } from "./coach-deals";
 import { CoachWelcome } from "./coach-welcome";
+import { DictateButton, withSpoken } from "./dictate";
 
 /** The pause between one packet of an answer and the next. */
 const PACKET_GAP_MS = 650;
@@ -237,6 +238,8 @@ export function CoachWindow() {
   const [mayCoach, setMayCoach] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [text, setText] = useState("");
+  // What the microphone is hearing, shown in the box as it comes (14 Nov 2026, Martin: talk into the chat field).
+  const [heard, setHeard] = useState("");
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [settings, setSettings] = useState(() => readSettingsOpen() && !readDealsOpen());
@@ -681,10 +684,18 @@ export function CoachWindow() {
               {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
               {mayCoach ? (
                 <div className="flex items-end gap-2">
+                  <DictateButton
+                    label={`Speak to ${name}`}
+                    onHearing={setHeard}
+                    onWords={(w) => setText((was) => withSpoken(was, w).slice(0, 2000))}
+                  />
                   <textarea
                     ref={box}
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
+                    value={heard ? withSpoken(text, heard) : text}
+                    onChange={(e) => {
+                      setHeard("");
+                      setText(e.target.value);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
