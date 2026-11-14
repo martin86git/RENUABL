@@ -28,8 +28,7 @@ import type { PreparedItem } from "@/lib/domain/design/prepared";
 import { siteUrl } from "@/lib/domain/sms";
 import { query } from "./db";
 import { markFollowUp } from "./design-after-sale-repo";
-import { addActivity, listJobs, updateJob } from "./design-crm-repo";
-import { cleanJobInput } from "@/lib/domain/design/crm";
+import { addActivity, listJobs } from "./design-crm-repo";
 import { isDemoBusiness } from "./design-demo-check";
 import { readyFor, type Pending } from "./design-prepared";
 import { loadBrand } from "./design-proposal-repo";
@@ -205,17 +204,6 @@ export async function sendOutboxItem(
     await putBack();
     return "no-email";
   }
-  // An install day handed to Sol (14 Nov 2026): if someone has set a day on the deal since, it no longer goes.
-  if (item.kind === "install-day") {
-    const set = await query<{ day: string | null }>(
-      `select install_date::text as day from design_jobs where business_id = $1 and id = $2`,
-      [business.id, item.jobId],
-    );
-    if (!item.installDay || set[0]?.day) {
-      await query(`update design_prepared set status = 'stale', done_at = now() where business_id = $1 and id = $2`, [business.id, id]);
-      return "gone";
-    }
-  }
   try {
     const brand = await loadBrand(business.id, business.name);
     const name = brand.name || business.name;
@@ -244,16 +232,6 @@ export async function sendOutboxItem(
       );
     if (item.kind === "follow-up" && item.day)
       await markFollowUp(business.id, item.jobId, item.day, "email", by).catch(() => console.error("a follow-up couldn't be marked done"));
-    // The day the email offered goes on the deal, unless one was set while it went.
-    if (item.kind === "install-day" && item.installDay) {
-      const day = item.installDay;
-      await updateJob(
-        business.id,
-        item.jobId,
-        (current) => (current.installDate ? cleanJobInput({}, current) : cleanJobInput({ installDate: day }, current)),
-        by,
-      ).catch(() => console.error("an install day couldn't be set on the deal"));
-    }
     return "sent";
   } catch (e) {
     console.error("an outbox email couldn't be sent", e instanceof Error ? e.message : e);

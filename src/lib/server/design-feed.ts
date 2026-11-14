@@ -154,9 +154,6 @@ export async function dealFeed(
             readyAt: lined.createdAt,
             held: lined.held,
             state: lined.state,
-            kind: lined.kind,
-            handed: Boolean((lined as { notBefore?: string }).notBefore),
-            ...(lined.installDay ? { installDay: lined.installDay } : {}),
           }
         : null,
       canCall: Boolean(c?.phone),

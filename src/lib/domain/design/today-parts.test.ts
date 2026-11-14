@@ -52,15 +52,14 @@ const askLine: DealLine = {
 };
 
 describe("Today in parts", () => {
-  it("puts a deal needing a person in Needs you, what Sol sends himself in his lane soonest first, and the rest in hand", () => {
+  it("puts a deal needing a person in Needs you, Sol's lined-up emails in Coming up soonest first, and the rest in hand", () => {
     const waiting = deal({ jobId: "a", events: [{ kind: "message", text: "Does it fit?", at: ago(1), by: "Jo" }] });
     const later = deal({ jobId: "b", sol: { subject: "Checking in", firesAt: ago(-5), held: false, state: "counting" } });
     const sooner = deal({ jobId: "c", sol: { subject: "Hello", firesAt: ago(-1), held: false, state: "counting" } });
     const quiet = deal({ jobId: "d" });
     const parts = todayParts([quiet, later, waiting, sooner], now);
     expect(parts.needs.map((d) => d.jobId)).toEqual(["a"]);
-    // Sol's lane since 14 Nov 2026: what he sends himself, soonest first.
-    expect(parts.sols.map((d) => d.jobId)).toEqual(["c", "b"]);
+    expect(parts.coming.map((d) => d.jobId)).toEqual(["c", "b"]);
     expect(parts.inHand.map((d) => d.jobId)).toEqual(["d"]);
   });
 
@@ -72,7 +71,6 @@ describe("Today in parts", () => {
     const parts = todayParts([both], now);
     expect(parts.needs).toHaveLength(1);
     expect(parts.coming).toHaveLength(0);
-    expect(parts.sols).toHaveLength(0);
   });
 });
 
@@ -109,7 +107,7 @@ describe("Sol's line at the top of Today", () => {
   });
 
   it("says nothing needs you when that's so", () => {
-    expect(todaySummary({ fresh: [], needs: [], sols: [], coming: [], inHand: [] }, null, now)).toBe("Nothing needs you right now.");
+    expect(todaySummary({ fresh: [], needs: [], coming: [], inHand: [] }, null, now)).toBe("Nothing needs you right now.");
   });
 });
 

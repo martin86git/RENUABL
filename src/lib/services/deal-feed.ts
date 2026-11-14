@@ -37,8 +37,3 @@ export const exampleDeals = (what: "add" | "clear") =>
 /** Done or Later on a deal's card, or taken off again. */
 export const markFeedDeal = (jobId: string, act: "done" | "later" | "undo", o: { later?: LaterChoice; need?: string } = {}) =>
   ask<{ mark: FeedMark | null }>("/api/design/feed", { method: "POST", body: { jobId, do: act, ...o } });
-/** Hands the deal's next piece of work to Sol (it goes in 30 minutes unless taken back), or takes it back. */
-export const handToSol = (jobId: string) =>
-  ask<{ words: string }>("/api/design/feed/hand", { method: "POST", body: { jobId, do: "hand" } });
-export const takeBackFromSol = (jobId: string) =>
-  ask<{ words: string }>("/api/design/feed/hand", { method: "POST", body: { jobId, do: "take-back" } });

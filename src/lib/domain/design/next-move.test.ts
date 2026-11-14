@@ -40,9 +40,10 @@ describe("a deal's next move", () => {
     expect(nextMove(d, now)).toMatchObject({ kind: "reply", label: "Reply to Jo" });
   });
 
-  it("asks for a review of what Sol wrote and waits on you, none while he sends it himself", () => {
-    // Counting down is Sol's: it sits in his lane, nothing for a person to do (14 Nov 2026).
-    expect(nextMove(deal({ sol: { subject: "Checking in", firesAt: ago(-2), held: false, state: "counting" } }), now)).toBeNull();
+  it("asks for a review of what Sol wrote, with when it goes", () => {
+    const counting = nextMove(deal({ sol: { subject: "Checking in", firesAt: ago(-2), held: false, state: "counting" } }), now);
+    expect(counting).toMatchObject({ kind: "review", label: "Review" });
+    expect(counting?.why).toMatch(/goes in 2h/);
     expect(nextMove(deal({ sol: { subject: "Hi", firesAt: ago(-2), held: false, state: "waiting" } }), now)?.why).toMatch(/waits for you/);
     expect(nextMove(deal({ sol: { subject: "Hi", firesAt: ago(-2), held: true, state: "held" } }), now)?.why).toMatch(/held/);
   });

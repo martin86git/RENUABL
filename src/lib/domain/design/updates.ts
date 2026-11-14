@@ -20,11 +20,6 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-14",
-    area: "Today",
-    words: "Today has two lanes: yours, and Sol's. Hand a card to Sol and he does it in 30 minutes, unless you take it back.",
-  },
-  {
-    day: "2026-11-14",
     area: "Calls",
     words: "Your agents sit in a bar of their own beside team chat, each with its name and job under it. Tools are in a second bar.",
   },

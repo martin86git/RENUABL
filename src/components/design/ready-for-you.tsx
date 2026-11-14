@@ -125,8 +125,7 @@ function ReadyCard({ item, onGone, showDeal }: CardProps) {
       <div className="flex flex-wrap items-start gap-x-3 gap-y-1">
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-medium text-ink">
-            {item.kind === "recap" ? "Recap email" : item.kind === "install-day" ? "Install day email" : "Follow-up email"} ·{" "}
-            {item.customer}
+            {item.kind === "recap" ? "Recap email" : "Follow-up email"} · {item.customer}
             {showDeal && <span className="font-normal text-muted"> · {item.title}</span>}
           </p>
           <p className="text-[12px] text-muted">{item.why}</p>
