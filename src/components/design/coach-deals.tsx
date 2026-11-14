@@ -7,11 +7,13 @@ import {
   STANDING_WORDS,
   dealGroups,
   dealsSummary,
+  DEALS_SEARCH_FROM,
   searchDeals,
   type AssistantDeal,
   type AssistantDealCall,
   type DealStanding,
 } from "@/lib/domain/design/assistant-deals";
+import { suburbOfAddress } from "@/lib/domain/design/deal-feed";
 import { useCallerInfo } from "@/lib/services/caller";
 import { loadAssistantDeals, loadDealCalls, useCoachCaller } from "@/lib/services/coaching";
 import { AfterCall, CallInPane } from "./assistant-call";
@@ -46,6 +48,13 @@ const when = (iso: string) => {
  * open the deal) and the chat beside it is then about that deal; pressing it again folds it. On a phone the pane takes
  * the window's place.
  */
+/** " · Solar and a battery · Rowville": what tells one customer's deals apart in the list. */
+const dealTag = (d: AssistantDeal) =>
+  [d.deal, suburbOfAddress(d.address)]
+    .filter(Boolean)
+    .map((w) => ` · ${w}`)
+    .join("");
+
 export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: AssistantDeal | null) => void; onBack: () => void }) {
   const { callsOn, textsOn } = useCallerInfo();
   const caller = useCoachCaller();
@@ -91,16 +100,20 @@ export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: As
           {name}&apos;s deals
           <span className="ml-auto text-xs font-normal text-muted">{deals ? dealsSummary(deals) : "Loading…"}</span>
         </p>
-        <label className="mt-2.5 flex items-center gap-2 rounded-full bg-canvas px-3 py-1.5 ring-1 ring-line focus-within:ring-sun-line">
-          <Search className="size-3.5 shrink-0 text-muted" aria-hidden />
-          <input
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            placeholder="Find a customer or address"
-            aria-label={`Search ${name}'s deals`}
-            className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
-          />
-        </label>
+        {/* One search in the window while the list is short (14 Nov 2026, Martin's tidy-up: this box beside the contact
+            search read as the same thing twice); a long list gets its own. */}
+        {(deals?.length ?? 0) >= DEALS_SEARCH_FROM && (
+          <label className="mt-2.5 flex items-center gap-2 rounded-full bg-canvas px-3 py-1.5 ring-1 ring-line focus-within:ring-sun-line">
+            <Search className="size-3.5 shrink-0 text-muted" aria-hidden />
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder="Find a customer or address"
+              aria-label={`Search ${name}'s deals`}
+              className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+            />
+          </label>
+        )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {failed && <p className="px-4 py-3 text-xs text-danger">{failed}</p>}
@@ -129,7 +142,11 @@ export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: As
                       className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-surface-2"
                     >
                       <span className={clsx("size-2 shrink-0 rounded-full", DOT[d.standing])} aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{d.customer}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        <span className="font-semibold text-ink">{d.customer}</span>
+                        {/* What the deal is and where, so two deals of one name read apart. */}
+                        <span className="text-xs text-muted">{dealTag(d)}</span>
+                      </span>
                       <span className="shrink-0 text-[11px] tabular-nums text-muted">{when(d.dueAt ?? d.at)}</span>
                       <ChevronDown className={clsx("size-4 shrink-0 text-ink-2 transition-transform", open && "rotate-180")} aria-hidden />
                     </button>

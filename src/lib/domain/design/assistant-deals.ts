@@ -95,6 +95,22 @@ export function callsTodayWords(calls: readonly AssistantDeal[]): string | null 
   return live ? `${count} · ${live} on now` : count;
 }
 
+/**
+ * The assistant's day in a line, under its name in the window's header (14 Nov 2026, Martin's tidy-up: something live,
+ * not a description): "On a call now · 2 calls today", "1 call today · next at 7:02 pm", "No calls lined up today".
+ * `calls` are today's, as `callsToday` orders them; `timeOf` says a time in the market's own.
+ */
+export function dayLine(calls: readonly AssistantDeal[], now: Date, timeOf: (iso: string) => string): string {
+  if (!calls.length) return "No calls lined up today";
+  const count = `${calls.length} ${calls.length === 1 ? "call" : "calls"} today`;
+  if (calls.some((c) => c.standing === "live")) return `On a call now · ${count}`;
+  const next = calls.find((c) => c.dueAt && Date.parse(c.dueAt) > now.getTime());
+  return next?.dueAt ? `${count} · next at ${timeOf(next.dueAt)}` : count;
+}
+
+/** How many deals the pane holds before it offers a search of its own: a short list is read at a glance. */
+export const DEALS_SEARCH_FROM = 9;
+
 /** The deals in the pane's order: by standing (what needs a person first), the latest first within each. */
 export function dealOrder(deals: readonly AssistantDeal[]): AssistantDeal[] {
   // Calls lined up run in the order they ring; everything else, the latest first.

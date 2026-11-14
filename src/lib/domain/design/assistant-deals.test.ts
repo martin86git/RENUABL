@@ -3,6 +3,7 @@ import {
   DEAL_CHAT_RULES,
   callsToday,
   callsTodayWords,
+  dayLine,
   dealBlock,
   dealGroups,
   dealsSummary,
@@ -144,5 +145,15 @@ describe("the calls on for today", () => {
     expect(callsTodayWords(callsToday(deals, now, dayOf))).toBe("4 calls today · 1 on now");
     expect(callsTodayWords([deal({ standing: "lined-up" })])).toBe("1 call today");
     expect(callsTodayWords([])).toBeNull();
+  });
+  it("gives the header a live line: on now, the next to ring, or nothing lined up", () => {
+    const at = new Date("2026-11-14T03:00:00.000Z");
+    const timeOf = (iso: string) => iso.slice(11, 16);
+    expect(dayLine([], at, timeOf)).toBe("No calls lined up today");
+    expect(dayLine([deal({ standing: "live" }), deal({ standing: "lined-up" })], at, timeOf)).toBe("On a call now · 2 calls today");
+    expect(dayLine([deal({ standing: "lined-up", dueAt: "2026-11-14T08:02:00.000Z" })], at, timeOf)).toBe("1 call today · next at 08:02");
+    // One whose time has passed is still today's, but nothing is said to be next.
+    expect(dayLine([deal({ standing: "lined-up", dueAt: "2026-11-14T01:00:00.000Z" })], at, timeOf)).toBe("1 call today");
+    expect(dayLine([deal({ standing: "lined-up" })], at, timeOf)).toBe("1 call today");
   });
 });

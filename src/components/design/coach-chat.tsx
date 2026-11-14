@@ -22,7 +22,8 @@ import {
   X,
 } from "lucide-react";
 import { useWatchedCall } from "@/lib/services/assistant-call";
-import type { AssistantDeal } from "@/lib/domain/design/assistant-deals";
+import { callsToday, dayLine, type AssistantDeal } from "@/lib/domain/design/assistant-deals";
+import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
 import {
   COACH_WINDOW_KEY,
   NO_SIZES,
@@ -42,6 +43,7 @@ import {
   closeCoach,
   coachAssistant,
   forgetCoachChat,
+  loadAssistantDeals,
   loadCoaching,
   newCoachChat,
   openCoach,
@@ -56,6 +58,10 @@ import { ContactReach } from "./coach-contacts";
 import { CoachDeals } from "./coach-deals";
 import { CoachWelcome } from "./coach-welcome";
 import { DictateButton, withSpoken } from "./dictate";
+
+/** A time in the market's own: "7:02 pm". */
+const marketTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", timeZone: LAUNCH_MARKET.timeZone });
 
 /** The pause between one packet of an answer and the next. */
 const PACKET_GAP_MS = 650;
@@ -283,6 +289,24 @@ function CoachWindowFor() {
   // from its day starts a new chat; Carry on, or an earlier chat opened, goes on in that one.
   const [past, setPast] = useState<CoachChatLine[]>([]);
   const [startNew, setStartNew] = useState(true);
+  // Its day in a line, under its name in the header: on a call, the next to ring, or nothing lined up.
+  const [day, setDay] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    let live = true;
+    const read = () =>
+      void loadAssistantDeals().then((res) => {
+        if (!live || !res.ok) return;
+        const now = new Date();
+        setDay(dayLine(callsToday(res.deals, now, todayInMarket), now, marketTime));
+      });
+    read();
+    window.addEventListener("renuabl:assistant-deals", read);
+    return () => {
+      live = false;
+      window.removeEventListener("renuabl:assistant-deals", read);
+    };
+  }, [isOpen]);
   const staying = useRef(false);
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- each open (a new state object) unfolds the window and lands it afresh */
@@ -370,7 +394,9 @@ function CoachWindowFor() {
   };
   const edge = (grip: "divider" | "left" | "top") => ({
     start: () => layout,
-    onDrag: (dx: number, dy: number, from: CoachLayout) => resize(dragCoach(sizes, pane, from, grip, dx, dy)),
+    // Centred on a wide screen, the window grows both ways from its middle: the top edge follows the pointer at twice dy.
+    onDrag: (dx: number, dy: number, from: CoachLayout) =>
+      resize(dragCoach(sizes, pane, from, grip, dx, grip === "top" && window.innerWidth >= 1024 ? dy * 2 : dy)),
     onReset: () => resize(grip === "top" ? { ...sizes, height: null } : { ...sizes, chat: null, ...(pane ? { [pane]: null } : {}) }),
   });
   const about = state.call ? null : deals ? picked : null;
@@ -445,12 +471,14 @@ function CoachWindowFor() {
                 width: `min(${layout.pane + layout.chat}px, calc(100vw - 2rem))`,
                 height: layout.height,
                 "--coach-pane": `${layout.pane}px`,
+                // On a wide screen the window's middle is the floating bar's (14 Nov 2026, Martin), never off the top.
+                "--coach-top": `max(1rem, calc(50dvh - ${layout.height / 2}px))`,
               } as React.CSSProperties)
         }
         className={clsx(
           "fixed bottom-20 right-4 z-[86] flex flex-col overflow-hidden rounded-2xl bg-surface text-ink shadow-lift ring-1 ring-line lg:bottom-6 print:hidden",
           watching ? "lg:right-[25.5rem]" : "lg:right-20",
-          small && "w-[min(19rem,calc(100vw-2rem))]",
+          small ? "w-[min(19rem,calc(100vw-2rem))]" : "lg:bottom-auto lg:top-[var(--coach-top)]",
         )}
       >
         {!small && (
@@ -480,7 +508,7 @@ function CoachWindowFor() {
               <AvatarEdit editable={mayCoach} onFailed={setFailed} />
               <div className="min-w-0">
                 <p className="truncate font-semibold">{COACH_COPY.title(name)}</p>
-                <p className="truncate text-xs text-white/70">Your phone assistant · learns from what you tell it</p>
+                <p className="truncate text-xs text-white/70">{day ?? "Your phone assistant"}</p>
               </div>
               {/* What the window can show and do, together by the title (14 Nov 2026, Martin: kept away from minimise and
                 close, so they aren't taken for window controls). */}
@@ -561,19 +589,6 @@ function CoachWindowFor() {
           )}
           <div className={clsx("flex min-w-0 flex-1 flex-col bg-surface", (settings || deals) && "hidden sm:flex")}>
             <ContactReach open={reaching} onOpen={setReaching} />
-            {!settings && !reaching && (
-              <button
-                type="button"
-                onClick={() => toggleSettings(true)}
-                className="flex w-full items-center justify-between border-b border-line px-4 py-2.5 text-left text-sm text-ink-2 hover:text-ink"
-              >
-                <span>
-                  <strong className="font-semibold text-ink">{notes.length}</strong> {notes.length === 1 ? "line" : "lines"} in {name}
-                  &apos;s script
-                </span>
-                <span className="text-xs font-medium text-ink">Open</span>
-              </button>
-            )}
             {landing && !reaching && (
               <div className="min-h-40 flex-1 overflow-y-auto px-4 py-3">
                 <CoachWelcome
@@ -693,37 +708,40 @@ function CoachWindowFor() {
               {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
               {mayCoach ? (
                 <div className="flex items-end gap-2">
-                  <DictateButton
-                    label={`Speak to ${name}`}
-                    onHearing={setHeard}
-                    onWords={(w) => setText((was) => withSpoken(was, w).slice(0, 2000))}
-                  />
-                  <textarea
-                    ref={box}
-                    value={heard ? withSpoken(text, heard) : text}
-                    onChange={(e) => {
-                      setHeard("");
-                      setText(e.target.value);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void send();
+                  {/* The microphone sits inside the box, as in Sol's. */}
+                  <div className="flex min-h-11 min-w-0 flex-1 items-end gap-1 rounded-2xl bg-canvas py-1 pl-1.5 pr-1 ring-1 ring-line focus-within:ring-sun-line">
+                    <DictateButton
+                      label={`Speak to ${name}`}
+                      onHearing={setHeard}
+                      onWords={(w) => setText((was) => withSpoken(was, w).slice(0, 2000))}
+                    />
+                    <textarea
+                      ref={box}
+                      value={heard ? withSpoken(text, heard) : text}
+                      onChange={(e) => {
+                        setHeard("");
+                        setText(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          void send();
+                        }
+                      }}
+                      rows={2}
+                      maxLength={2000}
+                      placeholder={
+                        state.call
+                          ? COACH_COPY.callAbout(name)
+                          : about
+                            ? `Ask ${name} about ${aboutFirst}…`
+                            : landing && turns.length > 0
+                              ? `Start a new chat with ${name}…`
+                              : `Tell ${name} what to change…`
                       }
-                    }}
-                    rows={2}
-                    maxLength={2000}
-                    placeholder={
-                      state.call
-                        ? COACH_COPY.callAbout(name)
-                        : about
-                          ? `Ask ${name} about ${aboutFirst}…`
-                          : landing && turns.length > 0
-                            ? `Start a new chat with ${name}…`
-                            : `Tell ${name} what to change…`
-                    }
-                    className="min-h-11 flex-1 resize-none rounded-2xl bg-canvas px-3 py-2 text-sm text-ink ring-1 ring-line placeholder:text-muted focus:outline-none focus:ring-sun-line"
-                  />
+                      className="min-w-0 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none"
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => void send()}

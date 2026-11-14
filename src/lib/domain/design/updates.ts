@@ -14,6 +14,11 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-14",
+    area: "Agents",
+    words: "Your phone assistant's window sits level with the agents bar, with one search, its day in the header and the mic in the box.",
+  },
+  {
     day: "2026-11-12",
     area: "Designer",
     words: "When a panel is shaded, Sol lists your options: an optimiser on it, rewiring the string, moving it or taking it off.",
