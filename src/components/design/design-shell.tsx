@@ -176,7 +176,14 @@ export function DesignShell(props: { children: React.ReactNode; compact?: boolea
 }
 
 /** The pad every page sits on (Primero's `PAGE_PAD`): a soft grey ground with rounded corners, white cards on it. */
-const PAD = "studio-pad min-h-[calc(100dvh-10rem)] rounded-[28px] bg-canvas p-4 sm:p-6";
+const PAD = "studio-pad min-h-[calc(100dvh-10rem)] rounded-[28px] bg-canvas p-4 sm:p-6 lg:pt-10";
+
+/**
+ * How far the sections menu drops below the top bar on a wide screen, so it sits half over the pad's top edge (14 Nov
+ * 2026, Martin: not in line with the wordmark and the cards at the sides). Kept in step with the pad's gap below the
+ * bar (`lg:pt-9`): the menu's middle lands on the pad's edge.
+ */
+const MENU_DROP_PX = 56;
 
 function Shell({
   children,
@@ -217,7 +224,8 @@ function Shell({
       root.style.removeProperty("--studio-head");
       return;
     }
-    const set = () => root.style.setProperty("--studio-head", `${el.offsetHeight}px`);
+    // The sections menu hangs below the bar on a page with a pad: what sticks clears it too.
+    const set = () => root.style.setProperty("--studio-head", `${el.offsetHeight + (tool ? 0 : MENU_DROP_PX)}px`);
     set();
     watchHead.current = new ResizeObserver(set);
     watchHead.current.observe(el);
@@ -425,7 +433,10 @@ function Shell({
               </button>
             )}
           </div>
-          <div className="mt-4 flex min-w-0 items-center justify-center">
+          <div
+            className="mt-4 flex min-w-0 items-center justify-center"
+            style={tool ? undefined : { transform: `translateY(${MENU_DROP_PX}px)` }}
+          >
             {/* One white pill like the rail (10 Nov 2026, Martin: the toggle hadn't looked right since the sections folded): every
                 round sits inside it at the same height, nothing standing out of it, and the section you're in is lit as the
                 rail's are, black with its word in orange. */}

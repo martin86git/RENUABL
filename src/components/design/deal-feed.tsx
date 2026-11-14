@@ -638,7 +638,7 @@ function TodayStrip(props: {
   right: React.ReactNode;
 }) {
   return (
-    <div className="sticky top-2 z-20 -mx-1 px-1 pb-1 pt-1 lg:top-[4.75rem]">
+    <div className="sticky top-2 z-20 -mx-1 px-1 pb-1 pt-1 lg:top-[calc(var(--studio-head,4.5rem)+0.25rem)]">
       <nav
         aria-label="Today at a glance"
         className="flex items-center gap-2 rounded-2xl bg-surface/90 px-2 py-1.5 shadow-[0_6px_24px_rgba(11,11,12,0.06)] ring-1 ring-line backdrop-blur"
