@@ -265,10 +265,18 @@ export function SolRail({ team, assistant }: { team?: React.ReactNode; assistant
   return (
     <aside
       aria-label="Who you talk to: your team and your agents"
-      className="sol-rail fixed right-4 top-1/2 z-30 hidden w-16 -translate-y-1/2 flex-col items-center gap-1.5 rounded-[2rem] bg-surface p-1.5 shadow-[0_8px_30px_rgba(20,22,26,0.10)] ring-1 ring-line print:hidden lg:flex"
+      className="sol-rail fixed right-4 top-1/2 z-30 hidden w-16 -translate-y-1/2 flex-col items-center rounded-[2rem] bg-surface px-2 pb-3 pt-1.5 shadow-[0_10px_36px_rgba(20,22,26,0.12)] ring-1 ring-line print:hidden lg:flex"
     >
-      {team && <span className="team-bulb">{team}</span>}
-      {/* The business's agents, each with its name and its job under it (rail-agents.tsx). */}
+      {/* One rhythm down the bar (14 Nov 2026, Martin: "the bar doesn't look as good as it could"): a round, its name
+          under it, and a fine rule between your team and your agents. */}
+      {team && (
+        <span className="flex flex-col items-center">
+          <span className="team-bulb">{team}</span>
+          <span className="text-[11px] font-medium leading-tight text-ink-2">Team</span>
+        </span>
+      )}
+      {team && assistant && <span className="my-2.5 h-px w-7 bg-line" aria-hidden />}
+      {/* The business's agents, each with its name under it (rail-agents.tsx). */}
       {assistant}
     </aside>
   );

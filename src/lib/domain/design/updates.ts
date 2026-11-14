@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-14",
     area: "Calls",
+    words: "On the floating bar each agent has just its name under it, and the plus to add an agent is back.",
+  },
+  {
+    day: "2026-11-14",
+    area: "Calls",
     words: "The floating bar on the right is back, with just team chat and your agents. The calculator and email stay at the top.",
   },
   {
