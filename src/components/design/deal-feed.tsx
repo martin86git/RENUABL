@@ -586,8 +586,12 @@ function ArrivalCard(props: {
   );
 }
 
-/** A part of Today in its own panel, the title inside at the top (14 Nov 2026, Martin). */
-const TRAY = "mt-6 scroll-mt-44 rounded-[28px] bg-surface/55 p-4 ring-1 ring-line/70 sm:p-6";
+/**
+ * A part of Today: its title, then its cards, straight on the pad's ground (14 Nov 2026, Martin: the panel between the
+ * pad and the cards put a third near-white layer under them, so no card came forward; room between the parts sets
+ * them apart instead).
+ */
+const TRAY = "mt-9 scroll-mt-44";
 
 /** Where each part of Today sits on the page, for the strip to go to. */
 export const TODAY_IDS = {
@@ -1409,7 +1413,7 @@ function BookInstall(props: { deal: FeedDeal; days: string[]; signOff?: { sender
       </p>
     );
   return (
-    <div className="mt-4 rounded-2xl bg-canvas p-3.5 ring-1 ring-line">
+    <div className="mt-4 border-t border-line pt-3.5">
       <p className="flex items-center gap-1.5 text-[12px] font-medium text-ink-2">
         <SolIcon className="size-3.5 text-sun-line" /> Sol found these days free
       </p>

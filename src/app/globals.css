@@ -207,6 +207,14 @@
 .studio-frame .studio-pad {
   --canvas: #f0f0f2;
 }
+/* Today's ground is a few shades deeper (14 Nov 2026, Martin: everything on Today was too close in colour for a card
+   to come forward): two surfaces only, the ground and white. Lines and quiet type are darkened with it so they still
+   read on the deeper grey. */
+.studio-frame .studio-pad:has([data-calm-ground]) {
+  --canvas: #e3e3e8;
+  --line: #d6d6dc;
+  --muted: #666870;
+}
 /* A page that floats its own rails beside its column (the deal) draws its own grey; the shell's pad steps back on a wide
    screen so the rails sit on the page itself. */
 @media (min-width: 80rem) {

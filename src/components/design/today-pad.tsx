@@ -4,20 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
-import {
-  ArrowUp,
-  ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  HardHat,
-  Mail,
-  Phone,
-  Play,
-  RefreshCw,
-  Search,
-  X,
-} from "lucide-react";
+import { ArrowUp, ArrowUpRight, ChevronLeft, ChevronRight, Eye, HardHat, Mail, Phone, Play, RefreshCw, Search, X } from "lucide-react";
 import { LAUNCH_MARKET, greeting } from "@/lib/domain/market";
 import { nextHeadline, searchNext, searchWords, workThroughAt, type NextItem } from "@/lib/domain/design/next-up";
 import { WELCOME_TOUR } from "@/lib/domain/design/welcome";
@@ -214,7 +201,7 @@ export function TodayPad(props: {
   };
 
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-13rem)] w-full max-w-6xl flex-col">
+    <div data-calm-ground className="mx-auto flex min-h-[calc(100dvh-13rem)] w-full max-w-6xl flex-col">
       {adding && (
         <div className="mx-auto mb-4 w-full max-w-5xl">
           <NewDeal onClose={() => setAdding(false)} />
