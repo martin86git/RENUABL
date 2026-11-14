@@ -444,26 +444,69 @@ html.sol-resizing .team-pop {
   }
 }
 /* Sol's conversation is black and white (15 Nov 2026, Martin: "this could be black and white, and still look
-   beautiful… default to black and white. and add highlights… think apple. think tesla"; the grey and then the warm
-   ground tried before it are gone). White ground, near-black type, hairlines; the one colour is the key point's. */
+   beautiful… think apple. think tesla"; then "perhaps the background is the charcoal from the theme"). The ground is
+   the studio's charcoal with light type and fine light lines; each block of his answer is a white pad on it
+   (`.sol-pad`, which puts the light colours back for what is inside); the member's message is a white outline. The
+   one colour is the key point's. */
 .sol-ground {
-  --canvas: #f5f5f7;
-  --line: #e3e3e8;
-  --muted: #6e6e73;
-  background: #fff;
+  --canvas: #45484f;
+  --surface: #3a3d43;
+  --surface-2: rgb(255 255 255 / 0.09);
+  --ink: #ffffff;
+  --ink-2: #e6e7ea;
+  --muted: #a9acb3;
+  --line: rgb(255 255 255 / 0.16);
+  --line-strong: rgb(255 255 255 / 0.28);
+  --primary: #ffffff;
+  --primary-ink: #1d1d1f;
+  --sun: rgb(255 90 31 / 0.18);
+  --sun-ink: #ffb08a;
+  background: #3a3d43;
+  color: var(--ink);
 }
-/* His answers' type: the interface's own face (the system face tried on 15 Nov read no better), set to be read: a
-   touch tighter, a generous line, near-black. Weight and size do the work that colour did. */
+.sol-ground .sol-pad {
+  --canvas: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #ebebed;
+  --ink: #1d1d1f;
+  --ink-2: #3c3d41;
+  --muted: #6e6e73;
+  --line: #e3e3e8;
+  --line-strong: #cdced3;
+  --primary: #3a3d43;
+  --primary-ink: #ffffff;
+  --sun: #fff0e6;
+  --sun-ink: #b53c00;
+  background: #ffffff;
+  color: #1d1d1f;
+}
+/* His answers' type (15 Nov 2026, Martin: "the font is too thick - and the font is too big"): the interface's own
+   face a size down and lighter than the interface sets it (Inter is a variable face, so 380 is a real weight, between
+   light and regular), near-black, with a generous line. Names and headings step up from it in weight, not in size. */
 .sol-prose {
-  font-size: 14.5px;
-  line-height: 1.62;
-  letter-spacing: -0.011em;
+  font-size: 13px;
+  font-weight: 380;
+  line-height: 1.6;
+  letter-spacing: -0.006em;
   color: #1d1d1f;
   -webkit-font-smoothing: antialiased;
 }
-/* The key point: the conversation's one highlight, a wash of the signal colour. */
-.sol-key {
-  background: color-mix(in srgb, var(--sun-line) 9%, #fff);
+/* The key point: the conversation's one highlight, and a pad of a different kind from the rest (Martin: "must also be
+   different aside from just the color highlight. perhaps make it italic"): a wash of the signal colour, and its words
+   in an italic serif, as a pulled quote is set. The serif is the reader's own (Iowan on a Mac, Palatino on Windows,
+   Georgia anywhere) because each carries a true italic; the site's own faces would only be slanted by the browser. */
+.sol-key,
+.sol-ground .sol-pad.sol-key {
+  background: color-mix(in srgb, var(--sun-line) 13%, #fff);
+}
+.sol-key-words {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.14em;
+  line-height: 1.45;
+  letter-spacing: 0;
+  color: #1d1d1f;
 }
 /* Where Sol stands (sol-dock.tsx `SolNavButton`, and every place that draws him): no round behind him since
    14 Nov 2026 (Martin: "remove the black ring… standalone sun"), so the box is only his place and he fills it. A soft

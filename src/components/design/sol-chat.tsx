@@ -907,8 +907,8 @@ function Bubble({
   return (
     <div className={clsx("flex flex-col", you ? "items-end" : "items-stretch")}>
       {/* Black and white (15 Nov 2026, Martin: "add outlines to discern my message from sols… think apple"): the
-          member's words sit right in a fine black outline; Sol's answer is not boxed at all, only named, and reads
-          across the column like a page. */}
+          member's words sit right in a fine black outline; Sol's answer is named, then each block of it sits in a
+          quiet pad of its own (sol-text.tsx `pads`), as the phone assistant's chat sets its answers. */}
       {!you && (
         <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
           <SolMark className="size-3.5" glow={false} /> Sol
@@ -918,13 +918,13 @@ function Bubble({
         className={clsx(
           "[overflow-wrap:anywhere]",
           you
-            ? "max-w-[80%] whitespace-pre-wrap rounded-[1.25rem] rounded-br-md border border-ink bg-surface px-4 py-2.5 text-[14px] leading-[1.5] tracking-[-0.011em] text-ink"
+            ? "max-w-[80%] whitespace-pre-wrap font-[380] rounded-[1.25rem] rounded-br-md border border-ink/80 px-3.5 py-2 text-[13px] leading-[1.5] tracking-[-0.006em] text-ink"
             : "sol-prose",
           pinned && (you ? "ring-2 ring-sun-line/50" : "rounded-2xl p-4 ring-2 ring-sun-line/50"),
         )}
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
-        {you ? text : <SolText text={text} onAnswer={onAnswer} onPick={onPick} />}
+        {you ? text : <SolText text={text} onAnswer={onAnswer} onPick={onPick} pads />}
         {at && <span className={clsx("block text-[10.5px] text-muted", you ? "mt-1" : "mt-3")}>{when(at)}</span>}
       </div>
       {at && (

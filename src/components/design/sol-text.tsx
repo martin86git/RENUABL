@@ -28,7 +28,24 @@ export type OnPick = (item: string) => void;
  * round bullets, the point that matters most in a warm pad, and a question to the reader ringed in the signal orange
  * so it is never missed. `tail` is put at the end of the last block (Sol's caret while he types).
  */
-export function SolText({ text, tail, onAnswer, onPick }: { text: string; tail?: React.ReactNode; onAnswer?: OnAnswer; onPick?: OnPick }) {
+export function SolText({
+  text,
+  tail,
+  onAnswer,
+  onPick,
+  pads = false,
+}: {
+  text: string;
+  tail?: React.ReactNode;
+  onAnswer?: OnAnswer;
+  onPick?: OnPick;
+  /**
+   * Each block of his answer in a pad of its own (15 Nov 2026, Martin: "keep the pads for each block of text. similar
+   * to how we designed the charlie chat"): a paragraph or a list in a pad as wide as its words, a section in one across
+   * the column. His own chat asks for it; a place that already draws his answer in a bubble doesn't.
+   */
+  pads?: boolean;
+}) {
   // A heading and the list under it are one section, numbered when there are several, so the eye has landmarks to
   // come back to (15 Nov 2026, Martin: the headings and bullets ran into one).
   const blocks = withSections(solBlocks(text));
@@ -36,25 +53,19 @@ export function SolText({ text, tail, onAnswer, onPick }: { text: string; tail?:
   const sections = blocks.filter((b) => b.kind === "section").length;
   let nth = 0;
   return (
-    <div className="space-y-4">
+    <div className={pads ? "space-y-2" : "space-y-4"}>
       {blocks.map((b, i) =>
         b.kind === "section" ? (
           <Section
             key={i}
+            pad={pads}
             section={b}
             number={sections > 1 ? ++nth : null}
             tail={i === blocks.length - 1 ? tail : null}
             onPick={tail ? undefined : onPick}
           />
         ) : (
-          <Block
-            key={i}
-            block={b}
-            tail={i === blocks.length - 1 ? tail : null}
-            onAnswer={tail ? undefined : onAnswer}
-            // The answer comes first and reads first.
-            lead={i === 0 && blocks.length > 1}
-          />
+          <Block key={i} block={b} tail={i === blocks.length - 1 ? tail : null} onAnswer={tail ? undefined : onAnswer} pad={pads} />
         ),
       )}
     </div>
@@ -72,36 +83,38 @@ function Section({
   number,
   tail,
   onPick,
+  pad = false,
 }: {
+  pad?: boolean;
   section: SolSection;
   number: number | null;
   tail: React.ReactNode;
   onPick?: OnPick;
 }) {
   return (
-    <section className="pt-1">
-      <h4 className="flex items-baseline gap-3 border-b border-ink pb-2 text-ink">
+    <section className={pad ? "sol-pad rounded-2xl bg-canvas px-3.5 pb-0.5 pt-3" : ""}>
+      <h4 className="flex items-baseline gap-2.5 border-b border-ink/80 pb-2 text-ink">
         {number !== null && (
-          <span className="shrink-0 text-[11px] font-medium tabular-nums text-muted" aria-hidden>
+          <span className="shrink-0 text-[10.5px] tabular-nums text-muted" aria-hidden>
             {String(number).padStart(2, "0")}
           </span>
         )}
-        <span className="min-w-0 text-[1.03em] font-semibold tracking-[-0.014em]">{section.title}</span>
-        <span className="ml-auto shrink-0 pl-2 text-[11px] font-normal tabular-nums text-muted">{section.items.length}</span>
+        <span className="min-w-0 font-[560]">{section.title}</span>
+        <span className="ml-auto shrink-0 pl-2 text-[10.5px] font-normal tabular-nums text-muted">{section.items.length}</span>
       </h4>
-      <ul className="divide-y divide-line">
+      <ul className="divide-y divide-black/[0.08]">
         {section.items.map((item, i) => {
           const row = solRow(item);
           return (
-            <li key={i} className="group/row flex items-start gap-3 py-3">
+            <li key={i} className="group/row flex items-start gap-3 py-2.5">
               <div className="min-w-0 flex-1">
                 {row.name && (
                   <p className="flex items-baseline gap-3">
-                    <span className="min-w-0 font-medium text-ink">{row.name}</span>
-                    {row.amount && <span className="ml-auto shrink-0 font-medium tabular-nums text-ink">{row.amount}</span>}
+                    <span className="min-w-0 font-[520] text-ink">{row.name}</span>
+                    {row.amount && <span className="ml-auto shrink-0 text-[0.94em] tabular-nums text-ink">{row.amount}</span>}
                   </p>
                 )}
-                <p className={row.name ? "mt-0.5 text-[0.93em] leading-[1.5] text-muted" : "text-ink"}>
+                <p className={row.name ? "mt-0.5 text-[0.95em] leading-[1.5] text-muted" : "text-ink"}>
                   <Runs text={row.name ? row.detail.charAt(0).toUpperCase() + row.detail.slice(1) : row.detail} />
                   {i === section.items.length - 1 && tail}
                 </p>
@@ -114,7 +127,7 @@ function Section({
                   aria-label={`Work on this one with Sol: ${row.name ?? row.detail}`}
                   className="-mr-1 grid size-7 shrink-0 place-items-center rounded-full text-muted/60 transition hover:bg-ink hover:text-white group-hover/row:text-ink group-hover/row:hover:text-white"
                 >
-                  <ArrowRight className="size-4" aria-hidden />
+                  <ArrowRight className="size-3.5" aria-hidden />
                 </button>
               )}
             </li>
@@ -135,13 +148,13 @@ function Runs({ text }: { text: string }) {
       {solRuns(text).map((r, i) => {
         if (r.kind === "strong")
           return (
-            <strong key={i} className="font-medium text-ink">
+            <strong key={i} className="font-[520] text-ink">
               {r.text}
             </strong>
           );
         if (r.kind === "figure")
           return (
-            <span key={i} className="whitespace-nowrap font-medium text-ink">
+            <span key={i} className="whitespace-nowrap font-[520] text-ink">
               {r.text}
             </span>
           );
@@ -150,7 +163,7 @@ function Runs({ text }: { text: string }) {
             <a
               key={i}
               href={`tel:${r.dial}`}
-              className="whitespace-nowrap font-medium text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
+              className="whitespace-nowrap font-[520] text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
             >
               {r.text}
             </a>
@@ -160,7 +173,7 @@ function Runs({ text }: { text: string }) {
             <a
               key={i}
               href={`mailto:${r.text}`}
-              className="font-medium text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
+              className="font-[520] text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
             >
               {r.text}
             </a>
@@ -171,20 +184,23 @@ function Runs({ text }: { text: string }) {
   );
 }
 
-function Block({ block, tail, onAnswer, lead = false }: { block: SolBlock; tail: React.ReactNode; onAnswer?: OnAnswer; lead?: boolean }) {
+/** A pad as wide as its words, for a paragraph or a list of his. */
+const PAD = "sol-pad w-fit max-w-full rounded-2xl bg-canvas px-3.5 py-2.5";
+
+function Block({ block, tail, onAnswer, pad = false }: { block: SolBlock; tail: React.ReactNode; onAnswer?: OnAnswer; pad?: boolean }) {
   switch (block.kind) {
     case "list":
       return (
-        <ul className="space-y-2.5">
+        <ul className={"space-y-2 " + (pad ? PAD : "")}>
           {block.items.map((item, i) => {
             const named = namedItem(item);
             return (
               <li key={i} className="flex gap-3">
-                <span className="mt-[0.68em] size-1 shrink-0 rounded-full bg-ink" aria-hidden />
+                <span className="mt-[0.7em] size-1 shrink-0 rounded-full bg-ink/70" aria-hidden />
                 <span className="min-w-0">
                   {named ? (
                     <>
-                      <strong className="font-medium text-ink">{named.name}</strong>
+                      <strong className="font-[520] text-ink">{named.name}</strong>
                       <span className="text-muted"> · </span>
                       <Runs text={named.rest} />
                     </>
@@ -203,9 +219,9 @@ function Block({ block, tail, onAnswer, lead = false }: { block: SolBlock; tail:
         // The point that matters most is the conversation's one highlight (15 Nov 2026, Martin: "default to black and
         // white. and add highlights. which will make key points stand out"): a wash of the signal colour, named in it,
         // its words a size up. Nothing else in his answer is coloured.
-        <div className="sol-key rounded-2xl px-4 py-3.5">
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.18em] text-sun-line">Key point</p>
-          <p className="mt-1.5 text-[1.07em] font-medium leading-[1.45] tracking-[-0.014em] text-ink">
+        <div className="sol-pad sol-key rounded-2xl px-4 py-3">
+          <p className="text-[10px] font-[560] uppercase tracking-[0.18em] text-sun-line">Key point</p>
+          <p className="sol-key-words mt-1">
             <Runs text={block.text} />
             {tail}
           </p>
@@ -213,7 +229,7 @@ function Block({ block, tail, onAnswer, lead = false }: { block: SolBlock; tail:
       );
     case "ask":
       return (
-        <div className="rounded-2xl bg-surface px-4 py-3 font-medium text-ink ring-1 ring-line">
+        <div className="sol-pad rounded-2xl bg-surface px-3.5 py-3 font-[520] text-ink ring-1 ring-line">
           <p className="flex gap-2.5">
             <CircleHelp className="mt-[0.2em] size-4 shrink-0 text-ink" aria-label="A question for you" />
             <span className="min-w-0">
@@ -257,14 +273,14 @@ function Block({ block, tail, onAnswer, lead = false }: { block: SolBlock; tail:
       return <ChoiceCard question={block.text} options={block.options} onAnswer={onAnswer} tail={tail} />;
     case "more":
       return (
-        <p className="text-[0.92em] text-muted">
+        <p className={"text-[0.95em] text-muted " + (pad ? "px-1 pt-1" : "")}>
           {block.text}
           {tail}
         </p>
       );
     default:
       return (
-        <p className={"whitespace-pre-line " + (lead ? "text-[1.14em] leading-[1.42] tracking-[-0.017em] text-ink" : "")}>
+        <p className={"whitespace-pre-line " + (pad ? PAD : "")}>
           <Runs text={block.text} />
           {tail}
         </p>
@@ -306,7 +322,7 @@ function ChoiceCard({
     );
   return (
     <div
-      className="overflow-hidden rounded-xl bg-surface font-normal text-ink ring-1 ring-line"
+      className="sol-pad overflow-hidden rounded-2xl bg-surface font-normal text-ink ring-1 ring-line"
       onKeyDown={(e) => {
         const n = Number(e.key);
         if (live && n >= 1 && n <= options.length && !(e.target instanceof HTMLInputElement)) choose(options[n - 1].label);
