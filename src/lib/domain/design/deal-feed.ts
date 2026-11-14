@@ -549,3 +549,43 @@ const STAGE_PILLS: Partial<Record<JobStage, { words: string; tone: StageTone }>>
 export function stagePill(stage: JobStage): { words: string; tone: StageTone } {
   return STAGE_PILLS[stage] ?? { words: STAGE_LABELS[stage], tone: "approvals" };
 }
+
+/**
+ * The deals panel on Today (14 Nov 2026, Martin: as Service's list of cases, on the right): New leads, In progress (what
+ * waits on you first: a reply needed, then proposals out) or All, searched by every word.
+ */
+export type PanelTab = "new" | "progress" | "all";
+export const PANEL_TABS: { id: PanelTab; label: string }[] = [
+  { id: "new", label: "New leads" },
+  { id: "progress", label: "In progress" },
+  { id: "all", label: "All" },
+];
+
+/** What a row says under its name: a customer waiting on a reply, or where the proposal is. */
+export function panelMark(d: Pick<FeedDeal, "events" | "stage" | "proposal">): { words: string; tone: "reply" | "plain" } | null {
+  if (d.events[0]?.kind === "message") return { words: "Reply needed", tone: "reply" };
+  if (d.stage === "proposal") return { words: d.proposal?.opened ? "Proposal sent · opened" : "Proposal sent · not opened", tone: "plain" };
+  return null;
+}
+
+const rank = (d: FeedDeal) => (d.events[0]?.kind === "message" ? 0 : d.stage === "proposal" ? 1 : 2);
+
+export function panelDeals(deals: readonly FeedDeal[], tab: PanelTab, search: string): FeedDeal[] {
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+  const found = deals.filter((d) => {
+    if (tab === "new" && d.stage !== "lead") return false;
+    if (tab === "progress" && d.stage === "lead") return false;
+    const hay = `${d.customer} ${d.suburb} ${d.title} ${d.address ?? ""}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
+  return found.sort((a, b) => (tab === "progress" ? rank(a) - rank(b) : 0) || lastAt(b).localeCompare(lastAt(a)));
+}
+
+/** "2 new · 9 in progress · 1 waiting on you". */
+export function panelCounts(deals: readonly FeedDeal[]): { fresh: number; progress: number; waiting: number } {
+  return {
+    fresh: deals.filter((d) => d.stage === "lead").length,
+    progress: deals.filter((d) => d.stage !== "lead").length,
+    waiting: deals.filter((d) => d.events[0]?.kind === "message").length,
+  };
+}

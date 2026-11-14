@@ -97,7 +97,7 @@ export function TodayCalls(props: { id?: string; className?: string; onSummary?:
 
   return (
     <section id={props.id} className={props.className ?? "mt-8"} aria-label="Calls today">
-      <div className="mb-4 flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1">
+      <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
           Calls<span className="ml-1.5 font-normal normal-case tracking-normal text-muted">{words ?? "none yet today"}</span>
         </h2>
@@ -108,7 +108,7 @@ export function TodayCalls(props: { id?: string; className?: string; onSummary?:
           All calls
         </Link>
       </div>
-      <div className="flex flex-wrap justify-center gap-3">
+      <div className="flex flex-wrap gap-3">
         {t.live.map((c) => {
           const ran = c.phase === "on-call" && c.startedAt ? clockWords(now.getTime() - Date.parse(c.startedAt)) : null;
           return (
@@ -195,7 +195,7 @@ export function TodayCalls(props: { id?: string; className?: string; onSummary?:
           </Link>
         )}
         {!words && (
-          <p className="max-w-[31.5rem] rounded-2xl bg-surface px-5 py-4 text-center text-[13px] leading-snug text-ink-2 ring-1 ring-line">
+          <p className="max-w-[31.5rem] rounded-2xl bg-surface px-5 py-4 text-[13px] leading-snug text-ink-2 ring-1 ring-line">
             No calls yet today. {caller.name} rings new leads and customers who ask, in calling hours, and each call shows here.
           </p>
         )}

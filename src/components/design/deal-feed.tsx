@@ -27,6 +27,8 @@ import {
   Undo2,
   X,
   UserPlus,
+  ChevronLeft,
+  Search,
   Truck,
   CalendarCheck,
   HardHat,
@@ -57,6 +59,11 @@ import {
   nextMove,
   systemLine,
   type MoveKind,
+  PANEL_TABS,
+  panelCounts,
+  panelDeals,
+  panelMark,
+  type PanelTab,
   type NextMove,
   type FeedDeal,
   type FeedEventKind,
@@ -106,6 +113,8 @@ const EVENT_ICONS: Record<FeedEventKind, React.ComponentType<{ className?: strin
 export function DealFeed(props: { me: string; onNew?: () => void; adding?: boolean; onDay?: () => void }) {
   const { me } = props;
   const [showAll, setShowAll] = useState(false);
+  // The deal picked in the deals panel, shown as its card on the left.
+  const [picked, setPicked] = useState<string | null>(null);
   // What the Calls part says, for the strip and for its place in the column.
   const [calls, setCalls] = useState<CallsSummary | null>(null);
   const [data, setData] = useState<FeedAnswer | null>(null);
@@ -203,6 +212,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
   };
 
   const parts = todayParts(deals, now);
+  const pickedDeal = picked ? (deals.find((d) => d.jobId === picked) ?? null) : null;
   // The salespeople (members, not designers or the owner): two or more and the owner sees a line for each, and chooses
   // who their new leads go to (10 Nov 2026).
   const sellers = (data?.team ?? []).filter((m) => m.role === "member");
@@ -225,7 +235,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
       signal: needs > 0 ? ("needs" as const) : data ? ("clear" as const) : null,
       order: 1,
     },
-    { id: TODAY_IDS.newIn, label: "New in", count: data ? parts.fresh.length : null, order: 2 },
+
     ...(calls && (calls.on || calls.live + calls.lined + calls.done > 0)
       ? [
           {
@@ -238,7 +248,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         ]
       : []),
     ...(parts.coming.length ? [{ id: TODAY_IDS.coming, label: "Coming up", count: parts.coming.length, order: 4 }] : []),
-    ...(parts.inHand.length ? [{ id: TODAY_IDS.inHand, label: "In hand", count: parts.inHand.length, order: 5 }] : []),
+
     { id: TODAY_IDS.news, label: "News", count: null, order: 7 },
   ].sort((a, b) => a.order - b.order);
   // One part of Today at a time (14 Nov 2026, Martin: "revealing", one thing at a time with the edge of the next): the
@@ -253,11 +263,12 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
   const view = (id: string) => (id === shown ? "" : id === next?.id ? PEEK : "hidden");
   const go = (id: string) => {
     setChosen(id);
+    setPicked(null);
     window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-5xl lg:max-w-[84rem]">
       {/* The overview strip, pinned under the top bar (14 Nov 2026, Martin): the pipeline picked, each part of Today with
           how many, a press to go to it, and the part in view lit. */}
       <TodayStrip
@@ -321,204 +332,251 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
 
       {/* The parts of Today in one column, in the order of what needs a person (14 Nov 2026, Martin): Needs you, New in,
           Calls, Coming up, In hand; Calls goes first while a call is ringing or on, the most live thing on the page. */}
-      <div className="flex flex-col">
-        {/* The phone assistant's calls: on now, lined up and done today (12 Nov 2026, Martin). */}
-        <TodayCalls id={TODAY_IDS.calls} className={clsx(TRAY, place.calls, view(TODAY_IDS.calls))} onSummary={setCalls} />
-
-        {/* The owner of a team: a line for each salesperson, new this week, not yet contacted, in play. */}
-        {ownerOfTeam && (
-          <section className={clsx(TRAY, place.team, shown !== TODAY_IDS.inHand && "hidden")} aria-label="Your team">
-            <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink">Your team</h2>
-            <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
-              <div className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 border-b border-line px-4 py-2 text-[11.5px] text-muted">
-                <span>Salesperson</span>
-                <span>New this week</span>
-                <span>Not contacted</span>
-                <span>In play</span>
-              </div>
-              {teamLines(data?.deals ?? [], sellers, now).map((l) => (
-                <div
-                  key={l.email}
-                  className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 px-4 py-2.5 text-[13.5px] text-ink"
-                >
-                  <span className="truncate font-medium">{l.name}</span>
-                  <span className="tabular-nums">{l.fresh}</span>
-                  <span className={clsx("tabular-nums", l.waiting > 0 && "font-semibold text-sun-ink")}>{l.waiting}</span>
-                  <span className="tabular-nums">
-                    {l.inPlay}
-                    {l.value > 0 && <span className="text-muted"> · ${Math.round(l.value / 1000).toLocaleString("en-AU")}k</span>}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* New in (12 Nov 2026, Martin): new leads that need a design, each with Design, so a quote goes out quickly;
-          New lead adds one. */}
-        <section id={TODAY_IDS.newIn} className={clsx(TRAY, place.newIn, view(TODAY_IDS.newIn))} aria-label="New in">
-          <div className="mb-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
-            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
-              New in
-              <span className="ml-1.5 font-normal normal-case tracking-normal text-muted">
-                {data ? `${parts.fresh.length} to design` : ""}
-              </span>
-            </h2>
-            {ownerOfTeam && (
-              <label className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
-                Your new leads go to
-                <select
-                  value={leadRule}
-                  onChange={(e) => void chooseRule(e.target.value as LeadRule)}
-                  className="cursor-pointer rounded-full bg-surface px-2.5 py-1 text-[12.5px] font-medium text-ink ring-1 ring-line focus:outline-none"
-                >
-                  {LEAD_RULES.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.id === "adder" ? "You" : r.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <button
-              type="button"
-              onClick={props.onNew}
-              aria-expanded={props.adding}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line transition hover:ring-ink-2"
-            >
-              <Plus className={clsx("size-4 text-ink-2 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden /> New lead
-            </button>
-          </div>
-          {data && parts.fresh.length === 0 ? (
-            <div className="flex justify-center">
-              <p className="rounded-2xl bg-surface px-5 py-5 text-center text-[13.5px] text-ink-2 ring-1 ring-line">
-                Every new lead has a design.
-              </p>
-            </div>
-          ) : (
-            // Pads of their own width, centred (14 Nov 2026, Martin): however many there are, they sit in the middle.
-            <div className="flex flex-wrap justify-center gap-3">
-              {parts.fresh.map((d) => (
-                <div key={d.jobId} className={`grid ${PAD}`}>
-                  <ArrivalCard
-                    deal={d}
-                    now={now}
-                    team={solo ? null : [{ email: me, name: "You" }, ...(data?.team ?? [])]}
-                    mayGive={data?.role === "owner"}
-                    onChanged={load}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <Part id={TODAY_IDS.needs} className={clsx(place.needs, view(TODAY_IDS.needs))} title="Needs you" count={data ? needs : null}>
-          {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
-          {data && needs === 0 && (
-            // One quiet line (14 Nov 2026, Martin): an empty Needs you shouldn't take the top of the page.
-            <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[13.5px] text-ink-2">
-              <span className="grid size-6 place-items-center rounded-full bg-positive-soft text-positive">
-                <Check className="size-3.5" aria-hidden />
-              </span>
-              <span className="font-medium text-ink">{allClearWords(data.today ?? null)}</span>
-              Nothing needs you right now. Sol has the rest in hand.
-            </p>
-          )}
-          {/* Cards at a width of their own, the one that suits a card (30rem: the need, the days and the email read
-            without crowding), centred, two side by side where they fit (14 Nov 2026, Martin: not tied to New in's row). */}
-          {parts.needs.length > 0 && (
-            <div className="flex flex-wrap items-start justify-center gap-3">
-              {parts.needs.map((d) => (
-                <div key={d.jobId} className="w-full max-w-[30rem]">
-                  <DealCard
-                    deal={d}
-                    now={now}
-                    me={me}
-                    callsOn={Boolean(data?.callsOn)}
-                    team={data?.team ?? []}
-                    solo={solo}
-                    onChanged={load}
-                    onMark={(mark) => setMark(d.jobId, mark)}
-                    installDays={data?.installDays}
-                    signOff={data?.signOff}
-                    stacked
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </Part>
-
-        {parts.coming.length > 0 && (
-          <Part
-            id={TODAY_IDS.coming}
-            className={clsx(place.coming, view(TODAY_IDS.coming))}
-            title="Coming up"
-            note="What Sol does next. Review one to change it, or let it go."
-          >
-            <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
-              {parts.coming.map((d) => (
-                <ComingRow key={d.jobId} deal={d} now={now} onChanged={load} />
-              ))}
-            </ul>
-          </Part>
-        )}
-
-        {parts.inHand.length > 0 && (
-          <Part
-            id={TODAY_IDS.inHand}
-            className={clsx(place.inHand, view(TODAY_IDS.inHand))}
-            title="In hand"
-            count={parts.inHand.length}
-            note="Moving along. Nothing needs you on these."
-          >
-            <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
-              {(showAll ? parts.inHand : parts.inHand.slice(0, IN_HAND_SHOWN)).map((d) => (
-                <DealRow
-                  key={d.jobId}
-                  deal={d}
+      {/* Your work on the left, the deals on the right (14 Nov 2026, Martin: as Service lays out its cases). */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_23rem] lg:items-start lg:gap-8">
+        <div className="min-w-0">
+          {/* A deal picked in the panel: its whole card, with the way back. */}
+          {pickedDeal && (
+            <div className="mt-9">
+              <button
+                type="button"
+                onClick={() => setPicked(null)}
+                className="mb-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-4 text-[13px] font-medium text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-ink-2"
+              >
+                <ChevronLeft className="size-4" aria-hidden /> Back to your day
+              </button>
+              <div className="max-w-[40rem]">
+                <DealCard
+                  key={pickedDeal.jobId}
+                  deal={pickedDeal}
                   now={now}
                   me={me}
                   callsOn={Boolean(data?.callsOn)}
                   team={data?.team ?? []}
                   solo={solo}
                   onChanged={load}
-                  onMark={(mark) => setMark(d.jobId, mark)}
+                  onMark={(mark) => setMark(pickedDeal.jobId, mark)}
                   installDays={data?.installDays}
                   signOff={data?.signOff}
+                  stacked
                 />
-              ))}
-            </ul>
-            {parts.inHand.length > IN_HAND_SHOWN && (
-              <button
-                type="button"
-                onClick={() => setShowAll((v) => !v)}
-                className="mt-2 text-[13px] font-medium text-ink-2 underline-offset-4 hover:text-ink hover:underline"
-              >
-                {showAll ? "Show fewer" : `Show all ${parts.inHand.length}`}
-              </button>
-            )}
-          </Part>
-        )}
+              </div>
+            </div>
+          )}
+          <div className={clsx(pickedDeal && "hidden")}>
+            <div className="flex flex-col">
+              {/* The phone assistant's calls: on now, lined up and done today (12 Nov 2026, Martin). */}
+              <TodayCalls id={TODAY_IDS.calls} className={clsx(TRAY, place.calls, view(TODAY_IDS.calls))} onSummary={setCalls} />
 
-        <div id={TODAY_IDS.news} className={clsx("mt-9", place.news, view(TODAY_IDS.news))}>
-          <TodayNews />
-        </div>
-        {/* The next part, a press away under the edge of it. */}
-        {next && (
-          <div className="order-last -mt-10 flex justify-center">
-            <button
-              type="button"
-              onClick={() => go(next.id)}
-              className="relative z-10 inline-flex h-10 items-center gap-2 rounded-full bg-surface px-5 text-[13.5px] font-medium text-ink shadow-[0_6px_24px_rgba(20,22,26,0.08)] ring-1 ring-line transition hover:ring-ink-2"
-            >
-              Next: {next.label}
-              {next.count ? <span className="text-muted">· {next.count}</span> : null}
-              <ChevronDown className="size-4 text-ink-2" aria-hidden />
-            </button>
+              {/* The owner of a team: a line for each salesperson, new this week, not yet contacted, in play. */}
+              {ownerOfTeam && (
+                <section className={clsx(TRAY, place.team, shown !== TODAY_IDS.needs && "hidden")} aria-label="Your team">
+                  <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink">Your team</h2>
+                  <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+                    <div className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 border-b border-line px-4 py-2 text-[11.5px] text-muted">
+                      <span>Salesperson</span>
+                      <span>New this week</span>
+                      <span>Not contacted</span>
+                      <span>In play</span>
+                    </div>
+                    {teamLines(data?.deals ?? [], sellers, now).map((l) => (
+                      <div
+                        key={l.email}
+                        className="grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-2 px-4 py-2.5 text-[13.5px] text-ink"
+                      >
+                        <span className="truncate font-medium">{l.name}</span>
+                        <span className="tabular-nums">{l.fresh}</span>
+                        <span className={clsx("tabular-nums", l.waiting > 0 && "font-semibold text-sun-ink")}>{l.waiting}</span>
+                        <span className="tabular-nums">
+                          {l.inPlay}
+                          {l.value > 0 && <span className="text-muted"> · ${Math.round(l.value / 1000).toLocaleString("en-AU")}k</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* New in (12 Nov 2026, Martin): new leads that need a design, each with Design, so a quote goes out quickly;
+              New lead adds one. */}
+              <section id={TODAY_IDS.newIn} className={clsx(TRAY, place.newIn, view(TODAY_IDS.newIn))} aria-label="New in">
+                <div className="mb-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+                  <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
+                    New in
+                    <span className="ml-1.5 font-normal normal-case tracking-normal text-muted">
+                      {data ? `${parts.fresh.length} to design` : ""}
+                    </span>
+                  </h2>
+                  {ownerOfTeam && (
+                    <label className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-2">
+                      Your new leads go to
+                      <select
+                        value={leadRule}
+                        onChange={(e) => void chooseRule(e.target.value as LeadRule)}
+                        className="cursor-pointer rounded-full bg-surface px-2.5 py-1 text-[12.5px] font-medium text-ink ring-1 ring-line focus:outline-none"
+                      >
+                        {LEAD_RULES.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.id === "adder" ? "You" : r.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <button
+                    type="button"
+                    onClick={props.onNew}
+                    aria-expanded={props.adding}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line transition hover:ring-ink-2"
+                  >
+                    <Plus className={clsx("size-4 text-ink-2 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden /> New
+                    lead
+                  </button>
+                </div>
+                {data && parts.fresh.length === 0 ? (
+                  <div className="flex justify-center">
+                    <p className="rounded-2xl bg-surface px-5 py-5 text-center text-[13.5px] text-ink-2 ring-1 ring-line">
+                      Every new lead has a design.
+                    </p>
+                  </div>
+                ) : (
+                  // Pads of their own width, centred (14 Nov 2026, Martin): however many there are, they sit in the middle.
+                  <div className="flex flex-wrap justify-center gap-3">
+                    {parts.fresh.map((d) => (
+                      <div key={d.jobId} className={`grid ${PAD}`}>
+                        <ArrivalCard
+                          deal={d}
+                          now={now}
+                          team={solo ? null : [{ email: me, name: "You" }, ...(data?.team ?? [])]}
+                          mayGive={data?.role === "owner"}
+                          onChanged={load}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <Part id={TODAY_IDS.needs} className={clsx(place.needs, view(TODAY_IDS.needs))} title="Needs you" count={data ? needs : null}>
+                {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
+                {data && needs === 0 && (
+                  // One quiet line (14 Nov 2026, Martin): an empty Needs you shouldn't take the top of the page.
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13.5px] text-ink-2">
+                    <span className="grid size-6 place-items-center rounded-full bg-positive-soft text-positive">
+                      <Check className="size-3.5" aria-hidden />
+                    </span>
+                    <span className="font-medium text-ink">{allClearWords(data.today ?? null)}</span>
+                    Nothing needs you right now. Sol has the rest in hand.
+                  </p>
+                )}
+                {/* Cards at a width of their own, the one that suits a card (30rem: the need, the days and the email read
+                without crowding), centred, two side by side where they fit (14 Nov 2026, Martin: not tied to New in's row). */}
+                {parts.needs.length > 0 && (
+                  <div className="flex flex-wrap items-start gap-3">
+                    {parts.needs.map((d) => (
+                      <div key={d.jobId} className="w-full max-w-[30rem]">
+                        <DealCard
+                          deal={d}
+                          now={now}
+                          me={me}
+                          callsOn={Boolean(data?.callsOn)}
+                          team={data?.team ?? []}
+                          solo={solo}
+                          onChanged={load}
+                          onMark={(mark) => setMark(d.jobId, mark)}
+                          installDays={data?.installDays}
+                          signOff={data?.signOff}
+                          stacked
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Part>
+
+              {parts.coming.length > 0 && (
+                <Part
+                  id={TODAY_IDS.coming}
+                  className={clsx(place.coming, view(TODAY_IDS.coming))}
+                  title="Coming up"
+                  note="What Sol does next. Review one to change it, or let it go."
+                >
+                  <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+                    {parts.coming.map((d) => (
+                      <ComingRow key={d.jobId} deal={d} now={now} onChanged={load} />
+                    ))}
+                  </ul>
+                </Part>
+              )}
+
+              {parts.inHand.length > 0 && (
+                <Part
+                  id={TODAY_IDS.inHand}
+                  className={clsx(place.inHand, view(TODAY_IDS.inHand))}
+                  title="In hand"
+                  count={parts.inHand.length}
+                  note="Moving along. Nothing needs you on these."
+                >
+                  <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+                    {(showAll ? parts.inHand : parts.inHand.slice(0, IN_HAND_SHOWN)).map((d) => (
+                      <DealRow
+                        key={d.jobId}
+                        deal={d}
+                        now={now}
+                        me={me}
+                        callsOn={Boolean(data?.callsOn)}
+                        team={data?.team ?? []}
+                        solo={solo}
+                        onChanged={load}
+                        onMark={(mark) => setMark(d.jobId, mark)}
+                        installDays={data?.installDays}
+                        signOff={data?.signOff}
+                      />
+                    ))}
+                  </ul>
+                  {parts.inHand.length > IN_HAND_SHOWN && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAll((v) => !v)}
+                      className="mt-2 text-[13px] font-medium text-ink-2 underline-offset-4 hover:text-ink hover:underline"
+                    >
+                      {showAll ? "Show fewer" : `Show all ${parts.inHand.length}`}
+                    </button>
+                  )}
+                </Part>
+              )}
+
+              <div id={TODAY_IDS.news} className={clsx("mt-9", place.news, view(TODAY_IDS.news))}>
+                <TodayNews />
+              </div>
+              {/* The next part, a press away under the edge of it. */}
+              {next && (
+                <div className="order-last -mt-10 flex">
+                  <button
+                    type="button"
+                    onClick={() => go(next.id)}
+                    className="relative z-10 inline-flex h-10 items-center gap-2 rounded-full bg-surface px-5 text-[13.5px] font-medium text-ink shadow-[0_6px_24px_rgba(20,22,26,0.08)] ring-1 ring-line transition hover:ring-ink-2"
+                  >
+                    Next: {next.label}
+                    {next.count ? <span className="text-muted">· {next.count}</span> : null}
+                    <ChevronDown className="size-4 text-ink-2" aria-hidden />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        )}
+        </div>
+        <DealsPanel
+          deals={deals}
+          now={now}
+          picked={pickedDeal?.jobId ?? null}
+          onPick={(id) => {
+            setPicked(id);
+            window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+          }}
+          onNew={props.onNew}
+          adding={props.adding}
+        />
       </div>
     </div>
   );
@@ -736,7 +794,7 @@ function Part(props: { id?: string; className?: string; title: string; count?: n
   return (
     <section id={props.id} className={clsx(TRAY, props.className)}>
       {/* The title over its cards, centred as they are (14 Nov 2026, Martin: three edges on one page looked messy). */}
-      <div className="mb-4 flex flex-col items-center gap-0.5 text-center">
+      <div className="mb-4 flex flex-col items-start gap-0.5">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">
           {props.title}
           {props.count !== undefined && props.count !== null && <span className="ml-1.5 font-normal text-muted">{props.count}</span>}
@@ -1487,6 +1545,122 @@ function BookInstall(props: { deal: FeedDeal; days: string[]; signOff?: { sender
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The deals on the right of Today (14 Nov 2026, Martin: as Service lists its cases): what is in play in a line, New
+ * leads, In progress (a reply needed first, then proposals out) or All, a search, and a row a deal that opens its card on
+ * the left. New lead is here too.
+ */
+function DealsPanel(props: {
+  deals: FeedDeal[];
+  now: Date;
+  picked: string | null;
+  onPick: (jobId: string) => void;
+  onNew?: () => void;
+  adding?: boolean;
+}) {
+  const counts = panelCounts(props.deals);
+  const [chosenTab, setTab] = useState<PanelTab | null>(null);
+  const tab = chosenTab ?? (counts.waiting > 0 || counts.fresh === 0 ? "progress" : "new");
+  const [search, setSearch] = useState("");
+  const rows = panelDeals(props.deals, tab, search);
+  return (
+    <aside aria-label="Deals" className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+5rem)]">
+      <div className="flex items-center gap-2.5">
+        <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-ink">Deals</h2>
+        {props.onNew && (
+          <button
+            type="button"
+            onClick={props.onNew}
+            aria-expanded={props.adding}
+            aria-label="New lead"
+            title="New lead"
+            className="grid size-9 place-items-center rounded-full bg-primary text-primary-ink transition hover:brightness-125"
+          >
+            <Plus className={clsx("size-4 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden />
+          </button>
+        )}
+      </div>
+      <p className="mt-1 text-[13px] text-muted">
+        {counts.fresh} new · {counts.progress} in progress
+        {counts.waiting > 0 && <span className="font-medium text-sun-ink"> · {counts.waiting} waiting on you</span>}
+      </p>
+      <div className="mt-3 grid grid-cols-3 gap-1 rounded-2xl bg-surface-2 p-1" role="tablist" aria-label="Which deals">
+        {PANEL_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={clsx(
+              "h-9 rounded-xl text-[13px] font-medium transition",
+              tab === t.id ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.1)]" : "text-ink-2 hover:text-ink",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <label className="mt-3 flex h-11 items-center gap-2.5 rounded-2xl bg-surface px-3.5 ring-1 ring-line focus-within:ring-2 focus-within:ring-sun-line">
+        <Search className="size-4 shrink-0 text-muted" aria-hidden />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search deals"
+          aria-label="Search deals"
+          className="min-w-0 flex-1 bg-transparent text-[14px] text-ink placeholder:text-muted focus:outline-none"
+        />
+      </label>
+      <ul className="staff-scroll mt-3 max-h-[calc(100dvh-24rem)] space-y-1.5 overflow-y-auto pr-0.5">
+        {rows.map((d) => {
+          const mark = panelMark(d);
+          const on = props.picked === d.jobId;
+          return (
+            <li key={d.jobId}>
+              <button
+                type="button"
+                onClick={() => props.onPick(d.jobId)}
+                aria-current={on ? "true" : undefined}
+                className={clsx(
+                  "flex w-full items-center gap-3 rounded-2xl bg-surface p-2.5 text-left ring-1 transition",
+                  on ? "ring-2 ring-ink" : "ring-line hover:ring-ink-2",
+                )}
+              >
+                <RoofThumb deal={d} small />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline gap-2">
+                    <span className="min-w-0 truncate text-[14px] font-medium text-ink">{d.customer}</span>
+                    <span className="ml-auto shrink-0 text-[11.5px] text-muted">{agoWords(lastAt(d), props.now)}</span>
+                  </span>
+                  <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <StagePill stage={d.stage} />
+                    {mark && (
+                      <span
+                        className={clsx(
+                          "text-[12px]",
+                          mark.tone === "reply" ? "inline-flex items-center gap-1 font-medium text-sun-ink" : "text-muted",
+                        )}
+                      >
+                        {mark.tone === "reply" && <span className="size-1.5 rounded-full bg-sun-line" aria-hidden />}
+                        {mark.words}
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+        {rows.length === 0 && (
+          <li className="rounded-2xl bg-surface px-4 py-4 text-[13.5px] text-ink-2 ring-1 ring-line">
+            {search ? "No deal matches that." : tab === "new" ? "No new leads." : "Nothing in progress."}
+          </li>
+        )}
+      </ul>
+    </aside>
   );
 }
 
