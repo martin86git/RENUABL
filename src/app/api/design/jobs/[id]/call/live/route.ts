@@ -1,6 +1,6 @@
 import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
-import { endAssistantCall, liveCallFor, steerCall } from "@/lib/server/voice-calls";
+import { callNowInstead, endAssistantCall, liveCallFor, steerCall } from "@/lib/server/voice-calls";
 import { cleanTeamNote } from "@/lib/domain/live-call";
 import { allow } from "@/lib/server/rate-limit";
 
@@ -46,6 +46,31 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     const sent = await steerCall(who.member.businessId, id, { text, say: body?.say === true });
     if (sent === "sent") return Response.json({ ok: true });
     return Response.json({ ok: false, message: STEER_WORDS[sent] }, { status: sent === "not-on" ? 409 : 502 });
+  });
+}
+
+const NOW_WORDS = {
+  "not-waiting": "There's no call waiting on this deal to ring now.",
+  off: "Calls aren't switched on for your business.",
+  failed: "The call couldn't be placed just now. It is still lined up as it was.",
+};
+
+/**
+ * PUT → { ok }: ring the call that is waiting on this deal now, whatever the calling hours (14 Nov 2026, Martin: "I need
+ * to be able to force the call"). Members who may publish and see the deal; never from a demo.
+ */
+export async function PUT(request: Request, ctx: RouteContext<"/api/design/jobs/[id]/call/live">) {
+  return answer(async () => {
+    const who = await requireMember("publish");
+    if ("refuse" in who) return who.refuse;
+    if (!allow(request, "design-call-now", 20)) return Response.json({ ok: false, message: "Try again in a minute." }, { status: 429 });
+    const { id } = await ctx.params;
+    if (!validId(id) || !(await jobById(who.member.businessId, id, viewerOf(who.member))))
+      return Response.json({ ok: false, message: "That deal isn't here." }, { status: 404 });
+    const name = who.member.firstName || who.member.email.split("@")[0];
+    const rung = await callNowInstead(who.member.businessId, id, { email: who.member.email, name });
+    if (rung === "ringing") return Response.json({ ok: true });
+    return Response.json({ ok: false, message: NOW_WORDS[rung] }, { status: rung === "failed" ? 502 : 409 });
   });
 }
 

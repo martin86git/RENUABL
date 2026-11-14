@@ -9,6 +9,8 @@ import {
   liveNowWords,
   underWay,
   mayEndCall,
+  mayCallNow,
+  callNowWords,
   livePhase,
   phaseWords,
   readLiveEvent,
@@ -74,6 +76,18 @@ describe("where the call stands", () => {
     expect(livePhase({ status: "waiting", liveStatus: null })).toBe("lined-up");
     expect(livePhase({ status: "calling", liveStatus: "queued" })).toBe("lined-up");
     expect(livePhase({ status: "calling", liveStatus: "ringing" })).toBe("ringing");
+    // A call waiting can be rung now; one ringing, on or over can't.
+    expect(mayCallNow({ status: "calling", liveStatus: null })).toBe(true);
+    expect(mayCallNow({ status: "calling", liveStatus: "queued" })).toBe(true);
+    expect(mayCallNow({ status: "calling", liveStatus: "ended" })).toBe(true);
+    expect(mayCallNow({ status: "calling", liveStatus: "ringing" })).toBe(false);
+    expect(mayCallNow({ status: "calling", liveStatus: "in-progress" })).toBe(false);
+    expect(mayCallNow({ status: "done", liveStatus: "ended" })).toBe(false);
+    expect(mayCallNow({ status: "stopped", liveStatus: null })).toBe(false);
+    expect(callNowWords({ customer: "Jo", outOfHours: false, timeNow: "2:10 pm" })).toBe("Yes, ring Jo now");
+    expect(callNowWords({ customer: "Jo", outOfHours: true, timeNow: "8:40 pm" })).toBe(
+      "It's 8:40 pm, outside calling hours. Yes, ring Jo now",
+    );
     expect(livePhase({ status: "calling", liveStatus: "in-progress" })).toBe("on-call");
     expect(livePhase({ status: "waiting", liveStatus: "ended" })).toBe("trying-again");
     expect(livePhase({ status: "booked", liveStatus: "ended" })).toBe("ended");

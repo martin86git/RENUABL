@@ -6,9 +6,10 @@ import clsx from "clsx";
 import Link from "next/link";
 import { ArrowUp, ArrowUpRight, ChevronDown, ChevronUp, MessageSquare, PhoneOff, PhoneOutgoing, X } from "lucide-react";
 import { TEXT_MAX } from "@/lib/domain/design/contact-reach";
-import { clockWords, joinRuns, phaseWords, TEAM_NOTE_MAX, teamLineWords, type LiveLine } from "@/lib/domain/live-call";
+import { callNowWords, clockWords, joinRuns, phaseWords, TEAM_NOTE_MAX, teamLineWords, type LiveLine } from "@/lib/domain/live-call";
+import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { CALL_HEADLINES, TEAM_ASK_MAX } from "@/lib/domain/voice-agent";
-import { endAssistantCall, stopWatching, tellAssistant, useLiveCall, useWatchedCall } from "@/lib/services/assistant-call";
+import { callNowInstead, endAssistantCall, stopWatching, tellAssistant, useLiveCall, useWatchedCall } from "@/lib/services/assistant-call";
 import { askAssistantToCallBack, textCustomer, useCallerInfo, type CallerState, callerFor } from "@/lib/services/caller";
 import { openCoach } from "@/lib/services/coaching";
 import { OtherCallsStrip } from "./live-calls";
@@ -149,6 +150,7 @@ export function AssistantCallWindow() {
               )}
             </div>
             {call?.canSteer && <TellBox jobId={watched.jobId} assistant={caller.name} />}
+            {call?.canCallNow && !practice && <CallNow jobId={watched.jobId} customer={customer} outOfHours={Boolean(call.outOfHours)} />}
             {call?.canEnd && <HangUp jobId={watched.jobId} assistant={caller.name} customer={customer} />}
             {!call?.canSteer && phase !== "ended" && (
               <p className="border-t border-line px-4 py-2 text-[11px] text-muted">
@@ -269,6 +271,7 @@ export function CallInPane({
         )}
       </div>
       {call?.canSteer && <TellBox jobId={jobId} assistant={caller.name} />}
+      {call?.canCallNow && <CallNow jobId={jobId} customer={customer} outOfHours={Boolean(call.outOfHours)} />}
       {call?.canEnd && <HangUp jobId={jobId} assistant={caller.name} customer={customer} />}
     </section>
   );
@@ -451,6 +454,48 @@ function HangUp({ jobId, assistant, customer }: { jobId: string; assistant: stri
       >
         <PhoneOff className="size-4" aria-hidden />
         {ending ? "Ending the call…" : sure ? `Yes, end ${assistant}'s call with ${customer}` : "Hang up"}
+      </button>
+      {problem && <p className="px-1 pt-1 text-[11px] text-danger">{problem}</p>}
+    </div>
+  );
+}
+
+/**
+ * Ring a waiting call now (14 Nov 2026, Martin: "I need to be able to force the call"): one press asks, a second rings.
+ * Outside calling hours the second press says so, with the time, since ringing then is the team's own decision.
+ */
+function CallNow({ jobId, customer, outOfHours }: { jobId: string; customer: string; outOfHours: boolean }) {
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sure) return;
+    const t = window.setTimeout(() => setSure(false), 6000);
+    return () => window.clearTimeout(t);
+  }, [sure]);
+  const ring = async () => {
+    if (!sure) return setSure(true);
+    setBusy(true);
+    setProblem(null);
+    const res = await callNowInstead(jobId);
+    setBusy(false);
+    setSure(false);
+    if (!res.ok) setProblem(res.message);
+  };
+  const timeNow = new Date().toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", timeZone: LAUNCH_MARKET.timeZone });
+  return (
+    <div className="border-t border-line px-3 py-2">
+      <button
+        type="button"
+        onClick={() => void ring()}
+        disabled={busy}
+        className={clsx(
+          "flex w-full items-center justify-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition-colors",
+          sure ? "bg-sun-line text-white" : "bg-primary text-white hover:opacity-90",
+        )}
+      >
+        <PhoneOutgoing className="size-4 shrink-0" aria-hidden />
+        {busy ? "Ringing…" : sure ? callNowWords({ customer, outOfHours, timeNow }) : "Call now"}
       </button>
       {problem && <p className="px-1 pt-1 text-[11px] text-danger">{problem}</p>}
     </div>

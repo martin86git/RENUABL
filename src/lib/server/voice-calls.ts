@@ -26,6 +26,7 @@ import {
   livePhase,
   teamCommand,
   END_CALL_COMMAND,
+  mayCallNow,
   mayEndCall,
   vapiCallOver,
   type LiveCallView,
@@ -959,8 +960,71 @@ export async function liveCallFor(businessId: string, jobId: string): Promise<Li
     partial: r.live_partial && (r.live_partial.role === "assistant" || r.live_partial.role === "customer") ? r.live_partial : null,
     canSteer: Boolean(r.live_control_url) && r.live_status === "in-progress",
     canEnd: mayEndCall({ controlUrl: r.live_control_url, liveStatus: r.live_status }),
+    canCallNow: mayCallNow({ status: r.status, liveStatus: r.live_status }),
+    outOfHours: outOfCallingHours(new Date(r.now)),
     transcriptId: written[0]?.id ?? null,
   };
+}
+
+/** Whether calls wouldn't start by themselves at this moment: the next calling window opens later, or never. */
+function outOfCallingHours(now: Date): boolean {
+  const window = nextCallWindow(now);
+  return !window || window.from.getTime() > now.getTime() + 60_000;
+}
+
+/**
+ * The team rings a waiting call now (14 Nov 2026, Martin: "I need to be able to force the call"): the call lined up for
+ * later, or waiting to try again, is placed at once, whatever the calling hours, and the one Vapi was holding is
+ * cancelled. The new call is placed first, so the held one's end is read as an older attempt and never as a reason to
+ * try again; if it can't be placed, the held one stands. Written on the deal by the member, saying so when it was
+ * outside calling hours. Business id first; the caller has checked the member may see the deal.
+ */
+export async function callNowInstead(
+  businessId: string,
+  jobId: string,
+  by: { email: string; name: string },
+): Promise<"ringing" | "not-waiting" | "off" | "failed"> {
+  const s = voiceSettings();
+  if (!s || !(await voiceOnFor(businessId))) return "off";
+  const rows = await query<VoiceRow & { live_status: string | null }>(
+    `select * from voice_calls where business_id = $1 and job_id = $2 and status in ('waiting', 'calling')
+      order by created_at desc limit 1`,
+    [businessId, jobId],
+  );
+  const r = rows[0];
+  if (!r || !mayCallNow({ status: r.status, liveStatus: r.live_status })) return "not-waiting";
+  const held = r.vapi_call_id;
+  const was = { status: r.status, attempts: r.attempts };
+  const now = new Date();
+  const outside = outOfCallingHours(now);
+  const placed = await placeCall(s, r, { from: now, until: new Date(now.getTime() + 15 * 60_000) });
+  if (!placed) {
+    // The call Vapi was holding still stands: put ours back as it was.
+    await query(`update voice_calls set status = $2, stop_reason = null where id = $1 and status = 'stopped'`, [r.id, was.status]).catch(
+      () => undefined,
+    );
+    return "failed";
+  }
+  // It took the place of the attempt that was waiting: one attempt, not two.
+  await query(`update voice_calls set attempts = $2, live_status = null where id = $1`, [r.id, Math.max(1, was.attempts)]).catch(
+    () => undefined,
+  );
+  if (held)
+    await fetch(`${VAPI}/call/${encodeURIComponent(held)}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${s.key}` },
+      signal: AbortSignal.timeout(10_000),
+    }).catch(() => undefined);
+  await transaction((q) =>
+    record(q, businessId, {
+      customerId: r.customer_id,
+      jobId,
+      kind: "note",
+      text: `${by.name} had ${r.lead.assistant || "the assistant"} ring now instead of waiting${outside ? ", outside calling hours" : ""}.`,
+      by: by.email,
+    }),
+  ).catch((e) => console.error("call now not written on the deal", e instanceof Error ? e.message : e));
+  return "ringing";
 }
 
 /**

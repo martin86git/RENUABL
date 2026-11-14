@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-14",
+    area: "Calls",
+    words: "Call now: ring a call your assistant has lined up for later straight away. Outside calling hours it asks you to confirm first.",
+  },
+  {
+    day: "2026-11-14",
     area: "Team chat",
     words: "In team chat, the plus by Channels adds a channel of your own, and the plus by Direct messages adds someone.",
   },

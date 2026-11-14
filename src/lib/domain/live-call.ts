@@ -109,6 +109,21 @@ export const mayEndCall = (o: { controlUrl: string | null; liveStatus: string | 
   Boolean(o.controlUrl) && (o.liveStatus === "ringing" || o.liveStatus === "in-progress" || o.liveStatus === "forwarding");
 
 /**
+ * Whether a call still waiting can be rung now (14 Nov 2026, Martin: "I need to be able to force the call"): one lined
+ * up for later, or waiting to try again. Never one ringing or on, and never one that is over.
+ */
+export const mayCallNow = (o: { status: string; liveStatus: string | null }): boolean => {
+  const phase = livePhase(o);
+  return phase === "lined-up" || phase === "trying-again";
+};
+
+/** What the second press says before a waiting call is rung now: plainer when it is outside calling hours. */
+export function callNowWords(o: { customer: string; outOfHours: boolean; timeNow: string }): string {
+  const who = o.customer || "them";
+  return o.outOfHours ? `It's ${o.timeNow}, outside calling hours. Yes, ring ${who} now` : `Yes, ring ${who} now`;
+}
+
+/**
  * Whether Vapi's own word on a call (its `status` from GET /call/<id>) says it is over, so a call we still hold open
  * can be closed (13 Nov 2026, Martin: "why isn't he calling": a call whose end never reached our webhook kept the deal
  * "lined up" and turned every new Call away). Only "ended" is over; anything unknown is left alone.
@@ -216,6 +231,10 @@ export interface LiveCallView {
   canSteer: boolean;
   /** The team can hang up now (ringing or on the call, with a control address). */
   canEnd: boolean;
+  /** The call is waiting (lined up, or to be tried again) and can be rung now instead. */
+  canCallNow?: boolean;
+  /** Now is outside the hours calls start in, so ringing now is the team's own decision. */
+  outOfHours?: boolean;
   /** Once the call is over and written up: its transcript's id on the deal, to ask the assistant about this call. */
   transcriptId?: string | null;
 }
