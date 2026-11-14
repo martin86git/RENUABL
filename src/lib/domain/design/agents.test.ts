@@ -102,3 +102,15 @@ describe("asking RENUABL for the business number", () => {
     expect(note.text).not.toMatch(/customer['’]?s? (name|phone|email)/i);
   });
 });
+
+describe("each agent's job on the rail", () => {
+  it("is a couple of words, different for each, and says who rings and who writes", () => {
+    const jobs = AGENT_KINDS.map((k) => AGENT_WORDS[k].job);
+    expect(new Set(jobs).size).toBe(jobs.length);
+    for (const j of jobs) expect(j.length).toBeLessThanOrEqual(14);
+    expect(AGENT_WORDS.sales.job).toMatch(/calls/i);
+    expect(AGENT_WORDS.admin.job).toMatch(/install/i);
+    expect(AGENT_WORDS.colleague.job).not.toMatch(/call/i);
+    expect(AGENT_WORDS.colleague.jobLine).toContain("in writing");
+  });
+});

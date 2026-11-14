@@ -41,6 +41,10 @@ export interface AgentKindWords {
   number: string;
   /** True when it makes and takes calls, so it needs the business's number. */
   usesNumber: boolean;
+  /** Its job in two words, under its round on the rail (14 Nov 2026, Martin: "it's not easy to remember what each is for"). */
+  job: string;
+  /** Its job in a line, as its round says on hover. */
+  jobLine: string;
 }
 
 export const AGENT_WORDS: Record<AgentKind, AgentKindWords> = {
@@ -50,6 +54,8 @@ export const AGENT_WORDS: Record<AgentKind, AgentKindWords> = {
     does: "Rings new leads and customers with a proposal out, answers their questions, and takes their calls back.",
     number: "It rings from your business phone number, the one number all your agents share.",
     usesNumber: true,
+    job: "Sales calls",
+    jobLine: "rings leads and customers about their proposal",
   },
   admin: {
     title: "Admin assistant",
@@ -57,6 +63,8 @@ export const AGENT_WORDS: Record<AgentKind, AgentKindWords> = {
     does: "Rings customers who have signed to pencil in their installation day.",
     number: "It rings from your business phone number, the same one your sales assistant uses.",
     usesNumber: true,
+    job: "Books installs",
+    jobLine: "rings customers who have signed to book their installation day",
   },
   colleague: {
     title: "Chief of staff",
@@ -64,6 +72,8 @@ export const AGENT_WORDS: Record<AgentKind, AgentKindWords> = {
     does: "Answers your team's questions about your deals in writing. Customers never reach it.",
     number: "You chat to it in writing, so it needs no phone number.",
     usesNumber: false,
+    job: "Answers you",
+    jobLine: "answers your team's questions about your deals, in writing",
   },
 };
 

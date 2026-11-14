@@ -281,34 +281,31 @@ export function SolRail({
       <Icon className="size-[18px]" aria-hidden />
     </Link>
   );
+  const bar = "flex flex-col items-center gap-1.5 bg-surface p-1.5 shadow-[0_8px_30px_rgba(20,22,26,0.10)] ring-1 ring-line";
+  // Two bars, not one (14 Nov 2026, Martin: chat, agents and tools were mixed in one place): who you talk to, your team
+  // and your agents, in the first; the tools and the numbers in a slimmer one under it.
   return (
     <aside
-      aria-label="Team chat, notifications and the numbers"
-      className="sol-rail fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 flex-col items-center gap-1.5 rounded-full bg-surface p-1.5 shadow-[0_8px_30px_rgba(20,22,26,0.10)] ring-1 ring-line print:hidden lg:flex"
+      aria-label="Team chat, your agents, and the tools"
+      className="sol-rail fixed right-4 top-1/2 z-30 hidden -translate-y-1/2 flex-col items-end gap-3 print:hidden lg:flex"
     >
-      {team && <span className="team-bulb">{team}</span>}
-      {/* The business's phone assistant, to talk to and coach (12 Nov 2026, Martin). */}
-      {/* Larger than the tools under them, with a rule after (13 Nov 2026, Martin: they got lost among the other icons). */}
-      {assistant && (
-        <>
-          <span className="peer mt-1.5">{assistant}</span>
-          {/* Only once an assistant is set up: nothing to rule off otherwise. */}
-          <span className="mb-0.5 mt-1.5 hidden h-px w-6 bg-line peer-has-[button]:block" aria-hidden />
-        </>
+      {(team || assistant) && (
+        <div role="group" aria-label="Who you talk to: your team and your agents" className={clsx(bar, "w-16 rounded-[2rem]")}>
+          {team && <span className="team-bulb">{team}</span>}
+          {/* The business's agents, each with its name and its job under it (rail-agents.tsx). */}
+          {assistant}
+        </div>
       )}
-      {/* The calculator under team chat (8 Nov 2026, Martin): an answer on the phone has to be instant. */}
-      {calc && <span className="mt-1">{calc}</span>}
-      {tools && (
-        <>
-          <span className="my-1 h-px w-6 bg-line" aria-hidden />
-          {tools}
-        </>
-      )}
-      <span className="my-1 h-px w-6 bg-line" aria-hidden />
-      {link("/design?view=sales", "Sales this month", TrendingUp, false)}
-      {/* The proposals out and those signed (8 Nov 2026, Martin): a paper plane for sent, the proposal's page with a tick for sold. */}
-      {link("/design/sales/proposals", "Proposals sent", Send, path.startsWith("/design/sales/proposals"))}
-      {link("/design/sales/signed", "Proposals signed", FileCheck, path.startsWith("/design/sales/signed"))}
+      <div role="group" aria-label="Tools and the numbers" className={clsx(bar, "rounded-full")}>
+        {/* The calculator (8 Nov 2026, Martin): an answer on the phone has to be instant. */}
+        {calc}
+        {tools}
+        {(calc || tools) && <span className="my-1 h-px w-6 bg-line" aria-hidden />}
+        {link("/design?view=sales", "Sales this month", TrendingUp, false)}
+        {/* The proposals out and those signed (8 Nov 2026, Martin): a paper plane for sent, the proposal's page with a tick for sold. */}
+        {link("/design/sales/proposals", "Proposals sent", Send, path.startsWith("/design/sales/proposals"))}
+        {link("/design/sales/signed", "Proposals signed", FileCheck, path.startsWith("/design/sales/signed"))}
+      </div>
     </aside>
   );
 }

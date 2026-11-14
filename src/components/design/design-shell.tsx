@@ -42,10 +42,10 @@ import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawe
 import { ComputerCallBar } from "./computer-call";
 import { AssistantCallWindow } from "./assistant-call";
 import { LiveCallsTray } from "./live-calls";
-import { CoachButton, CoachWindow } from "./coach-chat";
-import { ColleagueButton, ColleagueWindow } from "./colleague";
-import { RailCalls } from "./rail-calls";
-import { AgentsButton, AgentsWindow } from "./agents-window";
+import { CoachWindow } from "./coach-chat";
+import { ColleagueWindow } from "./colleague";
+import { RailAgents } from "./rail-agents";
+import { AgentsWindow } from "./agents-window";
 import { TeamChatButton } from "./team-chat";
 import { DayWeather, ProfileMenu, RailIcon, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
@@ -815,18 +815,7 @@ function Shell({
       {retail && !tool && (
         <SolRail
           team={<TeamChatButton me={account.email} customers={unread + mentions} />}
-          assistant={
-            kind === "retailer" ? (
-              <span className="flex flex-col items-center gap-2">
-                <CoachButton />
-                {/* Each call the phone assistant has under way, as a round of its own under its face. */}
-                <RailCalls />
-                <ColleagueButton />
-                {/* Your agents, and adding one: it says first whether the new one needs a phone number. */}
-                <AgentsButton />
-              </span>
-            ) : undefined
-          }
+          assistant={kind === "retailer" ? <RailAgents /> : undefined}
           calc={designsRoofs(kind) ? <QuickCalc place="rail" /> : undefined}
           tools={
             <>
