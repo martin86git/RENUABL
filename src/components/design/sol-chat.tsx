@@ -239,10 +239,18 @@ export function SolChat({
     if (unread > 0) void run(solSeen());
   }, [unread]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "end" });
-    const later = requestAnimationFrame(() => end.current?.scrollIntoView({ block: "end" }));
+    // His answer is read from its top (15 Nov 2026, Martin: it landed on the foot of a long answer): once he has
+    // answered, the answer's first line is put at the top of the chat; while waiting on him, the latest line is in view.
+    const last = turns[turns.length - 1];
+    const land = () => {
+      const answer = !pending && last?.role === "sol" ? document.getElementById(turnId(last)) : null;
+      if (answer) answer.scrollIntoView({ block: "start" });
+      else end.current?.scrollIntoView({ block: "end" });
+    };
+    land();
+    const later = requestAnimationFrame(land);
     return () => cancelAnimationFrame(later);
-  }, [turns.length, pending]);
+  }, [turns.length, pending]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (dealAt && jobs === null) void listJobs().then((r) => setJobs(r.ok ? r.jobs : []));
   }, [dealAt, jobs]);
@@ -499,7 +507,7 @@ export function SolChat({
           </div>
         )}
         {(redoFrom !== null ? turns.slice(0, redoFrom) : turns).map((t, i) => (
-          <div key={`${t.at}-${i}`} id={turnId(t)} className="group/turn space-y-2">
+          <div key={`${t.at}-${i}`} id={turnId(t)} className="group/turn scroll-mt-3 space-y-2">
             <Bubble
               you={t.role === "you"}
               text={t.shown || t.text}
@@ -897,17 +905,19 @@ function Bubble({
       <div
         className={clsx(
           "rounded-2xl [overflow-wrap:anywhere]",
-          // Theirs a notch smaller, in the pale sun with a fine warm edge, so his answers read first (5 Nov 2026, Martin).
+          // Theirs a notch smaller, in graphite on his warm ground (15 Nov 2026, Martin: the chat's colours blended;
+          // the pale sun of 5 Nov was lost on it), so the two sides are told apart at a glance.
           you
-            ? "max-w-[75%] whitespace-pre-wrap rounded-br-md bg-sun px-3 py-2 text-[13px] leading-[1.5] text-ink"
-            : // His answers are white cards on the deeper ground (14 Nov 2026, Martin: more contrast in his drawer).
-              "max-w-[92%] rounded-bl-md bg-surface px-4 py-3.5 text-[14px] leading-[1.6] text-ink shadow-[0_1px_2px_rgba(20,22,26,0.05),0_6px_18px_rgba(20,22,26,0.05)]",
-          pinned ? "ring-2 ring-sun-line/50" : you ? "ring-1 ring-sun-line/30" : "ring-1 ring-line",
+            ? "max-w-[75%] whitespace-pre-wrap rounded-br-md bg-primary px-3 py-2 text-[13px] leading-[1.5] text-primary-ink"
+            : // His answers are white cards on the ground (14 Nov 2026, Martin: more contrast in his drawer), in his
+              // quieter type (`.sol-prose`).
+              "sol-prose max-w-[92%] rounded-bl-md bg-surface px-4 py-3.5 shadow-[0_1px_2px_rgba(60,40,10,0.06),0_6px_18px_rgba(60,40,10,0.07)]",
+          pinned ? "ring-2 ring-sun-line/50" : you ? "" : "ring-1 ring-line",
         )}
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
         {you ? text : <SolText text={text} onAnswer={onAnswer} />}
-        {at && <span className={clsx("mt-1 block text-[10px]", you ? "text-sun-ink/70" : "text-muted")}>{when(at)}</span>}
+        {at && <span className={clsx("mt-1 block text-[10px]", you ? "text-primary-ink/60" : "text-muted")}>{when(at)}</span>}
       </div>
       {at && (
         <div

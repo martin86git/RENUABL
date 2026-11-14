@@ -37,7 +37,7 @@ export function SolText({ text, tail, onAnswer }: { text: string; tail?: React.R
 
 /**
  * One line of his words with what matters set apart (sol-format.ts `solRuns`): figures and marked words a weight
- * heavier and never broken across lines, a phone number or an email as something to press.
+ * heavier (medium, not bold: 15 Nov 2026, Martin, "less loud") and never broken across lines, a phone number or an email as something to press.
  */
 function Runs({ text }: { text: string }) {
   return (
@@ -45,13 +45,13 @@ function Runs({ text }: { text: string }) {
       {solRuns(text).map((r, i) => {
         if (r.kind === "strong")
           return (
-            <strong key={i} className="font-semibold text-ink">
+            <strong key={i} className="font-medium text-ink">
               {r.text}
             </strong>
           );
         if (r.kind === "figure")
           return (
-            <span key={i} className="whitespace-nowrap font-semibold text-ink">
+            <span key={i} className="whitespace-nowrap font-medium text-ink">
               {r.text}
             </span>
           );
@@ -60,7 +60,7 @@ function Runs({ text }: { text: string }) {
             <a
               key={i}
               href={`tel:${r.dial}`}
-              className="whitespace-nowrap font-semibold text-ink underline decoration-sun-line/60 underline-offset-2 hover:decoration-sun-line"
+              className="whitespace-nowrap font-medium text-ink underline decoration-sun-line/60 underline-offset-2 hover:decoration-sun-line"
             >
               {r.text}
             </a>
@@ -70,7 +70,7 @@ function Runs({ text }: { text: string }) {
             <a
               key={i}
               href={`mailto:${r.text}`}
-              className="font-semibold text-ink underline decoration-sun-line/60 underline-offset-2 hover:decoration-sun-line"
+              className="font-medium text-ink underline decoration-sun-line/60 underline-offset-2 hover:decoration-sun-line"
             >
               {r.text}
             </a>
@@ -106,7 +106,7 @@ function Block({
                 <span className="min-w-0">
                   {named ? (
                     <>
-                      <strong className="font-semibold text-ink">{named.name}</strong>
+                      <strong className="font-medium text-ink">{named.name}</strong>
                       <span className="text-muted"> · </span>
                       <Runs text={named.rest} />
                     </>
@@ -132,7 +132,7 @@ function Block({
             </span>
             Key point
           </p>
-          <p className="mt-1.5 text-[1.07em] font-semibold leading-snug text-ink">
+          <p className="mt-1.5 font-medium leading-snug text-ink">
             <Runs text={block.text} />
             {tail}
           </p>
@@ -191,12 +191,7 @@ function Block({
       );
     default:
       return (
-        <p
-          className={
-            "whitespace-pre-line " +
-            (intro ? "-mb-1 text-[0.93em] font-semibold text-ink" : lead ? "text-[1.04em] font-medium leading-snug text-ink" : "text-ink-2")
-          }
-        >
+        <p className={"whitespace-pre-line " + (intro ? "-mb-1 text-[0.93em] font-semibold text-ink" : lead ? "text-ink" : "")}>
           <Runs text={block.text} />
           {tail}
         </p>

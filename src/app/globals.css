@@ -378,13 +378,9 @@ html.sol-resizing .team-pop {
     display: none !important;
   }
 }
+/* With Sol's panel open the wordmark stays whole (15 Nov 2026, Martin: "the renuabl logo unnecessarily reduces down"):
+   Search beside it is put away then, which leaves it room. Only the weather gives way. */
 @media (max-width: 1919px) {
-  html.sol-docked .studio-mark-full {
-    display: none;
-  }
-  html.sol-docked .studio-mark-short {
-    display: flex;
-  }
   html.sol-docked .studio-day-weather {
     display: none !important;
   }
@@ -447,13 +443,29 @@ html.sol-resizing .team-pop {
     box-shadow: 0 0 0 6px rgb(255 90 31 / 0);
   }
 }
-/* The ground Sol's conversation sits on (14 Nov 2026, Martin: "a darker contrast in the sol chat drawer"): the deeper
-   grey Today's pad uses, with its lines and quiet type darkened to match, so his answers stand off it as white cards. */
+/* The ground Sol's conversation sits on. A warm ground of his own (15 Nov 2026, Martin: the deeper grey tried the day
+   before "blend[ed] in too much with the rest of the screen", which is that same cool grey), with its lines and quiet
+   type warmed to match, so the drawer reads as his place and his answers stand off it as white cards. */
 .sol-ground {
-  --canvas: #eaeaed;
-  --line: #dddde2;
-  --muted: #6b6d75;
+  --canvas: #f4ede3;
+  --line: #e6dccd;
+  --muted: #7a7166;
   background: var(--canvas);
+}
+/* His answers' type (15 Nov 2026, Martin: "a different font type thats easier on the eyes. less loud"; smaller too): the
+   reader's own system face (Segoe UI, San Francisco), softer and rounder than the interface's Inter, in a softer ink. */
+.sol-prose {
+  font-family:
+    "Segoe UI Variable Text",
+    "Segoe UI",
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    system-ui,
+    sans-serif;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #3a3d44;
 }
 /* Where Sol stands (sol-dock.tsx `SolNavButton`, and every place that draws him): no round behind him since
    14 Nov 2026 (Martin: "remove the black ring… standalone sun"), so the box is only his place and he fills it. A soft
