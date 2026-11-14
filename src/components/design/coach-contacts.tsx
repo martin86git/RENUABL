@@ -8,6 +8,7 @@ import { TEXT_MAX, TEXT_WORDS, reachContacts, textParts, type ReachContact } fro
 import { STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
 import { PHONE_FROM, digitsOf, looksLikePhone } from "@/lib/domain/design/find";
 import { textCustomer, useCallerInfo } from "@/lib/services/caller";
+import { useCoachCaller } from "@/lib/services/coaching";
 import { listCustomers, listJobs, type CustomerLine, type JobLine } from "@/lib/services/crm";
 import { CallChoices } from "./call-choice";
 
@@ -21,7 +22,8 @@ const ROUND = "grid size-9 shrink-0 place-items-center rounded-full ring-1 ring-
  * on their deal. While it is in use the list takes the chat's place (`onOpen`); the cross or Escape goes back.
  */
 export function ContactReach(props: { open: boolean; onOpen: (open: boolean) => void }) {
-  const { caller, textsOn } = useCallerInfo();
+  const { textsOn } = useCallerInfo();
+  const caller = useCoachCaller();
   const [q, setQ] = useState("");
   const [data, setData] = useState<{ customers: CustomerLine[]; jobs: JobLine[] } | null>(null);
   const [failed, setFailed] = useState(false);

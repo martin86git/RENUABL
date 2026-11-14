@@ -48,6 +48,7 @@ import {
   openCoachChat,
   removeNote,
   rewordNote,
+  useCoachCaller,
   useCoachOpen,
 } from "@/lib/services/coaching";
 import { CallerAvatar, VoicePicker } from "./settings-caller";
@@ -230,8 +231,16 @@ export function CoachButton() {
  * given to it with the feedback. Over the page, bottom right; Escape closes it.
  */
 export function CoachWindow() {
+  // One window, for whichever of the two voice agents was pressed: opening the other starts it afresh (its own notes,
+  // chats and deals), so nothing of one is shown under the other.
+  const role = useCoachOpen()?.role ?? "sales";
+  return <CoachWindowFor key={role} />;
+}
+
+function CoachWindowFor() {
   const state = useCoachOpen();
-  const caller = useCaller();
+  // Whichever of the two voice agents was pressed: the sales assistant, or the post-sale one.
+  const caller = useCoachCaller();
   const [notes, setNotes] = useState<CoachNote[]>([]);
   const [turns, setTurns] = useState<CoachTurn[]>([]);
   const [fixed, setFixed] = useState<string[]>([]);
@@ -754,7 +763,8 @@ function CoachSettings(props: {
   onNotes: (n: CoachNote[]) => void;
   onBack: () => void;
 }) {
-  const { caller, callsOn } = useCallerInfo();
+  const { callsOn } = useCallerInfo();
+  const caller = useCoachCaller();
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [scriptOpen, setScriptOpen] = useState(true);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
@@ -787,7 +797,14 @@ function CoachSettings(props: {
         {voiceOpen && (
           <div className="px-4 pb-4">
             {props.mayCoach ? (
-              <VoicePicker compact caller={caller} callsOn={callsOn} onSaved={() => undefined} onStatus={setStatus} />
+              <VoicePicker
+                compact
+                caller={caller}
+                callsOn={callsOn}
+                onSaved={() => undefined}
+                onStatus={setStatus}
+                role={caller.role ?? "sales"}
+              />
             ) : (
               <p className="text-xs text-muted">Only an admin can change the voice.</p>
             )}
@@ -832,7 +849,7 @@ function CoachSettings(props: {
  * checked by its own bytes and redrawn on the server).
  */
 function AvatarEdit({ editable, onFailed }: { editable: boolean; onFailed: (m: string | null) => void }) {
-  const caller = useCaller();
+  const caller = useCoachCaller();
   const pick = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   if (!editable) return <CallerAvatar caller={caller} size={44} className="ring-2 ring-white/20" />;
@@ -840,7 +857,7 @@ function AvatarEdit({ editable, onFailed }: { editable: boolean; onFailed: (m: s
     if (!file) return;
     setBusy(true);
     onFailed(null);
-    const res = await uploadCallerPhoto(file);
+    const res = await uploadCallerPhoto(file, caller.role ?? "sales");
     setBusy(false);
     if (!res.ok) onFailed(res.message);
   };
@@ -880,12 +897,12 @@ function AvatarEdit({ editable, onFailed }: { editable: boolean; onFailed: (m: s
 
 /** A practice call: the assistant rings the member's own mobile and talks to them as a customer (practice-call.ts). */
 function HearButton() {
-  const caller = useCaller();
+  const caller = useCoachCaller();
   const [said, setSaid] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const ring = async () => {
     setBusy(true);
-    const res = await ringMeToHear();
+    const res = await ringMeToHear(caller.role ?? "sales");
     setBusy(false);
     setSaid(res.ok ? null : res.message);
     window.setTimeout(() => setSaid(null), 6000);

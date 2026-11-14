@@ -113,21 +113,31 @@ export async function coachChatsOf(businessId: string, role: CallerRole = "sales
 }
 
 /** The chat going and the ones before it, kept together (a new chat, or an earlier one opened again). The notes stay. */
-export async function saveCoachChats(businessId: string, c: { turns: CoachTurn[]; past: CoachChat[] }, by: string): Promise<void> {
+export async function saveCoachChats(
+  businessId: string,
+  c: { turns: CoachTurn[]; past: CoachChat[] },
+  by: string,
+  role: CallerRole = "sales",
+): Promise<void> {
   await query(
-    `insert into design_caller (business_id, name, coach_chat, coach_past, updated_by) values ($1, $2, $3, $4, $5)
+    `insert into design_caller (business_id, name, coach_chat, coach_past, updated_by, role) values ($1, $2, $3, $4, $5, $6)
      on conflict (business_id, role) do update set coach_chat = excluded.coach_chat, coach_past = excluded.coach_past,
        updated_by = excluded.updated_by, updated_at = now()`,
-    [businessId, DEFAULT_CALLER, JSON.stringify(cleanTurns(c.turns)), JSON.stringify(cleanCoachChats(c.past)), by],
+    [businessId, DEFAULT_CALLER, JSON.stringify(cleanTurns(c.turns)), JSON.stringify(cleanCoachChats(c.past)), by, role],
   );
 }
 
 /** The notes and conversation, already cleaned (cleanNotes, cleanTurns). */
-export async function saveCoaching(businessId: string, c: { notes: CoachNote[]; turns: CoachTurn[] }, by: string): Promise<void> {
+export async function saveCoaching(
+  businessId: string,
+  c: { notes: CoachNote[]; turns: CoachTurn[] },
+  by: string,
+  role: CallerRole = "sales",
+): Promise<void> {
   await query(
-    `insert into design_caller (business_id, name, coach_notes, coach_chat, updated_by) values ($1, $2, $3, $4, $5)
+    `insert into design_caller (business_id, name, coach_notes, coach_chat, updated_by, role) values ($1, $2, $3, $4, $5, $6)
      on conflict (business_id, role) do update set coach_notes = excluded.coach_notes, coach_chat = excluded.coach_chat,
        updated_by = excluded.updated_by, updated_at = now()`,
-    [businessId, DEFAULT_CALLER, JSON.stringify(cleanNotes(c.notes)), JSON.stringify(cleanTurns(c.turns)), by],
+    [businessId, DEFAULT_CALLER, JSON.stringify(cleanNotes(c.notes)), JSON.stringify(cleanTurns(c.turns)), by, role],
   );
 }

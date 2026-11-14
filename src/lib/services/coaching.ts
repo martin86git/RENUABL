@@ -9,7 +9,8 @@ import { useSyncExternalStore } from "react";
 import type { AssistantDeal, AssistantDealCall } from "@/lib/domain/design/assistant-deals";
 import type { CoachChatLine } from "@/lib/domain/design/coach-threads";
 import type { CoachNote, CoachTurn } from "@/lib/domain/design/coaching";
-import type { CallerState } from "./caller";
+import type { CallerRole } from "@/lib/domain/install-call";
+import { useCallerInfo, type CallerState } from "./caller";
 
 export interface CoachCall {
   jobId: string;
@@ -18,19 +19,29 @@ export interface CoachCall {
   about: string;
 }
 
-let open: { call: CoachCall | null } | null = null;
+/** `role`: which of the business's two voice agents the window is talking to (left out: the sales one). */
+let open: { call: CoachCall | null; role?: CallerRole } | null = null;
 const listeners = new Set<() => void>();
 const set = (next: typeof open) => {
   open = next;
   listeners.forEach((l) => l());
 };
 
-export const openCoach = (call: CoachCall | null = null) => set({ call });
+export const openCoach = (call: CoachCall | null = null, role: CallerRole = "sales") => set({ call, role });
 export const closeCoach = () => set(null);
 // Only when a call is set: a new state object lands the window on the assistant's day again.
-export const clearCoachCall = () => open?.call && set({ call: null });
+export const clearCoachCall = () => open?.call && set({ call: null, role: open.role });
 
-export function useCoachOpen(): { call: CoachCall | null } | null {
+/** The assistant the window is open on (the sales one while it is shut). */
+export const coachRole = (): CallerRole => open?.role ?? "sales";
+
+/** The assistant the window is talking to, as a page shows it: its name, face and voice. */
+export function useCoachCaller(): CallerState {
+  const info = useCallerInfo();
+  return useCoachOpen()?.role === "admin" ? info.admin : info.caller;
+}
+
+export function useCoachOpen(): { call: CoachCall | null; role?: CallerRole } | null {
   return useSyncExternalStore(
     (l) => {
       listeners.add(l);
@@ -55,7 +66,8 @@ async function ask<T>(path: string, init?: RequestInit): Promise<Answer<T>> {
   }
 }
 
-const URL_ = "/api/design/caller/coach";
+/** Each assistant keeps its own notes, chats and deals: the address says which one the window is on. */
+const at = (path = "", more = "") => `/api/design/caller/${path || "coach"}?role=${coachRole()}${more}`;
 const json = (method: string, body: unknown): RequestInit => ({
   method,
   headers: { "content-type": "application/json" },
@@ -63,19 +75,19 @@ const json = (method: string, body: unknown): RequestInit => ({
 });
 
 export const loadCoaching = () =>
-  ask<{ notes: CoachNote[]; turns: CoachTurn[]; past: CoachChatLine[]; fixed: string[]; mayCoach: boolean }>(URL_);
+  ask<{ notes: CoachNote[]; turns: CoachTurn[]; past: CoachChatLine[]; fixed: string[]; mayCoach: boolean }>(at());
 
 type Chats = { turns: CoachTurn[]; past: CoachChatLine[] };
 /** An earlier chat becomes the one going; the one that was going is filed away in its place. */
-export const openCoachChat = (id: string) => ask<Chats>(URL_, json("POST", { do: "open", id }));
+export const openCoachChat = (id: string) => ask<Chats>(at(), json("POST", { do: "open", id }));
 /** The chat going is filed away with the earlier ones, leaving an empty one. */
-export const newCoachChat = () => ask<Chats>(URL_, json("POST", { do: "new" }));
-export const forgetCoachChat = (id: string) => ask<Chats>(URL_, json("POST", { do: "forget", id }));
+export const newCoachChat = () => ask<Chats>(at(), json("POST", { do: "new" }));
+export const forgetCoachChat = (id: string) => ask<Chats>(at(), json("POST", { do: "forget", id }));
 
 /** With a deal picked beside the chat, the assistant is given that deal and its own calls on it. */
 export const coachAssistant = (message: string, call: CoachCall | null, dealJobId: string | null = null, fresh = false) =>
   ask<{ notes: CoachNote[]; turns: CoachTurn[]; caller: CallerState; past: CoachChatLine[] }>(
-    URL_,
+    at(),
     json("POST", {
       message,
       ...(fresh ? { fresh: true } : {}),
@@ -83,11 +95,10 @@ export const coachAssistant = (message: string, call: CoachCall | null, dealJobI
     }),
   );
 
-export const rewordNote = (id: string, text: string) => ask<{ notes: CoachNote[] }>(URL_, json("PUT", { id, text }));
-export const removeNote = (id: string) => ask<{ notes: CoachNote[] }>(`${URL_}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+export const rewordNote = (id: string, text: string) => ask<{ notes: CoachNote[] }>(at(), json("PUT", { id, text }));
+export const removeNote = (id: string) => ask<{ notes: CoachNote[] }>(at("", `&id=${encodeURIComponent(id)}`), { method: "DELETE" });
 
 /** The deals the assistant is across: those it has rung, is on a call with or has a call lined up for. */
-export const loadAssistantDeals = () => ask<{ deals: AssistantDeal[] }>("/api/design/caller/deals");
+export const loadAssistantDeals = () => ask<{ deals: AssistantDeal[] }>(at("deals"));
 /** Its calls on one deal, as they were said. */
-export const loadDealCalls = (jobId: string) =>
-  ask<{ calls: AssistantDealCall[] }>(`/api/design/caller/deals?job=${encodeURIComponent(jobId)}`);
+export const loadDealCalls = (jobId: string) => ask<{ calls: AssistantDealCall[] }>(at("deals", `&job=${encodeURIComponent(jobId)}`));

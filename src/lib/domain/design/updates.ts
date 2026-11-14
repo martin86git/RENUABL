@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-14",
+    area: "Calls",
+    words: "Your post-sale voice agent opens its own chat from the bar, with its own script, chats and calls, as your sales agent does.",
+  },
+  {
+    day: "2026-11-14",
     area: "Sales",
     words: "Sales is back in the menu: the pipeline of deals by stage, proposals open and closed, and calls. Today scrolls again.",
   },

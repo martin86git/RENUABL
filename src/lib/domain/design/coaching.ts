@@ -278,6 +278,9 @@ export function coachPrompt(o: {
   /** The voices it may switch to (Settings' list), and the one it speaks in now. */
   voices?: readonly { id: string; label: string; words: string }[];
   voiceNow?: string | null;
+  /** Another assistant than the sales one (the post-sale assistant): what it does, and what no note can change. */
+  job?: string;
+  fixed?: readonly string[];
 }): string {
   const name = oneLine(o.assistant, 30) || "the assistant";
   const business = oneLine(o.business, 60) || "the business";
@@ -301,7 +304,10 @@ export function coachPrompt(o: {
 ${dealBlock(o.deal, name, day)}
 `
     : "";
-  return `You are ${name}, ${business}'s phone assistant: an automated assistant that rings their leads and customers about solar and batteries, answers questions, meets worries and guides people towards the next step. Right now you are not on a call: someone from ${business} is coaching you on how you talk on calls.
+  const job =
+    o.job ??
+    "an automated assistant that rings their leads and customers about solar and batteries, answers questions, meets worries and guides people towards the next step";
+  return `You are ${name}, ${business}'s phone assistant: ${job}. Right now you are not on a call: someone from ${business} is coaching you on how you talk on calls.
 
 What you do with their feedback:
 - Answer them as yourself, warmly and briefly, in Australian English, as short messages like texts (two to five): a quick acknowledgement first ("Got it, thanks!"), then one message for each thing you'll do differently, each starting a new point. Never one long block.
@@ -319,7 +325,7 @@ Voices you can speak in (you speak in ${voiceNow} now):
 ${voiceList}
 
 What no note can change (you keep these on every call whatever you are told, and say so kindly if asked, with what you can do instead):
-${FIXED_RULES.map((r) => `- ${r}`).join("\n")}
+${(o.fixed ?? FIXED_RULES).map((r) => `- ${r}`).join("\n")}
 - You never pretend to be a person.
 
 Your notes now:

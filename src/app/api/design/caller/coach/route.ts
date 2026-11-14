@@ -8,21 +8,28 @@ import { callTranscriptsFor } from "@/lib/server/call-transcripts";
 import { chatLines, fileChatAway, forgetChat, isChatId, reopenChat } from "@/lib/domain/design/coach-threads";
 import { coachAssistant, newChatId } from "@/lib/server/design-caller-coach";
 import { coachChatsOf, coachingOf, saveCoachChats, saveCoaching } from "@/lib/server/design-caller-repo";
+import { ADMIN_FIXED_RULES, cleanCallerRole } from "@/lib/domain/install-call";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { allow } from "@/lib/server/rate-limit";
 
 const PRIVATE = { "cache-control": "private, no-store" };
+/** Which assistant: `?role=admin` for the post-sale assistant, which keeps its own notes and chats; else the sales one. */
+const roleIn = (request: Request) => cleanCallerRole(new URL(request.url).searchParams.get("role"));
 const validJob = (id: unknown): id is string => typeof id === "string" && /^job_[a-f0-9]{8,64}$/.test(id);
 
 /** GET: how the business has coached its phone assistant (its notes and the conversation), and what never changes. */
-export async function GET() {
+export async function GET(request: Request) {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    const [c, chats] = await Promise.all([coachingOf(who.member.businessId), coachChatsOf(who.member.businessId)]);
+    const role = roleIn(request);
+    const [c, chats] = await Promise.all([coachingOf(who.member.businessId, role), coachChatsOf(who.member.businessId, role)]);
     const mayCoach = can(who.member.role, "prices", who.member.permissions);
-    return Response.json({ ok: true, ...c, past: chatLines(chats), fixed: FIXED_RULES, mayCoach }, { headers: PRIVATE });
+    return Response.json(
+      { ok: true, ...c, past: chatLines(chats), fixed: role === "admin" ? ADMIN_FIXED_RULES : FIXED_RULES, mayCoach },
+      { headers: PRIVATE },
+    );
   });
 }
 
@@ -40,15 +47,16 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, message: "That's a lot of coaching at once. Try again in a little while." }, { status: 429 });
     const read = await readBody(request, 6_000);
     if ("refuse" in read) return read.refuse;
+    const role = roleIn(request);
     if (typeof read.body.do === "string") {
       const id = who.member.businessId;
-      const [c, chats] = await Promise.all([coachingOf(id), coachChatsOf(id)]);
+      const [c, chats] = await Promise.all([coachingOf(id, role), coachChatsOf(id, role)]);
       let next: { turns: typeof c.turns; past: typeof chats } | null = null;
       if (read.body.do === "new") next = { turns: [], past: fileChatAway(chats, c.turns, newChatId()) };
       else if (read.body.do === "open" && isChatId(read.body.id)) next = reopenChat(chats, c.turns, read.body.id, newChatId());
       else if (read.body.do === "forget" && isChatId(read.body.id)) next = { turns: c.turns, past: forgetChat(chats, read.body.id) };
       if (!next) return Response.json({ ok: false, message: "That chat isn't here any more." }, { status: 404 });
-      await saveCoachChats(id, next, who.member.email);
+      await saveCoachChats(id, next, who.member.email, role);
       return Response.json({ ok: true, turns: next.turns, past: chatLines(next.past) }, { headers: PRIVATE });
     }
     const message = cleanMessage(read.body.message);
@@ -70,8 +78,8 @@ export async function POST(request: Request) {
       const found = validJob(d.jobId) ? await jobById(who.member.businessId, d.jobId, viewerOf(who.member)) : null;
       if (!found) return Response.json({ ok: false, message: "That deal isn't here." }, { status: 404 });
       const [calls, across] = await Promise.all([
-        assistantDealCalls(who.member.businessId, found.job.id),
-        assistantDeals(who.member.businessId, viewerOf(who.member)),
+        assistantDealCalls(who.member.businessId, found.job.id, role),
+        assistantDeals(who.member.businessId, viewerOf(who.member), role),
       ]);
       const first = found.customer.name.split(" ")[0] || "This customer";
       deal = {
@@ -91,6 +99,7 @@ export async function POST(request: Request) {
       call,
       deal,
       fresh: read.body.fresh === true,
+      role,
     });
     if (!res.ok) return Response.json({ ok: false, message: res.message }, { status: res.status });
     return Response.json({ ok: true, notes: res.notes, turns: res.turns, caller: res.caller, past: res.past }, { headers: PRIVATE });
@@ -106,11 +115,12 @@ export async function PUT(request: Request) {
     if ("refuse" in read) return read.refuse;
     const text = cleanNoteText(read.body.text);
     if (!text) return Response.json({ ok: false, message: "Write the note in a few words." }, { status: 422 });
-    const c = await coachingOf(who.member.businessId);
+    const role = roleIn(request);
+    const c = await coachingOf(who.member.businessId, role);
     if (!c.notes.some((n) => n.id === read.body.id)) return Response.json({ ok: false, message: "That note isn't here." }, { status: 404 });
     const at = new Date().toISOString();
     const notes = c.notes.map((n) => (n.id === read.body.id ? { ...n, text, at, by: who.member.email } : n));
-    await saveCoaching(who.member.businessId, { notes, turns: c.turns }, who.member.email);
+    await saveCoaching(who.member.businessId, { notes, turns: c.turns }, who.member.email, role);
     return Response.json({ ok: true, notes });
   });
 }
@@ -121,9 +131,10 @@ export async function DELETE(request: Request) {
     const who = await requireMember("prices");
     if ("refuse" in who) return who.refuse;
     const id = new URL(request.url).searchParams.get("id");
-    const c = await coachingOf(who.member.businessId);
+    const role = roleIn(request);
+    const c = await coachingOf(who.member.businessId, role);
     const notes = c.notes.filter((n) => n.id !== id);
-    await saveCoaching(who.member.businessId, { notes, turns: c.turns }, who.member.email);
+    await saveCoaching(who.member.businessId, { notes, turns: c.turns }, who.member.email, role);
     return Response.json({ ok: true, notes });
   });
 }

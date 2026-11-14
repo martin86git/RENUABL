@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { AGENT_WORDS, type AgentKind } from "@/lib/domain/design/agents";
 import { useCallerInfo } from "@/lib/services/caller";
 import { openCoach } from "@/lib/services/coaching";
@@ -51,12 +50,12 @@ export function RailAgents() {
       {/* Each call the sales assistant has under way, as a round of its own under its face. */}
       <RailCalls />
       {admin.named && (
-        <Link href="/design/settings/calls?assistant=admin" title={titleOf(admin.name, "admin")} className={SHELL}>
+        <button type="button" onClick={() => openCoach(null, "admin")} title={titleOf(admin.name, "admin")} className={SHELL}>
           <span className={ROUND}>
             <CallerAvatar caller={admin} size={44} />
           </span>
           <AgentLabel name={admin.name} />
-        </Link>
+        </button>
       )}
       {/* Your agents, and adding one, after a fine rule: it says first whether the new one needs the business's number. */}
       <span className="flex flex-col items-center gap-2.5 [&:not(:has(button))]:hidden">

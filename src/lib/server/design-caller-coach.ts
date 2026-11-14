@@ -17,6 +17,7 @@ import {
 import type { DealForChat } from "@/lib/domain/design/assistant-deals";
 import { chatLines, fileChatAway, type CoachChatLine } from "@/lib/domain/design/coach-threads";
 import { CALLER_VOICES, cleanCallerName } from "@/lib/domain/design/caller";
+import { ADMIN_COACH_JOB, ADMIN_FIXED_RULES, type CallerRole } from "@/lib/domain/install-call";
 import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { parseApiKey } from "./bill-reader";
 import { readWithClaude } from "./claude-reader";
@@ -52,13 +53,16 @@ export async function coachAssistant(o: {
   deal?: DealForChat | null;
   /** Start a new chat with this message: the one going is filed away with the earlier ones. */
   fresh?: boolean;
+  /** Which of the business's two assistants is being talked to (the post-sale one keeps its own notes and chats). */
+  role?: CallerRole;
 }): Promise<CoachResult> {
+  const role = o.role ?? "sales";
   const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) return { ok: false, status: 503, message: "Coaching needs Claude, which isn't set up on this site yet." };
   const [caller, coaching, chats, biz] = await Promise.all([
-    callerOf(o.businessId),
-    coachingOf(o.businessId),
-    coachChatsOf(o.businessId),
+    callerOf(o.businessId, role),
+    coachingOf(o.businessId, role),
+    coachChatsOf(o.businessId, role),
     query<{ name: string }>(`select name from businesses where id = $1`, [o.businessId]),
   ]);
   const brand = await loadBrand(o.businessId, biz[0]?.name ?? "");
@@ -72,6 +76,7 @@ export async function coachAssistant(o: {
     deal: o.deal ?? null,
     voices: VOICES,
     voiceNow: caller.voice?.voiceId ?? null,
+    ...(role === "admin" ? { job: ADMIN_COACH_JOB, fixed: ADMIN_FIXED_RULES } : {}),
   });
   const raw = await withSolCredit(
     o.businessId,
@@ -102,13 +107,13 @@ export async function coachAssistant(o: {
   if (answer.rename) {
     const name = cleanCallerName(answer.rename);
     if (name.ok && name.value !== caller.name) {
-      now = await setCallerName(o.businessId, name.value, o.by);
+      now = await setCallerName(o.businessId, name.value, o.by, role);
       settings.push(`Name: ${name.value}`);
     } else if (!name.ok) settings.push(`Name not changed: ${name.message}`);
   }
   const voice = answer.voice ? CALLER_VOICES.find((v) => v.voiceId === answer.voice) : null;
   if (voice && voice.voiceId !== caller.voice?.voiceId) {
-    now = await setCallerVoice(o.businessId, { provider: voice.provider, voiceId: voice.voiceId }, o.by);
+    now = await setCallerVoice(o.businessId, { provider: voice.provider, voiceId: voice.voiceId }, o.by, role);
     settings.push(`Voice: ${voice.label}, ${voice.words}`);
   }
   const past = o.fresh ? fileChatAway(chats, coaching.turns, newChatId()) : chats;
@@ -117,7 +122,7 @@ export async function coachAssistant(o: {
     { role: "you" as const, text: o.message, at, by: o.by, ...(o.call ? { about: o.call.about } : o.deal ? { about: o.deal.about } : {}) },
     { role: "assistant" as const, text: answer.reply, at, changes: { ...applied.changes, settings } },
   ].slice(-MAX_TURNS);
-  await saveCoaching(o.businessId, { notes: applied.notes, turns }, o.by);
-  if (o.fresh) await saveCoachChats(o.businessId, { turns, past }, o.by);
+  await saveCoaching(o.businessId, { notes: applied.notes, turns }, o.by, role);
+  if (o.fresh) await saveCoachChats(o.businessId, { turns, past }, o.by, role);
   return { ok: true, turns, notes: applied.notes, caller: now, past: chatLines(past) };
 }

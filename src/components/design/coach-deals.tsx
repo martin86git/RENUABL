@@ -13,7 +13,7 @@ import {
   type DealStanding,
 } from "@/lib/domain/design/assistant-deals";
 import { useCallerInfo } from "@/lib/services/caller";
-import { loadAssistantDeals, loadDealCalls } from "@/lib/services/coaching";
+import { loadAssistantDeals, loadDealCalls, useCoachCaller } from "@/lib/services/coaching";
 import { AfterCall, CallInPane } from "./assistant-call";
 
 const POLL_MS = 20_000;
@@ -47,7 +47,8 @@ const when = (iso: string) => {
  * the window's place.
  */
 export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: AssistantDeal | null) => void; onBack: () => void }) {
-  const { caller, callsOn, textsOn } = useCallerInfo();
+  const { callsOn, textsOn } = useCallerInfo();
+  const caller = useCoachCaller();
   const [deals, setDeals] = useState<AssistantDeal[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
@@ -163,7 +164,7 @@ export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: As
 
 /** One deal's context, dropped open under its line: where it stands, the assistant's calls on it as they were said, and what to do next. */
 function DealContext({ deal, actions }: { deal: AssistantDeal; actions: React.ReactNode }) {
-  const { caller } = useCallerInfo();
+  const caller = useCoachCaller();
   const [calls, setCalls] = useState<AssistantDealCall[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);

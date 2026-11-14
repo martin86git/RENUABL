@@ -33,6 +33,21 @@ export const ROLE_WORDS: Record<CallerRole, { label: string; does: string; opens
   },
 };
 
+/**
+ * The post-sale assistant in its own chat (14 Nov 2026, Martin: pressing it on the bar went to Settings; it should open
+ * as the sales assistant does): what it is told it does, and what no note can change, shown in the window too.
+ */
+export const ADMIN_COACH_JOB =
+  "an automated assistant that rings customers who have already gone ahead, once their job is approved, to find a day for their installation from the days the business has room for, and pencils that day in for the team to confirm";
+export const ADMIN_FIXED_RULES = [
+  "Says it's your automated assistant",
+  "Offers only the days your install calendar has room for",
+  "A day it pencils in is never final: it says the team will confirm it",
+  "Never discusses, changes or agrees a price, a payment or a deposit",
+  "Never promises an arrival time, how long the job takes or who will do it",
+  "Never asks for card, bank or ID details",
+] as const;
+
 /** The call mode each assistant makes; a mode's assistant is the reverse. */
 export const roleOfMode = (mode: string): CallerRole => (mode === "install" ? "admin" : "sales");
 
