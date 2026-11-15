@@ -8,6 +8,7 @@ import { bookedJobs, loadPrefs, savePrefs } from "@/lib/server/design-after-sale
 import { installDayChoices } from "@/lib/domain/design/install-days";
 import { todayInMarket } from "@/lib/domain/market";
 import { addDaysISO } from "@/lib/domain/scheduling";
+import { can, seesAllDeals } from "@/lib/domain/design/account";
 
 /**
  * GET → { deals, callsOn, team }: the deal feed on Today (deal-feed.ts), every deal this member may see that is being
@@ -45,6 +46,8 @@ export async function GET() {
       examples,
       today,
       role: who.member.role,
+      // An admin (every deal, and settings) picks the pipeline Today shows (15 Nov 2026, Martin).
+      admin: can(who.member.role, "prices", who.member.permissions) && seesAllDeals(who.member.role, who.member.permissions),
       leadRule: prefs?.leadRule ?? "adder",
       installDays,
       signOff,

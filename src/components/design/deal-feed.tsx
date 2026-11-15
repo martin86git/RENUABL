@@ -34,6 +34,7 @@ import {
   HardHat,
   Stamp,
   type LucideIcon,
+  SquareKanban,
 } from "lucide-react";
 import {
   LATER_CHOICES,
@@ -62,6 +63,7 @@ import {
   PANEL_TABS,
   panelCounts,
   panelDeals,
+  panelTabsFor,
   panelMark,
   type PanelTab,
   type NextMove,
@@ -129,6 +131,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         examples: r.examples,
         today: r.today ?? null,
         role: r.role,
+        admin: r.admin,
         leadRule: r.leadRule,
         installDays: r.installDays,
         signOff: r.signOff,
@@ -163,8 +166,10 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
     }
   });
   const solo = Boolean(data) && (data?.team.length ?? 0) === 0;
+  // Only an admin picks the pipeline (15 Nov 2026, Martin); anyone else sees every deal they may see.
+  const admin = Boolean(data?.admin);
   const feedPick = {
-    pipeline: kept.pipeline,
+    pipeline: admin ? kept.pipeline : "all",
     mine: solo ? false : (kept.mine ?? (data ? opensOnMine(data.role ?? "owner", data.team.length + 1) : false)),
   };
   const choosePick = (next: { pipeline: FeedPipeline; mine: boolean }) => {
@@ -198,6 +203,10 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
   );
   const open = deals.filter((d) => OPEN_STAGES.includes(d.stage));
   const openValue = open.reduce((sum, d) => sum + (d.value ?? 0), 0);
+  // The strip's first tile: what is being sold, or for a pipeline after the sale, what is in it (15 Nov 2026).
+  const selling = !pickedPipeline || pickedPipeline.stages.includes("lead");
+  const tileValue = selling ? openValue : deals.reduce((sum, d) => sum + (d.value ?? 0), 0);
+  const tileWords = selling ? `${open.length} being sold` : `${deals.length} in this pipeline`;
   // Done or Later on a card: the deal's mark put in place at once, then the feed read again (for the day's count).
   const setMark = (jobId: string, mark: FeedMark | null) => {
     setData((all) => (all ? { ...all, deals: all.deals.map((x) => (x.jobId === jobId ? { ...x, mark } : x)) } : all));
@@ -288,7 +297,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
       {/* The parts of Today in one column, in the order of what needs a person (14 Nov 2026, Martin): Needs you, New in,
           Calls, Coming up, In hand; Calls goes first while a call is ringing or on, the most live thing on the page. */}
       {/* Your work on the left, the deals on the right (14 Nov 2026, Martin: as Service lays out its cases). */}
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_23rem] lg:items-start lg:gap-8">
+      <div className="lg:mt-4 lg:grid lg:grid-cols-[minmax(0,1fr)_23rem] lg:items-start lg:gap-8">
         <div className="min-w-0">
           {/* The strip is as wide as the feed (15 Nov 2026, Martin), the deals beside it. */}
           {/* The overview strip, pinned under the top bar (14 Nov 2026, Martin): the pipeline picked, each part of Today with
@@ -299,11 +308,11 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
             onGo={go}
             left={
               <>
-                <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} solo={solo} bare />
+                <span className="whitespace-nowrap text-[11.5px] font-medium text-white/55">{pickedPipeline?.name ?? "All deals"}</span>
                 <span className={clsx(STRIP_FIGURE, "text-white")}>
-                  {data ? `$${Math.round(openValue / 1000).toLocaleString("en-AU")}k` : "–"}
+                  {data ? `$${Math.round(tileValue / 1000).toLocaleString("en-AU")}k` : "–"}
                 </span>
-                <span className={STRIP_SUB}>{data ? `${open.length} being sold` : "Looking over your deals…"}</span>
+                <span className={STRIP_SUB}>{data ? tileWords : "Looking over your deals…"}</span>
               </>
             }
             right={
@@ -567,6 +576,20 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
           }}
           onNew={props.onNew}
           adding={props.adding}
+          tabs={panelTabsFor(pickedPipeline?.stages ?? null)}
+          picker={
+            admin ? (
+              <FeedPicker
+                pick={feedPick}
+                pipelines={pipelines}
+                picked={pickedPipeline}
+                onPick={choosePick}
+                solo={solo}
+                panel
+                short={!selling}
+              />
+            ) : null
+          }
         />
       </div>
     </div>
@@ -755,8 +778,10 @@ function todayPlaces(callsLive: boolean) {
 }
 
 /** A tile's figure and the line under it, the same in every tile of Today's strip. */
-const STRIP_FIGURE = "mt-0.5 text-[22px] font-semibold leading-tight tabular-nums";
+const STRIP_FIGURE = "mt-0.5 text-[20px] font-semibold leading-tight tabular-nums";
 const STRIP_SUB = "mt-0.5 whitespace-nowrap text-[12px] text-white/55";
+/** Today's strip and the Deals strip beside it: graphite, one height, so they sit level (15 Nov 2026, Martin). */
+const STRIP_BOX = "flex h-[5.25rem] rounded-2xl bg-primary text-primary-ink shadow-[0_10px_30px_rgba(11,11,12,0.16)]";
 
 interface StripTab {
   id: string;
@@ -782,14 +807,11 @@ function TodayStrip(props: {
   right: React.ReactNode;
 }) {
   return (
-    <div className="sticky top-2 z-20 -mx-1 px-1 pb-1 pt-1 lg:top-[calc(var(--studio-head,4.5rem)+1.75rem)]">
+    <div className="sticky top-2 z-20 -mx-1 px-1 pb-1 pt-1 lg:top-[calc(var(--studio-head,4.5rem)+2.75rem)]">
       {/* One instrument (15 Nov 2026, Martin: the strip didn't look designed): equal tiles, each a label, a figure and a
           line under it, parted by hairlines; the part in view marked by a short orange line along its foot. */}
-      <nav
-        aria-label="Today at a glance"
-        className="flex items-stretch rounded-2xl bg-primary text-primary-ink shadow-[0_10px_30px_rgba(11,11,12,0.16)]"
-      >
-        <div className="flex w-[11.5rem] shrink-0 flex-col items-start px-5 py-3 sm:w-[13rem]">{props.left}</div>
+      <nav aria-label="Today at a glance" className={clsx(STRIP_BOX, "items-stretch")}>
+        <div className="flex w-[11.5rem] shrink-0 flex-col items-start justify-center px-5 sm:w-[13rem]">{props.left}</div>
         <div className="no-scrollbar flex min-w-0 flex-1 overflow-x-auto">
           {props.tabs.map((t) => {
             const on = props.lit === t.id;
@@ -799,7 +821,7 @@ function TodayStrip(props: {
                 type="button"
                 onClick={() => props.onGo(t.id)}
                 aria-current={on ? "true" : undefined}
-                className="group relative flex min-w-[8.5rem] flex-1 flex-col items-start border-l border-white/10 px-5 py-3 text-left transition-colors hover:bg-white/[0.04]"
+                className="group relative flex min-w-[8.5rem] flex-1 flex-col items-start justify-center border-l border-white/10 px-5 text-left transition-colors hover:bg-white/[0.04]"
               >
                 <span className={clsx("whitespace-nowrap text-[11.5px] font-medium", on ? "text-white" : "text-white/55")}>{t.label}</span>
                 <span className={clsx(STRIP_FIGURE, "flex items-center gap-1.5", on ? "text-white" : "text-white/75")}>
@@ -1610,19 +1632,61 @@ function DealsPanel(props: {
   onPick: (jobId: string) => void;
   onNew?: () => void;
   adding?: boolean;
+  /** The toggles, from the pipeline picked (panelTabsFor). */
+  tabs: { id: PanelTab; label: string }[];
+  /** The Pipeline button, for an admin; null for anyone else. */
+  picker: React.ReactNode;
 }) {
   const counts = panelCounts(props.deals);
+  const selling = props.tabs === PANEL_TABS;
   const [chosenTab, setTab] = useState<PanelTab | null>(null);
-  const tab = chosenTab ?? (counts.waiting > 0 || counts.fresh === 0 ? "progress" : "new");
+  const tab =
+    chosenTab && props.tabs.some((t) => t.id === chosenTab)
+      ? chosenTab
+      : selling
+        ? counts.waiting > 0 || counts.fresh === 0
+          ? "progress"
+          : "new"
+        : "all";
   const [search, setSearch] = useState("");
   const rows = panelDeals(props.deals, tab, search);
+  // A pipeline with many stages: tighter toggles, and an edge that fades when they still don't fit.
+  const many = props.tabs.length > 3;
+  const tabBox = useRef<HTMLDivElement>(null);
+  const [spills, setSpills] = useState(false);
+  useEffect(() => {
+    const box = tabBox.current;
+    if (!box) return;
+    const look = () => setSpills(box.scrollWidth > box.clientWidth + 1 && box.scrollLeft + box.clientWidth < box.scrollWidth - 1);
+    look();
+    const watch = new ResizeObserver(look);
+    watch.observe(box);
+    box.addEventListener("scroll", look, { passive: true });
+    return () => {
+      watch.disconnect();
+      box.removeEventListener("scroll", look);
+    };
+  }, [props.tabs]);
   return (
     <aside
       aria-label="Deals"
-      className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+1.75rem)] lg:mt-1 lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-3.25rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
+      className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+2.75rem)] lg:mt-1 lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-4.25rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
     >
-      <div className="flex items-center gap-2.5">
-        <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-ink">Deals</h2>
+      {/* Its own strip, level with Today's and the same height (15 Nov 2026, Martin). */}
+      <div className={clsx(STRIP_BOX, "items-center justify-between gap-3 px-5")}>
+        <div className="min-w-0">
+          <h2 className="text-[18px] font-semibold leading-tight tracking-[-0.01em] text-white">Deals</h2>
+          <p className={clsx(STRIP_SUB, "truncate")}>
+            {selling ? (
+              <>
+                {counts.fresh} new · {counts.progress} in progress
+              </>
+            ) : (
+              `${props.deals.length} in this pipeline`
+            )}
+            {counts.waiting > 0 && <span className="font-medium text-sun-bright"> · {counts.waiting} waiting on you</span>}
+          </p>
+        </div>
         {props.onNew && (
           <button
             type="button"
@@ -1630,43 +1694,46 @@ function DealsPanel(props: {
             aria-expanded={props.adding}
             aria-label="New lead"
             title="New lead"
-            className="grid size-9 place-items-center rounded-full bg-primary text-primary-ink transition hover:brightness-125"
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-white text-ink transition hover:bg-white/85"
           >
             <Plus className={clsx("size-4 transition", props.adding && "rotate-45")} strokeWidth={2.5} aria-hidden />
           </button>
         )}
       </div>
-      <p className="mt-1 text-[13px] text-muted">
-        {counts.fresh} new · {counts.progress} in progress
-        {counts.waiting > 0 && <span className="font-medium text-sun-ink"> · {counts.waiting} waiting on you</span>}
-      </p>
-      <div className="mt-3 grid grid-cols-3 gap-1 rounded-2xl bg-surface-2 p-1" role="tablist" aria-label="Which deals">
-        {PANEL_TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
-            className={clsx(
-              // Each one is outlined, so the three read as one group of toggles (15 Nov 2026, Martin).
-              "h-9 rounded-xl text-[13px] font-medium ring-1 ring-inset transition",
-              tab === t.id
-                ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.1)] ring-ink"
-                : "text-ink-2 ring-line-strong hover:text-ink hover:ring-ink-2",
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="mt-4 flex items-center gap-1.5">
+        <div
+          ref={tabBox}
+          className={clsx(
+            "no-scrollbar flex min-w-0 flex-1 overflow-x-auto rounded-2xl bg-surface-2 p-1",
+            many ? "gap-0.5" : "gap-1",
+            // Toggles past the edge fade into it, so it reads as more to slide to.
+            spills && "[mask-image:linear-gradient(to_right,black_82%,transparent)]",
+          )}
+          role="tablist"
+          aria-label="Which deals"
+        >
+          {props.tabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setTab(t.id)}
+              className={clsx(
+                // Each one is outlined, so they read as one group of toggles (15 Nov 2026, Martin).
+                "h-9 flex-1 shrink-0 whitespace-nowrap rounded-xl font-medium ring-1 ring-inset transition",
+                many ? "px-2 text-[12.5px]" : "px-2.5 text-[13px]",
+                tab === t.id
+                  ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.1)] ring-ink"
+                  : "text-ink-2 ring-line-strong hover:text-ink hover:ring-ink-2",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {props.picker}
       </div>
-      {/* The whole pipeline, a press away (14 Nov 2026, Martin). */}
-      <Link
-        href="/design/sales/pipelines"
-        className="mt-2 inline-flex items-center gap-1 text-[12.5px] font-medium text-ink-2 underline-offset-4 hover:text-ink hover:underline"
-      >
-        See the pipeline <ArrowRight className="size-3.5" aria-hidden />
-      </Link>
       <label className="mt-3 flex h-11 items-center gap-2.5 rounded-2xl bg-surface px-3.5 ring-1 ring-line focus-within:ring-2 focus-within:ring-sun-line">
         <Search className="size-4 shrink-0 text-muted" aria-hidden />
         <input
@@ -1721,7 +1788,13 @@ function DealsPanel(props: {
         })}
         {rows.length === 0 && (
           <li className="rounded-2xl bg-surface px-4 py-4 text-[13.5px] text-ink-2 ring-1 ring-line">
-            {search ? "No deal matches that." : tab === "new" ? "No new leads." : "Nothing in progress."}
+            {search
+              ? "No deal matches that."
+              : tab === "new"
+                ? "No new leads."
+                : tab === "progress"
+                  ? "Nothing in progress."
+                  : "No deals here."}
           </li>
         )}
       </ul>
@@ -1984,7 +2057,8 @@ function FeedPicker({
   picked,
   onPick,
   solo,
-  bare,
+  panel,
+  short,
 }: {
   pick: { pipeline: FeedPipeline; mine: boolean };
   pipelines: readonly Pipeline[];
@@ -1992,8 +2066,10 @@ function FeedPicker({
   onPick: (next: { pipeline: FeedPipeline; mine: boolean }) => void;
   /** A business of one: there is nobody else's to see. */
   solo?: boolean;
-  /** As the label of the strip's first tile: small words and a chevron, no pill. */
-  bare?: boolean;
+  /** Beside the toggles over the deals list (15 Nov 2026, Martin): a button the toggles' height, the board linked at its foot. */
+  panel?: boolean;
+  /** Its mark alone, leaving the room to a pipeline's many toggles. */
+  short?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -2020,21 +2096,32 @@ function FeedPicker({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
+        title={panel ? `Pipeline: ${label}` : undefined}
         className={
-          bare
-            ? "-mx-1 inline-flex max-w-full items-center gap-1 rounded-md px-1 text-[11.5px] font-medium text-white/55 hover:text-white"
+          panel
+            ? clsx(
+                "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl text-[13px] font-medium ring-1 ring-inset transition",
+                short ? "px-2.5" : "px-3",
+                open ? "bg-surface text-ink ring-ink" : "text-ink-2 ring-line-strong hover:text-ink hover:ring-ink-2",
+              )
             : "inline-flex h-9 items-center gap-2 rounded-full bg-surface pl-3.5 pr-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2"
         }
       >
-        <span className={bare ? "whitespace-nowrap" : undefined}>{label}</span>
-        <ChevronDown className={clsx("size-3.5 transition", bare ? "text-white/55" : "text-muted", open && "rotate-180")} aria-hidden />
+        {panel ? (
+          <>
+            <SquareKanban className="size-4" aria-hidden /> {!short && "Pipeline"}
+          </>
+        ) : (
+          label
+        )}
+        <ChevronDown className={clsx("size-3.5 text-muted transition", open && "rotate-180")} aria-hidden />
       </button>
       {open && (
         <div
           role="menu"
           className={clsx(
-            "absolute left-0 z-30 w-60 rounded-2xl bg-surface p-2 text-ink shadow-lg ring-1 ring-line",
-            bare ? "top-7" : "top-11",
+            "absolute top-11 z-30 w-60 rounded-2xl bg-surface p-2 text-ink shadow-lg ring-1 ring-line",
+            panel ? "right-0" : "left-0",
           )}
         >
           {!solo && (
@@ -2088,6 +2175,14 @@ function FeedPicker({
               </button>
             );
           })}
+          {panel && (
+            <Link
+              href="/design/sales/pipelines"
+              className="mt-1 flex items-center justify-between gap-3 rounded-lg border-t border-line px-2.5 pb-1.5 pt-2.5 text-[13px] font-medium text-ink-2 hover:text-ink"
+            >
+              Open the pipeline board <ArrowRight className="size-3.5" aria-hidden />
+            </Link>
+          )}
         </div>
       )}
     </div>

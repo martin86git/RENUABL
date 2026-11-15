@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { panelCounts, panelDeals, panelMark, type FeedDeal } from "./deal-feed";
+import { PANEL_TABS, panelCounts, panelDeals, panelMark, panelTabsFor, type FeedDeal } from "./deal-feed";
 
 const now = new Date("2026-11-06T03:00:00Z");
 const ago = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString();
@@ -52,5 +52,25 @@ describe("the deals panel", () => {
     expect(panelMark(sent)?.words).toBe("Proposal sent · not opened");
     expect(panelMark(sold)).toBeNull();
     expect(panelCounts(all)).toEqual({ fresh: 1, progress: 3, waiting: 1 });
+  });
+});
+
+describe("the toggles over the deals list", () => {
+  it("are New leads, In progress and All for every deal or a pipeline from a lead", () => {
+    expect(panelTabsFor(null)).toBe(PANEL_TABS);
+    expect(panelTabsFor(["lead", "designed", "proposal", "won"])).toBe(PANEL_TABS);
+  });
+
+  it("are each stage, then All, for any other pipeline, and filter to that stage", () => {
+    expect(panelTabsFor(["won", "ordered", "scheduled", "installed"]).map((t) => t.label)).toEqual([
+      "Sold",
+      "Ordered",
+      "Booked in",
+      "Installed",
+      "All",
+    ]);
+    const sold = deal({ jobId: "sold", stage: "won" });
+    const ordered = deal({ jobId: "ordered", stage: "ordered" });
+    expect(panelDeals([sold, ordered], "ordered", "").map((d) => d.jobId)).toEqual(["ordered"]);
   });
 });

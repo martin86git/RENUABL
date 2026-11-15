@@ -554,12 +554,33 @@ export function stagePill(stage: JobStage): { words: string; tone: StageTone } {
  * The deals panel on Today (14 Nov 2026, Martin: as Service's list of cases, on the right): New leads, In progress (what
  * waits on you first: a reply needed, then proposals out) or All, searched by every word.
  */
-export type PanelTab = "new" | "progress" | "all";
+export type PanelTab = "new" | "progress" | "all" | JobStage;
 export const PANEL_TABS: { id: PanelTab; label: string }[] = [
   { id: "new", label: "New leads" },
   { id: "progress", label: "In progress" },
   { id: "all", label: "All" },
 ];
+
+/** A stage's word on a toggle: short enough to sit beside the others. */
+const TAB_WORDS: Partial<Record<JobStage, string>> = {
+  won: "Sold",
+  ordered: "Ordered",
+  scheduled: "Booked in",
+  inspection: "Inspection",
+  coes: "CoES",
+  grid: "Grid",
+  claimed: "Claimed",
+};
+
+/**
+ * The toggles over the deals list follow the pipeline picked (15 Nov 2026, Martin: "changing the pipeline changes the
+ * toggle buttons"): every deal, or a pipeline that starts with a lead, splits New leads / In progress / All; any other
+ * pipeline has a toggle for each of its stages, then All.
+ */
+export function panelTabsFor(stages: readonly JobStage[] | null): { id: PanelTab; label: string }[] {
+  if (!stages || stages.includes("lead")) return PANEL_TABS;
+  return [...stages.map((st) => ({ id: st as PanelTab, label: TAB_WORDS[st] ?? stagePill(st).words })), { id: "all", label: "All" }];
+}
 
 /** What a row says under its name: a customer waiting on a reply, or where the proposal is. */
 export function panelMark(d: Pick<FeedDeal, "events" | "stage" | "proposal">): { words: string; tone: "reply" | "plain" } | null {
@@ -575,6 +596,7 @@ export function panelDeals(deals: readonly FeedDeal[], tab: PanelTab, search: st
   const found = deals.filter((d) => {
     if (tab === "new" && d.stage !== "lead") return false;
     if (tab === "progress" && d.stage === "lead") return false;
+    if (tab !== "new" && tab !== "progress" && tab !== "all" && d.stage !== tab) return false;
     const hay = `${d.customer} ${d.suburb} ${d.title} ${d.address ?? ""}`.toLowerCase();
     return words.every((w) => hay.includes(w));
   });

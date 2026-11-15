@@ -12,6 +12,8 @@ export interface FeedAnswer {
   today?: DayDone | null;
   /** The reader's role: the owner opens on everyone's deals, others on their own. */
   role?: "owner" | "member" | "designer";
+  /** Every deal and the settings: picks the pipeline Today shows. */
+  admin?: boolean;
   /** Who the owner's new leads go to (deal-feed.ts `LeadRule`). */
   leadRule?: "adder" | "turns";
   /** The days Sol offers for a signed deal's install, soonest first (install-days.ts). */

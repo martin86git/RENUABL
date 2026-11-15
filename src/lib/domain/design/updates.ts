@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-15",
+    area: "Today",
+    words: "Deals has its own strip beside Today's, and an admin's Pipeline button changes the toggles under it to that pipeline's stages.",
+  },
+  {
+    day: "2026-11-15",
     area: "Proposals",
     words: "In the builder, drag a block's picture to move it and drag its corners to make it bigger or smaller.",
   },
