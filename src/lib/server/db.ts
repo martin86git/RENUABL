@@ -1577,6 +1577,136 @@ create table if not exists design_favourites (
   updated_at timestamptz not null default now(),
   primary key (business_id, member_email)
 );
+-- RENUABL's own go-to-market contacts (staff only, /admin/marketing; domain/marketing/contacts.ts). Never a business's CRM.
+create table if not exists marketing_contacts (
+  id text primary key,
+  email text unique not null,
+  first_name text,
+  last_name text,
+  company text,
+  phone text,
+  website text,
+  state text,
+  postcode text,
+  role text,
+  source text not null,
+  consent text not null default 'unknown',
+  consent_note text,
+  consent_by text,
+  consent_at timestamptz,
+  unsub_token text unique,
+  unsubscribed_at timestamptz,
+  bounced_at timestamptz,
+  bounce_note text,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists marketing_lists (
+  id text primary key,
+  name text unique not null,
+  created_by text not null,
+  created_at timestamptz not null default now()
+);
+create table if not exists marketing_list_members (
+  list_id text not null references marketing_lists(id) on delete cascade,
+  contact_id text not null references marketing_contacts(id) on delete cascade,
+  added_at timestamptz not null default now(),
+  primary key (list_id, contact_id)
+);
+create index if not exists marketing_list_members_contact on marketing_list_members (contact_id);
+-- Each import kept: who, when, what file, the consent claimed, what came of it.
+create table if not exists marketing_imports (
+  id text primary key,
+  file_name text not null,
+  source text not null,
+  consent text not null,
+  consent_note text,
+  list_id text,
+  added integer not null,
+  updated integer not null,
+  skipped integer not null,
+  by_email text not null,
+  at timestamptz not null default now()
+);
+-- RENUABL's marketing emails (domain/marketing/edm.ts, sequences.ts): one settings row, campaigns, sequences,
+-- each email to each contact (a send, with its token for opens and clicks), and the pictures emails show.
+create table if not exists marketing_settings (
+  id text primary key,
+  brand jsonb not null default '{}',
+  daily_cap integer not null default 300,
+  paused boolean not null default false,
+  updated_by text,
+  updated_at timestamptz not null default now()
+);
+create table if not exists marketing_campaigns (
+  id text primary key,
+  name text not null,
+  content jsonb not null,
+  list_id text references marketing_lists(id) on delete set null,
+  status text not null default 'draft',
+  send_at timestamptz,
+  started_at timestamptz,
+  finished_at timestamptz,
+  sent_by text,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists marketing_sequences (
+  id text primary key,
+  name text not null,
+  draft jsonb not null,
+  status text not null default 'off',
+  on_at timestamptz,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists marketing_enrolments (
+  id text primary key,
+  sequence_id text not null references marketing_sequences(id) on delete cascade,
+  contact_id text not null references marketing_contacts(id) on delete cascade,
+  step integer not null default 0,
+  next_at timestamptz not null default now(),
+  status text not null default 'active',
+  stop_reason text,
+  enrolled_at timestamptz not null default now(),
+  ended_at timestamptz,
+  unique (sequence_id, contact_id)
+);
+create index if not exists marketing_enrolments_due on marketing_enrolments (status, next_at);
+create table if not exists marketing_sends (
+  id text primary key,
+  token text unique not null,
+  contact_id text not null references marketing_contacts(id) on delete cascade,
+  campaign_id text references marketing_campaigns(id) on delete cascade,
+  sequence_id text references marketing_sequences(id) on delete cascade,
+  step integer,
+  content jsonb,
+  status text not null default 'queued',
+  error text,
+  queued_at timestamptz not null default now(),
+  sent_at timestamptz,
+  opened_at timestamptz,
+  open_count integer not null default 0,
+  clicked_at timestamptz,
+  click_count integer not null default 0,
+  bounced_at timestamptz,
+  unsubscribed_at timestamptz
+);
+create unique index if not exists marketing_sends_campaign_contact on marketing_sends (campaign_id, contact_id) where campaign_id is not null;
+create unique index if not exists marketing_sends_step_contact on marketing_sends (sequence_id, step, contact_id) where sequence_id is not null;
+create index if not exists marketing_sends_queue on marketing_sends (status, queued_at);
+create table if not exists marketing_images (
+  id text primary key,
+  bytes bytea not null,
+  content_type text not null,
+  width integer not null,
+  height integer not null,
+  by_email text not null,
+  at timestamptz not null default now()
+);
 `;
 
 async function ensureSchema() {

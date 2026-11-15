@@ -26,6 +26,7 @@ export default function robots(): MetadataRoute.Robots {
         "/job/",
         "/live/",
         "/w/",
+        "/m/",
         // RENUABL Business, until it launches (business-link.ts).
         ...(BUSINESS_LINK_SHOWN ? [] : BUSINESS_PATHS),
       ],

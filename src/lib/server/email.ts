@@ -16,6 +16,12 @@ export interface Email {
   cc?: string[];
   /** Where a reply goes, when not the site's own reply address: e.g. the member who sent a purchase order. */
   replyTo?: string;
+  /** Extra headers, e.g. List-Unsubscribe on marketing email. */
+  headers?: Record<string, string>;
+  /** Labels the service sends back with its events (bounces, complaints), e.g. a marketing send's token. */
+  tags?: Record<string, string>;
+  /** The name shown as the sender, in place of EMAIL_FROM's own (the address stays EMAIL_FROM's). */
+  fromName?: string;
 }
 
 /** "RENUABL <hello@renuabl.com.au>" → name and address. */
@@ -37,7 +43,14 @@ async function viaSendGrid(email: Email, key: string, from: string) {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
     body: JSON.stringify({
-      personalizations: [{ to: [{ email: email.to }], ...(email.cc?.length ? { cc: email.cc.map((a) => ({ email: a })) } : {}) }],
+      personalizations: [
+        {
+          to: [{ email: email.to }],
+          ...(email.cc?.length ? { cc: email.cc.map((a) => ({ email: a })) } : {}),
+          ...(email.tags ? { custom_args: email.tags } : {}),
+        },
+      ],
+      ...(email.headers ? { headers: email.headers } : {}),
       from: parseFrom(from),
       ...(replyTo ? { reply_to: parseFrom(replyTo) } : {}),
       subject: email.subject,
@@ -70,6 +83,8 @@ async function viaResend(email: Email, key: string, from: string) {
       to: [email.to],
       ...(email.cc?.length ? { cc: email.cc } : {}),
       reply_to: email.replyTo?.trim() || process.env.EMAIL_REPLY_TO?.trim() || undefined,
+      ...(email.headers ? { headers: email.headers } : {}),
+      ...(email.tags ? { tags: Object.entries(email.tags).map(([name, value]) => ({ name, value })) } : {}),
       subject: email.subject,
       html: email.html,
       text: email.text,
@@ -114,7 +129,9 @@ export async function emailDiagnostics(email: Email) {
 
 export async function sendEmail(email: Email): Promise<"sent" | "skipped"> {
   const provider = emailProvider();
-  const from = process.env.EMAIL_FROM?.trim() ?? "";
+  const envFrom = process.env.EMAIL_FROM?.trim() ?? "";
+  const name = email.fromName?.replace(/[<>"\r\n]/g, "").trim();
+  const from = name && envFrom ? `"${name}" <${parseFrom(envFrom).email}>` : envFrom;
   if (!provider) {
     console.warn(`email skipped (email not configured): "${email.subject}"`);
     return "skipped";

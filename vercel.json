@@ -13,6 +13,10 @@
     {
       "path": "/api/cron/sol-outbox",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/marketing",
+      "schedule": "20 * * * *"
     }
   ]
 }

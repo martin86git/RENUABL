@@ -79,6 +79,12 @@ export default async function AdminPage() {
         </a>{" "}
         saves a note on RENUABL&apos;s own test contact and shows HubSpot&apos;s reply.
       </p>
+      <p className="-mt-4 mb-6 text-[13px] text-muted">
+        <a href="/admin/marketing" className="underline underline-offset-4">
+          Marketing contacts
+        </a>{" "}
+        : the solar businesses RENUABL Business is marketed to.
+      </p>
       <Panel title="Send a brief">
         <BriefSender />
       </Panel>
