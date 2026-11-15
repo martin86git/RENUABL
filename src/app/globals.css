@@ -258,6 +258,13 @@
 .studio-frame .staff-scroll {
   scrollbar-width: thin;
 }
+/* A list that scrolls with no bar showing (Today's Deals column): the wheel, touch and keys still move it. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
 
 /* Sol's panel (sol-dock.tsx): on a wide screen the page narrows to make room for it rather than being covered. */
 :root {

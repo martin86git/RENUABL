@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-15",
+    area: "Today",
+    words: "The Deals list scrolls without a scroll bar, and New, In progress and All are each outlined so they read as one group.",
+  },
+  {
+    day: "2026-11-15",
     area: "Proposals",
     words: "In the Builder every block is a dashed box with its name on it, and in a custom design you can add a block between two.",
   },

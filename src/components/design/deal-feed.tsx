@@ -1637,8 +1637,11 @@ function DealsPanel(props: {
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
             className={clsx(
-              "h-9 rounded-xl text-[13px] font-medium transition",
-              tab === t.id ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.1)]" : "text-ink-2 hover:text-ink",
+              // Each one is outlined, so the three read as one group of toggles (15 Nov 2026, Martin).
+              "h-9 rounded-xl text-[13px] font-medium ring-1 ring-inset transition",
+              tab === t.id
+                ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.1)] ring-ink"
+                : "text-ink-2 ring-line-strong hover:text-ink hover:ring-ink-2",
             )}
           >
             {t.label}
@@ -1663,7 +1666,8 @@ function DealsPanel(props: {
         />
       </label>
       {/* The deals stay put beside the scrolling feed, their own list scrolling in the room left on screen (14 Nov 2026, Martin). */}
-      <ul className="staff-scroll mt-3 min-h-0 space-y-1.5 pr-0.5 lg:flex-1 lg:overflow-y-auto">
+      {/* It scrolls with no bar showing (15 Nov 2026, Martin: "we dont need the scroll bar"). */}
+      <ul className="no-scrollbar mt-3 min-h-0 space-y-1.5 p-0.5 lg:flex-1 lg:overflow-y-auto">
         {rows.map((d) => {
           const mark = panelMark(d);
           const on = props.picked === d.jobId;
