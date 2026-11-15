@@ -22,6 +22,7 @@ import {
   CUSTOMER_WRITER,
   SOL_WRITER,
   textReplyOf,
+  boxGoesTo,
   type DealLine,
 } from "./deal-team";
 
@@ -210,5 +211,22 @@ describe("a customer's reply by text in the deal's chat", () => {
     expect(textReplyOf({ by: SOL_WRITER, kind: "note", text: "Tom's enquiry is in." })).toBeNull();
     expect(textReplyOf({ by: "sam@x.example", kind: "text", text: "See you then" })).toBeNull();
     expect(textReplyOf({ by: "sam@x.example", kind: "line", text: "Text from 0401 498 392: no" })).toBeNull();
+  });
+});
+
+describe("who the deal chat's box writes to", () => {
+  const theirs = { id: "dl_2", by: CUSTOMER_WRITER };
+  const ours = { id: "dl_1", by: "sam@x.example" };
+
+  it("is the customer by text while theirs is the latest line, else the team", () => {
+    expect(boxGoesTo([ours, theirs], null)).toBe("text");
+    expect(boxGoesTo([theirs, ours], null)).toBe("team");
+    expect(boxGoesTo([], null)).toBe("team");
+  });
+
+  it("keeps a choice made by hand until the next line comes", () => {
+    expect(boxGoesTo([ours, theirs], { to: "team", on: "dl_2" })).toBe("team");
+    expect(boxGoesTo([theirs, ours], { to: "text", on: "dl_1" })).toBe("text");
+    expect(boxGoesTo([ours, theirs, { id: "dl_3", by: CUSTOMER_WRITER }], { to: "team", on: "dl_2" })).toBe("text");
   });
 });

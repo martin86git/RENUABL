@@ -13,6 +13,7 @@ import {
   askWords,
   CUSTOMER_WRITER,
   SOL_WRITER,
+  boxGoesTo,
   briefHref,
   saidWhen,
   typingMention,
@@ -114,9 +115,12 @@ export function DealTeamChat(props: {
   };
 
   // Who the box writes to: the team (the chat), or the customer by text (15 Nov 2026, Martin: "I should also be able
-  // to text back"). The team unless chosen, so a remark meant for the team never reaches a customer by mistake.
-  const [to, setTo] = useState<"team" | "text">("team");
+  // to text back… make it jump to Text when the customer's line is latest"). It is Text while their text is the
+  // latest line, else the team; a choice made by hand holds until the next line comes (`boxGoesTo`).
+  const [chosen, setChosen] = useState<{ to: "team" | "text"; on: string } | null>(null);
   const texting = !pad ? (view?.texting ?? null) : null;
+  const to = texting ? boxGoesTo(lines, chosen) : "team";
+  const setTo = (next: "team" | "text") => setChosen({ to: next, on: lines.at(-1)?.id ?? "" });
   const byText = to === "text" && texting !== null && !texting.stopped;
   const firstName = writerName(CUSTOMER_WRITER, view?.customer);
 
@@ -262,6 +266,9 @@ export function DealTeamChat(props: {
                   : byText
                     ? `Goes to ${firstName} on ${texting.to}${texting.signOff ? ` · ends with ${texting.signOff.replace("\n", " ")}` : ""}`
                     : "Only your team sees this."}
+              </p>
+              <p className="sr-only" role="status">
+                {byText ? `This will be texted to ${firstName}.` : "This goes to your team only."}
               </p>
             </div>
           )}

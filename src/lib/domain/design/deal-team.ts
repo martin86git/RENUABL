@@ -213,6 +213,20 @@ export function briefLines(ask: DealAsk, now = new Date()): string[] {
 }
 
 /**
+ * Who the deal chat's box writes to, where the customer can be texted from it: the customer by text while theirs is
+ * the latest line (15 Nov 2026, Martin: "make it jump to Text when the customer's line is latest"), else the team. A
+ * choice the member made holds only while the latest line is the one it was made on, so a new reply jumps it again.
+ */
+export function boxGoesTo(
+  lines: readonly Pick<DealLine, "id" | "by">[],
+  chosen: { to: "team" | "text"; on: string } | null,
+): "team" | "text" {
+  const last = lines.at(-1);
+  if (chosen && chosen.on === (last?.id ?? "")) return chosen.to;
+  return last?.by === CUSTOMER_WRITER ? "text" : "team";
+}
+
+/**
  * A member's name as the deal chat shows it: their email's first part; Sol is Sol; the customer is their first name
  * (`customer`: their name on the deal), else "Customer".
  */
