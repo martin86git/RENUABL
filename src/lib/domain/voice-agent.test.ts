@@ -9,6 +9,7 @@ import {
   cleanTeamAsk,
   firstMessage,
   openingBlock,
+  openingParts,
   TEAM_ASK_MAX,
   teamAskBlock,
   screeningAnswer,
@@ -187,7 +188,7 @@ describe("what it says", () => {
   it("opens by saying who it is and that it's automated, never that it's recorded", () => {
     const m = firstMessage(lead);
     expect(m).toContain("is that Sam");
-    expect(m).toContain("Ella, RENUABL's automated assistant");
+    expect(m).toContain("Ella, Renewable's automated assistant");
     expect(m).not.toMatch(/record/i);
     expect(firstMessage({ ...lead, asked: true })).toContain("You said yes to a call");
     expect(m).not.toMatch(/\bAI\b|<script/);
@@ -257,12 +258,22 @@ describe("what it says", () => {
     expect(a.firstMessageMode).toBe("assistant-waits-for-user");
     expect(JSON.stringify(a)).toContain("customer.speech.timeout");
     const said = screeningAnswer(lead);
-    expect(said).toMatch(/^It's Ella, RENUABL's automated assistant, calling for Sam.* about their solar enquiry.$/);
+    expect(said).toMatch(/^It's Ella, Renewable's automated assistant, calling for Sam.* about their solar enquiry.$/);
     expect(said.length).toBeLessThan(firstMessage(lead).length);
     expect(screeningAnswer(asked)).toContain("the call they asked for");
     const p = voiceSystemPrompt(lead, [], { canTransfer: false });
     expect(p).toContain("How this call starts");
-    expect(p).toContain(firstMessage(lead));
+    // The opening is two turns: the question alone, then who is calling and why once they have answered.
+    const parts = openingParts(lead);
+    expect(parts.ask).toBe("Hi, is that Sam script?");
+    expect(parts.then).toMatch(/^It's Ella, Renewable's automated assistant, calling about/);
+    expect(p).toContain(`Say only this, then stop talking: "${parts.ask}"`);
+    expect(p).toContain(`word for word: "${parts.then}"`);
+    expect(p).not.toContain(firstMessage(lead));
+    expect(openingParts({ ...lead, asked: true }).ask).toBeNull();
+    // The name is written the way it is said, and the instructions say which is which.
+    expect(p).toContain('spelled "Renuabl" and said exactly like the word "renewable"');
+    expect(p).not.toMatch(/RENUABL's automated/);
     expect(p).toContain(said);
     expect(p).toContain("start from the top with your opening");
     expect(openingBlock(lead)).toContain("Never leave it for a call screener");
@@ -339,14 +350,14 @@ describe("calls that come in", () => {
   const rang = { ...lead, inbound: true, asked: true };
   it("thanks them for calling, says who it is and that it's automated, and leaves no voicemail", () => {
     const m = firstMessage(rang);
-    expect(m).toContain("thanks for calling RENUABL");
+    expect(m).toContain("thanks for calling Renewable");
     expect(m).toContain("Ella, the automated assistant");
     expect(m).not.toMatch(/record/i);
     const a = assistantConfig({ brief: rang, slots: [], serverUrl: "u", secret: "s", model: "m" });
     expect(a).not.toHaveProperty("voicemailMessage");
     expect(a.artifactPlan).toEqual({ recordingEnabled: false });
     expect(a.maxDurationSeconds).toBe(1200);
-    expect(a.model.messages[0].content).toContain("rang RENUABL's number themselves");
+    expect(a.model.messages[0].content).toContain("rang Renewable's number themselves");
     expect(a.model.messages[0].content).not.toContain("leave this message");
   });
 
@@ -359,7 +370,7 @@ describe("calls that come in", () => {
 
   it("says kindly when it can't take the call, with nothing to keep", () => {
     const c = closedAssistant({ business: "RENUABL <b>", model: "m" });
-    expect(c.firstMessage).toContain("Thanks for calling RENUABL");
+    expect(c.firstMessage).toContain("Thanks for calling Renewable");
     expect(c.firstMessage).not.toContain("<");
     expect(c).not.toHaveProperty("server");
   });

@@ -152,7 +152,7 @@ describe("the notes on every call", () => {
   it("come after every rule the assistant keeps", () => {
     const prompt = voiceSystemPrompt({ ...brief, coaching: ["Say you're from RENUABL first", "  "] }, [], { canTransfer: false });
     const rules = prompt.indexOf("Rules you always keep");
-    const coached = prompt.indexOf("## How RENUABL wants you to talk");
+    const coached = prompt.indexOf("## How Renewable wants you to talk");
     expect(rules).toBeGreaterThan(-1);
     expect(coached).toBeGreaterThan(rules);
     expect(prompt).toContain("- Say you're from RENUABL first");
