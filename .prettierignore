@@ -5,3 +5,4 @@ next-env.d.ts
 docs/product-contract
 # The cold email HTML (docs/marketing/edm/README.md): Prettier rewrites Outlook's conditional comments and breaks the button.
 docs/marketing/edm/*.html
+docs/marketing/wholesaler/*.html

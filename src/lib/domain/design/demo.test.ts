@@ -3,6 +3,7 @@ import {
   DEMO_DETAILS,
   DEMO_PAGE,
   cleanDemoDetails,
+  cleanDemoSource,
   demoDetailsNote,
   demoEmail,
   demoNeedsDetails,
@@ -192,5 +193,30 @@ describe("the demo's words", () => {
   it("makes no claim it can't prove, and quotes no price", () => {
     expect(words).not.toMatch(/\b(best|leading|first|fastest|guarantee\w*|exact|precise|#1|number one)\b/i);
     expect(words).not.toMatch(/\$\d/);
+  });
+});
+
+describe("where a demo came from", () => {
+  it("keeps the link's source and campaign as plain tags", () => {
+    expect(cleanDemoSource({ utm_source: " Rexel ", utm_campaign: "wholesaler-launch" })).toEqual({
+      source: "rexel",
+      campaign: "wholesaler-launch",
+    });
+    expect(cleanDemoSource({ utm_source: "<script>alert(1)</script>" })).toEqual({ source: "scriptalert1script", campaign: "" });
+    expect(cleanDemoSource({ utm_source: "x".repeat(90) })?.source).toHaveLength(40);
+  });
+
+  it("keeps nothing without a source", () => {
+    expect(cleanDemoSource(null)).toBeNull();
+    expect(cleanDemoSource({ utm_campaign: "wholesaler-launch" })).toBeNull();
+    expect(cleanDemoSource({ utm_source: 7 })).toBeNull();
+  });
+
+  it("tells staff where the demo came from", () => {
+    const d = { firstName: "Sam", lastName: "Lee", company: "Bright Solar", email: "sam@bright.com.au" };
+    const note = demoDetailsNote(d, { source: "rexel", campaign: "wholesaler-launch" });
+    expect(note.subject).toContain("(via rexel)");
+    expect(note.text).toContain("Came from: rexel · wholesaler-launch");
+    expect(demoDetailsNote(d).text).not.toContain("Came from");
   });
 });

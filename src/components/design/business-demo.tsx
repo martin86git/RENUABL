@@ -23,7 +23,13 @@ export function TryDemoButton({ look = "main" }: { look?: "main" | "quiet" | "ba
     setBusy(true);
     setProblem(null);
     try {
-      const res = await fetch("/api/business-demo", { method: "POST" });
+      // The link's tags (utm_source, utm_campaign) go with the press, so a demo says where it came from.
+      const tags = new URLSearchParams(window.location.search);
+      const res = await fetch("/api/business-demo", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ utm_source: tags.get("utm_source") ?? "", utm_campaign: tags.get("utm_campaign") ?? "" }),
+      });
       const data = (await res.json().catch(() => null)) as { ok?: boolean; message?: string; next?: string } | null;
       if (res.ok && data?.ok) {
         window.location.assign(data.next ?? "/design");

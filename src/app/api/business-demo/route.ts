@@ -1,7 +1,15 @@
 import { cookies } from "next/headers";
 import { after } from "next/server";
 import { SESSION_COOKIE } from "@/lib/domain/accounts";
-import { DEMO_DETAILS, DEMO_PAGE, DEMO_PER_HOUR, cleanDemoDetails, demoDetailsNote, isDemoEmail } from "@/lib/domain/design/demo";
+import {
+  DEMO_DETAILS,
+  DEMO_PAGE,
+  DEMO_PER_HOUR,
+  cleanDemoDetails,
+  cleanDemoSource,
+  demoDetailsNote,
+  isDemoEmail,
+} from "@/lib/domain/design/demo";
 import { STAFF_RETURN_COOKIE } from "@/lib/domain/design/staff-view";
 import { VIEW_AS_COOKIE } from "@/lib/domain/design/view-as";
 import { SESSION_COOKIE_OPTIONS, openSession } from "@/lib/server/accounts";
@@ -22,7 +30,9 @@ export async function POST(request: Request) {
     const access = await designAccess();
     if (access.state !== "signed-out") return Response.json({ ok: true, next: "/design" });
     if (!allow(request, "business-demo", DEMO_PER_HOUR)) return Response.json({ ok: false, message: DEMO_PAGE.busy }, { status: 429 });
-    const email = await openDemo();
+    // Where the button was pressed from (a wholesaler's email's link, an ad): the body is optional, and a bad one is no source.
+    const sent: unknown = await request.json().catch(() => null);
+    const email = await openDemo(cleanDemoSource(sent && typeof sent === "object" ? (sent as Record<string, unknown>) : null));
     const jar = await cookies();
     jar.set(SESSION_COOKIE, await openSession(email, "business"), SESSION_COOKIE_OPTIONS);
     // The demo is its own sign-in: nothing of another view carries into it.
@@ -45,9 +55,9 @@ export async function PUT(request: Request) {
     if ("refuse" in read) return read.refuse;
     const cleaned = cleanDemoDetails(read.body);
     if (!cleaned.ok) return Response.json({ ok: false, message: cleaned.message }, { status: 422 });
-    await keepDemoDetails(access.member, cleaned.details);
+    const from = await keepDemoDetails(access.member, cleaned.details);
     // Told once: someone changing what they typed isn't news.
-    if (!access.member.firstName) after(() => tellStaff(demoDetailsNote(cleaned.details)));
+    if (!access.member.firstName) after(() => tellStaff(demoDetailsNote(cleaned.details, from)));
     return Response.json({ ok: true, message: DEMO_DETAILS.title });
   });
 }

@@ -230,6 +230,9 @@ create table if not exists design_projects (
 alter table businesses add column if not exists samples_added_at timestamptz;
 -- What kind of business (domain/design/business-kind.ts): retailer (everything), installer or inspector.
 alter table businesses add column if not exists kind text not null default 'retailer';
+-- Where a demo business came from (domain/design/demo.ts, cleanDemoSource; 15 Nov 2026): utm_source and utm_campaign.
+alter table businesses add column if not exists demo_source text;
+alter table businesses add column if not exists demo_campaign text;
 -- The directory and connections (domain/design/connections.ts): a business is listed only once it chooses to be, and
 -- known to others by its key, never its id. A connection is one row a pair (the lower id first), pending until the
 -- other accepts; declining, cancelling or disconnecting removes it.

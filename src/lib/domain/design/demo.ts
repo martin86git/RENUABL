@@ -68,12 +68,50 @@ export function cleanDemoDetails(body: Record<string, unknown>): { ok: true; det
   };
 }
 
-/** The note to RENUABL's staff when someone in the demo says who they are. */
-export function demoDetailsNote(d: DemoDetails): { subject: string; text: string } {
+/**
+ * Where a demo came from (15 Nov 2026, Martin: a wholesaler's email links to the demo, and the demos it brings should
+ * say so): the `utm_source` and `utm_campaign` on the page the button was pressed on, sent with the press. Only plain
+ * tags are kept (letters, digits, dot, dash, underscore; lower case; `DEMO_TAG_MAX` long), so nothing typed into a link
+ * reaches an email or the database as anything but a tag. No source, no record.
+ */
+export interface DemoSource {
+  source: string;
+  /** The campaign, or empty. */
+  campaign: string;
+}
+
+export const DEMO_TAG_MAX = 40;
+
+const tag = (raw: unknown): string =>
+  typeof raw === "string"
+    ? raw
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9._-]/g, "")
+        .slice(0, DEMO_TAG_MAX)
+    : "";
+
+export function cleanDemoSource(body: Record<string, unknown> | null | undefined): DemoSource | null {
+  const source = tag(body?.utm_source);
+  if (!source) return null;
+  return { source, campaign: tag(body?.utm_campaign) };
+}
+
+/** "rexel · wholesaler-launch", or the source alone. */
+export const demoSourceWords = (s: DemoSource): string => (s.campaign ? `${s.source} · ${s.campaign}` : s.source);
+
+/** The note to RENUABL's staff when someone in the demo says who they are, with where the demo came from when known. */
+export function demoDetailsNote(d: DemoDetails, from?: DemoSource | null): { subject: string; text: string } {
   const who = [d.firstName, d.lastName].filter(Boolean).join(" ");
   return {
-    subject: `RENUABL Business demo: ${who}, ${d.company}`,
-    text: [`${who} is trying the RENUABL Business demo.`, `Company: ${d.company}`, `Email: ${d.email} (as typed, not verified)`].join("\n"),
+    subject: `RENUABL Business demo: ${who}, ${d.company}${from ? ` (via ${from.source})` : ""}`,
+    text: [
+      `${who} is trying the RENUABL Business demo.`,
+      `Company: ${d.company}`,
+      `Email: ${d.email} (as typed, not verified)`,
+      ...(from ? [`Came from: ${demoSourceWords(from)}`] : []),
+    ].join("\n"),
   };
 }
 
