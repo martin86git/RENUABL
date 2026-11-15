@@ -1,7 +1,12 @@
 import { after } from "next/server";
 import { asksSolOnDeal, cleanDealWords, isDealLineId } from "@/lib/domain/design/deal-team";
 import { parseApiKey } from "@/lib/server/bill-reader";
+import { normaliseMobile } from "@/lib/domain/contact";
+import { can } from "@/lib/domain/design/account";
+import { localMobile, textSignOff } from "@/lib/domain/design/texts";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
+import { jobById } from "@/lib/server/design-crm-repo";
+import { textsOnFor, textsStopped } from "@/lib/server/design-texts";
 import {
   DealTeamRefusal,
   dealAsk,
@@ -47,7 +52,21 @@ export async function GET(request: Request, ctx: RouteContext<"/api/design/jobs/
           : Response.json({ ok: false, message: "That request isn't here." }, { status: 404 });
       }
       const seen = new URL(request.url).searchParams.get("seen") === "1";
-      return Response.json({ ok: true, ...(await dealTeam(meOf(who.member), id, { seen })), me: who.member.email.toLowerCase() });
+      const m = who.member;
+      const view = await dealTeam(meOf(m), id, { seen });
+      // Texting the customer from this chat: where texts are on, they have a mobile, and this member may publish.
+      let texting: { to: string; stopped: boolean; signOff: string } | null = null;
+      if (can(m.role, "publish", m.permissions) && (await textsOnFor(m.businessId))) {
+        const found = await jobById(m.businessId, id, viewerOf(m));
+        const mobile = found ? normaliseMobile(found.customer.phone) : null;
+        if (found && mobile)
+          texting = {
+            to: localMobile(mobile),
+            stopped: await textsStopped(m.businessId, found.customer.id),
+            signOff: textSignOff(m.firstName, m.businessName),
+          };
+      }
+      return Response.json({ ok: true, ...view, texting, me: m.email.toLowerCase() });
     } catch (e) {
       if (e instanceof DealTeamRefusal) return gone();
       throw e;

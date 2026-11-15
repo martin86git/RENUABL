@@ -1,13 +1,17 @@
 "use client";
 
+import { TEXT_MAX } from "@/lib/domain/design/contact-reach";
+import { TEXTS_COPY } from "@/lib/domain/design/texts";
+import { textCustomer } from "@/lib/services/caller";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Bell, Check, PencilRuler, RotateCcw, SendHorizonal } from "lucide-react";
+import { Bell, Check, MessageSquare, PencilRuler, RotateCcw, SendHorizonal, Users } from "lucide-react";
 import {
   ASK_TYPES,
   DEAL_TEAM_POLL_MS,
   askWords,
+  CUSTOMER_WRITER,
   SOL_WRITER,
   briefHref,
   saidWhen,
@@ -109,7 +113,25 @@ export function DealTeamChat(props: {
     onChanged.current?.();
   };
 
+  // Who the box writes to: the team (the chat), or the customer by text (15 Nov 2026, Martin: "I should also be able
+  // to text back"). The team unless chosen, so a remark meant for the team never reaches a customer by mistake.
+  const [to, setTo] = useState<"team" | "text">("team");
+  const texting = !pad ? (view?.texting ?? null) : null;
+  const byText = to === "text" && texting !== null && !texting.stopped;
+  const firstName = writerName(CUSTOMER_WRITER, view?.customer);
+
   const send = async (text: string): Promise<boolean> => {
+    if (byText) {
+      const sent = await textCustomer(jobId, text);
+      if (!sent.ok) {
+        setProblem(sent.message);
+        return false;
+      }
+      setProblem(null);
+      await load();
+      changed();
+      return true;
+    }
     const r = await sayOnDeal(jobId, text);
     if (!r.ok) {
       setProblem(r.message);
@@ -189,7 +211,13 @@ export function DealTeamChat(props: {
           l.kind === "ask" && l.ask ? (
             <AskCard key={l.id} line={l} jobId={jobId} pad={pad} onSettle={settle} />
           ) : (
-            <Line key={l.id} line={l} pad={pad} />
+            <Line
+              key={l.id}
+              line={l}
+              pad={pad}
+              customer={view?.customer}
+              onReply={texting && !texting.stopped && l.by === CUSTOMER_WRITER ? () => setTo("text") : undefined}
+            />
           ),
         )}
         {waitingOnSol !== null && (
@@ -207,31 +235,94 @@ export function DealTeamChat(props: {
       {pad && props.onOpen ? (
         <OpenBox onOpen={props.onOpen} />
       ) : (
-        <Composer
-          pad={pad}
-          people={people}
-          onNeedPeople={() => !view && void load()}
-          onSend={send}
-          startText={props.startText}
-          autoFocus={props.autoFocus}
-        />
+        <>
+          {texting && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div role="group" aria-label="Who this goes to" className="inline-flex rounded-full bg-surface-2 p-0.5 ring-1 ring-line">
+                {(["team", "text"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={to === k}
+                    disabled={k === "text" && texting.stopped}
+                    onClick={() => setTo(k)}
+                    className={clsx(
+                      "inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium transition-colors",
+                      to === k ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink disabled:text-muted",
+                    )}
+                  >
+                    {k === "team" ? <Users className="size-3.5" aria-hidden /> : <MessageSquare className="size-3.5" aria-hidden />}
+                    {k === "team" ? "To the team" : `Text ${firstName}`}
+                  </button>
+                ))}
+              </div>
+              <p className="min-w-0 flex-1 truncate text-[11.5px] text-muted">
+                {texting.stopped
+                  ? TEXTS_COPY.stopped(firstName)
+                  : byText
+                    ? `Goes to ${firstName} on ${texting.to}${texting.signOff ? ` · ends with ${texting.signOff.replace("\n", " ")}` : ""}`
+                    : "Only your team sees this."}
+              </p>
+            </div>
+          )}
+          <Composer
+            pad={pad}
+            text={byText ? { who: firstName } : undefined}
+            people={people}
+            onNeedPeople={() => !view && void load()}
+            onSend={send}
+            startText={props.startText}
+            autoFocus={props.autoFocus}
+          />
+        </>
       )}
     </div>
   );
 }
 
-function Line({ line: l, pad }: { line: DealLine; pad?: boolean }) {
+function Line({ line: l, pad, customer, onReply }: { line: DealLine; pad?: boolean; customer?: string; onReply?: () => void }) {
   const sol = l.by === SOL_WRITER;
+  // The customer's own words, come in by text: theirs, outlined, never Sol's colours.
+  const theirs = l.by === CUSTOMER_WRITER;
+  // A text one of the team sent the customer: on the right in graphite, as a phone shows the sender's own.
+  const sent = l.kind === "text" && !theirs;
   return (
-    <li className={clsx("min-w-0", pad ? "text-[12.5px] leading-snug" : "text-[13.5px] leading-relaxed")}>
-      <div className={clsx("rounded-xl", pad ? "px-2.5 py-1.5" : "px-3 py-2", sol ? "bg-sun ring-1 ring-sun-line/25" : "bg-surface-2")}>
+    <li className={clsx("flex min-w-0", sent && "justify-end", pad ? "text-[12.5px] leading-snug" : "text-[13.5px] leading-relaxed")}>
+      {/* A bubble is as wide as its words, never the whole chat (15 Nov 2026, Martin). */}
+      <div
+        className={clsx(
+          "w-fit min-w-0 max-w-[85%] rounded-xl",
+          pad ? "px-2.5 py-1.5" : "px-3 py-2",
+          sol
+            ? "bg-sun ring-1 ring-sun-line/25"
+            : theirs
+              ? "bg-surface ring-1 ring-ink/25"
+              : sent
+                ? "bg-primary text-primary-ink"
+                : "bg-surface-2",
+        )}
+      >
         <p className="flex items-baseline gap-1.5">
           {sol && <SolIcon className="size-3.5 shrink-0 self-center text-sun-ink" />}
-          <span className={clsx("font-semibold", sol ? "text-sun-ink" : "text-ink")}>{writerName(l.by)}</span>
+          {(theirs || sent) && <MessageSquare className="size-3.5 shrink-0 self-center opacity-70" aria-hidden />}
+          <span className={clsx("font-semibold", sol ? "text-sun-ink" : sent ? "text-primary-ink" : "text-ink")}>
+            {writerName(l.by, customer)}
+          </span>
           {l.kind === "note" && <span className="text-[11px] text-sun-ink/80">note</span>}
-          <span className="ml-auto shrink-0 text-[11px] text-muted">{agoWords(l.at)}</span>
+          {theirs && <span className="text-[11px] text-muted">customer · by text</span>}
+          {sent && <span className="text-[11px] opacity-75">texted {writerName(CUSTOMER_WRITER, customer)}</span>}
+          <span className={clsx("ml-auto shrink-0 pl-3 text-[11px]", sent ? "opacity-75" : "text-muted")}>{agoWords(l.at)}</span>
         </p>
-        <p className={clsx("whitespace-pre-wrap break-words text-ink", pad && "line-clamp-3")}>{l.text}</p>
+        <p className={clsx("whitespace-pre-wrap break-words", sent ? "text-primary-ink" : "text-ink", pad && "line-clamp-3")}>{l.text}</p>
+        {onReply && !pad && (
+          <button
+            type="button"
+            onClick={onReply}
+            className="mt-1 text-[12px] font-medium text-ink-2 underline-offset-2 hover:text-ink hover:underline"
+          >
+            Reply by text
+          </button>
+        )}
       </div>
     </li>
   );
@@ -362,6 +453,8 @@ function Composer(props: {
   onSend: (text: string) => Promise<boolean>;
   startText?: string;
   autoFocus?: boolean;
+  /** Set while the box texts the customer: no @ offers, and it says who it goes to. */
+  text?: { who: string };
 }) {
   const [text, setText] = useState(props.startText ?? "");
   const [busy, setBusy] = useState(false);
@@ -375,7 +468,7 @@ function Composer(props: {
     box.current?.focus();
     box.current?.setSelectionRange(end, end);
   }, [autoFocus]);
-  const tag = typingMention(text, caret);
+  const tag = props.text ? null : typingMention(text, caret);
   const offered = tag
     ? [SOL_PERSON, ...props.people]
         .filter((p) => {
@@ -433,8 +526,15 @@ function Composer(props: {
           ref={box}
           rows={1}
           value={text}
-          aria-label="Write to the team"
-          placeholder={props.pad ? "Note to the team, or @Sol…" : "Write to the team on this deal… (@ to bring someone in)"}
+          aria-label={props.text ? `A text to ${props.text.who}` : "Write to the team"}
+          maxLength={props.text ? TEXT_MAX : undefined}
+          placeholder={
+            props.text
+              ? `Text ${props.text.who}…`
+              : props.pad
+                ? "Note to the team, or @Sol…"
+                : "Write to the team on this deal… (@ to bring someone in)"
+          }
           onFocus={props.onNeedPeople}
           onChange={(e) => {
             setText(e.target.value);

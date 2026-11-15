@@ -16,7 +16,7 @@ import {
   type TextLine,
 } from "@/lib/domain/design/texts";
 import { dbConfigured, newId, query } from "./db";
-import { solPostsOnDeal, tellDealFollowers } from "./design-deal-team-repo";
+import { customerTextsOnDeal, solPostsOnDeal, tellDealFollowers } from "./design-deal-team-repo";
 import { findCustomerByMobile, renuablCrm } from "./renuabl-crm";
 import { smsConfigured } from "./sms";
 
@@ -74,7 +74,7 @@ export async function strayTexts(businessId: string): Promise<StrayText[]> {
 
 /**
  * A text that came in to RENUABL's number (the only one texts go from for now): kept on the deal of the customer whose
- * mobile it is (their newest deal not lost, else their newest), said in that deal's team chat so it shows under Deals
+ * mobile it is (their newest deal not lost, else their newest), put in that deal's team chat as their own words so it shows under Deals
  * in the chat window for whoever looks after it, and written on the deal's record. STOP stops texts to them; START
  * lets them be texted again. From a number on no customer's record it is kept apart.
  */
@@ -103,8 +103,10 @@ export async function receiveText(from: string, body: string): Promise<"kept" | 
       businessId,
       customerId,
     ]);
-  // Said in the deal's team chat by Sol (which also writes it on the deal's record), for whoever looks after the deal.
+  // In the deal's team chat as the customer's own words (and on the deal's record), for whoever looks after the deal.
   await tellDealFollowers(businessId, jobId);
-  await solPostsOnDeal(businessId, jobId, { kind: "note", text: word ? stopRecord(mobile, word) : replyRecord(mobile, text) });
+  await customerTextsOnDeal(businessId, jobId, text, replyRecord(mobile, text));
+  // What STOP or START means for the team is Sol's to say.
+  if (word) await solPostsOnDeal(businessId, jobId, { kind: "note", text: stopRecord(mobile, word) });
   return "kept";
 }

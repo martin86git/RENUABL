@@ -523,6 +523,7 @@ export function TeamChatPanel({
                 <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
                 {dealOpen ? `${dealOpen.customer} · ${dealOpen.title}` : "Deal chat"}
               </p>
+              {dealOpen?.address && <p className="truncate text-xs text-ink-2">{dealOpen.address}</p>}
               <p className="truncate text-[11px] text-muted">Everyone who may see the deal · never seen by customers</p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -1521,7 +1522,7 @@ function DealChatsList(props: {
             on={props.room === dealRoom(d.jobId)}
             unread={d.unread}
             onClick={() => props.onPick(d.jobId)}
-            title={d.last ? `${writerName(d.last.by)}: ${d.last.text}` : undefined}
+            title={[d.address, d.last && `${writerName(d.last.by, d.customer)}: ${d.last.text}`].filter(Boolean).join("\n") || undefined}
           >
             {/* The deal mark, as the chat's header has it, so a deal reads apart from a person (14 Nov 2026, Martin). */}
             <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-surface text-sun-line ring-1 ring-line" aria-hidden>
@@ -1529,8 +1530,10 @@ function DealChatsList(props: {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate">{d.customer}</span>
+              {/* The deal's address under its name, so two deals of one name read apart (15 Nov 2026, Martin). */}
+              {d.address && <span className="block truncate text-[11px] font-normal text-ink-2">{d.address}</span>}
               <span className="block truncate text-[11px] font-normal text-muted">
-                {d.last ? `${writerName(d.last.by)}: ${d.last.text}` : d.title}
+                {d.last ? `${writerName(d.last.by, d.customer)}: ${d.last.text}` : d.title}
               </span>
             </span>
           </RoomButton>

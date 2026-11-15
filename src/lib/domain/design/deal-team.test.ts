@@ -19,6 +19,9 @@ import {
   typingMention,
   wantsFrom,
   writerName,
+  CUSTOMER_WRITER,
+  SOL_WRITER,
+  textReplyOf,
   type DealLine,
 } from "./deal-team";
 
@@ -177,6 +180,7 @@ describe("following a deal's chat", () => {
       jobId,
       customer: "",
       title: "",
+      address: "",
       unread,
       last: { by: "", text: "", at },
     });
@@ -188,5 +192,23 @@ describe("following a deal's chat", () => {
     expect(dealRoom("job_abc12345")).toBe("deal:job_abc12345");
     expect(jobOfRoom("deal:job_abc12345")).toBe("job_abc12345");
     expect(jobOfRoom("deals")).toBeNull();
+  });
+});
+
+describe("a customer's reply by text in the deal's chat", () => {
+  it("is the customer's, by their first name, never Sol's", () => {
+    expect(writerName(CUSTOMER_WRITER, "Mike Larry")).toBe("Mike");
+    expect(writerName(CUSTOMER_WRITER)).toBe("Customer");
+    expect(writerName(SOL_WRITER, "Mike Larry")).toBe("Sol");
+  });
+
+  it("reads a reply kept as theirs, and the first ones kept as Sol's note", () => {
+    expect(textReplyOf({ by: CUSTOMER_WRITER, kind: "text", text: "For Wednesday" })).toBe("For Wednesday");
+    expect(textReplyOf({ by: SOL_WRITER, kind: "note", text: "Text from 0401 498 392: Hello, yes that works" })).toBe(
+      "Hello, yes that works",
+    );
+    expect(textReplyOf({ by: SOL_WRITER, kind: "note", text: "Tom's enquiry is in." })).toBeNull();
+    expect(textReplyOf({ by: "sam@x.example", kind: "text", text: "See you then" })).toBeNull();
+    expect(textReplyOf({ by: "sam@x.example", kind: "line", text: "Text from 0401 498 392: no" })).toBeNull();
   });
 });

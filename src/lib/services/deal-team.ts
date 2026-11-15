@@ -6,10 +6,13 @@ export interface DealTeamView {
   jobId: string;
   customer: string;
   title: string;
+  address?: string;
   /** Whether this member follows it (it lists in their team chat window and counts there). */
   following: boolean;
   lines: DealLine[];
   members: { email: string; name: string; role: string }[];
+  /** Set where this member may text the customer from the chat: their mobile, whether they replied STOP, the sign-off. */
+  texting?: { to: string; stopped: boolean; signOff: string } | null;
   me: string;
 }
 

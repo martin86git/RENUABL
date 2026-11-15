@@ -10,6 +10,7 @@ import { mentionsIn } from "@/lib/domain/design/mentions";
 import {
   DEAL_LINES_SHOWN,
   PAD_LINES,
+  CUSTOMER_WRITER,
   SOL_WRITER,
   askFollowers,
   askWords,
@@ -19,6 +20,7 @@ import {
   isFollowing,
   openAsks,
   padOf,
+  textReplyOf,
   writerName,
   type DealAsk,
   type DealChatLine,
@@ -54,7 +56,11 @@ const LINE = `id, job_id as job, by_email as by, kind, text, ask, ${moment("at")
 
 function lineOf(r: Row): DealLine {
   const ask = r.kind === "ask" ? cleanAsk(r.ask) : null;
-  const kind: DealLineKind = ask ? "ask" : r.kind === "note" ? "note" : "line";
+  // A customer's reply by text reads as theirs, the first ones (kept as Sol's note) included.
+  const reply = ask ? null : textReplyOf(r);
+  if (reply !== null) return { id: r.id, jobId: r.job, by: CUSTOMER_WRITER, kind: "text", text: reply, at: r.at };
+  // A text a member sent the customer from this chat keeps its kind, so it reads as a text and not a note to the team.
+  const kind: DealLineKind = ask ? "ask" : r.kind === "note" ? "note" : r.kind === "text" ? "text" : "line";
   return { id: r.id, jobId: r.job, by: r.by, kind, text: r.text, at: r.at, ...(ask ? { ask } : {}) };
 }
 
@@ -89,6 +95,7 @@ export async function dealTeam(me: DealTeamMe, jobId: string, opts: { seen?: boo
     jobId,
     customer: found.customer.name,
     title: found.job.title,
+    address: found.job.address ?? "",
     following,
     lines,
     members: members.map((m) => ({ email: m.email.toLowerCase(), name: m.first_name || writerName(m.email), role: m.role })),
@@ -218,6 +225,56 @@ async function joinFollow(businessId: string, jobId: string, email: string): Pro
 }
 
 /**
+ * A customer's reply by text, in the deal's chat as their own words (never Sol's), and written on the deal's record
+ * (`record`: "Text from 0412 345 678: …"). False when the deal isn't there.
+ */
+export async function customerTextsOnDeal(businessId: string, jobId: string, text: string, record: string): Promise<boolean> {
+  const words = text.trim().slice(0, 2000);
+  if (!words) return false;
+  return transaction(async (q) => {
+    const jobs = await q<{ customer: string }>(`select customer_id as customer from design_jobs where business_id = $1 and id = $2`, [
+      businessId,
+      jobId,
+    ]);
+    if (!jobs[0]) return false;
+    await q(`insert into design_deal_lines (business_id, id, job_id, by_email, kind, text) values ($1,$2,$3,$4,'text',$5)`, [
+      businessId,
+      newId("dl", 10),
+      jobId,
+      CUSTOMER_WRITER,
+      words,
+    ]);
+    await q(`insert into design_activity (id, business_id, customer_id, job_id, kind, text, by_email) values ($1,$2,$3,$4,'note',$5,$6)`, [
+      newId("act"),
+      businessId,
+      jobs[0].customer,
+      jobId,
+      record.slice(0, 2000),
+      CUSTOMER_WRITER,
+    ]);
+    return true;
+  });
+}
+
+/**
+ * A text a member sent the customer, shown in the deal's chat as theirs (the route has sent it and written it on the
+ * deal's record). They follow the chat from then, and have read it.
+ */
+export async function memberTextsOnDeal(businessId: string, jobId: string, email: string, text: string): Promise<void> {
+  const words = text.trim().slice(0, 2000);
+  if (!words) return;
+  await query(`insert into design_deal_lines (business_id, id, job_id, by_email, kind, text) values ($1,$2,$3,$4,'text',$5)`, [
+    businessId,
+    newId("dl", 10),
+    jobId,
+    email.toLowerCase(),
+    words,
+  ]);
+  await joinFollow(businessId, jobId, email);
+  await markSeen(businessId, jobId, email);
+}
+
+/**
  * Whoever looks after a deal follows its chat (unless they chose not to): its owner, else the business's owners. For
  * something that came in on the deal by itself (a customer's reply by text), so it shows under Deals in their chat.
  */
@@ -282,6 +339,7 @@ export async function dealChats(me: DealTeamMe): Promise<{ deals: DealChatLine[]
   const rows = await query<{
     job: string;
     by: string | null;
+    kind: string | null;
     text: string | null;
     ask: DealLine["ask"] | null;
     at: string | null;
@@ -295,13 +353,13 @@ export async function dealChats(me: DealTeamMe): Promise<{ deals: DealChatLine[]
                or (f.following is null and lower(coalesce(j.owner_email, '')) = $2
                    and exists (select 1 from design_deal_lines l where l.business_id = j.business_id and l.job_id = j.id)))
      )
-     select m.id as job, last.by_email as by, last.text, last.ask, ${moment("last.at")} as at,
+     select m.id as job, last.by_email as by, last.kind, last.text, last.ask, ${moment("last.at")} as at,
             (select count(*)::int from design_deal_lines l
                left join design_deal_seen s on s.business_id = l.business_id and s.job_id = l.job_id and s.email = $2
               where l.business_id = $1 and l.job_id = m.id and l.by_email <> $2
                 and l.at > coalesce(s.seen_at, now() - interval '1 day')) as unread
        from mine m
-       left join lateral (select by_email, text, ask, at from design_deal_lines l
+       left join lateral (select by_email, kind, text, ask, at from design_deal_lines l
                             where l.business_id = $1 and l.job_id = m.id order by at desc, id desc limit 1) last on true`,
     [me.businessId, self],
   );
@@ -316,12 +374,17 @@ export async function dealChats(me: DealTeamMe): Promise<{ deals: DealChatLine[]
           jobId: r.job,
           customer: j.customerName,
           title: j.title,
+          address: j.address ?? "",
           // A request reads as its short words (askWords), as the card shows it.
           last:
             r.by && r.at
               ? {
-                  by: r.by,
-                  text: askWords({ text: r.text ?? "", ask: r.ask ?? undefined })
+                  // A customer's reply by text is theirs, not Sol's.
+                  by: textReplyOf({ by: r.by, kind: r.kind ?? "", text: r.text ?? "" }) !== null ? CUSTOMER_WRITER : r.by,
+                  text: (
+                    textReplyOf({ by: r.by, kind: r.kind ?? "", text: r.text ?? "" }) ??
+                    askWords({ text: r.text ?? "", ask: r.ask ?? undefined })
+                  )
                     .replace(/\s+/g, " ")
                     .slice(0, 160),
                   at: r.at,

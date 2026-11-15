@@ -24,8 +24,25 @@ export const PAD_LINES = 3;
 export const DEAL_TEAM_POLL_MS = 10_000;
 /** Who Sol's lines are written by (never a member's email: it has no "@"). */
 export const SOL_WRITER = "sol";
+/**
+ * Who a customer's own words are written by, when they come into the deal's chat from outside it (a reply by text, 15
+ * Nov 2026, Martin: "should the texts say from Sol? … they are not from Sol"). Never a member's email.
+ */
+export const CUSTOMER_WRITER = "customer";
 
-export type DealLineKind = "line" | "note" | "ask";
+/** "text": the customer's reply to a text, in their own words. */
+export type DealLineKind = "line" | "note" | "ask" | "text";
+
+/**
+ * A line as kept, read as a customer's text when it is one: kept so (kind "text"), or one of the first replies, which
+ * were kept as Sol's note "Text from 0412 345 678: …". Null for anything else.
+ */
+export function textReplyOf(line: { by: string; kind: string; text: string }): string | null {
+  if (line.kind === "text" && line.by === CUSTOMER_WRITER) return line.text;
+  if (line.by !== SOL_WRITER || line.kind !== "note") return null;
+  const m = /^Text from [\d ]{8,16}: ([\s\S]+)$/.exec(line.text);
+  return m ? m[1] : null;
+}
 export type AskType = "design" | "price" | "other";
 
 /** What a request is for, and who in the business it belongs to. */
@@ -55,7 +72,7 @@ export interface DealAsk {
 export interface DealLine {
   id: string;
   jobId: string;
-  /** The writer's email, or `SOL_WRITER`. */
+  /** The writer's email, `SOL_WRITER`, or `CUSTOMER_WRITER`. */
   by: string;
   kind: DealLineKind;
   text: string;
@@ -195,9 +212,13 @@ export function briefLines(ask: DealAsk, now = new Date()): string[] {
   return [ask.want, ...ask.why.map((q) => `"${q.text}" (${q.where}, ${saidWhen(q.at, now)})`)];
 }
 
-/** A member's name as the deal chat shows it: their email's first part; Sol is Sol. */
-export function writerName(by: string): string {
+/**
+ * A member's name as the deal chat shows it: their email's first part; Sol is Sol; the customer is their first name
+ * (`customer`: their name on the deal), else "Customer".
+ */
+export function writerName(by: string, customer = ""): string {
   if (by === SOL_WRITER) return "Sol";
+  if (by === CUSTOMER_WRITER) return customer.trim().split(/\s+/)[0] || "Customer";
   const h = handleOf(by)
     .replace(/[._-]+/g, " ")
     .trim();
@@ -250,6 +271,8 @@ export interface DealChatLine {
   jobId: string;
   customer: string;
   title: string;
+  /** The deal's address, under its name, so two deals of one name read apart. */
+  address: string;
   last: { by: string; text: string; at: string } | null;
   unread: number;
 }
