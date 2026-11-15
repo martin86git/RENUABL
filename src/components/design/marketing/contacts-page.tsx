@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, FileSpreadsheet, Loader2, Pencil, Search, Upload, X } from "lucide-react";
+import { Check, ChevronDown, FileSpreadsheet, Loader2, Pencil, Search, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, cn } from "@/components/ui/primitives";
 import {
@@ -27,6 +27,9 @@ import { CrmImport } from "./crm-import";
 const box = "rounded-2xl bg-surface p-5 shadow-[var(--shadow-soft)]";
 const field = "h-10 w-full rounded-lg border border-line bg-surface px-3 text-[14px] outline-none focus:border-ink/40";
 const n = (v: number) => v.toLocaleString("en-AU");
+/** A button in the bar over the list. */
+export const barButton =
+  "inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-[13px] font-medium hover:border-ink/40 disabled:cursor-default disabled:text-muted disabled:hover:border-line";
 
 /** The business's marketing contacts: bring in its customers or a sheet, sort into lists, record consent. */
 export function MarketingContactsPage() {
@@ -51,76 +54,74 @@ export function MarketingContactsPage() {
   }, [refresh]);
 
   const c = view?.counts;
+  const openFile = view?.imports.find((f) => f.id === file);
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <div>
-          <p className="text-[12px] font-medium tracking-wide text-muted uppercase">Go to market</p>
-          <h1 className="text-[22px] font-semibold tracking-tight">Marketing contacts</h1>
-          <p className="mt-1 max-w-2xl text-[13px] text-muted">
-            The people your business emails. Only contacts with express or inferred consent who haven&apos;t unsubscribed or bounced can
-            ever be emailed. Nothing is sent from this page.
+          <h1 className="text-[20px] font-semibold tracking-tight">Marketing contacts</h1>
+          <p className="text-[12px] text-muted">
+            Only contacts with express or inferred consent, not unsubscribed or bounced, can be emailed. Nothing is sent from this page.
           </p>
         </div>
+        {c && (
+          <dl className="flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-muted">
+            {(
+              [
+                ["contacts", c.total],
+                ["can be emailed", c.emailable],
+                ["consent not checked", c.unknown],
+                ["unsubscribed", c.unsubscribed],
+                ["bounced", c.bounced],
+              ] as const
+            ).map(([label, v], i) => (
+              <div key={label} className="flex items-baseline gap-1.5">
+                <dd className={cn("font-mono text-[15px] text-ink tabular-nums", i === 1 && "text-sun-line-ink")}>{n(v)}</dd>
+                <dt>{label}</dt>
+              </div>
+            ))}
+          </dl>
+        )}
       </div>
 
-      {c && (
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {(
-            [
-              ["Contacts", c.total],
-              ["Can be emailed", c.emailable],
-              ["Consent not checked", c.unknown],
-              ["Unsubscribed", c.unsubscribed],
-              ["Bounced", c.bounced],
-            ] as const
-          ).map(([label, v], i) => (
-            <div key={label} className={box}>
-              <p className="text-[12px] text-muted">{label}</p>
-              <p className={cn("mt-1 font-mono text-[22px] tabular-nums", i === 1 && "text-sun-line-ink")}>{n(v)}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className={cn(box, "relative mt-4 flex flex-wrap items-center gap-2 px-3 py-2.5")}>
+        <ListsBar
+          view={view}
+          list={list}
+          onPick={(id) => (setList(id), setFile(null), setOffset(0), setPicked(new Set()))}
+          onChange={refresh}
+        />
+        <div className="flex-1" />
+        <ImportedFiles
+          files={view?.imports ?? []}
+          open={file}
+          onOpen={(id) => (setFile(id), setList(null), setOffset(0), setPicked(new Set()))}
+          onChange={refresh}
+        />
+        <CrmImport onDone={refresh} />
+        <ImportCard onDone={refresh} />
+      </div>
 
-      <CrmImport onDone={refresh} />
-
-      <ImportCard onDone={refresh} />
-
-      <ImportedFiles
-        files={view?.imports ?? []}
-        open={file}
-        onOpen={(id) => (setFile(id), setList(null), setOffset(0), setPicked(new Set()))}
-        onChange={refresh}
-      />
-
-      <ListsBar
-        view={view}
-        list={list}
-        onPick={(id) => (setList(id), setFile(null), setOffset(0), setPicked(new Set()))}
-        onChange={refresh}
-      />
-
-      {file && view && (
-        <p className="mt-3 flex items-center gap-2 text-[13px] text-muted">
-          Showing the contacts from <span className="font-medium text-ink">{view.imports.find((f) => f.id === file)?.fileName}</span>
-          <button className="underline underline-offset-4 hover:text-ink" onClick={() => (setFile(null), setOffset(0))}>
-            Show everyone
-          </button>
-        </p>
-      )}
-
-      <div className={cn(box, "mt-4 p-0")}>
-        <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3">
+      <div className={cn(box, "mt-3 p-0")}>
+        <div className="flex flex-wrap items-center gap-3 border-b border-line px-4 py-2.5">
           <label className="relative flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
             <input
               value={q}
               onChange={(e) => (setQ(e.target.value), setOffset(0))}
-              placeholder="Search email, name, company, state or source"
-              className={cn(field, "pl-9")}
+              placeholder="Search email, name, company, mobile, state or source"
+              className={cn(field, "h-9 pl-9")}
             />
           </label>
+          {openFile && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-canvas px-3 py-1 text-[12px]">
+              <FileSpreadsheet className="size-3.5 text-muted" />
+              {openFile.fileName}
+              <button aria-label="Show everyone" onClick={() => (setFile(null), setOffset(0))} className="text-muted hover:text-ink">
+                <X className="size-3.5" />
+              </button>
+            </span>
+          )}
           <span className="text-[13px] text-muted">{view ? `${n(view.total)} shown` : ""}</span>
         </div>
         {picked.size > 0 && view && <BulkBar ids={[...picked]} view={view} list={list} onDone={() => (setPicked(new Set()), refresh())} />}
@@ -132,10 +133,10 @@ export function MarketingContactsPage() {
         ) : view.contacts.length === 0 ? (
           <p className="px-5 py-8 text-center text-[13px] text-muted">No contacts{q || list ? " match" : " yet. Import a sheet above"}.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="max-h-[calc(100dvh-24rem)] min-h-[18rem] overflow-auto overscroll-contain">
             <table className="w-full text-left text-[13px]">
-              <thead className="text-[12px] text-muted">
-                <tr className="border-b border-line">
+              <thead className="sticky top-0 z-10 bg-surface text-[12px] text-muted shadow-[inset_0_-1px_0_var(--line)]">
+                <tr>
                   <th className="w-10 px-5 py-2">
                     <input
                       type="checkbox"
@@ -248,6 +249,16 @@ function ImportedFiles({
   const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [shown, setShown] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!shown) return;
+    const away = (e: PointerEvent) => !wrap.current?.contains(e.target as Node) && setShown(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && !editing && setShown(false);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => (document.removeEventListener("pointerdown", away), document.removeEventListener("keydown", esc));
+  }, [shown, editing]);
   if (!files.length) return null;
   async function save(id: string) {
     const r = await changeContacts({ do: "rename-import", import: id, name });
@@ -257,72 +268,81 @@ function ImportedFiles({
     onChange();
   }
   return (
-    <div className={cn(box, "mt-4 p-0")}>
-      <div className="border-b border-line px-5 py-3">
-        <h2 className="text-[15px] font-semibold">Imported lists</h2>
-        <p className="text-[13px] text-muted">Every sheet you&apos;ve imported. Open one to see its contacts; the pencil renames it.</p>
-      </div>
-      <ul>
-        {files.map((f) => (
-          <li
-            key={f.id}
-            className={cn("flex flex-wrap items-center gap-3 border-b border-line px-5 py-3 last:border-0", open === f.id && "bg-canvas")}
-          >
-            <FileSpreadsheet className="size-4 shrink-0 text-muted" />
-            {editing === f.id ? (
-              <form
-                className="flex flex-1 items-center gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void save(f.id);
-                }}
+    <div ref={wrap} className="relative">
+      <button aria-expanded={shown} onClick={() => setShown(!shown)} className={cn(barButton, shown && "border-ink/40")}>
+        <FileSpreadsheet className="size-4 text-muted" />
+        Imported lists <span className="font-mono text-[12px] text-muted">{files.length}</span>
+        <ChevronDown className={cn("size-3.5 text-muted transition-transform", shown && "rotate-180")} />
+      </button>
+      {shown && (
+        <div className={cn(box, "absolute top-full right-0 z-30 mt-2 w-[min(36rem,calc(100vw-2rem))] p-0")}>
+          <p className="border-b border-line px-4 py-2.5 text-[12px] text-muted">Open one to see its contacts; the pencil renames it.</p>
+          <ul className="max-h-[22rem] overflow-auto">
+            {files.map((f) => (
+              <li
+                key={f.id}
+                className={cn(
+                  "flex flex-wrap items-center gap-3 border-b border-line px-4 py-2.5 last:border-0",
+                  open === f.id && "bg-canvas",
+                )}
               >
-                <input
-                  autoFocus
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Escape" && setEditing(null)}
-                  aria-label="File name"
-                  className={cn(field, "h-9 max-w-md")}
-                />
-                <Button size="sm" type="submit" disabled={!name.trim()}>
-                  Save
-                </Button>
-                <button type="button" aria-label="Cancel" onClick={() => setEditing(null)} className="text-muted hover:text-ink">
-                  <X className="size-4" />
-                </button>
-              </form>
-            ) : (
-              <>
-                <button className="min-w-0 flex-1 text-left" onClick={() => onOpen(open === f.id ? null : f.id)}>
-                  <p className="truncate text-[14px] font-medium hover:underline">{f.fileName}</p>
-                  <p className="text-[12px] text-muted">
-                    {dayWords(f.at)} · {f.by} · {CONSENT_WORDS[f.consent].label}
-                  </p>
-                </button>
-                <span className="text-[12px] text-muted">
-                  <span className="font-mono text-ink">{n(f.contacts || f.added + f.updated)}</span> contacts
-                  {f.contacts > 0 && (
-                    <>
-                      {" "}
-                      · <span className="font-mono text-ink">{n(f.withMobile)}</span> with a mobile
-                    </>
-                  )}
-                </span>
-                <button
-                  aria-label={`Rename ${f.fileName}`}
-                  title="Rename"
-                  onClick={() => (setEditing(f.id), setName(f.fileName))}
-                  className="tap-area grid size-8 place-items-center rounded-full text-muted hover:bg-canvas hover:text-ink"
-                >
-                  <Pencil className="size-3.5" />
-                </button>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
-      {msg && <p className="px-5 pb-3 text-[13px] text-danger">{msg}</p>}
+                <FileSpreadsheet className="size-4 shrink-0 text-muted" />
+                {editing === f.id ? (
+                  <form
+                    className="flex flex-1 items-center gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void save(f.id);
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Escape" && setEditing(null)}
+                      aria-label="File name"
+                      className={cn(field, "h-9 max-w-md")}
+                    />
+                    <Button size="sm" type="submit" disabled={!name.trim()}>
+                      Save
+                    </Button>
+                    <button type="button" aria-label="Cancel" onClick={() => setEditing(null)} className="text-muted hover:text-ink">
+                      <X className="size-4" />
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <button className="min-w-0 flex-1 text-left" onClick={() => (onOpen(open === f.id ? null : f.id), setShown(false))}>
+                      <p className="truncate text-[14px] font-medium hover:underline">{f.fileName}</p>
+                      <p className="text-[12px] text-muted">
+                        {dayWords(f.at)} · {f.by} · {CONSENT_WORDS[f.consent].label}
+                      </p>
+                    </button>
+                    <span className="text-[12px] text-muted">
+                      <span className="font-mono text-ink">{n(f.contacts || f.added + f.updated)}</span> contacts
+                      {f.contacts > 0 && (
+                        <>
+                          {" "}
+                          · <span className="font-mono text-ink">{n(f.withMobile)}</span> with a mobile
+                        </>
+                      )}
+                    </span>
+                    <button
+                      aria-label={`Rename ${f.fileName}`}
+                      title="Rename"
+                      onClick={() => (setEditing(f.id), setName(f.fileName))}
+                      className="tap-area grid size-8 place-items-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+          {msg && <p className="px-4 pb-3 text-[13px] text-danger">{msg}</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -340,56 +360,54 @@ function ListsBar({
 }) {
   const [naming, setNaming] = useState<string | null>(null);
   const chip = (on: boolean) =>
-    cn("h-9 rounded-full border px-4 text-[13px]", on ? "border-ink bg-ink text-canvas" : "border-line bg-surface hover:border-ink/40");
+    cn("h-8 rounded-full border px-3.5 text-[13px]", on ? "border-ink bg-ink text-canvas" : "border-line bg-surface hover:border-ink/40");
   const current = view?.lists.find((l) => l.id === list);
   return (
-    <div className="mt-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <button className={chip(!list)} onClick={() => onPick(null)}>
-          Everyone
+    <>
+      <button className={chip(!list)} onClick={() => onPick(null)}>
+        Everyone
+      </button>
+      {view?.lists.map((l) => (
+        <button key={l.id} className={chip(list === l.id)} onClick={() => onPick(l.id)}>
+          {l.name} <span className="ml-1 font-mono text-[12px] opacity-70">{n(l.members)}</span>
         </button>
-        {view?.lists.map((l) => (
-          <button key={l.id} className={chip(list === l.id)} onClick={() => onPick(l.id)}>
-            {l.name} <span className="ml-1 font-mono text-[12px] opacity-70">{n(l.members)}</span>
+      ))}
+      {naming === null ? (
+        <button
+          className="h-8 rounded-full border border-dashed border-line-strong px-3.5 text-[13px] text-muted hover:text-ink"
+          onClick={() => setNaming("")}
+        >
+          New list
+        </button>
+      ) : (
+        <form
+          className="flex items-center gap-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const r = await changeContacts({ do: "new-list", name: naming });
+            if (r.ok) {
+              setNaming(null);
+              onChange();
+            }
+          }}
+        >
+          <input
+            autoFocus
+            value={naming}
+            onChange={(e) => setNaming(e.target.value)}
+            placeholder="List name"
+            className={cn(field, "h-8 w-44")}
+          />
+          <Button size="sm" type="submit" disabled={!naming.trim()}>
+            Add
+          </Button>
+          <button type="button" aria-label="Cancel" onClick={() => setNaming(null)} className="text-muted hover:text-ink">
+            <X className="size-4" />
           </button>
-        ))}
-        {naming === null ? (
-          <button
-            className="h-9 rounded-full border border-dashed border-line-strong px-4 text-[13px] text-muted hover:text-ink"
-            onClick={() => setNaming("")}
-          >
-            New list
-          </button>
-        ) : (
-          <form
-            className="flex items-center gap-2"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const r = await changeContacts({ do: "new-list", name: naming });
-              if (r.ok) {
-                setNaming(null);
-                onChange();
-              }
-            }}
-          >
-            <input
-              autoFocus
-              value={naming}
-              onChange={(e) => setNaming(e.target.value)}
-              placeholder="List name"
-              className={cn(field, "h-9 w-48")}
-            />
-            <Button size="sm" type="submit" disabled={!naming.trim()}>
-              Add
-            </Button>
-            <button type="button" aria-label="Cancel" onClick={() => setNaming(null)} className="text-muted hover:text-ink">
-              <X className="size-4" />
-            </button>
-          </form>
-        )}
-      </div>
+        </form>
+      )}
       {current && (
-        <p className="mt-2 text-[13px] text-muted">
+        <p className="order-last basis-full px-1 text-[12px] text-muted">
           {n(current.members)} in {current.name}, {n(current.emailable)} of them can be emailed.{" "}
           <button
             className="underline underline-offset-4 hover:text-ink"
@@ -404,7 +422,7 @@ function ListsBar({
           </button>
         </p>
       )}
-    </div>
+    </>
   );
 }
 
@@ -501,27 +519,31 @@ function ImportCard({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <div className={cn(box, "mt-6")}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-[15px] font-semibold">Import contacts</h2>
-          <p className="text-[13px] text-muted">
-            An Excel (.xlsx) or CSV sheet with a header row. One contact per email; contacts already held only gain blanks.
-          </p>
-        </div>
-        <label
-          className={cn(
-            "inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-line-strong bg-surface px-4 text-[13px] font-medium hover:border-ink/40",
-          )}
-        >
-          {busy && !sheet ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {file ? file.name : "Choose a file"}
-          <input ref={input} type="file" accept=".xlsx,.csv,.txt" className="sr-only" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
-        </label>
-      </div>
+    <>
+      <label
+        title="An Excel (.xlsx) or CSV sheet with a header row. One contact per email; contacts already held only gain blanks."
+        className={cn(barButton, "cursor-pointer")}
+      >
+        {busy && !sheet ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+        {file ? file.name : "Import a sheet"}
+        <input ref={input} type="file" accept=".xlsx,.csv,.txt" className="sr-only" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+      </label>
 
       {sheet && map && (
-        <div className="mt-5 space-y-5">
+        <div className="order-last basis-full space-y-5 border-t border-line px-2 pt-4 pb-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[13px] text-muted">
+              <span className="font-medium text-ink">{file?.name}</span> · {n(sheet.rows)} rows. Check which column holds each field.
+            </p>
+            <button
+              type="button"
+              aria-label="Cancel the import"
+              onClick={() => (setFile(null), setSheet(null), input.current && (input.current.value = ""))}
+              className="text-muted hover:text-ink"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
           <p className="text-[13px] text-muted">{n(sheet.rows)} rows. Check which column holds each field.</p>
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {CONTACT_FIELDS.map((f) => (
@@ -632,7 +654,7 @@ function ImportCard({ onDone }: { onDone: () => void }) {
           </div>
         </div>
       )}
-      {msg && <p className={cn("mt-4 text-[13px]", msg.ok ? "text-positive" : "text-danger")}>{msg.text}</p>}
-    </div>
+      {msg && <p className={cn("order-last basis-full px-1 text-[12px]", msg.ok ? "text-positive" : "text-danger")}>{msg.text}</p>}
+    </>
   );
 }

@@ -45,6 +45,8 @@ export const USE_TIER: Record<Exclude<SolUse, "chat" | "channel">, SolTier> = {
   inbox: "quick",
   // Finding one figure in the customer's file.
   usage: "quick",
+  // A marketing email's subject, preview or heading is quick; its words are decided per part (`edmSolTier`).
+  marketing: "quick",
 };
 
 /** An email summarised is quick; a reply drafted for a customer is deep. */

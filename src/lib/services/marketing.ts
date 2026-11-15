@@ -200,6 +200,13 @@ export const loadMarketingSettings = () => send<MarketingSettingsView>(`/api/des
 export const saveMarketingSettings = (s: MarketingSettingsView["settings"]) =>
   send<{ settings: MarketingSettingsView["settings"] }>(`/api/design/marketing/settings`, json("PUT", s));
 
+/** Sol writes a marketing email's part, or all four from a brief; nothing is kept or sent. */
+export const writeWithSol = (body: {
+  part: "all" | "subject" | "preview" | "heading" | "text";
+  brief: string;
+  draft: { subject: string; preview: string; heading: string; text: string };
+}) => send<{ subject?: string; preview?: string; heading?: string; text?: string }>(`/api/design/marketing/write`, json("POST", body));
+
 export function uploadMarketingImage(file: File) {
   const form = new FormData();
   form.set("file", file);

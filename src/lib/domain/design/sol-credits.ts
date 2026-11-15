@@ -31,7 +31,7 @@ export function cleanSolPack(raw: unknown): SolPack | null {
 }
 
 /** What Sol is used for, kept on each credit used so the Billing page can say where they went. */
-export const SOL_USES = ["chat", "channel", "inbox", "customer", "call-notes", "usage"] as const;
+export const SOL_USES = ["chat", "channel", "inbox", "customer", "call-notes", "usage", "marketing"] as const;
 export type SolUse = (typeof SOL_USES)[number];
 export const SOL_USE_WORDS: Record<SolUse, string> = {
   chat: "Asked Sol",
@@ -40,6 +40,7 @@ export const SOL_USE_WORDS: Record<SolUse, string> = {
   customer: "Answered a customer",
   "call-notes": "Call written up",
   usage: "Usage found in a file",
+  marketing: "Marketing email written",
 };
 
 /**

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button, cn } from "@/components/ui/primitives";
 import { CONSENT_KINDS, CONSENT_WORDS, type ConsentKind } from "@/lib/domain/marketing/contacts";
 import { importCrm, loadCrmCount } from "@/lib/services/marketing";
+import { barButton } from "./contacts-page";
 import { field } from "./edm-builder";
 
 /**
@@ -36,27 +37,27 @@ export function CrmImport({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <div className="mt-6 rounded-2xl bg-surface p-5 shadow-[var(--shadow-soft)]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <Users className="mt-0.5 size-5 text-muted" />
-          <div>
-            <h2 className="text-[15px] font-semibold">Your customers</h2>
-            <p className="text-[13px] text-muted">
-              {count === null
-                ? "Bring in the customers from your CRM."
-                : `${count.withEmail} of your customers have an email${count.unsubscribed ? `, ${count.unsubscribed} of them unsubscribed from your group emails (they stay unsubscribed)` : ""}.`}
-            </p>
-          </div>
-        </div>
-        {!open && (
-          <Button size="sm" variant="secondary" disabled={!count?.withEmail} onClick={() => setOpen(true)}>
-            Bring them in
-          </Button>
-        )}
-      </div>
+    <>
+      <button
+        className={barButton}
+        disabled={!count?.withEmail}
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        title={
+          count === null
+            ? "Bring in the customers from your CRM."
+            : `${count.withEmail} of your customers have an email${count.unsubscribed ? `, ${count.unsubscribed} of them unsubscribed from your group emails (they stay unsubscribed)` : ""}.`
+        }
+      >
+        <Users className="size-4 text-muted" />
+        Your customers <span className="font-mono text-[12px] text-muted">{count?.withEmail ?? ""}</span>
+      </button>
       {open && (
-        <div className="mt-4 space-y-3">
+        <div className="order-last basis-full space-y-3 border-t border-line px-2 pt-4 pb-2">
+          <p className="text-[13px] text-muted">
+            Bring in the {count?.withEmail} customers from your CRM who have an email
+            {count?.unsubscribed ? `; ${count.unsubscribed} unsubscribed from your group emails stay unsubscribed` : ""}.
+          </p>
           <div className="grid gap-2 sm:grid-cols-2">
             {CONSENT_KINDS.map((k) => (
               <label
@@ -96,7 +97,7 @@ export function CrmImport({ onDone }: { onDone: () => void }) {
           </div>
         </div>
       )}
-      {msg && <p className={cn("mt-3 text-[13px]", msg.ok ? "text-positive" : "text-danger")}>{msg.text}</p>}
-    </div>
+      {msg && <p className={cn("order-last basis-full px-1 text-[12px]", msg.ok ? "text-positive" : "text-danger")}>{msg.text}</p>}
+    </>
   );
 }
