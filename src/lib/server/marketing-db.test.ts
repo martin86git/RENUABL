@@ -8,7 +8,17 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ContactInput } from "@/lib/domain/marketing/contacts";
 
 const url = process.env.TEST_DATABASE_URL;
-const blank = { firstName: null, lastName: null, company: null, phone: null, website: null, state: null, postcode: null, role: null };
+const blank = {
+  firstName: null,
+  lastName: null,
+  company: null,
+  mobile: null,
+  phone: null,
+  website: null,
+  state: null,
+  postcode: null,
+  role: null,
+};
 const person = (email: string, extra: Partial<ContactInput> = {}): ContactInput => ({ ...blank, email, ...extra });
 const A = "biz_mkt_a";
 const B = "biz_mkt_b";
@@ -117,5 +127,22 @@ describe.skipIf(!url)("marketing contacts (database)", () => {
     });
     expect((await repo.contactCounts(B)).unsubscribed).toBe(1);
     expect((await repo.contactCounts(B)).emailable).toBe(1);
+  });
+
+  it("keeps each imported file with its contacts and mobiles, renamable by its own business only", async () => {
+    await repo.importContacts(A, [person("m1@mkt.test", { mobile: "+61412345678" }), person("m2@mkt.test")], {
+      ...meta,
+      fileName: "installers.xlsx",
+      consent: "unknown",
+      listId: null,
+    });
+    const [file] = await repo.listImports(A);
+    expect(file).toMatchObject({ fileName: "installers.xlsx", contacts: 2, withMobile: 1 });
+    const { contacts } = await repo.listContacts(A, { importId: file.id });
+    expect(contacts.map((c) => c.email).sort()).toEqual(["m1@mkt.test", "m2@mkt.test"]);
+    expect(contacts.find((c) => c.email === "m1@mkt.test")?.mobile).toBe("+61412345678");
+    expect(await repo.renameImport(B, file.id, "Not theirs")).toBe(false);
+    expect(await repo.renameImport(A, file.id, "Installers, Nov 2026")).toBe(true);
+    expect((await repo.listImports(A))[0].fileName).toBe("Installers, Nov 2026");
   });
 });

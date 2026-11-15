@@ -10,7 +10,17 @@ import type { ContactInput } from "@/lib/domain/marketing/contacts";
 import { newBlock, type EdmContent } from "@/lib/domain/marketing/edm";
 
 const url = process.env.TEST_DATABASE_URL;
-const blank = { firstName: null, lastName: null, company: null, phone: null, website: null, state: null, postcode: null, role: null };
+const blank = {
+  firstName: null,
+  lastName: null,
+  company: null,
+  mobile: null,
+  phone: null,
+  website: null,
+  state: null,
+  postcode: null,
+  role: null,
+};
 const person = (email: string): ContactInput => ({ ...blank, email });
 const content: EdmContent = {
   subject: "Hello",

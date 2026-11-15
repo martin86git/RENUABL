@@ -1639,6 +1639,15 @@ create table if not exists design_marketing_imports (
   by_email text not null,
   at timestamptz not null default now()
 );
+alter table design_marketing_contacts add column if not exists mobile text;
+create table if not exists design_marketing_import_members (
+  business_id text not null,
+  import_id text not null references design_marketing_imports(id) on delete cascade,
+  contact_id text not null,
+  primary key (import_id, contact_id),
+  foreign key (business_id, contact_id) references design_marketing_contacts(business_id, id) on delete cascade
+);
+create index if not exists design_marketing_import_members_contact on design_marketing_import_members (contact_id);
 create table if not exists design_marketing_settings (
   business_id text primary key references businesses(id) on delete cascade,
   brand jsonb not null default '{}',

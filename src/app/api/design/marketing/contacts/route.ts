@@ -1,4 +1,4 @@
-import { cleanConsentNote, cleanListName, isConsentKind } from "@/lib/domain/marketing/contacts";
+import { cleanConsentNote, cleanImportName, cleanListName, isConsentKind } from "@/lib/domain/marketing/contacts";
 import { answer } from "@/lib/server/design-context";
 import { marketingMember, readJson, refuse } from "@/lib/server/marketing-guard";
 import {
@@ -6,32 +6,37 @@ import {
   contactCounts,
   deleteList,
   listContacts,
+  listImports,
   listLists,
   listNamed,
   removeFromList,
+  renameImport,
   renameList,
   setConsent,
   unsubscribeContact,
 } from "@/lib/server/marketing-repo";
 
-/** GET ?q=&list=&offset=: a page of the business's contacts, the counts and its lists. */
+/** GET ?q=&list=&import=&offset=: a page of the business's contacts, the counts, its lists and the files it imported. */
 export async function GET(request: Request) {
   return answer(async () => {
     const gate = await marketingMember("design");
     if ("refuse" in gate) return gate.refuse;
     const b = gate.member.businessId;
     const url = new URL(request.url);
-    const [page, counts, lists] = await Promise.all([
+    const file = url.searchParams.get("import");
+    const [page, counts, lists, imports] = await Promise.all([
       listContacts(b, {
         search: url.searchParams.get("q")?.slice(0, 120) ?? "",
         listId: url.searchParams.get("list") || null,
+        importId: file && /^mi_[0-9a-f]+$/.test(file) ? file : null,
         offset: Number(url.searchParams.get("offset")) || 0,
         limit: 50,
       }),
       contactCounts(b),
       listLists(b),
+      listImports(b),
     ]);
-    return Response.json({ ok: true, ...page, counts, lists });
+    return Response.json({ ok: true, ...page, counts, lists, imports });
   });
 }
 
@@ -41,7 +46,8 @@ const listId = (v: unknown) => (typeof v === "string" && /^ml_[0-9a-f]+$/.test(v
 
 /**
  * POST { do, ... } (members who may publish): "new-list" {name}, "rename-list" {list, name}, "delete-list" {list},
- * "add" / "remove" {list, ids}, "consent" {ids, consent, note}, "unsubscribe" {id}.
+ * "add" / "remove" {list, ids}, "consent" {ids, consent, note}, "unsubscribe" {id},
+ * "rename-import" {import, name}.
  */
 export async function POST(request: Request) {
   return answer(async () => {
@@ -80,6 +86,12 @@ export async function POST(request: Request) {
         const note = cleanConsentNote(b.note);
         if ((b.consent === "express" || b.consent === "inferred") && !note) return refuse("Note how they consented.");
         return Response.json({ ok: true, changed: await setConsent(biz, which, b.consent, note, email) });
+      }
+      case "rename-import": {
+        const id = typeof b.import === "string" && /^mi_[0-9a-f]+$/.test(b.import) ? b.import : null;
+        const name = cleanImportName(b.name);
+        if (!id || !name) return refuse("Give the file a name.");
+        return Response.json({ ok: await renameImport(biz, id, name) });
       }
       case "unsubscribe": {
         const [id] = ids([b.id]);

@@ -37,6 +37,7 @@ export const CONTACT_FIELDS = [
   "lastName",
   "fullName",
   "company",
+  "mobile",
   "phone",
   "website",
   "state",
@@ -51,7 +52,8 @@ export const FIELD_LABELS: Record<ContactField, string> = {
   lastName: "Last name",
   fullName: "Full name",
   company: "Company",
-  phone: "Phone",
+  mobile: "Mobile",
+  phone: "Other phone",
   website: "Website",
   state: "State",
   postcode: "Postcode",
@@ -63,6 +65,8 @@ export interface ContactInput {
   firstName: string | null;
   lastName: string | null;
   company: string | null;
+  /** An Australian mobile as +614…, else as typed. */
+  mobile: string | null;
   phone: string | null;
   website: string | null;
   state: string | null;
@@ -97,7 +101,8 @@ const HEADER_WORDS: Record<ContactField, RegExp> = {
   lastName: /^(last ?name|surname|family ?name|last|lname)$/,
   fullName: /^(name|full ?name|contact|contact ?name|person)$/,
   company: /^(company|company ?name|business|business ?name|organi[sz]ation|trading ?name|account ?name)$/,
-  phone: /^(phone|phone ?number|mobile|mobile ?number|telephone|tel|contact ?number|cell)$/,
+  mobile: /^(mobile|mobiles|mobile ?(phone|number|no)|mob|mob ?(no|number)|cell|cell ?phone|cellular|cell ?number)$/,
+  phone: /^(phone|phone ?(number|no)|ph|telephone|tel|contact ?number|landline|(office|work|business|direct|main) ?(phone|number|line))$/,
   website: /^(website|web|url|site|domain|web ?site)$/,
   state: /^(state|region|province)$/,
   postcode: /^(postcode|post ?code|zip|zip ?code)$/,
@@ -219,12 +224,17 @@ export function readContacts(rows: string[][], map: ColumnMap): ReadSheet {
     seen.add(email);
     const [fullFirst, fullLast] = splitFull(cell(row, "fullName"));
     const rawPhone = cell(row, "phone", 40);
+    const rawMobile = cell(row, "mobile", 40);
+    // A mobile in the phone column moves across when the mobile column is empty (or there is none).
+    const mobile = rawMobile ? (mobileOf(rawMobile) ?? rawMobile) : rawPhone ? mobileOf(rawPhone) : null;
+    const phone = rawPhone && !(mobile && !rawMobile && mobileOf(rawPhone)) ? rawPhone : null;
     contacts.push({
       email,
       firstName: cell(row, "firstName", 60) ?? fullFirst?.slice(0, 60) ?? null,
       lastName: cell(row, "lastName", 60) ?? fullLast?.slice(0, 60) ?? null,
       company: cell(row, "company", 160),
-      phone: rawPhone ? (normaliseMobile(rawPhone) ?? rawPhone) : null,
+      mobile,
+      phone,
       website: cleanWebsite(cell(row, "website", 200)),
       state: cleanState(cell(row, "state", 40)),
       postcode: cell(row, "postcode", 10)?.replace(/\D/g, "").slice(0, 4) || null,
@@ -232,6 +242,22 @@ export function readContacts(rows: string[][], map: ColumnMap): ReadSheet {
     });
   });
   return { contacts, skipped };
+}
+
+/**
+ * An Australian mobile as +614XXXXXXXX: 04XX XXX XXX, +61 4…, 61 4…, or 4XXXXXXXX (Excel drops the leading 0 from a number
+ * cell). Anything else is null.
+ */
+export function mobileOf(raw: string | null): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/\.0+$/, "").replace(/[\s().-]/g, "");
+  if (/^4\d{8}$/.test(digits)) return `+61${digits}`;
+  return normaliseMobile(digits);
+}
+
+/** A name for an imported file, as the business wants it shown. */
+export function cleanImportName(raw: unknown): string | null {
+  return typeof raw === "string" ? text(raw, 200) : null;
 }
 
 /** A source name: what the import was (e.g. "Solar installers list, Nov 2026"). */

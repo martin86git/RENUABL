@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, Search, Upload, X } from "lucide-react";
+import { Check, FileSpreadsheet, Loader2, Pencil, Search, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, cn } from "@/components/ui/primitives";
 import {
@@ -13,7 +13,15 @@ import {
   type ColumnMap,
   type ConsentKind,
 } from "@/lib/domain/marketing/contacts";
-import { changeContacts, checkSheet, importSheet, loadContacts, type CheckedSheet, type ContactsView } from "@/lib/services/marketing";
+import {
+  changeContacts,
+  checkSheet,
+  importSheet,
+  loadContacts,
+  type CheckedSheet,
+  type ContactsView,
+  type ImportedFile,
+} from "@/lib/services/marketing";
 import { CrmImport } from "./crm-import";
 
 const box = "rounded-2xl bg-surface p-5 shadow-[var(--shadow-soft)]";
@@ -24,17 +32,18 @@ const n = (v: number) => v.toLocaleString("en-AU");
 export function MarketingContactsPage() {
   const [q, setQ] = useState("");
   const [list, setList] = useState<string | null>(null);
+  const [file, setFile] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [view, setView] = useState<ContactsView | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
   const refresh = useCallback(async () => {
-    const r = await loadContacts({ q, list, offset });
+    const r = await loadContacts({ q, list, file, offset });
     if (!r.ok) return setProblem(r.message);
     setProblem(null);
     setView(r);
-  }, [q, list, offset]);
+  }, [q, list, file, offset]);
 
   useEffect(() => {
     const t = setTimeout(refresh, 250);
@@ -78,7 +87,28 @@ export function MarketingContactsPage() {
 
       <ImportCard onDone={refresh} />
 
-      <ListsBar view={view} list={list} onPick={(id) => (setList(id), setOffset(0), setPicked(new Set()))} onChange={refresh} />
+      <ImportedFiles
+        files={view?.imports ?? []}
+        open={file}
+        onOpen={(id) => (setFile(id), setList(null), setOffset(0), setPicked(new Set()))}
+        onChange={refresh}
+      />
+
+      <ListsBar
+        view={view}
+        list={list}
+        onPick={(id) => (setList(id), setFile(null), setOffset(0), setPicked(new Set()))}
+        onChange={refresh}
+      />
+
+      {file && view && (
+        <p className="mt-3 flex items-center gap-2 text-[13px] text-muted">
+          Showing the contacts from <span className="font-medium text-ink">{view.imports.find((f) => f.id === file)?.fileName}</span>
+          <button className="underline underline-offset-4 hover:text-ink" onClick={() => (setFile(null), setOffset(0))}>
+            Show everyone
+          </button>
+        </p>
+      )}
 
       <div className={cn(box, "mt-4 p-0")}>
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-3">
@@ -116,6 +146,7 @@ export function MarketingContactsPage() {
                   </th>
                   <th className="py-2 pr-4 font-normal">Contact</th>
                   <th className="py-2 pr-4 font-normal">Company</th>
+                  <th className="py-2 pr-4 font-normal">Mobile</th>
                   <th className="py-2 pr-4 font-normal">State</th>
                   <th className="py-2 pr-4 font-normal">Consent</th>
                   <th className="py-2 pr-4 font-normal">Source</th>
@@ -145,6 +176,19 @@ export function MarketingContactsPage() {
                         <p className="text-muted">{x.email}</p>
                       </td>
                       <td className="py-2.5 pr-4">{x.company ?? "--"}</td>
+                      <td className="py-2.5 pr-4 whitespace-nowrap">
+                        {x.mobile ? (
+                          <a href={`tel:${x.mobile}`} className="font-mono text-[12px] hover:underline">
+                            {mobileWords(x.mobile)}
+                          </a>
+                        ) : x.phone ? (
+                          <span className="font-mono text-[12px] text-muted" title="Other phone">
+                            {x.phone}
+                          </span>
+                        ) : (
+                          "--"
+                        )}
+                      </td>
                       <td className="py-2.5 pr-4">{x.state ?? "--"}</td>
                       <td className="py-2.5 pr-4">
                         <span className={cn(why ? "text-muted" : "text-positive")} title={x.consentNote ?? undefined}>
@@ -179,6 +223,106 @@ export function MarketingContactsPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** +61412345678 as 0412 345 678; anything else as kept. */
+const mobileWords = (m: string) => (/^\+614\d{8}$/.test(m) ? `0${m.slice(3, 6)} ${m.slice(6, 9)} ${m.slice(9)}` : m);
+
+const dayWords = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric", timeZone: "Australia/Melbourne" });
+
+/** The sheets the business imported: open one to see its contacts, or rename it. */
+function ImportedFiles({
+  files,
+  open,
+  onOpen,
+  onChange,
+}: {
+  files: ImportedFile[];
+  open: string | null;
+  onOpen: (id: string | null) => void;
+  onChange: () => void;
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  if (!files.length) return null;
+  async function save(id: string) {
+    const r = await changeContacts({ do: "rename-import", import: id, name });
+    if (!r.ok) return setMsg(r.message);
+    setMsg(null);
+    setEditing(null);
+    onChange();
+  }
+  return (
+    <div className={cn(box, "mt-4 p-0")}>
+      <div className="border-b border-line px-5 py-3">
+        <h2 className="text-[15px] font-semibold">Imported lists</h2>
+        <p className="text-[13px] text-muted">Every sheet you&apos;ve imported. Open one to see its contacts; the pencil renames it.</p>
+      </div>
+      <ul>
+        {files.map((f) => (
+          <li
+            key={f.id}
+            className={cn("flex flex-wrap items-center gap-3 border-b border-line px-5 py-3 last:border-0", open === f.id && "bg-canvas")}
+          >
+            <FileSpreadsheet className="size-4 shrink-0 text-muted" />
+            {editing === f.id ? (
+              <form
+                className="flex flex-1 items-center gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void save(f.id);
+                }}
+              >
+                <input
+                  autoFocus
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && setEditing(null)}
+                  aria-label="File name"
+                  className={cn(field, "h-9 max-w-md")}
+                />
+                <Button size="sm" type="submit" disabled={!name.trim()}>
+                  Save
+                </Button>
+                <button type="button" aria-label="Cancel" onClick={() => setEditing(null)} className="text-muted hover:text-ink">
+                  <X className="size-4" />
+                </button>
+              </form>
+            ) : (
+              <>
+                <button className="min-w-0 flex-1 text-left" onClick={() => onOpen(open === f.id ? null : f.id)}>
+                  <p className="truncate text-[14px] font-medium hover:underline">{f.fileName}</p>
+                  <p className="text-[12px] text-muted">
+                    {dayWords(f.at)} · {f.by} · {CONSENT_WORDS[f.consent].label}
+                  </p>
+                </button>
+                <span className="text-[12px] text-muted">
+                  <span className="font-mono text-ink">{n(f.contacts || f.added + f.updated)}</span> contacts
+                  {f.contacts > 0 && (
+                    <>
+                      {" "}
+                      · <span className="font-mono text-ink">{n(f.withMobile)}</span> with a mobile
+                    </>
+                  )}
+                </span>
+                <button
+                  aria-label={`Rename ${f.fileName}`}
+                  title="Rename"
+                  onClick={() => (setEditing(f.id), setName(f.fileName))}
+                  className="tap-area grid size-8 place-items-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+                >
+                  <Pencil className="size-3.5" />
+                </button>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      {msg && <p className="px-5 pb-3 text-[13px] text-danger">{msg}</p>}
     </div>
   );
 }

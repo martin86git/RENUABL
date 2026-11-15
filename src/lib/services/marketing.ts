@@ -16,6 +16,22 @@ export interface ContactsView {
   total: number;
   counts: ContactCounts;
   lists: MarketingList[];
+  imports: ImportedFile[];
+}
+
+/** A sheet the business imported: its name (renamable), when, and how many of its contacts are still held. */
+export interface ImportedFile {
+  id: string;
+  fileName: string;
+  source: string;
+  consent: ConsentKind;
+  added: number;
+  updated: number;
+  skipped: number;
+  by: string;
+  at: string;
+  contacts: number;
+  withMobile: number;
 }
 
 export interface CheckedSheet {
@@ -40,9 +56,15 @@ async function send<T>(url: string, init: RequestInit): Promise<Result<T>> {
   }
 }
 
-export function loadContacts(opts: { q: string; list: string | null; offset: number }): Promise<Result<ContactsView>> {
+export function loadContacts(opts: {
+  q: string;
+  list: string | null;
+  file?: string | null;
+  offset: number;
+}): Promise<Result<ContactsView>> {
   const p = new URLSearchParams({ q: opts.q, offset: String(opts.offset) });
   if (opts.list) p.set("list", opts.list);
+  if (opts.file) p.set("import", opts.file);
   return send<ContactsView>(`/api/design/marketing/contacts?${p}`, { cache: "no-store" });
 }
 
