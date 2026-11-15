@@ -12,7 +12,12 @@ import {
   undecidedLines,
   lineKey,
   MAX_LINE_QTY,
-  repriced,
+  MARGIN_KEY,
+  MAX_ADDED_LABEL,
+  MAX_ADDED_LINES,
+  addedKey,
+  addedLines,
+  quoteTotals,
   solarVicBar,
   solarVicFor,
   solarVicNote,
@@ -78,12 +83,14 @@ export function DesignQuote(props: {
   const stc = stcValue(costing, /^\d{4}$/.test(form.postcode) ? form.postcode : null, todayInMarket(), rates, workspace.settings.stcPrice);
 
   const all = costing.lines;
-  const lines = editedLines(all, edits);
+  // Every hand change: lines typed over or taken out, lines of the business's own, the margin typed over.
+  const totals = quoteTotals(costing, edits);
+  const lines = totals.lines;
+  const added = addedLines(edits);
+  const marginTyped = edits[MARGIN_KEY]?.amount !== undefined;
   // Hand changes, not counting the costs decided on each job (those are decisions, not changes).
   const changed = all.filter((l) => edits[lineKey(l)] && !l.confirm).length;
   const removed = all.filter((l) => edits[lineKey(l)]?.removed && !l.confirm).length;
-  const touched = all.some((l) => edits[lineKey(l)]);
-  const totals = touched ? repriced(costing, lines) : costing;
   // Costs that sometimes apply, not yet included or left out: nothing is published until each is decided.
   const undecided = undecidedLines(all, edits);
   const missing = lines.filter((l) => l.missing).length;
@@ -132,6 +139,26 @@ export function DesignQuote(props: {
     }
     props.onChange({ form, edits: next });
   };
+  /** Changes or takes away an edit kept by its key (the margin, a line of the business's own). */
+  const setKey = (key: string, to: LineEdit | null) => {
+    const next = { ...edits };
+    if (to) next[key] = to;
+    else delete next[key];
+    props.onChange({ form, edits: next });
+  };
+  const setMargin = (dollars: number | null) =>
+    setKey(MARGIN_KEY, dollars === null ? null : { amount: Math.max(0, Math.min(1_000_000, Math.round(dollars))) });
+  const marginPct = totals.priceExGst > 0 ? Math.round((totals.margin / totals.priceExGst) * 100) : 0;
+  /** The margin for a share of the price ex GST (a price is cost plus margin). */
+  const setMarginPct = (pct: number) => {
+    const p = Math.max(0, Math.min(90, pct));
+    setMargin((totals.cost * p) / (100 - p));
+  };
+  const addLine = () => setKey(addedKey(), { label: "New line", group: "Installation", qty: 1, amount: 0 });
+  const numberBox = (typed: boolean) =>
+    `rounded-md border bg-surface px-1 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
+      typed ? "border-sun-line font-semibold text-ink" : "border-line hover:border-ink-2"
+    }`;
 
   if (props.compact) {
     const priced = editedLines(all, edits);
@@ -184,7 +211,7 @@ export function DesignQuote(props: {
             <dl className="mt-2 space-y-0.5 border-t border-line pt-2">
               {[
                 ["Cost", money(totals.cost)],
-                ["Margin", money(costing.margin)],
+                ["Margin", money(totals.margin)],
                 ["Price inc. GST", money(totals.priceIncGst)],
                 ["After STCs", money(totals.priceIncGst - stc)],
               ].map(([k, v], i) => (
@@ -421,6 +448,90 @@ export function DesignQuote(props: {
           </table>
         );
       })}
+      {/* Lines of the business's own (15 Nov 2026, Martin): a name, how many and the cost each, ex GST. */}
+      {added.length > 0 && (
+        <table className="mt-4 w-full table-fixed text-sm">
+          <thead>
+            <tr className="border-b-2 border-forest text-xs font-semibold uppercase tracking-[0.12em] text-forest">
+              <th className="pb-1 text-left">Added by you</th>
+              <th className="w-10 pb-1 text-right">Qty</th>
+              <th className="w-[5.5rem] pb-1 text-right">Each</th>
+              <th className="w-6 pb-1" aria-label="Take out" />
+            </tr>
+          </thead>
+          <tbody>
+            {added.map((l) => {
+              const e = edits[l.key];
+              return (
+                <tr key={l.key} className="border-b border-line align-top last:border-0">
+                  <td className="py-1 pr-2">
+                    <input
+                      value={e.label ?? ""}
+                      maxLength={MAX_ADDED_LABEL}
+                      placeholder="What it is"
+                      onChange={(ev) => setKey(l.key, { ...e, label: ev.target.value })}
+                      onBlur={(ev) => !ev.target.value.trim() && setKey(l.key, { ...e, label: "New line" })}
+                      aria-label="What the line is"
+                      className="w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 outline-none hover:border-line focus:border-forest"
+                    />
+                    {(e.qty ?? 1) > 1 && <span className="block px-1 text-xs text-muted">{money(l.amount)} in all</span>}
+                  </td>
+                  <td className="py-1 text-right">
+                    <input
+                      type="number"
+                      min="1"
+                      max={MAX_LINE_QTY}
+                      step="1"
+                      value={e.qty ?? 1}
+                      onChange={(ev) =>
+                        setKey(l.key, { ...e, qty: Math.max(1, Math.min(MAX_LINE_QTY, Math.round(Number(ev.target.value) || 1))) })
+                      }
+                      aria-label={`How many: ${e.label}`}
+                      style={{ width: `${String(e.qty ?? 1).length + 2}ch` }}
+                      className={numberBox(false)}
+                    />
+                  </td>
+                  <td className="py-1 pl-1 text-right">
+                    <span className="inline-flex items-center justify-end gap-px">
+                      <span className="text-muted">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={Math.round(e.amount ?? 0)}
+                        onChange={(ev) => setKey(l.key, { ...e, amount: Math.max(0, Number(ev.target.value) || 0) })}
+                        aria-label={`Cost each of ${e.label}`}
+                        style={{ width: `${String(Math.round(e.amount ?? 0)).length + 2}ch` }}
+                        className={numberBox(false)}
+                      />
+                    </span>
+                  </td>
+                  <td className="py-1.5 text-right">
+                    <button
+                      className="text-base leading-none text-muted hover:text-danger"
+                      onClick={() => setKey(l.key, null)}
+                      aria-label={`Take out ${e.label}`}
+                      title="Take this line out"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+      {added.length < MAX_ADDED_LINES && (
+        <button
+          type="button"
+          onClick={addLine}
+          className="mt-3 rounded-full px-3 py-1 text-xs font-semibold text-ink ring-1 ring-line hover:ring-ink-2"
+          title="A line of your own, at a cost ex GST: it is added to the price with the margin and GST"
+        >
+          + Add a line
+        </button>
+      )}
     </>
   );
   const changedBox = changed > 0 && (
@@ -434,14 +545,54 @@ export function DesignQuote(props: {
   );
   const totalsBox = (
     <dl className="mt-4 space-y-1 rounded-md bg-canvas p-3 text-sm">
+      <div className="flex justify-between">
+        <dt className="text-muted">Your cost</dt>
+        <dd className="tabular-nums">{money(totals.cost)}</dd>
+      </div>
+      {/* The margin can be typed over, in dollars or as a share of the price ex GST (15 Nov 2026, Martin). */}
+      <div className="flex items-center justify-between gap-2">
+        <dt className="text-muted">Margin</dt>
+        <dd className="flex items-center gap-1 tabular-nums">
+          <span className="text-muted">$</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={Math.round(totals.margin)}
+            onChange={(e) => setMargin(Math.max(0, Number(e.target.value) || 0))}
+            aria-label="Margin in dollars, ex GST"
+            title="Type a margin in dollars, ex GST"
+            style={{ width: `${String(Math.round(totals.margin)).length + 2}ch` }}
+            className={numberBox(marginTyped)}
+          />
+          <input
+            type="number"
+            min="0"
+            max="90"
+            step="1"
+            value={marginPct}
+            onChange={(e) => setMarginPct(Number(e.target.value) || 0)}
+            aria-label="Margin as a share of the price ex GST"
+            title="Type a margin as a share of the price ex GST"
+            style={{ width: `${String(marginPct).length + 2}ch` }}
+            className={numberBox(marginTyped)}
+          />
+          <span className="text-muted">%</span>
+        </dd>
+      </div>
+      {marginTyped && (
+        <p className="text-right text-xs">
+          <button className="text-sun-ink underline underline-offset-2" onClick={() => setMargin(null)}>
+            Changed by hand: back to {money(costing.margin)}
+          </button>
+        </p>
+      )}
       {[
-        ["Your cost", money(totals.cost)],
-        ["Margin", `${money(costing.margin)} (${totals.priceExGst > 0 ? Math.round((costing.margin / totals.priceExGst) * 100) : 0}%)`],
         ["Price inc. GST", money(totals.priceIncGst)],
         [`After STCs (${money(stc)})`, money(totals.priceIncGst - stc)],
-      ].map(([k, v], i) => (
-        <div key={k} className={i >= 2 ? "flex justify-between font-semibold" : "flex justify-between"}>
-          <dt className={i >= 2 ? "" : "text-muted"}>{k}</dt>
+      ].map(([k, v]) => (
+        <div key={k} className="flex justify-between font-semibold">
+          <dt>{k}</dt>
           <dd className="tabular-nums">{v}</dd>
         </div>
       ))}

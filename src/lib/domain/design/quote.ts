@@ -280,6 +280,55 @@ export interface LineEdit {
   removed?: boolean;
   /** A cost decided on each job (`CostLine.confirm`), included. Left out is `removed`. */
   on?: boolean;
+  /** A line of the business's own, added by hand (kept under an `addedKey`): its name and group. Its `amount` is the cost each. */
+  label?: string;
+  group?: CostGroup;
+}
+
+/**
+ * Where the margin typed over the worked-out one is kept in a quote's edits (15 Nov 2026, Martin: "I need the ability to
+ * edit the margin"): `{ amount }`, in dollars ex GST. Line keys always hold a "|", so it can't be taken for a line.
+ */
+export const MARGIN_KEY = "margin";
+
+/** Lines of the business's own (15 Nov 2026, Martin: "the ability to add additional line items"), kept in a quote's edits. */
+export const ADDED_PREFIX = "added|";
+export const MAX_ADDED_LINES = 20;
+export const MAX_ADDED_LABEL = 80;
+export const isAddedKey = (key: string) => key.startsWith(ADDED_PREFIX);
+export function addedKey(): string {
+  return `${ADDED_PREFIX}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/** The lines added by hand, as quote lines: the cost each times how many. */
+export function addedLines(edits: Record<string, LineEdit>): (CostLine & { key: string })[] {
+  return Object.entries(edits)
+    .filter(([key, e]) => isAddedKey(key) && e.label !== undefined)
+    .map(([key, e]) => {
+      const qty = e.qty ?? 1;
+      return {
+        key,
+        group: e.group ?? "Installation",
+        label: e.label || "New line",
+        qty,
+        amount: Math.round((e.amount ?? 0) * qty * 100) / 100,
+      };
+    });
+}
+
+/** The margin as it stands: typed over by hand, else the worked-out one. */
+export function marginOf(costing: Pick<Costing, "margin">, edits: Record<string, LineEdit>): number {
+  const typed = edits[MARGIN_KEY]?.amount;
+  return typed === undefined ? costing.margin : typed;
+}
+
+/** A quote's totals with every hand change: the lines changed, those added, and the margin typed over. */
+export function quoteTotals(costing: Costing, edits: Record<string, LineEdit>) {
+  const lines = editedLines(costing.lines, edits);
+  const margin = marginOf(costing, edits);
+  const touched = Object.keys(edits).length > 0;
+  const totals = touched ? repriced({ margin }, lines) : costing;
+  return { lines, margin, cost: totals.cost, priceExGst: totals.priceExGst, priceIncGst: totals.priceIncGst };
 }
 
 /** The most a quantity typed over a line may be. */
@@ -301,7 +350,7 @@ export function lineKey(line: Pick<CostLine, "group" | "label">): string {
 
 /** The lines as they stand: the worked-out ones with any hand changes laid over them, and those taken out left out. */
 export function editedLines(lines: readonly CostLine[], edits: Record<string, LineEdit>): CostLine[] {
-  return lines
+  const worked = lines
     .filter((l) => !edits[lineKey(l)]?.removed && (!l.confirm || edits[lineKey(l)]?.on))
     .map((l) => {
       const edit = edits[lineKey(l)];
@@ -314,6 +363,7 @@ export function editedLines(lines: readonly CostLine[], edits: Record<string, Li
       // A cost typed over a line settles it, and wins over the quantity's.
       return edit?.amount === undefined ? line : { ...line, amount: edit.amount, missing: undefined };
     });
+  return [...worked, ...addedLines(edits).map((l) => ({ group: l.group, label: l.label, qty: l.qty, amount: l.amount }))];
 }
 
 /** The costs decided on each job (`costSystem`'s `decide`), as group and label. They are about the home, not one design. */
@@ -613,7 +663,23 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
     const edits: Record<string, LineEdit> = {};
     for (const [key, value] of Object.entries(q.edits && typeof q.edits === "object" ? q.edits : {}).slice(0, 60)) {
       if (key.length > 160 || !value || typeof value !== "object") continue;
-      const v = value as { amount?: unknown; qty?: unknown; removed?: unknown; on?: unknown };
+      const v = value as { amount?: unknown; qty?: unknown; removed?: unknown; on?: unknown; label?: unknown; group?: unknown };
+      const money = (x: unknown) =>
+        typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 1_000_000 ? Math.round(x * 100) / 100 : undefined;
+      if (key === MARGIN_KEY) {
+        const amount = money(v.amount);
+        if (amount !== undefined) edits[key] = { amount };
+        continue;
+      }
+      if (isAddedKey(key)) {
+        if (!/^added\|[a-z0-9]{1,24}$/.test(key) || Object.keys(edits).filter(isAddedKey).length >= MAX_ADDED_LINES) continue;
+        const label = typeof v.label === "string" ? v.label.replace(/\s+/g, " ").trim().slice(0, MAX_ADDED_LABEL) : "";
+        if (!label) continue;
+        const qty = typeof v.qty === "number" && Number.isInteger(v.qty) && v.qty >= 1 && v.qty <= MAX_LINE_QTY ? v.qty : 1;
+        const group = (COST_GROUPS as readonly string[]).includes(v.group as string) ? (v.group as CostGroup) : "Installation";
+        edits[key] = { label, group, qty, amount: money(v.amount) ?? 0 };
+        continue;
+      }
       if (v.removed === true) {
         edits[key] = { removed: true };
         continue;

@@ -44,11 +44,9 @@ import { panelCatalogue } from "./catalogue";
 import {
   costSystem,
   designFinance,
-  editedLines,
   undecidedLines,
   variationsOf,
-  lineKey,
-  repriced,
+  quoteTotals,
   sharedHome,
   solarVicFor,
   solarVicNote,
@@ -606,7 +604,7 @@ export function buildProposal(given: ProposalInputs): Built {
 
   const main = workOut(input, index);
   if (!main.ok) return { ok: false, problems: main.problems };
-  const { spec, lines, totals, costing, stc, youPay, solarVic, monthlyKwh, finance, saving, b, entered, selfUseShare, variations } = main;
+  const { spec, lines, totals, stc, youPay, solarVic, monthlyKwh, finance, saving, b, entered, selfUseShare, variations } = main;
   const summary = designSummary(design, YIELD_PER_KW_DAY);
   const batteryKwh = batteryKwhOf(design);
 
@@ -769,7 +767,7 @@ export function buildProposal(given: ProposalInputs): Built {
   };
   const internal: ProposalInternal = {
     cost: totals.cost,
-    margin: costing.margin,
+    margin: totals.margin,
     priceExGst: totals.priceExGst,
     lines: internalLines(lines),
     projectVersion: project.version,
@@ -782,7 +780,7 @@ export function buildProposal(given: ProposalInputs): Built {
               goal,
               design: at,
               cost: out.totals.cost,
-              margin: out.costing.margin,
+              margin: out.totals.margin,
               priceExGst: out.totals.priceExGst,
               lines: internalLines(out.lines),
             };
@@ -828,9 +826,9 @@ function workOut(input: ProposalInputs, at: number) {
   // What the battery shifts into the evening: a module held for blackouts doesn't count towards the saving.
   const batteryKwh = shiftingKwhOf(design);
   const costing = costSystem(spec, form, workspace);
-  const lines = editedLines(costing.lines, quote.edits);
-  const changed = costing.lines.some((l) => quote.edits[lineKey(l)]);
-  const totals = changed ? repriced(costing, lines) : costing;
+  // Every hand change: lines typed over or taken out, lines of the business's own, the margin typed over.
+  const totals = quoteTotals(costing, quote.edits);
+  const lines = totals.lines;
   const missing = lines.filter((l) => l.missing).length;
   const postcode = /^\d{4}$/.test(form.postcode) ? form.postcode : null;
   const stc = stcValue(costing, postcode, input.today, input.rates, workspace.settings.stcPrice);
