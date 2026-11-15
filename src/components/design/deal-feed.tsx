@@ -226,12 +226,14 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
   };
   const needs = parts.needs.length;
   const callsLive = (calls?.live ?? 0) > 0;
+  const [newsFresh, setNewsFresh] = useState<number | null>(null);
   const place = todayPlaces(callsLive);
   const tabs: StripTab[] = [
     {
       id: TODAY_IDS.needs,
       label: "Needs you",
       count: data ? needs : null,
+      sub: !data ? "" : needs > 0 ? "waiting on you" : "All clear",
       signal: needs > 0 ? ("needs" as const) : data ? ("clear" as const) : null,
       order: 1,
     },
@@ -242,14 +244,23 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
             id: TODAY_IDS.calls,
             label: "Calls",
             count: calls.live + calls.lined + calls.done,
+            sub: callsLive ? `${calls.live} on now` : calls.lined > 0 ? "lined up" : "done today",
             signal: callsLive ? ("live" as const) : null,
             order: callsLive ? 0 : 3,
           },
         ]
       : []),
-    ...(parts.coming.length ? [{ id: TODAY_IDS.coming, label: "Coming up", count: parts.coming.length, order: 4 }] : []),
+    ...(parts.coming.length
+      ? [{ id: TODAY_IDS.coming, label: "Coming up", count: parts.coming.length, sub: "Sol has lined up", order: 4 }]
+      : []),
 
-    { id: TODAY_IDS.news, label: "News", count: null, order: 7 },
+    {
+      id: TODAY_IDS.news,
+      label: "News",
+      count: newsFresh,
+      sub: newsFresh === null ? "" : "new today",
+      order: 7,
+    },
   ].sort((a, b) => a.order - b.order);
   // Today scrolls (14 Nov 2026, Martin: not locked to one part, but keep the revealing): each part below the fold is
   // soft until it comes into view, then sharpens and stays so. The strip goes to a part and lights the one on screen.
@@ -282,22 +293,11 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
         onGo={go}
         left={
           <>
-            <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} solo={solo} />
-            <p className="hidden whitespace-nowrap text-[13px] text-ink-2 xl:block">
-              {data ? (
-                <>
-                  <span className="font-semibold text-ink">{open.length}</span> being sold
-                  {openValue > 0 && (
-                    <>
-                      {" "}
-                      · <span className="font-semibold text-ink">${Math.round(openValue / 1000).toLocaleString("en-AU")}k</span>
-                    </>
-                  )}
-                </>
-              ) : (
-                "Looking over your deals…"
-              )}
-            </p>
+            <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} solo={solo} bare />
+            <span className={clsx(STRIP_FIGURE, "text-ink")}>
+              {data ? `$${Math.round(openValue / 1000).toLocaleString("en-AU")}k` : "–"}
+            </span>
+            <span className={STRIP_SUB}>{data ? `${open.length} being sold` : "Looking over your deals…"}</span>
           </>
         }
         right={
@@ -309,7 +309,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
               aria-label="Show me my day"
               className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-surface px-3 text-[13px] font-medium text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-ink-2"
             >
-              <SolIcon className="size-4 text-sun-line" /> <span className="hidden 2xl:inline">My day</span>
+              <SolIcon className="size-4 text-sun-line" /> <span>My day</span>
             </button>
           ) : null
         }
@@ -552,7 +552,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
               )}
 
               <div id={TODAY_IDS.news} className={clsx("mt-9", place.news, view(TODAY_IDS.news))}>
-                <TodayNews />
+                <TodayNews onCount={setNewsFresh} />
               </div>
             </div>
           </div>
@@ -754,11 +754,17 @@ function todayPlaces(callsLive: boolean) {
   };
 }
 
+/** A tile's figure and the line under it, the same in every tile of Today's strip. */
+const STRIP_FIGURE = "mt-0.5 text-[22px] font-semibold leading-tight tabular-nums";
+const STRIP_SUB = "mt-0.5 whitespace-nowrap text-[12px] text-muted";
+
 interface StripTab {
   id: string;
   label: string;
   /** How many; null when there is nothing to count (or not read yet). */
   count: number | null;
+  /** A few words under the figure: what the count is. */
+  sub: string;
   /** A dot beside the count: something waits on a person, or a call is live. */
   signal?: "needs" | "live" | "clear" | null;
   order: number;
@@ -777,12 +783,14 @@ function TodayStrip(props: {
 }) {
   return (
     <div className="sticky top-2 z-20 -mx-1 px-1 pb-1 pt-1 lg:top-[calc(var(--studio-head,4.5rem)+1.75rem)]">
+      {/* One instrument (15 Nov 2026, Martin: the strip didn't look designed): equal tiles, each a label, a figure and a
+          line under it, parted by hairlines; the part in view marked by a short orange line along its foot. */}
       <nav
         aria-label="Today at a glance"
-        className="flex items-center gap-2 rounded-2xl bg-surface/90 px-2 py-1.5 shadow-[0_6px_24px_rgba(11,11,12,0.06)] ring-1 ring-line backdrop-blur"
+        className="flex items-stretch rounded-2xl bg-surface/90 shadow-[0_6px_24px_rgba(11,11,12,0.06)] ring-1 ring-line backdrop-blur"
       >
-        <div className="flex shrink-0 items-center gap-2">{props.left}</div>
-        <div className="staff-scroll flex min-w-0 flex-1 justify-center-safe gap-0.5 overflow-x-auto">
+        <div className="flex w-[11.5rem] shrink-0 flex-col items-start px-5 py-3 sm:w-[13rem]">{props.left}</div>
+        <div className="no-scrollbar flex min-w-0 flex-1 overflow-x-auto">
           {props.tabs.map((t) => {
             const on = props.lit === t.id;
             return (
@@ -791,31 +799,35 @@ function TodayStrip(props: {
                 type="button"
                 onClick={() => props.onGo(t.id)}
                 aria-current={on ? "true" : undefined}
-                className={clsx(
-                  "flex min-w-[4.75rem] shrink-0 flex-col items-center rounded-xl px-3 py-1 transition-colors",
-                  on ? "bg-canvas ring-1 ring-line" : "hover:bg-canvas",
-                )}
+                className="group relative flex min-w-[8.5rem] flex-1 flex-col items-start border-l border-line px-5 py-3 text-left transition-colors hover:bg-canvas/60"
               >
                 <span className={clsx("whitespace-nowrap text-[11.5px] font-medium", on ? "text-ink" : "text-muted")}>{t.label}</span>
-                <span className="flex h-5 items-center gap-1 text-[15px] font-semibold text-ink">
+                <span className={clsx(STRIP_FIGURE, "flex items-center gap-1.5", on ? "text-ink" : "text-ink-2")}>
+                  {t.count ?? "–"}
                   {t.signal === "live" && (
                     <span className="relative flex size-2" aria-label="A call is on now">
                       <span className="absolute inset-0 animate-ping rounded-full bg-positive/60 motion-reduce:hidden" />
                       <span className="relative size-2 rounded-full bg-positive" />
                     </span>
                   )}
-                  {t.signal === "needs" && <span className="size-1.5 rounded-full bg-sun-line" aria-hidden />}
-                  {t.signal === "clear" ? (
-                    <Check className="size-4 text-positive" aria-label="All clear" />
-                  ) : (
-                    (t.count ?? <span className="text-[12px] font-normal text-muted">Latest</span>)
-                  )}
+                  {t.signal === "needs" && <span className="size-2 rounded-full bg-sun-line" aria-hidden />}
                 </span>
+                <span className={clsx(STRIP_SUB, "inline-flex items-center gap-1", t.signal === "clear" && "text-positive")}>
+                  {t.signal === "clear" && <Check className="size-3.5" aria-hidden />}
+                  {t.sub}
+                </span>
+                <span
+                  aria-hidden
+                  className={clsx(
+                    "absolute bottom-0 left-5 h-[2px] rounded-full bg-sun-line transition-all duration-300 motion-reduce:transition-none",
+                    on ? "w-8 opacity-100" : "w-0 opacity-0",
+                  )}
+                />
               </button>
             );
           })}
         </div>
-        <div className="flex shrink-0 items-center">{props.right}</div>
+        {props.right && <div className="hidden shrink-0 items-center border-l border-line px-4 sm:flex">{props.right}</div>}
       </nav>
     </div>
   );
@@ -1972,6 +1984,7 @@ function FeedPicker({
   picked,
   onPick,
   solo,
+  bare,
 }: {
   pick: { pipeline: FeedPipeline; mine: boolean };
   pipelines: readonly Pipeline[];
@@ -1979,6 +1992,8 @@ function FeedPicker({
   onPick: (next: { pipeline: FeedPipeline; mine: boolean }) => void;
   /** A business of one: there is nobody else's to see. */
   solo?: boolean;
+  /** As the label of the strip's first tile: small words and a chevron, no pill. */
+  bare?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -2005,13 +2020,20 @@ function FeedPicker({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex h-9 items-center gap-2 rounded-full bg-surface pl-3.5 pr-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2"
+        className={
+          bare
+            ? "-mx-1 inline-flex max-w-full items-center gap-1 rounded-md px-1 text-[11.5px] font-medium text-muted hover:text-ink"
+            : "inline-flex h-9 items-center gap-2 rounded-full bg-surface pl-3.5 pr-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2"
+        }
       >
-        {label}
+        <span className={bare ? "whitespace-nowrap" : undefined}>{label}</span>
         <ChevronDown className={clsx("size-3.5 text-muted transition", open && "rotate-180")} aria-hidden />
       </button>
       {open && (
-        <div role="menu" className="absolute left-0 top-11 z-30 w-60 rounded-2xl bg-surface p-2 shadow-lg ring-1 ring-line">
+        <div
+          role="menu"
+          className={clsx("absolute left-0 z-30 w-60 rounded-2xl bg-surface p-2 shadow-lg ring-1 ring-line", bare ? "top-7" : "top-11")}
+        >
           {!solo && (
             <div
               role="radiogroup"

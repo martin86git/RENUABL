@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Newspaper } from "lucide-react";
 import { NEWS_TOPIC_LABELS, newsShown, type NewsItem } from "@/lib/domain/design/industry-news";
 import { loadNews } from "@/lib/services/industry-news";
@@ -14,11 +14,18 @@ const SHOWN = 3;
  * future, so it is seen every morning without a press): the newest stories Sol has read, each to its source, with All news
  * opening the whole feed at /design/news. Nothing is shown until there is a story.
  */
-export function TodayNews() {
+export function TodayNews({ onCount }: { onCount?: (fresh: number) => void } = {}) {
   const [items, setItems] = useState<NewsItem[] | null>(null);
+  const told = useRef(onCount);
   useEffect(() => {
     let gone = false;
-    void loadNews().then((r) => !gone && r.ok && setItems(newsShown(r.items, "all").slice(0, SHOWN)));
+    void loadNews().then((r) => {
+      if (gone || !r.ok) return;
+      setItems(newsShown(r.items, "all").slice(0, SHOWN));
+      // How many stories Sol found in the last day, for Today's strip.
+      const since = Date.now() - 24 * 3600_000;
+      told.current?.(r.items.filter((n) => Date.parse(n.foundAt) >= since).length);
+    });
     return () => {
       gone = true;
     };

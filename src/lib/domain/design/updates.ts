@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-15",
     area: "Today",
+    words: "The strip across the top is one row of tiles: each part with its count and a line under it, the one in view marked in orange.",
+  },
+  {
+    day: "2026-11-15",
+    area: "Today",
     words: "The Deals list scrolls without a scroll bar, and New, In progress and All are each outlined so they read as one group.",
   },
   {
