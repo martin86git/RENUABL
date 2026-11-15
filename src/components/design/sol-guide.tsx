@@ -166,14 +166,17 @@ export function SolGuide(props: {
                 value={kliplok === null ? null : kliplok ? "yes" : "no"}
                 onPick={(v) => setKliplok(v === "yes")}
               />
+              {/* A flat roof has a natural fall of about 2°, so laid flat reads as 2° (15 Nov 2026, Martin); the rest are tilt frames. */}
               <Choice
                 options={[
-                  ["0", "Lay them flat"],
+                  ["2", "Flat · 2°"],
                   ["10", "Tilt 10°"],
                   ["15", "Tilt 15°"],
+                  ["25", "Tilt 25°"],
+                  ["30", "Tilt 30°"],
                 ]}
-                value={tilt === undefined ? null : String(tilt ?? 0)}
-                onPick={(v) => setTilt(v === "0" ? null : Number(v))}
+                value={tilt === undefined ? null : String(tilt ?? 2)}
+                onPick={(v) => setTilt(v === "2" ? null : Number(v))}
               />
             </div>
             <Actions>
