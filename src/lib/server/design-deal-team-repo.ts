@@ -217,6 +217,24 @@ async function joinFollow(businessId: string, jobId: string, email: string): Pro
   ]);
 }
 
+/**
+ * Whoever looks after a deal follows its chat (unless they chose not to): its owner, else the business's owners. For
+ * something that came in on the deal by itself (a customer's reply by text), so it shows under Deals in their chat.
+ */
+export async function tellDealFollowers(businessId: string, jobId: string): Promise<void> {
+  const jobs = await query<{ owner: string | null }>(`select owner_email as owner from design_jobs where business_id = $1 and id = $2`, [
+    businessId,
+    jobId,
+  ]);
+  if (!jobs[0]) return;
+  const to = jobs[0].owner
+    ? [jobs[0].owner]
+    : (await query<{ email: string }>(`select email from business_members where business_id = $1 and role = 'owner'`, [businessId])).map(
+        (m) => m.email,
+      );
+  for (const email of to) await joinFollow(businessId, jobId, email);
+}
+
 async function markSeen(businessId: string, jobId: string, email: string): Promise<void> {
   await query(
     `insert into design_deal_seen (business_id, job_id, email, seen_at) values ($1,$2,$3,now())

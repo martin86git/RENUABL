@@ -80,7 +80,7 @@ export const TEXT_WORDS = {
   noMobile: "There's no Australian mobile on this customer's record to text.",
   failed: "The text couldn't be sent just now. Try again in a moment.",
   missing: "That deal isn't here.",
-  replies: "Replies to a text aren't read here yet.",
+  replies: "Replies come back onto this deal, under Deals in team chat.",
 } as const;
 
 /** The words of a text as they are sent: trimmed, line ends made plain, no control characters. */

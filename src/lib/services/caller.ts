@@ -4,6 +4,7 @@
  */
 "use client";
 
+import type { StrayText, TextLine } from "@/lib/domain/design/texts";
 import { useEffect, useState } from "react";
 import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
 import type { CallerKey } from "@/lib/domain/install-call";
@@ -213,6 +214,13 @@ export const askAssistantToBook = (jobId: string) =>
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ book: true }),
   });
+
+/** The texts with this deal's customer, both ways, whether they replied STOP, and the sign-off a text ends with. */
+export const loadDealTexts = (jobId: string) =>
+  ask<{ lines: TextLine[]; stopped: boolean; signOff: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/text`);
+
+/** The latest texts from numbers on no customer's record. */
+export const loadStrayTexts = () => ask<{ texts: StrayText[] }>("/api/design/caller/texts");
 
 /** A text to this deal's customer, on the mobile on their record. Answers what to tell the member. */
 export const textCustomer = (jobId: string, text: string) =>

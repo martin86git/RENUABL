@@ -1660,6 +1660,8 @@ export function TeamChatButton({ me, customers = 0 }: { me: string; customers?: 
         className={clsx(
           "relative flex size-10 items-center justify-center rounded-full transition-colors",
           open ? "bg-ink text-sun-line" : "text-ink-2 hover:bg-canvas hover:text-ink",
+          // Something unread: the round flashes on and off until the chat is opened (15 Nov 2026, Martin).
+          unread > 0 && !open && "team-flash",
         )}
       >
         <MessagesSquare className="size-[18px]" aria-hidden />

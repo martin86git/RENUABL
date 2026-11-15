@@ -7,7 +7,8 @@ import { ArrowUp, MessageSquare, Phone, Search, X } from "lucide-react";
 import { TEXT_MAX, TEXT_WORDS, reachContacts, textParts, type ReachContact } from "@/lib/domain/design/contact-reach";
 import { STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
 import { PHONE_FROM, digitsOf, looksLikePhone } from "@/lib/domain/design/find";
-import { textCustomer, useCallerInfo } from "@/lib/services/caller";
+import { TEXTS_COPY, signedText, type StrayText, type TextLine } from "@/lib/domain/design/texts";
+import { loadDealTexts, loadStrayTexts, textCustomer, useCallerInfo } from "@/lib/services/caller";
 import { useCoachCaller } from "@/lib/services/coaching";
 import { listCustomers, listJobs, type CustomerLine, type JobLine } from "@/lib/services/crm";
 import { CallChoices } from "./call-choice";
@@ -31,6 +32,17 @@ export function ContactReach(props: { open: boolean; onOpen: (open: boolean) => 
   const [sent, setSent] = useState<{ id: string; message: string } | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const asked = useRef(false);
+  const [strays, setStrays] = useState<StrayText[]>([]);
+
+  // Texts from numbers on no customer's record, read each time the contacts open, so none is lost.
+  useEffect(() => {
+    if (!props.open || !textsOn) return;
+    let live = true;
+    void loadStrayTexts().then((r) => live && r.ok && setStrays(r.texts));
+    return () => {
+      live = false;
+    };
+  }, [props.open, textsOn]);
 
   useEffect(() => {
     if (!props.open || asked.current) return;
@@ -96,6 +108,24 @@ export function ContactReach(props: { open: boolean; onOpen: (open: boolean) => 
 
       {props.open && (
         <div className="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Contacts found">
+          {!typed && strays.length > 0 && (
+            <section aria-label={TEXTS_COPY.strays} className="mb-2 rounded-xl bg-surface-2 p-2 ring-1 ring-line">
+              <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{TEXTS_COPY.strays}</p>
+              <ul className="space-y-1">
+                {strays.map((t) => (
+                  <li key={t.id} className="rounded-lg bg-surface px-2.5 py-1.5 text-sm text-ink ring-1 ring-line">
+                    <span className="flex items-baseline justify-between gap-2 text-xs text-muted">
+                      <a href={`tel:${t.from.replace(/\s/g, "")}`} className="font-medium tabular-nums text-ink hover:underline">
+                        {t.from}
+                      </a>
+                      {textWhen(t.at)}
+                    </span>
+                    <span className="mt-0.5 block whitespace-pre-wrap break-words">{t.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {!typed && found.length > 0 && (
             <p className="px-2 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Latest contacts</p>
           )}
@@ -143,6 +173,10 @@ export function ContactReach(props: { open: boolean; onOpen: (open: boolean) => 
     </>
   );
 }
+
+/** When a text was sent or came in: "Sat 3:15 pm". */
+const textWhen = (iso: string) =>
+  new Date(iso).toLocaleString("en-AU", { weekday: "short", hour: "numeric", minute: "2-digit" }).replace(",", "");
 
 function ContactRow(props: {
   contact: ReachContact;
@@ -248,7 +282,11 @@ function ContactRow(props: {
   );
 }
 
-/** A text to one contact: the words, how many messages they go as, and Send. Enter sends; Shift+Enter is a new line. */
+/**
+ * A text to one contact: the texts with them so far (theirs left, the business's right), the words, the sign-off they
+ * go with, how many messages that comes to, and Send. Enter sends; Shift+Enter is a new line. While the box is open it
+ * looks for a reply every 15 seconds.
+ */
 function TextBox(props: {
   jobId: string;
   who: string;
@@ -262,10 +300,28 @@ function TextBox(props: {
   const [failed, setFailed] = useState<string | null>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   useEffect(() => box.current?.focus(), []);
-  const parts = textParts(text.trim());
+  const [thread, setThread] = useState<{ lines: TextLine[]; stopped: boolean; signOff: string } | null>(null);
+  const end = useRef<HTMLLIElement>(null);
+  const { jobId } = props;
+  useEffect(() => {
+    let live = true;
+    const read = () => void loadDealTexts(jobId).then((r) => live && r.ok && setThread(r));
+    read();
+    const t = window.setInterval(() => !document.hidden && read(), 15_000);
+    return () => {
+      live = false;
+      window.clearInterval(t);
+    };
+  }, [jobId]);
+  const said = thread?.lines.length ?? 0;
+  useEffect(() => end.current?.scrollIntoView({ block: "nearest" }), [said]);
+  const signOff = thread?.signOff ?? "";
+  const stopped = thread?.stopped === true;
+  // What goes is the words with the sign-off, so that is what is counted.
+  const parts = textParts(text.trim() ? signedText(text, signOff) : "");
 
   const send = async () => {
-    if (!text.trim() || sending || !props.textsOn) return;
+    if (!text.trim() || sending || !props.textsOn || stopped) return;
     setSending(true);
     setFailed(null);
     const res = await textCustomer(props.jobId, text);
@@ -273,17 +329,42 @@ function TextBox(props: {
     if (!res.ok) return setFailed(res.message);
     props.onSent(res.message);
   };
+  const off = !props.textsOn || stopped;
 
   return (
     <div className="border-t border-line p-3">
       {!props.textsOn && (
         <p className="mb-2 text-xs text-muted">{`${TEXT_WORDS.off} Until then, text ${props.who} from your own phone.`}</p>
       )}
+      {thread && thread.lines.length > 0 && (
+        <ol aria-label={`Texts with ${props.who}`} className="mb-2 max-h-48 space-y-1 overflow-y-auto pr-1">
+          {thread.lines.map((l, i) => (
+            <li
+              key={l.id}
+              ref={i === thread.lines.length - 1 ? end : undefined}
+              className={clsx("flex flex-col", l.direction === "out" ? "items-end" : "items-start")}
+            >
+              <span
+                className={clsx(
+                  "max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-1.5 text-[13px]",
+                  l.direction === "out" ? "bg-primary text-white" : "bg-surface text-ink ring-1 ring-line",
+                )}
+              >
+                {l.text}
+              </span>
+              <span className="px-1 pt-0.5 text-[10px] text-muted">
+                {l.direction === "out" ? "Sent" : props.who} · {textWhen(l.at)}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {stopped && <p className="mb-2 text-xs text-danger">{TEXTS_COPY.stopped(props.who)}</p>}
       <div className="flex items-end gap-2">
         <textarea
           ref={box}
           value={text}
-          disabled={!props.textsOn}
+          disabled={off}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
@@ -303,7 +384,7 @@ function TextBox(props: {
         <button
           type="button"
           onClick={() => void send()}
-          disabled={!text.trim() || sending || !props.textsOn}
+          disabled={!text.trim() || sending || off}
           aria-label={`Send the text to ${props.who}`}
           className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-line disabled:text-muted"
         >
@@ -311,6 +392,11 @@ function TextBox(props: {
         </button>
       </div>
       {failed && <p className="mt-1.5 text-xs text-danger">{failed}</p>}
+      {props.textsOn && signOff && (
+        <p className="mt-1.5 whitespace-pre-line text-[11px] text-muted" title="Added to the end of every text you send">
+          Ends with: {signOff.replace("\n", " ")}
+        </p>
+      )}
       {props.textsOn && (
         <p className="mt-1.5 text-[11px] tabular-nums text-muted">
           {sending

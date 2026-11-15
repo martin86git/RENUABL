@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-15",
+    area: "Calls",
+    words: "Texts you send end with your name and company. Replies show under Deals in team chat, and its round flashes.",
+  },
+  {
+    day: "2026-11-15",
     area: "Today",
     words: "Deals has its own strip beside Today's, and an admin's Pipeline button changes the toggles under it to that pipeline's stages.",
   },

@@ -769,6 +769,23 @@ create table if not exists design_team_files (
   at timestamptz not null default now(),
   primary key (business_id, id)
 );
+-- Texts with a customer, both ways (domain/design/texts.ts): one sent from a deal, and a reply that came back to the
+-- number it was sent from. One from a number on no customer's record has no deal. Gone with the business.
+create table if not exists design_texts (
+  business_id text not null references businesses(id) on delete cascade,
+  id text not null,
+  job_id text,
+  customer_id text,
+  direction text not null,
+  mobile text not null,
+  text text not null,
+  by_email text not null default '',
+  at timestamptz not null default now(),
+  primary key (business_id, id)
+);
+create index if not exists design_texts_job on design_texts(business_id, job_id, at desc);
+-- Set when the customer replies STOP to a text, cleared when they text START: no texts go to them while it is set.
+alter table design_customers add column if not exists no_texts_at timestamptz;
 -- Channels a business adds to its team chat beside the ones it starts with (their lines are design_team_lines, by id).
 create table if not exists design_team_channels (
   business_id text not null references businesses(id) on delete cascade,
