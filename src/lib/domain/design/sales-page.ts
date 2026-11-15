@@ -136,22 +136,10 @@ export const ASK_DEMO = {
 /**
  * The three things RENUABL is known by (3 Nov 2026, Martin: the designer, Sol and the Marketplace are huge features and
  * must feel it; the designer is sold for the AI over it, not as one more design tool). The Marketplace is labelled
- * coming soon.
+ * coming soon. The designer has no band of its own (6 Nov 2026, Martin: the "Your business, upgraded" deck just above
+ * already shows it, and the hero's film; "we don't need it twice").
  */
 export const BIG_THREE = [
-  {
-    id: "designer",
-    eyebrow: "The design tool, with AI over it",
-    title: "Type it. It's designed.",
-    body: "Tell it what you want in plain words, typed or spoken: “Load 8 kW of panels, an inverter and a battery.” The panels go on the roof, the inverter and battery are chosen to suit, and the quote prices itself as it goes. Or press once and get three designs, each priced against the customer's bill.",
-    points: [
-      "Plain words or your voice: “fit 10 kW on the north face”",
-      "Three designs in one press: quickest payback, maximum return, most independence",
-      "Strings checked against the inverter's limits",
-      "A light that only turns green when the design is ready to install",
-    ],
-    link: { label: "See the quote build itself", href: "#journey" },
-  },
   {
     id: "crm",
     eyebrow: "The smart CRM",
@@ -439,6 +427,26 @@ export const FAQ: readonly { q: string; a: string }[] = [
   },
 ];
 
+/**
+ * The hero's product film (6 Nov 2026, Martin: a film like Stack AI's, taking the reader through several selling points):
+ * the camera glides into a laptop and on through real screens, a chapter at a time. Every chapter is something the
+ * product does today, on the made-up demo business. `CRM_TOAST` is what the call note-taker's Apply all leaves.
+ */
+export const FILM = {
+  label: "RENUABL at work: a short film of the product on example data",
+  chapters: [
+    { key: "today", title: "Sol lines up your day", line: "What needs you, in the order it matters." },
+    { key: "design", title: "Ask, and the roof is designed", line: "Panels, inverter and battery from one sentence." },
+    { key: "crm", title: "The CRM that takes its own notes", line: "Calls written up, next steps on the deal." },
+    { key: "service", title: "Service, sorted", line: "Sol reads the case and recommends the fix." },
+  ],
+  /** What is typed to Sol on Today, before he lays out the day. */
+  todayAsk: "Who should I call next?",
+  crmToast: { title: "Call with Olivia written up", body: "Notes, next step and a follow-up added to her deal." },
+  pause: "Pause the film",
+  play: "Play the film",
+} as const;
+
 export const CLOSING = {
   headline: "Solar just got a brain. Your move.",
   sub: "Up and running today. Bring the whole team. Cancel any time.",
@@ -480,6 +488,10 @@ export function salesCopy(): string[] {
     PRICING.firstMonth,
     PRICING.includesTitle,
     ...PRICING.includes,
+    ...FILM.chapters.flatMap((c) => [c.title, c.line]),
+    FILM.todayAsk,
+    FILM.crmToast.title,
+    FILM.crmToast.body,
     CLOSING.headline,
     CLOSING.sub,
   ];

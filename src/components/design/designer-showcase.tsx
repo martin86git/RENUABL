@@ -1172,8 +1172,20 @@ const HERO_ASK = { typeFrom: 700, perChar: 55, pressGap: 350, panelEvery: 110, t
  * the design tool's command bar and done, on the made-up home. The words come from the page's copy (`ASK_DEMO`), and
  * what happens is what the design tool does with them: 17 panels to about 8 kW, an inverter and a battery by rule.
  */
-export function AskDesignDemo({ label, request, reply }: { label: string; request: string; reply: string }) {
-  const [t, playing] = useTimeline(HERO_ASK.total);
+export function AskDesignDemo({
+  label,
+  request,
+  reply,
+  clock,
+}: {
+  label: string;
+  request: string;
+  reply: string;
+  /** The time into the demo when something else plays it (the hero's film), in place of its own timeline. */
+  clock?: number;
+}) {
+  const [own, playing] = useTimeline(HERO_ASK.total);
+  const t = clock ?? own;
   const typed = Math.max(0, Math.min(request.length, Math.floor((t - HERO_ASK.typeFrom) / HERO_ASK.perChar)));
   const pressAt = HERO_ASK.typeFrom + request.length * HERO_ASK.perChar + HERO_ASK.pressGap;
   const spots = ARRAYS.flatMap((a) => a.spots).slice(0, 17);

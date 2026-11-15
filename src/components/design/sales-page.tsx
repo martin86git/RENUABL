@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Brain, Check, Clock, LifeBuoy, PencilRuler, Sparkles } from "lucide-react";
+import { ArrowRight, Brain, Check, Clock, LifeBuoy, Sparkles } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, dollars, packPriceCents, type BillingInterval } from "@/lib/domain/design/plans";
 import {
@@ -15,7 +15,6 @@ import {
   FAQ,
   JOURNEY,
   MARKETPLACE,
-  ASK_ANYTHING,
   ASK_DEMO,
   BIG_THREE,
   PRICING,
@@ -34,12 +33,12 @@ import {
   AutomationDemo,
   ConversationDemo,
   ListingRoofExample,
-  SolAskDemo,
   ThreeDesignsDemo,
 } from "./designer-showcase";
 import { Reveal } from "./front-hero";
 import { SolBadge, SolIcon } from "./sol-icon";
 import { MarketplaceMark } from "./marketplace-bar";
+import { ProductFilm } from "./product-film";
 
 /**
  * The sign-up page for solar businesses (`/design` signed out; copy in `domain/design/sales-page.ts`, prices in
@@ -164,7 +163,7 @@ function Header({ signedIn }: { signedIn: boolean }) {
           <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-line sm:tracking-[0.2em]">Business</span>
         </Link>
         <nav className="hidden items-center gap-7 text-[14px] text-ink-2 md:flex">
-          <a href="#designer" className="hover:text-ink">
+          <a href="#step-design" className="hover:text-ink">
             Designer
           </a>
           <a href="#sol" className="hover:text-ink">
@@ -346,7 +345,7 @@ function Hero({ signedIn }: { signedIn: boolean }) {
   return (
     <section
       id="start"
-      className="relative isolate overflow-x-clip snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center"
+      className="relative isolate overflow-x-clip snap-start lg:h-[calc(100dvh-4rem)] lg:min-h-[44rem]"
       aria-labelledby="hero"
     >
       <div
@@ -354,36 +353,39 @@ function Hero({ signedIn }: { signedIn: boolean }) {
         className="absolute inset-x-0 top-0 -z-10 h-[80vh]"
         style={{ background: "radial-gradient(55% 50% at 30% 30%, rgba(255,90,31,0.12), rgba(255,90,31,0) 70%)" }}
       />
-      <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-5 pb-20 pt-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:px-8 lg:pb-28 lg:pt-20">
-        <div>
-          <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">{SALES_HERO.eyebrow}</p>
-          <h1 id="hero" className="mt-5 text-[clamp(52px,8vw,104px)] font-semibold leading-[0.92] tracking-[-0.045em]">
-            {SALES_HERO.headline.map((part, i, all) => (
-              <span key={part} className={clsx("block", i === all.length - 1 && "text-sun-line")}>
-                {part}
-              </span>
+      {/*
+        As Stack AI's (6 Nov 2026, Martin): the line centred, the product film under it. On a large screen the hero is
+        one fold and the film takes the room left under the words (a size container), at its own 16:10 with room for
+        its chapter rail, so the whole of it is on screen (Martin: "I can only see half of it").
+      */}
+      <div className="mx-auto flex w-full max-w-7xl flex-col px-5 pb-16 pt-12 text-center lg:h-full lg:px-8 lg:pb-6 lg:pt-8">
+        <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">{SALES_HERO.eyebrow}</p>
+        <h1 id="hero" className="mt-4 text-[clamp(44px,5.6vw,80px)] font-semibold leading-[0.95] tracking-[-0.045em]">
+          {SALES_HERO.headline.map((part, i, all) => (
+            <span key={part} className={clsx("block sm:inline", i === all.length - 1 && "text-sun-line")}>
+              {part}
+              {i < all.length - 1 && " "}
+            </span>
+          ))}
+        </h1>
+        <p className="mx-auto mt-4 max-w-3xl text-[17px] leading-relaxed text-ink-2">{SALES_HERO.sub}</p>
+        <div className="mt-6 flex flex-col items-center gap-4 lg:flex-row lg:justify-center lg:gap-7">
+          <SignUpLink />
+          {/* Try the demo (demo.ts): one press into a demo account, no form. Not for someone already signed in. */}
+          {!signedIn && <TryDemoButton look="quiet" />}
+          <ul className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-[13px] text-ink-2">
+            {SALES_HERO.small.map((s) => (
+              <li key={s} className="inline-flex items-center gap-1.5">
+                <Check className="size-3.5 text-sun-line" aria-hidden />
+                {s}
+              </li>
             ))}
-          </h1>
-          <p className="mt-7 max-w-xl text-[18px] leading-relaxed text-ink-2">{SALES_HERO.sub}</p>
-          <div className="mt-8 max-w-xl">
-            <div className="flex flex-wrap items-center gap-3">
-              <SignUpLink />
-              {/* Try the demo (demo.ts): one press into a demo account, no form. Not for someone already signed in. */}
-              {!signedIn && <TryDemoButton look="quiet" />}
-            </div>
-            <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-ink-2">
-              {SALES_HERO.small.map((s) => (
-                <li key={s} className="inline-flex items-center gap-1.5">
-                  <Check className="size-3.5 text-sun-line" aria-hidden />
-                  {s}
-                </li>
-              ))}
-            </ul>
-          </div>
+          </ul>
         </div>
-        <div className="lg:-mr-24">
-          <SolAskDemo label={ASK_ANYTHING.label} prompts={ASK_ANYTHING.prompts} />
-          <p className="mt-3 text-center text-xs text-muted">{ASK_ANYTHING.caption}</p>
+        <div className="mt-10 flex w-full justify-center lg:mt-6 lg:min-h-0 lg:flex-1 lg:[container-type:size]">
+          <div className="w-full text-left lg:w-[min(100cqw,calc((100cqh-4.25rem)*1.6))]">
+            <ProductFilm />
+          </div>
         </div>
       </div>
     </section>
@@ -396,47 +398,35 @@ function Hero({ signedIn }: { signedIn: boolean }) {
  */
 function BigThree() {
   return (
-    <div aria-label="The design tool, Sol and RENUABL Marketplace">
+    <div aria-label="The smart CRM, service, Sol and RENUABL Marketplace">
       {BIG_THREE.map((p, i) => {
         const look =
-          p.id === "designer"
+          p.id === "crm" || p.id === "service"
             ? {
-                band: "bg-canvas text-ink",
+                band: p.id === "crm" ? "bg-surface text-ink" : "bg-canvas text-ink",
                 eyebrow: "text-ink-2",
                 body: "text-ink-2",
                 tick: "text-sun-line",
                 link: "text-sun-line hover:brightness-110",
               }
-            : p.id === "crm" || p.id === "service"
+            : p.id === "sol"
               ? {
-                  band: p.id === "crm" ? "bg-surface text-ink" : "bg-canvas text-ink",
-                  eyebrow: "text-ink-2",
-                  body: "text-ink-2",
-                  tick: "text-sun-line",
-                  link: "text-sun-line hover:brightness-110",
+                  band: "bg-primary text-white",
+                  eyebrow: "text-sun-bright",
+                  body: "text-white/75",
+                  tick: "text-sun-bright",
+                  link: "text-white hover:text-white/80",
                 }
-              : p.id === "sol"
-                ? {
-                    band: "bg-primary text-white",
-                    eyebrow: "text-sun-bright",
-                    body: "text-white/75",
-                    tick: "text-sun-bright",
-                    link: "text-white hover:text-white/80",
-                  }
-                : {
-                    band: "bg-market text-white",
-                    eyebrow: "text-market-ink",
-                    body: "text-white/80",
-                    tick: "text-market-ink",
-                    link: "text-white hover:text-white/80",
-                  };
+              : {
+                  band: "bg-market text-white",
+                  eyebrow: "text-market-ink",
+                  body: "text-white/80",
+                  tick: "text-market-ink",
+                  link: "text-white hover:text-white/80",
+                };
         const linkClass = clsx("mt-6 inline-flex items-center gap-1.5 text-[15px] font-semibold", look.link);
         const mark =
-          p.id === "designer" ? (
-            <span className="grid size-12 place-items-center rounded-full bg-sun-line text-white">
-              <PencilRuler className="size-6" />
-            </span>
-          ) : p.id === "crm" ? (
+          p.id === "crm" ? (
             <span className="grid size-12 place-items-center rounded-full bg-primary text-white">
               <Brain className="size-6" />
             </span>
@@ -454,12 +444,7 @@ function BigThree() {
             </span>
           );
         const visual =
-          p.id === "designer" ? (
-            <div>
-              <AskDesignDemo label={ASK_DEMO.label} request={ASK_DEMO.request} reply={ASK_DEMO.reply} />
-              <p className="mt-3 text-center text-xs text-muted">{ASK_DEMO.caption}</p>
-            </div>
-          ) : p.id === "crm" ? (
+          p.id === "crm" ? (
             <Screen src={CRM_SHOT.src} alt={CRM_SHOT.alt} />
           ) : p.id === "service" ? (
             <Screen src={SERVICE_SHOT.src} alt={SERVICE_SHOT.alt} />
@@ -476,7 +461,7 @@ function BigThree() {
         return (
           <section
             key={p.id}
-            id={p.id === "marketplace" ? "network" : p.id === "designer" || p.id === "crm" || p.id === "service" ? p.id : undefined}
+            id={p.id === "marketplace" ? "network" : p.id === "crm" || p.id === "service" ? p.id : undefined}
             className={clsx(
               "scroll-mt-16 px-5 py-20 lg:px-8 lg:py-24 snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center",
               look.band,
