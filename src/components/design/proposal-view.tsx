@@ -1157,6 +1157,13 @@ export function ProposalPage({
             {greeting && <div className="mt-6">{greeting}</div>}
             {view.note && <p className="mt-6 max-w-2xl whitespace-pre-line text-[16px] leading-relaxed text-ink">{view.note}</p>}
             {cover && (cover.words || cover.image) && <div className="mt-6">{own(cover)}</div>}
+            {/* With a choice of systems: the options first, ahead of the roof from above (15 Nov 2026, Martin), the one
+                chosen showing in the picture and below. */}
+            {view.options && view.options.length > 1 && (
+              <div className="mt-10">
+                <ChooseSystem view={view} choice={choice} locked={state === "accepted"} />
+              </div>
+            )}
             {hero && <div className="mt-8">{hero.kind === "roof" ? roofPicture(hero) : <BatteryDay hero={hero} />}</div>}
             {view.indicative && (
               <div className="mt-8">
@@ -1182,9 +1189,6 @@ export function ProposalPage({
             </div>
           </section>,
         )}
-
-        {/* With a choice of systems: the options side by side, the one chosen showing below. */}
-        {view.options && view.options.length > 1 && <ChooseSystem view={view} choice={choice} locked={state === "accepted"} />}
 
         {/* The rest, in the business's own order: each block under its heading, with the business's own words and picture first. */}
         {blocks

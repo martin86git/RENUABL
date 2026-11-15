@@ -80,11 +80,8 @@ export function CustomerProposal(props: {
             </div>
           )}
           <ChatGreeting chat={chat} />
-          {props.callMe && state !== "withdrawn" && (
-            <div className="mt-4">
-              <CallMe token={token} assistant={props.callMe.assistant} />
-            </div>
-          )}
+          {/* Floats on the right of the page, always in view. */}
+          {props.callMe && state !== "withdrawn" && <CallMe token={token} assistant={props.callMe.assistant} />}
         </>
       }
       chat={<ChatDock chat={chat} />}
