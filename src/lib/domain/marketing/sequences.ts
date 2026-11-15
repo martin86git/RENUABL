@@ -1,5 +1,5 @@
 /**
- * RENUABL's own marketing: campaigns, sequences (a trigger, then emails and waits, until a stop), when
+ * A business's marketing in RENUABL Business: campaigns, sequences (a trigger, then emails and waits, until a stop), when
  * emails may go out, and a campaign's report. Pure and tested; the server runs them from the cron.
  */
 import { LAUNCH_MARKET, marketDateTime, todayInMarket } from "../market";
@@ -118,7 +118,7 @@ export const TRIGGER_WORDS: Record<SequenceTrigger["kind"], string> = {
 export type SequenceStep = { id: string; kind: "email"; content: EdmContent } | { id: string; kind: "wait"; days: number };
 
 export interface SequenceStops {
-  /** Always on: signing up on RENUABL Business ends it. */
+  /** Always on: becoming a customer ends it (a deal of theirs sold; for RENUABL's own business, signing up to RENUABL Business). */
   signedUp: true;
   /** Clicking any email in this sequence ends it (they've engaged; a person takes over). */
   clicked: boolean;
@@ -186,7 +186,7 @@ export function sequenceProblem(s: SequenceDraft): string | null {
 export type StopReason = "signed-up" | "unsubscribed" | "bounced" | "no-consent" | "clicked" | "finished";
 
 export const STOP_WORDS: Record<StopReason, string> = {
-  "signed-up": "Signed up to RENUABL Business",
+  "signed-up": "Became a customer",
   unsubscribed: "Unsubscribed",
   bounced: "Email bounced",
   "no-consent": "No consent to email",

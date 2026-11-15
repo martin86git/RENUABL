@@ -9,8 +9,13 @@ import {
   moveBlock,
   newBlock,
   renderEdm,
+  footerLines,
+  senderProblem,
   type EdmContent,
+  type EdmSender,
 } from "./edm";
+import { MARKETING_PAGE_ID, withMarketing } from "./access";
+import { SECTIONS } from "../design/sections";
 import {
   afterWorkingDays,
   cleanSendAt,
@@ -66,6 +71,34 @@ describe("blocks", () => {
   });
 });
 
+const sender: EdmSender = { name: "Sunrise Solar", abn: "12345678901", email: "hi@sunrise.example", phone: null, address: "1 Sample St" };
+
+describe("the business as sender", () => {
+  it("needs a name and a way to reach it", () => {
+    expect(senderProblem(sender)).toBeNull();
+    expect(senderProblem({ ...sender, email: null })).toMatch(/email or phone/);
+    expect(senderProblem({ ...sender, name: " " })).toMatch(/name/);
+  });
+
+  it("puts the business, its contact and the reason in the footer; an address set in Marketing wins", () => {
+    expect(footerLines(cleanBrand({ reason: "Because." }), sender)).toEqual([
+      "Sunrise Solar (ABN 12 345 678 901)",
+      "1 Sample St",
+      "Contact us: hi@sunrise.example",
+      "Because.",
+    ]);
+    expect(footerLines(cleanBrand({ address: "PO Box 1" }), sender)[1]).toBe("PO Box 1");
+  });
+});
+
+describe("Marketing in the menu", () => {
+  const has = (s: ReturnType<typeof withMarketing>) => s.some((x) => x.pages.some((p) => p.id === MARKETING_PAGE_ID));
+  it("shows only where it is switched on", () => {
+    expect(has(withMarketing(SECTIONS, true))).toBe(true);
+    expect(has(withMarketing(SECTIONS, false))).toBe(false);
+  });
+});
+
 describe("renderEdm", () => {
   const content: EdmContent = {
     subject: "For {company}",
@@ -77,13 +110,13 @@ describe("renderEdm", () => {
   };
 
   it("fills merge fields, escapes them, tracks clicks by index and always carries the footer", () => {
-    const r = renderEdm(content, cleanBrand({}), { firstName: "<Sam>", company: null }, links);
+    const r = renderEdm(content, cleanBrand({}), sender, { firstName: "<Sam>", company: null }, links);
     expect(r.subject).toBe("For your business");
     expect(r.html).toContain("Hello &lt;Sam&gt;");
     expect(r.html).not.toContain("<Sam>");
     expect(r.html).toContain("https://site.test/api/m/c/tok?l=0");
     expect(r.html).toContain("https://site.test/m/u/abc");
-    expect(r.html).toContain("ABN");
+    expect(r.html).toContain("Sunrise Solar (ABN 12 345 678 901)");
     expect(r.html).toContain("https://site.test/api/m/o/tok");
     expect(r.text).toContain("Unsubscribe: https://site.test/m/u/abc");
     expect(edmLinks(content.blocks)).toEqual(["https://renuabl.com.au/business"]);

@@ -1,6 +1,6 @@
 /** The staff marketing pages' calls to the server (contacts, lists, imports). */
 import type { ColumnMap, ConsentKind, MarketingContact, MarketingList } from "@/lib/domain/marketing/contacts";
-import type { EdmBrand, EdmContent } from "@/lib/domain/marketing/edm";
+import type { EdmBrand, EdmContent, EdmSender } from "@/lib/domain/marketing/edm";
 import type { CampaignState, SendCounts, SequenceDraft, StopReason } from "@/lib/domain/marketing/sequences";
 
 export interface ContactCounts {
@@ -43,11 +43,11 @@ async function send<T>(url: string, init: RequestInit): Promise<Result<T>> {
 export function loadContacts(opts: { q: string; list: string | null; offset: number }): Promise<Result<ContactsView>> {
   const p = new URLSearchParams({ q: opts.q, offset: String(opts.offset) });
   if (opts.list) p.set("list", opts.list);
-  return send<ContactsView>(`/api/admin/marketing/contacts?${p}`, { cache: "no-store" });
+  return send<ContactsView>(`/api/design/marketing/contacts?${p}`, { cache: "no-store" });
 }
 
 export function changeContacts(body: Record<string, unknown>): Promise<Result<{ changed?: number; id?: string }>> {
-  return send(`/api/admin/marketing/contacts`, {
+  return send(`/api/design/marketing/contacts`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -58,7 +58,7 @@ export function checkSheet(file: File): Promise<Result<CheckedSheet>> {
   const form = new FormData();
   form.set("file", file);
   form.set("step", "check");
-  return send<CheckedSheet>(`/api/admin/marketing/import`, { method: "POST", body: form });
+  return send<CheckedSheet>(`/api/design/marketing/import`, { method: "POST", body: form });
 }
 
 export function importSheet(
@@ -73,7 +73,7 @@ export function importSheet(
   form.set("consent", opts.consent);
   form.set("consentNote", opts.consentNote);
   form.set("list", opts.list);
-  return send(`/api/admin/marketing/import`, { method: "POST", body: form });
+  return send(`/api/design/marketing/import`, { method: "POST", body: form });
 }
 
 // ---- Campaigns, sequences, settings, pictures ----
@@ -132,8 +132,23 @@ export interface Sequence extends SequenceLine {
 
 export interface MarketingSettingsView {
   settings: { brand: EdmBrand; dailyCap: number; paused: boolean };
-  ready: { email: boolean; siteUrl: boolean; cron: boolean; bounces: boolean };
+  /** Who the emails are from: the business's brand kit. */
+  sender: EdmSender;
+  /** RENUABL's own business (its contacts signing up to RENUABL Business count as becoming customers). */
+  renuabl: boolean;
+  ready: { sender: boolean; email: boolean; siteUrl: boolean; cron: boolean; bounces: boolean };
 }
+
+export const NO_SENDER: EdmSender = { name: "", abn: null, email: null, phone: null, address: null };
+
+export const loadCrmCount = () =>
+  send<{ withEmail: number; unsubscribed: number }>(`/api/design/marketing/customers`, { cache: "no-store" });
+export const importCrm = (body: { consent: ConsentKind; note: string; list: string }) =>
+  send<{ added: number; updated: number }>(`/api/design/marketing/customers`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
 
 const json = (method: string, body?: unknown): RequestInit => ({
   method,
@@ -141,29 +156,30 @@ const json = (method: string, body?: unknown): RequestInit => ({
   ...(body === undefined ? {} : { body: JSON.stringify(body) }),
 });
 
-export const loadCampaigns = () => send<{ campaigns: CampaignLine[] }>(`/api/admin/marketing/campaigns`, { cache: "no-store" });
-export const newCampaign = (name?: string) => send<{ id: string }>(`/api/admin/marketing/campaigns`, json("POST", { name }));
-export const loadCampaign = (id: string) => send<CampaignView>(`/api/admin/marketing/campaigns/${id}`, { cache: "no-store" });
+export const loadCampaigns = () => send<{ campaigns: CampaignLine[] }>(`/api/design/marketing/campaigns`, { cache: "no-store" });
+export const newCampaign = (name?: string) => send<{ id: string }>(`/api/design/marketing/campaigns`, json("POST", { name }));
+export const loadCampaign = (id: string) => send<CampaignView>(`/api/design/marketing/campaigns/${id}`, { cache: "no-store" });
 export const saveCampaignDraft = (id: string, body: { name: string; content: EdmContent; listId: string | null }) =>
-  send(`/api/admin/marketing/campaigns/${id}`, json("PUT", body));
+  send(`/api/design/marketing/campaigns/${id}`, json("PUT", body));
 export const campaignAction = (id: string, body: Record<string, unknown>) =>
-  send<{ to?: string; at?: string; id?: string; state?: CampaignState }>(`/api/admin/marketing/campaigns/${id}`, json("POST", body));
-export const deleteCampaign = (id: string) => send(`/api/admin/marketing/campaigns/${id}`, { method: "DELETE" });
+  send<{ to?: string; at?: string; id?: string; state?: CampaignState }>(`/api/design/marketing/campaigns/${id}`, json("POST", body));
+export const deleteCampaign = (id: string) => send(`/api/design/marketing/campaigns/${id}`, { method: "DELETE" });
 
-export const loadSequences = () => send<{ sequences: SequenceLine[] }>(`/api/admin/marketing/sequences`, { cache: "no-store" });
-export const newSequence = (name?: string) => send<{ id: string }>(`/api/admin/marketing/sequences`, json("POST", { name }));
-export const loadSequence = (id: string) => send<{ sequence: Sequence }>(`/api/admin/marketing/sequences/${id}`, { cache: "no-store" });
-export const saveSequenceDraft = (id: string, draft: SequenceDraft) => send(`/api/admin/marketing/sequences/${id}`, json("PUT", { draft }));
+export const loadSequences = () => send<{ sequences: SequenceLine[] }>(`/api/design/marketing/sequences`, { cache: "no-store" });
+export const newSequence = (name?: string) => send<{ id: string }>(`/api/design/marketing/sequences`, json("POST", { name }));
+export const loadSequence = (id: string) => send<{ sequence: Sequence }>(`/api/design/marketing/sequences/${id}`, { cache: "no-store" });
+export const saveSequenceDraft = (id: string, draft: SequenceDraft) =>
+  send(`/api/design/marketing/sequences/${id}`, json("PUT", { draft }));
 export const switchSequence = (id: string, on: boolean) =>
-  send(`/api/admin/marketing/sequences/${id}`, json("POST", { do: on ? "on" : "off" }));
-export const deleteSequence = (id: string) => send(`/api/admin/marketing/sequences/${id}`, { method: "DELETE" });
+  send(`/api/design/marketing/sequences/${id}`, json("POST", { do: on ? "on" : "off" }));
+export const deleteSequence = (id: string) => send(`/api/design/marketing/sequences/${id}`, { method: "DELETE" });
 
-export const loadMarketingSettings = () => send<MarketingSettingsView>(`/api/admin/marketing/settings`, { cache: "no-store" });
+export const loadMarketingSettings = () => send<MarketingSettingsView>(`/api/design/marketing/settings`, { cache: "no-store" });
 export const saveMarketingSettings = (s: MarketingSettingsView["settings"]) =>
-  send<{ settings: MarketingSettingsView["settings"] }>(`/api/admin/marketing/settings`, json("PUT", s));
+  send<{ settings: MarketingSettingsView["settings"] }>(`/api/design/marketing/settings`, json("PUT", s));
 
 export function uploadMarketingImage(file: File) {
   const form = new FormData();
   form.set("file", file);
-  return send<{ id: string }>(`/api/admin/marketing/images`, { method: "POST", body: form });
+  return send<{ id: string }>(`/api/design/marketing/images`, { method: "POST", body: form });
 }

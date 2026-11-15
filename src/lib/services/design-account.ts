@@ -30,6 +30,8 @@ export type DesignAccount =
       viewedBy?: string;
       /** A new retailer's owner who hasn't chosen a plan and paid yet (business-kind.ts `needsPlan`). */
       needsPlan?: boolean;
+      /** The business has Marketing (domain/marketing/access.ts: RENUABL's own for now). */
+      marketing?: boolean;
       /** A demo account (demo.ts): made-up deals, nothing sent to anyone. */
       demo?: boolean;
       /** In a demo, who is trying it hasn't been said yet: asked before a roof is designed, Sol is asked or a proposal published. */

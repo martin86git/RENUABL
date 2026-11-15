@@ -92,6 +92,8 @@ const BLOCKED: readonly RegExp[] = [
   // Asking RENUABL for a phone number for an agent.
   /^\/api\/design\/agents$/,
   /^\/api\/design\/inbox$/,
+  // Marketing email to a business's contacts (domain/marketing).
+  /^\/api\/design\/marketing(\/|$)/,
   // Other businesses: the feed every business reads, connections, the Marketplace, jobs passed on.
   /^\/api\/design\/(posts|connections|marketplace|trade|installer-jobs|inspections)(\/|$)/,
   // People and money.

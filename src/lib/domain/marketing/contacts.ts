@@ -1,6 +1,6 @@
 /**
- * RENUABL's own go-to-market contacts: the solar businesses RENUABL markets RENUABL Business to.
- * Staff only (under /admin), never a business's own CRM. Pure: reading an imported sheet into
+ * A business's marketing contacts in RENUABL Business: the people it emails, imported from a sheet or its own CRM.
+ * Pure: reading an imported sheet into
  * contacts, consent under the Spam Act 2003, and who may be emailed.
  */
 import { normaliseEmail } from "../accounts";

@@ -1577,10 +1577,12 @@ create table if not exists design_favourites (
   updated_at timestamptz not null default now(),
   primary key (business_id, member_email)
 );
--- RENUABL's own go-to-market contacts (staff only, /admin/marketing; domain/marketing/contacts.ts). Never a business's CRM.
-create table if not exists marketing_contacts (
+-- Marketing email in RENUABL Business (domain/marketing/*): each business's own contacts, lists, campaigns, sequences
+-- and sends, under the tenant rule (business id first). Switched on only for RENUABL's own business for now (marketingOn).
+create table if not exists design_marketing_contacts (
   id text primary key,
-  email text unique not null,
+  business_id text not null references businesses(id) on delete cascade,
+  email text not null,
   first_name text,
   last_name text,
   company text,
@@ -1600,24 +1602,32 @@ create table if not exists marketing_contacts (
   bounce_note text,
   created_by text not null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (business_id, email),
+  unique (business_id, id)
 );
-create table if not exists marketing_lists (
+create table if not exists design_marketing_lists (
   id text primary key,
-  name text unique not null,
+  business_id text not null references businesses(id) on delete cascade,
+  name text not null,
   created_by text not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (business_id, name),
+  unique (business_id, id)
 );
-create table if not exists marketing_list_members (
-  list_id text not null references marketing_lists(id) on delete cascade,
-  contact_id text not null references marketing_contacts(id) on delete cascade,
+create table if not exists design_marketing_list_members (
+  business_id text not null,
+  list_id text not null,
+  contact_id text not null,
   added_at timestamptz not null default now(),
-  primary key (list_id, contact_id)
+  primary key (list_id, contact_id),
+  foreign key (business_id, list_id) references design_marketing_lists(business_id, id) on delete cascade,
+  foreign key (business_id, contact_id) references design_marketing_contacts(business_id, id) on delete cascade
 );
-create index if not exists marketing_list_members_contact on marketing_list_members (contact_id);
--- Each import kept: who, when, what file, the consent claimed, what came of it.
-create table if not exists marketing_imports (
+create index if not exists design_marketing_list_members_contact on design_marketing_list_members (contact_id);
+create table if not exists design_marketing_imports (
   id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
   file_name text not null,
   source text not null,
   consent text not null,
@@ -1629,21 +1639,20 @@ create table if not exists marketing_imports (
   by_email text not null,
   at timestamptz not null default now()
 );
--- RENUABL's marketing emails (domain/marketing/edm.ts, sequences.ts): one settings row, campaigns, sequences,
--- each email to each contact (a send, with its token for opens and clicks), and the pictures emails show.
-create table if not exists marketing_settings (
-  id text primary key,
+create table if not exists design_marketing_settings (
+  business_id text primary key references businesses(id) on delete cascade,
   brand jsonb not null default '{}',
   daily_cap integer not null default 300,
   paused boolean not null default false,
   updated_by text,
   updated_at timestamptz not null default now()
 );
-create table if not exists marketing_campaigns (
+create table if not exists design_marketing_campaigns (
   id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
   name text not null,
   content jsonb not null,
-  list_id text references marketing_lists(id) on delete set null,
+  list_id text,
   status text not null default 'draft',
   send_at timestamptz,
   started_at timestamptz,
@@ -1651,37 +1660,44 @@ create table if not exists marketing_campaigns (
   sent_by text,
   created_by text not null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (business_id, id)
 );
-create table if not exists marketing_sequences (
+create table if not exists design_marketing_sequences (
   id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
   name text not null,
   draft jsonb not null,
   status text not null default 'off',
   on_at timestamptz,
   created_by text not null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (business_id, id)
 );
-create table if not exists marketing_enrolments (
+create table if not exists design_marketing_enrolments (
   id text primary key,
-  sequence_id text not null references marketing_sequences(id) on delete cascade,
-  contact_id text not null references marketing_contacts(id) on delete cascade,
+  business_id text not null,
+  sequence_id text not null,
+  contact_id text not null,
   step integer not null default 0,
   next_at timestamptz not null default now(),
   status text not null default 'active',
   stop_reason text,
   enrolled_at timestamptz not null default now(),
   ended_at timestamptz,
-  unique (sequence_id, contact_id)
+  unique (sequence_id, contact_id),
+  foreign key (business_id, sequence_id) references design_marketing_sequences(business_id, id) on delete cascade,
+  foreign key (business_id, contact_id) references design_marketing_contacts(business_id, id) on delete cascade
 );
-create index if not exists marketing_enrolments_due on marketing_enrolments (status, next_at);
-create table if not exists marketing_sends (
+create index if not exists design_marketing_enrolments_due on design_marketing_enrolments (status, next_at);
+create table if not exists design_marketing_sends (
   id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
   token text unique not null,
-  contact_id text not null references marketing_contacts(id) on delete cascade,
-  campaign_id text references marketing_campaigns(id) on delete cascade,
-  sequence_id text references marketing_sequences(id) on delete cascade,
+  contact_id text not null,
+  campaign_id text,
+  sequence_id text,
   step integer,
   content jsonb,
   status text not null default 'queued',
@@ -1693,13 +1709,17 @@ create table if not exists marketing_sends (
   clicked_at timestamptz,
   click_count integer not null default 0,
   bounced_at timestamptz,
-  unsubscribed_at timestamptz
+  unsubscribed_at timestamptz,
+  foreign key (business_id, contact_id) references design_marketing_contacts(business_id, id) on delete cascade,
+  foreign key (business_id, campaign_id) references design_marketing_campaigns(business_id, id) on delete cascade,
+  foreign key (business_id, sequence_id) references design_marketing_sequences(business_id, id) on delete cascade
 );
-create unique index if not exists marketing_sends_campaign_contact on marketing_sends (campaign_id, contact_id) where campaign_id is not null;
-create unique index if not exists marketing_sends_step_contact on marketing_sends (sequence_id, step, contact_id) where sequence_id is not null;
-create index if not exists marketing_sends_queue on marketing_sends (status, queued_at);
-create table if not exists marketing_images (
+create unique index if not exists design_marketing_sends_campaign_contact on design_marketing_sends (campaign_id, contact_id) where campaign_id is not null;
+create unique index if not exists design_marketing_sends_step_contact on design_marketing_sends (sequence_id, step, contact_id) where sequence_id is not null;
+create index if not exists design_marketing_sends_queue on design_marketing_sends (business_id, status, queued_at);
+create table if not exists design_marketing_images (
   id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
   bytes bytea not null,
   content_type text not null,
   width integer not null,

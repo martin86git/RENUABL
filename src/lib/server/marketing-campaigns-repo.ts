@@ -1,7 +1,7 @@
 /**
- * Server only. RENUABL's marketing emails: settings, pictures, campaigns and sequences, and their reports
- * (domain/marketing/edm.ts, sequences.ts). Staff only: every caller checks the staff session first.
- * Sending itself is marketing-send.ts.
+ * Server only. A business's marketing emails in RENUABL Business: settings, pictures, campaigns and sequences, and their
+ * reports (domain/marketing/edm.ts, sequences.ts). The tenant rule holds: the business id first in every function,
+ * filtered by it, from the signed-in member only. Sending itself is marketing-send.ts.
  */
 import { DEFAULT_BRAND, cleanBrand, type EdmBrand, type EdmContent } from "@/lib/domain/marketing/edm";
 import {
@@ -25,9 +25,10 @@ export interface MarketingSettings {
   paused: boolean;
 }
 
-export async function marketingSettings(): Promise<MarketingSettings> {
+export async function marketingSettings(businessId: string): Promise<MarketingSettings> {
   const rows = await query<{ brand: unknown; daily_cap: number; paused: boolean }>(
-    `select brand, daily_cap, paused from marketing_settings where id = 'main'`,
+    `select brand, daily_cap, paused from design_marketing_settings where business_id = $1`,
+    [businessId],
   );
   const r = rows[0];
   return r
@@ -35,32 +36,36 @@ export async function marketingSettings(): Promise<MarketingSettings> {
     : { brand: DEFAULT_BRAND, dailyCap: DAILY_CAP.default, paused: false };
 }
 
-export async function saveMarketingSettings(s: MarketingSettings, by: string): Promise<void> {
+export async function saveMarketingSettings(businessId: string, s: MarketingSettings, by: string): Promise<void> {
   await query(
-    `insert into marketing_settings (id, brand, daily_cap, paused, updated_by) values ('main', $1, $2, $3, $4)
-     on conflict (id) do update set brand = excluded.brand, daily_cap = excluded.daily_cap, paused = excluded.paused,
+    `insert into design_marketing_settings (business_id, brand, daily_cap, paused, updated_by) values ($1, $2, $3, $4, $5)
+     on conflict (business_id) do update set brand = excluded.brand, daily_cap = excluded.daily_cap, paused = excluded.paused,
        updated_by = excluded.updated_by, updated_at = now()`,
-    [JSON.stringify(cleanBrand(s.brand)), cleanDailyCap(s.dailyCap), s.paused, by.toLowerCase()],
+    [businessId, JSON.stringify(cleanBrand(s.brand)), cleanDailyCap(s.dailyCap), s.paused, by.toLowerCase()],
   );
 }
 
 // ---- Pictures ----
 
-export async function saveImage(img: { bytes: Buffer; contentType: string; width: number; height: number }, by: string): Promise<string> {
+export async function saveImage(
+  businessId: string,
+  img: { bytes: Buffer; contentType: string; width: number; height: number },
+  by: string,
+): Promise<string> {
   const id = newId("mimg");
-  await query(`insert into marketing_images (id, bytes, content_type, width, height, by_email) values ($1,$2,$3,$4,$5,$6)`, [
-    id,
-    img.bytes,
-    img.contentType,
-    img.width,
-    img.height,
-    by.toLowerCase(),
-  ]);
+  await query(
+    `insert into design_marketing_images (id, business_id, bytes, content_type, width, height, by_email) values ($1,$2,$3,$4,$5,$6,$7)`,
+    [id, businessId, img.bytes, img.contentType, img.width, img.height, by.toLowerCase()],
+  );
   return id;
 }
 
+/** A picture in an email, by its id alone: mail apps load it, so it is public (the id is long and random). */
 export async function imageById(id: string): Promise<{ bytes: Buffer; contentType: string } | null> {
-  const rows = await query<{ bytes: Buffer; content_type: string }>(`select bytes, content_type from marketing_images where id = $1`, [id]);
+  const rows = await query<{ bytes: Buffer; content_type: string }>(
+    `select bytes, content_type from design_marketing_images where id = $1`,
+    [id],
+  );
   return rows[0] ? { bytes: rows[0].bytes, contentType: rows[0].content_type } : null;
 }
 
@@ -101,27 +106,31 @@ export interface Campaign extends CampaignLine {
 const CAMPAIGN_COLUMNS = `c.id, c.name, c.content->>'subject' as subject, c.status, c.list_id as "listId", l.name as "listName",
   ${moment("c.send_at")} as "sendAt", ${moment("c.started_at")} as "startedAt", ${moment("c.finished_at")} as "finishedAt",
   ${moment("c.updated_at")} as "updatedAt",
-  (select row_to_json(x) from (select ${COUNTS} from marketing_sends s where s.campaign_id = c.id) x) as counts`;
+  (select row_to_json(x) from (select ${COUNTS} from design_marketing_sends s where s.campaign_id = c.id) x) as counts`;
 
-export async function listCampaigns(): Promise<CampaignLine[]> {
+const FROM_CAMPAIGNS = `from design_marketing_campaigns c left join design_marketing_lists l on l.id = c.list_id and l.business_id = c.business_id`;
+
+export async function listCampaigns(businessId: string): Promise<CampaignLine[]> {
   const rows = await query<CampaignLine>(
-    `select ${CAMPAIGN_COLUMNS} from marketing_campaigns c left join marketing_lists l on l.id = c.list_id order by c.created_at desc limit 200`,
+    `select ${CAMPAIGN_COLUMNS} ${FROM_CAMPAIGNS} where c.business_id = $1 order by c.created_at desc limit 200`,
+    [businessId],
   );
   return rows.map((r) => ({ ...r, counts: r.counts ?? EMPTY }));
 }
 
-export async function campaignById(id: string): Promise<Campaign | null> {
+export async function campaignById(businessId: string, id: string): Promise<Campaign | null> {
   const rows = await query<Campaign>(
-    `select ${CAMPAIGN_COLUMNS}, c.content, c.sent_by as "sentBy" from marketing_campaigns c left join marketing_lists l on l.id = c.list_id where c.id = $1`,
-    [id],
+    `select ${CAMPAIGN_COLUMNS}, c.content, c.sent_by as "sentBy" ${FROM_CAMPAIGNS} where c.business_id = $1 and c.id = $2`,
+    [businessId, id],
   );
   return rows[0] ? { ...rows[0], counts: rows[0].counts ?? EMPTY } : null;
 }
 
-export async function createCampaign(name: string, content: EdmContent, by: string): Promise<string> {
+export async function createCampaign(businessId: string, name: string, content: EdmContent, by: string): Promise<string> {
   const id = newId("mca");
-  await query(`insert into marketing_campaigns (id, name, content, created_by) values ($1,$2,$3,$4)`, [
+  await query(`insert into design_marketing_campaigns (id, business_id, name, content, created_by) values ($1,$2,$3,$4,$5)`, [
     id,
+    businessId,
     name,
     JSON.stringify(content),
     by.toLowerCase(),
@@ -129,52 +138,66 @@ export async function createCampaign(name: string, content: EdmContent, by: stri
   return id;
 }
 
-/** Only a draft changes; a scheduled campaign is cancelled back to a draft first. */
-export async function saveCampaign(id: string, patch: { name: string; content: EdmContent; listId: string | null }): Promise<boolean> {
+/** Only a draft changes; a scheduled campaign is cancelled back to a draft first. A list must be the business's own. */
+export async function saveCampaign(
+  businessId: string,
+  id: string,
+  patch: { name: string; content: EdmContent; listId: string | null },
+): Promise<boolean> {
   const rows = await query(
-    `update marketing_campaigns set name = $2, content = $3,
-       list_id = (select id from marketing_lists where id = $4), updated_at = now()
-     where id = $1 and status = 'draft' returning id`,
-    [id, patch.name, JSON.stringify(patch.content), patch.listId],
+    `update design_marketing_campaigns set name = $3, content = $4,
+       list_id = (select l.id from design_marketing_lists l where l.business_id = $1 and l.id = $5), updated_at = now()
+     where business_id = $1 and id = $2 and status = 'draft' returning id`,
+    [businessId, id, patch.name, JSON.stringify(patch.content), patch.listId],
   );
   return rows.length > 0;
 }
 
 /** A deliberate send: draft → scheduled for `at`. Nothing is queued until the time comes (the cron). */
-export async function scheduleCampaign(id: string, at: Date, by: string): Promise<boolean> {
+export async function scheduleCampaign(businessId: string, id: string, at: Date, by: string): Promise<boolean> {
   const rows = await query(
-    `update marketing_campaigns set status = 'scheduled', send_at = $2, sent_by = $3, updated_at = now()
-     where id = $1 and status = 'draft' and list_id is not null returning id`,
-    [id, at.toISOString(), by.toLowerCase()],
+    `update design_marketing_campaigns set status = 'scheduled', send_at = $3, sent_by = $4, updated_at = now()
+     where business_id = $1 and id = $2 and status = 'draft' and list_id is not null returning id`,
+    [businessId, id, at.toISOString(), by.toLowerCase()],
   );
   return rows.length > 0;
 }
 
 /** Back to a draft while scheduled; while sending, stops it (the emails not yet gone are taken off). */
-export async function cancelCampaign(id: string): Promise<CampaignState | null> {
+export async function cancelCampaign(businessId: string, id: string): Promise<CampaignState | null> {
   const back = await query(
-    `update marketing_campaigns set status = 'draft', send_at = null, updated_at = now() where id = $1 and status = 'scheduled' returning id`,
-    [id],
+    `update design_marketing_campaigns set status = 'draft', send_at = null, updated_at = now()
+      where business_id = $1 and id = $2 and status = 'scheduled' returning id`,
+    [businessId, id],
   );
   if (back.length) return "draft";
   const stopped = await query(
-    `update marketing_campaigns set status = 'cancelled', finished_at = now(), updated_at = now() where id = $1 and status = 'sending' returning id`,
-    [id],
+    `update design_marketing_campaigns set status = 'cancelled', finished_at = now(), updated_at = now()
+      where business_id = $1 and id = $2 and status = 'sending' returning id`,
+    [businessId, id],
   );
   if (!stopped.length) return null;
-  await query(`update marketing_sends set status = 'skipped', error = 'Campaign stopped' where campaign_id = $1 and status = 'queued'`, [
-    id,
-  ]);
+  await query(
+    `update design_marketing_sends set status = 'skipped', error = 'Campaign stopped' where business_id = $1 and campaign_id = $2 and status = 'queued'`,
+    [businessId, id],
+  );
   return "cancelled";
 }
 
-export async function deleteCampaign(id: string): Promise<boolean> {
-  return (await query(`delete from marketing_campaigns where id = $1 and status in ('draft','cancelled') returning id`, [id])).length > 0;
+export async function deleteCampaign(businessId: string, id: string): Promise<boolean> {
+  return (
+    (
+      await query(
+        `delete from design_marketing_campaigns where business_id = $1 and id = $2 and status in ('draft','cancelled') returning id`,
+        [businessId, id],
+      )
+    ).length > 0
+  );
 }
 
-export async function duplicateCampaign(id: string, by: string): Promise<string | null> {
-  const c = await campaignById(id);
-  return c ? createCampaign(`${c.name} (copy)`.slice(0, 80), c.content, by) : null;
+export async function duplicateCampaign(businessId: string, id: string, by: string): Promise<string | null> {
+  const c = await campaignById(businessId, id);
+  return c ? createCampaign(businessId, `${c.name} (copy)`.slice(0, 80), c.content, by) : null;
 }
 
 export interface Recipient {
@@ -188,14 +211,14 @@ export interface Recipient {
 }
 
 /** Who clicked (and opened) in a campaign, most engaged first. */
-export async function campaignRecipients(id: string, limit = 200): Promise<Recipient[]> {
+export async function campaignRecipients(businessId: string, id: string, limit = 200): Promise<Recipient[]> {
   return query<Recipient>(
     `select k.email, trim(concat_ws(' ', k.first_name, k.last_name)) as name, k.company, ${moment("s.sent_at")} as "sentAt",
             ${moment("s.opened_at")} as "openedAt", ${moment("s.clicked_at")} as "clickedAt", s.status
-       from marketing_sends s join marketing_contacts k on k.id = s.contact_id
-      where s.campaign_id = $1
+       from design_marketing_sends s join design_marketing_contacts k on k.id = s.contact_id
+      where s.business_id = $1 and s.campaign_id = $2
       order by (s.clicked_at is not null) desc, (s.opened_at is not null) desc, s.sent_at desc nulls last limit ${Math.min(limit, 500)}`,
-    [id],
+    [businessId, id],
   );
 }
 
@@ -219,25 +242,29 @@ export interface Sequence extends SequenceLine {
 }
 
 const SEQUENCE_COLUMNS = `q.id, q.name, q.status, ${moment("q.on_at")} as "onAt", ${moment("q.updated_at")} as "updatedAt",
-  (select count(*)::int from marketing_enrolments e where e.sequence_id = q.id and e.status = 'active') as active,
-  (select count(*)::int from marketing_enrolments e where e.sequence_id = q.id and e.stop_reason = 'finished') as finished,
-  (select count(*)::int from marketing_enrolments e where e.sequence_id = q.id and e.status = 'stopped' and e.stop_reason <> 'finished') as stopped,
-  (select row_to_json(x) from (select ${COUNTS} from marketing_sends s where s.sequence_id = q.id) x) as counts`;
+  (select count(*)::int from design_marketing_enrolments e where e.sequence_id = q.id and e.status = 'active') as active,
+  (select count(*)::int from design_marketing_enrolments e where e.sequence_id = q.id and e.stop_reason = 'finished') as finished,
+  (select count(*)::int from design_marketing_enrolments e where e.sequence_id = q.id and e.status = 'stopped' and e.stop_reason <> 'finished') as stopped,
+  (select row_to_json(x) from (select ${COUNTS} from design_marketing_sends s where s.sequence_id = q.id) x) as counts`;
 
-export async function listSequences(): Promise<SequenceLine[]> {
-  const rows = await query<SequenceLine>(`select ${SEQUENCE_COLUMNS} from marketing_sequences q order by q.created_at desc`);
+export async function listSequences(businessId: string): Promise<SequenceLine[]> {
+  const rows = await query<SequenceLine>(
+    `select ${SEQUENCE_COLUMNS} from design_marketing_sequences q where q.business_id = $1 order by q.created_at desc`,
+    [businessId],
+  );
   return rows.map((r) => ({ ...r, counts: r.counts ?? EMPTY }));
 }
 
-export async function sequenceById(id: string): Promise<Sequence | null> {
+export async function sequenceById(businessId: string, id: string): Promise<Sequence | null> {
   const rows = await query<Sequence & { draft: unknown }>(
-    `select ${SEQUENCE_COLUMNS}, q.draft from marketing_sequences q where q.id = $1`,
-    [id],
+    `select ${SEQUENCE_COLUMNS}, q.draft from design_marketing_sequences q where q.business_id = $1 and q.id = $2`,
+    [businessId, id],
   );
   if (!rows[0]) return null;
   const stops = await query<{ reason: StopReason; n: number }>(
-    `select stop_reason as reason, count(*)::int as n from marketing_enrolments where sequence_id = $1 and stop_reason is not null group by stop_reason`,
-    [id],
+    `select stop_reason as reason, count(*)::int as n from design_marketing_enrolments
+      where business_id = $1 and sequence_id = $2 and stop_reason is not null group by stop_reason`,
+    [businessId, id],
   );
   return {
     ...rows[0],
@@ -247,10 +274,11 @@ export async function sequenceById(id: string): Promise<Sequence | null> {
   };
 }
 
-export async function createSequence(draft: SequenceDraft, by: string): Promise<string> {
+export async function createSequence(businessId: string, draft: SequenceDraft, by: string): Promise<string> {
   const id = newId("msq");
-  await query(`insert into marketing_sequences (id, name, draft, created_by) values ($1,$2,$3,$4)`, [
+  await query(`insert into design_marketing_sequences (id, business_id, name, draft, created_by) values ($1,$2,$3,$4,$5)`, [
     id,
+    businessId,
     draft.name || "New sequence",
     JSON.stringify(draft),
     by.toLowerCase(),
@@ -259,30 +287,37 @@ export async function createSequence(draft: SequenceDraft, by: string): Promise<
 }
 
 /**
- * Saves the sequence. While it is on, its trigger can't change (people already in it were let in by it);
- * its steps can, and people carry on from the step number they are at.
+ * Saves the sequence. While it is on, its trigger can't change (people already in it were let in by it); its steps can,
+ * and people carry on from the step number they are at.
  */
-export async function saveSequence(id: string, draft: SequenceDraft): Promise<boolean> {
+export async function saveSequence(businessId: string, id: string, draft: SequenceDraft): Promise<boolean> {
   const rows = await query(
-    `update marketing_sequences set name = $2,
-       draft = case when status = 'on' then jsonb_set($3::jsonb, '{trigger}', draft->'trigger') else $3::jsonb end,
+    `update design_marketing_sequences set name = $3,
+       draft = case when status = 'on' then jsonb_set($4::jsonb, '{trigger}', draft->'trigger') else $4::jsonb end,
        updated_at = now()
-     where id = $1 returning id`,
-    [id, draft.name || "New sequence", JSON.stringify(draft)],
+     where business_id = $1 and id = $2 returning id`,
+    [businessId, id, draft.name || "New sequence", JSON.stringify(draft)],
   );
   return rows.length > 0;
 }
 
-/** On: from now, people the trigger catches are let in (never anyone from before it was switched on). Off: everyone in it is paused where they are. */
-export async function setSequenceOn(id: string, on: boolean): Promise<boolean> {
+/** On: from now, people the trigger catches are let in (never anyone from before it was switched on). Off: everyone in it waits where they are. */
+export async function setSequenceOn(businessId: string, id: string, on: boolean): Promise<boolean> {
   const rows = await query(
-    `update marketing_sequences set status = $2, on_at = case when $2 = 'on' and status <> 'on' then now() else on_at end, updated_at = now()
-     where id = $1 returning id`,
-    [id, on ? "on" : "off"],
+    `update design_marketing_sequences set status = $3, on_at = case when $3 = 'on' and status <> 'on' then now() else on_at end, updated_at = now()
+     where business_id = $1 and id = $2 returning id`,
+    [businessId, id, on ? "on" : "off"],
   );
   return rows.length > 0;
 }
 
-export async function deleteSequence(id: string): Promise<boolean> {
-  return (await query(`delete from marketing_sequences where id = $1 and status = 'off' returning id`, [id])).length > 0;
+export async function deleteSequence(businessId: string, id: string): Promise<boolean> {
+  return (
+    (
+      await query(`delete from design_marketing_sequences where business_id = $1 and id = $2 and status = 'off' returning id`, [
+        businessId,
+        id,
+      ])
+    ).length > 0
+  );
 }

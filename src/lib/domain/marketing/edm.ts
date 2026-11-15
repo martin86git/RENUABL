@@ -1,10 +1,9 @@
 /**
- * RENUABL's own marketing emails (EDMs), built from blocks as the proposal builder's are, but for email:
+ * A business's marketing emails (EDMs) in RENUABL Business, built from blocks as the proposal builder's are, but for email:
  * tables and inline styles, so Gmail and Outlook draw them alike. Pure: blocks, cleaning, the fixed footer
  * (sender identity and unsubscribe, which can't be removed: Spam Act 2003, ss 17 and 18) and the HTML and
  * text of one email for one contact.
  */
-import { LEGAL } from "../legal";
 
 export const EDM_BLOCK_KINDS = ["heading", "text", "image", "button", "divider"] as const;
 export type EdmBlockKind = (typeof EDM_BLOCK_KINDS)[number];
@@ -40,7 +39,7 @@ export interface EdmContent {
 
 /** The look and sender, set once for every email. */
 export interface EdmBrand {
-  /** Shown as who the email is from, e.g. "Martin at RENUABL". */
+  /** Shown as who the email is from, e.g. "Martin at Sunrise Solar"; blank uses the business's own name. */
   fromName: string;
   /** Where replies go; blank uses the site's own reply address. */
   replyTo: string | null;
@@ -48,15 +47,15 @@ export interface EdmBrand {
   colour: string;
   /** Why they're getting it, said in the footer. */
   reason: string;
-  /** A postal address for the footer, if wanted. */
+  /** A postal address for the footer, in place of the business's own; blank uses its own. */
   address: string | null;
 }
 
 export const DEFAULT_BRAND: EdmBrand = {
-  fromName: "RENUABL",
+  fromName: "",
   replyTo: null,
   colour: "#ff5a1f",
-  reason: "You're receiving this because your business works in solar, batteries or EV charging.",
+  reason: "You're receiving this because you're one of our customers or contacts.",
   address: null,
 };
 
@@ -141,7 +140,7 @@ export function cleanBrand(raw: unknown): EdmBrand {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const replyTo = line(r.replyTo, 200).toLowerCase();
   return {
-    fromName: line(r.fromName, 60).replace(/[<>"@]/g, "") || DEFAULT_BRAND.fromName,
+    fromName: line(r.fromName, 60).replace(/[<>"@]/g, ""),
     replyTo: /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(replyTo) ? replyTo : null,
     colour: cleanColour(r.colour),
     reason: line(r.reason, 240) || DEFAULT_BRAND.reason,
@@ -190,12 +189,12 @@ export function starterContent(rand?: () => number): EdmContent {
     subject: "",
     preview: "",
     blocks: [
-      { ...newBlock("heading", rand), text: "Run your solar business from one place" },
+      { ...newBlock("heading", rand), text: "A heading" },
       {
         ...newBlock("text", rand),
-        text: "Hi {firstName},\n\nRENUABL Business designs the roof, prices it, sends the proposal and runs the job once it's signed.",
+        text: "Hi {firstName},\n\nWhat you'd like to tell them.",
       },
-      { ...newBlock("button", rand), text: "See RENUABL Business" },
+      { ...newBlock("button", rand), text: "Find out more" },
     ],
   };
 }
@@ -230,18 +229,38 @@ export interface RenderedEdm {
   text: string;
 }
 
-/** The footer's lines, the same in the HTML and the text: sender, how to reach us, why, unsubscribe. */
-export function footerLines(brand: EdmBrand): string[] {
+/** Who sends the email (the business, from its brand kit): named in the header and footer, with how to reach it. */
+export interface EdmSender {
+  name: string;
+  /** Eleven digits, or null. */
+  abn: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+}
+
+/** Why an email can't name its sender properly yet (Spam Act s 17: who sent it and how to contact them), or null. */
+export function senderProblem(s: EdmSender): string | null {
+  if (!s.name.trim()) return "Give your business its name in Settings, Branding.";
+  if (!s.email && !s.phone) return "Add your business's email or phone in Settings, Branding, so every email says how to reach you.";
+  return null;
+}
+
+const abnWords = (abn: string) => abn.replace(/^(\d{2})(\d{3})(\d{3})(\d{3})$/, "$1 $2 $3 $4");
+
+/** The footer's lines, the same in the HTML and the text: who sent it, how to reach them, why, then unsubscribe. */
+export function footerLines(brand: EdmBrand, sender: EdmSender): string[] {
+  const reach = [sender.email, sender.phone].filter(Boolean).join(" · ");
   return [
-    `${LEGAL.tradingAs} (${LEGAL.company}, ABN ${LEGAL.abn})`,
-    brand.address ? brand.address : null,
-    `Contact us: ${LEGAL.email}`,
+    sender.abn ? `${sender.name} (ABN ${abnWords(sender.abn)})` : sender.name,
+    brand.address || sender.address,
+    reach ? `Contact us: ${reach}` : null,
     brand.reason,
   ].filter((l): l is string => Boolean(l));
 }
 
 /** One email for one contact. Merge fields are filled before escaping, so a name can't add markup. */
-export function renderEdm(content: EdmContent, brand: EdmBrand, fields: MergeFields, links: RenderLinks): RenderedEdm {
+export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSender, fields: MergeFields, links: RenderLinks): RenderedEdm {
   const colour = cleanColour(brand.colour);
   const linkList = edmLinks(content.blocks);
   let linkAt = 0;
@@ -289,12 +308,12 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, fields: MergeFie
       textParts.push("—");
     }
   }
-  const foot = footerLines(brand);
+  const foot = footerLines(brand, sender);
   const footHtml = `${foot.map((l) => esc(l)).join("<br>")}<br><a href="${esc(links.unsubscribe)}" style="color:#7b7d84;text-decoration:underline">Unsubscribe</a> from these emails.`;
   const preview = content.preview ? merge(content.preview, fields) : "";
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(merge(content.subject, fields))}</title></head><body style="margin:0;padding:0;background:#f4f4f5">${
     preview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preview)}</div>` : ""
-  }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px"><tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:13px;letter-spacing:0.18em;font-weight:700;color:#0b0b0c">RENUABL</td></tr>${rows.join(
+  }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px"><tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#0b0b0c">${esc(sender.name)}</td></tr>${rows.join(
     "",
   )}<tr><td style="padding:24px 32px 28px"></td></tr></table><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px"><tr><td style="padding:16px 32px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#7b7d84;text-align:center">${footHtml}</td></tr></table>${
     links.pixel ? `<img src="${esc(links.pixel)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0">` : ""

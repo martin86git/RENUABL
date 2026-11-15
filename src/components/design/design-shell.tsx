@@ -29,6 +29,7 @@ import {
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 import { KIND_SECTIONS, designsRoofs, pageAt, sectionAt } from "@/lib/domain/design/sections";
+import { withMarketing } from "@/lib/domain/marketing/access";
 import { MarketplaceMark, MarketplaceMenu } from "./marketplace-bar";
 import { BUSINESS_KINDS, cleanKind, pageAllowed, type BusinessKind } from "@/lib/domain/design/business-kind";
 import { DemoBar, DemoDetailsPrompt } from "./demo-details";
@@ -206,7 +207,8 @@ function Shell({
   // nothing of the CRM is asked for.
   const kind: BusinessKind = cleanKind(account?.signedIn ? account.business?.kind : undefined);
   const retail = on && kind === "retailer";
-  const sections = KIND_SECTIONS[kind];
+  // Marketing beside Customers only where the business has it (domain/marketing/access.ts).
+  const sections = withMarketing(KIND_SECTIONS[kind], Boolean(account?.signedIn && account.marketing));
   // How many of the customers' messages nobody has seen, the service cases to put right, and this member's unread mentions.
   const unread = useUnreadMessages(retail);
   const service = useServiceCount(retail);
@@ -345,7 +347,9 @@ function Shell({
 
   if (away) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   const here = pageAt(path, kind);
-  const current = sectionAt(path, kind);
+  const at = sectionAt(path, kind);
+  // As this business's menu has it (Marketing only where it is on).
+  const current = sections.find((s) => s.id === at.id) ?? at;
   const count = (pageId: string) => counts[pageId] ?? 0;
   const settingsOn = path.startsWith(PATHS.settings) || path.startsWith(PATHS.account);
 

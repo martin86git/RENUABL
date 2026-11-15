@@ -82,7 +82,16 @@ export const SECTIONS: readonly Section[] = [
     ],
   },
   // People are looked up by name, not by job, so they keep a word of their own.
-  { id: "customers", label: "Customers", pages: [{ id: "customers", label: "Customers", href: "/design/customers" }] },
+  // Marketing (15 Nov 2026): emails to the business's own customers and contacts; the shell shows it only where it is
+  // switched on (domain/marketing/access.ts).
+  {
+    id: "customers",
+    label: "Customers",
+    pages: [
+      { id: "customers", label: "Customers", href: "/design/customers" },
+      { id: "marketing", label: "Marketing", href: "/design/marketing" },
+    ],
+  },
   { id: "service", label: "Service", pages: [{ id: "service", label: "Service pipeline", href: "/design/service" }] },
   {
     id: "marketplace",

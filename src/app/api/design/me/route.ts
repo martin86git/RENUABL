@@ -5,6 +5,7 @@ import { sampleByEmail } from "@/lib/domain/design/staff-view";
 import { subscriptionOf } from "@/lib/server/design-billing-repo";
 import { answer, designAccess } from "@/lib/server/design-context";
 import { staffBehind } from "@/lib/server/design-staff-view";
+import { marketingOn } from "@/lib/server/marketing-access";
 
 /**
  * GET: who the roof designer is being used by. Signed out, the designer keeps
@@ -28,6 +29,8 @@ export async function GET() {
       access.email.toLowerCase() === process.env.RENUABL_CRM_EMAIL?.trim().toLowerCase();
     const plan = exempt ? null : await subscriptionOf(member.businessId).catch(() => undefined);
     const planDue = !exempt && plan !== undefined && needsPlan(cleanKind(member.businessKind), member.role, plan?.status ?? null);
+    // Marketing (domain/marketing/access.ts): only where it is switched on for the business, RENUABL's own for now.
+    const marketing = member ? await marketingOn(member.businessId).catch(() => false) : false;
     return Response.json({
       signedIn: true,
       state: access.state,
@@ -42,6 +45,7 @@ export async function GET() {
       },
       termsVersion: BUSINESS_TERMS_VERSION,
       ...(planDue ? { needsPlan: true } : {}),
+      ...(marketing ? { marketing: true } : {}),
       // A demo account (demo.ts): no plan asked for, and the shell says it is a demo.
       ...(demo ? { demo: true, ...(member?.firstName ? {} : { demoNeedsDetails: true }) } : {}),
       // About you (profile.ts): their own first name to greet them by, or, until given, that it is still to ask. Not
