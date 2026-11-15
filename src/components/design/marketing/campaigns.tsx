@@ -16,6 +16,8 @@ import {
 } from "@/lib/domain/marketing/sequences";
 import type { MarketingList } from "@/lib/domain/marketing/contacts";
 import {
+  addGtmDrafts,
+  loadGtmDrafts,
   campaignAction,
   deleteCampaign,
   loadCampaign,
@@ -82,9 +84,20 @@ export function CampaignsPage() {
   const router = useRouter();
   const [list, setList] = useState<CampaignLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  useEffect(() => {
+  const [gtm, setGtm] = useState<{ offer: boolean; made?: boolean } | null>(null);
+  const [adding, setAdding] = useState(false);
+  const refresh = useCallback(() => {
     loadCampaigns().then((r) => (r.ok ? setList(r.campaigns) : setProblem(r.message)));
+    loadGtmDrafts().then((r) => r.ok && setGtm(r));
   }, []);
+  useEffect(refresh, [refresh]);
+  async function addDrafts() {
+    setAdding(true);
+    const r = await addGtmDrafts();
+    setAdding(false);
+    if (!r.ok) return setProblem(r.message);
+    refresh();
+  }
   async function make() {
     const r = await newCampaign();
     if (r.ok) router.push(`/design/marketing/campaigns/${r.id}`);
@@ -104,6 +117,20 @@ export function CampaignsPage() {
         </Button>
       </div>
       {problem && <p className="mt-4 text-[13px] text-danger">{problem}</p>}
+      {gtm?.offer && !gtm.made && (
+        <div className={cn(box, "mt-5 flex flex-wrap items-center justify-between gap-3")}>
+          <div>
+            <p className="text-[14px] font-medium">RENUABL Business go-to-market</p>
+            <p className="text-[13px] text-muted">
+              A launch email and a four-email nurture sequence, added as drafts for you to read and change. Nothing is sent, and the
+              sequence stays off.
+            </p>
+          </div>
+          <Button size="sm" variant="secondary" onClick={addDrafts} disabled={adding}>
+            {adding && <Loader2 className="size-4 animate-spin" />} Add the drafts
+          </Button>
+        </div>
+      )}
       <div className={cn(box, "mt-5 p-0")}>
         {!list ? (
           <p className="flex items-center gap-2 px-5 py-6 text-[13px] text-muted">

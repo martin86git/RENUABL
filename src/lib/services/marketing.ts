@@ -200,6 +200,10 @@ export const loadMarketingSettings = () => send<MarketingSettingsView>(`/api/des
 export const saveMarketingSettings = (s: MarketingSettingsView["settings"]) =>
   send<{ settings: MarketingSettingsView["settings"] }>(`/api/design/marketing/settings`, json("PUT", s));
 
+/** RENUABL's own go-to-market drafts: whether they're offered and made, and adding them (drafts only). */
+export const loadGtmDrafts = () => send<{ offer: boolean; made?: boolean }>(`/api/design/marketing/gtm`, { cache: "no-store" });
+export const addGtmDrafts = () => send<{ campaign: string; sequence: string }>(`/api/design/marketing/gtm`, { method: "POST" });
+
 /** Sol writes a marketing email's part, or all four from a brief; nothing is kept or sent. */
 export const writeWithSol = (body: {
   part: "all" | "subject" | "preview" | "heading" | "text";
