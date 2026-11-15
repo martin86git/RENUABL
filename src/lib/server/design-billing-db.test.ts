@@ -12,6 +12,15 @@ const A = "owner@alpha-billing.test";
 const B = "owner@beta-billing.test";
 
 describe.skipIf(!url)("plans and design tokens (database)", () => {
+  const alphaPlan = {
+    email: A,
+    checkoutSession: "cs_test_alpha_0000000001",
+    stripeCustomer: "cus_alpha",
+    stripeSubscription: "sub_alpha",
+    interval: "month" as const,
+    trialEnd: null,
+    periodEnd: null,
+  };
   let db: typeof import("./db");
   let billing: typeof import("./design-billing-repo");
   let repo: typeof import("./design-repo");
@@ -68,6 +77,8 @@ describe.skipIf(!url)("plans and design tokens (database)", () => {
 
   it("credits a pack once in dollars, takes $3 a roof and $4 more once it has a battery, and nothing past nothing", async () => {
     const a = (await db.query<{ id: string }>(`select id from businesses where created_by = $1`, [A]))[0].id;
+    // No plan running, so no pool: every job from the balance.
+    await billing.updateSubscription({ ...alphaPlan, status: "canceled", seats: 4 });
     // A pack of 20 design jobs is $60 of balance.
     await billing.creditPack(a, "cs_test_pack_0000000001", 60, A);
     await billing.creditPack(a, "cs_test_pack_0000000001", 60, A);
@@ -86,5 +97,33 @@ describe.skipIf(!url)("plans and design tokens (database)", () => {
     expect(await billing.canStartRoof(b)).toBe(false);
     expect(await billing.canAddBattery(b, "roof_b")).toBe(false);
     expect((await billing.tokenLedger(a)).map((l) => l.reason)).toEqual(["battery", "job", "pack"]);
+  });
+
+  it("pools the month's design jobs for the whole business, used first by any designer, battery included, then the balance", async () => {
+    const a = (await db.query<{ id: string }>(`select id from businesses where created_by = $1`, [A]))[0].id;
+    await billing.updateSubscription({ ...alphaPlan, status: "active", seats: 1 });
+    // Started more than a month ago: one user's 30.
+    await db.query(`update design_subscriptions set created_at = now() - interval '60 days' where email = $1`, [A]);
+    const today = "2026-11-15";
+    expect(await billing.designPoolOf(a, today)).toEqual({ included: 30, used: 0, left: 30 });
+    const before = await billing.tokenBalance(a);
+    expect(await billing.spendToken(a, "roof_pool_1", A, today)).toBe("used");
+    expect(await billing.spendToken(a, "roof_pool_2", "designer@alpha-billing.test", today)).toBe("used");
+    expect(await billing.spendToken(a, "roof_pool_2", A, today)).toBe("already");
+    expect(await billing.spendBatteryDesign(a, "roof_pool_1", A)).toBe("used");
+    expect(await billing.tokenBalance(a)).toBe(before);
+    expect(await billing.designPoolOf(a, today)).toEqual({ included: 30, used: 2, left: 28 });
+    // Next month the pool is whole again.
+    expect((await billing.designPoolOf(a, "2026-12-01")).used).toBe(0);
+    // Pool used up: the next comes from the balance.
+    await db.query(
+      `insert into design_tokens (id, business_id, change, reason, project_id, source, month)
+         select 'tok_fill_' || g, $1, 0, 'job', 'roof_fill_' || g, 'included', '2026-11' from generate_series(1, 28) g`,
+      [a],
+    );
+    expect((await billing.designPoolOf(a, today)).left).toBe(0);
+    expect(await billing.spendToken(a, "roof_paid", A, today)).toBe("used");
+    expect(await billing.tokenBalance(a)).toBe(before - 3);
+    expect((await billing.tokenLedger(a))[0]).toMatchObject({ reason: "job", source: "paid", change: -3 });
   });
 });

@@ -13,6 +13,7 @@ import {
   solUseThisMonth,
   subscriptionOf,
   tokenBalance,
+  designPoolOf,
   tokenLedger,
   updateSubscription,
 } from "@/lib/server/design-billing-repo";
@@ -40,9 +41,10 @@ export async function GET() {
       await syncSeats(businessId);
     }
     const today = todayInMarket();
-    const [plan, tokens, ledger, sol, solUses, solPacks, details, customer] = await Promise.all([
+    const [plan, tokens, pool, ledger, sol, solUses, solPacks, details, customer] = await Promise.all([
       withPlan ? subscriptionOf(businessId) : null,
       tokenBalance(businessId),
+      withPlan ? designPoolOf(businessId, today) : null,
       tokenLedger(businessId),
       withSol ? solBalanceOf(businessId, today) : null,
       withSol ? solUseThisMonth(businessId, today) : [],
@@ -74,6 +76,7 @@ export async function GET() {
       },
       today,
       tokens,
+      pool,
       ledger,
       sol,
       solUses,

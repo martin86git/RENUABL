@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { EMPTY_BILLING, INVOICE_STATUS, type BillingDetails } from "@/lib/domain/design/billing-invoice";
 import {
+  designPoolWords,
   PLAN_WORDS,
   SEAT_NOTE,
   TOKEN_PACKS,
@@ -239,7 +240,27 @@ export function BillingPanel() {
             <span className="ml-2 text-xs text-muted">{designBalanceWords(state.tokens).split(" · ")[1]}</span>
           </p>
         </div>
-        <p className="text-sm leading-relaxed text-ink-2">{PLAN_WORDS.tokenExplained}</p>
+        {state.pool && state.pool.included > 0 && (
+          <div className="space-y-2 rounded-md border border-line p-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+              <span className="font-medium text-ink">This month&apos;s pool</span>
+              <span className="tabular-nums text-ink">
+                <span className="text-lg font-semibold">{state.pool.left}</span> of {state.pool.included} left
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-canvas" aria-hidden>
+              <div
+                className="h-full rounded-full bg-sun-line"
+                style={{ width: `${Math.min(100, (state.pool.used / state.pool.included) * 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted">{designPoolWords(state.pool)}</p>
+          </div>
+        )}
+        <p className="text-sm leading-relaxed text-ink-2">
+          {state.pool && state.pool.included > 0 ? `${PLAN_WORDS.poolExplained} ` : ""}
+          {PLAN_WORDS.tokenExplained}
+        </p>
         {bought && (
           <p className="rounded-md bg-positive-soft px-3 py-2 text-sm text-positive">
             Thanks. Your pack is added as soon as Stripe confirms it.
@@ -271,7 +292,11 @@ export function BillingPanel() {
                   <span className="ml-2 text-xs text-muted">{day(l.at)}</span>
                 </span>
                 <span className={clsx("tabular-nums", l.change > 0 ? "text-positive" : "text-ink")}>
-                  {l.change > 0 ? `+${dollars(l.change * 100)}` : `−${dollars(-l.change * 100)}`}
+                  {l.source === "included"
+                    ? "From the pool"
+                    : l.change > 0
+                      ? `+${dollars(l.change * 100)}`
+                      : `−${dollars(-l.change * 100)}`}
                 </span>
               </li>
             ))}

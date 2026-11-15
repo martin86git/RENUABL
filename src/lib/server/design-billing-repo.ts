@@ -5,7 +5,16 @@
  * email it was made for until that person's business exists, then attached to it (`claimSubscriptions`).
  */
 import type { BillingDetails } from "@/lib/domain/design/billing-invoice";
-import { BATTERY_EXTRA_DOLLARS, DESIGN_DOLLARS, type BillingInterval, type PlanTerm } from "@/lib/domain/design/plans";
+import { todayInMarket } from "@/lib/domain/market";
+import {
+  BATTERY_EXTRA_DOLLARS,
+  DESIGN_DOLLARS,
+  designPool,
+  designsIncluded,
+  type BillingInterval,
+  type DesignPool,
+  type PlanTerm,
+} from "@/lib/domain/design/plans";
 import { creditSource, includedThisMonth, monthOf, solBalance, type SolBalance, type SolUse } from "@/lib/domain/design/sol-credits";
 import { newId, query, transaction } from "./db";
 
@@ -28,12 +37,15 @@ export interface Subscription {
   term: PlanTerm;
   commitFrom: string | null;
   commitUntil: string | null;
+  /** The day the plan began, for the first month's pool of design jobs. */
+  startedAt?: string | null;
 }
 
 const SUBSCRIPTION = `id, email, business_id as "businessId", status, billing_interval as interval, seats,
   ${moment("trial_end")} as "trialEnd", ${moment("period_end")} as "periodEnd",
   stripe_customer as "stripeCustomer", stripe_subscription as "stripeSubscription",
-  term, to_char(commit_from, 'YYYY-MM-DD') as "commitFrom", to_char(commit_until, 'YYYY-MM-DD') as "commitUntil"`;
+  term, to_char(commit_from, 'YYYY-MM-DD') as "commitFrom", to_char(commit_until, 'YYYY-MM-DD') as "commitUntil",
+  to_char(created_at, 'YYYY-MM-DD') as "startedAt"`;
 
 export interface SubscriptionFacts {
   email: string;
@@ -156,13 +168,15 @@ export async function tokenBalance(businessId: string): Promise<number> {
 export interface TokenLine {
   change: number;
   reason: string;
+  /** 'included' when it came from the month's pool, else 'paid'. */
+  source: string;
   by: string | null;
   at: string;
 }
 
 export async function tokenLedger(businessId: string, limit = 50): Promise<TokenLine[]> {
   return query<TokenLine>(
-    `select change, reason, by_email as by, ${moment("at")} as at from design_tokens where business_id = $1 order by at desc limit $2`,
+    `select change, reason, source, by_email as by, ${moment("at")} as at from design_tokens where business_id = $1 order by at desc limit $2`,
     [businessId, limit],
   );
 }
@@ -176,23 +190,56 @@ export async function creditPack(businessId: string, stripeSession: string, toke
   );
 }
 
-/** Whether a new roof can be designed now: a token is left, or the roof has had its token already. */
+/** The month's pooled design jobs and how many anyone in the business has used, read inside a transaction or not. */
+async function poolIn(q: Q, businessId: string, today: string): Promise<DesignPool> {
+  const plan =
+    (
+      await q<Subscription>(`select ${SUBSCRIPTION} from design_subscriptions where business_id = $1 order by created_at desc limit 1`, [
+        businessId,
+      ])
+    )[0] ?? null;
+  const row = (
+    await q<{ n: string }>(
+      `select count(*) as n from design_tokens where business_id = $1 and source = 'included' and reason = 'job' and month = $2`,
+      [businessId, monthOf(today)],
+    )
+  )[0];
+  return designPool(designsIncluded(plan, today), Number(row?.n ?? 0));
+}
+
+/** Where the business's pool of design jobs stands this month (plans.ts): shared by every designer in it. */
+export async function designPoolOf(businessId: string, today = todayInMarket()): Promise<DesignPool> {
+  return poolIn(query, businessId, today);
+}
+
+/** Whether a new roof can be designed now: the month's pool has a job left, or the balance holds it. */
 export async function canStartRoof(businessId: string, withBattery = false): Promise<boolean> {
+  if ((await designPoolOf(businessId)).left > 0) return true;
   return (await tokenBalance(businessId)) >= DESIGN_DOLLARS + (withBattery ? BATTERY_EXTRA_DOLLARS : 0);
 }
 
-/** Whether a battery can go on a roof's designs now: it was paid for on this roof already, or $4 is left. */
+/** Whether the roof's design job came from the month's pool, which covers a battery too. */
+async function fromPool(q: Q, businessId: string, projectId: string): Promise<boolean> {
+  const rows = await q(
+    `select 1 from design_tokens where business_id = $1 and project_id = $2 and reason = 'job' and source = 'included'`,
+    [businessId, projectId],
+  );
+  return rows.length > 0;
+}
+
+/** Whether a battery can go on a roof's designs now: paid for on this roof already, its job came from the pool, or $4 is left. */
 export async function canAddBattery(businessId: string, projectId: string): Promise<boolean> {
-  const had = await query(`select 1 from design_tokens where business_id = $1 and project_id = $2 and reason = 'battery'`, [
+  const q: Q = query;
+  const had = await q(`select 1 from design_tokens where business_id = $1 and project_id = $2 and reason = 'battery'`, [
     businessId,
     projectId,
   ]);
-  return had.length > 0 || (await tokenBalance(businessId)) >= BATTERY_EXTRA_DOLLARS;
+  return had.length > 0 || (await fromPool(q, businessId, projectId)) || (await tokenBalance(businessId)) >= BATTERY_EXTRA_DOLLARS;
 }
 
 /**
- * The $4 more a battery job takes (plans.ts), once a roof, when a design on it is first saved with a battery. Under the
- * same lock as `spendToken`. "none" when too little is left (nothing is taken).
+ * The $4 more a battery job takes (plans.ts), once a roof, when a design on it is first saved with a battery: nothing
+ * when the roof's job came from the month's pool. Under the same lock as `spendToken`. "none" when too little is left.
  */
 export async function spendBatteryDesign(businessId: string, projectId: string, by: string): Promise<"used" | "already" | "none"> {
   return transaction(async (q) => {
@@ -202,24 +249,30 @@ export async function spendBatteryDesign(businessId: string, projectId: string, 
       projectId,
     ]);
     if (had.length) return "already";
-    const left = await q<{ n: string | null }>(`select sum(change) as n from design_tokens where business_id = $1`, [businessId]);
-    if (Number(left[0]?.n ?? 0) < BATTERY_EXTRA_DOLLARS) return "none";
-    await q(`insert into design_tokens (id, business_id, change, reason, project_id, by_email) values ($1, $2, $3, 'battery', $4, $5)`, [
-      newId("tok"),
-      businessId,
-      -BATTERY_EXTRA_DOLLARS,
-      projectId,
-      by.toLowerCase(),
-    ]);
+    const pooled = await fromPool(q, businessId, projectId);
+    if (!pooled) {
+      const left = await q<{ n: string | null }>(`select sum(change) as n from design_tokens where business_id = $1`, [businessId]);
+      if (Number(left[0]?.n ?? 0) < BATTERY_EXTRA_DOLLARS) return "none";
+    }
+    await q(
+      `insert into design_tokens (id, business_id, change, reason, project_id, by_email, source) values ($1, $2, $3, 'battery', $4, $5, $6)`,
+      [newId("tok"), businessId, pooled ? 0 : -BATTERY_EXTRA_DOLLARS, projectId, by.toLowerCase(), pooled ? "included" : "paid"],
+    );
     return "used";
   });
 }
 
 /**
- * Uses one token for a roof's first design. Once a roof: saving it again, or a teammate saving it, uses nothing.
- * "none" when there is no token to use (nothing is taken). Under a lock on the business, so two saves can't overspend.
+ * Uses a design job for a roof's first design: from the month's pool while it has one, else $3 of the balance. Once a
+ * roof: saving it again, or a teammate saving it, uses nothing. "none" when neither has one (nothing is taken). Under a
+ * lock on the business, so two designers saving at once can't overspend the pool or the balance.
  */
-export async function spendToken(businessId: string, projectId: string, by: string): Promise<"used" | "already" | "none"> {
+export async function spendToken(
+  businessId: string,
+  projectId: string,
+  by: string,
+  today = todayInMarket(),
+): Promise<"used" | "already" | "none"> {
   return transaction(async (q) => {
     await q(`select pg_advisory_xact_lock(hashtext('design-tokens:' || $1))`, [businessId]);
     const had = await q(`select 1 from design_tokens where business_id = $1 and project_id = $2 and reason = 'job'`, [
@@ -227,15 +280,15 @@ export async function spendToken(businessId: string, projectId: string, by: stri
       projectId,
     ]);
     if (had.length) return "already";
-    const left = await q<{ n: string | null }>(`select sum(change) as n from design_tokens where business_id = $1`, [businessId]);
-    if (Number(left[0]?.n ?? 0) < DESIGN_DOLLARS) return "none";
-    await q(`insert into design_tokens (id, business_id, change, reason, project_id, by_email) values ($1, $2, $3, 'job', $4, $5)`, [
-      newId("tok"),
-      businessId,
-      -DESIGN_DOLLARS,
-      projectId,
-      by.toLowerCase(),
-    ]);
+    const pooled = (await poolIn(q, businessId, today)).left > 0;
+    if (!pooled) {
+      const left = await q<{ n: string | null }>(`select sum(change) as n from design_tokens where business_id = $1`, [businessId]);
+      if (Number(left[0]?.n ?? 0) < DESIGN_DOLLARS) return "none";
+    }
+    await q(
+      `insert into design_tokens (id, business_id, change, reason, project_id, by_email, source, month) values ($1, $2, $3, 'job', $4, $5, $6, $7)`,
+      [newId("tok"), businessId, pooled ? 0 : -DESIGN_DOLLARS, projectId, by.toLowerCase(), pooled ? "included" : "paid", monthOf(today)],
+    );
     return "used";
   });
 }

@@ -5,7 +5,7 @@
  */
 import type { BillingPart } from "@/lib/domain/design/business-kind";
 import type { BillingDetails } from "@/lib/domain/design/billing-invoice";
-import type { BillingInterval, PlanTerm, TokenPack } from "@/lib/domain/design/plans";
+import type { BillingInterval, DesignPool, PlanTerm, TokenPack } from "@/lib/domain/design/plans";
 import type { SolBalance } from "@/lib/domain/design/sol-credits";
 
 type Answer = { ok: true; url?: string; message?: string } | { ok: false; message: string };
@@ -63,7 +63,9 @@ export interface BillingState {
   /** The market's today, as the server sees it. */
   today: string;
   tokens: number;
-  ledger: { change: number; reason: string; by: string | null; at: string }[];
+  /** The month's design jobs pooled for the whole business; null without a plan. */
+  pool: DesignPool | null;
+  ledger: { change: number; reason: string; source?: string; by: string | null; at: string }[];
   /** Null for a business with no Sol (an installer). */
   sol: SolBalance | null;
   solUses: { use: string; count: number }[];

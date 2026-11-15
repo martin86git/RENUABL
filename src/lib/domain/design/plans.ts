@@ -85,7 +85,8 @@ export const DESIGN_DOLLARS = TOKEN_CENTS / 100;
 export const packDollars = (pack: TokenPack) => (pack * TOKEN_CENTS) / 100;
 
 /** Said when a roof can't be designed, or a battery added, for want of design jobs. */
-export const NO_DESIGN_JOBS = "There isn't enough left for this design job ($3, or $7 with a battery). Buy a pack in Settings → Billing.";
+export const NO_DESIGN_JOBS =
+  "This month's design jobs are used, and there isn't enough on your balance for this one ($3, or $7 with a battery). Buy a pack in Settings → Billing.";
 
 /** The balance in words: "$57 · 19 designs, or 8 with a battery". */
 export function designBalanceWords(dollarsLeft: number): string {
@@ -155,6 +156,49 @@ export function dollars(cents: number): string {
 }
 
 /** The lines the page and the Billing page print, so they always agree with the prices above. */
+/**
+ * Design jobs that come with the plan (15 Nov 2026, Martin: pooled across the account, as Pylon's are, so every
+ * designer in the business draws from the same pool). Each paid user adds `DESIGNS_PER_USER` to the business's pool
+ * each calendar month (the market's month; they don't carry over); a new plan's first month holds up to
+ * `FIRST_MONTH_DESIGNS` whatever its users. A design job from the pool covers the roof, battery or not. Once the month's
+ * are used, jobs come from the bought balance at $3, or $7 with a battery.
+ */
+export const DESIGNS_PER_USER = 30;
+/** A new plan's pool for its first month, whatever its users. Not "unlimited": a figure we can stand behind. */
+export const FIRST_MONTH_DESIGNS = 200;
+/** How long the first month's pool holds, days from the plan's start. */
+export const FIRST_MONTH_DAYS = 31;
+
+/** Whole days from one ISO date to another. */
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(to.slice(0, 10)) - Date.parse(from.slice(0, 10))) / 86_400_000);
+
+/** The month's pooled design jobs for a plan on `today`: every paid user's share, the first month's more, else none. */
+export function designsIncluded(plan: { status: string; seats: number; startedAt?: string | null } | null, today: string): number {
+  if (!plan || !["active", "past_due", "trialing"].includes(plan.status)) return 0;
+  const perUsers = DESIGNS_PER_USER * Math.max(1, plan.seats);
+  const firstMonth =
+    plan.startedAt != null && daysBetween(plan.startedAt, today) >= 0 && daysBetween(plan.startedAt, today) < FIRST_MONTH_DAYS;
+  return firstMonth ? Math.max(perUsers, FIRST_MONTH_DESIGNS) : perUsers;
+}
+
+export interface DesignPool {
+  /** In the pool this month. */
+  included: number;
+  /** Of those, used by anyone in the business. */
+  used: number;
+  /** Still to use this month. */
+  left: number;
+}
+
+export function designPool(included: number, used: number): DesignPool {
+  return { included, used, left: Math.max(0, included - used) };
+}
+
+/** "12 of 90 used this month · shared by everyone in the business". */
+export function designPoolWords(pool: DesignPool): string {
+  return `${pool.used} of ${pool.included} used this month · shared by everyone in the business`;
+}
+
 export const PLAN_WORDS = {
   seat: `${dollars(SEAT_MONTHLY_CENTS)} a user a month`,
   /** The offer, in one line for the page. */
@@ -170,7 +214,10 @@ export const PLAN_WORDS = {
   yearly: `${Math.round(YEARLY_DISCOUNT * 100)}% off when you pay for the year`,
   yearlySeat: `${dollars(Math.round(seatPriceCents("year") / 12))} a user a month, billed yearly`,
   token: `${dollars(TOKEN_CENTS)} a design, ${dollars(BATTERY_DESIGN_CENTS)} with a battery`,
-  tokenExplained: `The design tool is ${dollars(TOKEN_CENTS)} a design job, ${dollars(BATTERY_DESIGN_CENTS)} once it has a battery: taken once a roof, the day it's saved, and the rest the day a battery goes on it. Open it, change it and send it again as often as you like. Packs add their price to your balance.`,
+  designsPerUser: `${DESIGNS_PER_USER} design jobs a user each month, pooled`,
+  firstMonthDesigns: `Up to ${FIRST_MONTH_DESIGNS} design jobs in your first month`,
+  poolExplained: `Each user brings ${DESIGNS_PER_USER} design jobs a month to one pool the whole business shares, so any designer can use them; your first month holds up to ${FIRST_MONTH_DESIGNS}. They start again on the 1st. Once they are used, design jobs come from your balance.`,
+  tokenExplained: `Beyond the month's pool, the design tool is ${dollars(TOKEN_CENTS)} a design job, ${dollars(BATTERY_DESIGN_CENTS)} once it has a battery: taken once a roof, the day it's saved, and the rest the day a battery goes on it. Open it, change it and send it again as often as you like. Packs add their price to your balance.`,
   start: "Get started",
   startExplained: `Your card is taken on Stripe's secure page and your plan starts straight away, at ${dollars(FIRST_MONTH_CENTS)} a user for the first month. Cancel any time: it runs to the end of the month you've paid for.`,
   enterprise: `${ENTERPRISE_FROM} users or more? Talk to us about Enterprise.`,

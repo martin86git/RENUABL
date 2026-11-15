@@ -1247,6 +1247,10 @@ create unique index if not exists design_tokens_one_battery on design_tokens(bus
 alter table design_tokens add column if not exists in_dollars boolean not null default false;
 update design_tokens set change = change * 3, in_dollars = true where not in_dollars;
 alter table design_tokens alter column in_dollars set default true;
+-- Design jobs from the month's pool (plans.ts, 15 Nov 2026): change 0, source 'included', counted by the market's month.
+alter table design_tokens add column if not exists source text not null default 'paid';
+alter table design_tokens add column if not exists month text;
+create index if not exists design_tokens_pool on design_tokens(business_id, month) where source = 'included';
 create table if not exists design_leads (
   id text primary key,
   kind text not null,
