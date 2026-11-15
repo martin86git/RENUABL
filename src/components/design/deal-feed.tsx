@@ -285,61 +285,61 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
 
   return (
     <div className="mx-auto w-full max-w-5xl lg:max-w-[84rem]">
-      {/* The overview strip, pinned under the top bar (14 Nov 2026, Martin): the pipeline picked, each part of Today with
-          how many, a press to go to it, and the part in view lit. */}
-      <TodayStrip
-        tabs={tabs}
-        lit={lit}
-        onGo={go}
-        left={
-          <>
-            <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} solo={solo} bare />
-            <span className={clsx(STRIP_FIGURE, "text-ink")}>
-              {data ? `$${Math.round(openValue / 1000).toLocaleString("en-AU")}k` : "–"}
-            </span>
-            <span className={STRIP_SUB}>{data ? `${open.length} being sold` : "Looking over your deals…"}</span>
-          </>
-        }
-        right={
-          data && props.onDay ? (
-            <button
-              type="button"
-              onClick={props.onDay}
-              title="Show me my day"
-              aria-label="Show me my day"
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-surface px-3 text-[13px] font-medium text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-ink-2"
-            >
-              <SolIcon className="size-4 text-sun-line" /> <span>My day</span>
-            </button>
-          ) : null
-        }
-      />
-      {data?.examples !== null && data?.examples !== undefined && (
-        <p className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] text-ink-2">
-          {data.examples > 0
-            ? `This made-up business has ${data.examples} example deals to try the feed with.`
-            : "A made-up business: add example deals to try the feed."}
-          <button
-            type="button"
-            disabled={filling}
-            onClick={() => void examples(data.examples ? "clear" : "add")}
-            className="ml-auto rounded-full bg-surface px-3 py-1 font-medium text-ink ring-1 ring-line hover:ring-ink-2 disabled:text-muted"
-          >
-            {filling ? "Working…" : data.examples ? "Clear example deals" : "Add example deals"}
-          </button>
-        </p>
-      )}
-      {problem && (
-        <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
-          {problem}
-        </p>
-      )}
-
       {/* The parts of Today in one column, in the order of what needs a person (14 Nov 2026, Martin): Needs you, New in,
           Calls, Coming up, In hand; Calls goes first while a call is ringing or on, the most live thing on the page. */}
       {/* Your work on the left, the deals on the right (14 Nov 2026, Martin: as Service lays out its cases). */}
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_23rem] lg:items-start lg:gap-8">
         <div className="min-w-0">
+          {/* The strip is as wide as the feed (15 Nov 2026, Martin), the deals beside it. */}
+          {/* The overview strip, pinned under the top bar (14 Nov 2026, Martin): the pipeline picked, each part of Today with
+              how many, a press to go to it, and the part in view lit. */}
+          <TodayStrip
+            tabs={tabs}
+            lit={lit}
+            onGo={go}
+            left={
+              <>
+                <FeedPicker pick={feedPick} pipelines={pipelines} picked={pickedPipeline} onPick={choosePick} solo={solo} bare />
+                <span className={clsx(STRIP_FIGURE, "text-white")}>
+                  {data ? `$${Math.round(openValue / 1000).toLocaleString("en-AU")}k` : "–"}
+                </span>
+                <span className={STRIP_SUB}>{data ? `${open.length} being sold` : "Looking over your deals…"}</span>
+              </>
+            }
+            right={
+              data && props.onDay ? (
+                <button
+                  type="button"
+                  onClick={props.onDay}
+                  title="Show me my day"
+                  aria-label="Show me my day"
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3.5 text-[13px] font-medium text-white ring-1 ring-white/15 transition hover:bg-white/15"
+                >
+                  <SolIcon className="size-4 text-sun-line" /> <span>My day</span>
+                </button>
+              ) : null
+            }
+          />
+          {data?.examples !== null && data?.examples !== undefined && (
+            <p className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[12.5px] text-ink-2">
+              {data.examples > 0
+                ? `This made-up business has ${data.examples} example deals to try the feed with.`
+                : "A made-up business: add example deals to try the feed."}
+              <button
+                type="button"
+                disabled={filling}
+                onClick={() => void examples(data.examples ? "clear" : "add")}
+                className="ml-auto rounded-full bg-surface px-3 py-1 font-medium text-ink ring-1 ring-line hover:ring-ink-2 disabled:text-muted"
+              >
+                {filling ? "Working…" : data.examples ? "Clear example deals" : "Add example deals"}
+              </button>
+            </p>
+          )}
+          {problem && (
+            <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
+              {problem}
+            </p>
+          )}
           {/* A deal picked in the panel: its whole card, with the way back. */}
           {pickedDeal && (
             <div className="mt-9">
@@ -756,7 +756,7 @@ function todayPlaces(callsLive: boolean) {
 
 /** A tile's figure and the line under it, the same in every tile of Today's strip. */
 const STRIP_FIGURE = "mt-0.5 text-[22px] font-semibold leading-tight tabular-nums";
-const STRIP_SUB = "mt-0.5 whitespace-nowrap text-[12px] text-muted";
+const STRIP_SUB = "mt-0.5 whitespace-nowrap text-[12px] text-white/55";
 
 interface StripTab {
   id: string;
@@ -787,7 +787,7 @@ function TodayStrip(props: {
           line under it, parted by hairlines; the part in view marked by a short orange line along its foot. */}
       <nav
         aria-label="Today at a glance"
-        className="flex items-stretch rounded-2xl bg-surface/90 shadow-[0_6px_24px_rgba(11,11,12,0.06)] ring-1 ring-line backdrop-blur"
+        className="flex items-stretch rounded-2xl bg-primary text-primary-ink shadow-[0_10px_30px_rgba(11,11,12,0.16)]"
       >
         <div className="flex w-[11.5rem] shrink-0 flex-col items-start px-5 py-3 sm:w-[13rem]">{props.left}</div>
         <div className="no-scrollbar flex min-w-0 flex-1 overflow-x-auto">
@@ -799,10 +799,10 @@ function TodayStrip(props: {
                 type="button"
                 onClick={() => props.onGo(t.id)}
                 aria-current={on ? "true" : undefined}
-                className="group relative flex min-w-[8.5rem] flex-1 flex-col items-start border-l border-line px-5 py-3 text-left transition-colors hover:bg-canvas/60"
+                className="group relative flex min-w-[8.5rem] flex-1 flex-col items-start border-l border-white/10 px-5 py-3 text-left transition-colors hover:bg-white/[0.04]"
               >
-                <span className={clsx("whitespace-nowrap text-[11.5px] font-medium", on ? "text-ink" : "text-muted")}>{t.label}</span>
-                <span className={clsx(STRIP_FIGURE, "flex items-center gap-1.5", on ? "text-ink" : "text-ink-2")}>
+                <span className={clsx("whitespace-nowrap text-[11.5px] font-medium", on ? "text-white" : "text-white/55")}>{t.label}</span>
+                <span className={clsx(STRIP_FIGURE, "flex items-center gap-1.5", on ? "text-white" : "text-white/75")}>
                   {t.count ?? "–"}
                   {t.signal === "live" && (
                     <span className="relative flex size-2" aria-label="A call is on now">
@@ -812,7 +812,7 @@ function TodayStrip(props: {
                   )}
                   {t.signal === "needs" && <span className="size-2 rounded-full bg-sun-line" aria-hidden />}
                 </span>
-                <span className={clsx(STRIP_SUB, "inline-flex items-center gap-1", t.signal === "clear" && "text-positive")}>
+                <span className={clsx(STRIP_SUB, "inline-flex items-center gap-1", t.signal === "clear" && "text-emerald-300")}>
                   {t.signal === "clear" && <Check className="size-3.5" aria-hidden />}
                   {t.sub}
                 </span>
@@ -827,7 +827,7 @@ function TodayStrip(props: {
             );
           })}
         </div>
-        {props.right && <div className="hidden shrink-0 items-center border-l border-line px-4 sm:flex">{props.right}</div>}
+        {props.right && <div className="hidden shrink-0 items-center border-l border-white/10 px-4 sm:flex">{props.right}</div>}
       </nav>
     </div>
   );
@@ -1619,7 +1619,7 @@ function DealsPanel(props: {
   return (
     <aside
       aria-label="Deals"
-      className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+6.5rem)] lg:mt-2 lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-8rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
+      className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+1.75rem)] lg:mt-1 lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-3.25rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
     >
       <div className="flex items-center gap-2.5">
         <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-ink">Deals</h2>
@@ -2022,17 +2022,20 @@ function FeedPicker({
         aria-haspopup="menu"
         className={
           bare
-            ? "-mx-1 inline-flex max-w-full items-center gap-1 rounded-md px-1 text-[11.5px] font-medium text-muted hover:text-ink"
+            ? "-mx-1 inline-flex max-w-full items-center gap-1 rounded-md px-1 text-[11.5px] font-medium text-white/55 hover:text-white"
             : "inline-flex h-9 items-center gap-2 rounded-full bg-surface pl-3.5 pr-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2"
         }
       >
         <span className={bare ? "whitespace-nowrap" : undefined}>{label}</span>
-        <ChevronDown className={clsx("size-3.5 text-muted transition", open && "rotate-180")} aria-hidden />
+        <ChevronDown className={clsx("size-3.5 transition", bare ? "text-white/55" : "text-muted", open && "rotate-180")} aria-hidden />
       </button>
       {open && (
         <div
           role="menu"
-          className={clsx("absolute left-0 z-30 w-60 rounded-2xl bg-surface p-2 shadow-lg ring-1 ring-line", bare ? "top-7" : "top-11")}
+          className={clsx(
+            "absolute left-0 z-30 w-60 rounded-2xl bg-surface p-2 text-ink shadow-lg ring-1 ring-line",
+            bare ? "top-7" : "top-11",
+          )}
         >
           {!solo && (
             <div
