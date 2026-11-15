@@ -134,6 +134,8 @@ describe("designs offered by hand", () => {
       "return",
     ]);
     expect(offeredDesigns({ primary: 0, designs: [d()] })).toEqual([]);
+    // A primary of the business's own, with goal designs beside it on the roof: only the primary goes out.
+    expect(offeredDesigns({ primary: 0, designs: [d(), d({ goal: "payback" }), d({ goal: "return" })] })).toEqual([]);
   });
 });
 

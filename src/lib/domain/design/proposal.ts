@@ -334,6 +334,10 @@ export function offeredDesigns(
       };
     });
   }
+  // A primary laid or changed by hand (no goal of its own) is what goes out, alone (15 Nov 2026, Martin: the proposal
+  // showed Design it for me's layouts, crooked, not the panels he had placed). The goal designs go beside it only when
+  // the primary is one of them, or when offered by hand.
+  if (!set.designs[set.primary]?.goal) return [];
   const goals = DESIGN_GOALS.flatMap((goal) => {
     const at = set.designs.findIndex((d) => d.goal === goal);
     return at >= 0 ? [{ goal: goal as OptionKey, at, name: GOAL_WORDS[goal].name, promise: GOAL_WORDS[goal].promise }] : [];
