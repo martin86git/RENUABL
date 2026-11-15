@@ -27,6 +27,7 @@ import {
   GripVertical,
   ImagePlus,
   LayoutTemplate,
+  Lock,
   Moon,
   PanelLeft,
   PanelRight,
@@ -228,12 +229,25 @@ export function useProposalBuilder(
       const setting = kit?.blocks.find((b) => b.id === block.id);
       const index = kit?.blocks.findIndex((b) => b.id === block.id) ?? -1;
       const line = dropAt?.id === block.id;
+      const fixed = isFixed(block.id);
+      const movable = custom && !fixed;
+      const addHere = () => {
+        if (!kit) return;
+        const id = nextOwnBlock(kit.blocks);
+        if (!id) return setProblem("All six of your own blocks are on the proposal.");
+        const shown = kit.blocks.map((b) => (b.id === id ? { ...b, on: true } : b));
+        change({ blocks: placeBlock(shown, id, index + 1) });
+        setEditing(id);
+      };
       return (
         <div
           key={block.id}
           className={clsx(
-            "group/block relative rounded-2xl outline-offset-[10px]",
-            custom && "hover:outline hover:outline-2 hover:outline-sun-line/60",
+            // Every block a dashed box with its name on the edge (15 Nov 2026, Martin: "i cant tell whats customizable").
+            "group/block relative rounded-2xl border-2 border-dashed px-4 pb-5 pt-7 transition-colors sm:px-6",
+            movable
+              ? "border-sun-line/45 hover:border-sun-line hover:bg-sun-line/[0.03]"
+              : "border-line-strong/70 hover:border-line-strong",
           )}
           onDragOver={(e) => {
             if (!custom && !pictureIn(e)) return;
@@ -251,9 +265,22 @@ export function useProposalBuilder(
               aria-hidden
               className={clsx(
                 "pointer-events-none absolute inset-x-0 z-20 h-1 rounded-full bg-sun-line",
-                dropAt.after ? "-bottom-6" : "-top-6",
+                dropAt.after ? "-bottom-[27px]" : "-top-[27px]",
               )}
             />
+          )}
+          {!custom && (
+            <span className="absolute -top-[15px] left-3 z-30 inline-flex h-7 items-center gap-1.5 rounded-md bg-surface px-2 text-[12px] font-medium text-ink-2 shadow-sm ring-1 ring-line">
+              <Lock className="size-3.5 text-muted" aria-hidden />
+              {nameOf(block.id)}
+              <button
+                type="button"
+                onClick={() => change({ design: "custom" })}
+                className="ml-1 hidden rounded px-1.5 py-0.5 text-[11.5px] font-medium text-sun-ink hover:bg-sun group-hover/block:inline"
+              >
+                Switch to Custom to move or change it
+              </button>
+            </span>
           )}
           {custom && setting && (
             <BlockTools
@@ -285,6 +312,23 @@ export function useProposalBuilder(
           {custom && setting && editing === block.id && (
             <BlockWords setting={setting} onSet={(patch) => setBlock(block.id, patch)} onDone={() => setEditing(null)} />
           )}
+          {movable && !isFixed(kit?.blocks[index + 1]?.id ?? "terms") && nextOwnBlock(kit?.blocks ?? []) && (
+            // Between this block and the next: a place to add a block of their own, lit as the pointer comes to it.
+            <button
+              type="button"
+              onClick={addHere}
+              className="group/add absolute inset-x-0 top-[calc(100%+6px)] z-20 flex h-9 items-center justify-center"
+              aria-label="Add a block of your own here"
+            >
+              <span
+                aria-hidden
+                className="absolute inset-x-6 top-1/2 border-t-2 border-dashed border-sun-line/0 group-hover/add:border-sun-line/60"
+              />
+              <span className="relative inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-1 text-[12px] font-medium text-muted opacity-0 shadow-sm ring-1 ring-line transition-opacity group-hover/add:text-sun-ink group-hover/add:opacity-100 group-hover/add:ring-sun-line focus-visible:opacity-100">
+                <Plus className="size-3.5" aria-hidden /> Add a block here
+              </span>
+            </button>
+          )}
         </div>
       );
     },
@@ -306,7 +350,10 @@ function PictureSpot(props: {
   const pick = useRef<HTMLInputElement>(null);
   return (
     <div
-      className={clsx("group/spot relative rounded-xl", over && "outline outline-2 outline-offset-4 outline-sun-line")}
+      className={clsx(
+        "group/spot relative rounded-xl outline-dashed outline-2 outline-offset-[6px]",
+        over ? "outline-solid outline-sun-line" : "outline-sun-line/45 hover:outline-sun-line",
+      )}
       onDragOver={(e) => {
         if (!pictureIn(e)) return;
         e.preventDefault();
@@ -372,15 +419,10 @@ function BlockTools(props: {
   const { setting } = props;
   const pick = useRef<HTMLInputElement>(null);
   const fixed = isFixed(setting.id);
-  const tool = "flex size-8 items-center justify-center rounded-md text-white/85 hover:bg-white/15 hover:text-white disabled:opacity-30";
+  const tool = "flex size-7 items-center justify-center rounded-md text-white/85 hover:bg-white/15 hover:text-white disabled:opacity-30";
   const lit = "bg-white/20 text-white";
   return (
-    <div
-      className={clsx(
-        "absolute -top-12 left-0 z-30 flex items-center gap-0.5 rounded-lg bg-ink px-1.5 py-1 shadow-xl transition-opacity",
-        props.editing || props.busy ? "opacity-100" : "opacity-0 group-hover/block:opacity-100 focus-within:opacity-100",
-      )}
-    >
+    <div className={clsx("absolute -top-[17px] left-3 z-30 flex h-8 items-center gap-0.5 rounded-lg bg-ink px-1 shadow-lg")}>
       {!fixed && (
         <span
           draggable
@@ -394,9 +436,16 @@ function BlockTools(props: {
       )}
       <span className="px-1.5 text-[12px] font-medium text-white">{nameOf(setting.id)}</span>
       {fixed ? (
-        <span className="px-1.5 text-[11.5px] text-white/60">Always last, never reworded</span>
+        <span className="inline-flex items-center gap-1 px-1.5 text-[11.5px] text-white/60">
+          <Lock className="size-3" aria-hidden /> Always last, never reworded
+        </span>
       ) : (
-        <>
+        <span
+          className={clsx(
+            "items-center gap-0.5",
+            props.editing || props.busy ? "flex" : "hidden group-hover/block:flex group-focus-within/block:flex",
+          )}
+        >
           <span className="mx-1 h-5 w-px bg-white/20" aria-hidden />
           <button
             type="button"
@@ -495,7 +544,7 @@ function BlockTools(props: {
             </>
           )}
           {props.busy && <span className="px-1.5 text-[11.5px] text-white/70">Putting it up…</span>}
-        </>
+        </span>
       )}
       <input
         ref={pick}
@@ -602,6 +651,11 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
           {builder.problem}
         </p>
       )}
+      <p className="rounded-lg bg-sun/60 px-3 py-2.5 text-xs leading-relaxed text-sun-ink">
+        {custom
+          ? "Each dashed box on the page is a block. Drag one by its handle to move it, hover it for its picture, words and layout, or add a block between two."
+          : "Each dashed box on the page is a block. In Standard they keep their usual order: switch to Custom to move them, add your own and put pictures on them."}
+      </p>
       <fieldset>
         <legend className={ui.label}>Design</legend>
         <div className="mt-1.5 grid grid-cols-2 gap-1.5" role="radiogroup">

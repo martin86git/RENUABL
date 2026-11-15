@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-15",
+    area: "Proposals",
+    words: "In the Builder every block is a dashed box with its name on it, and in a custom design you can add a block between two.",
+  },
+  {
+    day: "2026-11-15",
     area: "Sol",
     words: "An orange frame round Sol's chat and the page beside it shows when he can see that page. The eye in his header turns it off.",
   },
