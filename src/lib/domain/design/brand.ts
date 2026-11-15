@@ -136,10 +136,87 @@ export const DEFAULT_VALID_DAYS = 14;
  * a face the PDF has built in (a PDF made here embeds no font files): the
  * page and the file are close, not identical, and the settings page says so.
  */
+/**
+ * The type a proposal is set in: a face for its headings and one for its words, each kept in the site (./fonts, from
+ * Google Fonts under the SIL Open Font Licence, loaded only on a page that uses it). More were added on 15 Nov 2026
+ * (Martin: "provide more font style options"). The PDF has only the faces built into every PDF, so each says which it
+ * uses there (`pdfHeading`, `pdfBody`): a serif face is Times there, the rest Helvetica.
+ */
 export const FONTS = [
-  { id: "modern", name: "Modern", blurb: "A clean sans-serif throughout.", pdf: "Helvetica in the PDF." },
-  { id: "editorial", name: "Editorial", blurb: "Serif headings over a clean sans-serif.", pdf: "Times headings in the PDF." },
+  {
+    id: "modern",
+    name: "Modern",
+    blurb: "A clean sans-serif throughout.",
+    pdf: "Helvetica in the PDF.",
+    heading: "var(--font-inter), system-ui, sans-serif",
+    body: "var(--font-inter), system-ui, sans-serif",
+    pdfHeading: "Helvetica-Bold",
+    pdfBody: "Helvetica",
+  },
+  {
+    id: "editorial",
+    name: "Editorial",
+    blurb: "Serif headings over a clean sans-serif.",
+    pdf: "Times headings in the PDF.",
+    heading: "var(--font-serif), Georgia, serif",
+    body: "var(--font-inter), system-ui, sans-serif",
+    pdfHeading: "Times-Bold",
+    pdfBody: "Helvetica",
+  },
+  {
+    id: "classic",
+    name: "Classic",
+    blurb: "A warm book serif throughout.",
+    pdf: "Times in the PDF.",
+    heading: "var(--font-lora), Georgia, serif",
+    body: "var(--font-lora), Georgia, serif",
+    pdfHeading: "Times-Bold",
+    pdfBody: "Times-Roman",
+  },
+  {
+    id: "elegant",
+    name: "Elegant",
+    blurb: "High-contrast display serif headings over a clean sans-serif.",
+    pdf: "Times headings in the PDF.",
+    heading: "var(--font-playfair), Georgia, serif",
+    body: "var(--font-inter), system-ui, sans-serif",
+    pdfHeading: "Times-Bold",
+    pdfBody: "Helvetica",
+  },
+  {
+    id: "geometric",
+    name: "Geometric",
+    blurb: "A crisp geometric sans-serif throughout.",
+    pdf: "Helvetica in the PDF.",
+    heading: "var(--font-manrope), system-ui, sans-serif",
+    body: "var(--font-manrope), system-ui, sans-serif",
+    pdfHeading: "Helvetica-Bold",
+    pdfBody: "Helvetica",
+  },
+  {
+    id: "friendly",
+    name: "Friendly",
+    blurb: "A soft, rounded sans-serif throughout.",
+    pdf: "Helvetica in the PDF.",
+    heading: "var(--font-nunito), system-ui, sans-serif",
+    body: "var(--font-nunito), system-ui, sans-serif",
+    pdfHeading: "Helvetica-Bold",
+    pdfBody: "Helvetica",
+  },
+  {
+    id: "technical",
+    name: "Technical",
+    blurb: "Engineered headings over a clean sans-serif.",
+    pdf: "Helvetica in the PDF.",
+    heading: "var(--font-grotesk), system-ui, sans-serif",
+    body: "var(--font-inter), system-ui, sans-serif",
+    pdfHeading: "Helvetica-Bold",
+    pdfBody: "Helvetica",
+  },
 ] as const;
+
+/** A font choice's faces, the usual Modern for one not known. */
+export const fontOf = (id: string | undefined) => FONTS.find((f) => f.id === id) ?? FONTS[0];
 export type FontId = (typeof FONTS)[number]["id"];
 
 /** How the price is written. The price itself always has GST in it: this is only whether it is shown as one figure or broken out. */
@@ -245,8 +322,9 @@ export function themeVars(theme: Pick<BrandKit, "palette" | "primary" | "accent"
     "--forest": theme.primary,
     "--accent": accent,
     "--positive": accent,
-    // The headings' face: the site's own serif for Editorial, else the same face as everything else.
-    "--proposal-heading": theme.font === "editorial" ? "var(--font-serif), Georgia, serif" : "inherit",
+    // The faces chosen for the headings and the words (`FONTS`).
+    "--proposal-heading": fontOf(theme.font).heading,
+    "--proposal-body": fontOf(theme.font).body,
   };
 }
 

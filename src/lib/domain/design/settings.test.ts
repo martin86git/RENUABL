@@ -196,8 +196,15 @@ describe("warranty, installation time and who is told", () => {
     expect(`${email.subject} ${email.text} ${email.html}`).not.toMatch(/\$|BSB|account number|guarantee/i);
   });
   it("offer only fonts the site loads, each with a face the PDF has built in", () => {
-    expect(FONTS.map((f) => f.id)).toEqual(["modern", "editorial"]);
-    for (const font of FONTS) expect(font.pdf).toMatch(/Helvetica|Times/);
+    expect(FONTS.map((f) => f.id)).toEqual(["modern", "editorial", "classic", "elegant", "geometric", "friendly", "technical"]);
+    for (const font of FONTS) {
+      expect(font.pdf).toMatch(/Helvetica|Times/);
+      expect([font.pdfHeading, font.pdfBody].every((face) => /^(Helvetica|Times)/.test(face))).toBe(true);
+      // Each face on the page is one the site loads, with a fallback.
+      for (const face of [font.heading, font.body])
+        expect(face).toMatch(/^var\(--font-(inter|serif|lora|playfair|manrope|nunito|grotesk)\), /);
+    }
+    expect(cleaned({ font: "geometric" }).font).toBe("geometric");
     expect(cleaned({ font: "editorial" }).font).toBe("editorial");
     expect(cleaned({ font: "comic" }).font).toBe("modern");
   });
@@ -234,6 +241,9 @@ describe("the proposal's blocks", () => {
       image: null,
       layout: "stack",
       tone: "light",
+      size: 100,
+      x: 50,
+      y: 50,
     });
     for (const id of ["price", "accept", "conditions", "cover"] as const) expect(blocks.find((b) => b.id === id)?.on).toBe(true);
     expect(blocks.find((b) => b.id === "system")).toMatchObject({ on: false, image: "img_0000000000000000000000aa" });

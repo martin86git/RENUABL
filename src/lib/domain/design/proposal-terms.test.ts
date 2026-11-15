@@ -121,6 +121,9 @@ describe("the standard terms and conditions on a proposal", () => {
       image: null,
       layout: "stack",
       tone: "light",
+      size: 100,
+      x: 50,
+      y: 50,
     });
     // On the proposal the block is there; what it shows is the fixed copy's terms, or nothing when they are off.
     expect(built().view.blocks!.at(-1)).toEqual({ id: "terms", heading: "", words: "", image: null });

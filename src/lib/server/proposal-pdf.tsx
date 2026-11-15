@@ -17,7 +17,7 @@
  */
 import { Document, Image, Page, Polygon, Polyline, Rect, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
-import { contrast, inkOn, lookOf, shownAbn, shownBsb, shownWebsite, type ChartStyle } from "@/lib/domain/design/brand";
+import { contrast, fontOf, inkOn, lookOf, shownAbn, shownBsb, shownWebsite, type ChartStyle } from "@/lib/domain/design/brand";
 import { batteryHero } from "@/lib/domain/design/battery-hero";
 import { money } from "@/lib/domain/design/deposit";
 import {
@@ -171,7 +171,7 @@ function ProposalDocument({
   // So a colour too pale to see on white gives way to black for the drawing and the bars.
   const accent = contrast(colour, "#ffffff") >= 1.6 ? colour : INK;
   // Headings in the face the business chose, as near as the faces built into every PDF come to it.
-  const heading = [s.h2, { fontFamily: view.theme.font === "editorial" ? "Times-Bold" : "Helvetica-Bold" }];
+  const heading = [s.h2, { fontFamily: fontOf(view.theme.font).pdfHeading }];
   const picture = (id: string | undefined) => {
     const image = id ? images[id] : undefined;
     return image ? { data: image.bytes, format: image.contentType === "image/png" ? ("png" as const) : ("jpg" as const) } : null;
@@ -192,7 +192,7 @@ function ProposalDocument({
   );
 
   const look = lookOf(view.template);
-  const headingFace = view.theme.font === "editorial" ? "Times-Bold" : "Helvetica-Bold";
+  const headingFace = fontOf(view.theme.font).pdfHeading;
   /** The proposal's title, in the colours it sits on. */
   const titleBlock = (ink: string, soft: string, size?: number) => (
     <>
@@ -491,8 +491,13 @@ function ProposalDocument({
       <>
         {block.words ? <Text style={{ marginBottom: 6 }}>{block.words}</Text> : null}
         {image ? (
-          // eslint-disable-next-line jsx-a11y/alt-text -- a PDF image has no alt attribute
-          <Image src={image} style={{ maxHeight: 200, width: "100%", objectFit: "cover", borderRadius: 4, marginBottom: 8 }} />
+          // At the width and across the place the business set (the page's springs, as on the page).
+          <View style={{ flexDirection: "row", marginBottom: 8 }}>
+            <View style={{ flexGrow: block.x ?? 50 }} />
+            {/* eslint-disable-next-line jsx-a11y/alt-text -- a PDF image has no alt attribute */}
+            <Image src={image} style={{ maxHeight: 200, width: `${block.size ?? 100}%`, objectFit: "cover", borderRadius: 4 }} />
+            <View style={{ flexGrow: 100 - (block.x ?? 50) }} />
+          </View>
         ) : null}
       </>
     );
@@ -500,7 +505,7 @@ function ProposalDocument({
 
   return (
     <Document title={`${view.title}: ${view.customer.name}`} author={b.name} creator={b.name} producer={b.name}>
-      <Page size="A4" style={s.page}>
+      <Page size="A4" style={[s.page, { fontFamily: fontOf(view.theme.font).pdfBody }]}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           {logo ? (
             // eslint-disable-next-line jsx-a11y/alt-text -- a PDF image has no alt attribute
@@ -582,7 +587,7 @@ function ProposalDocument({
       </Page>
 
       {/* The rest, in the business's own order, as on the page: each block under its heading, running on over as many pages as it needs. */}
-      <Page size="A4" style={s.page}>
+      <Page size="A4" style={[s.page, { fontFamily: fontOf(view.theme.font).pdfBody }]}>
         {blocks
           .filter((block) => block.id !== "cover")
           .map((block) => ({ block, inner: content[block.id](), hasOwn: Boolean(block.words || block.image) }))

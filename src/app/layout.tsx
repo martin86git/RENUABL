@@ -30,6 +30,26 @@ const script = localFont({
   ],
   display: "swap",
 });
+// The faces a business may set its proposals in (FONTS in domain/design/brand.ts). Not preloaded: only a proposal
+// that chooses one loads it.
+const lora = localFont({ variable: "--font-lora", src: [{ path: "./fonts/lora-latin.woff2", weight: "400 700" }], preload: false });
+const playfair = localFont({
+  variable: "--font-playfair",
+  src: [{ path: "./fonts/playfair-display-latin.woff2", weight: "400 900" }],
+  preload: false,
+});
+const manrope = localFont({
+  variable: "--font-manrope",
+  src: [{ path: "./fonts/manrope-latin.woff2", weight: "200 800" }],
+  preload: false,
+});
+const nunito = localFont({ variable: "--font-nunito", src: [{ path: "./fonts/nunito-latin.woff2", weight: "200 1000" }], preload: false });
+const grotesk = localFont({
+  variable: "--font-grotesk",
+  src: [{ path: "./fonts/space-grotesk-latin.woff2", weight: "300 700" }],
+  preload: false,
+});
+const proposalFaces = [lora, playfair, manrope, nunito, grotesk].map((f) => f.variable).join(" ");
 // Figures in the roof designer (.theme-studio). Not preloaded: only that product uses it.
 const mono = localFont({
   variable: "--font-mono",
@@ -60,7 +80,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en-AU" className={`${inter.variable} ${serif.variable} ${script.variable} ${mono.variable} h-full antialiased`}>
+    <html
+      lang="en-AU"
+      className={`${inter.variable} ${serif.variable} ${script.variable} ${mono.variable} ${proposalFaces} h-full antialiased`}
+    >
       <body className="flex min-h-full flex-col">
         {children}
         {/* Google Ads IDs are public; read here so short Vercel names (GADS_*) work. */}

@@ -117,6 +117,32 @@ export const BLOCK_TONES = [
 ] as const;
 export type BlockTone = (typeof BLOCK_TONES)[number]["id"];
 
+/**
+ * A block's picture can be made smaller and moved (15 Nov 2026, Martin: "i need to be able to position it and resize
+ * it"): its width as a share of the room it has, and where it sits in that room, across and down, each 0 to 100 (50 is
+ * the middle). Down only tells where the room is taller than the picture (beside the words). Kept as whole numbers.
+ */
+export const PICTURE_SIZE = { min: 20, max: 100, usual: 100 } as const;
+export const PICTURE_PLACE_USUAL = 50;
+
+/** A picture's width share, as whole numbers within its bounds (anything else is the usual full width). */
+export function cleanPictureSize(raw: unknown): number {
+  const n = typeof raw === "number" && Number.isFinite(raw) ? Math.round(raw) : PICTURE_SIZE.usual;
+  return Math.min(PICTURE_SIZE.max, Math.max(PICTURE_SIZE.min, n));
+}
+
+/** Where a picture sits, across or down, 0 to 100 (anything else is the middle). */
+export function cleanPicturePlace(raw: unknown): number {
+  const n = typeof raw === "number" && Number.isFinite(raw) ? Math.round(raw) : PICTURE_PLACE_USUAL;
+  return Math.min(100, Math.max(0, n));
+}
+
+/** Whether a picture is as it always was: full width, in the middle. */
+export const pictureAsUsual = (p: { size?: number; x?: number; y?: number }) =>
+  (p.size ?? PICTURE_SIZE.usual) === PICTURE_SIZE.usual &&
+  (p.x ?? PICTURE_PLACE_USUAL) === PICTURE_PLACE_USUAL &&
+  (p.y ?? PICTURE_PLACE_USUAL) === PICTURE_PLACE_USUAL;
+
 /** Whether a block may take the dark ground: only the blocks of the business's own words. */
 export const mayGoDark = (id: BlockId) => isCustom(id) || id === "about";
 
@@ -135,6 +161,10 @@ export interface BlockSetting {
   layout: BlockLayout;
   /** Its ground (`mayGoDark`). */
   tone: BlockTone;
+  /** The picture's width as a share of its room (`PICTURE_SIZE`), and where it sits there across and down (0 to 100). */
+  size: number;
+  x: number;
+  y: number;
 }
 
 /** The blocks as every business starts: all the usual ones on, in the usual order, its own three off. */
@@ -147,6 +177,9 @@ export function defaultBlocks(): BlockSetting[] {
     image: null,
     layout: "stack",
     tone: "light",
+    size: PICTURE_SIZE.usual,
+    x: PICTURE_PLACE_USUAL,
+    y: PICTURE_PLACE_USUAL,
   }));
   // The standard terms close the proposal.
   return [...all.filter((b) => !isFixed(b.id)), ...all.filter((b) => isFixed(b.id))];
@@ -187,6 +220,9 @@ export function cleanBlocks(raw: unknown): BlockSetting[] {
       image: !isFixed(e.id) && typeof e.image === "string" && /^img_[a-f0-9]{8,64}$/.test(e.image) ? e.image : null,
       layout: BLOCK_LAYOUTS.some((l) => l.id === e.layout) && !isFixed(e.id) ? (e.layout as BlockLayout) : "stack",
       tone: e.tone === "dark" && mayGoDark(e.id) ? "dark" : "light",
+      size: isFixed(e.id) ? PICTURE_SIZE.usual : cleanPictureSize(e.size),
+      x: isFixed(e.id) ? PICTURE_PLACE_USUAL : cleanPicturePlace(e.x),
+      y: isFixed(e.id) ? PICTURE_PLACE_USUAL : cleanPicturePlace(e.y),
     });
   }
   for (const block of defaultBlocks()) if (!seen.has(block.id)) out.push(block);
@@ -233,6 +269,10 @@ export interface ViewBlock {
   /** Where its picture sits and its ground (left out on a proposal published before they could be chosen). */
   layout?: BlockLayout;
   tone?: BlockTone;
+  /** The picture's width share and place (left out when as usual, and on a proposal published before they could be set). */
+  size?: number;
+  x?: number;
+  y?: number;
 }
 
 /**
@@ -253,6 +293,7 @@ export function blocksForView(
       image: (block.image && images.find((i) => i.id === block.image && i.kind === "block")) || null,
       ...(block.layout !== "stack" ? { layout: block.layout } : {}),
       ...(block.tone === "dark" ? { tone: block.tone } : {}),
+      ...(block.image && !pictureAsUsual(block) ? { size: block.size, x: block.x, y: block.y } : {}),
     }));
 }
 
@@ -263,7 +304,14 @@ export function blocksAreUsual(blocks: readonly BlockSetting[]): boolean {
     blocks.length === usual.length &&
     blocks.every(
       (b, i) =>
-        b.id === usual[i].id && b.on === usual[i].on && !b.heading && !b.words && !b.image && b.layout === "stack" && b.tone === "light",
+        b.id === usual[i].id &&
+        b.on === usual[i].on &&
+        !b.heading &&
+        !b.words &&
+        !b.image &&
+        b.layout === "stack" &&
+        b.tone === "light" &&
+        pictureAsUsual(b),
     )
   );
 }

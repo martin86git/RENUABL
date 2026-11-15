@@ -3,7 +3,16 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Download, FileText } from "lucide-react";
-import { blockHeading, isCustom, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
+import {
+  blockHeading,
+  isCustom,
+  PICTURE_PLACE_USUAL,
+  PICTURE_SIZE,
+  viewBlocks,
+  type BlockId,
+  type ViewBlock,
+} from "@/lib/domain/design/blocks";
+import { BlockPicture } from "./block-picture";
 import { darkGroundVars, lookOf, lookVars, shownAbn, shownBsb, shownWebsite, themeVars, type ChartStyle } from "@/lib/domain/design/brand";
 import {
   BANK_NOTE,
@@ -707,6 +716,8 @@ export interface BuildHooks {
   block: (block: ViewBlock, node: React.ReactNode) => React.ReactNode;
   cover: (node: React.ReactNode) => React.ReactNode;
   logo: (node: React.ReactNode) => React.ReactNode;
+  /** Where a block's picture can be resized and moved in place (a custom design), else nothing. */
+  placePicture?: (block: ViewBlock) => ((place: { size: number; x: number; y: number }) => void) | null;
 }
 
 /**
@@ -1073,14 +1084,14 @@ export function ProposalPage({
    */
   const own = (block: ViewBlock) => {
     const words = block.words && <p className="max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-ink">{block.words}</p>;
+    const side = Boolean(block.layout && block.layout !== "stack");
+    const place = {
+      size: block.size ?? PICTURE_SIZE.usual,
+      x: block.x ?? PICTURE_PLACE_USUAL,
+      y: block.y ?? PICTURE_PLACE_USUAL,
+    };
     const picture = block.image && (
-      // eslint-disable-next-line @next/next/no-img-element -- as above
-      <img
-        src={urls.image(block.image.id)}
-        alt=""
-        loading="lazy"
-        className={clsx("w-full rounded-xl object-cover", block.layout && block.layout !== "stack" ? "aspect-[4/3]" : "max-h-[26rem]")}
-      />
+      <BlockPicture src={urls.image(block.image.id)} side={side} place={place} onPlace={build?.placePicture?.(block) ?? null} />
     );
     if (!words && !picture)
       return build && isCustom(block.id) ? (
@@ -1090,9 +1101,9 @@ export function ProposalPage({
       ) : null;
     if (words && picture && block.layout && block.layout !== "stack")
       return (
-        <div className="grid items-center gap-5 sm:grid-cols-2 sm:gap-8">
-          <div className={clsx(block.layout === "right" && "sm:order-2")}>{picture}</div>
-          <div>{words}</div>
+        <div className="grid items-stretch gap-5 sm:grid-cols-2 sm:gap-8">
+          <div className={clsx("flex", block.layout === "right" && "sm:order-2")}>{picture}</div>
+          <div className="self-center">{words}</div>
         </div>
       );
     return (
@@ -1107,7 +1118,7 @@ export function ProposalPage({
   return (
     <div
       style={{ ...themeVars(view.theme), ...lookVars(view.template) } as React.CSSProperties}
-      className="min-h-dvh bg-canvas text-ink [color-scheme:light]"
+      className="min-h-dvh bg-canvas text-ink [color-scheme:light] [font-family:var(--proposal-body)]"
     >
       <header className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-5 sm:px-8">
         {(build ? build.logo : (node: React.ReactNode) => node)(

@@ -225,6 +225,8 @@ export function useProposalBuilder(
         {node}
       </PictureSpot>
     ),
+    // A picture is resized and moved in place on a custom design (15 Nov 2026, Martin).
+    placePicture: (block: ViewBlock) => (custom && !isFixed(block.id) ? (place) => setBlock(block.id, place) : null),
     block: (block: ViewBlock, node) => {
       const setting = kit?.blocks.find((b) => b.id === block.id);
       const index = kit?.blocks.findIndex((b) => b.id === block.id) ?? -1;
@@ -712,20 +714,38 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
             />
           </label>
         </div>
-        <label className={clsx(ui.label, "mt-3 block")}>
-          Type
-          <select
-            className={clsx(ui.input, "mt-1.5 appearance-auto")}
-            value={kit.font}
-            onChange={(e) => builder.change({ font: e.target.value as BrandKit["font"] })}
-          >
-            {FONTS.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <fieldset className="mt-3">
+          <legend className={ui.label}>Type</legend>
+          {/* Each choice set in its own faces, so it is picked by eye (15 Nov 2026, Martin: more font styles). */}
+          <div className="mt-1.5 grid grid-cols-2 gap-2">
+            {FONTS.map((f) => {
+              const on = kit.font === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  aria-pressed={on}
+                  title={`${f.blurb} ${f.pdf}`}
+                  onClick={() => builder.change({ font: f.id })}
+                  className={clsx(
+                    "rounded-lg border px-3 py-2 text-left transition-colors",
+                    on ? "border-ink bg-surface ring-1 ring-ink" : "border-line bg-surface hover:border-line-strong",
+                  )}
+                >
+                  <span className="block text-[22px] leading-none text-ink" style={{ fontFamily: f.heading }}>
+                    Aa
+                  </span>
+                  <span className="mt-1.5 block text-[12.5px] font-medium text-ink" style={{ fontFamily: f.heading }}>
+                    {f.name}
+                  </span>
+                  <span className="block text-[11px] leading-snug text-muted" style={{ fontFamily: f.body }}>
+                    Your new system
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
       </div>
 
       {custom ? (

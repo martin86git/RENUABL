@@ -180,9 +180,12 @@ describe("a business's branding", () => {
   it("turns a theme into the site's own colour tokens, and never lets an unreadable accent through", () => {
     const vars = themeVars({ palette: "paper", primary: "#0f4c81", accent: "#c2410c" });
     expect(vars).toMatchObject({ "--canvas": "#f6f6f4", "--primary": "#0f4c81", "--primary-ink": "#ffffff", "--accent": "#c2410c" });
-    // Every colour is six hex digits; the one thing that isn't a colour is the headings' face, which is one of two fixed values.
-    for (const [name, value] of Object.entries(vars)) if (name !== "--proposal-heading") expect(value).toMatch(/^#[0-9a-f]{6}$/);
-    expect(vars["--proposal-heading"]).toBe("inherit");
+    // Every colour is six hex digits; the faces are fixed values from the font list.
+    for (const [name, value] of Object.entries(vars)) if (!name.startsWith("--proposal-")) expect(value).toMatch(/^#[0-9a-f]{6}$/);
+    expect(vars["--proposal-heading"]).toMatch(/^var\(--font-inter\)/);
+    expect(themeVars({ palette: "paper", primary: "#0f4c81", accent: "#c2410c", font: "classic" })["--proposal-body"]).toMatch(
+      /^var\(--font-lora\)/,
+    );
     expect(themeVars({ palette: "paper", primary: "#0f4c81", accent: "#c2410c", font: "editorial" })["--proposal-heading"]).toMatch(
       /^var\(--font-serif\)/,
     );

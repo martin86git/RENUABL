@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-15",
+    area: "Proposals",
+    words: "In the builder, drag a block's picture to move it and drag its corners to make it bigger or smaller.",
+  },
+  {
+    day: "2026-11-15",
+    area: "Proposals",
+    words: "Five more type styles for proposals: Classic, Elegant, Geometric, Friendly and Technical, each shown in its own face.",
+  },
+  {
+    day: "2026-11-15",
     area: "Today",
     words: "The strip across the top is one row of tiles: each part with its count and a line under it, the one in view marked in orange.",
   },
