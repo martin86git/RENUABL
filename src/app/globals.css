@@ -207,6 +207,38 @@
 .studio-frame .studio-pad {
   --canvas: #f0f0f2;
 }
+/* The pad's top edge, kept in place as the page scrolls under the lowered menu (15 Nov 2026, Martin): a band of the
+   page's ground with the pad's own grey rounded into it, sticking where the pad's top rests. Today's strip sits a little
+   lower, so its band reaches down to it. The cover behind the menu then stops at the pad's top (.pad-under). */
+.pad-cap {
+  display: none;
+}
+@media (min-width: 64rem) {
+  .studio-frame .pad-cap {
+    display: block;
+    position: sticky;
+    top: calc(var(--studio-head, 8rem) - 20px);
+    z-index: 15;
+    height: var(--pad-cap, 20px);
+    margin: -2.5rem -1.5rem calc(2.5rem - var(--pad-cap, 20px));
+    background: #fafafa;
+    pointer-events: none;
+  }
+  .studio-frame .pad-cap > div {
+    height: 100%;
+    border-radius: 28px 28px 0 0;
+    background: var(--canvas);
+  }
+  .studio-frame .studio-pad:has([data-today-strip]) {
+    --pad-cap: 68px;
+  }
+  .studio-frame .studio-pad:has(> [data-rails-out]) .pad-cap {
+    display: none;
+  }
+  .studio-frame:not(:has([data-rails-out])) .pad-under {
+    height: 36px !important;
+  }
+}
 /* Today's ground is a little deeper (14 Nov 2026, Martin: everything on Today was too close in colour for a card
    to come forward; the first try, #e3e3e8, was too harsh, so this is half way): two surfaces only, the ground and
    white. Lines and quiet type are darkened with it so they still read on the deeper grey. */

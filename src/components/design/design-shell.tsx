@@ -298,7 +298,7 @@ function Shell({
   // ground, so the page never shows through around it (14 Nov 2026, Martin).
   const [underBar, setUnderBar] = useState(false);
   useEffect(() => {
-    const look = () => setUnderBar(window.scrollY > MENU_DROP_PX - 20);
+    const look = () => setUnderBar(window.scrollY > 0);
     look();
     window.addEventListener("scroll", look, { passive: true });
     return () => window.removeEventListener("scroll", look);
@@ -659,7 +659,7 @@ function Shell({
         {!tool && (
           <div
             aria-hidden
-            className={clsx("pointer-events-none absolute inset-x-0 top-full -z-10 bg-canvas/90 backdrop-blur", !underBar && "hidden")}
+            className={clsx("pad-under pointer-events-none absolute inset-x-0 top-full -z-10 bg-canvas", !underBar && "hidden")}
             style={{ height: MENU_DROP_PX + 48 }}
           />
         )}
@@ -691,6 +691,11 @@ function Shell({
       ) : (
         <div className="px-3 pb-20 pt-2 sm:px-6 lg:px-14 lg:pt-9">
           <div data-tour="pad" data-sol-page className={PAD}>
+            {/* The pad's top edge stays put while the page scrolls under it (15 Nov 2026, Martin: the top of the grey pad
+                disappeared): its own grey with its rounded corners, drawn on a wide screen only (globals.css .pad-cap). */}
+            <div aria-hidden className="pad-cap">
+              <div />
+            </div>
             {/* Inside the Marketplace, its own menu at the top of the pad, from its blue home, once it is open; until then
                 the launch page's demo carries it. */}
             {sectionPages && <div className="studio-pages -mt-2 mb-5 hidden lg:block">{sectionPages}</div>}

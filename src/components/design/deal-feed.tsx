@@ -807,7 +807,7 @@ function TodayStrip(props: {
   right: React.ReactNode;
 }) {
   return (
-    <div className="sticky top-2 z-20 -mx-1 px-1 pb-1 pt-1 lg:top-[calc(var(--studio-head,4.5rem)+2.75rem)]">
+    <div data-today-strip className="sticky top-2 z-20 -mx-1 px-1 pb-1 pt-1 lg:top-[calc(var(--studio-head,4.5rem)+2.75rem)]">
       {/* One instrument (15 Nov 2026, Martin: the strip didn't look designed): equal tiles, each a label, a figure and a
           line under it, parted by hairlines; the part in view marked by a short orange line along its foot. */}
       <nav aria-label="Today at a glance" className={clsx(STRIP_BOX, "items-stretch")}>
@@ -1670,7 +1670,7 @@ function DealsPanel(props: {
   return (
     <aside
       aria-label="Deals"
-      className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+2.75rem)] lg:mt-1 lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-4.25rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
+      className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+3rem)] lg:mt-1 lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-11rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
     >
       {/* Its own strip, level with Today's and the same height (15 Nov 2026, Martin). */}
       <div className={clsx(STRIP_BOX, "items-center justify-between gap-3 px-5")}>
