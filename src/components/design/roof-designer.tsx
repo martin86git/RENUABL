@@ -74,6 +74,7 @@ import {
   TriangleAlert,
   WandSparkles,
   Sparkles,
+  LoaderCircle,
   FileText,
   Layers,
   SunMedium,
@@ -1313,9 +1314,7 @@ export function RoofDesigner(props: {
     open(new URLSearchParams(window.location.search).get("side"), false);
     const hear = (e: MessageEvent) => {
       if (e.origin !== window.location.origin || e.source !== window.parent) return;
-      const asked = (e.data as { renuablDesign?: { side?: unknown; save?: unknown; record?: unknown } } | null)?.renuablDesign;
-      // The Record round in the grey beside the pop-up (design-drawer.tsx) opens the walkthrough recorder.
-      if (asked?.record === true) setRecordOpen(true);
+      const asked = (e.data as { renuablDesign?: { side?: unknown; save?: unknown } } | null)?.renuablDesign;
       // The window round it asks for a save before it shows the proposal (design-drawer.tsx, `saveThen`).
       if (asked?.save === true) window.dispatchEvent(new Event("renuabl:design-save"));
       open(asked?.side, true);
@@ -8393,10 +8392,24 @@ export function RoofDesigner(props: {
                               ...(res.ok ? {} : { missing }),
                             });
                           }}
-                          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-surface px-2.5 py-1.5 font-medium text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted"
+                          aria-busy={findingSheet}
+                          className={clsx(
+                            "relative mt-2 flex w-full items-center justify-center gap-1.5 overflow-hidden rounded-md bg-surface px-2.5 py-1.5 font-medium text-ink ring-1 hover:bg-surface-2",
+                            findingSheet ? "ring-sun-line/60" : "ring-line",
+                          )}
                         >
-                          <Sparkles className="size-3.5 text-sun-ink" aria-hidden />
+                          {/* While it looks, a spinner and a light sweeping along the foot, so it plainly isn't stuck (Martin). */}
+                          {findingSheet ? (
+                            <LoaderCircle className="size-3.5 shrink-0 animate-spin text-sun-line motion-reduce:animate-none" aria-hidden />
+                          ) : (
+                            <Sparkles className="size-3.5 shrink-0 text-sun-ink" aria-hidden />
+                          )}
                           {findingSheet ? "Looking for its datasheet… (up to a minute or two)" : "Find its datasheet online"}
+                          {findingSheet && (
+                            <span aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden">
+                              <span className="sheet-sweep absolute inset-y-0 w-1/3 rounded-full bg-sun-line" />
+                            </span>
+                          )}
                         </button>
                       )}
                     </p>
@@ -9528,8 +9541,7 @@ export function RoofDesigner(props: {
                     aria-label="Record a walkthrough of this design for the customer"
                     className={clsx(
                       "pointer-events-auto absolute bottom-0 flex items-center gap-2 rounded-full bg-surface pl-3 pr-4 text-[14px] font-medium text-ink shadow-[0_12px_32px_rgba(11,11,12,0.25)] ring-1 ring-line transition hover:-translate-y-0.5 motion-reduce:transition-none",
-                      // In the pop-up on a wide screen it floats in the grey beside the window instead (design-drawer.tsx).
-                      props.tight ? "left-[calc(50%+6.75rem)] h-14 xl:hidden" : "left-[calc(50%+9rem)] h-12",
+                      props.tight ? "left-[calc(50%+6.75rem)] h-14" : "left-[calc(50%+9rem)] h-12",
                     )}
                   >
                     <span className="relative flex size-3">

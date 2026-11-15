@@ -924,3 +924,24 @@ html.team-resizing * {
 html.team-resizing .team-pop {
   transition: none;
 }
+
+/* A light sweeping along the foot of a button while something is being looked for (the datasheet finder). */
+@keyframes sheet-sweep {
+  from {
+    left: -33%;
+  }
+  to {
+    left: 100%;
+  }
+}
+.sheet-sweep {
+  animation: sheet-sweep 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-sweep {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
