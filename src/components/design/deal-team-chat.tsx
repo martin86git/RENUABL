@@ -289,7 +289,8 @@ export function DealTeamChat(props: {
 
 function Line({ line: l, pad, customer, onReply }: { line: DealLine; pad?: boolean; customer?: string; onReply?: () => void }) {
   const sol = l.by === SOL_WRITER;
-  // The customer's own words, come in by text: theirs, outlined, never Sol's colours.
+  // The customer's own words, come in by text: theirs, in the signal orange with white words (15 Nov 2026, Martin:
+  // "make customer texts appear in orange"), filled so no edge can be cut off by the list's scroll.
   const theirs = l.by === CUSTOMER_WRITER;
   // A text one of the team sent the customer: on the right in graphite, as a phone shows the sender's own.
   const sent = l.kind === "text" && !theirs;
@@ -303,7 +304,7 @@ function Line({ line: l, pad, customer, onReply }: { line: DealLine; pad?: boole
           sol
             ? "bg-sun ring-1 ring-sun-line/25"
             : theirs
-              ? "bg-surface ring-1 ring-ink/25"
+              ? "bg-sun-line text-white"
               : sent
                 ? "bg-primary text-primary-ink"
                 : "bg-surface-2",
@@ -312,20 +313,30 @@ function Line({ line: l, pad, customer, onReply }: { line: DealLine; pad?: boole
         <p className="flex items-baseline gap-1.5">
           {sol && <SolIcon className="size-3.5 shrink-0 self-center text-sun-ink" />}
           {(theirs || sent) && <MessageSquare className="size-3.5 shrink-0 self-center opacity-70" aria-hidden />}
-          <span className={clsx("font-semibold", sol ? "text-sun-ink" : sent ? "text-primary-ink" : "text-ink")}>
+          <span className={clsx("font-semibold", sol ? "text-sun-ink" : sent ? "text-primary-ink" : theirs ? "text-white" : "text-ink")}>
             {writerName(l.by, customer)}
           </span>
           {l.kind === "note" && <span className="text-[11px] text-sun-ink/80">note</span>}
-          {theirs && <span className="text-[11px] text-muted">customer · by text</span>}
+          {theirs && <span className="text-[11px] text-white/85">customer · by text</span>}
           {sent && <span className="text-[11px] opacity-75">texted {writerName(CUSTOMER_WRITER, customer)}</span>}
-          <span className={clsx("ml-auto shrink-0 pl-3 text-[11px]", sent ? "opacity-75" : "text-muted")}>{agoWords(l.at)}</span>
+          <span className={clsx("ml-auto shrink-0 pl-3 text-[11px]", sent ? "opacity-75" : theirs ? "text-white/85" : "text-muted")}>
+            {agoWords(l.at)}
+          </span>
         </p>
-        <p className={clsx("whitespace-pre-wrap break-words", sent ? "text-primary-ink" : "text-ink", pad && "line-clamp-3")}>{l.text}</p>
+        <p
+          className={clsx(
+            "whitespace-pre-wrap break-words",
+            sent ? "text-primary-ink" : theirs ? "font-medium text-white" : "text-ink",
+            pad && "line-clamp-3",
+          )}
+        >
+          {l.text}
+        </p>
         {onReply && !pad && (
           <button
             type="button"
             onClick={onReply}
-            className="mt-1 text-[12px] font-medium text-ink-2 underline-offset-2 hover:text-ink hover:underline"
+            className="mt-1 text-[12px] font-medium text-white underline underline-offset-2 hover:no-underline"
           >
             Reply by text
           </button>
