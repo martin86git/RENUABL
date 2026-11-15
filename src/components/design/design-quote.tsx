@@ -41,6 +41,8 @@ const label = "text-[10px] font-medium uppercase tracking-[0.14em] text-muted";
  * under it, and is marked so, with the way back to the worked-out figure.
  */
 export function DesignQuote(props: {
+  /** Roof, storeys and phase already answered elsewhere (Sol's guide), so the home box doesn't ask to be checked. */
+  homeSettled?: boolean;
   /** Which of the roof's designs this is: "Design 2". */
   design: string;
   /** Flicking between the roof's designs from the quote (8 Nov 2026, Martin): the one before, and the next. */
@@ -215,6 +217,7 @@ export function DesignQuote(props: {
     <div className="mt-2.5">
       <HomeToggles
         form={form}
+        settled={props.homeSettled}
         onPick={(name, value) => props.onChange({ form: { ...form, [name]: value } as QuoteFields["form"], edits })}
       />
     </div>
@@ -690,8 +693,14 @@ export function DesignQuote(props: {
  * The three things about the home that change the price (roof, storeys, phase), each a choice between its options:
  * one tap each. Easy to pass over, so the pad asks to be checked, and settles once one has been set on this visit.
  */
-export function HomeToggles(props: { form: QuoteFields["form"]; onPick: (name: "roof" | "storeys" | "phase", value: string) => void }) {
-  const [checked, setChecked] = useState(false);
+export function HomeToggles(props: {
+  form: QuoteFields["form"];
+  onPick: (name: "roof" | "storeys" | "phase", value: string) => void;
+  /** Already answered (Sol's guide asked roof, storeys and phase first): nothing to check again (15 Nov 2026, Martin). */
+  settled?: boolean;
+}) {
+  const [picked, setChecked] = useState(false);
+  const checked = picked || Boolean(props.settled);
   const pick = (name: "roof" | "storeys" | "phase", value: string) => {
     setChecked(true);
     props.onPick(name, value);

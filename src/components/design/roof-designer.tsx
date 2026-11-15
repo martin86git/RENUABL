@@ -10133,6 +10133,7 @@ export function RoofDesigner(props: {
               <section className="rounded-lg border border-line bg-surface p-3" aria-label="This home">
                 <HomeToggles
                   form={quoteNow.form}
+                  settled={guideAnswered.includes("home")}
                   onPick={(name, value) => setQuote({ ...quoteNow, form: { ...quoteNow.form, [name]: value } as QuoteFields["form"] })}
                 />
                 {!props.sitesOnly && (
@@ -10207,6 +10208,7 @@ export function RoofDesigner(props: {
             </div>
             <div className={clsx(shown !== "quote" && "hidden")}>
               <DesignQuote
+                homeSettled={guideAnswered.includes("home")}
                 design={`Design ${active + 1} of ${designs.length}${active === primary ? " (primary)" : ""}`}
                 onDesign={designs.length > 1 ? (step) => show(everyDesign(), (active + step + designs.length) % designs.length) : undefined}
                 spec={spec}
