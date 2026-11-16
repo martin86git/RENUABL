@@ -219,8 +219,8 @@ export function SolGuide(props: {
               ) : (
                 <Choice
                   options={[
-                    ["bill", "Their bill"],
-                    ["size", "A system size"],
+                    ["bill", "Nominate bill amount"],
+                    ["size", "Set system size"],
                   ]}
                   value={mode}
                   onPick={(v) => {
