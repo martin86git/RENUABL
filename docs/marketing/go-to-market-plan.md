@@ -68,7 +68,7 @@ Draw a roof and it's priced as you draw. Send a branded proposal your customer c
 
 Sol, RENUABL's built-in AI, works inside your deals. He tells you who to ring next, drafts the follow-up in your voice and answers questions on solar and the standards, with his sources. He never sends anything himself: you check, you send.
 
-It's $99 a user a month, and your first month is $29 a user. Prices include GST. Cancel any time.
+It's $49 a user a month, and your first month is free. Prices include GST. Cancel any time.
 
 **Button:** See RENUABL Business → https://www.renuabl.com.au/business
 
@@ -97,9 +97,9 @@ Button: See RENUABL Business → https://www.renuabl.com.au/business
 
 **4 · after 5 more working days**
 Subject: One price for {company}
-Preview: $99 a user a month, first month $29. Cancel any time.
+Preview: $49 a user a month, first month free. Cancel any time.
 Heading: One price. Everything in it.
-Hi {firstName}, every feature for every user: the designer, CRM, proposals, after the sale, service and Sol. $99 a user a month, or $69 a user a month on the 12-month plan. Your first month is $29 a user. Prices include GST, and you can cancel any time.
+Hi {firstName}, every feature for every user: the designer, CRM, proposals, after the sale, service and Sol. $49 a user a month, or $39 a user a month on the 12-month plan. Your first month is free. Prices include GST, and you can cancel any time.
 Button: Sign up → https://www.renuabl.com.au/business#pricing
 
 ---

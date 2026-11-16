@@ -6,7 +6,7 @@
  * discount), no rival named, no best, first, leading or guaranteed, only {firstName} and {company}. Added to RENUABL's
  * own business by one press (`/api/design/marketing/gtm`); never sent or switched on by it.
  */
-import { COMMIT_MONTHS, COMMIT_SEAT_CENTS, FIRST_MONTH_CENTS, SEAT_MONTHLY_CENTS, dollars } from "@/lib/domain/design/plans";
+import { COMMIT_MONTHS, COMMIT_SEAT_CENTS, SEAT_MONTHLY_CENTS, dollars, firstMonthWords } from "@/lib/domain/design/plans";
 import type { EdmBlock, EdmContent } from "./edm";
 import type { SequenceDraft, SequenceStep } from "./sequences";
 
@@ -14,7 +14,7 @@ const SITE = "https://www.renuabl.com.au/business";
 const DEMO = "https://www.renuabl.com.au/business/demo";
 const PRICING = `${SITE}#pricing`;
 
-const PRICE_LINE = `It's ${dollars(SEAT_MONTHLY_CENTS)} a user a month, and your first month is ${dollars(FIRST_MONTH_CENTS)} a user. Prices include GST. Cancel any time.`;
+const PRICE_LINE = `It's ${dollars(SEAT_MONTHLY_CENTS)} a user a month, and your first month is ${firstMonthWords}. Prices include GST. Cancel any time.`;
 
 function email(key: string, subject: string, preview: string, heading: string, words: string[], button: [string, string]): EdmContent {
   const block = (n: number, b: Omit<EdmBlock, "id" | "imageId">): EdmBlock => ({ id: `gtm${key}${n}`, imageId: null, ...b });
@@ -94,11 +94,11 @@ const NURTURE: { wait: number; content: EdmContent }[] = [
     content: email(
       "d",
       "One price for {company}",
-      `${dollars(SEAT_MONTHLY_CENTS)} a user a month, first month ${dollars(FIRST_MONTH_CENTS)}. Cancel any time.`,
+      `${dollars(SEAT_MONTHLY_CENTS)} a user a month, first month ${firstMonthWords}. Cancel any time.`,
       "One price. Everything in it.",
       [
         "Every feature for every user: the designer, CRM, proposals, after the sale, service and Sol.",
-        `${dollars(SEAT_MONTHLY_CENTS)} a user a month, or ${dollars(COMMIT_SEAT_CENTS)} a user a month on the ${COMMIT_MONTHS}-month plan. Your first month is ${dollars(FIRST_MONTH_CENTS)} a user. Prices include GST, and you can cancel any time.`,
+        `${dollars(SEAT_MONTHLY_CENTS)} a user a month, or ${dollars(COMMIT_SEAT_CENTS)} a user a month on the ${COMMIT_MONTHS}-month plan. Your first month is ${firstMonthWords}. Prices include GST, and you can cancel any time.`,
       ],
       ["Sign up", PRICING],
     ),

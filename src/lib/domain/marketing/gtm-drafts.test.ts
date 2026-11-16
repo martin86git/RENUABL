@@ -26,9 +26,10 @@ describe("the go-to-market drafts", () => {
   it("link only to renuabl.com.au/business, and price as the page does", () => {
     for (const c of GTM_EMAILS) for (const b of c.blocks) if (b.url) expect(b.url).toMatch(/^https:\/\/www\.renuabl\.com\.au\/business/);
     const words = GTM_EMAILS.map(allText).join(" ");
-    expect(words).toContain("$99 a user a month");
-    expect(words).toContain("$69 a user a month");
-    expect(words).toContain("$29 a user");
+    expect(words).toContain("$49 a user a month");
+    expect(words).toContain("$39 a user a month");
+    expect(words).toContain("first month is free");
+    expect(words).not.toContain("$0");
   });
 
   it("is a valid sequence of four emails, started by opening the launch, ended by signing up", () => {
