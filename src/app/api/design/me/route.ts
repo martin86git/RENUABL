@@ -29,7 +29,7 @@ export async function GET() {
       access.email.toLowerCase() === process.env.RENUABL_CRM_EMAIL?.trim().toLowerCase();
     const plan = exempt ? null : await subscriptionOf(member.businessId).catch(() => undefined);
     const planDue = !exempt && plan !== undefined && needsPlan(cleanKind(member.businessKind), member.role, plan?.status ?? null);
-    // Marketing (domain/marketing/access.ts): only where it is switched on for the business, RENUABL's own for now.
+    // Marketing (domain/marketing/access.ts): a retailer's add-on (add-ons.ts), RENUABL's own business always.
     const marketing = member ? await marketingOn(member.businessId).catch(() => false) : false;
     return Response.json({
       signedIn: true,

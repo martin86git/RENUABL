@@ -208,7 +208,7 @@ function Shell({
   const kind: BusinessKind = cleanKind(account?.signedIn ? account.business?.kind : undefined);
   const retail = on && kind === "retailer";
   // Marketing beside Customers only where the business has it (domain/marketing/access.ts).
-  const sections = withMarketing(KIND_SECTIONS[kind], Boolean(account?.signedIn && account.marketing));
+  const sections = withMarketing(KIND_SECTIONS[kind], Boolean(account?.signedIn && account.business));
   // How many of the customers' messages nobody has seen, the service cases to put right, and this member's unread mentions.
   const unread = useUnreadMessages(retail);
   const service = useServiceCount(retail);

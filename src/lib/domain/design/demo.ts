@@ -129,6 +129,8 @@ const BLOCKED: readonly RegExp[] = [
   /^\/api\/design\/sol-agents$/,
   // Asking RENUABL for a phone number for an agent.
   /^\/api\/design\/agents$/,
+  // Add-ons to the plan, and a phone number bought (domain/design/add-ons.ts).
+  /^\/api\/design\/addons(\/|$)/,
   /^\/api\/design\/inbox$/,
   // Marketing email to a business's contacts (domain/marketing).
   /^\/api\/design\/marketing(\/|$)/,

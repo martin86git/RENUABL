@@ -46,6 +46,10 @@ export async function gstTaxRate(stripe: Stripe): Promise<string> {
   return rate.id;
 }
 
+/** The plan's own item (its users): never an add-on's item (design-addons.ts), whatever order Stripe lists them in. */
+export const seatItem = (sub: Pick<Stripe.Subscription, "items">): Stripe.SubscriptionItem | undefined =>
+  sub.items.data.find((i) => !i.metadata?.addon) ?? sub.items.data[0];
+
 /** At the foot of every invoice RENUABL's Stripe account sends a business. */
 export const INVOICE_FOOTER = `Tax invoice. ${RENUABL_BUSINESS.name} trading as ${RENUABL_BUSINESS.tradingAs}, ABN ${shownAbn(RENUABL_BUSINESS.abn)}. All prices include GST.`;
 
@@ -94,7 +98,7 @@ export async function createSolCheckout(
  */
 export async function setSeats(stripe: Stripe, subscriptionId: string, seats: number): Promise<boolean> {
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
-  const item = sub.items.data[0];
+  const item = seatItem(sub);
   const want = Math.max(1, seats);
   if (!item || item.quantity === want || ["canceled", "incomplete_expired"].includes(sub.status)) return false;
   await stripe.subscriptions.update(subscriptionId, {
@@ -279,7 +283,7 @@ export async function commitToTwelveMonths(
   today: string,
 ): Promise<TermChange | "not-monthly" | "ended" | "running"> {
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
-  const item = sub.items.data[0];
+  const item = seatItem(sub);
   if (!item || ["canceled", "incomplete_expired"].includes(sub.status)) return "ended";
   // A 12-month plan still running stays as it is: choosing it again would start its months afresh and wipe what leaving
   // early costs (3 Nov 2026, a bug review).
@@ -301,7 +305,7 @@ export async function commitToTwelveMonths(
 /** The 12-month plan over: back to $59 a user a month, month to month. Nothing happens to one already month to month. */
 export async function endTwelveMonths(stripe: Stripe, subscriptionId: string): Promise<boolean> {
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
-  const item = sub.items.data[0];
+  const item = seatItem(sub);
   if (!item || termOf(sub).term !== "commit" || ["canceled", "incomplete_expired"].includes(sub.status)) return false;
   const product = typeof item.price.product === "string" ? item.price.product : item.price.product.id;
   await stripe.subscriptions.update(subscriptionId, {
@@ -321,7 +325,7 @@ export async function cancelPlan(stripe: Stripe, subscriptionId: string, today: 
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
   // Already cancelled (a second press, a retry): nothing more is charged or changed.
   if (sub.cancel_at_period_end || ["canceled", "incomplete_expired"].includes(sub.status)) return { chargedCents: 0 };
-  const item = sub.items.data[0];
+  const item = seatItem(sub);
   const term = termOf(sub);
   let chargedCents = 0;
   if (term.term === "commit" && term.from && commitRunning(term.until, today)) {

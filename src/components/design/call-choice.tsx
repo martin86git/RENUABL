@@ -9,6 +9,8 @@ import { askAssistantToBook, askAssistantToCall, askByEmailFirst, useCallerInfo 
 import type { CallerKey } from "@/lib/domain/install-call";
 import { watchAssistantCall } from "@/lib/services/assistant-call";
 import { callFromComputer, useComputerCall, useComputerCallsOn } from "@/lib/services/computer-call";
+import { VOICE_STANDING_WORDS } from "@/lib/domain/design/add-ons";
+import { useAddOns } from "@/lib/services/addons";
 import { CallerAvatar } from "./settings-caller";
 
 const ROW = "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-surface-2";
@@ -48,6 +50,10 @@ export function CallChoices(props: {
   const dial = props.phone.replace(/s/g, "");
   const who = props.name || "them";
   const canHand = callsOn && Boolean(dial);
+  // Why calls are off (add-ons.ts): most often the voice add-on not on the plan yet, or no number of its own.
+  const [addOns] = useAddOns();
+  const callsOffWords =
+    addOns && addOns.voice !== "on" ? VOICE_STANDING_WORDS[addOns.voice] : "Calls aren't switched on for your business yet";
 
   const handOver = async (agent: CallerKey = "sales") => {
     setSending(true);
@@ -97,7 +103,7 @@ export function CallChoices(props: {
             <span className="block text-[15px] font-semibold">Have {admin.name} book the install</span>
             <span className={clsx("block text-xs", canHand ? "text-muted group-hover:text-white/70" : "text-muted")}>
               {!callsOn
-                ? "Calls aren't switched on for your business yet"
+                ? callsOffWords
                 : !dial
                   ? "There's no mobile on this customer's record"
                   : booking
@@ -149,7 +155,7 @@ export function CallChoices(props: {
             <span className="block text-[15px] font-semibold">Hand it to {caller.name}</span>
             <span className={clsx("block text-xs", canHand ? "text-muted group-hover:text-white/70" : "text-muted")}>
               {!callsOn
-                ? "Calls aren't switched on for your business yet"
+                ? callsOffWords
                 : !dial
                   ? "There's no mobile on this customer's record"
                   : sending

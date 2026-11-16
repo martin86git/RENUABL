@@ -3,6 +3,7 @@ import { addNote, contactIdByEmail, reservationNote, hubspotToken } from "@/lib/
 import { todayInMarket } from "@/lib/domain/market";
 import { creditPack, creditSolPack, recordSubscription, updateSubscription } from "@/lib/server/design-billing-repo";
 import { stripeClient, subscriptionFacts } from "@/lib/server/stripe";
+import { syncAddOnsFromStripe } from "@/lib/server/design-addons";
 import { connectFacts } from "@/lib/server/stripe-billing";
 import { businessOfAccount, updateConnect } from "@/lib/server/design-connect-repo";
 import { recordCardPayment } from "@/lib/server/design-proposal-repo";
@@ -50,6 +51,12 @@ export async function POST(request: Request) {
     if (sub.metadata?.kind === "design-plan") {
       try {
         await updateSubscription(subscriptionFacts(sub));
+        // The plan's add-ons follow its items (design-addons.ts): an add-on item gone, or the plan ended, ends it here.
+        await syncAddOnsFromStripe(
+          sub.id,
+          sub.items.data.map((i) => ({ id: i.id, addon: i.metadata?.addon })),
+          event.type === "customer.subscription.deleted" || ["canceled", "incomplete_expired"].includes(sub.status),
+        );
       } catch (e) {
         console.error("plan update failed", sub.id, e instanceof Error ? e.message : e);
         return new Response("Not saved", { status: 500 });

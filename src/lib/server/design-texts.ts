@@ -1,7 +1,7 @@
 /**
  * Server only. Whether a business may text its customers from RENUABL (13 Nov 2026, Martin: call or text a contact
- * from the phone assistant's window). Only RENUABL's own business for now, as its calls are: the number a text comes
- * from is RENUABL's (`TWILIO_FROM`). Each business's own number comes later.
+ * from the phone assistant's window). Texts go from the business's own number, which comes with the voice add-on
+ * (add-ons.ts, business-numbers.ts); RENUABL's own business texts from RENUABL's number (`TWILIO_FROM`).
  */
 import { normaliseMobile } from "@/lib/domain/contact";
 import {
@@ -18,11 +18,21 @@ import {
 import { dbConfigured, newId, query } from "./db";
 import { customerTextsOnDeal, solPostsOnDeal, tellDealFollowers } from "./design-deal-team-repo";
 import { findCustomerByMobile, renuablCrm } from "./renuabl-crm";
+import { numberOf, businessOfNumber } from "./business-numbers";
+import { hasAddOn } from "./design-addons";
 import { smsConfigured } from "./sms";
 
 export async function textsOnFor(businessId: string): Promise<boolean> {
   if (!smsConfigured() || !dbConfigured()) return false;
-  return (await renuablCrm().catch(() => null))?.businessId === businessId;
+  if ((await renuablCrm().catch(() => null))?.businessId === businessId) return true;
+  const [addOn, number] = await Promise.all([hasAddOn(businessId, "voice").catch(() => false), numberOf(businessId).catch(() => null)]);
+  return addOn && Boolean(number);
+}
+
+/** The number a business's texts go from (its own, or RENUABL's for RENUABL's own business). */
+export async function textFrom(businessId: string): Promise<string | undefined> {
+  const n = await numberOf(businessId).catch(() => null);
+  return n && !n.renuabl ? n.e164 : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,17 +83,17 @@ export async function strayTexts(businessId: string): Promise<StrayText[]> {
 }
 
 /**
- * A text that came in to RENUABL's number (the only one texts go from for now): kept on the deal of the customer whose
+ * A text that came in to a business's number (`to`: its own, else RENUABL's): kept on the deal of the customer whose
  * mobile it is (their newest deal not lost, else their newest), put in that deal's team chat as their own words so it shows under Deals
  * in the chat window for whoever looks after it, and written on the deal's record. STOP stops texts to them; START
  * lets them be texted again. From a number on no customer's record it is kept apart.
  */
-export async function receiveText(from: string, body: string): Promise<"kept" | "stray" | "ignored"> {
+export async function receiveText(from: string, body: string, to?: string): Promise<"kept" | "stray" | "ignored"> {
   const mobile = normaliseMobile(from);
   const text = cleanInbound(body);
-  const crm = await renuablCrm().catch(() => null);
-  if (!mobile || !text || !crm) return "ignored";
-  const businessId = crm.businessId;
+  // The business whose number it came in to; with no number given, RENUABL's own.
+  const businessId = to ? await businessOfNumber({ e164: to }).catch(() => null) : (await renuablCrm().catch(() => null))?.businessId;
+  if (!mobile || !text || !businessId) return "ignored";
   const customerId = await findCustomerByMobile(businessId, mobile);
   const jobs = customerId
     ? await query<{ id: string }>(

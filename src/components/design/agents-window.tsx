@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { ArrowLeft, Check, ChevronRight, CircleAlert, MessagesSquare, Phone, Plus, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, CircleAlert, MessagesSquare, Plus, X } from "lucide-react";
 import {
   AGENT_COPY,
   AGENT_WORDS,
@@ -13,26 +13,17 @@ import {
   agentStanding,
   kindsToAdd,
   needsNewNumber,
-  numberPriceWords,
   type AgentKind,
   type AgentNeed,
 } from "@/lib/domain/design/agents";
 import { CALLER_VOICES, type CallerVoice } from "@/lib/domain/design/caller";
 import { INSTRUCTIONS_MAX, instructionLines } from "@/lib/domain/design/coaching";
 import type { CallerKey } from "@/lib/domain/install-call";
-import {
-  addAgent,
-  askForNumber,
-  closeAgents,
-  loadAgents,
-  openAgents,
-  useAgentsOpen,
-  type AgentLine,
-  type AgentsState,
-} from "@/lib/services/agents";
+import { addAgent, closeAgents, loadAgents, openAgents, useAgentsOpen, type AgentLine, type AgentsState } from "@/lib/services/agents";
 import { callerFor, useCallerInfo, type CallerInfo } from "@/lib/services/caller";
 import { openCoach } from "@/lib/services/coaching";
 import { openColleague } from "@/lib/services/colleague";
+import { AddOnOffer } from "./add-on-offer";
 import { CallerAvatar } from "./settings-caller";
 
 /**
@@ -230,9 +221,9 @@ function AgentCard({ agent, state, info, onOpen }: { agent: AgentLine; state: Ag
           aria-hidden
         />
       </button>
-      {short && state.mayChange && (
+      {short && (
         <div className="border-t border-line px-3 py-2">
-          <NumberAsk kind={agent.kind} state={state} />
+          <AddOnOffer addOn="voice" compact />
         </div>
       )}
     </li>
@@ -263,41 +254,6 @@ function Needs({ needs, staff }: { needs: AgentNeed[]; staff: boolean }) {
   );
 }
 
-/** Asking RENUABL for the number an agent is short of. */
-function NumberAsk({ kind, state }: { kind: AgentKind; state: AgentsState }) {
-  const [busy, setBusy] = useState(false);
-  const [said, setSaid] = useState<{ ok: boolean; words: string } | null>(null);
-  const send = async () => {
-    setBusy(true);
-    const r = await askForNumber(kind);
-    setBusy(false);
-    setSaid({ ok: r.ok, words: r.message });
-  };
-  if (said?.ok) return <p className="text-xs text-positive">{said.words}</p>;
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <button
-        type="button"
-        onClick={() => void send()}
-        disabled={busy}
-        className="text-xs font-semibold text-ink underline disabled:text-muted"
-      >
-        {busy ? "Asking…" : AGENT_COPY.ask}
-      </button>
-      {said && <span className="text-xs text-danger">{said.words}</span>}
-      {state.staff && (
-        <span className="font-mono text-[11px] text-ink-2">
-          Staff:{" "}
-          {agentNeeds(kind, state.status)
-            .filter((n) => n.needsNumber)
-            .map((n) => NEED_SETTINGS[n.key])
-            .join("; ")}
-        </span>
-      )}
-    </div>
-  );
-}
-
 const EXAMPLES: Record<AgentKind, string> = {
   sales:
     "Say you're calling from our Rowville office.\nIf they ask about batteries, mention we install them ourselves.\nKeep calls under five minutes.",
@@ -316,7 +272,6 @@ function AddForm({ kinds, state, onMade }: { kinds: AgentKind[]; state: AgentsSt
   const [name, setName] = useState("");
   const [instructions, setInstructions] = useState("");
   const [voice, setVoice] = useState("");
-  const [askToo, setAskToo] = useState(true);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const lines = instructionLines(instructions).length;
@@ -336,7 +291,6 @@ function AddForm({ kinds, state, onMade }: { kinds: AgentKind[]; state: AgentsSt
       setBusy(false);
       return setFailed(made.message);
     }
-    if (number && askToo) await askForNumber(kind);
     setBusy(false);
     onMade(kind, key);
   };
@@ -423,23 +377,7 @@ function AddForm({ kinds, state, onMade }: { kinds: AgentKind[]; state: AgentsSt
       )}
 
       {number ? (
-        <div className="rounded-xl bg-sun p-3 ring-1 ring-sun-line/30">
-          <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
-            <Phone className="size-4 text-sun-line" aria-hidden />
-            {AGENT_COPY.numberHead}
-          </p>
-          <p className="mt-1 text-xs text-ink-2">{AGENT_COPY.numberWhy}</p>
-          <p className="mt-1 text-xs font-medium text-ink">{numberPriceWords()}</p>
-          <label className="mt-2 flex items-center gap-2 text-xs font-medium text-ink">
-            <input
-              type="checkbox"
-              checked={askToo}
-              onChange={(e) => setAskToo(e.target.checked)}
-              className="size-4 accent-[var(--sun-line)]"
-            />
-            {AGENT_COPY.ask} when I add it
-          </label>
-        </div>
+        <AddOnOffer addOn="voice" compact />
       ) : (
         <div className="px-1">
           <Needs needs={agentNeeds(kind, state.status)} staff={state.staff} />

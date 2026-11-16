@@ -1,22 +1,23 @@
 /**
- * Server only. Whether a business has Marketing (domain/marketing/access.ts: only RENUABL's own business for now), and
+ * Server only. Whether a business has Marketing (a retailer's paid add-on, domain/design/add-ons.ts; RENUABL's own
+ * business always), and
  * who its emails say they are from (its brand kit: name, ABN, email, phone, address).
  */
+import { marketingUsable } from "@/lib/domain/design/add-ons";
 import { cleanKind } from "@/lib/domain/design/business-kind";
-import { MARKETING_FOR_EVERY_RETAILER } from "@/lib/domain/marketing/access";
 import type { EdmSender } from "@/lib/domain/marketing/edm";
 import { dbConfigured, query } from "./db";
+import { standingOf } from "./design-addons";
 import { loadBrand } from "./design-proposal-repo";
 import { renuablCrm } from "./renuabl-crm";
 
 export async function marketingOn(businessId: string): Promise<boolean> {
   if (!dbConfigured()) return false;
-  if (MARKETING_FOR_EVERY_RETAILER) {
-    const rows = await query<{ kind: string | null }>(`select kind from businesses where id = $1`, [businessId]);
-    return cleanKind(rows[0]?.kind ?? undefined) === "retailer";
-  }
-  const own = await renuablCrm().catch(() => null);
-  return own?.businessId === businessId;
+  const [rows, standing] = await Promise.all([
+    query<{ kind: string | null }>(`select kind from businesses where id = $1`, [businessId]),
+    standingOf(businessId, "marketing"),
+  ]);
+  return marketingUsable({ retailer: cleanKind(rows[0]?.kind ?? undefined) === "retailer", standing });
 }
 
 /** Whether this is RENUABL's own business (its contacts signing up to RENUABL Business also count as becoming customers). */

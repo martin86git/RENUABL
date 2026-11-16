@@ -4,7 +4,7 @@
  * the customer's record, never one sent from a browser); Twilio brings the ticket back with the member's identity
  * (`takeTicket`, once, within TICKET_SECONDS); how it ended and its recording follow (`callEnded`, `callRecorded`), and
  * the call is written on the deal, with Sol's write-up of both sides when Twilio's transcripts are on (`writeUp`).
- * Only RENUABL's own business for now: the number rung from is RENUABL's (`mayCallFromBrowser`).
+ * The number rung from is the business's own (voice add-on), RENUABL's for RENUABL's own business (`mayCallFromBrowser`).
  */
 import {
   MIN_WRITE_UP_WORDS,
@@ -26,6 +26,8 @@ import { readWithClaude } from "./claude-reader";
 import { dbConfigured, newId, query, transaction } from "./db";
 import { record } from "./design-crm-repo";
 import { loadBrand } from "./design-proposal-repo";
+import { numberOf } from "./business-numbers";
+import { hasAddOn } from "./design-addons";
 import { renuablCrm } from "./renuabl-crm";
 import { withSolCredit } from "./sol-credits";
 import { browserCallSettings, startTranscript, transcriptSentences, type BrowserCallSettings } from "./twilio-voice";
@@ -46,10 +48,21 @@ export interface BrowserCallRow {
   transcript_sid: string | null;
 }
 
-/** Whether this business's members may call from the computer: set up, and (for now) RENUABL's own business. */
+/**
+ * Whether this business's members may call from the computer: set up, and a number to ring from (business-numbers.ts):
+ * RENUABL's for RENUABL's own business, else the business's own, which comes with the voice add-on.
+ */
 export async function mayCallFromBrowser(businessId: string): Promise<boolean> {
   if (!browserCallSettings() || !dbConfigured()) return false;
-  return (await renuablCrm().catch(() => null))?.businessId === businessId;
+  if ((await renuablCrm().catch(() => null))?.businessId === businessId) return true;
+  const [addOn, number] = await Promise.all([hasAddOn(businessId, "voice").catch(() => false), numberOf(businessId).catch(() => null)]);
+  return addOn && Boolean(number);
+}
+
+/** The number a business's calls from the computer show: its own, else the site's (RENUABL's). */
+export async function callerIdFor(businessId: string, fallback: string): Promise<string> {
+  const n = await numberOf(businessId).catch(() => null);
+  return n && !n.renuabl ? n.e164 : fallback;
 }
 
 /** A ticket for one call to this deal's customer, or why there can't be one. */

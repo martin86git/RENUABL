@@ -6,8 +6,8 @@
  * Off unless VOICE_CALLS_ENABLED=true and VAPI_API_KEY, VAPI_PHONE_NUMBER_ID (a number imported into Vapi, e.g.
  * RENUABL's Twilio number), VAPI_WEBHOOK_SECRET (20+ characters, our own) and SITE_URL are set. Optional: VAPI_MODEL
  * (default claude-sonnet-5), VAPI_VOICE_PROVIDER + VAPI_VOICE_ID, VOICE_TRANSFER_NUMBER (put through to a person).
- * For now only RENUABL's own deals are called (`voiceOnFor`: the business behind RENUABL_CRM_EMAIL); other
- * businesses come later.
+ * A business's deals are called once it has the voice add-on and a number of its own (`voiceOnFor`, add-ons.ts,
+ * business-numbers.ts); RENUABL's own business (RENUABL_CRM_EMAIL) on RENUABL's number, always.
  *
  * One row a run of calls on a deal (`voice_calls`). Calls start only in calling hours: outside them Vapi is asked to
  * call at the next window (`schedulePlan`), so no cron is needed; unanswered calls are tried again the same way. Every
@@ -75,6 +75,9 @@ import { testCallWords } from "@/lib/domain/design/caller";
 import { callerOf, coachingOf } from "./design-caller-repo";
 import { pencilledLine, PENCILLED_WORDS, readInstallDay, cleanCallerKey, roleOfMode, type CallerKey } from "@/lib/domain/install-call";
 import { installDaysFor, pencilInstall } from "./design-install-call";
+import { voiceStanding, type VoiceStanding } from "@/lib/domain/design/add-ons";
+import { businessOfNumber, numberOf } from "./business-numbers";
+import { hasAddOn } from "./design-addons";
 import { addHomeLead, findCustomerByMobile, type HomeLead, renuablCrm } from "./renuabl-crm";
 import { sendSms, smsConfigured } from "./sms";
 
@@ -124,11 +127,27 @@ export function voiceStatus(env: Record<string, string | undefined> = process.en
   };
 }
 
-/** Whether this business's deals may be called: calling set up, and (for now) RENUABL's own business only. */
+/**
+ * Whether this business's calls are on, and if not why (add-ons.ts): calling set up, and RENUABL's own business (on
+ * RENUABL's number) or a business with the voice add-on and a number of its own in Vapi (business-numbers.ts).
+ */
+export async function voiceStandingFor(businessId: string): Promise<VoiceStanding> {
+  const settings = Boolean(voiceSettings()) && dbConfigured();
+  if (!settings) return "not-set-up";
+  const own = (await renuablCrm().catch(() => null))?.businessId === businessId;
+  if (own) return "on";
+  const [addOn, number] = await Promise.all([hasAddOn(businessId, "voice").catch(() => false), numberOf(businessId).catch(() => null)]);
+  return voiceStanding({ settings, own, addOn, number: Boolean(number?.vapiId) });
+}
+
+/** Whether this business's deals may be called now. */
 export async function voiceOnFor(businessId: string): Promise<boolean> {
-  if (!voiceSettings() || !dbConfigured()) return false;
-  const own = await renuablCrm().catch(() => null);
-  return own?.businessId === businessId;
+  return (await voiceStandingFor(businessId)) === "on";
+}
+
+/** The Vapi number a business's calls go from: its own, or RENUABL's for RENUABL's own business. Null: none. */
+async function callFromId(businessId: string): Promise<string | null> {
+  return (await numberOf(businessId).catch(() => null))?.vapiId ?? null;
 }
 
 export interface VoiceRow {
@@ -319,10 +338,15 @@ async function placeCall(s: VoiceSettings, row: VoiceRow, window: { from: Date; 
     await finish(row.id, "stopped", { stop_reason: "no calling hours in the next fortnight" });
     return false;
   }
+  const from = await callFromId(row.business_id);
+  if (!from) {
+    await finish(row.id, "stopped", { stop_reason: "the business has no phone number" });
+    return false;
+  }
   const { brief, voice } = await briefFor(row);
   const scheduled = window.from.getTime() > Date.now() + 60_000;
   const body = {
-    phoneNumberId: s.phoneNumberId,
+    phoneNumberId: from,
     customer: { number: row.mobile, ...(row.first_name ? { name: row.first_name } : {}) },
     name: `RENUABL deal ${row.id}`,
     assistant: assistantConfig({
@@ -580,7 +604,12 @@ export async function handleToolCall(
   if (name === VOICE_TOOLS.link) {
     const { brief, token } = await briefFor(row);
     if (!token) return "There's no proposal out for them right now. Offer a call back from the team.";
-    const sent = await sendSms(row.mobile, proposalLinkSms({ business: brief.business, link: `${site}/p/${token}` }));
+    const n = await numberOf(row.business_id).catch(() => null);
+    const sent = await sendSms(
+      row.mobile,
+      proposalLinkSms({ business: brief.business, link: `${site}/p/${token}` }),
+      n && !n.renuabl ? n.e164 : undefined,
+    );
     if (sent !== "sent")
       return "The text couldn't be sent just now. Tell them the link is in the email the proposal came with, and offer a call back.";
     await said(row, "link-sent");
@@ -704,22 +733,24 @@ export async function listVoiceCalls(limit = 50): Promise<VoiceCallListing[]> {
 export type InboundAnswer = { assistant: unknown };
 
 /**
- * Someone rang the number (Vapi's "assistant-request"): find who they are on RENUABL's own deals by their number (the
+ * Someone rang a number (Vapi's "assistant-request"): the business whose number it is, then who they are on its deals (the
  * open run of calls on it, else their latest deal still going, else a new lead made from the number), keep the call
  * on that deal and answer with the business's assistant, told they rang in. When calling is off, the number isn't
- * ours, it's withheld, or anything fails, a short message says we can't take the call. Only RENUABL's own number for
- * now: each business's own number comes later.
+ * any business's, it's withheld, or anything fails, a short message says we can't take the call.
  */
 export async function answerInbound(e: VapiEvent): Promise<InboundAnswer> {
   const s = voiceSettings();
-  const crm = await renuablCrm().catch(() => null);
-  const closed = (): InboundAnswer => ({ assistant: closedAssistant({ business: crm?.name ?? "", model: s?.model ?? "claude-sonnet-5" }) });
-  if (!s || !crm || !dbConfigured()) return closed();
-  if (e.phoneNumberId && e.phoneNumberId !== s.phoneNumberId) return closed();
+  // Whose number was rung: a business's own (business-numbers.ts), else RENUABL's.
+  const businessId = s && dbConfigured() ? await businessOfNumber({ vapiId: e.phoneNumberId ?? s.phoneNumberId }).catch(() => null) : null;
+  const named = businessId ? await query<{ name: string }>(`select name from businesses where id = $1`, [businessId]).catch(() => []) : [];
+  const closed = (): InboundAnswer => ({
+    assistant: closedAssistant({ business: named[0]?.name ?? "", model: s?.model ?? "claude-sonnet-5" }),
+  });
+  if (!s || !businessId || !(await voiceOnFor(businessId).catch(() => false))) return closed();
   const mobile = normaliseMobile(e.number ?? "");
   if (!mobile || !e.callId) return closed();
   try {
-    const row = await inboundRow(s, crm.businessId, mobile, e.callId);
+    const row = await inboundRow(s, businessId, mobile, e.callId);
     if (!row) return closed();
     const { brief, voice } = await briefFor(row);
     const today = todayInMarket();
@@ -776,11 +807,14 @@ async function inboundRow(s: VoiceSettings, businessId: string, mobile: string, 
     jobId = jobs[0]?.id ?? null;
   }
   if (!jobId) {
-    const deal = await addHomeLead({
-      mobile,
-      source: "Rang our number",
-      details: { "How they came": `They rang ${mobile.replace(/^\+61/, "0")} into our number and ${caller.name} answered.` },
-    });
+    const deal = await addHomeLead(
+      {
+        mobile,
+        source: "Rang our number",
+        details: { "How they came": `They rang ${mobile.replace(/^\+61/, "0")} into our number and ${caller.name} answered.` },
+      },
+      businessId,
+    );
     if (!deal) return null;
     jobId = deal.jobId;
     customerId = deal.customerId;
@@ -826,6 +860,8 @@ export async function ringToHearVoice(
   if (!s || !(await voiceOnFor(businessId).catch(() => false))) return "off";
   const m = normaliseMobile(mobile ?? "");
   if (!m) return "no-number";
+  const from = await callFromId(businessId);
+  if (!from) return "off";
   try {
     const caller = await callerOf(businessId, role);
     const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [businessId]);
@@ -835,7 +871,7 @@ export async function ringToHearVoice(
       method: "POST",
       headers: { authorization: `Bearer ${s.key}`, "content-type": "application/json" },
       body: JSON.stringify({
-        phoneNumberId: s.phoneNumberId,
+        phoneNumberId: from,
         customer: { number: m },
         name: "Voice test",
         assistant: {

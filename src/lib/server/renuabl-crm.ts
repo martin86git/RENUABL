@@ -73,10 +73,11 @@ export async function findCustomerByMobile(businessId: string, mobile: string): 
 /**
  * A homeowner lead into RENUABL's CRM: the customer found by email, else by mobile (never overwritten), else made;
  * then a new deal at "lead" with the note. Null when RENUABL's CRM isn't set up or the lead couldn't be kept (logged:
- * the lead page carries on).
+ * the lead page carries on). With `businessId`, into that business's CRM instead (someone ringing a business's own
+ * number, voice-calls.ts).
  */
-export async function addHomeLead(lead: HomeLead): Promise<HomeDeal | null> {
-  const crm = await renuablCrm().catch(() => null);
+export async function addHomeLead(lead: HomeLead, businessId?: string): Promise<HomeDeal | null> {
+  const crm = businessId ? { businessId } : await renuablCrm().catch(() => null);
   if (!crm) return null;
   const mobile = lead.mobile ? normaliseMobile(lead.mobile) : null;
   const email = lead.email?.trim().toLowerCase() || null;

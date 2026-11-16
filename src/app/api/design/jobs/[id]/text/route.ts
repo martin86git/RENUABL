@@ -4,7 +4,7 @@ import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-c
 import { addActivity, jobById } from "@/lib/server/design-crm-repo";
 import { TEXTS_COPY, signedText, textSignOff } from "@/lib/domain/design/texts";
 import { memberTextsOnDeal } from "@/lib/server/design-deal-team-repo";
-import { keepText, textsOnDeal, textsOnFor, textsStopped } from "@/lib/server/design-texts";
+import { keepText, textFrom, textsOnDeal, textsOnFor, textsStopped } from "@/lib/server/design-texts";
 import { allow } from "@/lib/server/rate-limit";
 import { sendSms } from "@/lib/server/sms";
 
@@ -58,7 +58,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if (await textsStopped(who.member.businessId, found.customer.id))
       return Response.json({ ok: false, message: TEXTS_COPY.stopped(name) }, { status: 409 });
     const words = signedText(clean.text, textSignOff(who.member.firstName, who.member.businessName));
-    if ((await sendSms(mobile, words)) !== "sent") return Response.json({ ok: false, message: TEXT_WORDS.failed }, { status: 502 });
+    if ((await sendSms(mobile, words, await textFrom(who.member.businessId))) !== "sent")
+      return Response.json({ ok: false, message: TEXT_WORDS.failed }, { status: 502 });
     await keepText(who.member.businessId, {
       jobId: id,
       customerId: found.customer.id,

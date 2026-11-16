@@ -1,5 +1,5 @@
 import { dialTwiml, sayTwiml } from "@/lib/domain/browser-call";
-import { takeTicket } from "@/lib/server/browser-calls";
+import { callerIdFor, takeTicket } from "@/lib/server/browser-calls";
 import { browserCallSettings, fromTwilio } from "@/lib/server/twilio-voice";
 
 const twiml = (body: string) => new Response(body, { headers: { "content-type": "text/xml; charset=utf-8" } });
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const at = (path: string) => `${s.site}/api/voice/twilio/${path}?call=${row.id}`;
   return twiml(
     dialTwiml({
-      callerId: s.callerId,
+      callerId: await callerIdFor(row.business_id, s.callerId),
       number: row.number,
       actionUrl: at("done"),
       noticeUrl: s.record ? at("notice") : null,

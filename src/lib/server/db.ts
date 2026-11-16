@@ -475,6 +475,28 @@ create table if not exists design_addons (
   ended_at timestamptz,
   primary key (business_id, add_on)
 );
+-- Add-ons (domain/design/add-ons.ts): asked for while unpriced, else on; the Stripe subscription item that charges it.
+alter table design_addons add column if not exists status text not null default 'on';
+alter table design_addons add column if not exists stripe_item text;
+alter table design_addons add column if not exists by_email text;
+alter table design_addons add column if not exists requested_at timestamptz;
+-- Each business's own phone number for its voice agents and texts (server/business-numbers.ts): bought on Twilio,
+-- imported into Vapi; one live number a business, released when the voice add-on ends.
+create table if not exists design_phone_numbers (
+  business_id text not null references businesses(id) on delete cascade,
+  id text not null,
+  e164 text not null,
+  twilio_sid text,
+  vapi_id text,
+  status text not null default 'live',
+  bought_by text,
+  bought_at timestamptz not null default now(),
+  released_at timestamptz,
+  primary key (business_id, id)
+);
+create unique index if not exists design_phone_numbers_live on design_phone_numbers (business_id) where status = 'live';
+create unique index if not exists design_phone_numbers_e164 on design_phone_numbers (e164) where status = 'live';
+create index if not exists design_phone_numbers_vapi on design_phone_numbers (vapi_id) where status = 'live';
 -- Each walkthrough's own private link (/w/<token>), what a text to the customer carries.
 alter table design_walkthroughs add column if not exists share_token text unique;
 -- The private link to a job's pickup slip (domain/design/pickup-slip.ts): what the installer shows at the wholesaler's

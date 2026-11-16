@@ -6,11 +6,13 @@
  * set yet (`CUSTOM_PROPOSALS_MONTHLY_CENTS`), and until it is, and while billing isn't enforced, nothing is held back.
  */
 
-/** The add-on's price a month for the whole business, including GST. Null until Martin sets it. */
-export const CUSTOM_PROPOSALS_MONTHLY_CENTS: number | null = null;
+import { ADD_ON_MONTHLY_CENTS } from "./add-ons";
+
+/** The add-on's price a month for the whole business, including GST (add-ons.ts). Null until Martin sets it. */
+export const CUSTOM_PROPOSALS_MONTHLY_CENTS: number | null = ADD_ON_MONTHLY_CENTS["custom-proposals"];
 
 /** The add-on's key where a business's add-ons are kept. */
-export const CUSTOM_PROPOSALS = "custom-proposals";
+export const CUSTOM_PROPOSALS = "custom-proposals" as const;
 
 /** The add-on in words, for the builder. */
 export function customPriceWords(cents: number | null = CUSTOM_PROPOSALS_MONTHLY_CENTS): string {

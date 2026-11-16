@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
 import { MARKETING_OFF } from "@/lib/domain/marketing/access";
+import { AddOnOffer } from "../add-on-offer";
 import { useDesignAccount } from "../design-account";
 
 const TABS = [
@@ -40,11 +41,17 @@ export function MarketingNav() {
   );
 }
 
-/** Every Marketing page: the tabs and the page, or, for a business without Marketing, one plain line (the routes refuse too). */
+/** Every Marketing page: the tabs and the page, or, for a business without the add-on, the add-on offered (the routes refuse too). */
 export function MarketingFrame({ children }: { children: ReactNode }) {
   const [account] = useDesignAccount();
   if (!account) return null;
-  if (!account.signedIn || !account.marketing) return <p className="px-1 py-10 text-center text-[14px] text-muted">{MARKETING_OFF}</p>;
+  if (!account.signedIn) return <p className="px-1 py-10 text-center text-[14px] text-muted">{MARKETING_OFF}</p>;
+  if (!account.marketing)
+    return (
+      <div className="mx-auto max-w-2xl px-1 py-8">
+        <AddOnOffer addOn="marketing" />
+      </div>
+    );
   return (
     <div className="px-1 pb-10">
       <MarketingNav />

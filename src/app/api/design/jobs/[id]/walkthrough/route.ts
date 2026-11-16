@@ -11,7 +11,7 @@ import {
   walkthroughPrefix,
 } from "@/lib/domain/design/walkthrough";
 import { siteUrl } from "@/lib/domain/sms";
-import { textsOnFor } from "@/lib/server/design-texts";
+import { textFrom, textsOnFor } from "@/lib/server/design-texts";
 import { sendSms } from "@/lib/server/sms";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
@@ -119,7 +119,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       const link = `${site.replace(/\/$/, "")}${WATCH_PATH}${token}`;
       const clean = cleanText(words.trim() ? textWithLink(words, link) : link);
       if (!clean.ok) return Response.json({ ok: false, message: clean.message }, { status: 422 });
-      if ((await sendSms(mobile, clean.text)) !== "sent") return Response.json({ ok: false, message: TEXT_WORDS.failed }, { status: 502 });
+      if ((await sendSms(mobile, clean.text, await textFrom(who.member.businessId))) !== "sent")
+        return Response.json({ ok: false, message: TEXT_WORDS.failed }, { status: 502 });
       await addActivity(
         who.member.businessId,
         found.customer.id,

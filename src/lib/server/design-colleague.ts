@@ -3,7 +3,7 @@
  * member's PIN for the team line, calls in the browser and on the team line, and the read-only tools it answers.
  * Tenant rule as everywhere: business id first. Who a call is for comes only from the signed-in member (a call in the
  * browser) or from their profile mobile and a PIN they said (the team line); nothing from a browser or a caller decides it.
- * For now only RENUABL's own business has it, as with the phone assistant (`voiceOnFor`).
+ * A business has it with the voice add-on (add-ons.ts); RENUABL's own business always.
  */
 import { createHash } from "node:crypto";
 import { canvasFacts } from "@/lib/domain/design/canvas";
@@ -34,6 +34,7 @@ import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-r
 import { hashPassword, passwordMatches } from "./design-passwords";
 import { memberByEmail, type Member } from "./design-repo";
 import { casesToResolve } from "./design-service-repo";
+import { hasAddOn } from "./design-addons";
 import { renuablCrm } from "./renuabl-crm";
 import { voiceSettings } from "./voice-calls";
 
@@ -98,12 +99,14 @@ export async function setColleague(businessId: string, s: ColleagueSettings, by:
 export async function colleagueReady(businessId: string): Promise<{ on: boolean; web: boolean; teamNumber: string | null }> {
   const s = voiceSettings();
   const crm = await renuablCrm().catch(() => null);
-  const on = Boolean(s && crm && crm.businessId === businessId);
+  const own = Boolean(crm && crm.businessId === businessId);
+  // With the voice add-on (add-ons.ts) any business has it; the team line is RENUABL's own number, so only RENUABL's.
+  const on = Boolean(s) && (own || (await hasAddOn(businessId, "voice").catch(() => false)));
   const teamNumber = (process.env.TEAM_LINE_NUMBER ?? "").replace(/[^\d+]/g, "") || null;
   return {
     on,
     web: on && Boolean(process.env.VAPI_PUBLIC_KEY?.trim()),
-    teamNumber: on && process.env.VAPI_TEAM_PHONE_NUMBER_ID?.trim() ? teamNumber : null,
+    teamNumber: on && own && process.env.VAPI_TEAM_PHONE_NUMBER_ID?.trim() ? teamNumber : null,
   };
 }
 

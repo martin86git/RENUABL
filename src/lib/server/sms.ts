@@ -18,7 +18,8 @@ export function smsConfigured() {
   return Boolean(process.env.TWILIO_ACCOUNT_SID?.trim() && process.env.TWILIO_AUTH_TOKEN?.trim() && smsFrom());
 }
 
-export async function sendSms(to: string, body: string): Promise<"sent" | "skipped" | "failed"> {
+/** `from`: a business's own number (business-numbers.ts) in place of RENUABL's. */
+export async function sendSms(to: string, body: string, from?: string): Promise<"sent" | "skipped" | "failed"> {
   const mobile = normaliseMobile(to);
   if (!mobile) return "skipped";
   if (!smsConfigured()) {
@@ -31,7 +32,7 @@ export async function sendSms(to: string, body: string): Promise<"sent" | "skipp
     const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`, {
       method: "POST",
       headers: { authorization: `Basic ${auth}`, "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ To: mobile, From: smsFrom(), Body: body }),
+      body: new URLSearchParams({ To: mobile, From: from || smsFrom(), Body: body }),
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {

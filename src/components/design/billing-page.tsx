@@ -26,6 +26,8 @@ import {
   saveBillingDetails,
   type BillingState,
 } from "@/lib/services/billing";
+import { ADD_ON_KEYS } from "@/lib/domain/design/add-ons";
+import { AddOnOffer } from "./add-on-offer";
 import { ui } from "./design-shell";
 import type { BillingPart } from "@/lib/domain/design/business-kind";
 
@@ -178,6 +180,18 @@ export function BillingPanel() {
             </div>
           )}
           {plan && <p className="text-xs leading-relaxed text-muted">{SEAT_NOTE}</p>}
+        </section>
+      )}
+
+      {/* Add-ons to the plan (domain/design/add-ons.ts): a retailer's only, each with Add to your plan or how it stands. */}
+      {has("plan") && (
+        <section className="space-y-3" aria-labelledby="add-ons">
+          <h2 id="add-ons" className="px-1 text-base font-semibold text-ink">
+            Add-ons
+          </h2>
+          {ADD_ON_KEYS.map((key) => (
+            <AddOnOffer key={key} addOn={key} manage />
+          ))}
         </section>
       )}
 

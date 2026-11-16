@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-16",
+    area: "Billing",
+    words: "Voice agents and marketing email are add-ons. Add them to your plan in Settings → Billing, or where each one lives.",
+  },
+  {
+    day: "2026-11-16",
+    area: "Calls",
+    words: "With voice agents on your plan, your agents call and text from a business number of your own.",
+  },
+  {
+    day: "2026-11-16",
     area: "Designer",
     words: "The address sits under the map: search another there, or Create deal to put the design on a new customer's deal.",
   },

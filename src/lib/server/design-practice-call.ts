@@ -11,6 +11,7 @@ import { PRACTICE_SECONDS, PRACTICE_STALE_MINUTES, practiceBlock, practiceBrief 
 import { assistantConfig } from "@/lib/domain/voice-agent";
 import { cleanCallerKey, type CallerKey } from "@/lib/domain/install-call";
 import { newId, query } from "./db";
+import { numberOf } from "./business-numbers";
 import { callerOf, coachingOf } from "./design-caller-repo";
 import { loadBrand } from "./design-proposal-repo";
 import { voiceOnFor, voiceSettings } from "./voice-calls";
@@ -84,7 +85,12 @@ export async function startPracticeCall(
     const res = await fetch(`${VAPI}/call`, {
       method: "POST",
       headers: { authorization: `Bearer ${s.key}`, "content-type": "application/json" },
-      body: JSON.stringify({ phoneNumberId: s.phoneNumberId, customer: { number: mobile }, name: "Practice call", assistant }),
+      body: JSON.stringify({
+        phoneNumberId: (await numberOf(member.businessId))?.vapiId ?? s.phoneNumberId,
+        customer: { number: mobile },
+        name: "Practice call",
+        assistant,
+      }),
       signal: AbortSignal.timeout(15_000),
     });
     const json = (await res.json().catch(() => ({}))) as { id?: unknown; message?: unknown; monitor?: { controlUrl?: unknown } };

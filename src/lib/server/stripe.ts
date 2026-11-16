@@ -10,7 +10,7 @@ import {
   type BillingInterval,
   type TokenPack,
 } from "@/lib/domain/design/plans";
-import { INVOICE_FOOTER, gstTaxRate, packInvoice, portalWithoutCancel, termOf } from "./stripe-billing";
+import { INVOICE_FOOTER, gstTaxRate, packInvoice, portalWithoutCancel, seatItem, termOf } from "./stripe-billing";
 
 /** The API version and beta flag Stripe's embedded checkout form needs. */
 export const STRIPE_API_VERSION = "2026-03-25.dahlia; custom_checkout_payment_form_preview=v1";
@@ -192,7 +192,7 @@ export async function billingPortalUrl(stripe: Stripe, customer: string, origin:
 
 /** What we keep of a subscription Stripe sends: its status, seats, interval, trial and period end, and its term. */
 export function subscriptionFacts(sub: Stripe.Subscription) {
-  const item = sub.items.data[0];
+  const item = seatItem(sub);
   const interval: BillingInterval = item?.price?.recurring?.interval === "year" ? "year" : "month";
   const term = termOf(sub);
   return {

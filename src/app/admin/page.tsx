@@ -28,6 +28,9 @@ import { solCostsThisMonth } from "@/lib/server/design-billing-repo";
 import { todayInMarket } from "@/lib/domain/market";
 import { listVoiceCalls } from "@/lib/server/voice-calls";
 import { OUTCOME_WORDS, type CallOutcome } from "@/lib/domain/voice-agent";
+import { ADD_ON_WORDS } from "@/lib/domain/design/add-ons";
+import { addOnsAskedFor, addOnsOnForStaff } from "@/lib/server/design-addons";
+import { AddOnActions, AttachNumber } from "@/components/admin/add-on-actions";
 
 export const metadata = { title: "Partners and jobs" };
 
@@ -52,7 +55,7 @@ export default async function AdminPage() {
   await processOffersSoon();
   // Briefs left partway for a few hours get their "not finished" note when staff look (and from the daily cron).
   await noteUnfinishedBriefs();
-  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls, solCosts] = await Promise.all([
+  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls, solCosts, addOnsAsked, addOnsOn] = await Promise.all([
     listPartners(),
     listAllJobs(),
     listPriceUploads(),
@@ -62,6 +65,8 @@ export default async function AdminPage() {
     listDesignBusinesses(),
     listVoiceCalls().catch(() => []),
     solCostsThisMonth(todayInMarket()).catch(() => []),
+    addOnsAskedFor().catch(() => []),
+    addOnsOnForStaff().catch(() => []),
   ]);
   const kinds = countByKind(businesses);
   const tallies = interestSummary(checks);
@@ -365,6 +370,39 @@ export default async function AdminPage() {
                   </span>
                 </span>
                 <Badge tone={b.kind === "retailer" ? "info" : "neutral"}>{kindLabel(b.kind)}</Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      {/* Add-ons (domain/design/add-ons.ts): asked for while unpriced, switched on here once the price is agreed. */}
+      <Panel className="mt-6" title={`Add-ons · ${addOnsAsked.length} asked for`}>
+        {addOnsAsked.length === 0 && addOnsOn.length === 0 ? (
+          <p className="px-5 py-4 text-[14px] text-muted">No business has asked for or has an add-on yet.</p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {addOnsAsked.map((a) => (
+              <li key={`${a.businessId}-${a.key}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-[14px]">
+                <span className="min-w-0">
+                  <span className="font-medium text-ink">{a.business}</span> asked for {ADD_ON_WORDS[a.key].name}
+                  <span className="block text-[13px] text-muted">
+                    {a.by ?? "Someone"} · {formatDate(a.at.slice(0, 10))}. Agree the price, then switch it on.
+                  </span>
+                </span>
+                <AddOnActions businessId={a.businessId} addOn={a.key} on={false} />
+              </li>
+            ))}
+            {addOnsOn.map((a) => (
+              <li key={`on-${a.businessId}-${a.key}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-[14px]">
+                <span className="min-w-0">
+                  <span className="font-medium text-ink">{a.business}</span> · {ADD_ON_WORDS[a.key].name} on
+                  {a.charged ? " (charged through Stripe)" : " (switched on by staff)"}
+                </span>
+                <span className="flex flex-wrap items-center gap-2">
+                  {a.key === "voice" && <AttachNumber businessId={a.businessId} />}
+                  <AddOnActions businessId={a.businessId} addOn={a.key} on />
+                </span>
               </li>
             ))}
           </ul>
