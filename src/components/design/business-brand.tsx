@@ -33,9 +33,10 @@ export function BrandEyebrow({ children, dark, className }: { children: React.Re
 
 /**
  * The sun rising from the foot of a dark section: a wide warm glow with the disc's rim over a fine horizon line.
- * Purely drawn, nothing to read; still with reduced motion.
+ * Purely drawn, nothing to read; still with reduced motion. `light` is the softer glow for a white section (the hero,
+ * 17 Nov 2026, Martin: the wordmark suits a white backdrop best).
  */
-export function Sunrise({ className, size = "large" }: { className?: string; size?: "large" | "small" }) {
+export function Sunrise({ className, size = "large", light }: { className?: string; size?: "large" | "small"; light?: boolean }) {
   return (
     <div aria-hidden className={clsx("pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full overflow-hidden", className)}>
       <style>{`
@@ -50,11 +51,12 @@ export function Sunrise({ className, size = "large" }: { className?: string; siz
           width: size === "large" ? "min(150vw, 120rem)" : "min(120vw, 80rem)",
           transform: "translate(-50%, 0)",
           marginBottom: size === "large" ? "-60%" : "-64%",
-          background:
-            "radial-gradient(closest-side, rgba(255,150,70,0.9) 0%, rgba(255,90,31,0.7) 30%, rgba(255,90,31,0.26) 55%, rgba(255,90,31,0.07) 78%, rgba(255,90,31,0) 100%)",
+          background: light
+            ? "radial-gradient(closest-side, rgba(255,170,100,0.5) 0%, rgba(255,90,31,0.28) 30%, rgba(255,90,31,0.1) 55%, rgba(255,90,31,0.03) 78%, rgba(255,90,31,0) 100%)"
+            : "radial-gradient(closest-side, rgba(255,150,70,0.9) 0%, rgba(255,90,31,0.7) 30%, rgba(255,90,31,0.26) 55%, rgba(255,90,31,0.07) 78%, rgba(255,90,31,0) 100%)",
         }}
       />
-      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+      <div className={clsx("absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent to-transparent", light ? "via-ink/15" : "via-white/35")} />
     </div>
   );
 }

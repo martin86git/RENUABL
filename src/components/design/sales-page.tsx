@@ -151,37 +151,37 @@ function useFoldScroll() {
 
 function Header({ signedIn }: { signedIn: boolean }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0b0b0d]/85 text-white backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-5 lg:px-8">
         {/* RENUABL Business: the network's side for retailers and installers (RENUABL Home, for homeowners, is at /). */}
         <Link href="/business" aria-label="RENUABL Business" className="flex items-baseline gap-2">
-          <Wordmark tone="light" />
+          <Wordmark />
           <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-line sm:tracking-[0.2em]">Business</span>
         </Link>
-        <nav className="hidden items-center gap-7 text-[14px] text-white/65 md:flex">
-          <a href="#step-design" className="hover:text-white">
+        <nav className="hidden items-center gap-7 text-[14px] text-ink-2 md:flex">
+          <a href="#step-design" className="hover:text-ink">
             Designer
           </a>
-          <a href="#sol" className="hover:text-white">
+          <a href="#sol" className="hover:text-ink">
             Sol
           </a>
-          <a href="#network" className="hover:text-white">
+          <a href="#network" className="hover:text-ink">
             Marketplace
           </a>
-          <a href="#journey" className="hover:text-white">
+          <a href="#journey" className="hover:text-ink">
             How it works
           </a>
-          <a href="#pricing" className="hover:text-white">
+          <a href="#pricing" className="hover:text-ink">
             Pricing
           </a>
         </nav>
         <div className="flex items-center gap-3">
           {signedIn ? (
-            <Link href="/design" className="whitespace-nowrap text-[14px] font-medium text-white hover:text-sun-line">
+            <Link href="/design" className="whitespace-nowrap text-[14px] font-medium text-ink hover:text-sun-line">
               Open RENUABL
             </Link>
           ) : (
-            <Link href="/design/sign-in" className="whitespace-nowrap text-[14px] text-white/65 hover:text-white">
+            <Link href="/design/sign-in" className="whitespace-nowrap text-[14px] text-ink-2 hover:text-ink">
               Sign in
             </Link>
           )}
@@ -338,11 +338,11 @@ function Hero({ signedIn }: { signedIn: boolean }) {
   return (
     <section
       id="start"
-      className="relative isolate overflow-hidden bg-[#0b0b0d] text-white snap-start lg:h-[calc(100dvh-4rem)] lg:min-h-[44rem]"
+      className="relative isolate overflow-hidden snap-start lg:h-[calc(100dvh-4rem)] lg:min-h-[44rem]"
       aria-labelledby="hero"
     >
-      {/* The brand's sun rising behind the hero (16 Nov 2026, Martin: the page needed a brand feel, as xAI's and OpenAI's). */}
-      <Sunrise />
+      {/* The brand's sun rising behind the hero (16 Nov 2026, Martin: the page needed a brand feel, as xAI's and OpenAI's), on white (17 Nov 2026, Martin: the wordmark suits a white backdrop best). */}
+      <Sunrise light />
       {/*
         The words on the left and the film on the right, as large as the fold allows (16 Nov 2026, Martin: "i prefer when
         solar just got a brain was on the left and the video on the right", and the film bigger). On a large screen the
@@ -350,7 +350,7 @@ function Hero({ signedIn }: { signedIn: boolean }) {
       */}
       <div className="mx-auto grid w-full max-w-[100rem] gap-10 px-5 pb-16 pt-12 lg:h-full lg:grid-cols-[minmax(18rem,28rem)_minmax(0,1fr)] lg:items-center lg:gap-16 lg:px-12 lg:pb-8 lg:pt-8">
         <div className="text-center lg:text-left">
-          <BrandEyebrow dark className="mb-6">
+          <BrandEyebrow className="mb-6">
             {SALES_HERO.introducing}
           </BrandEyebrow>
           <h1 id="hero" className="text-[clamp(44px,4.6vw,76px)] font-semibold leading-[0.95] tracking-[-0.045em]">
@@ -360,7 +360,7 @@ function Hero({ signedIn }: { signedIn: boolean }) {
               </span>
             ))}
           </h1>
-          <p className="mx-auto mt-5 max-w-sm text-[18px] leading-relaxed text-white/65 lg:mx-0">{SALES_HERO.sub}</p>
+          <p className="mx-auto mt-5 max-w-sm text-[18px] leading-relaxed text-ink-2 lg:mx-0">{SALES_HERO.sub}</p>
           <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
             <div className="flex flex-col items-center gap-4 sm:flex-row">
               <SignUpLink />
